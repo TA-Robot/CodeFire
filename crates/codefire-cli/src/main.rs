@@ -193,8 +193,17 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         }
         Some("clone") => {
             let options = parse_clone_args(&args[1..])?;
-            clone_branch(&env::current_dir()?, &options)?;
-            println!("cloned {} -> {}", options.source, options.new_branch);
+            let result = clone_branch(&env::current_dir()?, &options)?;
+            if options.json_output {
+                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+            } else if options.dry_run {
+                println!(
+                    "clone dry-run: {} would create {}",
+                    options.source, options.new_branch
+                );
+            } else {
+                println!("cloned {} -> {}", options.source, options.new_branch);
+            }
             Ok(())
         }
         Some("upload") => {
@@ -363,7 +372,17 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         Some("open") => {
             let options = parse_open_args(&args[1..])?;
             let result = open_branch(&options)?;
-            println!("opened {}: {}", result.branch, result.open_dir.display());
+            if options.json_output {
+                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+            } else if options.dry_run {
+                println!(
+                    "open dry-run: {} would open at {}",
+                    result.branch,
+                    result.open_dir.display()
+                );
+            } else {
+                println!("opened {}: {}", result.branch, result.open_dir.display());
+            }
             Ok(())
         }
         Some("branch") => match args.get(1).map(String::as_str) {
@@ -532,12 +551,15 @@ struct InitResult {
 struct OpenOptions {
     branch: String,
     path: PathBuf,
+    dry_run: bool,
+    json_output: bool,
 }
 
 #[derive(Debug)]
 struct OpenResult {
     branch: String,
     open_dir: PathBuf,
+    plan: Value,
 }
 
 #[derive(Debug)]
@@ -590,6 +612,13 @@ struct CommitResult {
 struct CloneOptions {
     source: String,
     new_branch: String,
+    dry_run: bool,
+    json_output: bool,
+}
+
+#[derive(Debug)]
+struct CloneResult {
+    plan: Value,
 }
 
 #[derive(Debug)]
@@ -829,13 +858,30 @@ fn parse_init_args(args: &[String]) -> Result<InitOptions, CliError> {
 }
 
 fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
-    match args {
+    let mut positional = Vec::new();
+    let mut dry_run = false;
+    let mut json_output = false;
+    for value in args {
+        match value.as_str() {
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
+            option if option.starts_with("--") => {
+                return Err(CliError::Usage(format!(
+                    "unsupported open option: {option}"
+                )));
+            }
+            _ => positional.push(value.clone()),
+        }
+    }
+    match positional.as_slice() {
         [branch, path] => Ok(OpenOptions {
             branch: branch.to_string(),
             path: PathBuf::from(path),
+            dry_run,
+            json_output,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs open <branch> <path>".to_string(),
+            "usage: codefire-rs open <branch> <path> [--dry-run] [--json]".to_string(),
         )),
     }
 }
@@ -996,13 +1042,31 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
 }
 
 fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
-    match args {
+    let mut positional = Vec::new();
+    let mut dry_run = false;
+    let mut json_output = false;
+    for value in args {
+        match value.as_str() {
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
+            option if option.starts_with("--") => {
+                return Err(CliError::Usage(format!(
+                    "unsupported clone option: {option}"
+                )));
+            }
+            _ => positional.push(value.clone()),
+        }
+    }
+    match positional.as_slice() {
         [source, new_branch] => Ok(CloneOptions {
             source: source.to_string(),
             new_branch: new_branch.to_string(),
+            dry_run,
+            json_output,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs clone <source-branch> <new-branch>".to_string(),
+            "usage: codefire-rs clone <source-branch> <new-branch> [--dry-run] [--json]"
+                .to_string(),
         )),
     }
 }
@@ -1903,7 +1967,7 @@ fn apply_patch_entry(open_dir: &Path, entry: &Value) -> Result<(), CliError> {
     }
 }
 
-fn clone_branch(start: &Path, options: &CloneOptions) -> Result<(), CliError> {
+fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, CliError> {
     let repo_root = find_repo_root(start)?;
     let _lock = RepoLock::acquire(&repo_root)?;
     if branch_record_path(&repo_root, &options.new_branch).exists() {
@@ -1949,6 +2013,10 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<(), CliError> {
             &repo_root.join(".codefire").join("objects"),
             &source_head,
         )?;
+        let plan = clone_operation_plan(options, &repo_root, &source_head, "cf+http");
+        if options.dry_run {
+            return Ok(CloneResult { plan });
+        }
         let branch = json!({
             "type": "branch",
             "version": 1,
@@ -1959,7 +2027,7 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<(), CliError> {
             "created_at": now_iso_utc(),
         });
         save_branch_record(&repo_root, &branch)?;
-        return Ok(());
+        return Ok(CloneResult { plan });
     }
     if options.source.starts_with("cf://") {
         let remote = parse_cf_url(&options.source)?;
@@ -1967,6 +2035,10 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<(), CliError> {
         let source_head = required_string(&source, &["head"])?;
         let remote_objects = remote_dirs(&remote.project_root).objects;
         codefire_store::validate_sealed_commit(&remote_objects, &source_head)?;
+        let plan = clone_operation_plan(options, &repo_root, &source_head, "cf");
+        if options.dry_run {
+            return Ok(CloneResult { plan });
+        }
         copy_object_graph(
             &remote_objects,
             &repo_root.join(".codefire").join("objects"),
@@ -1982,7 +2054,7 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<(), CliError> {
             "created_at": now_iso_utc(),
         });
         save_branch_record(&repo_root, &branch)?;
-        return Ok(());
+        return Ok(CloneResult { plan });
     }
     let source = load_branch_record(&repo_root, &options.source)?;
     let source_head = required_string(&source, &["head"])?;
@@ -2000,6 +2072,10 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<(), CliError> {
         &repo_root.join(".codefire").join("objects"),
         &source_head,
     )?;
+    let plan = clone_operation_plan(options, &repo_root, &source_head, "local");
+    if options.dry_run {
+        return Ok(CloneResult { plan });
+    }
     let branch = json!({
         "type": "branch",
         "version": 1,
@@ -2010,7 +2086,7 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<(), CliError> {
         "created_at": now_iso_utc(),
     });
     save_branch_record(&repo_root, &branch)?;
-    Ok(())
+    Ok(CloneResult { plan })
 }
 
 fn open_branch(options: &OpenOptions) -> Result<OpenResult, CliError> {
@@ -2040,14 +2116,30 @@ fn open_branch_from(start: &Path, options: &OpenOptions) -> Result<OpenResult, C
             options.branch
         )));
     }
-
-    fs::create_dir_all(&target)?;
-    materialize_commit(&objects, &branch_head, &target)?;
     let opened_at = now_iso_utc();
     let open_instance_id = format!(
         "open_{:012x}",
         stable_hash_48(format!("{}:{}:{opened_at}", options.branch, target.display()).as_bytes())
     );
+    let active_path = cf.join("active").join(&open_instance_id);
+    let plan = open_operation_plan(
+        options,
+        &repo_root,
+        &target,
+        &branch_head,
+        &registry_path,
+        &active_path,
+    );
+    if options.dry_run {
+        return Ok(OpenResult {
+            branch: options.branch.clone(),
+            open_dir: target,
+            plan,
+        });
+    }
+
+    fs::create_dir_all(&target)?;
+    materialize_commit(&objects, &branch_head, &target)?;
     let repo_json = read_json(&cf.join("repo.json"))?;
     let repository_id = required_string(&repo_json, &["repository_id"])?;
     write_json_atomic(
@@ -2059,7 +2151,6 @@ fn open_branch_from(start: &Path, options: &OpenOptions) -> Result<OpenResult, C
             "open": {"open_instance_id": open_instance_id, "opened_path": target, "opened_at": opened_at},
         }),
     )?;
-    let active_path = cf.join("active").join(&open_instance_id);
     write_json_atomic(
         &registry_path,
         &json!({
@@ -2086,6 +2177,67 @@ fn open_branch_from(start: &Path, options: &OpenOptions) -> Result<OpenResult, C
     Ok(OpenResult {
         branch: options.branch.clone(),
         open_dir: target,
+        plan,
+    })
+}
+
+fn open_operation_plan(
+    options: &OpenOptions,
+    repo_root: &Path,
+    target: &Path,
+    branch_head: &str,
+    registry_path: &Path,
+    active_path: &Path,
+) -> Value {
+    json!({
+        "type": "codefire_operation_plan",
+        "version": 1,
+        "command": "open",
+        "dry_run": options.dry_run,
+        "would_apply": !options.dry_run,
+        "branch": &options.branch,
+        "repo": repo_root,
+        "target": target,
+        "base_commit": branch_head,
+        "operations": [
+            {"kind": "materialize_commit", "commit": branch_head, "target": target},
+            {"kind": "write_open_marker", "path": target.join(".codefire-open")},
+            {"kind": "write_open_registry", "path": registry_path},
+            {"kind": "create_active_state", "path": active_path},
+            {"kind": "update_branch_state", "branch": &options.branch, "state": "open-clean"},
+        ],
+        "next_actions": [
+            {"kind": "status", "command": "codefire-rs status --json", "target": {"path": target}},
+        ],
+    })
+}
+
+fn clone_operation_plan(
+    options: &CloneOptions,
+    repo_root: &Path,
+    source_head: &str,
+    source_kind: &str,
+) -> Value {
+    json!({
+        "type": "codefire_operation_plan",
+        "version": 1,
+        "command": "clone",
+        "dry_run": options.dry_run,
+        "would_apply": !options.dry_run,
+        "repo": repo_root,
+        "source": {
+            "value": &options.source,
+            "kind": source_kind,
+            "head": source_head,
+        },
+        "new_branch": &options.new_branch,
+        "operations": [
+            {"kind": "copy_object_graph_if_remote", "commit": source_head},
+            {"kind": "write_branch_record", "branch": &options.new_branch, "head": source_head, "state": "closed"},
+        ],
+        "next_actions": [
+            {"kind": "open", "command": format!("codefire-rs open {} <path>", options.new_branch), "target": {"branch": &options.new_branch}},
+        ],
     })
 }
 

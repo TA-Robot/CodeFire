@@ -47,6 +47,8 @@ fn open_materializes_manifest_and_updates_registry() {
         &OpenOptions {
             branch: "main".to_string(),
             path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -95,6 +97,8 @@ fn clone_branch_creates_closed_branch_and_rejects_burning_source() {
         &CloneOptions {
             source: "main".to_string(),
             new_branch: "feature/session".to_string(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -114,6 +118,8 @@ fn clone_branch_creates_closed_branch_and_rejects_burning_source() {
         &CloneOptions {
             source: "burning".to_string(),
             new_branch: "copy".to_string(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap_err()
@@ -461,6 +467,8 @@ fn context_pack_returns_atom_changed_and_fire_views() {
         &OpenOptions {
             branch: "main".to_string(),
             path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -571,6 +579,79 @@ fn parse_mutating_dry_run_json_args() {
     assert_eq!(extinguish.fire_id, "FIRE-001");
     assert!(extinguish.dry_run);
     assert!(extinguish.json_output);
+
+    let open = parse_open_args(&[
+        "main".to_string(),
+        "/tmp/open".to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(open.branch, "main");
+    assert_eq!(open.path, PathBuf::from("/tmp/open"));
+    assert!(open.dry_run);
+    assert!(open.json_output);
+
+    let clone = parse_clone_args(&[
+        "main".to_string(),
+        "feature".to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(clone.source, "main");
+    assert_eq!(clone.new_branch, "feature");
+    assert!(clone.dry_run);
+    assert!(clone.json_output);
+}
+
+#[test]
+fn open_and_clone_dry_run_return_plans_without_structural_changes() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    let main = load_branch_record(&repo_root, "main").unwrap();
+    let main_head = required_string(&main, &["head"]).unwrap();
+
+    let open_result = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: true,
+            json_output: true,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(open_result.plan["type"], "codefire_operation_plan");
+    assert_eq!(open_result.plan["command"], "open");
+    assert_eq!(open_result.plan["dry_run"], true);
+    assert_eq!(open_result.plan["base_commit"], main_head);
+    assert!(!open_dir.exists());
+    assert!(!opened_registry_path(&repo_root, "main").exists());
+    assert_eq!(
+        load_branch_record(&repo_root, "main").unwrap()["state"],
+        "closed"
+    );
+
+    let clone_result = clone_branch(
+        &repo_root,
+        &CloneOptions {
+            source: "main".to_string(),
+            new_branch: "feature".to_string(),
+            dry_run: true,
+            json_output: true,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(clone_result.plan["type"], "codefire_operation_plan");
+    assert_eq!(clone_result.plan["command"], "clone");
+    assert_eq!(clone_result.plan["dry_run"], true);
+    assert_eq!(clone_result.plan["source"]["head"], main_head);
+    assert!(!branch_record_path(&repo_root, "feature").exists());
 }
 
 #[test]
@@ -584,6 +665,8 @@ fn commit_dry_run_returns_plan_without_updating_branch() {
         &OpenOptions {
             branch: "main".to_string(),
             path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -621,6 +704,8 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
         &OpenOptions {
             branch: "main".to_string(),
             path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -878,6 +963,8 @@ fn patch_export_import_applies_manifest_delta_to_open_directory() {
         &OpenOptions {
             branch: "main".to_string(),
             path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -993,6 +1080,8 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         &CloneOptions {
             source: main_url.clone(),
             new_branch: "main-from-remote".to_string(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -1110,6 +1199,8 @@ fn merge_branch_writes_source_changes_and_marks_target_burning() {
         &OpenOptions {
             branch: "main".to_string(),
             path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -1210,6 +1301,8 @@ fn merge_branch_writes_conflict_markers_for_divergent_changes() {
         &OpenOptions {
             branch: "main".to_string(),
             path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -1311,6 +1404,8 @@ fn merge_dry_run_reports_plan_without_writing_target() {
         &OpenOptions {
             branch: "main".to_string(),
             path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();

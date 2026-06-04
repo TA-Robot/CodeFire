@@ -61,6 +61,7 @@ force-upload
 
 ```bash
 codefire open main ./main
+codefire open main ./main --dry-run --json
 ```
 
 仕様：
@@ -71,6 +72,7 @@ branch headのsealed commitを指定pathに展開する
 target pathは存在しないか空でなければならない
 .codefire-openを生成する
 open registryを更新する
+--dry-runはtarget materialization、open marker、registry、branch stateを書き換えず、codefire_operation_planを返す
 ```
 
 ## 4.4 `close`
@@ -96,6 +98,7 @@ codefire close feature-login --discard
 
 ```bash
 codefire clone main feature-login
+codefire clone main feature-login --dry-run --json
 ```
 
 仕様：
@@ -104,6 +107,7 @@ codefire clone main feature-login
 source branchのsealed headをtarget branchのheadとして設定する
 sourceがopen-burningの場合は拒否する
 target branchはclosed状態で作成される
+--dry-runはbranch recordやremote object graphを書き換えず、codefire_operation_planを返す
 ```
 
 remoteから取得する場合：
