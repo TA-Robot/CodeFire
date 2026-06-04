@@ -28,8 +28,8 @@ codefire commit -m <message>
 
 codefire merge <source-branch> --into <target-branch>
 
-codefire upload <branch> <server-url>
-codefire request-merge <source-url> <target-url>
+codefire upload <branch> <server-url> [--dry-run] [--json]
+codefire request-merge <source-url> <target-url> [--dry-run] [--json]
 
 codefire list <server-url>
 codefire show <branch-or-url>
@@ -266,6 +266,7 @@ semantic conflict candidateは自動解決しない
 ```bash
 codefire upload feature-login cf://server/alice/app/feature-login
 codefire upload feature-login cf+http://127.0.0.1:8080/alice/app/feature-login
+codefire upload feature-login cf://server/alice/app/feature-login --dry-run --json
 ```
 
 仕様：
@@ -275,6 +276,9 @@ sealed branchだけuploadできる
 open-burning branchはupload不可
 server branchが進んでいたら拒否する
 force uploadは存在しない
+--dry-runはlocal branch、sealed commit、remote fast-forward条件を検証し、remote layout、object graph、branch record、generation stateを書き換えない
+--json併用時はcodefire_operation_planを返し、copy_object_graphとwrite_remote_branchの予定をoperationsに含める
+cf+http dry-runはHTTP write requestを送らず、local object graph収集まででoperation planを返す
 ```
 
 ## 4.14 `show` / `diff`
@@ -365,6 +369,14 @@ codefire request-merge \
 codefire request-merge \
   cf+http://127.0.0.1:8080/alice/app/feature-login \
   cf+http://127.0.0.1:8080/org/app/main
+
+codefire request-merge \
+  cf://server/alice/app/feature-login \
+  cf://server/org/app/main \
+  --dry-run --json
+
+codefire request-review cf://server/org/app MR-abc123 --reviewer alice --decision approve --dry-run --json
+codefire request-apply cf://server/org/app MR-abc123 --dry-run --json
 ```
 
 仕様：
@@ -373,4 +385,9 @@ codefire request-merge \
 source sealed commitをtargetに統合してほしいという申請を作る
 source/targetともsealed commitを指す
 不整合状態はmerge request不可
+request-merge --dry-runはsource/target remote branchとsealed commitを検証し、merge request recordを作成しない
+request-review --dry-runはmerge request、stale判定、decision値を検証し、reviews配列とstatusを書き換えない
+request-apply --dry-runはapproved status、stale判定、fast-forward条件、source/target object graphを検証し、target branch、object graph、merge request statusを書き換えない
+cf+http request-* dry-runはHTTP write requestを送らず、transport/URL/operation planだけを返す
+--json併用時は各commandのcodefire_operation_planを返し、write_merge_request、append_review、write_remote_branchなどの予定をoperationsに含める
 ```

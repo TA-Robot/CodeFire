@@ -192,8 +192,12 @@ commit --dry-run --json
 extinguish --dry-run --json
 open --dry-run --json
 clone --dry-run --json
+upload --dry-run --json
 merge --dry-run --json
 patch import --dry-run --json
+request-merge --dry-run --json
+request-review --dry-run --json
+request-apply --dry-run --json
 ```
 
 ## Diagnostics

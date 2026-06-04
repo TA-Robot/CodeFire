@@ -209,10 +209,19 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         Some("upload") => {
             let options = parse_upload_args(&args[1..])?;
             let result = upload_branch(&env::current_dir()?, &options)?;
-            println!(
-                "uploaded {}@{} -> {}",
-                options.branch, result.head, options.remote_url
-            );
+            if options.json_output {
+                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+            } else if options.dry_run {
+                println!(
+                    "upload dry-run: {}@{} would update {}",
+                    options.branch, result.head, options.remote_url
+                );
+            } else {
+                println!(
+                    "uploaded {}@{} -> {}",
+                    options.branch, result.head, options.remote_url
+                );
+            }
             Ok(())
         }
         Some("list") => {
@@ -226,9 +235,18 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         Some("request-merge") => {
             let options = parse_request_merge_args(&args[1..])?;
             let result = request_merge(&options)?;
-            println!("created {}", result.id);
-            println!("source: {}", result.source_head);
-            println!("target: {}", result.target_head);
+            if options.json_output {
+                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+            } else if options.dry_run {
+                println!(
+                    "request-merge dry-run: {} would request {}",
+                    options.source_url, options.target_url
+                );
+            } else {
+                println!("created {}", result.id);
+                println!("source: {}", result.source_head);
+                println!("target: {}", result.target_head);
+            }
             Ok(())
         }
         Some("request-list") => {
@@ -245,17 +263,35 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         Some("request-review") => {
             let options = parse_request_review_args(&args[1..])?;
             let result = review_merge_request(&options)?;
-            println!(
-                "{}d {} by {}",
-                result.decision, options.mr_id, result.reviewer
-            );
+            if options.json_output {
+                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+            } else if options.dry_run {
+                println!(
+                    "request-review dry-run: {} would be {}d by {}",
+                    options.mr_id, result.decision, result.reviewer
+                );
+            } else {
+                println!(
+                    "{}d {} by {}",
+                    result.decision, options.mr_id, result.reviewer
+                );
+            }
             Ok(())
         }
         Some("request-apply") => {
             let options = parse_request_apply_args(&args[1..])?;
             let result = apply_merge_request(&options)?;
-            println!("applied {}", options.mr_id);
-            println!("target: {}@{}", result.target_branch, result.head);
+            if options.json_output {
+                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+            } else if options.dry_run {
+                println!(
+                    "request-apply dry-run: {} would update {}@{}",
+                    options.mr_id, result.target_branch, result.head
+                );
+            } else {
+                println!("applied {}", options.mr_id);
+                println!("target: {}@{}", result.target_branch, result.head);
+            }
             Ok(())
         }
         Some("serve") => {
@@ -1273,14 +1309,28 @@ fn parse_patch_import_args(args: &[String]) -> Result<PatchImportOptions, CliErr
 }
 
 fn parse_upload_args(args: &[String]) -> Result<UploadOptions, CliError> {
-    let positional = positional_args(args)?;
+    let mut positional = Vec::new();
+    let mut dry_run = false;
+    let mut json_output = false;
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
+            value if value.starts_with("--") => skip_ignored_option(args, &mut index)?,
+            value => positional.push(value.to_string()),
+        }
+        index += 1;
+    }
     match positional.as_slice() {
         [branch, remote_url] => Ok(UploadOptions {
             branch: branch.clone(),
             remote_url: remote_url.clone(),
+            dry_run,
+            json_output,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs upload <branch> <cf-url>".to_string(),
+            "usage: codefire-rs upload <branch> <cf-url> [--dry-run] [--json]".to_string(),
         )),
     }
 }
@@ -1301,14 +1351,29 @@ fn parse_remote_project_args(
 }
 
 fn parse_request_merge_args(args: &[String]) -> Result<RequestMergeOptions, CliError> {
-    let positional = positional_args(args)?;
+    let mut positional = Vec::new();
+    let mut dry_run = false;
+    let mut json_output = false;
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
+            value if value.starts_with("--") => skip_ignored_option(args, &mut index)?,
+            value => positional.push(value.to_string()),
+        }
+        index += 1;
+    }
     match positional.as_slice() {
         [source_url, target_url] => Ok(RequestMergeOptions {
             source_url: source_url.clone(),
             target_url: target_url.clone(),
+            dry_run,
+            json_output,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs request-merge <source-url> <target-url>".to_string(),
+            "usage: codefire-rs request-merge <source-url> <target-url> [--dry-run] [--json]"
+                .to_string(),
         )),
     }
 }
@@ -1318,9 +1383,13 @@ fn parse_request_review_args(args: &[String]) -> Result<RequestReviewOptions, Cl
     let mut reviewer = None;
     let mut decision = "approve".to_string();
     let mut comment = String::new();
+    let mut dry_run = false;
+    let mut json_output = false;
     let mut index = 0usize;
     while index < args.len() {
         match args[index].as_str() {
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
             "--reviewer" => {
                 index += 1;
                 reviewer = Some(
@@ -1360,22 +1429,39 @@ fn parse_request_review_args(args: &[String]) -> Result<RequestReviewOptions, Cl
             reviewer: reviewer.unwrap_or_else(|| "reviewer".to_string()),
             decision,
             comment,
+            dry_run,
+            json_output,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs request-review <project-url> <mr-id> [--reviewer <name>] [--decision approve|reject] [--comment <text>]".to_string(),
+            "usage: codefire-rs request-review <project-url> <mr-id> [--reviewer <name>] [--decision approve|reject] [--comment <text>] [--dry-run] [--json]".to_string(),
         )),
     }
 }
 
 fn parse_request_apply_args(args: &[String]) -> Result<RequestApplyOptions, CliError> {
-    let positional = positional_args(args)?;
+    let mut positional = Vec::new();
+    let mut dry_run = false;
+    let mut json_output = false;
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
+            value if value.starts_with("--") => skip_ignored_option(args, &mut index)?,
+            value => positional.push(value.to_string()),
+        }
+        index += 1;
+    }
     match positional.as_slice() {
         [project_url, mr_id] => Ok(RequestApplyOptions {
             project_url: project_url.clone(),
             mr_id: mr_id.clone(),
+            dry_run,
+            json_output,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs request-apply <project-url> <mr-id>".to_string(),
+            "usage: codefire-rs request-apply <project-url> <mr-id> [--dry-run] [--json]"
+                .to_string(),
         )),
     }
 }

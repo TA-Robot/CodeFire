@@ -7,15 +7,24 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+mod plans;
+use plans::{
+    request_apply_operation_plan, request_merge_operation_plan, request_review_operation_plan,
+    upload_operation_plan,
+};
+
 #[derive(Debug)]
 pub(crate) struct UploadOptions {
     pub(crate) branch: String,
     pub(crate) remote_url: String,
+    pub(crate) dry_run: bool,
+    pub(crate) json_output: bool,
 }
 
 #[derive(Debug)]
 pub(crate) struct UploadResult {
     pub(crate) head: String,
+    pub(crate) plan: Value,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -33,6 +42,8 @@ pub(crate) struct RemoteProjectOptions {
 pub(crate) struct RequestMergeOptions {
     pub(crate) source_url: String,
     pub(crate) target_url: String,
+    pub(crate) dry_run: bool,
+    pub(crate) json_output: bool,
 }
 
 #[derive(Debug)]
@@ -40,6 +51,7 @@ pub(crate) struct RequestMergeResult {
     pub(crate) id: String,
     pub(crate) source_head: String,
     pub(crate) target_head: String,
+    pub(crate) plan: Value,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -57,24 +69,30 @@ pub(crate) struct RequestReviewOptions {
     pub(crate) reviewer: String,
     pub(crate) decision: String,
     pub(crate) comment: String,
+    pub(crate) dry_run: bool,
+    pub(crate) json_output: bool,
 }
 
 #[derive(Debug)]
 pub(crate) struct RequestReviewResult {
     pub(crate) reviewer: String,
     pub(crate) decision: String,
+    pub(crate) plan: Value,
 }
 
 #[derive(Debug)]
 pub(crate) struct RequestApplyOptions {
     pub(crate) project_url: String,
     pub(crate) mr_id: String,
+    pub(crate) dry_run: bool,
+    pub(crate) json_output: bool,
 }
 
 #[derive(Debug)]
 pub(crate) struct RequestApplyResult {
     pub(crate) target_branch: String,
     pub(crate) head: String,
+    pub(crate) plan: Value,
 }
 
 #[derive(Debug, Clone)]
@@ -110,6 +128,18 @@ pub(crate) fn upload_branch(
 
     if options.remote_url.starts_with("cf+http://") {
         let remote = parse_cf_http_url(&options.remote_url)?;
+        let object_count = collect_object_records(&local_objects, &head)?.len();
+        let plan = upload_operation_plan(
+            options,
+            &repo_root,
+            &head,
+            "http",
+            remote.branch.as_str(),
+            Some(object_count),
+        );
+        if options.dry_run {
+            return Ok(UploadResult { head, plan });
+        }
         let response = http_json(
             "POST",
             &http_remote_path(
@@ -125,19 +155,15 @@ pub(crate) fn upload_branch(
                 "actor": "local",
             })),
         )?;
+        let response_head = required_string(&response, &["head"])?;
         return Ok(UploadResult {
-            head: required_string(&response, &["head"])?,
+            head: response_head,
+            plan,
         });
     }
 
     let remote = parse_cf_url(&options.remote_url)?;
     let remote_branch = remote.branch.clone();
-    ensure_remote_layout(&remote.project_root)?;
-    let _lock = FileLock::acquire(
-        remote_dirs(&remote.project_root)
-            .locks
-            .join(format!("branch-{}.lock", ref_file_name(&remote_branch))),
-    )?;
     if let Some(current) =
         read_optional_json(&remote_branch_path(&remote.project_root, &remote_branch))?
     {
@@ -149,6 +175,23 @@ pub(crate) fn upload_branch(
             ));
         }
     }
+    let plan = upload_operation_plan(
+        options,
+        &repo_root,
+        &head,
+        "file",
+        remote_branch.as_str(),
+        None,
+    );
+    if options.dry_run {
+        return Ok(UploadResult { head, plan });
+    }
+    ensure_remote_layout(&remote.project_root)?;
+    let _lock = FileLock::acquire(
+        remote_dirs(&remote.project_root)
+            .locks
+            .join(format!("branch-{}.lock", ref_file_name(&remote_branch))),
+    )?;
     let generation = next_remote_generation(&remote.project_root)?;
     copy_object_graph(
         &local_objects,
@@ -167,7 +210,7 @@ pub(crate) fn upload_branch(
             "updated_at": now_iso_utc(),
         }),
     )?;
-    Ok(UploadResult { head })
+    Ok(UploadResult { head, plan })
 }
 
 pub(crate) fn list_remote_branches(project_url: &str) -> Result<Vec<RemoteBranch>, CliError> {
@@ -232,6 +275,22 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
                 "request-merge requires both URLs to use the same remote transport".to_string(),
             ));
         }
+        let plan = request_merge_operation_plan(
+            options,
+            "",
+            "",
+            "pending",
+            "http",
+            &parse_cf_http_url(&options.target_url)?.branch,
+        );
+        if options.dry_run {
+            return Ok(RequestMergeResult {
+                id: String::new(),
+                source_head: String::new(),
+                target_head: String::new(),
+                plan,
+            });
+        }
         let target = parse_cf_http_url(&options.target_url)?;
         let response = http_json(
             "POST",
@@ -251,6 +310,7 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
             id: required_string(&response, &["id"])?,
             source_head: required_string(&response, &["source"])?,
             target_head: required_string(&response, &["target"])?,
+            plan,
         });
     }
     let source = parse_cf_url(&options.source_url)?;
@@ -267,7 +327,6 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
         &remote_dirs(&target.project_root).objects,
         &target_head,
     )?;
-    ensure_remote_layout(&target.project_root)?;
     let mut mr_payload = json!({
         "version": 1,
         "source_url": options.source_url,
@@ -283,6 +342,23 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
         &sha256_hex(&codefire_store::canonical_json(&mr_payload)?)[..12]
     );
     mr_payload["id"] = Value::String(mr_id.clone());
+    let plan = request_merge_operation_plan(
+        options,
+        &source_head,
+        &target_head,
+        &mr_id,
+        "file",
+        &target.branch,
+    );
+    if options.dry_run {
+        return Ok(RequestMergeResult {
+            id: mr_id,
+            source_head,
+            target_head,
+            plan,
+        });
+    }
+    ensure_remote_layout(&target.project_root)?;
     write_json_atomic(
         &remote_dirs(&target.project_root)
             .merge_requests
@@ -293,6 +369,7 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
         id: mr_id,
         source_head: required_string(&mr_payload, &["source_head"])?,
         target_head: required_string(&mr_payload, &["target_head_at_request"])?,
+        plan,
     })
 }
 
@@ -383,6 +460,14 @@ pub(crate) fn review_merge_request(
 ) -> Result<RequestReviewResult, CliError> {
     if options.project_url.starts_with("cf+http://") {
         let project = parse_cf_http_project_url(&options.project_url)?;
+        let plan = request_review_operation_plan(options, "http", "");
+        if options.dry_run {
+            return Ok(RequestReviewResult {
+                reviewer: options.reviewer.clone(),
+                decision: options.decision.clone(),
+                plan,
+            });
+        }
         let response = http_json(
             "POST",
             &http_remote_path(
@@ -401,6 +486,7 @@ pub(crate) fn review_merge_request(
         return Ok(RequestReviewResult {
             reviewer: required_string(&response, &["reviewer"])?,
             decision: required_string(&response, &["decision"])?,
+            plan,
         });
     }
     let project = parse_cf_project_url(&options.project_url)?;
@@ -410,7 +496,18 @@ pub(crate) fn review_merge_request(
     let mut mr = read_optional_json(&mr_path)?
         .ok_or_else(|| CliError::Usage(format!("merge request not found: {}", options.mr_id)))?;
     validate_merge_request_record(&mr)?;
+    if options.dry_run {
+        reject_stale_merge_request_read_only(&mr)?;
+        let plan =
+            request_review_operation_plan(options, "file", &required_string(&mr, &["status"])?);
+        return Ok(RequestReviewResult {
+            reviewer: options.reviewer.clone(),
+            decision: options.decision.clone(),
+            plan,
+        });
+    }
     reject_stale_merge_request(&mut mr, &mr_path)?;
+    let plan = request_review_operation_plan(options, "file", &required_string(&mr, &["status"])?);
     let review = json!({
         "reviewer": options.reviewer,
         "decision": options.decision,
@@ -433,6 +530,7 @@ pub(crate) fn review_merge_request(
     Ok(RequestReviewResult {
         reviewer: options.reviewer.clone(),
         decision: options.decision.clone(),
+        plan,
     })
 }
 
@@ -441,6 +539,14 @@ pub(crate) fn apply_merge_request(
 ) -> Result<RequestApplyResult, CliError> {
     if options.project_url.starts_with("cf+http://") {
         let project = parse_cf_http_project_url(&options.project_url)?;
+        let plan = request_apply_operation_plan(options, "http", "", "");
+        if options.dry_run {
+            return Ok(RequestApplyResult {
+                target_branch: String::new(),
+                head: String::new(),
+                plan,
+            });
+        }
         let response = http_json(
             "POST",
             &http_remote_path(
@@ -454,6 +560,7 @@ pub(crate) fn apply_merge_request(
         return Ok(RequestApplyResult {
             target_branch: required_string(&response, &["target_branch"])?,
             head: required_string(&response, &["head"])?,
+            plan,
         });
     }
     let project = parse_cf_project_url(&options.project_url)?;
@@ -476,6 +583,12 @@ pub(crate) fn apply_merge_request(
     let target_head = required_string(&target_branch, &["head"])?;
     let target_head_at_request = required_string(&mr, &["target_head_at_request"])?;
     if target_head != target_head_at_request {
+        if options.dry_run {
+            return Err(CliError::Usage(format!(
+                "merge request is stale: {}",
+                options.mr_id
+            )));
+        }
         mr["status"] = Value::String("stale".to_string());
         write_json_atomic(&mr_path, &mr)?;
         return Err(CliError::Usage(format!(
@@ -491,6 +604,14 @@ pub(crate) fn apply_merge_request(
         return Err(CliError::Usage(
             "request apply rejected: source is not a fast-forward of target".to_string(),
         ));
+    }
+    let plan = request_apply_operation_plan(options, "file", &target.branch, &source_head);
+    if options.dry_run {
+        return Ok(RequestApplyResult {
+            target_branch: target.branch,
+            head: source_head,
+            plan,
+        });
     }
     let _lock = FileLock::acquire(
         remote_dirs(&target.project_root)
@@ -528,6 +649,7 @@ pub(crate) fn apply_merge_request(
     Ok(RequestApplyResult {
         target_branch: target.branch,
         head: source_head,
+        plan,
     })
 }
 
@@ -939,6 +1061,22 @@ fn reject_stale_merge_request(mr: &mut Value, mr_path: &Path) -> Result<(), CliE
         if current_head != required_string(mr, &["target_head_at_request"])? {
             mr["status"] = Value::String("stale".to_string());
             write_json_atomic(mr_path, mr)?;
+            return Err(CliError::Usage(format!(
+                "merge request is stale: {}",
+                required_string(mr, &["id"])?
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn reject_stale_merge_request_read_only(mr: &Value) -> Result<(), CliError> {
+    let target = parse_cf_url(&required_string(mr, &["target_url"])?)?;
+    if let Some(current_target) =
+        read_optional_json(&remote_branch_path(&target.project_root, &target.branch))?
+    {
+        let current_head = required_string(&current_target, &["head"])?;
+        if current_head != required_string(mr, &["target_head_at_request"])? {
             return Err(CliError::Usage(format!(
                 "merge request is stale: {}",
                 required_string(mr, &["id"])?

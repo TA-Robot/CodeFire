@@ -1059,12 +1059,29 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
     let project_url = format!("cf://{}/org/app", server.display());
     let main_url = format!("{project_url}/main");
     let feature_url = format!("{project_url}/feature-session");
+    let remote_project_root = parse_cf_url(&main_url).unwrap().project_root;
+
+    let upload_dry_run = upload_branch(
+        &repo_root,
+        &UploadOptions {
+            branch: "main".to_string(),
+            remote_url: main_url.clone(),
+            dry_run: true,
+            json_output: true,
+        },
+    )
+    .unwrap();
+    assert_eq!(upload_dry_run.plan["type"], "codefire_operation_plan");
+    assert_eq!(upload_dry_run.plan["command"], "upload");
+    assert!(!remote_project_root.exists());
 
     upload_branch(
         &repo_root,
         &UploadOptions {
             branch: "main".to_string(),
             remote_url: main_url.clone(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -1096,6 +1113,8 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         &UploadOptions {
             branch: "feature-session".to_string(),
             remote_url: feature_url.clone(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -1108,29 +1127,85 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
     assert!(diff.contains(&format!("+++ {feature_url}@CF-COMMIT-")));
     assert!(diff.contains("+hello 15"));
 
+    let request_dir = remote_dirs(&remote_project_root).merge_requests;
+    assert_eq!(fs::read_dir(&request_dir).unwrap().count(), 0);
+    let mr_dry_run = request_merge(&RequestMergeOptions {
+        source_url: feature_url.clone(),
+        target_url: main_url.clone(),
+        dry_run: true,
+        json_output: true,
+    })
+    .unwrap();
+    assert_eq!(mr_dry_run.plan["command"], "request-merge");
+    assert!(mr_dry_run.id.starts_with("MR-"));
+    assert_eq!(fs::read_dir(&request_dir).unwrap().count(), 0);
+
     let mr = request_merge(&RequestMergeOptions {
         source_url: feature_url.clone(),
         target_url: main_url.clone(),
+        dry_run: false,
+        json_output: false,
     })
     .unwrap();
     assert!(mr.id.starts_with("MR-"));
     let listed = list_merge_requests(&project_url).unwrap();
     assert_eq!(listed[0].status, "open");
+    let mr_path = request_dir.join(format!("{}.json", mr.id));
+    let open_mr_before_review = read_json(&mr_path).unwrap();
+    let review_dry_run = review_merge_request(&RequestReviewOptions {
+        project_url: project_url.clone(),
+        mr_id: mr.id.clone(),
+        reviewer: "alice".to_string(),
+        decision: "approve".to_string(),
+        comment: "sealed source is ready".to_string(),
+        dry_run: true,
+        json_output: true,
+    })
+    .unwrap();
+    assert_eq!(review_dry_run.plan["command"], "request-review");
+    assert_eq!(read_json(&mr_path).unwrap(), open_mr_before_review);
     review_merge_request(&RequestReviewOptions {
         project_url: project_url.clone(),
         mr_id: mr.id.clone(),
         reviewer: "alice".to_string(),
         decision: "approve".to_string(),
         comment: "sealed source is ready".to_string(),
+        dry_run: false,
+        json_output: false,
     })
     .unwrap();
     assert_eq!(
         list_merge_requests(&project_url).unwrap()[0].status,
         "approved"
     );
+    let approved_mr_before_apply = read_json(&mr_path).unwrap();
+    let main_before_apply = required_string(
+        &load_remote_branch(&parse_cf_url(&main_url).unwrap()).unwrap(),
+        &["head"],
+    )
+    .unwrap();
+    let apply_dry_run = apply_merge_request(&RequestApplyOptions {
+        project_url: project_url.clone(),
+        mr_id: mr.id.clone(),
+        dry_run: true,
+        json_output: true,
+    })
+    .unwrap();
+    assert_eq!(apply_dry_run.plan["command"], "request-apply");
+    assert_eq!(
+        required_string(
+            &load_remote_branch(&parse_cf_url(&main_url).unwrap()).unwrap(),
+            &["head"]
+        )
+        .unwrap(),
+        main_before_apply
+    );
+    assert_eq!(read_json(&mr_path).unwrap(), approved_mr_before_apply);
     let applied = apply_merge_request(&RequestApplyOptions {
         project_url: project_url.clone(),
         mr_id: mr.id,
+        dry_run: false,
+        json_output: false,
     })
     .unwrap();
     assert_eq!(applied.target_branch, "main");
