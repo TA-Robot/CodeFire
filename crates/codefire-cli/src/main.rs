@@ -15,8 +15,9 @@ mod http;
 mod remote;
 mod view;
 use automation::{
-    command_result_envelope, scan_data_json, scan_diagnostics_json, status_data_json,
-    verification_data_json, verification_diagnostics_json,
+    command_result_envelope, scan_data_json, scan_diagnostics_json, scan_next_actions,
+    status_data_json, status_next_actions, verification_data_json, verification_diagnostics_json,
+    verification_next_actions,
 };
 use context::{build_context_pack, parse_context_args, print_context_summary};
 use exit_code::{
@@ -108,7 +109,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         repo_root.as_deref(),
                         scan_data_json(&scan),
                         scan_diagnostics_json(&scan),
-                        Vec::new(),
+                        scan_next_actions(&scan),
                     ))?
                 );
             } else {
@@ -131,7 +132,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         repo_root.as_deref(),
                         verification_data_json(&verification),
                         verification_diagnostics_json(&verification),
-                        Vec::new(),
+                        verification_next_actions(&verification),
                     ))?
                 );
             } else {
@@ -372,7 +373,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         repo_root.as_deref(),
                         status_data_json(&status),
                         Vec::new(),
-                        Vec::new(),
+                        status_next_actions(&status),
                     ))?
                 );
             } else {

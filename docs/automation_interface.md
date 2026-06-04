@@ -32,6 +32,26 @@ next_actions: machine-readable remediation hints
 
 Human output may change between releases. JSON output with the same schema version must remain backward compatible.
 
+`next_actions` entries use this shape:
+
+```json
+{
+  "kind": "context_atom",
+  "command": "codefire-rs context --atom REQ-session --depth 2 --json",
+  "reason": "inspect the atom and nearby trace graph before adding the missing link",
+  "target": {"atom_id": "REQ-session"}
+}
+```
+
+Fields:
+
+```text
+kind: stable action class
+command: suggested command or shell command
+reason: short machine-readable remediation reason
+target: action-specific target object
+```
+
 ## Exit Codes
 
 CodeFire v0.6 uses a stable process exit code taxonomy. The `exit_code` field in JSON command result envelopes must match the intended process exit code for the same command result.
@@ -109,6 +129,16 @@ codefire context --fire FIRE-001 --json
 
 `verify --json` sets `exit_code` to the matching blocker code from the exit code taxonomy. For example, missing required links produce code `11`; failed configured verification commands produce code `14`.
 
+`status --json`, `scan --json`, and `verify --json` include remediation-oriented `next_actions`:
+
+```text
+status: verify, scan, context_changed, commit
+scan: context_changed, context_fire, extinguish_fire, verify
+verify: context_changed, scan, context_atom, refresh_resolution, rerun_check, commit
+```
+
+Rust `doctor`, `storage`, and `migrate` commands are still planned separately; their `next_actions` are added when those command surfaces land.
+
 `context --json` data:
 
 ```json
@@ -161,4 +191,4 @@ duplicate_atom_id
 failed_check
 ```
 
-`next_actions` is present in every envelope. CF-218 defines the stable location and array shape; later diagnostics tasks populate richer remediation actions across more commands.
+`next_actions` is present in every envelope. Empty arrays mean no action is currently suggested for that command result.

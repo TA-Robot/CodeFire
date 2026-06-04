@@ -131,6 +131,7 @@ Trace Graphに基づきfireを生成する
 obsolete fireを整理する
 branch stateを更新する
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.changed_atoms、data.open_fires、diagnosticsを含める
+--jsonはchanged atoms、open fires、verifyに進むためのmachine-readable next_actionsを含める
 ```
 
 ## 4.7 `fire`
@@ -189,6 +190,7 @@ verification objectをactive stateに保存する
 --jsonはcodefire.command_result.v1 envelopeを出力し、verification data、blocking diagnostics、next_actionsを含める
 --jsonのexit_codeはprocess exit codeと一致する
 verify blockerのexit codeはopen fires=10、missing links=11、stale resolutions=12、duplicate Atom IDs=13、failed checks=14の優先順で決まる
+next_actionsはcontext_changed、context_atom、refresh_resolution、rerun_check、commitなどの安定action kindを返す
 ```
 
 ## 4.10 `context`
