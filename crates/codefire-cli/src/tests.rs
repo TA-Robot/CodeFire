@@ -238,6 +238,124 @@ fn parse_merge_args_accepts_dry_run_json() {
 }
 
 #[test]
+fn parse_review_pack_args_accepts_base_output_and_algorithm() {
+    let args = vec![
+        "feature-session".to_string(),
+        "--base".to_string(),
+        "main".to_string(),
+        "--output".to_string(),
+        "review-pack.json".to_string(),
+        "--algorithm=patience".to_string(),
+        "--no-rename-detection".to_string(),
+    ];
+    let parsed = parse_review_pack_args(&args).unwrap();
+    assert_eq!(parsed.review.source, "feature-session");
+    assert_eq!(parsed.review.base.as_deref(), Some("main"));
+    assert_eq!(parsed.review.algorithm, DiffAlgorithm::Patience);
+    assert!(!parsed.review.rename_detection);
+    assert_eq!(parsed.output, Some(PathBuf::from("review-pack.json")));
+}
+
+#[test]
+fn review_pack_exports_file_atom_verification_and_next_actions() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit_with_atoms(
+        &objects,
+        &[(
+            "docs/spec/session.md",
+            "## REQ-session: Requirement\nTTL 30\n",
+        )],
+        &[(
+            "REQ-session",
+            "requirement",
+            "docs/spec/session.md",
+            "sha256:req-base",
+        )],
+        vec![],
+    );
+    let feature_commit = write_file_commit_with_atoms(
+        &objects,
+        &[(
+            "docs/spec/session.md",
+            "## REQ-session: Requirement\nTTL 15\n",
+        )],
+        &[(
+            "REQ-session",
+            "requirement",
+            "docs/spec/session.md",
+            "sha256:req-feature",
+        )],
+        vec![base_commit.clone()],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": base_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-session",
+            "head": feature_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+
+    let pack = review_pack_with_options(
+        Some(&repo_root),
+        &ReviewPackOptions {
+            source: "feature-session".to_string(),
+            base: None,
+            algorithm: DiffAlgorithm::Myers,
+            rename_detection: true,
+        },
+    )
+    .unwrap();
+    let json: Value = serde_json::from_str(&pack).unwrap();
+
+    assert_eq!(json["type"], "codefire_review_pack");
+    assert_eq!(json["version"], 1);
+    assert!(json["source"]["label"]
+        .as_str()
+        .unwrap()
+        .starts_with("feature-session@"));
+    assert!(json["base"]["label"]
+        .as_str()
+        .unwrap()
+        .starts_with("parent@"));
+    assert!(json["file_diff"]["text"]
+        .as_str()
+        .unwrap()
+        .contains("-TTL 30"));
+    assert!(json["file_diff"]["text"]
+        .as_str()
+        .unwrap()
+        .contains("+TTL 15"));
+    assert_eq!(json["semantic_diff"]["type"], "codefire_diff");
+    assert_eq!(
+        json["semantic_diff"]["atoms"]["changed"][0]["atom_id"],
+        "REQ-session"
+    );
+    assert!(json["semantic_diff"]["trace"].is_object());
+    assert!(json["verification"]["source"].is_object());
+    assert!(json["next_actions"].is_array());
+}
+
+#[test]
 fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");

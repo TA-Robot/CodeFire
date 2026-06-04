@@ -263,6 +263,28 @@ binary fileはpayload diffを出さず、sizeとsha256 prefixのsummaryだけを
 --jsonはdiff結果をJSON objectとして出力し、impact有効時はmachine-readable next_actionsを含める
 ```
 
+## 4.12B `review-pack`
+
+```bash
+codefire review-pack feature-login
+codefire review-pack feature-login --base main --output review-pack.json
+codefire review-pack feature-login --base main --algorithm patience --no-rename-detection
+```
+
+仕様：
+
+```text
+source sealed commitのreview-pack JSONを出力する
+--base省略時はsource commitのfirst parentをbaseにする
+root commitでは--baseが必須
+出力typeはcodefire_review_pack、versionは1
+file_diff.textにunified text diffを含める
+semantic_diffにAtom diff、TraceGraph diff、impact diff、next_actionsを含める
+verificationにbase/sourceそれぞれのverification summaryを含める
+--output指定時は指定fileへ書き込み、未指定時はstdoutへ出力する
+review-packはsealed commitから再現可能な情報だけで構成し、生成時刻などの非決定的値は含めない
+```
+
 ## 4.13 `request-merge`
 
 ```bash

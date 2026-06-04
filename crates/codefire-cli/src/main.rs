@@ -19,7 +19,8 @@ use remote::{
     RequestMergeOptions, RequestReviewOptions, UploadOptions,
 };
 use view::{
-    diff_commitish_with_options, manifest_contents, show_commitish, DiffAlgorithm, DiffOptions,
+    diff_commitish_with_options, manifest_contents, review_pack_with_options, show_commitish,
+    DiffAlgorithm, DiffOptions, ReviewPackOptions,
 };
 
 fn main() {
@@ -183,6 +184,20 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 &options.diff,
             )?;
             print!("{output}");
+            Ok(())
+        }
+        Some("review-pack") => {
+            let options = parse_review_pack_args(&args[1..])?;
+            let repo_root = optional_repo_root(&env::current_dir()?);
+            let output = review_pack_with_options(repo_root.as_deref(), &options.review)?;
+            if let Some(path) = options.output {
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::write(path, output)?;
+            } else {
+                print!("{output}");
+            }
             Ok(())
         }
         Some("merge") => {
@@ -417,6 +432,12 @@ struct DiffArgs {
     left: String,
     right: String,
     diff: DiffOptions,
+}
+
+#[derive(Debug)]
+struct ReviewPackArgs {
+    review: ReviewPackOptions,
+    output: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -819,6 +840,68 @@ fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
 fn parse_diff_algorithm(value: &str) -> Result<DiffAlgorithm, CliError> {
     DiffAlgorithm::parse(value).ok_or_else(|| {
         CliError::Usage("--algorithm must be one of: myers, patience, histogram".to_string())
+    })
+}
+
+fn parse_review_pack_args(args: &[String]) -> Result<ReviewPackArgs, CliError> {
+    let mut source = None;
+    let mut base = None;
+    let mut output = None;
+    let mut algorithm = DiffAlgorithm::Myers;
+    let mut rename_detection = true;
+    let mut index = 0usize;
+    while index < args.len() {
+        let value = &args[index];
+        if value == "--base" {
+            index += 1;
+            base = Some(
+                args.get(index)
+                    .ok_or_else(|| CliError::Usage("--base requires a value".to_string()))?
+                    .to_string(),
+            );
+        } else if value == "--output" {
+            index += 1;
+            output = Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                CliError::Usage("--output requires a value".to_string())
+            })?));
+        } else if value == "--algorithm" {
+            index += 1;
+            let name = args
+                .get(index)
+                .ok_or_else(|| CliError::Usage("--algorithm requires a value".to_string()))?;
+            algorithm = parse_diff_algorithm(name)?;
+        } else if let Some(name) = value.strip_prefix("--algorithm=") {
+            algorithm = parse_diff_algorithm(name)?;
+        } else if value == "--rename-detection" {
+            rename_detection = true;
+        } else if value == "--no-rename-detection" {
+            rename_detection = false;
+        } else if value.starts_with("--") {
+            return Err(CliError::Usage(format!(
+                "unsupported review-pack option: {value}"
+            )));
+        } else if source.is_none() {
+            source = Some(value.clone());
+        } else {
+            return Err(CliError::Usage(format!(
+                "unexpected review-pack argument: {value}"
+            )));
+        }
+        index += 1;
+    }
+    Ok(ReviewPackArgs {
+        review: ReviewPackOptions {
+            source: source.ok_or_else(|| {
+                CliError::Usage(
+                    "usage: codefire-rs review-pack <source> [--base <base>] [--output <path>] [--algorithm myers|patience|histogram] [--no-rename-detection]"
+                        .to_string(),
+                )
+            })?,
+            base,
+            algorithm,
+            rename_detection,
+        },
+        output,
     })
 }
 

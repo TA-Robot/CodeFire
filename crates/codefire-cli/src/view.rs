@@ -8,7 +8,7 @@ use semantic_diff::{
     diff_impact, load_atom_index, load_trace_graph, render_atom_diff, render_diff_json,
     render_impact_diff, render_trace_diff, DiffJsonContext,
 };
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
@@ -31,6 +31,14 @@ impl DiffAlgorithm {
             "patience" => Some(Self::Patience),
             "histogram" => Some(Self::Histogram),
             _ => None,
+        }
+    }
+
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Myers => "myers",
+            Self::Patience => "patience",
+            Self::Histogram => "histogram",
         }
     }
 }
@@ -58,11 +66,19 @@ impl Default for DiffOptions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ResolvedCommitish {
     objects: PathBuf,
     commit_id: String,
     label: String,
+}
+
+#[derive(Debug)]
+pub(crate) struct ReviewPackOptions {
+    pub(crate) source: String,
+    pub(crate) base: Option<String>,
+    pub(crate) algorithm: DiffAlgorithm,
+    pub(crate) rename_detection: bool,
 }
 
 pub(crate) fn show_commitish(repo_root: Option<&Path>, value: &str) -> Result<String, CliError> {
@@ -125,6 +141,14 @@ pub(crate) fn diff_commitish_with_options(
 ) -> Result<String, CliError> {
     let left = resolve_commitish_any(repo_root, left)?;
     let right = resolve_commitish_any(repo_root, right)?;
+    diff_resolved_commitish_with_options(&left, &right, options)
+}
+
+fn diff_resolved_commitish_with_options(
+    left: &ResolvedCommitish,
+    right: &ResolvedCommitish,
+    options: &DiffOptions,
+) -> Result<String, CliError> {
     let left_files = manifest_contents(&left.objects, &left.commit_id)?;
     let right_files = manifest_contents(&right.objects, &right.commit_id)?;
     let left_index = (options.atom_diff || options.impact_diff || options.json_output)
@@ -142,8 +166,8 @@ pub(crate) fn diff_commitish_with_options(
     let impact = (options.impact_diff || options.json_output)
         .then(|| {
             diff_impact(
-                &left,
-                &right,
+                left,
+                right,
                 left_index.as_ref().expect("left atom index loaded"),
                 left_graph.as_ref().expect("left trace graph loaded"),
                 right_index.as_ref().expect("right atom index loaded"),
@@ -153,8 +177,8 @@ pub(crate) fn diff_commitish_with_options(
         .transpose()?;
     if options.json_output {
         return render_diff_json(DiffJsonContext {
-            left: &left,
-            right: &right,
+            left,
+            right,
             left_index: left_index.as_ref(),
             right_index: right_index.as_ref(),
             left_graph: left_graph.as_ref(),
@@ -188,6 +212,110 @@ pub(crate) fn diff_commitish_with_options(
         render_impact_diff(impact, &mut output);
     }
     Ok(output)
+}
+
+pub(crate) fn review_pack_with_options(
+    repo_root: Option<&Path>,
+    options: &ReviewPackOptions,
+) -> Result<String, CliError> {
+    let source = resolve_commitish_any(repo_root, &options.source)?;
+    let base = if let Some(base) = &options.base {
+        resolve_commitish_any(repo_root, base)?
+    } else {
+        first_parent_commitish(&source)?
+    };
+    let file_options = DiffOptions {
+        algorithm: options.algorithm,
+        rename_detection: options.rename_detection,
+        ..DiffOptions::default()
+    };
+    let semantic_options = DiffOptions {
+        algorithm: options.algorithm,
+        rename_detection: options.rename_detection,
+        atom_diff: true,
+        trace_diff: true,
+        impact_diff: true,
+        json_output: true,
+    };
+    let file_diff_text = diff_resolved_commitish_with_options(&base, &source, &file_options)?;
+    let semantic_diff_text =
+        diff_resolved_commitish_with_options(&base, &source, &semantic_options)?;
+    let semantic_diff = serde_json::from_str::<Value>(&semantic_diff_text)?;
+    let next_actions = semantic_diff
+        .get("next_actions")
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+    let base_summary = commit_review_summary(&base)?;
+    let source_summary = commit_review_summary(&source)?;
+    let value = json!({
+        "type": "codefire_review_pack",
+        "version": 1,
+        "base": base_summary,
+        "source": source_summary,
+        "options": {
+            "algorithm": options.algorithm.as_str(),
+            "rename_detection": options.rename_detection,
+        },
+        "file_diff": {
+            "format": "unified",
+            "text": file_diff_text,
+        },
+        "semantic_diff": semantic_diff,
+        "verification": {
+            "base": verification_summary(&base)?,
+            "source": verification_summary(&source)?,
+        },
+        "next_actions": next_actions,
+    });
+    Ok(format!("{}\n", serde_json::to_string_pretty(&value)?))
+}
+
+fn first_parent_commitish(source: &ResolvedCommitish) -> Result<ResolvedCommitish, CliError> {
+    let commit = codefire_store::read_object(&source.objects, &source.commit_id)?;
+    let parents = commit
+        .get("parents")
+        .and_then(Value::as_array)
+        .ok_or_else(|| CliError::InvalidRepository("commit parents must be a list".to_string()))?;
+    let parent = parents.first().and_then(Value::as_str).ok_or_else(|| {
+        CliError::Usage("review-pack requires --base for a root commit".to_string())
+    })?;
+    codefire_store::validate_sealed_commit(&source.objects, parent)?;
+    Ok(ResolvedCommitish {
+        objects: source.objects.clone(),
+        commit_id: parent.to_string(),
+        label: format!("parent@{parent}"),
+    })
+}
+
+fn commit_review_summary(resolved: &ResolvedCommitish) -> Result<Value, CliError> {
+    let commit = codefire_store::read_object(&resolved.objects, &resolved.commit_id)?;
+    let manifest = root_object(&resolved.objects, &commit, "content_manifest")?;
+    let atom_index = root_object(&resolved.objects, &commit, "atom_index")?;
+    Ok(json!({
+        "label": &resolved.label,
+        "commit": &resolved.commit_id,
+        "message": commit.get("message").and_then(Value::as_str).unwrap_or(""),
+        "parents": commit.get("parents").cloned().unwrap_or_else(|| json!([])),
+        "certificate": commit.get("certificate").cloned().unwrap_or_else(|| json!(null)),
+        "files": manifest.get("entries").and_then(Value::as_array).map_or(0, Vec::len),
+        "atoms": atom_index.get("atoms").and_then(Value::as_array).map_or(0, Vec::len),
+        "duplicate_atom_ids": atom_index.get("duplicate_atom_ids").cloned().unwrap_or_else(|| json!([])),
+        "verification": verification_summary(resolved)?,
+    }))
+}
+
+fn verification_summary(resolved: &ResolvedCommitish) -> Result<Value, CliError> {
+    let commit = codefire_store::read_object(&resolved.objects, &resolved.commit_id)?;
+    let verification = root_object(&resolved.objects, &commit, "verification")?;
+    Ok(json!({
+        "result": verification.get("result").and_then(Value::as_str).unwrap_or("unknown"),
+        "open_required_fires": verification.get("open_required_fires").and_then(Value::as_u64).unwrap_or(0),
+        "failed_checks": verification.get("failed_checks").and_then(Value::as_array).map_or(0, Vec::len),
+        "missing_required_links": verification.get("missing_required_links").and_then(Value::as_array).map_or(0, Vec::len),
+        "stale_resolutions": verification.get("stale_resolutions").and_then(Value::as_array).map_or(0, Vec::len),
+        "duplicate_atom_ids": verification.get("duplicate_atom_ids").and_then(Value::as_array).map_or(0, Vec::len),
+        "verified_at": verification.get("verified_at").cloned().unwrap_or_else(|| json!(null)),
+    }))
 }
 
 fn resolve_local_commitish(repo_root: &Path, value: &str) -> Result<(String, String), CliError> {
