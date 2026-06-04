@@ -3,7 +3,7 @@ use std::env;
 use std::fmt;
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() {
@@ -23,6 +23,12 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 result.repo_root.display()
             );
             println!("main: {}", result.main_commit);
+            Ok(())
+        }
+        Some("open") => {
+            let options = parse_open_args(&args[1..])?;
+            let result = open_branch(&options)?;
+            println!("opened {}: {}", result.branch, result.open_dir.display());
             Ok(())
         }
         Some("branch") => match args.get(1).map(String::as_str) {
@@ -71,6 +77,7 @@ enum CliError {
     Usage(String),
     NotOpen(PathBuf),
     InvalidMarker(String),
+    InvalidRepository(String),
 }
 
 impl fmt::Display for CliError {
@@ -87,6 +94,9 @@ impl fmt::Display for CliError {
             ),
             CliError::InvalidMarker(message) => {
                 write!(f, "invalid open directory marker: {message}")
+            }
+            CliError::InvalidRepository(message) => {
+                write!(f, "invalid CodeFire repository: {message}")
             }
         }
     }
@@ -139,6 +149,18 @@ struct InitResult {
     main_commit: String,
 }
 
+#[derive(Debug)]
+struct OpenOptions {
+    branch: String,
+    path: PathBuf,
+}
+
+#[derive(Debug)]
+struct OpenResult {
+    branch: String,
+    open_dir: PathBuf,
+}
+
 fn print_status(status: &Status) {
     println!("Branch: {}", status.branch);
     println!("State: {}", status.state);
@@ -168,6 +190,18 @@ fn parse_init_args(args: &[String]) -> Result<InitOptions, CliError> {
         path: path.unwrap_or_else(|| PathBuf::from(".")),
         force,
     })
+}
+
+fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
+    match args {
+        [branch, path] => Ok(OpenOptions {
+            branch: branch.to_string(),
+            path: PathBuf::from(path),
+        }),
+        _ => Err(CliError::Usage(
+            "usage: codefire-rs open <branch> <path>".to_string(),
+        )),
+    }
 }
 
 fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
@@ -227,6 +261,82 @@ fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
     Ok(InitResult {
         repo_root,
         main_commit: commit_id,
+    })
+}
+
+fn open_branch(options: &OpenOptions) -> Result<OpenResult, CliError> {
+    open_branch_from(&env::current_dir()?, options)
+}
+
+fn open_branch_from(start: &Path, options: &OpenOptions) -> Result<OpenResult, CliError> {
+    let repo_root = find_repo_root(start)?;
+    let _lock = RepoLock::acquire(&repo_root)?;
+    let cf = repo_root.join(".codefire");
+    let objects = cf.join("objects");
+    let mut branch = load_branch_record(&repo_root, &options.branch)?;
+    let branch_head = required_string(&branch, &["head"])?;
+    codefire_store::validate_sealed_commit(&objects, &branch_head)?;
+
+    let target = absolute_path(&options.path)?;
+    if target.exists() && !is_empty_dir(&target)? {
+        return Err(CliError::Usage(format!(
+            "target path must not exist or must be empty: {}",
+            target.display()
+        )));
+    }
+    let registry_path = opened_registry_path(&repo_root, &options.branch);
+    if registry_path.exists() {
+        return Err(CliError::Usage(format!(
+            "branch is already open: {}",
+            options.branch
+        )));
+    }
+
+    fs::create_dir_all(&target)?;
+    materialize_commit(&objects, &branch_head, &target)?;
+    let opened_at = now_iso_utc();
+    let open_instance_id = format!(
+        "open_{:012x}",
+        stable_hash_48(format!("{}:{}:{opened_at}", options.branch, target.display()).as_bytes())
+    );
+    let repo_json = read_json(&cf.join("repo.json"))?;
+    let repository_id = required_string(&repo_json, &["repository_id"])?;
+    write_json_atomic(
+        &target.join(".codefire-open"),
+        &json!({
+            "version": 1,
+            "repository": {"path": cf, "repository_id": repository_id},
+            "branch": {"name": options.branch, "opened_from_commit": branch_head},
+            "open": {"open_instance_id": open_instance_id, "opened_path": target, "opened_at": opened_at},
+        }),
+    )?;
+    let active_path = cf.join("active").join(&open_instance_id);
+    write_json_atomic(
+        &registry_path,
+        &json!({
+            "version": 1,
+            "branch": {"name": options.branch},
+            "open": {
+                "open_instance_id": open_instance_id,
+                "path": target,
+                "opened_from_commit": branch_head,
+                "current_base_commit": branch_head,
+                "active_state_path": active_path,
+            },
+            "state": {"last_known": "open-clean"},
+        }),
+    )?;
+    fs::create_dir_all(&active_path)?;
+    write_json_atomic(
+        &active_path.join("state.json"),
+        &json!({"state": "open-clean"}),
+    )?;
+    branch["state"] = Value::String("open-clean".to_string());
+    save_branch_record(&repo_root, &branch)?;
+
+    Ok(OpenResult {
+        branch: options.branch.clone(),
+        open_dir: target,
     })
 }
 
@@ -321,12 +431,19 @@ fn absolute_path(path: &Path) -> Result<PathBuf, CliError> {
 }
 
 fn stable_repo_id(repo_root: &Path) -> String {
+    format!(
+        "repo_{:012x}",
+        stable_hash_48(repo_root.to_string_lossy().as_bytes())
+    )
+}
+
+fn stable_hash_48(bytes: &[u8]) -> u64 {
     let mut hash = 0xcbf29ce484222325u64;
-    for byte in repo_root.to_string_lossy().as_bytes() {
+    for byte in bytes {
         hash ^= u64::from(*byte);
         hash = hash.wrapping_mul(0x100000001b3);
     }
-    format!("repo_{:012x}", hash & 0x0000_ffff_ffff_ffff)
+    hash & 0x0000_ffff_ffff_ffff
 }
 
 fn write_json_atomic(path: &Path, value: &Value) -> Result<(), CliError> {
@@ -362,10 +479,7 @@ fn read_status(start: &Path) -> Result<Status, CliError> {
         .parent()
         .ok_or_else(|| CliError::InvalidMarker("repository path has no parent".to_string()))?;
     let branch = required_string(&marker, &["branch", "name"])?;
-    let registry_path = repo_root
-        .join(".codefire")
-        .join("opened")
-        .join(format!("{}.json", ref_file_name(&branch)));
+    let registry_path = opened_registry_path(repo_root, &branch);
     let registry: Value = read_json(&registry_path)?;
     let registry_open_path = PathBuf::from(required_string(&registry, &["open", "path"])?);
     if registry_open_path != open_dir {
@@ -438,6 +552,186 @@ fn list_branches(start: &Path) -> Result<Vec<Branch>, CliError> {
         branches.push(Branch { name, head, state });
     }
     Ok(branches)
+}
+
+fn load_branch_record(repo_root: &Path, branch: &str) -> Result<Value, CliError> {
+    let path = branch_record_path(repo_root, branch);
+    if !path.exists() {
+        return Err(CliError::Usage(format!("unknown branch: {branch}")));
+    }
+    read_json(&path)
+}
+
+fn save_branch_record(repo_root: &Path, branch: &Value) -> Result<(), CliError> {
+    let name = required_string(branch, &["name"])?;
+    write_json_atomic(&branch_record_path(repo_root, &name), branch)?;
+    codefire_store::store_object(
+        &repo_root.join(".codefire").join("objects"),
+        "branch",
+        branch.clone(),
+    )?;
+    Ok(())
+}
+
+fn branch_record_path(repo_root: &Path, branch: &str) -> PathBuf {
+    repo_root
+        .join(".codefire")
+        .join("branches")
+        .join(format!("{}.json", ref_file_name(branch)))
+}
+
+fn opened_registry_path(repo_root: &Path, branch: &str) -> PathBuf {
+    repo_root
+        .join(".codefire")
+        .join("opened")
+        .join(format!("{}.json", ref_file_name(branch)))
+}
+
+fn materialize_commit(objects: &Path, commit_id: &str, target: &Path) -> Result<(), CliError> {
+    let commit = codefire_store::read_object(objects, commit_id)?;
+    let manifest_id = required_string(&commit, &["roots", "content_manifest"])?;
+    let manifest = codefire_store::read_object(objects, &manifest_id)?;
+    let entries = manifest
+        .get("entries")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            CliError::InvalidRepository("content manifest entries must be a list".to_string())
+        })?;
+    for entry in entries {
+        if entry.get("kind").and_then(Value::as_str) != Some("file") {
+            continue;
+        }
+        let rel_path = required_string(entry, &["path"])?;
+        let blob_id = required_string(entry, &["blob"])?;
+        let blob = codefire_store::read_object(objects, &blob_id)?;
+        let encoding = required_string(&blob, &["encoding"])?;
+        if encoding != "base64" {
+            return Err(CliError::InvalidRepository(format!(
+                "unsupported blob encoding: {encoding}"
+            )));
+        }
+        let content = required_string(&blob, &["content"])?;
+        let output_path = safe_manifest_output_path(target, &rel_path)?;
+        if let Some(parent) = output_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(output_path, decode_base64(&content)?)?;
+    }
+    Ok(())
+}
+
+fn safe_manifest_output_path(target: &Path, rel_path: &str) -> Result<PathBuf, CliError> {
+    let path = Path::new(rel_path);
+    if path.is_absolute() {
+        return Err(CliError::InvalidRepository(format!(
+            "manifest path must be relative: {rel_path}"
+        )));
+    }
+    let mut output = target.to_path_buf();
+    for component in path.components() {
+        match component {
+            Component::Normal(part) => output.push(part),
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return Err(CliError::InvalidRepository(format!(
+                    "manifest path escapes target: {rel_path}"
+                )));
+            }
+        }
+    }
+    Ok(output)
+}
+
+fn decode_base64(input: &str) -> Result<Vec<u8>, CliError> {
+    let bytes: Vec<u8> = input
+        .bytes()
+        .filter(|byte| !byte.is_ascii_whitespace())
+        .collect();
+    if bytes.len() % 4 != 0 {
+        return Err(CliError::InvalidRepository(
+            "base64 content length is invalid".to_string(),
+        ));
+    }
+    let mut output = Vec::with_capacity(bytes.len() / 4 * 3);
+    for (chunk_index, chunk) in bytes.chunks(4).enumerate() {
+        let last = chunk_index + 1 == bytes.len() / 4;
+        let a = base64_value(chunk[0])?;
+        let b = base64_value(chunk[1])?;
+        let c_padding = chunk[2] == b'=';
+        let d_padding = chunk[3] == b'=';
+        if c_padding && !d_padding {
+            return Err(CliError::InvalidRepository(
+                "base64 padding is invalid".to_string(),
+            ));
+        }
+        if (c_padding || d_padding) && !last {
+            return Err(CliError::InvalidRepository(
+                "base64 padding before final chunk".to_string(),
+            ));
+        }
+        let c = if c_padding {
+            0
+        } else {
+            base64_value(chunk[2])?
+        };
+        let d = if d_padding {
+            0
+        } else {
+            base64_value(chunk[3])?
+        };
+        output.push((a << 2) | (b >> 4));
+        if !c_padding {
+            output.push(((b & 0x0f) << 4) | (c >> 2));
+        }
+        if !d_padding {
+            output.push(((c & 0x03) << 6) | d);
+        }
+    }
+    Ok(output)
+}
+
+fn base64_value(byte: u8) -> Result<u8, CliError> {
+    match byte {
+        b'A'..=b'Z' => Ok(byte - b'A'),
+        b'a'..=b'z' => Ok(byte - b'a' + 26),
+        b'0'..=b'9' => Ok(byte - b'0' + 52),
+        b'+' => Ok(62),
+        b'/' => Ok(63),
+        _ => Err(CliError::InvalidRepository(
+            "base64 content contains an invalid character".to_string(),
+        )),
+    }
+}
+
+fn is_empty_dir(path: &Path) -> Result<bool, CliError> {
+    Ok(path.is_dir() && fs::read_dir(path)?.next().is_none())
+}
+
+struct RepoLock {
+    path: PathBuf,
+}
+
+impl RepoLock {
+    fn acquire(repo_root: &Path) -> Result<Self, CliError> {
+        let path = repo_root.join(".codefire").join("locks").join("repo.lock");
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(_) => Ok(Self { path }),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                Err(CliError::Usage("CodeFire repository is locked".to_string()))
+            }
+            Err(error) => Err(CliError::Io(error)),
+        }
+    }
+}
+
+impl Drop for RepoLock {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
 }
 
 fn find_repo_root(start: &Path) -> Result<PathBuf, CliError> {
@@ -574,6 +868,52 @@ mod tests {
     }
 
     #[test]
+    fn open_materializes_manifest_and_updates_registry() {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+        let open_dir = temp.path().join("main-open");
+        init_repo(&repo_root, false).unwrap();
+        let objects = repo_root.join(".codefire").join("objects");
+        let commit_id = write_file_commit(&objects, "docs/readme.md", "hello\n");
+        let branch = json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": commit_id,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        });
+        save_branch_record(&repo_root, &branch).unwrap();
+
+        let result = open_branch_from(
+            &repo_root,
+            &OpenOptions {
+                branch: "main".to_string(),
+                path: open_dir.clone(),
+            },
+        )
+        .unwrap();
+        let status = read_status(&open_dir).unwrap();
+        let branches = list_branches(&open_dir).unwrap();
+
+        assert_eq!(result.open_dir, open_dir);
+        assert_eq!(
+            fs::read_to_string(result.open_dir.join("docs").join("readme.md")).unwrap(),
+            "hello\n"
+        );
+        assert_eq!(
+            status,
+            Status {
+                branch: "main".to_string(),
+                state: "open-clean".to_string(),
+                base: commit_id.clone(),
+                open_fires: 0,
+            }
+        );
+        assert_eq!(branches[0].state, "open-clean");
+    }
+
+    #[test]
     fn status_reads_python_compatible_open_directory() {
         let temp = tempdir().unwrap();
         let repo_root = temp.path();
@@ -702,11 +1042,74 @@ mod tests {
         assert_eq!(format_unix_seconds_utc(951_782_400), "2000-02-29T00:00:00Z");
     }
 
+    #[test]
+    fn base64_decoder_handles_padding_and_rejects_invalid_input() {
+        assert_eq!(decode_base64("aGVsbG8K").unwrap(), b"hello\n");
+        assert_eq!(decode_base64("Zg==").unwrap(), b"f");
+        assert!(decode_base64("Z===").is_err());
+    }
+
     fn write_valid_commit(objects: &Path) -> String {
         let roots = write_required_roots(objects);
         let certificate = consistent_certificate();
         let commit = codefire_store::commit_payload(vec![], roots, certificate);
         codefire_store::store_object(objects, "commit", commit).unwrap()
+    }
+
+    fn write_file_commit(objects: &Path, path: &str, contents: &str) -> String {
+        let blob = codefire_store::store_object(
+            objects,
+            "blob",
+            json!({
+                "type": "blob",
+                "version": 1,
+                "encoding": "base64",
+                "content": encode_base64(contents.as_bytes()),
+            }),
+        )
+        .unwrap();
+        let manifest = codefire_store::store_object(
+            objects,
+            "content_manifest",
+            json!({
+                "type": "content_manifest",
+                "version": 1,
+                "entries": [{"path": path, "kind": "file", "mode": "100644", "blob": blob}],
+            }),
+        )
+        .unwrap();
+        let mut roots = write_required_roots(objects);
+        roots.insert("content_manifest".to_string(), Value::String(manifest));
+        codefire_store::store_object(
+            objects,
+            "commit",
+            codefire_store::commit_payload(vec![], roots, consistent_certificate()),
+        )
+        .unwrap()
+    }
+
+    fn encode_base64(bytes: &[u8]) -> String {
+        const ALPHABET: &[u8; 64] =
+            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut encoded = String::with_capacity(bytes.len().div_ceil(3) * 4);
+        for chunk in bytes.chunks(3) {
+            let a = chunk[0];
+            let b = *chunk.get(1).unwrap_or(&0);
+            let c = *chunk.get(2).unwrap_or(&0);
+            encoded.push(ALPHABET[(a >> 2) as usize] as char);
+            encoded.push(ALPHABET[(((a & 0x03) << 4) | (b >> 4)) as usize] as char);
+            if chunk.len() >= 2 {
+                encoded.push(ALPHABET[(((b & 0x0f) << 2) | (c >> 6)) as usize] as char);
+            } else {
+                encoded.push('=');
+            }
+            if chunk.len() == 3 {
+                encoded.push(ALPHABET[(c & 0x3f) as usize] as char);
+            } else {
+                encoded.push('=');
+            }
+        }
+        encoded
     }
 
     fn write_required_roots(objects: &Path) -> Map<String, Value> {
