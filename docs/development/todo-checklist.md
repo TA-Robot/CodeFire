@@ -182,10 +182,29 @@
 | CF-215 | Rust Storage | storage reportとexternal artifact refsをRustで実装する | CF-202, CF-167 | todo | CFB-008 |
 | CF-216 | Migration | `migrate check/dry-run` を実装する | CF-209 | todo | v0.6 migration |
 | CF-217 | Release | installerをRust binary default + Python fallbackへ切り替える | CF-216 | todo | v0.6 release |
+| CF-218 | Automation Interface | state/diagnostic command向けstable JSON envelope/schemaを実装する | CF-200 | todo | v0.6 automation interface |
+| CF-219 | Automation Interface | CLI全体のstable exit code taxonomyを実装する | CF-218 | todo | v0.6 automation interface |
+| CF-220 | Context | `codefire context` でatom/fire/changed/branch context packを返す | CF-206, CF-218 | todo | v0.6 automation interface |
+| CF-221 | Diagnostics | status/scan/verify/doctor/storage/migrateにmachine-readable `next_actions` を追加する | CF-208, CF-220 | todo | v0.6 automation interface |
+| CF-222 | Operation Plans | mutating commandに `--dry-run` / operation plan出力を追加する | CF-209, CF-218 | todo | v0.6 automation interface |
+| CF-223 | Batch | link/fire/extinguish/evidence/artifactのbatch操作とdry-run validationを実装する | CF-207, CF-222 | todo | v0.6 automation interface |
+| CF-224 | Safety | local/remote mutating operationにidempotency keyを実装する | CF-222, CF-211 | todo | v0.6 automation interface |
+| CF-225 | Safety | `--wait-lock` / `--lock-timeout` / JSON lock diagnosticsを実装する | CF-203, CF-219 | todo | v0.6 automation interface |
+| CF-226 | Evidence | command outputとartifact hashを取り込むevidence capture APIを実装する | CF-215, CF-218 | todo | v0.6 automation interface |
+| CF-227 | Explain | fire/atom/verify failure/storage warning向けread-only `codefire explain` を実装する | CF-220, CF-221 | todo | v0.6 automation interface |
+| CF-228 | Diff | pluggable Myers / patience / histogram-style text diffを実装する | CF-210 | todo | v0.6 diff intelligence |
+| CF-229 | Diff | rename/copy detectionとbinary diff summaryを実装する | CF-228 | todo | v0.6 diff intelligence |
+| CF-230 | Diff | Atom diffとTraceGraph diffを実装する | CF-205, CF-228 | todo | v0.6 diff intelligence |
+| CF-231 | Impact | policy/fire impact diffとmachine-readable next actionsを実装する | CF-221, CF-230 | todo | v0.6 diff intelligence |
+| CF-232 | Merge | merge dry-run predictionとsemantic conflict candidate reportingを実装する | CF-210, CF-231 | todo | v0.6 diff intelligence |
+| CF-233 | Review | file diff、Atom diff、Trace diff、verification、next actionsを含むreview-pack exportを実装する | CF-231, CF-232 | todo | v0.6 diff intelligence |
+| CF-234 | Patch | review / remote workflow向けpatch export/importを実装する | CF-228, CF-233 | todo | v0.6 diff intelligence |
+| CF-235 | Testing | diff/merge golden fixturesとGit comparison smoke testsを追加する | CF-228, CF-232 | todo | v0.6 diff intelligence |
 
 ## Immediate Next Actions
 
-1. v0.6 Rust rewriteのcrate境界とgolden compatibility testsを先に作る。
-2. CFB-005/006のUX改善をRust CLI計画へ組み込み、dogfooding中の操作コストと診断ノイズを下げる。
-3. YAML parser とobject ID仕様の互換性方針をv0.6 Rust計画で確定する。
-4. OS-level sandbox / process isolationの方針を決める。
+1. v0.6 Rust rewriteのcrate境界、golden compatibility tests、automation interface schema方針を先に作る。
+2. JSON output、exit code taxonomy、context、next_actionsをv0.3/v0.4から段階導入する。
+3. diff algorithm / rename detection / Atom-Trace impact diffのgolden fixture方針を決める。
+4. CFB-005/006のUX改善をRust CLI計画へ組み込み、dogfooding中の操作コストと診断ノイズを下げる。
+5. YAML parser とobject ID仕様の互換性方針をv0.6 Rust計画で確定する。
