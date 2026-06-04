@@ -201,7 +201,7 @@
 | CF-225 | Safety | `--wait-lock` / `--lock-timeout` / JSON lock diagnosticsを実装する | CF-203, CF-219 | todo | v0.6 automation interface |
 | CF-226 | Evidence | command outputとartifact hashを取り込むevidence capture APIを実装する | CF-215, CF-218 | todo | v0.6 automation interface |
 | CF-227 | Explain | fire/atom/verify failure/storage warning向けread-only `codefire explain` を実装する | CF-220, CF-221 | todo | v0.6 automation interface |
-| CF-228 | Diff | pluggable Myers / patience / histogram-style text diffを実装する | CF-210 | todo | v0.6 diff intelligence |
+| CF-228 | Diff | pluggable Myers / patience / histogram-style text diffを実装する | CF-210 | done | `codefire-rs diff --algorithm myers|patience|histogram`; `view::tests::*_diff_*`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-229 | Diff | rename/copy detectionとbinary diff summaryを実装する | CF-228 | todo | v0.6 diff intelligence |
 | CF-230 | Diff | Atom diffとTraceGraph diffを実装する | CF-205, CF-228 | todo | v0.6 diff intelligence |
 | CF-231 | Impact | policy/fire impact diffとmachine-readable next actionsを実装する | CF-221, CF-230 | todo | v0.6 diff intelligence |

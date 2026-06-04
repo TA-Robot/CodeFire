@@ -161,11 +161,49 @@ fn show_and_diff_local_branches() {
     assert!(show.contains("Files: 1"));
     assert!(show.contains("Certificate: consistent"));
 
-    let diff = diff_commitish(Some(&repo_root), "main", "feature-session").unwrap();
+    let diff = diff_commitish_with_options(
+        Some(&repo_root),
+        "main",
+        "feature-session",
+        &DiffOptions::default(),
+    )
+    .unwrap();
     assert!(diff.contains("--- main@CF-COMMIT-"));
     assert!(diff.contains("+++ feature-session@CF-COMMIT-"));
     assert!(diff.contains("-    return 30"));
     assert!(diff.contains("+    return 15"));
+}
+
+#[test]
+fn parse_diff_args_accepts_algorithm_forms() {
+    let args = vec![
+        "--algorithm".to_string(),
+        "patience".to_string(),
+        "main".to_string(),
+        "feature".to_string(),
+    ];
+    let parsed = parse_diff_args(&args).unwrap();
+    assert_eq!(parsed.left, "main");
+    assert_eq!(parsed.right, "feature");
+    assert_eq!(parsed.diff.algorithm, DiffAlgorithm::Patience);
+
+    let args = vec![
+        "main".to_string(),
+        "feature".to_string(),
+        "--algorithm=histogram".to_string(),
+    ];
+    let parsed = parse_diff_args(&args).unwrap();
+    assert_eq!(parsed.diff.algorithm, DiffAlgorithm::Histogram);
+
+    let error = parse_diff_args(&[
+        "--algorithm".to_string(),
+        "minimal".to_string(),
+        "main".to_string(),
+        "feature".to_string(),
+    ])
+    .unwrap_err()
+    .to_string();
+    assert!(error.contains("--algorithm must be one of"));
 }
 
 #[test]
@@ -252,7 +290,8 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
     let show = show_commitish(None, &feature_url).unwrap();
     assert!(show.contains(&format!("Object: {feature_url}@CF-COMMIT-")));
     assert!(show.contains("Certificate: consistent"));
-    let diff = diff_commitish(None, &main_url, &feature_url).unwrap();
+    let diff = diff_commitish_with_options(None, &main_url, &feature_url, &DiffOptions::default())
+        .unwrap();
     assert!(diff.contains(&format!("--- {main_url}@CF-COMMIT-")));
     assert!(diff.contains(&format!("+++ {feature_url}@CF-COMMIT-")));
     assert!(diff.contains("+hello 15"));

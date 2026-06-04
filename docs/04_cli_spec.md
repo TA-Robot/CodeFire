@@ -27,7 +27,7 @@ codefire request-merge <source-url> <target-url>
 
 codefire list <server-url>
 codefire show <branch-or-url>
-codefire diff <branch-or-url> <branch-or-url>
+codefire diff [--algorithm myers|patience|histogram] <branch-or-url> <branch-or-url>
 codefire request-list <server-url>
 
 codefire discard <branch>
@@ -223,6 +223,27 @@ sealed branchだけuploadできる
 open-burning branchはupload不可
 server branchが進んでいたら拒否する
 force uploadは存在しない
+```
+
+## 4.12A `show` / `diff`
+
+```bash
+codefire show feature-login
+codefire diff main feature-login
+codefire diff --algorithm patience main feature-login
+codefire diff main feature-login --algorithm=histogram
+```
+
+仕様：
+
+```text
+local branch、sealed commit ID、cf:// URL、cf+http:// URLを参照できる
+参照先のsealed commit妥当性を検証してから表示する
+diffのdefault algorithmはmyers
+--algorithmはmyers、patience、histogramを受け付ける
+myersはexact text diff baselineとして使う
+patienceはunique line anchorを優先してrefactor時の可読性を上げる
+histogramは低頻度line anchorを優先して繰り返しの多いfileの差分を安定させる
 ```
 
 ## 4.13 `request-merge`

@@ -18,7 +18,9 @@ use remote::{
     upload_branch, write_object_records, RemoteProjectOptions, RequestApplyOptions,
     RequestMergeOptions, RequestReviewOptions, UploadOptions,
 };
-use view::{diff_commitish, manifest_contents, show_commitish};
+use view::{
+    diff_commitish_with_options, manifest_contents, show_commitish, DiffAlgorithm, DiffOptions,
+};
 
 fn main() {
     if let Err(error) = run(env::args().skip(1).collect()) {
@@ -172,16 +174,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("diff") => {
-            let (left, right) = match args.as_slice() {
-                [_, left, right] => (left, right),
-                _ => {
-                    return Err(CliError::Usage(
-                        "usage: codefire-rs diff <left> <right>".to_string(),
-                    ))
-                }
-            };
+            let options = parse_diff_args(&args[1..])?;
             let repo_root = optional_repo_root(&env::current_dir()?);
-            let output = diff_commitish(repo_root.as_deref(), left, right)?;
+            let output = diff_commitish_with_options(
+                repo_root.as_deref(),
+                &options.left,
+                &options.right,
+                &options.diff,
+            )?;
             print!("{output}");
             Ok(())
         }
@@ -406,6 +406,13 @@ struct CommitResult {
 struct CloneOptions {
     source: String,
     new_branch: String,
+}
+
+#[derive(Debug)]
+struct DiffArgs {
+    left: String,
+    right: String,
+    diff: DiffOptions,
 }
 
 #[derive(Debug)]
@@ -702,6 +709,46 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
             "usage: codefire-rs clone <source-branch> <new-branch>".to_string(),
         )),
     }
+}
+
+fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
+    let mut positional = Vec::new();
+    let mut algorithm = DiffAlgorithm::Myers;
+    let mut index = 0usize;
+    while index < args.len() {
+        let value = &args[index];
+        if value == "--algorithm" {
+            index += 1;
+            let name = args
+                .get(index)
+                .ok_or_else(|| CliError::Usage("--algorithm requires a value".to_string()))?;
+            algorithm = parse_diff_algorithm(name)?;
+        } else if let Some(name) = value.strip_prefix("--algorithm=") {
+            algorithm = parse_diff_algorithm(name)?;
+        } else if value.starts_with("--") {
+            return Err(CliError::Usage(format!("unsupported diff option: {value}")));
+        } else {
+            positional.push(value.clone());
+        }
+        index += 1;
+    }
+    match positional.as_slice() {
+        [left, right] => Ok(DiffArgs {
+            left: left.clone(),
+            right: right.clone(),
+            diff: DiffOptions { algorithm },
+        }),
+        _ => Err(CliError::Usage(
+            "usage: codefire-rs diff [--algorithm myers|patience|histogram] <left> <right>"
+                .to_string(),
+        )),
+    }
+}
+
+fn parse_diff_algorithm(value: &str) -> Result<DiffAlgorithm, CliError> {
+    DiffAlgorithm::parse(value).ok_or_else(|| {
+        CliError::Usage("--algorithm must be one of: myers, patience, histogram".to_string())
+    })
 }
 
 fn parse_upload_args(args: &[String]) -> Result<UploadOptions, CliError> {

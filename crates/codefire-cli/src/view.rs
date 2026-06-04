@@ -4,10 +4,41 @@ use super::remote::{
 };
 use super::*;
 use serde_json::Value;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DiffAlgorithm {
+    Myers,
+    Patience,
+    Histogram,
+}
+
+impl DiffAlgorithm {
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        match value {
+            "myers" => Some(Self::Myers),
+            "patience" => Some(Self::Patience),
+            "histogram" => Some(Self::Histogram),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DiffOptions {
+    pub(crate) algorithm: DiffAlgorithm,
+}
+
+impl Default for DiffOptions {
+    fn default() -> Self {
+        Self {
+            algorithm: DiffAlgorithm::Myers,
+        }
+    }
+}
 
 #[derive(Debug)]
 struct ResolvedCommitish {
@@ -68,10 +99,11 @@ pub(crate) fn show_commitish(repo_root: Option<&Path>, value: &str) -> Result<St
     ))
 }
 
-pub(crate) fn diff_commitish(
+pub(crate) fn diff_commitish_with_options(
     repo_root: Option<&Path>,
     left: &str,
     right: &str,
+    options: &DiffOptions,
 ) -> Result<String, CliError> {
     let left = resolve_commitish_any(repo_root, left)?;
     let right = resolve_commitish_any(repo_root, right)?;
@@ -82,6 +114,7 @@ pub(crate) fn diff_commitish(
         &left_files,
         &right.label,
         &right_files,
+        options,
     ))
 }
 
@@ -209,6 +242,7 @@ fn render_manifest_diff(
     left: &BTreeMap<String, Vec<u8>>,
     right_label: &str,
     right: &BTreeMap<String, Vec<u8>>,
+    options: &DiffOptions,
 ) -> String {
     let paths = left
         .keys()
@@ -239,6 +273,7 @@ fn render_manifest_diff(
             left_data.map(Vec::as_slice).unwrap_or(&[]),
             right_data.map(Vec::as_slice).unwrap_or(&[]),
             &mut output,
+            options.algorithm,
         );
     }
     if !changed {
@@ -247,31 +282,233 @@ fn render_manifest_diff(
     output
 }
 
-fn render_line_delta(left: &[u8], right: &[u8], output: &mut String) {
+fn render_line_delta(left: &[u8], right: &[u8], output: &mut String, algorithm: DiffAlgorithm) {
     let left_lines = split_lines_lossy(left);
     let right_lines = split_lines_lossy(right);
-    let mut prefix = 0usize;
-    while prefix < left_lines.len()
-        && prefix < right_lines.len()
-        && left_lines[prefix] == right_lines[prefix]
-    {
-        prefix += 1;
+    for op in diff_lines(&left_lines, &right_lines, algorithm) {
+        match op {
+            DiffOp::Equal(_) => {}
+            DiffOp::Delete(line) => push_diff_line(output, '-', line),
+            DiffOp::Insert(line) => push_diff_line(output, '+', line),
+        }
     }
-    let mut left_suffix = left_lines.len();
-    let mut right_suffix = right_lines.len();
-    while left_suffix > prefix
-        && right_suffix > prefix
-        && left_lines[left_suffix - 1] == right_lines[right_suffix - 1]
-    {
-        left_suffix -= 1;
-        right_suffix -= 1;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DiffOp<'a> {
+    Equal(&'a str),
+    Delete(&'a str),
+    Insert(&'a str),
+}
+
+fn diff_lines<'a>(
+    left: &'a [String],
+    right: &'a [String],
+    algorithm: DiffAlgorithm,
+) -> Vec<DiffOp<'a>> {
+    match algorithm {
+        DiffAlgorithm::Myers => lcs_script(left, right),
+        DiffAlgorithm::Patience => anchored_script(left, right, AnchorMode::Patience, 0),
+        DiffAlgorithm::Histogram => anchored_script(left, right, AnchorMode::Histogram, 0),
     }
-    for line in &left_lines[prefix..left_suffix] {
-        push_diff_line(output, '-', line);
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AnchorMode {
+    Patience,
+    Histogram,
+}
+
+fn anchored_script<'a>(
+    left: &'a [String],
+    right: &'a [String],
+    mode: AnchorMode,
+    depth: usize,
+) -> Vec<DiffOp<'a>> {
+    if left.is_empty() || right.is_empty() || depth > 128 {
+        return lcs_script(left, right);
     }
-    for line in &right_lines[prefix..right_suffix] {
-        push_diff_line(output, '+', line);
+    let anchors = match mode {
+        AnchorMode::Patience => patience_anchors(left, right),
+        AnchorMode::Histogram => histogram_anchors(left, right),
+    };
+    if anchors.is_empty() {
+        return lcs_script(left, right);
     }
+
+    let mut ops = Vec::new();
+    let mut left_start = 0usize;
+    let mut right_start = 0usize;
+    for (left_anchor, right_anchor) in anchors {
+        ops.extend(anchored_script(
+            &left[left_start..left_anchor],
+            &right[right_start..right_anchor],
+            mode,
+            depth + 1,
+        ));
+        ops.push(DiffOp::Equal(&left[left_anchor]));
+        left_start = left_anchor + 1;
+        right_start = right_anchor + 1;
+    }
+    ops.extend(anchored_script(
+        &left[left_start..],
+        &right[right_start..],
+        mode,
+        depth + 1,
+    ));
+    ops
+}
+
+fn lcs_script<'a>(left: &'a [String], right: &'a [String]) -> Vec<DiffOp<'a>> {
+    let pairs = lcs_pairs(left, right, None);
+    script_from_pairs(left, right, &pairs)
+}
+
+fn script_from_pairs<'a>(
+    left: &'a [String],
+    right: &'a [String],
+    pairs: &[(usize, usize)],
+) -> Vec<DiffOp<'a>> {
+    let mut ops = Vec::with_capacity(left.len() + right.len());
+    let mut left_cursor = 0usize;
+    let mut right_cursor = 0usize;
+    for &(left_match, right_match) in pairs {
+        for line in &left[left_cursor..left_match] {
+            ops.push(DiffOp::Delete(line));
+        }
+        for line in &right[right_cursor..right_match] {
+            ops.push(DiffOp::Insert(line));
+        }
+        ops.push(DiffOp::Equal(&left[left_match]));
+        left_cursor = left_match + 1;
+        right_cursor = right_match + 1;
+    }
+    for line in &left[left_cursor..] {
+        ops.push(DiffOp::Delete(line));
+    }
+    for line in &right[right_cursor..] {
+        ops.push(DiffOp::Insert(line));
+    }
+    ops
+}
+
+fn patience_anchors(left: &[String], right: &[String]) -> Vec<(usize, usize)> {
+    let left_counts = line_counts(left);
+    let right_counts = line_counts(right);
+    lcs_pairs(
+        left,
+        right,
+        Some(&|line| {
+            left_counts.get(line).copied().unwrap_or(0) == 1
+                && right_counts.get(line).copied().unwrap_or(0) == 1
+        }),
+    )
+}
+
+fn histogram_anchors(left: &[String], right: &[String]) -> Vec<(usize, usize)> {
+    let left_counts = line_counts(left);
+    let right_counts = line_counts(right);
+    let best_frequency = left_counts
+        .iter()
+        .filter_map(|(line, left_count)| {
+            let right_count = right_counts.get(line)?;
+            Some(left_count + right_count)
+        })
+        .filter(|count| *count <= 64)
+        .min();
+    let Some(best_frequency) = best_frequency else {
+        return Vec::new();
+    };
+    lcs_pairs(
+        left,
+        right,
+        Some(&|line| {
+            left_counts.get(line).copied().unwrap_or(0)
+                + right_counts.get(line).copied().unwrap_or(0)
+                == best_frequency
+        }),
+    )
+}
+
+fn line_counts(lines: &[String]) -> HashMap<&str, usize> {
+    let mut counts = HashMap::new();
+    for line in lines {
+        *counts.entry(line.as_str()).or_insert(0) += 1;
+    }
+    counts
+}
+
+fn lcs_pairs(
+    left: &[String],
+    right: &[String],
+    allowed: Option<&dyn Fn(&str) -> bool>,
+) -> Vec<(usize, usize)> {
+    let mut right_positions: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (index, line) in right.iter().enumerate() {
+        if predicate_allows(allowed, line) {
+            right_positions
+                .entry(line.as_str())
+                .or_default()
+                .push(index);
+        }
+    }
+
+    let mut tails: Vec<usize> = Vec::new();
+    let mut tail_nodes: Vec<usize> = Vec::new();
+    let mut nodes: Vec<LcsNode> = Vec::new();
+    for (left_index, line) in left.iter().enumerate() {
+        if !predicate_allows(allowed, line) {
+            continue;
+        }
+        let Some(positions) = right_positions.get(line.as_str()) else {
+            continue;
+        };
+        for &right_index in positions.iter().rev() {
+            let length_index = tails.partition_point(|&value| value < right_index);
+            let previous = length_index
+                .checked_sub(1)
+                .and_then(|index| tail_nodes.get(index).copied());
+            let node_index = nodes.len();
+            nodes.push(LcsNode {
+                left: left_index,
+                right: right_index,
+                previous,
+            });
+            if length_index == tails.len() {
+                tails.push(right_index);
+                tail_nodes.push(node_index);
+            } else if right_index < tails[length_index] {
+                tails[length_index] = right_index;
+                tail_nodes[length_index] = node_index;
+            }
+        }
+    }
+
+    let Some(mut node_index) = tail_nodes.last().copied() else {
+        return Vec::new();
+    };
+    let mut pairs = Vec::with_capacity(tails.len());
+    loop {
+        let node = nodes[node_index];
+        pairs.push((node.left, node.right));
+        let Some(previous) = node.previous else {
+            break;
+        };
+        node_index = previous;
+    }
+    pairs.reverse();
+    pairs
+}
+
+fn predicate_allows(allowed: Option<&dyn Fn(&str) -> bool>, line: &str) -> bool {
+    allowed.map_or(true, |predicate| predicate(line))
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LcsNode {
+    left: usize,
+    right: usize,
+    previous: Option<usize>,
 }
 
 fn split_lines_lossy(bytes: &[u8]) -> Vec<String> {
@@ -286,5 +523,46 @@ fn push_diff_line(output: &mut String, prefix: char, line: &str) {
     output.push_str(line);
     if !line.ends_with('\n') {
         output.push('\n');
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn diff_text(left: &str, right: &str, algorithm: DiffAlgorithm) -> String {
+        let mut output = String::new();
+        render_line_delta(left.as_bytes(), right.as_bytes(), &mut output, algorithm);
+        output
+    }
+
+    #[test]
+    fn myers_diff_keeps_middle_common_lines() {
+        let diff = diff_text(
+            "alpha\nkeep\nold\nomega\n",
+            "alpha\nkeep\nnew\nomega\n",
+            DiffAlgorithm::Myers,
+        );
+        assert_eq!(diff, "-old\n+new\n");
+    }
+
+    #[test]
+    fn patience_diff_uses_unique_anchors_around_repeated_lines() {
+        let diff = diff_text(
+            "header\nsame\nleft only\nsame\nfooter\n",
+            "header\nsame\nright only\nsame\nfooter\n",
+            DiffAlgorithm::Patience,
+        );
+        assert_eq!(diff, "-left only\n+right only\n");
+    }
+
+    #[test]
+    fn histogram_diff_handles_low_frequency_anchors() {
+        let diff = diff_text(
+            "block\nanchor\nold\nblock\n",
+            "block\nanchor\nnew\nblock\n",
+            DiffAlgorithm::Histogram,
+        );
+        assert_eq!(diff, "-old\n+new\n");
     }
 }
