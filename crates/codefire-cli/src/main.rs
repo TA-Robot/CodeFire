@@ -13,6 +13,23 @@ fn main() {
 
 fn run(args: Vec<String>) -> Result<(), CliError> {
     match args.first().map(String::as_str) {
+        Some("branch") => match args.get(1).map(String::as_str) {
+            Some("list") => {
+                let start = args
+                    .get(2)
+                    .map(PathBuf::from)
+                    .unwrap_or(env::current_dir()?);
+                let branches = list_branches(&start)?;
+                print_branches(&branches);
+                Ok(())
+            }
+            Some(command) => Err(CliError::Usage(format!(
+                "unsupported branch command: {command}"
+            ))),
+            None => Err(CliError::Usage(
+                "missing branch command; expected: list".to_string(),
+            )),
+        },
         Some("status") => {
             let start = args
                 .get(1)
@@ -91,11 +108,24 @@ struct Status {
     open_fires: usize,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct Branch {
+    name: String,
+    head: String,
+    state: String,
+}
+
 fn print_status(status: &Status) {
     println!("Branch: {}", status.branch);
     println!("State: {}", status.state);
     println!("Base: {}", status.base);
     println!("Open fires: {}", status.open_fires);
+}
+
+fn print_branches(branches: &[Branch]) {
+    for branch in branches {
+        println!("{}\t{}\t{}", branch.name, branch.head, branch.state);
+    }
 }
 
 fn read_status(start: &Path) -> Result<Status, CliError> {
@@ -159,8 +189,65 @@ fn read_status(start: &Path) -> Result<Status, CliError> {
     })
 }
 
+fn list_branches(start: &Path) -> Result<Vec<Branch>, CliError> {
+    let repo_root = find_repo_root(start)?;
+    let branches_root = repo_root.join(".codefire").join("branches");
+    let objects_root = repo_root.join(".codefire").join("objects");
+    let mut branch_paths = Vec::new();
+    for entry in fs::read_dir(branches_root)? {
+        let path = entry?.path();
+        if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
+            branch_paths.push(path);
+        }
+    }
+    branch_paths.sort();
+
+    let mut branches = Vec::with_capacity(branch_paths.len());
+    for path in branch_paths {
+        let record = read_json(&path)?;
+        let name = required_string(&record, &["name"])?;
+        let head = required_string(&record, &["head"])?;
+        codefire_store::validate_sealed_commit(&objects_root, &head)?;
+        let state = record
+            .get("state")
+            .and_then(Value::as_str)
+            .unwrap_or("closed")
+            .to_string();
+        branches.push(Branch { name, head, state });
+    }
+    Ok(branches)
+}
+
+fn find_repo_root(start: &Path) -> Result<PathBuf, CliError> {
+    let mut current = start.canonicalize()?;
+    if current.is_file() {
+        current.pop();
+    }
+    let mut candidate = Some(current.as_path());
+    while let Some(path) = candidate {
+        if path.join(".codefire").is_dir() {
+            return Ok(path.to_path_buf());
+        }
+        candidate = path.parent();
+    }
+    if let Some(marker_path) = find_open_marker(&current)? {
+        let marker = read_json(&marker_path)?;
+        let repo_dir = PathBuf::from(required_string(&marker, &["repository", "path"])?);
+        return repo_dir
+            .parent()
+            .map(Path::to_path_buf)
+            .ok_or_else(|| CliError::InvalidMarker("repository path has no parent".to_string()));
+    }
+    Err(CliError::Usage(
+        "not inside a CodeFire repository; run 'codefire init' first".to_string(),
+    ))
+}
+
 fn find_open_marker(start: &Path) -> Result<Option<PathBuf>, CliError> {
     let mut current = start.canonicalize()?;
+    if current.is_file() {
+        current.pop();
+    }
     loop {
         let marker = current.join(".codefire-open");
         if marker.exists() {
@@ -271,6 +358,55 @@ mod tests {
                 base: commit_id,
                 open_fires: 1
             }
+        );
+    }
+
+    #[test]
+    fn branch_list_reads_repo_from_open_marker_and_validates_heads() {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+        let open_dir = temp.path().join("worktree");
+        let cf = repo_root.join(".codefire");
+        fs::create_dir_all(cf.join("branches")).unwrap();
+        fs::create_dir_all(&open_dir).unwrap();
+
+        let commit_id = write_valid_commit(&cf.join("objects"));
+        let branch_name = "feature/a b%雪";
+        fs::write(
+            cf.join("branches")
+                .join(format!("{}.json", ref_file_name(branch_name))),
+            serde_json::to_string_pretty(&json!({
+                "type": "branch",
+                "version": 1,
+                "name": branch_name,
+                "head": commit_id,
+                "state": "open-clean",
+                "created_at": "2026-06-04T00:00:00Z"
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            open_dir.join(".codefire-open"),
+            serde_json::to_string_pretty(&json!({
+                "version": 1,
+                "repository": {"path": cf, "repository_id": "repo_123"},
+                "branch": {"name": branch_name, "opened_from_commit": commit_id},
+                "open": {"open_instance_id": "open_123", "opened_at": "2026-06-04T00:00:00Z", "opened_path": open_dir}
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let branches = list_branches(&open_dir).unwrap();
+
+        assert_eq!(
+            branches,
+            vec![Branch {
+                name: branch_name.to_string(),
+                head: commit_id,
+                state: "open-clean".to_string()
+            }]
         );
     }
 
