@@ -8,9 +8,14 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+mod automation;
 mod http;
 mod remote;
 mod view;
+use automation::{
+    command_result_envelope, scan_data_json, scan_diagnostics_json, status_data_json,
+    verification_data_json, verification_diagnostics_json,
+};
 use http::{http_json, http_remote_path, parse_cf_http_url, serve_http};
 use remote::{
     apply_merge_request, copy_object_graph, list_merge_requests, list_remote_branches,
@@ -63,18 +68,47 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("scan") => {
-            let start = args
-                .get(1)
-                .map(PathBuf::from)
-                .unwrap_or(env::current_dir()?);
-            let scan = run_scan(&start)?;
-            print_scan(&scan);
+            let options = parse_path_json_args(&args[1..], "scan")?;
+            let scan = run_scan(&options.path)?;
+            if options.json_output {
+                let repo_root = open_context(&options.path).ok().map(|context| context.repo_root);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "scan",
+                        true,
+                        0,
+                        repo_root.as_deref(),
+                        scan_data_json(&scan),
+                        scan_diagnostics_json(&scan),
+                        Vec::new(),
+                    ))?
+                );
+            } else {
+                print_scan(&scan);
+            }
             Ok(())
         }
         Some("verify") => {
             let options = parse_verify_args(&args[1..])?;
             let verification = run_verify(&options.path)?;
-            print_verification(&verification, options.details);
+            if options.json_output {
+                let repo_root = open_context(&options.path).ok().map(|context| context.repo_root);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "verify",
+                        verification.result == "passed",
+                        if verification.result == "passed" { 0 } else { 1 },
+                        repo_root.as_deref(),
+                        verification_data_json(&verification),
+                        verification_diagnostics_json(&verification),
+                        Vec::new(),
+                    ))?
+                );
+            } else {
+                print_verification(&verification, options.details);
+            }
             if verification.result == "passed" {
                 Ok(())
             } else {
@@ -297,12 +331,25 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             )),
         },
         Some("status") => {
-            let start = args
-                .get(1)
-                .map(PathBuf::from)
-                .unwrap_or(env::current_dir()?);
-            let status = read_status(&start)?;
-            print_status(&status);
+            let options = parse_path_json_args(&args[1..], "status")?;
+            let status = read_status(&options.path)?;
+            if options.json_output {
+                let repo_root = open_context(&options.path).ok().map(|context| context.repo_root);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "status",
+                        true,
+                        0,
+                        repo_root.as_deref(),
+                        status_data_json(&status),
+                        Vec::new(),
+                        Vec::new(),
+                    ))?
+                );
+            } else {
+                print_status(&status);
+            }
             Ok(())
         }
         Some("--version") | Some("version") => {
@@ -432,6 +479,13 @@ struct OpenResult {
 struct VerifyOptions {
     path: PathBuf,
     details: bool,
+    json_output: bool,
+}
+
+#[derive(Debug)]
+struct PathJsonOptions {
+    path: PathBuf,
+    json_output: bool,
 }
 
 #[derive(Debug)]
@@ -711,9 +765,12 @@ fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
 fn parse_verify_args(args: &[String]) -> Result<VerifyOptions, CliError> {
     let mut path = None;
     let mut details = false;
+    let mut json_output = false;
     for arg in args {
         if arg == "--details" {
             details = true;
+        } else if arg == "--json" {
+            json_output = true;
         } else if path.is_none() {
             path = Some(PathBuf::from(arg));
         } else {
@@ -725,6 +782,31 @@ fn parse_verify_args(args: &[String]) -> Result<VerifyOptions, CliError> {
     Ok(VerifyOptions {
         path: path.unwrap_or(env::current_dir()?),
         details,
+        json_output,
+    })
+}
+
+fn parse_path_json_args(args: &[String], command: &str) -> Result<PathJsonOptions, CliError> {
+    let mut path = None;
+    let mut json_output = false;
+    for arg in args {
+        if arg == "--json" {
+            json_output = true;
+        } else if arg.starts_with("--") {
+            return Err(CliError::Usage(format!(
+                "unsupported {command} option: {arg}"
+            )));
+        } else if path.is_none() {
+            path = Some(PathBuf::from(arg));
+        } else {
+            return Err(CliError::Usage(format!(
+                "unexpected {command} argument: {arg}"
+            )));
+        }
+    }
+    Ok(PathJsonOptions {
+        path: path.unwrap_or(env::current_dir()?),
+        json_output,
     })
 }
 

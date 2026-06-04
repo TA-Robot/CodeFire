@@ -392,6 +392,27 @@ fn parse_diff_args_accepts_algorithm_forms() {
 }
 
 #[test]
+fn parse_state_diagnostic_json_args() {
+    let status = parse_path_json_args(
+        &["/tmp/example".to_string(), "--json".to_string()],
+        "status",
+    )
+    .unwrap();
+    assert_eq!(status.path, PathBuf::from("/tmp/example"));
+    assert!(status.json_output);
+
+    let verify = parse_verify_args(&[
+        "--details".to_string(),
+        "--json".to_string(),
+        "/tmp/example".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(verify.path, PathBuf::from("/tmp/example"));
+    assert!(verify.details);
+    assert!(verify.json_output);
+}
+
+#[test]
 fn parse_merge_args_accepts_dry_run_json() {
     let args = vec![
         "feature-session".to_string(),

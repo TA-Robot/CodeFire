@@ -14,10 +14,13 @@ codefire close <branch> --discard
 codefire clone <source-branch-or-url> <new-branch>
 
 codefire status
+codefire status --json
 codefire scan
+codefire scan --json
 codefire fire <atom-id> --reason <text>
 codefire extinguish <fire-id> --resolution <type> [--rationale <text>] [--evidence <ref>]
 codefire verify
+codefire verify --json
 codefire commit -m <message>
 
 codefire merge <source-branch> --into <target-branch>
@@ -113,6 +116,7 @@ remote tracking branchは作らない。
 
 ```bash
 codefire scan
+codefire scan --json
 ```
 
 仕様：
@@ -123,6 +127,7 @@ Atom単位で変更を検出する
 Trace Graphに基づきfireを生成する
 obsolete fireを整理する
 branch stateを更新する
+--jsonはcodefire.command_result.v1 envelopeを出力し、data.changed_atoms、data.open_fires、diagnosticsを含める
 ```
 
 ## 4.7 `fire`
@@ -166,6 +171,8 @@ basisとしてsource/target/link/policy hashを保存する
 ```bash
 codefire verify
 codefire verify --details
+codefire verify --json
+codefire verify --details --json
 ```
 
 仕様：
@@ -176,6 +183,7 @@ policy checkを実行する
 required verification commandを実行する
 verification objectをactive stateに保存する
 `--details` 指定時は、失敗したdiagnosticsの代表例を最大5件ずつ出力する
+--jsonはcodefire.command_result.v1 envelopeを出力し、verification data、blocking diagnostics、next_actionsを含める
 ```
 
 ## 4.10 `commit`
