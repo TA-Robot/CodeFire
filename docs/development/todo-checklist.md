@@ -159,6 +159,7 @@
 | CF-160 | Extinguish | stale resolutionを通常CLIで再解消できる復旧導線を実装する | CF-073 | done | CFB-001; `test_stale_resolution_blocks_verify` |
 | CF-161 | Indexer | Python method派生IDにclass ownerを含める | CF-042 | done | CFB-002; `test_python_methods_include_class_owner_in_derived_atom_id` |
 | CF-162 | Verify | verify出力をblocking/non-blocking diagnosticsに分ける | CF-081 | done | CFB-003; verify failure tests |
+| CF-163 | Verify | verify失敗時の対象詳細をCLIで確認できるようにする | CF-162 | done | CFB-004; `test_verify_details_reports_missing_required_links` |
 
 ## Immediate Next Actions
 

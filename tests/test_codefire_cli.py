@@ -809,11 +809,13 @@ class CodeFireCliTests(unittest.TestCase):
             "This duplicates an Atom ID.\n",
             encoding="utf-8",
         )
-        verify = self.run_cf("verify", cwd=main, check=False)
+        verify = self.run_cf("verify", "--details", cwd=main, check=False)
         self.assertNotEqual(verify.returncode, 0)
         self.assertIn("Blocking checks:", verify.stdout)
         self.assertIn("duplicate atom ids", verify.stdout)
         self.assertIn("Duplicate atom ids: 1", verify.stdout)
+        self.assertIn("Duplicate Atom ID details:", verify.stdout)
+        self.assertIn("REQ-AUTH-001", verify.stdout)
 
     def test_python_methods_include_class_owner_in_derived_atom_id(self):
         self.run_cf("init")
@@ -951,6 +953,19 @@ class CodeFireCliTests(unittest.TestCase):
         )
         verify = self.run_cf("verify", cwd=main, check=False)
         self.assertEqual(verify.returncode, 0, verify.stderr)
+
+    def test_verify_details_reports_missing_required_links(self):
+        self.run_cf("init")
+        main = self.tmp / "main"
+        self.run_cf("open", "main", str(main))
+        self.write_demo_files(main, 30)
+        (main / "codefire.links.yaml").write_text("version: 1\nlinks:\n", encoding="utf-8")
+
+        verify = self.run_cf("verify", "--details", cwd=main, check=False)
+
+        self.assertNotEqual(verify.returncode, 0)
+        self.assertIn("Missing required link details:", verify.stdout)
+        self.assertIn("REQ-AUTH-001 requires refined_by -> design min 1", verify.stdout)
 
     def test_openapi_json_operations_are_indexed(self):
         self.run_cf("init")
@@ -3333,11 +3348,13 @@ class CodeFireCliTests(unittest.TestCase):
         self.assertIn("complete -F _codefire_complete codefire", bash.stdout)
         self.assertIn("request-apply", bash.stdout)
         self.assertIn("serve", bash.stdout)
+        self.assertIn("--details", bash.stdout)
 
         zsh = self.run_cf("completion", "zsh")
         self.assertIn("#compdef codefire", zsh.stdout)
         self.assertIn("_codefire", zsh.stdout)
         self.assertIn("completion\\:completion", zsh.stdout)
+        self.assertIn("--details[show failed verification diagnostic details]", zsh.stdout)
 
         prefix = self.tmp / "prefix"
         completion_dir = self.tmp / "completions"

@@ -165,6 +165,7 @@ basisとしてsource/target/link/policy hashを保存する
 
 ```bash
 codefire verify
+codefire verify --details
 ```
 
 仕様：
@@ -174,6 +175,7 @@ scanを実行する
 policy checkを実行する
 required verification commandを実行する
 verification objectをactive stateに保存する
+`--details` 指定時は、失敗したdiagnosticsの代表例を最大5件ずつ出力する
 ```
 
 ## 4.10 `commit`

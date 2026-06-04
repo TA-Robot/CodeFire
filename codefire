@@ -4997,7 +4997,30 @@ def cmd_verify(args: argparse.Namespace) -> int:
     print(f"Stale resolutions: {len(result['stale_resolutions'])}")
     print(f"Duplicate atom ids: {len(result['duplicate_atom_ids'])}")
     print(f"Failed checks: {len(result['failed_checks'])}")
+    if args.details:
+        print_verify_details(result)
     return 1
+
+
+def print_verify_details(result: dict[str, Any]) -> None:
+    if result["missing_required_links"]:
+        print("Missing required link details:")
+        for item in result["missing_required_links"][:5]:
+            print(f"  {item['atom_id']} requires {item['required_type']} -> {item['target_kind']} min {item.get('min', 1)}")
+    if result["stale_resolutions"]:
+        print("Stale resolution details:")
+        for item in result["stale_resolutions"][:5]:
+            print(f"  {item['resolution_uid']}: {item['reason']}")
+    if result["duplicate_atom_ids"]:
+        print("Duplicate Atom ID details:")
+        for atom_id in result["duplicate_atom_ids"][:5]:
+            print(f"  {atom_id}")
+    if result["failed_checks"]:
+        print("Failed check details:")
+        for item in result["failed_checks"][:5]:
+            first_line = item.get("output", "").strip().splitlines()
+            summary = first_line[0] if first_line else ""
+            print(f"  {item.get('id', 'verification')}: {item.get('command', '')} {summary}")
 
 
 def cmd_commit(args: argparse.Namespace) -> int:
@@ -5300,6 +5323,9 @@ _codefire_complete()
     extinguish)
       COMPREPLY=( $(compgen -W "--resolution --rationale --evidence --refresh" -- "$cur") )
       ;;
+    verify)
+      COMPREPLY=( $(compgen -W "--details" -- "$cur") )
+      ;;
     commit)
       COMPREPLY=( $(compgen -W "-m --message --signer --key-id" -- "$cur") )
       ;;
@@ -5348,6 +5374,9 @@ _codefire()
       ;;
     extinguish)
       _arguments '--resolution[resolution]:resolution:(changed verified no-change-required invalid-fire)' '--rationale[rationale]' '--evidence[evidence]' '--refresh[refresh an extinguished fire resolution basis]'
+      ;;
+    verify)
+      _arguments '--details[show failed verification diagnostic details]'
       ;;
     commit)
       _arguments '-m[message]' '--message[message]' '--signer[commit signer]' '--key-id[commit signing key id]'
@@ -5441,6 +5470,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--refresh", action="store_true", help="refresh resolution basis for an already extinguished fire")
     p.set_defaults(func=cmd_extinguish)
     p = sub.add_parser("verify")
+    p.add_argument("--details", action="store_true", help="show details for failed verification diagnostics")
     p.set_defaults(func=cmd_verify)
     p = sub.add_parser("commit")
     p.add_argument("-m", "--message", required=True)
