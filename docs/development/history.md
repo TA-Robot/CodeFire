@@ -99,6 +99,7 @@
 | 2026-06-04 | Planning | 外部自動化ツール向けautomation-friendly interfaceと、Git比較を踏まえたdiff/merge intelligenceをv0.6計画へ追加した | `docs/development/v0.6-rust-rewrite-plan.md`, `docs/development/todo-checklist.md` | CF-218..CF-235 |
 | 2026-06-04 | Rust Foundation | v0.6 Rust workspaceを追加し、`codefire-store` でPython版と互換のcanonical JSON / object digest / object ID golden testsを実装した | `Cargo.toml`, `crates/codefire-*`, `Cargo.lock` | `cargo fmt --check`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Python py_compile |
 | 2026-06-04 | Rust Store | `codefire-store` にimmutable object record write/read/validateを追加し、重複保存再利用、改ざん検出、unknown type拒否をテストした | `crates/codefire-store` | 6 Rust tests pass; `cargo clippy --workspace --all-targets -- -D warnings` |
+| 2026-06-04 | Rust Store | Rust版sealed commit validationを追加し、parent履歴、required roots、root type、certificateを検証できるようにした | `crates/codefire-store` | 10 Rust tests pass; `cargo clippy --workspace --all-targets -- -D warnings` |
 
 ## Current Decisions
 

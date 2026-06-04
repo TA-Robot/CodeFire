@@ -166,7 +166,7 @@
 | CF-167 | Storage | object store size report、large artifact warning、external artifact reference方針を実装/文書化する | CF-166 | todo | CFB-008 |
 | CF-200 | Rust | v0.6 Rust rewrite workspaceとcrate境界を作成する | CF-167 | done | `Cargo.toml`; `crates/codefire-*`; `cargo test --workspace` |
 | CF-201 | Rust Store | canonical JSON / object IDのgolden test付きRust実装を作る | CF-200 | done | `codefire-store`; Python golden payload parity; `cargo test --workspace` |
-| CF-202 | Rust Store | immutable object storeとsealed commit validationをRustで実装する | CF-201 | todo | v0.6 milestone |
+| CF-202 | Rust Store | immutable object storeとsealed commit validationをRustで実装する | CF-201 | done | `validate_sealed_commit`; 10 Rust tests pass |
 | CF-202A | Rust Store | immutable object record write/read/validateをRustで実装する | CF-201 | done | `codefire-store::store_object`; tamper detection tests |
 | CF-203 | Rust Repo | init/open/status/branch registry互換をRustで実装する | CF-202 | todo | v0.3 exit |
 | CF-204 | Rust Index | Markdownと明示 `cf-atom` extractorをRustで実装する | CF-203 | todo | v0.4 local parity |

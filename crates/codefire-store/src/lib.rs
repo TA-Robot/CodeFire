@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Map;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fmt;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -16,6 +18,7 @@ pub enum StoreError {
     ObjectHashMismatch { expected: String, actual: String },
     FilenameMismatch { expected: String, actual: String },
     ObjectNotFound(String),
+    InvalidSealedCommit(String),
 }
 
 impl fmt::Display for StoreError {
@@ -40,6 +43,9 @@ impl fmt::Display for StoreError {
                 )
             }
             StoreError::ObjectNotFound(object_id) => write!(f, "object not found: {object_id}"),
+            StoreError::InvalidSealedCommit(message) => {
+                write!(f, "sealed commit validation failed: {message}")
+            }
         }
     }
 }
@@ -244,6 +250,139 @@ fn read_object_record_path(path: &Path) -> Result<ObjectRecord, StoreError> {
     Ok(serde_json::from_str(&text)?)
 }
 
+pub fn validate_sealed_commit(objects_root: &Path, commit_id: &str) -> Result<(), StoreError> {
+    let mut seen = HashSet::new();
+    validate_sealed_commit_inner(objects_root, commit_id, &mut seen)
+}
+
+fn validate_sealed_commit_inner(
+    objects_root: &Path,
+    commit_id: &str,
+    seen: &mut HashSet<String>,
+) -> Result<(), StoreError> {
+    if !seen.insert(commit_id.to_string()) {
+        return Ok(());
+    }
+    let commit = read_object(objects_root, commit_id)?;
+    if commit.get("type").and_then(Value::as_str) != Some("commit") {
+        return Err(StoreError::InvalidSealedCommit(format!(
+            "not a commit object: {commit_id}"
+        )));
+    }
+
+    let parents = commit
+        .get("parents")
+        .and_then(Value::as_array)
+        .ok_or_else(|| StoreError::InvalidSealedCommit("parents must be a list".to_string()))?;
+    for (index, parent) in parents.iter().enumerate() {
+        let parent_id = parent.as_str().ok_or_else(|| {
+            StoreError::InvalidSealedCommit(format!("parent {index} must be a commit object id"))
+        })?;
+        if !parent_id.starts_with("CF-COMMIT-") {
+            return Err(StoreError::InvalidSealedCommit(format!(
+                "parent {index} must be a commit object id"
+            )));
+        }
+        let parent_payload = read_object(objects_root, parent_id)?;
+        if parent_payload.get("type").and_then(Value::as_str) != Some("commit") {
+            return Err(StoreError::InvalidSealedCommit(format!(
+                "parent {index} is not a commit object"
+            )));
+        }
+        validate_sealed_commit_inner(objects_root, parent_id, seen)?;
+    }
+
+    let roots = commit
+        .get("roots")
+        .and_then(Value::as_object)
+        .ok_or_else(|| StoreError::InvalidSealedCommit("roots must be an object".to_string()))?;
+    for root in REQUIRED_COMMIT_ROOTS {
+        if !roots.contains_key(*root) {
+            return Err(StoreError::InvalidSealedCommit(format!(
+                "missing root {root}"
+            )));
+        }
+    }
+    for (root, object_id) in roots {
+        let object_id = object_id.as_str().ok_or_else(|| {
+            StoreError::InvalidSealedCommit(format!("root {root} must be an object id"))
+        })?;
+        if !object_id.starts_with("CF-") {
+            return Err(StoreError::InvalidSealedCommit(format!(
+                "root {root} must be an object id"
+            )));
+        }
+        if let Some(expected_type) = expected_root_type(root) {
+            let payload = read_object(objects_root, object_id)?;
+            let actual_type = payload
+                .get("type")
+                .and_then(Value::as_str)
+                .unwrap_or("(missing)");
+            if actual_type != expected_type {
+                return Err(StoreError::InvalidSealedCommit(format!(
+                    "root {root} has type {actual_type}, expected {expected_type}"
+                )));
+            }
+        }
+    }
+
+    let certificate = commit
+        .get("certificate")
+        .and_then(Value::as_object)
+        .ok_or_else(|| {
+            StoreError::InvalidSealedCommit("certificate must be an object".to_string())
+        })?;
+    if certificate.get("result").and_then(Value::as_str) != Some("consistent") {
+        return Err(StoreError::InvalidSealedCommit(
+            "certificate is not consistent".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+const REQUIRED_COMMIT_ROOTS: &[&str] = &[
+    "content_manifest",
+    "atom_index",
+    "trace_graph",
+    "fire_delta",
+    "verification",
+    "policy",
+];
+
+fn expected_root_type(root: &str) -> Option<&'static str> {
+    match root {
+        "content_manifest" => Some("content_manifest"),
+        "atom_index" => Some("atom_index"),
+        "trace_graph" => Some("trace_graph"),
+        "fire_delta" => Some("fire_ledger"),
+        "resolution_ledger" => Some("resolution_ledger"),
+        "verification" => Some("verification"),
+        "policy" => Some("policy"),
+        _ => None,
+    }
+}
+
+pub fn commit_payload(
+    parents: Vec<String>,
+    roots: Map<String, Value>,
+    certificate: Map<String, Value>,
+) -> Value {
+    let mut payload = Map::new();
+    payload.insert("type".to_string(), Value::String("commit".to_string()));
+    payload.insert("version".to_string(), Value::Number(1.into()));
+    payload.insert(
+        "parents".to_string(),
+        Value::Array(parents.into_iter().map(Value::String).collect()),
+    );
+    payload.insert(
+        "message".to_string(),
+        Value::String("test commit".to_string()),
+    );
+    payload.insert("roots".to_string(), Value::Object(roots));
+    payload.insert("certificate".to_string(), Value::Object(certificate));
+    Value::Object(payload)
+}
+
 fn hex_lower(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut out = String::with_capacity(bytes.len() * 2);
@@ -396,5 +535,152 @@ mod tests {
         let error = store_object(&objects, "future", json!({"type": "future"})).unwrap_err();
 
         assert!(matches!(error, StoreError::UnknownObjectType(type_tag) if type_tag == "future"));
+    }
+
+    #[test]
+    fn validate_sealed_commit_accepts_valid_commit_graph() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let parent_id = write_valid_commit(&objects, vec![]);
+        let child_id = write_valid_commit(&objects, vec![parent_id]);
+
+        validate_sealed_commit(&objects, &child_id).unwrap();
+    }
+
+    #[test]
+    fn validate_sealed_commit_rejects_missing_required_root() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let mut roots = write_required_roots(&objects);
+        roots.remove("fire_delta");
+        let commit = commit_payload(vec![], roots, consistent_certificate());
+        let commit_id = store_object(&objects, "commit", commit).unwrap();
+
+        let error = validate_sealed_commit(&objects, &commit_id).unwrap_err();
+
+        assert!(
+            matches!(error, StoreError::InvalidSealedCommit(message) if message.contains("missing root fire_delta"))
+        );
+    }
+
+    #[test]
+    fn validate_sealed_commit_rejects_wrong_root_type() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let mut roots = write_required_roots(&objects);
+        let wrong_id = store_object(
+            &objects,
+            "policy",
+            json!({"type": "policy", "version": 1, "policy": {}}),
+        )
+        .unwrap();
+        roots.insert("verification".to_string(), Value::String(wrong_id));
+        let commit = commit_payload(vec![], roots, consistent_certificate());
+        let commit_id = store_object(&objects, "commit", commit).unwrap();
+
+        let error = validate_sealed_commit(&objects, &commit_id).unwrap_err();
+
+        assert!(
+            matches!(error, StoreError::InvalidSealedCommit(message) if message.contains("root verification has type policy"))
+        );
+    }
+
+    #[test]
+    fn validate_sealed_commit_rejects_invalid_parent_id() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let commit = commit_payload(
+            vec!["CF-BLOB-not-a-parent".to_string()],
+            write_required_roots(&objects),
+            consistent_certificate(),
+        );
+        let commit_id = store_object(&objects, "commit", commit).unwrap();
+
+        let error = validate_sealed_commit(&objects, &commit_id).unwrap_err();
+
+        assert!(
+            matches!(error, StoreError::InvalidSealedCommit(message) if message.contains("parent 0 must be a commit object id"))
+        );
+    }
+
+    fn write_valid_commit(objects: &Path, parents: Vec<String>) -> String {
+        store_object(
+            objects,
+            "commit",
+            commit_payload(
+                parents,
+                write_required_roots(objects),
+                consistent_certificate(),
+            ),
+        )
+        .unwrap()
+    }
+
+    fn write_required_roots(objects: &Path) -> Map<String, Value> {
+        let content_manifest = store_object(
+            objects,
+            "content_manifest",
+            json!({"type": "content_manifest", "version": 1, "entries": []}),
+        )
+        .unwrap();
+        let atom_index = store_object(
+            objects,
+            "atom_index",
+            json!({"type": "atom_index", "version": 1, "atoms": [], "duplicate_atom_ids": []}),
+        )
+        .unwrap();
+        let trace_graph = store_object(
+            objects,
+            "trace_graph",
+            json!({"type": "trace_graph", "version": 1, "links": []}),
+        )
+        .unwrap();
+        let fire_delta = store_object(
+            objects,
+            "fire_ledger",
+            json!({"type": "fire_ledger", "version": 1, "fires": []}),
+        )
+        .unwrap();
+        let verification = store_object(
+            objects,
+            "verification",
+            json!({"type": "verification", "version": 1, "checks": []}),
+        )
+        .unwrap();
+        let policy = store_object(
+            objects,
+            "policy",
+            json!({"type": "policy", "version": 1, "policy": {}}),
+        )
+        .unwrap();
+
+        let mut roots = Map::new();
+        roots.insert(
+            "content_manifest".to_string(),
+            Value::String(content_manifest),
+        );
+        roots.insert("atom_index".to_string(), Value::String(atom_index));
+        roots.insert("trace_graph".to_string(), Value::String(trace_graph));
+        roots.insert("fire_delta".to_string(), Value::String(fire_delta));
+        roots.insert("verification".to_string(), Value::String(verification));
+        roots.insert("policy".to_string(), Value::String(policy));
+        roots
+    }
+
+    fn consistent_certificate() -> Map<String, Value> {
+        let mut certificate = Map::new();
+        certificate.insert(
+            "result".to_string(),
+            Value::String("consistent".to_string()),
+        );
+        certificate.insert("open_required_fires".to_string(), Value::Number(0.into()));
+        certificate.insert("failed_checks".to_string(), Value::Number(0.into()));
+        certificate.insert(
+            "missing_required_links".to_string(),
+            Value::Number(0.into()),
+        );
+        certificate.insert("stale_resolutions".to_string(), Value::Number(0.into()));
+        certificate.insert("duplicate_atom_ids".to_string(), Value::Number(0.into()));
+        certificate
     }
 }
