@@ -184,6 +184,8 @@ required verification commandを実行する
 verification objectをactive stateに保存する
 `--details` 指定時は、失敗したdiagnosticsの代表例を最大5件ずつ出力する
 --jsonはcodefire.command_result.v1 envelopeを出力し、verification data、blocking diagnostics、next_actionsを含める
+--jsonのexit_codeはprocess exit codeと一致する
+verify blockerのexit codeはopen fires=10、missing links=11、stale resolutions=12、duplicate Atom IDs=13、failed checks=14の優先順で決まる
 ```
 
 ## 4.10 `commit`

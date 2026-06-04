@@ -9,12 +9,16 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod automation;
+mod exit_code;
 mod http;
 mod remote;
 mod view;
 use automation::{
     command_result_envelope, scan_data_json, scan_diagnostics_json, status_data_json,
     verification_data_json, verification_diagnostics_json,
+};
+use exit_code::{
+    core_error_exit_code, store_error_exit_code, usage_exit_code, verification_exit_code, ExitCode,
 };
 use http::{http_json, http_remote_path, parse_cf_http_url, serve_http};
 use remote::{
@@ -31,7 +35,7 @@ use view::{
 
 fn main() {
     if let Err(error) = run(env::args().skip(1).collect()) {
-        if !matches!(error, CliError::VerificationFailed) {
+        if !matches!(error, CliError::VerificationFailed(_)) {
             eprintln!("error: {error}");
         }
         std::process::exit(error.exit_code());
@@ -92,6 +96,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         Some("verify") => {
             let options = parse_verify_args(&args[1..])?;
             let verification = run_verify(&options.path)?;
+            let exit_code = verification_exit_code(&verification);
             if options.json_output {
                 let repo_root = open_context(&options.path).ok().map(|context| context.repo_root);
                 println!(
@@ -99,7 +104,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     serde_json::to_string_pretty(&command_result_envelope(
                         "verify",
                         verification.result == "passed",
-                        if verification.result == "passed" { 0 } else { 1 },
+                        exit_code.code(),
                         repo_root.as_deref(),
                         verification_data_json(&verification),
                         verification_diagnostics_json(&verification),
@@ -112,7 +117,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             if verification.result == "passed" {
                 Ok(())
             } else {
-                Err(CliError::VerificationFailed)
+                Err(CliError::VerificationFailed(exit_code))
             }
         }
         Some("extinguish") => {
@@ -371,18 +376,29 @@ enum CliError {
     Core(codefire_core::CoreError),
     Store(codefire_store::StoreError),
     Usage(String),
-    VerificationFailed,
+    VerificationFailed(ExitCode),
     NotOpen(PathBuf),
     InvalidMarker(String),
     InvalidRepository(String),
+    LockContention(String),
 }
 
 impl CliError {
     fn exit_code(&self) -> i32 {
         match self {
-            CliError::VerificationFailed => 1,
-            _ => 2,
+            CliError::Io(_) => ExitCode::GenericFailure,
+            CliError::Json(_) => ExitCode::RepositoryCorruption,
+            CliError::Core(error) => core_error_exit_code(error),
+            CliError::Store(error) => store_error_exit_code(error),
+            CliError::Usage(message) => usage_exit_code(message),
+            CliError::VerificationFailed(exit_code) => *exit_code,
+            CliError::NotOpen(_) => ExitCode::InvalidUsageOrConfig,
+            CliError::InvalidMarker(_) | CliError::InvalidRepository(_) => {
+                ExitCode::RepositoryCorruption
+            }
+            CliError::LockContention(_) => ExitCode::LockContention,
         }
+        .code()
     }
 }
 
@@ -394,7 +410,7 @@ impl fmt::Display for CliError {
             CliError::Core(error) => write!(f, "{error}"),
             CliError::Store(error) => write!(f, "{error}"),
             CliError::Usage(message) => write!(f, "{message}"),
-            CliError::VerificationFailed => write!(f, "verification failed"),
+            CliError::VerificationFailed(_) => write!(f, "verification failed"),
             CliError::NotOpen(path) => write!(
                 f,
                 "not inside an open CodeFire branch directory: {}",
@@ -406,6 +422,7 @@ impl fmt::Display for CliError {
             CliError::InvalidRepository(message) => {
                 write!(f, "invalid CodeFire repository: {message}")
             }
+            CliError::LockContention(message) => write!(f, "{message}"),
         }
     }
 }
@@ -2946,9 +2963,9 @@ impl RepoLock {
             .open(&path)
         {
             Ok(_) => Ok(Self { path }),
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                Err(CliError::Usage("CodeFire repository is locked".to_string()))
-            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Err(
+                CliError::LockContention("CodeFire repository is locked".to_string()),
+            ),
             Err(error) => Err(CliError::Io(error)),
         }
     }
@@ -2975,9 +2992,9 @@ impl FileLock {
             .open(&path)
         {
             Ok(_) => Ok(Self { path }),
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                Err(CliError::Usage("CodeFire resource is locked".to_string()))
-            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Err(
+                CliError::LockContention("CodeFire resource is locked".to_string()),
+            ),
             Err(error) => Err(CliError::Io(error)),
         }
     }

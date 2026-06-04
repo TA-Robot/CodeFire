@@ -192,7 +192,7 @@
 | CF-216 | Migration | `migrate check/dry-run` を実装する | CF-209 | todo | v0.6 migration |
 | CF-217 | Release | installerをRust binary default + Python fallbackへ切り替える | CF-216 | todo | v0.6 release |
 | CF-218 | Automation Interface | state/diagnostic command向けstable JSON envelope/schemaを実装する | CF-200 | done | `codefire-rs status --json`; `codefire-rs scan --json`; `codefire-rs verify --json`; `command_result_envelope_has_stable_shape`; `docs/automation_interface.md`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
-| CF-219 | Automation Interface | CLI全体のstable exit code taxonomyを実装する | CF-218 | todo | v0.6 automation interface |
+| CF-219 | Automation Interface | CLI全体のstable exit code taxonomyを実装する | CF-218 | done | `exit_code.rs`; `verify --json` blocker exit codes; lock contention=30; object/store classifications; `cli_error_exit_codes_follow_stable_taxonomy`; live verify exit smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-220 | Context | `codefire context` でatom/fire/changed/branch context packを返す | CF-206, CF-218 | todo | v0.6 automation interface |
 | CF-221 | Diagnostics | status/scan/verify/doctor/storage/migrateにmachine-readable `next_actions` を追加する | CF-208, CF-220 | todo | v0.6 automation interface |
 | CF-222 | Operation Plans | mutating commandに `--dry-run` / operation plan出力を追加する | CF-209, CF-218 | todo | v0.6 automation interface |

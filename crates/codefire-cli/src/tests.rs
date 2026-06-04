@@ -413,6 +413,44 @@ fn parse_state_diagnostic_json_args() {
 }
 
 #[test]
+fn cli_error_exit_codes_follow_stable_taxonomy() {
+    assert_eq!(
+        CliError::Usage("bad args".to_string()).exit_code(),
+        ExitCode::InvalidUsageOrConfig.code()
+    );
+    assert_eq!(
+        CliError::Usage("HTTP remote error: rejected".to_string()).exit_code(),
+        ExitCode::RemoteRejected.code()
+    );
+    assert_eq!(
+        CliError::LockContention("CodeFire repository is locked".to_string()).exit_code(),
+        ExitCode::LockContention.code()
+    );
+    assert_eq!(
+        CliError::InvalidRepository("missing branch head".to_string()).exit_code(),
+        ExitCode::RepositoryCorruption.code()
+    );
+    assert_eq!(
+        CliError::Store(codefire_store::StoreError::ObjectNotFound(
+            "CF-BLOB-missing".to_string()
+        ))
+        .exit_code(),
+        ExitCode::ObjectReferenceInvalid.code()
+    );
+    assert_eq!(
+        CliError::Store(codefire_store::StoreError::InvalidSealedCommit(
+            "missing root".to_string()
+        ))
+        .exit_code(),
+        ExitCode::SealedCommitInvalid.code()
+    );
+    assert_eq!(
+        CliError::VerificationFailed(ExitCode::MissingRequiredLinks).exit_code(),
+        ExitCode::MissingRequiredLinks.code()
+    );
+}
+
+#[test]
 fn parse_merge_args_accepts_dry_run_json() {
     let args = vec![
         "feature-session".to_string(),
