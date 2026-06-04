@@ -27,7 +27,7 @@ codefire request-merge <source-url> <target-url>
 
 codefire list <server-url>
 codefire show <branch-or-url>
-codefire diff [--algorithm myers|patience|histogram] [--rename-detection] <branch-or-url> <branch-or-url>
+codefire diff [--algorithm myers|patience|histogram] [--rename-detection] [--atoms] [--trace] <branch-or-url> <branch-or-url>
 codefire request-list <server-url>
 
 codefire discard <branch>
@@ -233,6 +233,7 @@ codefire diff main feature-login
 codefire diff --algorithm patience main feature-login
 codefire diff main feature-login --algorithm=histogram
 codefire diff --rename-detection main feature-login
+codefire diff --atoms --trace main feature-login
 ```
 
 仕様：
@@ -248,6 +249,8 @@ histogramは低頻度line anchorを優先して繰り返しの多いfileの差�
 --rename-detectionは削除/追加fileのsimilarityからrenameを検出する
 --rename-detectionは既存fileと追加fileのsimilarityからcopyも検出する
 binary fileはpayload diffを出さず、sizeとsha256 prefixのsummaryだけを表示する
+--atomsはsealed commit内のAtomIndexを比較し、Atom IDのadded/removed/changedを表示する
+--traceはsealed commit内のTraceGraphを比較し、TraceLink IDのadded/removed/changedを表示する
 ```
 
 ## 4.13 `request-merge`

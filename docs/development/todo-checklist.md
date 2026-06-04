@@ -203,7 +203,7 @@
 | CF-227 | Explain | fire/atom/verify failure/storage warning向けread-only `codefire explain` を実装する | CF-220, CF-221 | todo | v0.6 automation interface |
 | CF-228 | Diff | pluggable Myers / patience / histogram-style text diffを実装する | CF-210 | done | `codefire-rs diff --algorithm myers|patience|histogram`; `view::tests::*_diff_*`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-229 | Diff | rename/copy detectionとbinary diff summaryを実装する | CF-228 | done | `codefire-rs diff --rename-detection`; `view::tests::rename_detection_reports_similar_deleted_and_added_file`; `view::tests::copy_detection_reports_added_file_from_existing_source`; `view::tests::binary_diff_uses_summary_instead_of_payload_lines`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
-| CF-230 | Diff | Atom diffとTraceGraph diffを実装する | CF-205, CF-228 | todo | v0.6 diff intelligence |
+| CF-230 | Diff | Atom diffとTraceGraph diffを実装する | CF-205, CF-228 | done | `codefire-rs diff --atoms --trace`; `view::tests::atom_diff_reports_added_removed_and_changed_atoms`; `view::tests::trace_diff_reports_added_removed_and_changed_links`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-231 | Impact | policy/fire impact diffとmachine-readable next actionsを実装する | CF-221, CF-230 | todo | v0.6 diff intelligence |
 | CF-232 | Merge | merge dry-run predictionとsemantic conflict candidate reportingを実装する | CF-210, CF-231 | todo | v0.6 diff intelligence |
 | CF-233 | Review | file diff、Atom diff、Trace diff、verification、next actionsを含むreview-pack exportを実装する | CF-231, CF-232 | todo | v0.6 diff intelligence |

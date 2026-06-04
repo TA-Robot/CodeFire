@@ -32,6 +32,8 @@ impl DiffAlgorithm {
 pub(crate) struct DiffOptions {
     pub(crate) algorithm: DiffAlgorithm,
     pub(crate) rename_detection: bool,
+    pub(crate) atom_diff: bool,
+    pub(crate) trace_diff: bool,
 }
 
 impl Default for DiffOptions {
@@ -39,6 +41,8 @@ impl Default for DiffOptions {
         Self {
             algorithm: DiffAlgorithm::Myers,
             rename_detection: false,
+            atom_diff: false,
+            trace_diff: false,
         }
     }
 }
@@ -112,13 +116,24 @@ pub(crate) fn diff_commitish_with_options(
     let right = resolve_commitish_any(repo_root, right)?;
     let left_files = manifest_contents(&left.objects, &left.commit_id)?;
     let right_files = manifest_contents(&right.objects, &right.commit_id)?;
-    Ok(render_manifest_diff(
+    let mut output = render_manifest_diff(
         &left.label,
         &left_files,
         &right.label,
         &right_files,
         options,
-    ))
+    );
+    if options.atom_diff {
+        let left_index = load_atom_index(&left.objects, &left.commit_id)?;
+        let right_index = load_atom_index(&right.objects, &right.commit_id)?;
+        render_atom_diff(&left_index, &right_index, &mut output);
+    }
+    if options.trace_diff {
+        let left_graph = load_trace_graph(&left.objects, &left.commit_id)?;
+        let right_graph = load_trace_graph(&right.objects, &right.commit_id)?;
+        render_trace_diff(&left_graph, &right_graph, &mut output);
+    }
+    Ok(output)
 }
 
 fn resolve_local_commitish(repo_root: &Path, value: &str) -> Result<(String, String), CliError> {
@@ -206,6 +221,27 @@ fn resolve_commitish_any(
 fn root_object(objects: &Path, commit: &Value, root_name: &str) -> Result<Value, CliError> {
     let object_id = required_string(commit, &["roots", root_name])?;
     Ok(codefire_store::read_object(objects, &object_id)?)
+}
+
+fn load_atom_index(objects: &Path, commit_id: &str) -> Result<codefire_core::AtomIndex, CliError> {
+    let commit = codefire_store::read_object(objects, commit_id)?;
+    Ok(serde_json::from_value(root_object(
+        objects,
+        &commit,
+        "atom_index",
+    )?)?)
+}
+
+fn load_trace_graph(
+    objects: &Path,
+    commit_id: &str,
+) -> Result<codefire_core::TraceGraph, CliError> {
+    let commit = codefire_store::read_object(objects, commit_id)?;
+    Ok(serde_json::from_value(root_object(
+        objects,
+        &commit,
+        "trace_graph",
+    )?)?)
 }
 
 pub(crate) fn manifest_contents(
@@ -347,6 +383,115 @@ fn render_file_delta(
         return;
     }
     render_line_delta(left_bytes, right_bytes, output, algorithm);
+}
+
+fn render_atom_diff(
+    left: &codefire_core::AtomIndex,
+    right: &codefire_core::AtomIndex,
+    output: &mut String,
+) {
+    let left_atoms = atom_map(left);
+    let right_atoms = atom_map(right);
+    let ids = left_atoms
+        .keys()
+        .chain(right_atoms.keys())
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let mut rows = Vec::new();
+    for atom_id in ids {
+        match (left_atoms.get(atom_id), right_atoms.get(atom_id)) {
+            (None, Some(atom)) => rows.push(format!(
+                "+ atom {} kind={} path={} hash={}",
+                atom.atom_id, atom.kind, atom.artifact_path, atom.content_hash
+            )),
+            (Some(atom), None) => rows.push(format!(
+                "- atom {} kind={} path={} hash={}",
+                atom.atom_id, atom.kind, atom.artifact_path, atom.content_hash
+            )),
+            (Some(left_atom), Some(right_atom)) if *left_atom != *right_atom => rows.push(format!(
+                "~ atom {} {} -> {} path {} -> {}",
+                atom_id,
+                left_atom.content_hash,
+                right_atom.content_hash,
+                left_atom.artifact_path,
+                right_atom.artifact_path
+            )),
+            _ => {}
+        }
+    }
+    output.push_str("Atom diff:\n");
+    if rows.is_empty() {
+        output.push_str("  no atom changes\n");
+    } else {
+        for row in rows {
+            output.push_str("  ");
+            output.push_str(&row);
+            output.push('\n');
+        }
+    }
+}
+
+fn render_trace_diff(
+    left: &codefire_core::TraceGraph,
+    right: &codefire_core::TraceGraph,
+    output: &mut String,
+) {
+    let left_links = trace_link_map(left);
+    let right_links = trace_link_map(right);
+    let ids = left_links
+        .keys()
+        .chain(right_links.keys())
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let mut rows = Vec::new();
+    for link_id in ids {
+        match (left_links.get(link_id), right_links.get(link_id)) {
+            (None, Some(link)) => rows.push(format!(
+                "+ link {} {} -{}-> {} hash={}",
+                link.link_id, link.from, link.link_type, link.to, link.link_hash
+            )),
+            (Some(link), None) => rows.push(format!(
+                "- link {} {} -{}-> {} hash={}",
+                link.link_id, link.from, link.link_type, link.to, link.link_hash
+            )),
+            (Some(left_link), Some(right_link)) if *left_link != *right_link => rows.push(format!(
+                "~ link {} {} -{}-> {} hash {} -> {}",
+                link_id,
+                right_link.from,
+                right_link.link_type,
+                right_link.to,
+                left_link.link_hash,
+                right_link.link_hash
+            )),
+            _ => {}
+        }
+    }
+    output.push_str("Trace diff:\n");
+    if rows.is_empty() {
+        output.push_str("  no trace changes\n");
+    } else {
+        for row in rows {
+            output.push_str("  ");
+            output.push_str(&row);
+            output.push('\n');
+        }
+    }
+}
+
+fn atom_map(index: &codefire_core::AtomIndex) -> BTreeMap<&str, &codefire_core::Atom> {
+    index
+        .atoms
+        .iter()
+        .map(|atom| (atom.atom_id.as_str(), atom))
+        .collect()
+}
+
+fn trace_link_map(graph: &codefire_core::TraceGraph) -> BTreeMap<&str, &codefire_core::TraceLink> {
+    graph
+        .links
+        .iter()
+        .map(|link| (link.link_id.as_str(), link))
+        .collect()
 }
 
 #[derive(Debug, Default)]
@@ -784,6 +929,7 @@ mod tests {
             &DiffOptions {
                 algorithm: DiffAlgorithm::Myers,
                 rename_detection: true,
+                ..DiffOptions::default()
             },
         );
         assert!(output.contains("rename src/old.rs -> src/new.rs"));
@@ -807,6 +953,7 @@ mod tests {
             &DiffOptions {
                 algorithm: DiffAlgorithm::Myers,
                 rename_detection: true,
+                ..DiffOptions::default()
             },
         );
         assert!(output.contains("copy src/base.rs -> src/copied.rs (100% similarity)"));
@@ -820,5 +967,99 @@ mod tests {
         let output = render_manifest_diff("left", &left, "right", &right, &DiffOptions::default());
         assert!(output.contains("Binary files differ: 6 bytes sha256:"));
         assert!(!output.contains("-\u{0}\u{1}"));
+    }
+
+    #[test]
+    fn atom_diff_reports_added_removed_and_changed_atoms() {
+        let left = codefire_core::AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: 1,
+            atoms: vec![
+                atom("REQ-OLD", "requirement", "docs/old.md", "old-hash"),
+                atom("REQ-SAME", "requirement", "docs/same.md", "hash-a"),
+                atom("REQ-CHANGED", "requirement", "docs/change.md", "hash-a"),
+            ],
+            duplicate_atom_ids: Vec::new(),
+        };
+        let right = codefire_core::AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: 1,
+            atoms: vec![
+                atom("REQ-NEW", "requirement", "docs/new.md", "new-hash"),
+                atom("REQ-SAME", "requirement", "docs/same.md", "hash-a"),
+                atom("REQ-CHANGED", "requirement", "docs/change.md", "hash-b"),
+            ],
+            duplicate_atom_ids: Vec::new(),
+        };
+        let mut output = String::new();
+        render_atom_diff(&left, &right, &mut output);
+        assert!(output.contains("- atom REQ-OLD"));
+        assert!(output.contains("+ atom REQ-NEW"));
+        assert!(output.contains("~ atom REQ-CHANGED hash-a -> hash-b"));
+        assert!(!output.contains("REQ-SAME"));
+    }
+
+    #[test]
+    fn trace_diff_reports_added_removed_and_changed_links() {
+        let left = codefire_core::TraceGraph {
+            type_tag: "trace_graph".to_string(),
+            version: 1,
+            links: vec![
+                link("L-OLD", "REQ-A", "DES-A", "refined_by", "old-hash"),
+                link("L-SAME", "REQ-B", "DES-B", "refined_by", "same-hash"),
+                link("L-CHANGED", "REQ-C", "DES-C", "refined_by", "hash-a"),
+            ],
+        };
+        let right = codefire_core::TraceGraph {
+            type_tag: "trace_graph".to_string(),
+            version: 1,
+            links: vec![
+                link("L-NEW", "REQ-D", "DES-D", "refined_by", "new-hash"),
+                link("L-SAME", "REQ-B", "DES-B", "refined_by", "same-hash"),
+                link("L-CHANGED", "REQ-C", "DES-C2", "refined_by", "hash-b"),
+            ],
+        };
+        let mut output = String::new();
+        render_trace_diff(&left, &right, &mut output);
+        assert!(output.contains("- link L-OLD REQ-A -refined_by-> DES-A"));
+        assert!(output.contains("+ link L-NEW REQ-D -refined_by-> DES-D"));
+        assert!(
+            output.contains("~ link L-CHANGED REQ-C -refined_by-> DES-C2 hash hash-a -> hash-b")
+        );
+        assert!(!output.contains("L-SAME"));
+    }
+
+    fn atom(
+        atom_id: &str,
+        kind: &str,
+        artifact_path: &str,
+        content_hash: &str,
+    ) -> codefire_core::Atom {
+        codefire_core::Atom {
+            atom_id: atom_id.to_string(),
+            kind: kind.to_string(),
+            artifact_path: artifact_path.to_string(),
+            selector: codefire_core::Selector {
+                selector_type: "heading".to_string(),
+                value: atom_id.to_string(),
+            },
+            content_hash: content_hash.to_string(),
+        }
+    }
+
+    fn link(
+        link_id: &str,
+        from: &str,
+        to: &str,
+        link_type: &str,
+        link_hash: &str,
+    ) -> codefire_core::TraceLink {
+        codefire_core::TraceLink {
+            from: from.to_string(),
+            to: to.to_string(),
+            link_type: link_type.to_string(),
+            link_id: link_id.to_string(),
+            link_hash: link_hash.to_string(),
+        }
     }
 }
