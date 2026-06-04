@@ -367,7 +367,7 @@ fn print_verification_details(verification: &codefire_core::Verification) {
     if !verification.stale_resolutions.is_empty() {
         println!("Stale resolution details:");
         for item in verification.stale_resolutions.iter().take(5) {
-            println!("  {item}");
+            println!("  {}: {}", item.resolution_uid, item.reason);
         }
     }
     if !verification.duplicate_atom_ids.is_empty() {
@@ -698,11 +698,23 @@ fn run_verify(start: &Path) -> Result<codefire_core::Verification, CliError> {
     let missing_required_links =
         codefire_core::required_link_missing(&scan.atom_index, &scan.trace_graph, &trace_policy);
     let failed_checks = run_verification_commands(&context.open_dir, &policy)?;
+    let resolutions_path = active_state_path.join("resolutions.json");
+    let resolutions: Vec<codefire_core::Resolution> = if resolutions_path.exists() {
+        serde_json::from_value(read_json(&resolutions_path)?)?
+    } else {
+        Vec::new()
+    };
+    let stale_resolutions = codefire_core::stale_resolutions(
+        &scan.atom_index,
+        &scan.trace_graph,
+        &policy,
+        &resolutions,
+    )?;
     let verification = codefire_core::build_verification(
         &scan,
         missing_required_links,
         failed_checks,
-        Vec::new(),
+        stale_resolutions,
         &policy,
         &now_iso_utc(),
     );

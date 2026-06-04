@@ -185,6 +185,12 @@ pub struct FailedCheck {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StaleResolution {
+    pub resolution_uid: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Verification {
     #[serde(rename = "type")]
     pub type_tag: String,
@@ -193,7 +199,7 @@ pub struct Verification {
     pub open_required_fires: usize,
     pub failed_checks: Vec<FailedCheck>,
     pub missing_required_links: Vec<MissingRequiredLink>,
-    pub stale_resolutions: Vec<serde_json::Value>,
+    pub stale_resolutions: Vec<StaleResolution>,
     pub duplicate_atom_ids: Vec<String>,
     pub verified_at: String,
 }
@@ -572,7 +578,7 @@ pub fn build_verification(
     scan: &ScanResult,
     missing_required_links: Vec<MissingRequiredLink>,
     failed_checks: Vec<FailedCheck>,
-    stale_resolutions: Vec<serde_json::Value>,
+    stale_resolutions: Vec<StaleResolution>,
     policy: &VerificationPolicy,
     verified_at: &str,
 ) -> Verification {
@@ -604,6 +610,64 @@ pub fn build_verification(
         duplicate_atom_ids,
         verified_at: verified_at.to_string(),
     }
+}
+
+pub fn stale_resolutions(
+    atom_index: &AtomIndex,
+    trace_graph: &TraceGraph,
+    policy: &VerificationPolicy,
+    resolutions: &[Resolution],
+) -> Result<Vec<StaleResolution>, CoreError> {
+    let atoms = atom_index
+        .atoms
+        .iter()
+        .map(|atom| (atom.atom_id.as_str(), atom.content_hash.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let link_hashes = trace_graph
+        .links
+        .iter()
+        .map(|link| (link.link_id.as_str(), link.link_hash.as_str()))
+        .collect::<BTreeMap<_, _>>();
+    let current_policy_hash = policy_hash(policy)?;
+    let mut stale = Vec::new();
+
+    for resolution in resolutions {
+        if resolution.status != "active" {
+            continue;
+        }
+        let source_id = resolution.basis.source_atom.atom_id.as_str();
+        if atoms.get(source_id).cloned() != resolution.basis.source_atom.content_hash {
+            stale.push(StaleResolution {
+                resolution_uid: resolution.resolution_uid.clone(),
+                reason: "source atom changed".to_string(),
+            });
+            continue;
+        }
+        let target_id = resolution.basis.target_atom.atom_id.as_str();
+        if atoms.get(target_id).cloned() != resolution.basis.target_atom.content_hash {
+            stale.push(StaleResolution {
+                resolution_uid: resolution.resolution_uid.clone(),
+                reason: "target atom changed".to_string(),
+            });
+            continue;
+        }
+        if current_policy_hash != resolution.basis.policy_hash {
+            stale.push(StaleResolution {
+                resolution_uid: resolution.resolution_uid.clone(),
+                reason: "policy changed".to_string(),
+            });
+            continue;
+        }
+        if resolution.basis.trace_links.iter().any(|link| {
+            link_hashes.get(link.link_id.as_str()).copied() != Some(link.link_hash.as_str())
+        }) {
+            stale.push(StaleResolution {
+                resolution_uid: resolution.resolution_uid.clone(),
+                reason: "trace link changed".to_string(),
+            });
+        }
+    }
+    Ok(stale)
 }
 
 pub fn build_resolution(
@@ -1685,6 +1749,99 @@ mod tests {
         assert_eq!(verification.result, "failed");
         assert_eq!(verification.duplicate_atom_ids, vec!["REQ-AUTH-001"]);
         assert_eq!(verification.missing_required_links.len(), 1);
+    }
+
+    #[test]
+    fn stale_resolutions_detect_atom_policy_and_trace_changes() {
+        let policy = default_verification_policy();
+        let atom_index = AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: VERSION,
+            atoms: vec![
+                atom("REQ-AUTH-001", "requirement", "sha256:req1"),
+                atom("DES-AUTH-001", "design", "sha256:des1"),
+            ],
+            duplicate_atom_ids: Vec::new(),
+        };
+        let trace_graph = TraceGraph {
+            type_tag: "trace_graph".to_string(),
+            version: VERSION,
+            links: vec![TraceLinkInput {
+                from: "REQ-AUTH-001".to_string(),
+                to: Some("DES-AUTH-001".to_string()),
+                link_type: Some("refined_by".to_string()),
+            }
+            .into_trace_link()
+            .unwrap()],
+        };
+        let fire = Fire {
+            type_tag: "fire".to_string(),
+            version: VERSION,
+            fire_uid: "fire_001".to_string(),
+            display_id: "FIRE-001".to_string(),
+            status: "extinguished".to_string(),
+            severity: "required".to_string(),
+            source: FireAtomRef {
+                atom_id: "REQ-AUTH-001".to_string(),
+                content_hash_at_fire: Some("sha256:req1".to_string()),
+            },
+            target: FireAtomRef {
+                atom_id: "DES-AUTH-001".to_string(),
+                content_hash_at_fire: Some("sha256:des1".to_string()),
+            },
+            reason: "atom_changed".to_string(),
+            trace_path: vec!["REQ-AUTH-001".to_string(), "DES-AUTH-001".to_string()],
+            created_by: "scan".to_string(),
+            created_at: "2026-06-04T00:00:00Z".to_string(),
+            key: "sha256:key".to_string(),
+            obsolete_at: None,
+            resolution_uid: Some("res_001".to_string()),
+        };
+        let resolution = build_resolution(
+            &fire,
+            &atom_index,
+            &trace_graph,
+            &policy,
+            ResolutionRequest {
+                resolution_uid: "res_001".to_string(),
+                resolution_type: "addressed".to_string(),
+                rationale: "checked".to_string(),
+                evidence: String::new(),
+                resolved_at: "2026-06-04T00:00:00Z".to_string(),
+            },
+        )
+        .unwrap();
+        assert!(stale_resolutions(
+            &atom_index,
+            &trace_graph,
+            &policy,
+            std::slice::from_ref(&resolution),
+        )
+        .unwrap()
+        .is_empty());
+
+        let changed_index = AtomIndex {
+            atoms: vec![
+                atom("REQ-AUTH-001", "requirement", "sha256:req2"),
+                atom("DES-AUTH-001", "design", "sha256:des1"),
+            ],
+            ..atom_index
+        };
+        let stale = stale_resolutions(
+            &changed_index,
+            &trace_graph,
+            &policy,
+            std::slice::from_ref(&resolution),
+        )
+        .unwrap();
+
+        assert_eq!(
+            stale,
+            vec![StaleResolution {
+                resolution_uid: "res_001".to_string(),
+                reason: "source atom changed".to_string(),
+            }]
+        );
     }
 
     #[test]
