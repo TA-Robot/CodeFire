@@ -175,6 +175,176 @@ fn show_and_diff_local_branches() {
 }
 
 #[test]
+fn diff_manifest_matches_golden_fixture() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit_with_atoms(
+        &objects,
+        &[(
+            "docs/spec/session.md",
+            "## REQ-session: Requirement\nTTL 30\n",
+        )],
+        &[(
+            "REQ-session",
+            "requirement",
+            "docs/spec/session.md",
+            "sha256:req-base",
+        )],
+        vec![],
+    );
+    let feature_commit = write_file_commit_with_atoms(
+        &objects,
+        &[
+            (
+                "docs/spec/session.md",
+                "## REQ-session: Requirement\nTTL 15\n",
+            ),
+            ("src/app.py", "print('hi')\n"),
+        ],
+        &[
+            (
+                "REQ-session",
+                "requirement",
+                "docs/spec/session.md",
+                "sha256:req-feature",
+            ),
+            ("CODE-app", "code", "src/app.py", "sha256:code-app"),
+        ],
+        vec![base_commit.clone()],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": base_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-session",
+            "head": feature_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+
+    let diff = diff_commitish_with_options(
+        Some(&repo_root),
+        "main",
+        "feature-session",
+        &DiffOptions::default(),
+    )
+    .unwrap();
+    let normalized = normalize_diff_labels(&diff, "main", "feature-session");
+
+    assert_eq!(
+        normalized.trim_end(),
+        include_str!("../tests/fixtures/diff_manifest.golden").trim_end()
+    );
+}
+
+#[test]
+fn codefire_text_diff_matches_git_payload_lines() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let git_base = temp.path().join("git-base");
+    let git_feature = temp.path().join("git-feature");
+    fs::create_dir_all(git_base.join("docs/spec")).unwrap();
+    fs::create_dir_all(git_feature.join("docs/spec")).unwrap();
+    fs::write(
+        git_base.join("docs/spec/session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    fs::write(
+        git_feature.join("docs/spec/session.md"),
+        "## REQ-session: Requirement\nTTL 15\n",
+    )
+    .unwrap();
+
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit(
+        &objects,
+        "docs/spec/session.md",
+        "## REQ-session: Requirement\nTTL 30\n",
+    );
+    let feature_commit = write_file_commit_with_parents(
+        &objects,
+        "docs/spec/session.md",
+        "## REQ-session: Requirement\nTTL 15\n",
+        vec![base_commit.clone()],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": base_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-session",
+            "head": feature_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+
+    let codefire_diff = diff_commitish_with_options(
+        Some(&repo_root),
+        "main",
+        "feature-session",
+        &DiffOptions::default(),
+    )
+    .unwrap();
+    let git_output = Command::new("git")
+        .args([
+            "diff",
+            "--no-index",
+            "--no-color",
+            "--",
+            git_base
+                .join("docs/spec/session.md")
+                .to_str()
+                .expect("utf-8 path"),
+            git_feature
+                .join("docs/spec/session.md")
+                .to_str()
+                .expect("utf-8 path"),
+        ])
+        .output()
+        .unwrap();
+    assert!(!git_output.status.success());
+    let git_diff = String::from_utf8(git_output.stdout).unwrap();
+
+    assert_eq!(
+        diff_payload_lines(&codefire_diff),
+        diff_payload_lines(&git_diff)
+    );
+}
+
+#[test]
 fn parse_diff_args_accepts_algorithm_forms() {
     let args = vec![
         "--algorithm".to_string(),
@@ -919,6 +1089,11 @@ fn merge_dry_run_reports_plan_without_writing_target() {
         .unwrap()
         .iter()
         .any(|action| action["kind"] == "resolve_file_conflict"));
+
+    assert_eq!(
+        normalize_merge_dry_run(&render_merge_dry_run(&result)).trim_end(),
+        include_str!("../tests/fixtures/merge_dry_run.golden").trim_end()
+    );
 }
 
 #[test]
@@ -1055,6 +1230,65 @@ fn base64_decoder_handles_padding_and_rejects_invalid_input() {
     assert_eq!(decode_base64("aGVsbG8K").unwrap(), b"hello\n");
     assert_eq!(decode_base64("Zg==").unwrap(), b"f");
     assert!(decode_base64("Z===").is_err());
+}
+
+fn normalize_diff_labels(output: &str, left_branch: &str, right_branch: &str) -> String {
+    output
+        .lines()
+        .map(|line| {
+            normalize_diff_label_line(line, "--- ", left_branch, "<LEFT>")
+                .or_else(|| normalize_diff_label_line(line, "+++ ", right_branch, "<RIGHT>"))
+                .unwrap_or_else(|| line.to_string())
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n"
+}
+
+fn normalize_diff_label_line(
+    line: &str,
+    marker: &str,
+    branch: &str,
+    replacement: &str,
+) -> Option<String> {
+    let prefix = format!("{marker}{branch}@CF-COMMIT-");
+    if !line.starts_with(&prefix) {
+        return None;
+    }
+    let slash = line[prefix.len()..].find('/')? + prefix.len();
+    Some(format!("{marker}{replacement}{}", &line[slash..]))
+}
+
+fn diff_payload_lines(diff: &str) -> Vec<String> {
+    diff.lines()
+        .filter(|line| {
+            (line.starts_with('+') || line.starts_with('-'))
+                && !line.starts_with("+++")
+                && !line.starts_with("---")
+        })
+        .map(str::to_string)
+        .collect()
+}
+
+fn normalize_merge_dry_run(output: &str) -> String {
+    output
+        .lines()
+        .map(|line| {
+            if line.starts_with("  base: ") {
+                "  base: <BASE>".to_string()
+            } else if line.starts_with("  source: ") {
+                "  source: <SOURCE>".to_string()
+            } else if line.starts_with("  target: ") {
+                "  target: <TARGET>".to_string()
+            } else if line.starts_with("  target dir: ") {
+                "  target dir: <TARGET_DIR>".to_string()
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n"
 }
 
 fn write_valid_commit(objects: &Path) -> String {

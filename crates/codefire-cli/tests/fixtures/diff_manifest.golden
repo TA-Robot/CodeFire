@@ -1,0 +1,7 @@
+--- <LEFT>/docs/spec/session.md
++++ <RIGHT>/docs/spec/session.md
+-TTL 30
++TTL 15
+--- <LEFT>/src/app.py (missing)
++++ <RIGHT>/src/app.py
++print('hi')
