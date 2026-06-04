@@ -147,24 +147,48 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         Some("extinguish") => {
             let options = parse_extinguish_args(&args[1..])?;
             let result = run_extinguish(&options)?;
-            println!(
-                "{} {}",
-                if options.refresh {
-                    "refreshed"
-                } else {
-                    "extinguished"
-                },
-                result.display_id
-            );
+            if options.json_output {
+                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+            } else if options.dry_run {
+                println!(
+                    "extinguish dry-run: {} would be {}",
+                    result.display_id,
+                    if options.refresh {
+                        "refreshed"
+                    } else {
+                        "extinguished"
+                    }
+                );
+            } else {
+                println!(
+                    "{} {}",
+                    if options.refresh {
+                        "refreshed"
+                    } else {
+                        "extinguished"
+                    },
+                    result.display_id
+                );
+            }
             Ok(())
         }
         Some("commit") => {
             let options = parse_commit_args(&args[1..])?;
             let result = run_commit(&options)?;
-            println!("Sealed commit created.");
-            println!("Commit: {}", result.commit_id);
-            println!("Branch: {}", result.branch);
-            println!("State: open-clean");
+            if options.json_output {
+                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+            } else if options.dry_run {
+                println!("commit dry-run: branch {} would be sealed", result.branch);
+                println!(
+                    "Changed atoms: {}",
+                    result.plan["changed_atoms"].as_array().map(Vec::len).unwrap_or(0)
+                );
+            } else {
+                println!("Sealed commit created.");
+                println!("Commit: {}", result.commit_id);
+                println!("Branch: {}", result.branch);
+                println!("State: open-clean");
+            }
             Ok(())
         }
         Some("clone") => {
@@ -537,23 +561,29 @@ struct ExtinguishOptions {
     rationale: String,
     evidence: String,
     refresh: bool,
+    dry_run: bool,
+    json_output: bool,
 }
 
 #[derive(Debug)]
 struct ExtinguishResult {
     display_id: String,
+    plan: Value,
 }
 
 #[derive(Debug)]
 struct CommitOptions {
     path: PathBuf,
     message: String,
+    dry_run: bool,
+    json_output: bool,
 }
 
 #[derive(Debug)]
 struct CommitResult {
     commit_id: String,
     branch: String,
+    plan: Value,
 }
 
 #[derive(Debug)]
@@ -658,6 +688,13 @@ struct OpenContext {
     branch: String,
     registry_path: PathBuf,
     registry: Value,
+}
+
+struct ScanExecution {
+    context: OpenContext,
+    active_state_path: PathBuf,
+    scan: codefire_core::ScanResult,
+    fires: Vec<codefire_core::Fire>,
 }
 
 fn print_status(status: &Status) {
@@ -858,6 +895,8 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
     let mut rationale = String::new();
     let mut evidence = String::new();
     let mut refresh = false;
+    let mut dry_run = false;
+    let mut json_output = false;
     let mut index = 0usize;
     while index < args.len() {
         match args[index].as_str() {
@@ -890,6 +929,8 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
                     .to_string();
             }
             "--refresh" => refresh = true,
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
             value if fire_id.is_none() => fire_id = Some(value.to_string()),
             value => {
                 return Err(CliError::Usage(format!(
@@ -908,12 +949,16 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
         rationale,
         evidence,
         refresh,
+        dry_run,
+        json_output,
     })
 }
 
 fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
     let mut path = None;
     let mut message = None;
+    let mut dry_run = false;
+    let mut json_output = false;
     let mut index = 0usize;
     while index < args.len() {
         match args[index].as_str() {
@@ -931,6 +976,8 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
                         .to_string(),
                 );
             }
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
             value if path.is_none() => path = Some(PathBuf::from(value)),
             value => {
                 return Err(CliError::Usage(format!(
@@ -943,6 +990,8 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
     Ok(CommitOptions {
         path: path.unwrap_or(env::current_dir()?),
         message: message.unwrap_or_else(|| "CodeFire commit".to_string()),
+        dry_run,
+        json_output,
     })
 }
 
@@ -2041,6 +2090,10 @@ fn open_branch_from(start: &Path, options: &OpenOptions) -> Result<OpenResult, C
 }
 
 fn run_scan(start: &Path) -> Result<codefire_core::ScanResult, CliError> {
+    Ok(compute_scan(start, true)?.scan)
+}
+
+fn compute_scan(start: &Path, persist: bool) -> Result<ScanExecution, CliError> {
     let context = open_context(start)?;
     let objects = context.repo_root.join(".codefire").join("objects");
     let base_commit = required_string(&context.registry, &["open", "current_base_commit"])?;
@@ -2078,28 +2131,42 @@ fn run_scan(start: &Path) -> Result<codefire_core::ScanResult, CliError> {
         reason,
         &now,
     )?;
-    fs::create_dir_all(&active_state_path)?;
-    write_json_atomic(&fires_path, &serde_json::to_value(fires)?)?;
-    write_json_atomic(
-        &active_state_path.join("scan.json"),
-        &serde_json::to_value(&scan)?,
-    )?;
-    let state = if scan.changed_atoms.is_empty() && scan.open_fires.is_empty() {
-        "open-clean"
-    } else {
-        "open-burning"
-    };
-    set_open_state(&context, &active_state_path, state)?;
-    Ok(scan)
+    if persist {
+        fs::create_dir_all(&active_state_path)?;
+        write_json_atomic(&fires_path, &serde_json::to_value(&fires)?)?;
+        write_json_atomic(
+            &active_state_path.join("scan.json"),
+            &serde_json::to_value(&scan)?,
+        )?;
+        let state = if scan.changed_atoms.is_empty() && scan.open_fires.is_empty() {
+            "open-clean"
+        } else {
+            "open-burning"
+        };
+        set_open_state(&context, &active_state_path, state)?;
+    }
+    Ok(ScanExecution {
+        context,
+        active_state_path,
+        scan,
+        fires,
+    })
 }
 
 fn run_verify(start: &Path) -> Result<codefire_core::Verification, CliError> {
-    let context = open_context(start)?;
-    let active_state_path = PathBuf::from(required_string(
-        &context.registry,
-        &["open", "active_state_path"],
-    )?);
-    let scan = run_scan(start)?;
+    Ok(compute_verify(start, true)?.verification)
+}
+
+struct VerifyExecution {
+    scan: codefire_core::ScanResult,
+    verification: codefire_core::Verification,
+}
+
+fn compute_verify(start: &Path, persist: bool) -> Result<VerifyExecution, CliError> {
+    let scan_execution = compute_scan(start, persist)?;
+    let context = scan_execution.context;
+    let active_state_path = scan_execution.active_state_path;
+    let scan = scan_execution.scan;
     let policy = codefire_core::parse_verification_policy(&context.open_dir)?;
     let trace_policy = codefire_core::TracePolicy {
         required_links: policy.required_links.clone(),
@@ -2127,17 +2194,19 @@ fn run_verify(start: &Path) -> Result<codefire_core::Verification, CliError> {
         &policy,
         &now_iso_utc(),
     );
-    write_json_atomic(
-        &active_state_path.join("verification.json"),
-        &serde_json::to_value(&verification)?,
-    )?;
-    let state = if verification.result == "passed" {
-        "open-consistent"
-    } else {
-        "open-burning"
-    };
-    set_open_state(&context, &active_state_path, state)?;
-    Ok(verification)
+    if persist {
+        write_json_atomic(
+            &active_state_path.join("verification.json"),
+            &serde_json::to_value(&verification)?,
+        )?;
+        let state = if verification.result == "passed" {
+            "open-consistent"
+        } else {
+            "open-burning"
+        };
+        set_open_state(&context, &active_state_path, state)?;
+    }
+    Ok(VerifyExecution { scan, verification })
 }
 
 fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliError> {
@@ -2161,13 +2230,10 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
         ));
     }
 
-    let scan = run_scan(&context.open_dir)?;
+    let scan_execution = compute_scan(&context.open_dir, !options.dry_run)?;
+    let scan = scan_execution.scan;
     let fires_path = active_state_path.join("fires.json");
-    let mut fires: Vec<codefire_core::Fire> = if fires_path.exists() {
-        serde_json::from_value(read_json(&fires_path)?)?
-    } else {
-        Vec::new()
-    };
+    let mut fires = scan_execution.fires;
     let fire_index = fires
         .iter()
         .position(|fire| fire.display_id == options.fire_id || fire.fire_uid == options.fire_id)
@@ -2198,6 +2264,16 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
         },
     )?;
     let display_id = fires[fire_index].display_id.clone();
+    let plan = extinguish_operation_plan(
+        options,
+        &context,
+        &active_state_path,
+        &fires[fire_index],
+        &resolution_uid,
+    );
+    if options.dry_run {
+        return Ok(ExtinguishResult { display_id, plan });
+    }
     fires[fire_index].status = "extinguished".to_string();
     fires[fire_index].resolution_uid = Some(resolution_uid);
 
@@ -2217,7 +2293,7 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
     resolutions.push(resolution);
     write_json_atomic(&fires_path, &serde_json::to_value(fires)?)?;
     write_json_atomic(&resolutions_path, &serde_json::to_value(resolutions)?)?;
-    Ok(ExtinguishResult { display_id })
+    Ok(ExtinguishResult { display_id, plan })
 }
 
 fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
@@ -2227,7 +2303,8 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         &context.registry,
         &["open", "active_state_path"],
     )?);
-    let verification = run_verify(&context.open_dir)?;
+    let verify_execution = compute_verify(&context.open_dir, !options.dry_run)?;
+    let verification = verify_execution.verification;
     if verification.result != "passed" {
         return Err(CliError::Usage(
             "commit blocked: verification failed or consistency blockers remain".to_string(),
@@ -2235,8 +2312,7 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
     }
 
     let objects = context.repo_root.join(".codefire").join("objects");
-    let scan: codefire_core::ScanResult =
-        serde_json::from_value(read_json(&active_state_path.join("scan.json"))?)?;
+    let scan = verify_execution.scan;
     let fires: Vec<codefire_core::Fire> = if active_state_path.join("fires.json").exists() {
         serde_json::from_value(read_json(&active_state_path.join("fires.json"))?)?
     } else {
@@ -2254,6 +2330,22 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
             Vec::new()
         };
     let policy = codefire_core::parse_verification_policy(&context.open_dir)?;
+    let parents = commit_parents_for_open(&context, &active_state_path)?;
+    let plan = commit_operation_plan(
+        options,
+        &context,
+        &active_state_path,
+        &scan,
+        &verification,
+        &parents,
+    );
+    if options.dry_run {
+        return Ok(CommitResult {
+            commit_id: String::new(),
+            branch: context.branch,
+            plan,
+        });
+    }
 
     let manifest_id = codefire_store::store_object(
         &objects,
@@ -2291,17 +2383,6 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         json!({"type": "policy", "version": 1, "policy": policy}),
     )?;
 
-    let mut parents = vec![required_string(
-        &context.registry,
-        &["open", "current_base_commit"],
-    )?];
-    let state_path = active_state_path.join("state.json");
-    if state_path.exists() {
-        let state = read_json(&state_path)?;
-        if let Some(parent) = state.get("pending_merge_parent").and_then(Value::as_str) {
-            parents.push(parent.to_string());
-        }
-    }
     let commit = json!({
         "type": "commit",
         "version": 1,
@@ -2343,7 +2424,114 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
     Ok(CommitResult {
         commit_id,
         branch: context.branch,
+        plan,
     })
+}
+
+fn extinguish_operation_plan(
+    options: &ExtinguishOptions,
+    context: &OpenContext,
+    active_state_path: &Path,
+    fire: &codefire_core::Fire,
+    resolution_uid: &str,
+) -> Value {
+    json!({
+        "type": "codefire_operation_plan",
+        "version": 1,
+        "command": "extinguish",
+        "dry_run": options.dry_run,
+        "would_apply": !options.dry_run,
+        "branch": &context.branch,
+        "open_dir": &context.open_dir,
+        "fire": {
+            "display_id": &fire.display_id,
+            "fire_uid": &fire.fire_uid,
+            "source_atom": &fire.source.atom_id,
+            "target_atom": &fire.target.atom_id,
+            "status": &fire.status,
+        },
+        "resolution": {
+            "resolution_uid": resolution_uid,
+            "resolution_type": &options.resolution,
+            "refresh": options.refresh,
+            "has_rationale": !options.rationale.is_empty(),
+            "has_evidence": !options.evidence.is_empty(),
+        },
+        "operations": [
+            {"kind": "update_fire_status", "path": active_state_path.join("fires.json"), "status": "extinguished"},
+            {"kind": "append_resolution", "path": active_state_path.join("resolutions.json"), "resolution_uid": resolution_uid},
+        ],
+        "next_actions": [
+            {"kind": "verify", "command": "codefire-rs verify --details --json", "target": {"branch": &context.branch}},
+        ],
+    })
+}
+
+fn commit_operation_plan(
+    options: &CommitOptions,
+    context: &OpenContext,
+    active_state_path: &Path,
+    scan: &codefire_core::ScanResult,
+    verification: &codefire_core::Verification,
+    parents: &[String],
+) -> Value {
+    json!({
+        "type": "codefire_operation_plan",
+        "version": 1,
+        "command": "commit",
+        "dry_run": options.dry_run,
+        "would_apply": !options.dry_run,
+        "branch": &context.branch,
+        "open_dir": &context.open_dir,
+        "message": &options.message,
+        "parents": parents,
+        "changed_atoms": &scan.changed_atoms,
+        "verification": {
+            "result": &verification.result,
+            "open_required_fires": verification.open_required_fires,
+            "missing_required_links": verification.missing_required_links.len(),
+            "stale_resolutions": verification.stale_resolutions.len(),
+            "duplicate_atom_ids": verification.duplicate_atom_ids.len(),
+            "failed_checks": verification.failed_checks.len(),
+        },
+        "objects": [
+            "content_manifest",
+            "atom_index",
+            "trace_graph",
+            "fire_ledger",
+            "resolution_ledger",
+            "verification",
+            "policy",
+            "commit",
+        ],
+        "operations": [
+            {"kind": "store_objects", "path": context.repo_root.join(".codefire").join("objects")},
+            {"kind": "update_branch_head", "branch": &context.branch},
+            {"kind": "update_open_registry", "path": &context.registry_path},
+            {"kind": "reset_active_state", "path": active_state_path},
+        ],
+        "next_actions": [
+            {"kind": "apply_commit", "command": "codefire-rs commit -m <message>", "target": {"branch": &context.branch}},
+        ],
+    })
+}
+
+fn commit_parents_for_open(
+    context: &OpenContext,
+    active_state_path: &Path,
+) -> Result<Vec<String>, CliError> {
+    let mut parents = vec![required_string(
+        &context.registry,
+        &["open", "current_base_commit"],
+    )?];
+    let state_path = active_state_path.join("state.json");
+    if state_path.exists() {
+        let state = read_json(&state_path)?;
+        if let Some(parent) = state.get("pending_merge_parent").and_then(Value::as_str) {
+            parents.push(parent.to_string());
+        }
+    }
+    Ok(parents)
 }
 
 fn run_verification_commands(

@@ -540,6 +540,134 @@ fn parse_merge_args_accepts_dry_run_json() {
 }
 
 #[test]
+fn parse_mutating_dry_run_json_args() {
+    let commit = parse_commit_args(&[
+        "--dry-run".to_string(),
+        "--json".to_string(),
+        "--path".to_string(),
+        "/tmp/open".to_string(),
+        "-m".to_string(),
+        "Seal".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(commit.path, PathBuf::from("/tmp/open"));
+    assert_eq!(commit.message, "Seal");
+    assert!(commit.dry_run);
+    assert!(commit.json_output);
+
+    let extinguish = parse_extinguish_args(&[
+        "FIRE-001".to_string(),
+        "--path".to_string(),
+        "/tmp/open".to_string(),
+        "--resolution".to_string(),
+        "addressed".to_string(),
+        "--rationale".to_string(),
+        "fixed".to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(extinguish.path, PathBuf::from("/tmp/open"));
+    assert_eq!(extinguish.fire_id, "FIRE-001");
+    assert!(extinguish.dry_run);
+    assert!(extinguish.json_output);
+}
+
+#[test]
+fn commit_dry_run_returns_plan_without_updating_branch() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+        },
+    )
+    .unwrap();
+    let before = load_branch_record(&repo_root, "main").unwrap();
+    let before_head = required_string(&before, &["head"]).unwrap();
+
+    let result = run_commit(&CommitOptions {
+        path: open_dir.clone(),
+        message: "Dry run".to_string(),
+        dry_run: true,
+        json_output: true,
+    })
+    .unwrap();
+    let after = load_branch_record(&repo_root, "main").unwrap();
+    let after_head = required_string(&after, &["head"]).unwrap();
+
+    assert_eq!(result.commit_id, "");
+    assert_eq!(result.plan["type"], "codefire_operation_plan");
+    assert_eq!(result.plan["command"], "commit");
+    assert_eq!(result.plan["dry_run"], true);
+    assert_eq!(before_head, after_head);
+    assert!(!active_state_path(&open_dir)
+        .join("verification.json")
+        .exists());
+}
+
+#[test]
+fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design").join("session.md"),
+        "## DES-session: Design\nClock policy\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("codefire.links.yaml"),
+        "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
+    )
+    .unwrap();
+
+    let result = run_extinguish(&ExtinguishOptions {
+        path: open_dir.clone(),
+        fire_id: "FIRE-001".to_string(),
+        resolution: "addressed".to_string(),
+        rationale: "fixed".to_string(),
+        evidence: String::new(),
+        refresh: false,
+        dry_run: true,
+        json_output: true,
+    })
+    .unwrap();
+    let active = active_state_path(&open_dir);
+
+    assert_eq!(result.display_id, "FIRE-001");
+    assert_eq!(result.plan["type"], "codefire_operation_plan");
+    assert_eq!(result.plan["command"], "extinguish");
+    assert_eq!(result.plan["dry_run"], true);
+    assert!(!active.join("fires.json").exists());
+    assert!(!active.join("resolutions.json").exists());
+    assert_eq!(read_status(&open_dir).unwrap().state, "open-clean");
+}
+
+#[test]
 fn parse_review_pack_args_accepts_base_output_and_algorithm() {
     let args = vec![
         "feature-session".to_string(),
@@ -1623,4 +1751,13 @@ fn consistent_certificate() -> Map<String, Value> {
     certificate.insert("stale_resolutions".to_string(), Value::Number(0.into()));
     certificate.insert("duplicate_atom_ids".to_string(), Value::Number(0.into()));
     certificate
+}
+
+fn active_state_path(open_dir: &Path) -> PathBuf {
+    let marker = read_json(&open_dir.join(".codefire-open")).unwrap();
+    let repo_dir = PathBuf::from(required_string(&marker, &["repository", "path"]).unwrap());
+    let repo_root = repo_dir.parent().unwrap();
+    let branch = required_string(&marker, &["branch", "name"]).unwrap();
+    let registry = read_json(&opened_registry_path(repo_root, &branch)).unwrap();
+    PathBuf::from(required_string(&registry, &["open", "active_state_path"]).unwrap())
 }

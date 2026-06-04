@@ -159,6 +159,11 @@ codefire extinguish FIRE-001 \
   --resolution changed \
   --evidence "stale resolutionを再確認した" \
   --refresh
+
+codefire extinguish FIRE-001 \
+  --resolution addressed \
+  --rationale "修正済み" \
+  --dry-run --json
 ```
 
 仕様：
@@ -168,6 +173,7 @@ fireを解消する
 basisとしてsource/target/link/policy hashを保存する
 `--refresh` 指定時は、すでにextinguishedのfireについて現在のbasisでresolutionを更新する
 必要なrationale/evidenceがない場合は拒否する
+--dry-runはfire/resolution ledgerを書き換えず、codefire_operation_planを返す
 ```
 
 ## 4.9 `verify`
@@ -216,6 +222,7 @@ selectorは--branch、--changed、--atom、--fireのいずれか1つ
 
 ```bash
 codefire commit -m "Implement login handler"
+codefire commit --dry-run --json -m "Implement login handler"
 ```
 
 仕様：
@@ -226,6 +233,7 @@ committable条件を満たす場合だけsealed commitを作る
 branch headを更新する
 active stateをresetする
 open stateをopen-cleanにする
+--dry-runはsealed object、branch head、open registry、active stateを書き換えず、codefire_operation_planを返す
 ```
 
 ## 4.12 `merge`

@@ -171,6 +171,29 @@ Context selectors:
 --fire <fire-id>: selected fire, source/target atoms, trace path, and matching links
 ```
 
+Mutating command dry-runs use `codefire_operation_plan` data when available:
+
+```json
+{
+  "type": "codefire_operation_plan",
+  "version": 1,
+  "command": "commit",
+  "dry_run": true,
+  "would_apply": false,
+  "operations": [],
+  "next_actions": []
+}
+```
+
+Current Rust operation plan coverage:
+
+```text
+commit --dry-run --json
+extinguish --dry-run --json
+merge --dry-run --json
+patch import --dry-run --json
+```
+
 ## Diagnostics
 
 Diagnostics are objects with at least:
