@@ -714,6 +714,7 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
 fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
     let mut positional = Vec::new();
     let mut algorithm = DiffAlgorithm::Myers;
+    let mut rename_detection = false;
     let mut index = 0usize;
     while index < args.len() {
         let value = &args[index];
@@ -725,6 +726,8 @@ fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
             algorithm = parse_diff_algorithm(name)?;
         } else if let Some(name) = value.strip_prefix("--algorithm=") {
             algorithm = parse_diff_algorithm(name)?;
+        } else if value == "--rename-detection" {
+            rename_detection = true;
         } else if value.starts_with("--") {
             return Err(CliError::Usage(format!("unsupported diff option: {value}")));
         } else {
@@ -736,11 +739,13 @@ fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
         [left, right] => Ok(DiffArgs {
             left: left.clone(),
             right: right.clone(),
-            diff: DiffOptions { algorithm },
+            diff: DiffOptions {
+                algorithm,
+                rename_detection,
+            },
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs diff [--algorithm myers|patience|histogram] <left> <right>"
-                .to_string(),
+            "usage: codefire-rs diff [--algorithm myers|patience|histogram] [--rename-detection] <left> <right>".to_string(),
         )),
     }
 }

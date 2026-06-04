@@ -1,6 +1,7 @@
 use super::http::{http_json, http_remote_path, parse_cf_http_url};
 use super::remote::{
-    ensure_object_dirs, load_remote_branch, parse_cf_url, remote_dirs, write_object_records,
+    ensure_object_dirs, load_remote_branch, parse_cf_url, remote_dirs, sha256_hex,
+    write_object_records,
 };
 use super::*;
 use serde_json::Value;
@@ -30,12 +31,14 @@ impl DiffAlgorithm {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DiffOptions {
     pub(crate) algorithm: DiffAlgorithm,
+    pub(crate) rename_detection: bool,
 }
 
 impl Default for DiffOptions {
     fn default() -> Self {
         Self {
             algorithm: DiffAlgorithm::Myers,
+            rename_detection: false,
         }
     }
 }
@@ -244,6 +247,11 @@ fn render_manifest_diff(
     right: &BTreeMap<String, Vec<u8>>,
     options: &DiffOptions,
 ) -> String {
+    let file_moves = if options.rename_detection {
+        detect_file_moves(left, right)
+    } else {
+        FileMoveDetection::default()
+    };
     let paths = left
         .keys()
         .chain(right.keys())
@@ -251,7 +259,43 @@ fn render_manifest_diff(
         .collect::<BTreeSet<_>>();
     let mut output = String::new();
     let mut changed = false;
+
+    for rename in &file_moves.renames {
+        changed = true;
+        output.push_str(&format!(
+            "rename {} -> {} ({}% similarity)\n",
+            rename.source, rename.target, rename.score
+        ));
+        render_file_delta(
+            &format!("{left_label}/{}", rename.source),
+            left.get(&rename.source),
+            &format!("{right_label}/{}", rename.target),
+            right.get(&rename.target),
+            &mut output,
+            options.algorithm,
+        );
+    }
+
+    for copy in &file_moves.copies {
+        changed = true;
+        output.push_str(&format!(
+            "copy {} -> {} ({}% similarity)\n",
+            copy.source, copy.target, copy.score
+        ));
+        render_file_delta(
+            &format!("{left_label}/{}", copy.source),
+            left.get(&copy.source),
+            &format!("{right_label}/{}", copy.target),
+            right.get(&copy.target),
+            &mut output,
+            options.algorithm,
+        );
+    }
+
     for path in paths {
+        if file_moves.skip_paths.contains(&path) {
+            continue;
+        }
         let left_data = left.get(&path);
         let right_data = right.get(&path);
         if left_data == right_data {
@@ -268,10 +312,11 @@ fn render_manifest_diff(
         } else {
             format!("{right_label}/{path} (missing)")
         };
-        output.push_str(&format!("--- {left_path}\n+++ {right_path}\n"));
-        render_line_delta(
-            left_data.map(Vec::as_slice).unwrap_or(&[]),
-            right_data.map(Vec::as_slice).unwrap_or(&[]),
+        render_file_delta(
+            &left_path,
+            left_data,
+            &right_path,
+            right_data,
             &mut output,
             options.algorithm,
         );
@@ -280,6 +325,160 @@ fn render_manifest_diff(
         output.push_str("No differences.\n");
     }
     output
+}
+
+fn render_file_delta(
+    left_path: &str,
+    left_data: Option<&Vec<u8>>,
+    right_path: &str,
+    right_data: Option<&Vec<u8>>,
+    output: &mut String,
+    algorithm: DiffAlgorithm,
+) {
+    output.push_str(&format!("--- {left_path}\n+++ {right_path}\n"));
+    let left_bytes = left_data.map(Vec::as_slice).unwrap_or(&[]);
+    let right_bytes = right_data.map(Vec::as_slice).unwrap_or(&[]);
+    if is_binary(left_bytes) || is_binary(right_bytes) {
+        output.push_str(&format!(
+            "Binary files differ: {} -> {}\n",
+            binary_summary(left_data),
+            binary_summary(right_data)
+        ));
+        return;
+    }
+    render_line_delta(left_bytes, right_bytes, output, algorithm);
+}
+
+#[derive(Debug, Default)]
+struct FileMoveDetection {
+    renames: Vec<FileMove>,
+    copies: Vec<FileMove>,
+    skip_paths: BTreeSet<String>,
+}
+
+#[derive(Debug)]
+struct FileMove {
+    source: String,
+    target: String,
+    score: u8,
+}
+
+fn detect_file_moves(
+    left: &BTreeMap<String, Vec<u8>>,
+    right: &BTreeMap<String, Vec<u8>>,
+) -> FileMoveDetection {
+    const MIN_SIMILARITY: u8 = 60;
+    let deleted = left
+        .keys()
+        .filter(|path| !right.contains_key(*path))
+        .cloned()
+        .collect::<Vec<_>>();
+    let added = right
+        .keys()
+        .filter(|path| !left.contains_key(*path))
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let mut detection = FileMoveDetection::default();
+    let mut used_deleted = BTreeSet::new();
+    let mut used_added = BTreeSet::new();
+    let mut rename_candidates = Vec::new();
+    for source in &deleted {
+        for target in &added {
+            let score = similarity_score(&left[source], &right[target]);
+            if score >= MIN_SIMILARITY {
+                rename_candidates.push((score, source.clone(), target.clone()));
+            }
+        }
+    }
+    rename_candidates.sort_by(|left, right| {
+        right
+            .0
+            .cmp(&left.0)
+            .then_with(|| left.1.cmp(&right.1))
+            .then_with(|| left.2.cmp(&right.2))
+    });
+    for (score, source, target) in rename_candidates {
+        if used_deleted.insert(source.clone()) && used_added.insert(target.clone()) {
+            detection.skip_paths.insert(source.clone());
+            detection.skip_paths.insert(target.clone());
+            detection.renames.push(FileMove {
+                source,
+                target,
+                score,
+            });
+        }
+    }
+
+    for target in added {
+        if used_added.contains(&target) {
+            continue;
+        }
+        let Some((source, score)) = best_copy_source(left, right, &target, MIN_SIMILARITY) else {
+            continue;
+        };
+        detection.skip_paths.insert(target.clone());
+        detection.copies.push(FileMove {
+            source,
+            target,
+            score,
+        });
+    }
+
+    detection.renames.sort_by(|left, right| {
+        left.source
+            .cmp(&right.source)
+            .then_with(|| left.target.cmp(&right.target))
+    });
+    detection.copies.sort_by(|left, right| {
+        left.source
+            .cmp(&right.source)
+            .then_with(|| left.target.cmp(&right.target))
+    });
+    detection
+}
+
+fn best_copy_source(
+    left: &BTreeMap<String, Vec<u8>>,
+    right: &BTreeMap<String, Vec<u8>>,
+    target: &str,
+    min_similarity: u8,
+) -> Option<(String, u8)> {
+    left.iter()
+        .filter(|(source, _)| right.contains_key(*source))
+        .filter_map(|(source, source_data)| {
+            let score = similarity_score(source_data, &right[target]);
+            (score >= min_similarity).then(|| (source.clone(), score))
+        })
+        .max_by(|left, right| left.1.cmp(&right.1).then_with(|| right.0.cmp(&left.0)))
+}
+
+fn similarity_score(left: &[u8], right: &[u8]) -> u8 {
+    if left == right {
+        return 100;
+    }
+    if left.is_empty() || right.is_empty() || is_binary(left) || is_binary(right) {
+        return 0;
+    }
+    let left_lines = split_lines_lossy(left);
+    let right_lines = split_lines_lossy(right);
+    if left_lines.is_empty() || right_lines.is_empty() {
+        return 0;
+    }
+    let common = lcs_pairs(&left_lines, &right_lines, None).len();
+    let total = left_lines.len() + right_lines.len();
+    ((common * 200 + total / 2) / total).min(100) as u8
+}
+
+fn is_binary(data: &[u8]) -> bool {
+    data.contains(&0) || std::str::from_utf8(data).is_err()
+}
+
+fn binary_summary(data: Option<&Vec<u8>>) -> String {
+    let Some(data) = data else {
+        return "missing".to_string();
+    };
+    format!("{} bytes sha256:{}", data.len(), &sha256_hex(data)[..12])
 }
 
 fn render_line_delta(left: &[u8], right: &[u8], output: &mut String, algorithm: DiffAlgorithm) {
@@ -536,6 +735,13 @@ mod tests {
         output
     }
 
+    fn manifest(items: &[(&str, &[u8])]) -> BTreeMap<String, Vec<u8>> {
+        items
+            .iter()
+            .map(|(path, data)| ((*path).to_string(), (*data).to_vec()))
+            .collect()
+    }
+
     #[test]
     fn myers_diff_keeps_middle_common_lines() {
         let diff = diff_text(
@@ -564,5 +770,55 @@ mod tests {
             DiffAlgorithm::Histogram,
         );
         assert_eq!(diff, "-old\n+new\n");
+    }
+
+    #[test]
+    fn rename_detection_reports_similar_deleted_and_added_file() {
+        let left = manifest(&[("src/old.rs", b"fn main() {\n    old();\n}\n")]);
+        let right = manifest(&[("src/new.rs", b"fn main() {\n    new();\n}\n")]);
+        let output = render_manifest_diff(
+            "left",
+            &left,
+            "right",
+            &right,
+            &DiffOptions {
+                algorithm: DiffAlgorithm::Myers,
+                rename_detection: true,
+            },
+        );
+        assert!(output.contains("rename src/old.rs -> src/new.rs"));
+        assert!(output.contains("-    old();"));
+        assert!(output.contains("+    new();"));
+        assert!(!output.contains("src/old.rs (missing)"));
+    }
+
+    #[test]
+    fn copy_detection_reports_added_file_from_existing_source() {
+        let left = manifest(&[("src/base.rs", b"shared\nbody\n")]);
+        let right = manifest(&[
+            ("src/base.rs", b"shared\nbody\n"),
+            ("src/copied.rs", b"shared\nbody\n"),
+        ]);
+        let output = render_manifest_diff(
+            "left",
+            &left,
+            "right",
+            &right,
+            &DiffOptions {
+                algorithm: DiffAlgorithm::Myers,
+                rename_detection: true,
+            },
+        );
+        assert!(output.contains("copy src/base.rs -> src/copied.rs (100% similarity)"));
+        assert!(!output.contains("src/copied.rs (missing)"));
+    }
+
+    #[test]
+    fn binary_diff_uses_summary_instead_of_payload_lines() {
+        let left = manifest(&[("asset.bin", b"\x00\x01\x02old")]);
+        let right = manifest(&[("asset.bin", b"\x00\x01\x02new")]);
+        let output = render_manifest_diff("left", &left, "right", &right, &DiffOptions::default());
+        assert!(output.contains("Binary files differ: 6 bytes sha256:"));
+        assert!(!output.contains("-\u{0}\u{1}"));
     }
 }
