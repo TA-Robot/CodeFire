@@ -76,6 +76,46 @@ pub struct AtomIndex {
     pub duplicate_atom_ids: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraceLink {
+    pub from: String,
+    pub to: String,
+    #[serde(rename = "type")]
+    pub link_type: String,
+    pub link_id: String,
+    pub link_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraceGraph {
+    #[serde(rename = "type")]
+    pub type_tag: String,
+    pub version: u32,
+    pub links: Vec<TraceLink>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RequiredLinkRule {
+    #[serde(rename = "type")]
+    pub link_type: String,
+    pub target_kind: String,
+    pub min: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TracePolicy {
+    pub required_links: BTreeMap<String, Vec<RequiredLinkRule>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MissingRequiredLink {
+    pub atom_id: String,
+    pub required_type: String,
+    pub target_kind: String,
+    pub min: usize,
+    pub found: usize,
+}
+
 pub fn build_atom_index(open_dir: &Path) -> Result<AtomIndex, CoreError> {
     let config = Config::parse(open_dir)?;
     let mut atoms = Vec::new();
@@ -115,6 +155,321 @@ pub fn build_atom_index(open_dir: &Path) -> Result<AtomIndex, CoreError> {
         atoms,
         duplicate_atom_ids,
     })
+}
+
+pub fn current_trace_graph(open_dir: &Path) -> Result<TraceGraph, CoreError> {
+    let links = parse_links(&open_dir.join("codefire.links.yaml"))?
+        .into_iter()
+        .map(TraceLinkInput::into_trace_link)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(TraceGraph {
+        type_tag: "trace_graph".to_string(),
+        version: VERSION,
+        links,
+    })
+}
+
+pub fn parse_links(path: &Path) -> Result<Vec<TraceLinkInput>, CoreError> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let mut links = Vec::new();
+    let mut current = None;
+    let mut current_line = 0usize;
+
+    for (line_index, raw_line) in read_text_lossy(path)?.lines().enumerate() {
+        let line_no = line_index + 1;
+        let stripped = raw_line.split('#').next().unwrap_or_default().trim();
+        if stripped.is_empty() {
+            continue;
+        }
+        if let Some(value) = stripped.strip_prefix("- from:") {
+            flush_link(&mut links, current.take(), current_line)?;
+            current = Some(TraceLinkInput {
+                from: unquote(value.trim()),
+                to: None,
+                link_type: None,
+            });
+            current_line = line_no;
+            continue;
+        }
+        let Some(link) = current.as_mut() else {
+            continue;
+        };
+        if let Some(value) = stripped.strip_prefix("to:") {
+            link.to = Some(unquote(value.trim()));
+        } else if let Some(value) = stripped.strip_prefix("type:") {
+            link.link_type = Some(unquote(value.trim()));
+        }
+    }
+    flush_link(&mut links, current, current_line)?;
+    Ok(links)
+}
+
+pub fn parse_trace_policy(open_dir: &Path) -> Result<TracePolicy, CoreError> {
+    let path = open_dir.join("codefire.policy.yaml");
+    if !path.exists() {
+        return Ok(default_trace_policy());
+    }
+
+    let mut required_links = BTreeMap::<String, Vec<RequiredLinkRule>>::new();
+    let mut in_required_links = false;
+    let mut current_kind = None::<String>;
+    let mut current_rule = None::<RequiredLinkRuleDraft>;
+
+    for raw_line in read_text_lossy(&path)?.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim_end();
+        let stripped = line.trim();
+        if stripped.is_empty() {
+            continue;
+        }
+        if !raw_line.starts_with([' ', '\t']) {
+            if stripped == "required_links:" {
+                flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
+                in_required_links = true;
+                current_kind = None;
+            } else {
+                flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
+                in_required_links = false;
+                current_kind = None;
+            }
+            continue;
+        }
+        if !in_required_links {
+            continue;
+        }
+        if line.starts_with("  ") && !line.starts_with("    ") && stripped.ends_with(':') {
+            flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
+            let kind = stripped.trim_end_matches(':').to_string();
+            required_links.entry(kind.clone()).or_default();
+            current_kind = Some(kind);
+            continue;
+        }
+        if let Some(value) = stripped.strip_prefix("- type:") {
+            flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
+            current_rule = Some(RequiredLinkRuleDraft {
+                link_type: Some(unquote(value.trim())),
+                target_kind: None,
+                min: None,
+            });
+            continue;
+        }
+        let Some(rule) = current_rule.as_mut() else {
+            continue;
+        };
+        if let Some(value) = stripped.strip_prefix("type:") {
+            rule.link_type = Some(unquote(value.trim()));
+        } else if let Some(value) = stripped.strip_prefix("target_kind:") {
+            rule.target_kind = Some(unquote(value.trim()));
+        } else if let Some(value) = stripped.strip_prefix("min:") {
+            rule.min = Some(parse_usize_field("required_links min", value.trim())?);
+        }
+    }
+    flush_required_rule(&mut required_links, &current_kind, current_rule)?;
+    if required_links.is_empty() {
+        Ok(default_trace_policy())
+    } else {
+        Ok(TracePolicy { required_links })
+    }
+}
+
+pub fn required_link_missing(
+    atom_index: &AtomIndex,
+    trace_graph: &TraceGraph,
+    policy: &TracePolicy,
+) -> Vec<MissingRequiredLink> {
+    let atoms = atom_index
+        .atoms
+        .iter()
+        .map(|atom| (atom.atom_id.as_str(), atom))
+        .collect::<BTreeMap<_, _>>();
+    let mut missing = Vec::new();
+    for atom in &atom_index.atoms {
+        let Some(rules) = policy.required_links.get(&atom.kind) else {
+            continue;
+        };
+        for rule in rules {
+            let found = trace_graph
+                .links
+                .iter()
+                .filter(|link| {
+                    link.from == atom.atom_id
+                        && link.link_type == rule.link_type
+                        && atoms
+                            .get(link.to.as_str())
+                            .is_some_and(|target| target.kind == rule.target_kind)
+                })
+                .count();
+            if found < rule.min {
+                missing.push(MissingRequiredLink {
+                    atom_id: atom.atom_id.clone(),
+                    required_type: rule.link_type.clone(),
+                    target_kind: rule.target_kind.clone(),
+                    min: rule.min,
+                    found,
+                });
+            }
+        }
+    }
+    missing
+}
+
+pub fn current_required_link_missing(
+    open_dir: &Path,
+) -> Result<Vec<MissingRequiredLink>, CoreError> {
+    let atom_index = build_atom_index(open_dir)?;
+    let trace_graph = current_trace_graph(open_dir)?;
+    let policy = parse_trace_policy(open_dir)?;
+    Ok(required_link_missing(&atom_index, &trace_graph, &policy))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TraceLinkInput {
+    pub from: String,
+    pub to: Option<String>,
+    pub link_type: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RequiredLinkRuleDraft {
+    link_type: Option<String>,
+    target_kind: Option<String>,
+    min: Option<usize>,
+}
+
+impl TraceLinkInput {
+    fn into_trace_link(self) -> Result<TraceLink, CoreError> {
+        let to = self.to.ok_or_else(|| {
+            CoreError::Config("invalid codefire.links.yaml: link missing to".to_string())
+        })?;
+        let link_type = self.link_type.ok_or_else(|| {
+            CoreError::Config("invalid codefire.links.yaml: link missing type".to_string())
+        })?;
+        let link_id = format!("LINK-{}-{}-{}", self.from, link_type, to);
+        let link_hash = trace_link_hash(&self.from, &to, &link_type, &link_id)?;
+        Ok(TraceLink {
+            from: self.from,
+            to,
+            link_type,
+            link_id,
+            link_hash,
+        })
+    }
+}
+
+fn flush_link(
+    links: &mut Vec<TraceLinkInput>,
+    current: Option<TraceLinkInput>,
+    current_line: usize,
+) -> Result<(), CoreError> {
+    let Some(link) = current else {
+        return Ok(());
+    };
+    let mut missing = Vec::new();
+    if link.from.is_empty() {
+        missing.push("from");
+    }
+    if link.to.is_none() {
+        missing.push("to");
+    }
+    if link.link_type.is_none() {
+        missing.push("type");
+    }
+    if !missing.is_empty() {
+        return Err(CoreError::Config(format!(
+            "invalid codefire.links.yaml: link at line {current_line} missing {}",
+            missing.join(", ")
+        )));
+    }
+    links.push(link);
+    Ok(())
+}
+
+fn default_trace_policy() -> TracePolicy {
+    TracePolicy {
+        required_links: BTreeMap::from([
+            (
+                "requirement".to_string(),
+                vec![
+                    RequiredLinkRule {
+                        link_type: "refined_by".to_string(),
+                        target_kind: "design".to_string(),
+                        min: 1,
+                    },
+                    RequiredLinkRule {
+                        link_type: "verified_by".to_string(),
+                        target_kind: "test".to_string(),
+                        min: 1,
+                    },
+                ],
+            ),
+            (
+                "design".to_string(),
+                vec![RequiredLinkRule {
+                    link_type: "implemented_by".to_string(),
+                    target_kind: "code".to_string(),
+                    min: 1,
+                }],
+            ),
+        ]),
+    }
+}
+
+fn flush_required_rule(
+    required_links: &mut BTreeMap<String, Vec<RequiredLinkRule>>,
+    current_kind: &Option<String>,
+    draft: Option<RequiredLinkRuleDraft>,
+) -> Result<(), CoreError> {
+    let Some(draft) = draft else {
+        return Ok(());
+    };
+    let Some(kind) = current_kind else {
+        return Err(CoreError::Config(
+            "invalid codefire.policy.yaml: required link rule has no source kind".to_string(),
+        ));
+    };
+    let link_type = draft.link_type.ok_or_else(|| {
+        CoreError::Config(format!(
+            "invalid codefire.policy.yaml: required_links.{kind} missing type"
+        ))
+    })?;
+    let target_kind = draft.target_kind.ok_or_else(|| {
+        CoreError::Config(format!(
+            "invalid codefire.policy.yaml: required_links.{kind} missing target_kind"
+        ))
+    })?;
+    required_links
+        .entry(kind.clone())
+        .or_default()
+        .push(RequiredLinkRule {
+            link_type,
+            target_kind,
+            min: draft.min.unwrap_or(1),
+        });
+    Ok(())
+}
+
+fn parse_usize_field(field: &str, value: &str) -> Result<usize, CoreError> {
+    unquote(value).parse::<usize>().map_err(|_| {
+        CoreError::Config(format!(
+            "invalid codefire.policy.yaml: {field} must be an integer"
+        ))
+    })
+}
+
+fn trace_link_hash(
+    from: &str,
+    to: &str,
+    link_type: &str,
+    link_id: &str,
+) -> Result<String, CoreError> {
+    let value = serde_json::json!({
+        "from": from,
+        "link_id": link_id,
+        "to": to,
+        "type": link_type,
+    });
+    Ok(digest_bytes(&serde_json::to_vec(&value)?))
 }
 
 pub fn extract_markdown_atoms(
@@ -272,8 +627,12 @@ fn normalized_block_content(lines: &[&str]) -> String {
 }
 
 fn hash_text(text: &str) -> String {
+    digest_bytes(text.as_bytes())
+}
+
+fn digest_bytes(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(text.as_bytes());
+    hasher.update(bytes);
     format!("sha256:{}", hex_lower(&hasher.finalize()))
 }
 
@@ -616,6 +975,114 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(ids, vec!["CODE-RustMain", "REQ-CUSTOM-001"]);
+    }
+
+    #[test]
+    fn trace_graph_parses_links_and_matches_python_hash() {
+        let temp = tempdir().unwrap();
+        write_file(
+            &temp.path().join("codefire.links.yaml"),
+            "version: 1\nlinks:\n  - from: REQ-AUTH-001\n    to: DES-AUTH-001\n    type: refined_by\n",
+        );
+
+        let graph = current_trace_graph(temp.path()).unwrap();
+
+        assert_eq!(graph.type_tag, "trace_graph");
+        assert_eq!(graph.links.len(), 1);
+        assert_eq!(graph.links[0].from, "REQ-AUTH-001");
+        assert_eq!(graph.links[0].to, "DES-AUTH-001");
+        assert_eq!(graph.links[0].link_type, "refined_by");
+        assert_eq!(
+            graph.links[0].link_id,
+            "LINK-REQ-AUTH-001-refined_by-DES-AUTH-001"
+        );
+        assert_eq!(
+            graph.links[0].link_hash,
+            "sha256:54748236f430e7b4e61322f644932c04e96e75a7d174a1a993aeacd98f08bb89"
+        );
+    }
+
+    #[test]
+    fn trace_graph_reports_missing_required_link_fields() {
+        let temp = tempdir().unwrap();
+        write_file(
+            &temp.path().join("codefire.links.yaml"),
+            "links:\n  - from: REQ-AUTH-001\n    to: DES-AUTH-001\n",
+        );
+
+        let error = current_trace_graph(temp.path()).unwrap_err();
+
+        assert!(matches!(error, CoreError::Config(message) if message.contains("missing type")));
+    }
+
+    #[test]
+    fn trace_graph_is_empty_when_links_file_is_absent() {
+        let temp = tempdir().unwrap();
+
+        let graph = current_trace_graph(temp.path()).unwrap();
+
+        assert!(graph.links.is_empty());
+    }
+
+    #[test]
+    fn required_link_missing_uses_default_policy() {
+        let temp = tempdir().unwrap();
+        write_file(
+            &temp.path().join("docs/spec/auth.md"),
+            "## REQ-AUTH-001: Session expiration\n",
+        );
+        write_file(
+            &temp.path().join("docs/design/auth.md"),
+            "## DES-AUTH-001: Session design\n",
+        );
+        write_file(
+            &temp.path().join("src/app.py"),
+            "# cf-atom: CODE-SessionPolicy\n",
+        );
+        write_file(
+            &temp.path().join("codefire.links.yaml"),
+            "links:\n  - from: REQ-AUTH-001\n    to: DES-AUTH-001\n    type: refined_by\n",
+        );
+
+        let missing = current_required_link_missing(temp.path()).unwrap();
+
+        assert_eq!(missing.len(), 2);
+        assert!(missing.iter().any(|item| item.atom_id == "REQ-AUTH-001"
+            && item.required_type == "verified_by"
+            && item.target_kind == "test"));
+        assert!(missing.iter().any(|item| item.atom_id == "DES-AUTH-001"
+            && item.required_type == "implemented_by"
+            && item.target_kind == "code"));
+    }
+
+    #[test]
+    fn required_link_missing_uses_custom_policy() {
+        let temp = tempdir().unwrap();
+        write_file(
+            &temp.path().join("docs/adr/platform.md"),
+            "## ADR-PLATFORM-001: Runtime choice\n",
+        );
+        write_file(
+            &temp.path().join("docs/ops/deploy.md"),
+            "## OPS-DEPLOY-001: Runtime deployment\n",
+        );
+        write_file(
+            &temp.path().join("codefire.policy.yaml"),
+            "required_links:\n  adr:\n    - type: operated_by\n      target_kind: ops\n      min: 1\n",
+        );
+
+        let missing = current_required_link_missing(temp.path()).unwrap();
+
+        assert_eq!(
+            missing,
+            vec![MissingRequiredLink {
+                atom_id: "ADR-PLATFORM-001".to_string(),
+                required_type: "operated_by".to_string(),
+                target_kind: "ops".to_string(),
+                min: 1,
+                found: 0,
+            }]
+        );
     }
 
     fn write_file(path: &Path, contents: &str) {

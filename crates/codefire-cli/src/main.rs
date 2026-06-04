@@ -24,6 +24,24 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             println!("{}", serde_json::to_string_pretty(&index)?);
             Ok(())
         }
+        Some("trace-graph") => {
+            let start = args
+                .get(1)
+                .map(PathBuf::from)
+                .unwrap_or(env::current_dir()?);
+            let trace_graph = codefire_core::current_trace_graph(&start)?;
+            println!("{}", serde_json::to_string_pretty(&trace_graph)?);
+            Ok(())
+        }
+        Some("missing-links") => {
+            let start = args
+                .get(1)
+                .map(PathBuf::from)
+                .unwrap_or(env::current_dir()?);
+            let missing = codefire_core::current_required_link_missing(&start)?;
+            println!("{}", serde_json::to_string_pretty(&missing)?);
+            Ok(())
+        }
         Some("init") => {
             let options = parse_init_args(&args[1..])?;
             let result = init_repo(&options.path, options.force)?;

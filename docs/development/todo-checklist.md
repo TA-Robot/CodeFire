@@ -174,7 +174,7 @@
 | CF-203C | Rust Repo | Python-compatible `init` をRustで実装し、初期sealed commitとmain branchを生成する | CF-203B | done | Rust init unit test; Python `doctor`/`branch list` smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-203D | Rust Repo | Python-compatible `open` をRustで実装し、marker/registry/active stateとmanifest materializationを生成する | CF-203C | done | Rust open unit test; Rust init/open + Python `status`/`doctor`/`branch list` smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-204 | Rust Index | Markdownと明示 `cf-atom` extractorをRustで実装する | CF-203 | done | `codefire-core::build_atom_index`; `codefire-rs atom-index`; real repo smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
-| CF-205 | Rust Trace | links parser、trace graph、required link policyをRustで実装する | CF-204 | todo | v0.4 local parity |
+| CF-205 | Rust Trace | links parser、trace graph、required link policyをRustで実装する | CF-204 | done | `codefire-core::current_trace_graph`; `current_required_link_missing`; `codefire-rs trace-graph`/`missing-links`; real repo smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-206 | Rust Fire | scan、changed atom detection、fire ledgerをRustで実装する | CF-205 | todo | v0.4 local parity |
 | CF-207 | Rust UX | interactive / batch extinguishをRust CLIで実装する | CF-206, CF-164 | todo | CFB-005 |
 | CF-208 | Rust Verify | verification engineとstructured diagnosticsをRustで実装する | CF-206, CF-165 | todo | CFB-006 |
