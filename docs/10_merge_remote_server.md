@@ -62,6 +62,21 @@ W = target open directory
 9. targetをopen-burningにする
 ```
 
+`--dry-run` では 1-7 だけを実行し、予測結果をoperation planとして返す。file書き込み、conflict marker書き込み、active state更新、branch state更新、fire生成は行わない。
+
+dry-run planには以下を含める。
+
+```text
+source/target/base commit
+target open directory
+write_source / delete_target / write_conflict_markers のfile action
+file conflict一覧
+semantic conflict candidate一覧
+machine-readable next_actions
+```
+
+semantic conflict candidateは、同一Atom IDがsourceとtargetの双方でbaseから変更され、source headとtarget headのcontent_hashが異なる場合に報告する。v0.6では候補報告に留め、自動semantic mergeや自動解決は行わない。
+
 ## 10.5 server方針
 
 serverは不整合状態を保存しない。

@@ -188,7 +188,11 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         Some("merge") => {
             let options = parse_merge_args(&args[1..])?;
             let result = merge_branch(&env::current_dir()?, &options)?;
-            if result.conflicts.is_empty() {
+            if options.json_output {
+                println!("{}", render_merge_result_json(&result)?);
+            } else if options.dry_run {
+                print!("{}", render_merge_dry_run(&result));
+            } else if result.conflicts.is_empty() {
                 println!(
                     "merged {} into {}; target is open-burning",
                     options.source_branch, options.target_branch
@@ -426,11 +430,57 @@ struct ServeOptions {
 struct MergeOptions {
     source_branch: String,
     target_branch: String,
+    dry_run: bool,
+    json_output: bool,
 }
 
 #[derive(Debug)]
 struct MergeResult {
+    source_branch: String,
+    target_branch: String,
+    source_head: String,
+    target_head: String,
+    base: String,
+    target_dir: PathBuf,
+    file_actions: Vec<MergeFileAction>,
     conflicts: Vec<String>,
+    semantic_conflicts: Vec<SemanticConflictCandidate>,
+    dry_run: bool,
+    applied: bool,
+}
+
+#[derive(Debug)]
+struct MergeFileAction {
+    path: String,
+    action: MergeAction,
+    content: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MergeAction {
+    WriteSource,
+    DeleteTarget,
+    WriteConflictMarkers,
+}
+
+impl MergeAction {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::WriteSource => "write_source",
+            Self::DeleteTarget => "delete_target",
+            Self::WriteConflictMarkers => "write_conflict_markers",
+        }
+    }
+}
+
+#[derive(Debug)]
+struct SemanticConflictCandidate {
+    atom_id: String,
+    base_hash: Option<String>,
+    source_hash: Option<String>,
+    target_hash: Option<String>,
+    source_path: Option<String>,
+    target_path: Option<String>,
 }
 
 struct OpenContext {
@@ -962,15 +1012,47 @@ fn skip_ignored_option(args: &[String], index: &mut usize) -> Result<(), CliErro
 }
 
 fn parse_merge_args(args: &[String]) -> Result<MergeOptions, CliError> {
-    match args {
-        [source_branch, flag, target_branch] if flag == "--into" => Ok(MergeOptions {
-            source_branch: source_branch.to_string(),
-            target_branch: target_branch.to_string(),
-        }),
-        _ => Err(CliError::Usage(
-            "usage: codefire-rs merge <source-branch> --into <target-branch>".to_string(),
-        )),
+    let mut source_branch = None;
+    let mut target_branch = None;
+    let mut dry_run = false;
+    let mut json_output = false;
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--into" => {
+                index += 1;
+                let value = args.get(index).ok_or_else(|| {
+                    CliError::Usage("--into requires a target branch".to_string())
+                })?;
+                target_branch = Some(value.clone());
+            }
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
+            value if source_branch.is_none() => source_branch = Some(value.to_string()),
+            value => {
+                return Err(CliError::Usage(format!(
+                    "unexpected merge argument: {value}"
+                )));
+            }
+        }
+        index += 1;
     }
+    Ok(MergeOptions {
+        source_branch: source_branch.ok_or_else(|| {
+            CliError::Usage(
+                "usage: codefire-rs merge <source-branch> --into <target-branch> [--dry-run] [--json]"
+                    .to_string(),
+            )
+        })?,
+        target_branch: target_branch.ok_or_else(|| {
+            CliError::Usage(
+                "usage: codefire-rs merge <source-branch> --into <target-branch> [--dry-run] [--json]"
+                    .to_string(),
+            )
+        })?,
+        dry_run,
+        json_output,
+    })
 }
 
 fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
@@ -1036,8 +1118,17 @@ fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
 fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, CliError> {
     let repo_root = find_repo_root(start)?;
     let _lock = RepoLock::acquire(&repo_root)?;
+    let mut result = build_merge_result(&repo_root, options)?;
+    if options.dry_run {
+        return Ok(result);
+    }
+    apply_merge_result(&repo_root, &mut result)?;
+    Ok(result)
+}
+
+fn build_merge_result(repo_root: &Path, options: &MergeOptions) -> Result<MergeResult, CliError> {
     let objects = repo_root.join(".codefire").join("objects");
-    let source = load_branch_record(&repo_root, &options.source_branch)?;
+    let source = load_branch_record(repo_root, &options.source_branch)?;
     let source_head = required_string(&source, &["head"])?;
     let source_state = source
         .get("state")
@@ -1049,12 +1140,12 @@ fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, Cli
             options.source_branch
         )));
     }
-    let target = load_branch_record(&repo_root, &options.target_branch)?;
+    let target = load_branch_record(repo_root, &options.target_branch)?;
     let target_head = required_string(&target, &["head"])?;
     codefire_store::validate_sealed_commit(&objects, &source_head)?;
     codefire_store::validate_sealed_commit(&objects, &target_head)?;
 
-    let registry_path = opened_registry_path(&repo_root, &options.target_branch);
+    let registry_path = opened_registry_path(repo_root, &options.target_branch);
     if !registry_path.exists() {
         return Err(CliError::Usage(format!(
             "target branch must be open: {}",
@@ -1081,6 +1172,7 @@ fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, Cli
         .cloned()
         .collect::<BTreeSet<_>>();
     let mut conflicts = Vec::new();
+    let mut file_actions = Vec::new();
     for path in paths {
         let base_data = base_files.get(&path);
         let source_data = source_files.get(&path);
@@ -1089,7 +1181,15 @@ fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, Cli
             continue;
         }
         if target_data == base_data {
-            write_merged_file(&target_dir, &path, source_data.map(Vec::as_slice))?;
+            file_actions.push(MergeFileAction {
+                path,
+                action: if source_data.is_some() {
+                    MergeAction::WriteSource
+                } else {
+                    MergeAction::DeleteTarget
+                },
+                content: source_data.cloned(),
+            });
             continue;
         }
         if source_data == target_data {
@@ -1100,9 +1200,36 @@ fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, Cli
             target_data.map(Vec::as_slice),
             source_data.map(Vec::as_slice),
         );
-        write_merged_file(&target_dir, &path, Some(&content))?;
+        file_actions.push(MergeFileAction {
+            path,
+            action: MergeAction::WriteConflictMarkers,
+            content: Some(content),
+        });
     }
 
+    let semantic_conflicts =
+        semantic_conflict_candidates(&objects, &base, &source_head, &target_head)?;
+    Ok(MergeResult {
+        source_branch: options.source_branch.clone(),
+        target_branch: options.target_branch.clone(),
+        source_head,
+        target_head,
+        base,
+        target_dir,
+        file_actions,
+        conflicts,
+        semantic_conflicts,
+        dry_run: options.dry_run,
+        applied: false,
+    })
+}
+
+fn apply_merge_result(repo_root: &Path, result: &mut MergeResult) -> Result<(), CliError> {
+    for action in &result.file_actions {
+        write_merged_file(&result.target_dir, &action.path, action.content.as_deref())?;
+    }
+    let registry_path = opened_registry_path(repo_root, &result.target_branch);
+    let registry = read_json(&registry_path)?;
     let active_state_path =
         PathBuf::from(required_string(&registry, &["open", "active_state_path"])?);
     let state_path = active_state_path.join("state.json");
@@ -1111,19 +1238,193 @@ fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, Cli
     } else {
         json!({})
     };
-    state["pending_merge_parent"] = Value::String(source_head);
-    state["pending_merge_base"] = Value::String(base);
-    state["merge_conflicts"] = Value::Array(conflicts.iter().cloned().map(Value::String).collect());
+    state["pending_merge_parent"] = Value::String(result.source_head.clone());
+    state["pending_merge_base"] = Value::String(result.base.clone());
+    state["merge_conflicts"] = Value::Array(
+        result
+            .conflicts
+            .iter()
+            .cloned()
+            .map(Value::String)
+            .collect(),
+    );
+    state["semantic_conflict_candidates"] = Value::Array(
+        result
+            .semantic_conflicts
+            .iter()
+            .map(semantic_conflict_json)
+            .collect(),
+    );
     write_json_atomic(&state_path, &state)?;
     let context = OpenContext {
-        repo_root,
-        open_dir: target_dir,
-        branch: options.target_branch.clone(),
+        repo_root: repo_root.to_path_buf(),
+        open_dir: result.target_dir.clone(),
+        branch: result.target_branch.clone(),
         registry_path,
         registry,
     };
     set_open_state(&context, &active_state_path, "open-burning")?;
-    Ok(MergeResult { conflicts })
+    result.applied = true;
+    Ok(())
+}
+
+fn semantic_conflict_candidates(
+    objects: &Path,
+    base_commit: &str,
+    source_commit: &str,
+    target_commit: &str,
+) -> Result<Vec<SemanticConflictCandidate>, CliError> {
+    let base_index = load_base_atom_index(objects, base_commit)?;
+    let source_index = load_base_atom_index(objects, source_commit)?;
+    let target_index = load_base_atom_index(objects, target_commit)?;
+    let source_changed = codefire_core::changed_atoms(&source_index, &base_index)
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    let target_changed = codefire_core::changed_atoms(&target_index, &base_index)
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    let base_atoms = atom_by_id(&base_index);
+    let source_atoms = atom_by_id(&source_index);
+    let target_atoms = atom_by_id(&target_index);
+    let mut candidates = Vec::new();
+    for atom_id in source_changed.intersection(&target_changed) {
+        let source_atom = source_atoms.get(atom_id.as_str()).copied();
+        let target_atom = target_atoms.get(atom_id.as_str()).copied();
+        let source_hash = source_atom.map(|atom| atom.content_hash.clone());
+        let target_hash = target_atom.map(|atom| atom.content_hash.clone());
+        if source_hash == target_hash {
+            continue;
+        }
+        candidates.push(SemanticConflictCandidate {
+            atom_id: atom_id.clone(),
+            base_hash: base_atoms
+                .get(atom_id.as_str())
+                .map(|atom| atom.content_hash.clone()),
+            source_hash,
+            target_hash,
+            source_path: source_atom.map(|atom| atom.artifact_path.clone()),
+            target_path: target_atom.map(|atom| atom.artifact_path.clone()),
+        });
+    }
+    candidates.sort_by(|left, right| left.atom_id.cmp(&right.atom_id));
+    Ok(candidates)
+}
+
+fn atom_by_id(index: &codefire_core::AtomIndex) -> BTreeMap<&str, &codefire_core::Atom> {
+    index
+        .atoms
+        .iter()
+        .map(|atom| (atom.atom_id.as_str(), atom))
+        .collect()
+}
+
+fn render_merge_dry_run(result: &MergeResult) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "merge dry-run {} into {}; target unchanged\n",
+        result.source_branch, result.target_branch
+    ));
+    output.push_str(&format!("  base: {}\n", result.base));
+    output.push_str(&format!("  source: {}\n", result.source_head));
+    output.push_str(&format!("  target: {}\n", result.target_head));
+    output.push_str(&format!("  target dir: {}\n", result.target_dir.display()));
+    output.push_str(&format!(
+        "  file actions: {} conflicts: {} semantic candidates: {}\n",
+        result.file_actions.len(),
+        result.conflicts.len(),
+        result.semantic_conflicts.len()
+    ));
+    if result.file_actions.is_empty() {
+        output.push_str("  no file changes predicted\n");
+    } else {
+        for action in &result.file_actions {
+            output.push_str(&format!("  {}: {}\n", action.action.as_str(), action.path));
+        }
+    }
+    if !result.semantic_conflicts.is_empty() {
+        output.push_str("Semantic conflict candidates:\n");
+        for candidate in &result.semantic_conflicts {
+            output.push_str(&format!(
+                "  {} source={} target={}\n",
+                candidate.atom_id,
+                candidate.source_hash.as_deref().unwrap_or("(missing)"),
+                candidate.target_hash.as_deref().unwrap_or("(missing)")
+            ));
+        }
+    }
+    output
+}
+
+fn render_merge_result_json(result: &MergeResult) -> Result<String, CliError> {
+    let value = json!({
+        "type": "codefire_merge_plan",
+        "version": 1,
+        "dry_run": result.dry_run,
+        "applied": result.applied,
+        "source": {
+            "branch": &result.source_branch,
+            "commit": &result.source_head,
+        },
+        "target": {
+            "branch": &result.target_branch,
+            "commit": &result.target_head,
+            "open_dir": result.target_dir,
+        },
+        "base": {"commit": &result.base},
+        "file_actions": result.file_actions.iter().map(merge_file_action_json).collect::<Vec<_>>(),
+        "conflicts": &result.conflicts,
+        "semantic_conflicts": result.semantic_conflicts.iter().map(semantic_conflict_json).collect::<Vec<_>>(),
+        "next_actions": merge_next_actions(result),
+    });
+    Ok(serde_json::to_string_pretty(&value)?)
+}
+
+fn merge_file_action_json(action: &MergeFileAction) -> Value {
+    json!({
+        "path": &action.path,
+        "action": action.action.as_str(),
+        "bytes": action.content.as_ref().map(Vec::len),
+    })
+}
+
+fn semantic_conflict_json(candidate: &SemanticConflictCandidate) -> Value {
+    json!({
+        "atom_id": &candidate.atom_id,
+        "base_hash": &candidate.base_hash,
+        "source_hash": &candidate.source_hash,
+        "target_hash": &candidate.target_hash,
+        "source_path": &candidate.source_path,
+        "target_path": &candidate.target_path,
+    })
+}
+
+fn merge_next_actions(result: &MergeResult) -> Vec<Value> {
+    let mut actions = Vec::new();
+    if result.dry_run && result.conflicts.is_empty() {
+        actions.push(json!({
+            "kind": "apply_merge",
+            "source_branch": &result.source_branch,
+            "target_branch": &result.target_branch,
+            "hint": format!("run codefire merge {} --into {}", result.source_branch, result.target_branch),
+        }));
+    }
+    for conflict in &result.conflicts {
+        actions.push(json!({
+            "kind": "resolve_file_conflict",
+            "path": conflict,
+            "hint": format!("merge writes conflict markers for {conflict}; resolve them before commit"),
+        }));
+    }
+    for candidate in &result.semantic_conflicts {
+        actions.push(json!({
+            "kind": "review_semantic_conflict",
+            "atom_id": &candidate.atom_id,
+            "source_hash": &candidate.source_hash,
+            "target_hash": &candidate.target_hash,
+            "hint": format!("review concurrent semantic changes to {}", candidate.atom_id),
+        }));
+    }
+    actions
 }
 
 fn clone_branch(start: &Path, options: &CloneOptions) -> Result<(), CliError> {

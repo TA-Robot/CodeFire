@@ -222,6 +222,22 @@ fn parse_diff_args_accepts_algorithm_forms() {
 }
 
 #[test]
+fn parse_merge_args_accepts_dry_run_json() {
+    let args = vec![
+        "feature-session".to_string(),
+        "--into".to_string(),
+        "main".to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ];
+    let parsed = parse_merge_args(&args).unwrap();
+    assert_eq!(parsed.source_branch, "feature-session");
+    assert_eq!(parsed.target_branch, "main");
+    assert!(parsed.dry_run);
+    assert!(parsed.json_output);
+}
+
+#[test]
 fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
@@ -411,6 +427,8 @@ fn merge_branch_writes_source_changes_and_marks_target_burning() {
         &MergeOptions {
             source_branch: "feature-session".to_string(),
             target_branch: "main".to_string(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -509,6 +527,8 @@ fn merge_branch_writes_conflict_markers_for_divergent_changes() {
         &MergeOptions {
             source_branch: "feature-session".to_string(),
             target_branch: "main".to_string(),
+            dry_run: false,
+            json_output: false,
         },
     )
     .unwrap();
@@ -519,6 +539,124 @@ fn merge_branch_writes_conflict_markers_for_divergent_changes() {
     assert!(content.contains("return 45"));
     assert!(content.contains("return 15"));
     assert!(content.contains(">>>>>>> source"));
+}
+
+#[test]
+fn merge_dry_run_reports_plan_without_writing_target() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit_with_atoms(
+        &objects,
+        &[(
+            "docs/spec/session.md",
+            "## REQ-session: Requirement\nTTL 30\n",
+        )],
+        &[(
+            "REQ-session",
+            "requirement",
+            "docs/spec/session.md",
+            "sha256:req-base",
+        )],
+        vec![],
+    );
+    let target_commit = write_file_commit_with_atoms(
+        &objects,
+        &[(
+            "docs/spec/session.md",
+            "## REQ-session: Requirement\nTTL 45\n",
+        )],
+        &[(
+            "REQ-session",
+            "requirement",
+            "docs/spec/session.md",
+            "sha256:req-target",
+        )],
+        vec![base_commit.clone()],
+    );
+    let source_commit = write_file_commit_with_atoms(
+        &objects,
+        &[(
+            "docs/spec/session.md",
+            "## REQ-session: Requirement\nTTL 15\n",
+        )],
+        &[(
+            "REQ-session",
+            "requirement",
+            "docs/spec/session.md",
+            "sha256:req-source",
+        )],
+        vec![base_commit],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": target_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-session",
+            "head": source_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+        },
+    )
+    .unwrap();
+
+    let result = merge_branch(
+        &repo_root,
+        &MergeOptions {
+            source_branch: "feature-session".to_string(),
+            target_branch: "main".to_string(),
+            dry_run: true,
+            json_output: true,
+        },
+    )
+    .unwrap();
+
+    assert!(!result.applied);
+    assert_eq!(result.conflicts, vec!["docs/spec/session.md".to_string()]);
+    assert_eq!(
+        result.file_actions[0].action,
+        MergeAction::WriteConflictMarkers
+    );
+    assert_eq!(result.semantic_conflicts[0].atom_id, "REQ-session");
+    assert_eq!(
+        fs::read_to_string(open_dir.join("docs/spec/session.md")).unwrap(),
+        "## REQ-session: Requirement\nTTL 45\n"
+    );
+    assert_eq!(read_status(&open_dir).unwrap().state, "open-clean");
+    let rendered = render_merge_result_json(&result).unwrap();
+    let json: Value = serde_json::from_str(&rendered).unwrap();
+    assert_eq!(json["type"], "codefire_merge_plan");
+    assert_eq!(json["dry_run"], true);
+    assert_eq!(json["file_actions"][0]["path"], "docs/spec/session.md");
+    assert_eq!(json["semantic_conflicts"][0]["atom_id"], "REQ-session");
+    assert!(json["next_actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|action| action["kind"] == "resolve_file_conflict"));
 }
 
 #[test]
@@ -697,6 +835,69 @@ fn write_file_commit_with_parents(
     .unwrap();
     let mut roots = write_required_roots(objects);
     roots.insert("content_manifest".to_string(), Value::String(manifest));
+    codefire_store::store_object(
+        objects,
+        "commit",
+        codefire_store::commit_payload(parents, roots, consistent_certificate()),
+    )
+    .unwrap()
+}
+
+fn write_file_commit_with_atoms(
+    objects: &Path,
+    files: &[(&str, &str)],
+    atoms: &[(&str, &str, &str, &str)],
+    parents: Vec<String>,
+) -> String {
+    let entries = files
+        .iter()
+        .map(|(path, contents)| {
+            let blob = codefire_store::store_object(
+                objects,
+                "blob",
+                json!({
+                    "type": "blob",
+                    "version": 1,
+                    "encoding": "base64",
+                    "content": encode_base64(contents.as_bytes()),
+                }),
+            )
+            .unwrap();
+            json!({"path": path, "kind": "file", "mode": "100644", "blob": blob})
+        })
+        .collect::<Vec<_>>();
+    let manifest = codefire_store::store_object(
+        objects,
+        "content_manifest",
+        json!({"type": "content_manifest", "version": 1, "entries": entries}),
+    )
+    .unwrap();
+    let atom_values = atoms
+        .iter()
+        .map(|(atom_id, kind, artifact_path, content_hash)| {
+            json!({
+                "atom_id": atom_id,
+                "kind": kind,
+                "artifact_path": artifact_path,
+                "selector": {"type": "heading", "value": atom_id},
+                "content_hash": content_hash,
+            })
+        })
+        .collect::<Vec<_>>();
+    let atom_index = codefire_store::store_object(
+        objects,
+        "atom_index",
+        json!({
+            "type": "atom_index",
+            "version": 1,
+            "atoms": atom_values,
+            "duplicate_atom_ids": [],
+        }),
+    )
+    .unwrap();
+    let mut roots = write_required_roots(objects);
+    roots.insert("content_manifest".to_string(), Value::String(manifest));
+    roots.insert("atom_index".to_string(), Value::String(atom_index));
     codefire_store::store_object(
         objects,
         "commit",

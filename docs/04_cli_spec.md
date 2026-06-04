@@ -198,6 +198,8 @@ open stateをopen-cleanにする
 
 ```bash
 codefire merge feature-login --into main
+codefire merge feature-login --into main --dry-run
+codefire merge feature-login --into main --dry-run --json
 ```
 
 仕様：
@@ -207,6 +209,10 @@ source sealed headをtarget open directoryへ統合する
 targetはopen-cleanでなければならない
 merge実行時点ではcommitを作らない
 merge fireを生成し、targetをopen-burningにする
+--dry-runは共通祖先、file action、file conflict、semantic conflict candidateを予測し、target file / active state / branch stateを変更しない
+--jsonはcodefire_merge_plan envelopeを出力し、file_actions、conflicts、semantic_conflicts、next_actionsを含める
+semantic conflict candidateは同一Atom IDがsource/target双方でbaseから変わり、最終content_hashが異なる場合に報告する
+semantic conflict candidateは自動解決しない
 ```
 
 ## 4.12 `upload`
