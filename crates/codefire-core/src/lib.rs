@@ -531,7 +531,7 @@ fn parse_bool_field(value: &str) -> Result<bool, CoreError> {
     }
 }
 
-fn default_verification_policy() -> VerificationPolicy {
+pub fn default_verification_policy() -> VerificationPolicy {
     VerificationPolicy {
         require_no_required_fires: true,
         require_no_stale_resolutions: true,

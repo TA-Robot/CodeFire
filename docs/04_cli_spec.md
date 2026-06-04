@@ -27,7 +27,7 @@ codefire request-merge <source-url> <target-url>
 
 codefire list <server-url>
 codefire show <branch-or-url>
-codefire diff [--algorithm myers|patience|histogram] [--rename-detection] [--atoms] [--trace] <branch-or-url> <branch-or-url>
+codefire diff [--algorithm myers|patience|histogram] [--rename-detection] [--atoms] [--trace] [--impact] [--json] <branch-or-url> <branch-or-url>
 codefire request-list <server-url>
 
 codefire discard <branch>
@@ -234,6 +234,8 @@ codefire diff --algorithm patience main feature-login
 codefire diff main feature-login --algorithm=histogram
 codefire diff --rename-detection main feature-login
 codefire diff --atoms --trace main feature-login
+codefire diff --impact main feature-login
+codefire diff --impact --json main feature-login
 ```
 
 仕様：
@@ -251,6 +253,8 @@ histogramは低頻度line anchorを優先して繰り返しの多いfileの差�
 binary fileはpayload diffを出さず、sizeとsha256 prefixのsummaryだけを表示する
 --atomsはsealed commit内のAtomIndexを比較し、Atom IDのadded/removed/changedを表示する
 --traceはsealed commit内のTraceGraphを比較し、TraceLink IDのadded/removed/changedを表示する
+--impactはrequired-link policy上のmissing link増減と、changed Atomから予測されるfire impactを表示する
+--jsonはdiff結果をJSON objectとして出力し、impact有効時はmachine-readable next_actionsを含める
 ```
 
 ## 4.13 `request-merge`

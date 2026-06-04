@@ -717,6 +717,8 @@ fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
     let mut rename_detection = false;
     let mut atom_diff = false;
     let mut trace_diff = false;
+    let mut impact_diff = false;
+    let mut json_output = false;
     let mut index = 0usize;
     while index < args.len() {
         let value = &args[index];
@@ -734,6 +736,10 @@ fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
             atom_diff = true;
         } else if value == "--trace" {
             trace_diff = true;
+        } else if value == "--impact" {
+            impact_diff = true;
+        } else if value == "--json" {
+            json_output = true;
         } else if value.starts_with("--") {
             return Err(CliError::Usage(format!("unsupported diff option: {value}")));
         } else {
@@ -750,10 +756,12 @@ fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
                 rename_detection,
                 atom_diff,
                 trace_diff,
+                impact_diff,
+                json_output,
             },
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs diff [--algorithm myers|patience|histogram] [--rename-detection] [--atoms] [--trace] <left> <right>".to_string(),
+            "usage: codefire-rs diff [--algorithm myers|patience|histogram] [--rename-detection] [--atoms] [--trace] [--impact] [--json] <left> <right>".to_string(),
         )),
     }
 }

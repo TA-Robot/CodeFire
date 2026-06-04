@@ -182,6 +182,8 @@ fn parse_diff_args_accepts_algorithm_forms() {
         "--rename-detection".to_string(),
         "--atoms".to_string(),
         "--trace".to_string(),
+        "--impact".to_string(),
+        "--json".to_string(),
         "main".to_string(),
         "feature".to_string(),
     ];
@@ -192,6 +194,8 @@ fn parse_diff_args_accepts_algorithm_forms() {
     assert!(parsed.diff.rename_detection);
     assert!(parsed.diff.atom_diff);
     assert!(parsed.diff.trace_diff);
+    assert!(parsed.diff.impact_diff);
+    assert!(parsed.diff.json_output);
 
     let args = vec![
         "main".to_string(),
@@ -203,6 +207,8 @@ fn parse_diff_args_accepts_algorithm_forms() {
     assert!(!parsed.diff.rename_detection);
     assert!(!parsed.diff.atom_diff);
     assert!(!parsed.diff.trace_diff);
+    assert!(!parsed.diff.impact_diff);
+    assert!(!parsed.diff.json_output);
 
     let error = parse_diff_args(&[
         "--algorithm".to_string(),
