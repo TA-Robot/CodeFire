@@ -184,7 +184,8 @@
 | CF-209 | Rust Commit | commit sealingとbranch head updateをRustで実装する | CF-208 | done | `codefire-rs commit`; Rust init/open/scan/extinguish/verify/commit smoke; Python `doctor`/`branch list` compatibility; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-210 | Rust Merge | clone、show/diff、merge、merge firesをRustで実装する | CF-209 | done | `codefire-rs clone/show/diff/merge`; merge pending state drives `merge_changed` scan fires; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust local clone/show/diff/merge smoke |
 | CF-211 | Rust Remote | file-backed remoteとMR flowをRustで実装する | CF-210 | done | `codefire-rs upload/list/clone/show/diff/request-merge/request-list/request-review/request-apply`; Rust file-backed remote/MR smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
-| CF-212 | Rust Server | HTTP/HTTPS server parityをRustで実装する | CF-211 | todo | v0.5 remote parity |
+| CF-212 | Rust Server | HTTP/HTTPS server parityをRustで実装する | CF-211 | todo | CF-212A HTTP done; HTTPS/TLS transport remains |
+| CF-212A | Rust Server | HTTP remote upload/list/clone/show/diff/MR routesをRustで実装する | CF-211 | done | `codefire-rs serve`; `cf+http://` upload/list/clone/show/diff/request-merge/request-list/request-review/request-apply smoke; HTTP transport split into `crates/codefire-cli/src/http.rs`; `cargo test -p codefire-cli --bin codefire-rs`; `cargo clippy -p codefire-cli --all-targets -- -D warnings` |
 | CF-213 | Rust Security | commit/request signaturesとkey rotation parityをRustで実装する | CF-212 | todo | v0.5 remote parity |
 | CF-214 | Rust Observability | perf/metrics outputをRustで実装する | CF-208, CF-166 | todo | CFB-007 |
 | CF-215 | Rust Storage | storage reportとexternal artifact refsをRustで実装する | CF-202, CF-167 | todo | CFB-008 |

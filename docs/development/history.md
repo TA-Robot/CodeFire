@@ -113,6 +113,7 @@
 | 2026-06-04 | Rust Commit | Rust CLI `commit` を追加し、manifest/blob保存、sealed commit生成、branch head/open registry更新、active state resetをPython-compatibleに実行できるようにした | `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust local commit E2E; Python `doctor` / `branch list` smoke |
 | 2026-06-04 | Rust Merge | Rust CLI `clone` / `show` / `diff` / `merge` を追加し、local branch clone、sealed commit summary、manifest diff、common ancestor based 3-way merge、conflict marker、merge後の`merge_changed` fire導線を実装した | `crates/codefire-cli`, docs | `cargo fmt --check`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust local clone/show/diff/merge smoke |
 | 2026-06-04 | Rust Remote | Rust CLIにfile-backed `cf://` remoteの `upload` / `list` / remote `clone` / remote `show` / remote `diff` と、MR `request-merge` / `request-list` / `request-review` / `request-apply` を追加した | `crates/codefire-cli`, docs | `cargo fmt --check`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust file-backed remote/MR smoke |
+| 2026-06-04 | Rust Server | Rust CLIのHTTP transport/serverを `http.rs` へ分割し、`codefire-rs serve` と `cf+http://` upload/list/clone/show/diff/MR flowを実装した | `crates/codefire-cli/src/main.rs`, `crates/codefire-cli/src/http.rs`, `crates/codefire-cli/src/tests.rs`, docs | `cargo test -p codefire-cli --bin codefire-rs`; `cargo clippy -p codefire-cli --all-targets -- -D warnings`; live `cf+http://` remote/MR smoke |
 
 ## Current Decisions
 

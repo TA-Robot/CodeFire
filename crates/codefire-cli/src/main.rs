@@ -9,6 +9,9 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+mod http;
+use http::{http_json, http_remote_path, parse_cf_http_project_url, parse_cf_http_url, serve_http};
+
 fn main() {
     if let Err(error) = run(env::args().skip(1).collect()) {
         if !matches!(error, CliError::VerificationFailed) {
@@ -146,6 +149,10 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             println!("applied {}", options.mr_id);
             println!("target: {}@{}", result.target_branch, result.head);
             Ok(())
+        }
+        Some("serve") => {
+            let options = parse_serve_args(&args[1..])?;
+            serve_http(&options)
         }
         Some("show") => {
             let target = args.get(1).ok_or_else(|| {
@@ -461,6 +468,13 @@ struct RequestApplyOptions {
 struct RequestApplyResult {
     target_branch: String,
     head: String,
+}
+
+#[derive(Debug)]
+struct ServeOptions {
+    storage_root: PathBuf,
+    host: String,
+    port: u16,
 }
 
 #[derive(Debug, Clone)]
@@ -878,6 +892,55 @@ fn parse_request_apply_args(args: &[String]) -> Result<RequestApplyOptions, CliE
     }
 }
 
+fn parse_serve_args(args: &[String]) -> Result<ServeOptions, CliError> {
+    let mut storage_root = None;
+    let mut host = "127.0.0.1".to_string();
+    let mut port = 8080u16;
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--host" => {
+                index += 1;
+                host = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--host requires a value".to_string()))?
+                    .to_string();
+            }
+            "--port" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--port requires a value".to_string()))?;
+                port = value.parse::<u16>().map_err(|_| {
+                    CliError::Usage("--port must be an integer from 0 to 65535".to_string())
+                })?;
+            }
+            "--tls-cert" | "--tls-key" => {
+                return Err(CliError::Usage(
+                    "Rust HTTP server does not implement TLS yet; use cf+http".to_string(),
+                ));
+            }
+            value if storage_root.is_none() => storage_root = Some(PathBuf::from(value)),
+            value => {
+                return Err(CliError::Usage(format!(
+                    "unexpected serve argument: {value}"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(ServeOptions {
+        storage_root: storage_root.ok_or_else(|| {
+            CliError::Usage(
+                "usage: codefire-rs serve <storage-root> [--host <host>] [--port <port>]"
+                    .to_string(),
+            )
+        })?,
+        host,
+        port,
+    })
+}
+
 fn positional_args(args: &[String]) -> Result<Vec<String>, CliError> {
     let mut positional = Vec::new();
     let mut index = 0usize;
@@ -999,6 +1062,28 @@ fn upload_branch(start: &Path, options: &UploadOptions) -> Result<UploadResult, 
         }
     }
 
+    if options.remote_url.starts_with("cf+http://") {
+        let remote = parse_cf_http_url(&options.remote_url)?;
+        let response = http_json(
+            "POST",
+            &http_remote_path(
+                &remote.endpoint,
+                &remote.org,
+                &remote.app,
+                &["branches", &remote.branch, "upload"],
+            ),
+            Some(json!({
+                "branch": options.branch,
+                "head": head,
+                "objects": collect_object_records(&local_objects, &required_string(&branch, &["head"])?)?,
+                "actor": "local",
+            })),
+        )?;
+        return Ok(UploadResult {
+            head: required_string(&response, &["head"])?,
+        });
+    }
+
     let remote = parse_cf_url(&options.remote_url)?;
     let remote_branch = remote.branch.clone();
     ensure_remote_layout(&remote.project_root)?;
@@ -1040,6 +1125,31 @@ fn upload_branch(start: &Path, options: &UploadOptions) -> Result<UploadResult, 
 }
 
 fn list_remote_branches(project_url: &str) -> Result<Vec<RemoteBranch>, CliError> {
+    if project_url.starts_with("cf+http://") {
+        let project = parse_cf_http_project_url(project_url)?;
+        let response = http_json(
+            "GET",
+            &http_remote_path(&project.endpoint, &project.org, &project.app, &["branches"]),
+            None,
+        )?;
+        let branches = response
+            .get("branches")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                CliError::InvalidRepository(
+                    "HTTP remote returned an invalid branch list".to_string(),
+                )
+            })?;
+        return branches
+            .iter()
+            .map(|branch| {
+                Ok(RemoteBranch {
+                    name: required_string(branch, &["name"])?,
+                    head: required_string(branch, &["head"])?,
+                })
+            })
+            .collect();
+    }
     let project = parse_cf_project_url(project_url)?;
     let dirs = remote_dirs(&project.project_root);
     if !dirs.branches.exists() {
@@ -1067,6 +1177,36 @@ fn list_remote_branches(project_url: &str) -> Result<Vec<RemoteBranch>, CliError
 }
 
 fn request_merge(options: &RequestMergeOptions) -> Result<RequestMergeResult, CliError> {
+    if options.source_url.starts_with("cf+http://") || options.target_url.starts_with("cf+http://")
+    {
+        if !options.source_url.starts_with("cf+http://")
+            || !options.target_url.starts_with("cf+http://")
+        {
+            return Err(CliError::Usage(
+                "request-merge requires both URLs to use the same remote transport".to_string(),
+            ));
+        }
+        let target = parse_cf_http_url(&options.target_url)?;
+        let response = http_json(
+            "POST",
+            &http_remote_path(
+                &target.endpoint,
+                &target.org,
+                &target.app,
+                &["merge-requests"],
+            ),
+            Some(json!({
+                "source_url": options.source_url,
+                "target_url": options.target_url,
+                "actor": "local",
+            })),
+        )?;
+        return Ok(RequestMergeResult {
+            id: required_string(&response, &["id"])?,
+            source_head: required_string(&response, &["source"])?,
+            target_head: required_string(&response, &["target"])?,
+        });
+    }
     let source = parse_cf_url(&options.source_url)?;
     let target = parse_cf_url(&options.target_url)?;
     let source_branch = load_remote_branch(&source)?;
@@ -1111,6 +1251,38 @@ fn request_merge(options: &RequestMergeOptions) -> Result<RequestMergeResult, Cl
 }
 
 fn list_merge_requests(project_url: &str) -> Result<Vec<MergeRequestListItem>, CliError> {
+    if project_url.starts_with("cf+http://") {
+        let project = parse_cf_http_project_url(project_url)?;
+        let response = http_json(
+            "GET",
+            &http_remote_path(
+                &project.endpoint,
+                &project.org,
+                &project.app,
+                &["merge-requests"],
+            ),
+            None,
+        )?;
+        let requests = response
+            .get("merge_requests")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                CliError::InvalidRepository(
+                    "HTTP remote returned an invalid merge request list".to_string(),
+                )
+            })?;
+        return requests
+            .iter()
+            .map(|request| {
+                Ok(MergeRequestListItem {
+                    id: required_string(request, &["id"])?,
+                    status: required_string(request, &["status"])?,
+                    source_url: required_string(request, &["source_url"])?,
+                    target_url: required_string(request, &["target_url"])?,
+                })
+            })
+            .collect();
+    }
     let project = parse_cf_project_url(project_url)?;
     let dirs = remote_dirs(&project.project_root);
     if !dirs.merge_requests.exists() {
@@ -1159,6 +1331,28 @@ fn list_merge_requests(project_url: &str) -> Result<Vec<MergeRequestListItem>, C
 }
 
 fn review_merge_request(options: &RequestReviewOptions) -> Result<RequestReviewResult, CliError> {
+    if options.project_url.starts_with("cf+http://") {
+        let project = parse_cf_http_project_url(&options.project_url)?;
+        let response = http_json(
+            "POST",
+            &http_remote_path(
+                &project.endpoint,
+                &project.org,
+                &project.app,
+                &["merge-requests", &options.mr_id, "review"],
+            ),
+            Some(json!({
+                "reviewer": options.reviewer,
+                "decision": options.decision,
+                "comment": options.comment,
+                "actor": "local",
+            })),
+        )?;
+        return Ok(RequestReviewResult {
+            reviewer: required_string(&response, &["reviewer"])?,
+            decision: required_string(&response, &["decision"])?,
+        });
+    }
     let project = parse_cf_project_url(&options.project_url)?;
     let mr_path = remote_dirs(&project.project_root)
         .merge_requests
@@ -1193,6 +1387,23 @@ fn review_merge_request(options: &RequestReviewOptions) -> Result<RequestReviewR
 }
 
 fn apply_merge_request(options: &RequestApplyOptions) -> Result<RequestApplyResult, CliError> {
+    if options.project_url.starts_with("cf+http://") {
+        let project = parse_cf_http_project_url(&options.project_url)?;
+        let response = http_json(
+            "POST",
+            &http_remote_path(
+                &project.endpoint,
+                &project.org,
+                &project.app,
+                &["merge-requests", &options.mr_id, "apply"],
+            ),
+            Some(json!({"actor": "local"})),
+        )?;
+        return Ok(RequestApplyResult {
+            target_branch: required_string(&response, &["target_branch"])?,
+            head: required_string(&response, &["head"])?,
+        });
+    }
     let project = parse_cf_project_url(&options.project_url)?;
     let dirs = remote_dirs(&project.project_root);
     let mr_path = dirs.merge_requests.join(format!("{}.json", options.mr_id));
@@ -1369,6 +1580,55 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<(), CliError> {
             "branch already exists: {}",
             options.new_branch
         )));
+    }
+    if options.source.starts_with("cf+http://") {
+        let remote = parse_cf_http_url(&options.source)?;
+        let bundle = http_json(
+            "GET",
+            &http_remote_path(
+                &remote.endpoint,
+                &remote.org,
+                &remote.app,
+                &["branches", &remote.branch, "bundle"],
+            ),
+            None,
+        )?;
+        let branch_record = bundle
+            .get("branch")
+            .ok_or_else(|| {
+                CliError::InvalidRepository(
+                    "HTTP remote returned an invalid branch bundle".to_string(),
+                )
+            })?
+            .clone();
+        let records = bundle
+            .get("objects")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                CliError::InvalidRepository(
+                    "HTTP remote returned an invalid branch bundle".to_string(),
+                )
+            })?;
+        write_object_records(
+            &repo_root.join(".codefire").join("objects"),
+            records.iter().cloned(),
+        )?;
+        let source_head = required_string(&branch_record, &["head"])?;
+        codefire_store::validate_sealed_commit(
+            &repo_root.join(".codefire").join("objects"),
+            &source_head,
+        )?;
+        let branch = json!({
+            "type": "branch",
+            "version": 1,
+            "name": options.new_branch,
+            "head": source_head,
+            "state": "closed",
+            "created_from": options.source,
+            "created_at": now_iso_utc(),
+        });
+        save_branch_record(&repo_root, &branch)?;
+        return Ok(());
     }
     if options.source.starts_with("cf://") {
         let remote = parse_cf_url(&options.source)?;
@@ -2161,6 +2421,47 @@ fn resolve_commitish_any(
     repo_root: Option<&Path>,
     value: &str,
 ) -> Result<ResolvedCommitish, CliError> {
+    if value.starts_with("cf+http://") {
+        let remote = parse_cf_http_url(value)?;
+        let bundle = http_json(
+            "GET",
+            &http_remote_path(
+                &remote.endpoint,
+                &remote.org,
+                &remote.app,
+                &["branches", &remote.branch, "bundle"],
+            ),
+            None,
+        )?;
+        let branch = bundle.get("branch").ok_or_else(|| {
+            CliError::InvalidRepository("HTTP remote returned an invalid branch bundle".to_string())
+        })?;
+        let records = bundle
+            .get("objects")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                CliError::InvalidRepository(
+                    "HTTP remote returned an invalid branch bundle".to_string(),
+                )
+            })?;
+        let temp_objects = env::temp_dir().join(format!(
+            "codefire-http-objects-{}-{}",
+            std::process::id(),
+            stable_hash_48(value.as_bytes())
+        ));
+        if temp_objects.exists() {
+            fs::remove_dir_all(&temp_objects)?;
+        }
+        ensure_object_dirs(&temp_objects)?;
+        write_object_records(&temp_objects, records.iter().cloned())?;
+        let head = required_string(branch, &["head"])?;
+        codefire_store::validate_sealed_commit(&temp_objects, &head)?;
+        return Ok(ResolvedCommitish {
+            objects: temp_objects,
+            commit_id: head.clone(),
+            label: format!("{value}@{head}"),
+        });
+    }
     if value.starts_with("cf://") {
         let remote = parse_cf_url(value)?;
         let branch = load_remote_branch(&remote)?;
@@ -2556,6 +2857,107 @@ fn copy_object_record(
         .open(&dest)?;
     file.write_all(serde_json::to_string_pretty(&record)?.as_bytes())?;
     file.write_all(b"\n")?;
+    Ok(())
+}
+
+fn collect_object_records(objects: &Path, root_id: &str) -> Result<Vec<Value>, CliError> {
+    let mut records = Vec::new();
+    let mut seen = BTreeSet::new();
+    let mut stack = vec![root_id.to_string()];
+    while let Some(object_id) = stack.pop() {
+        if !seen.insert(object_id.clone()) {
+            continue;
+        }
+        let record = codefire_store::read_object_record(objects, &object_id)?;
+        for reference in object_references(&record.payload) {
+            stack.push(reference);
+        }
+        records.push(serde_json::to_value(record)?);
+    }
+    records.sort_by_key(|record| {
+        record
+            .get("object_id")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string()
+    });
+    Ok(records)
+}
+
+fn write_object_records<I>(objects: &Path, records: I) -> Result<(), CliError>
+where
+    I: IntoIterator<Item = Value>,
+{
+    ensure_object_dirs(objects)?;
+    for record_value in records {
+        let record: codefire_store::ObjectRecord = serde_json::from_value(record_value)?;
+        codefire_store::validate_object_record(&record, Some(&record.object_id), None)?;
+        let subdir = codefire_store::object_subdir(&record.type_tag).ok_or_else(|| {
+            CliError::InvalidRepository(format!("unknown object type: {}", record.type_tag))
+        })?;
+        let path = objects
+            .join(subdir)
+            .join(format!("{}.json", record.object_id));
+        if path.exists() {
+            let existing = codefire_store::read_object_record(objects, &record.object_id)?;
+            if existing != record {
+                return Err(CliError::InvalidRepository(format!(
+                    "object collision: {}",
+                    record.object_id
+                )));
+            }
+            continue;
+        }
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)?;
+        file.write_all(serde_json::to_string_pretty(&record)?.as_bytes())?;
+        file.write_all(b"\n")?;
+    }
+    Ok(())
+}
+
+fn ensure_object_dirs(objects: &Path) -> Result<(), CliError> {
+    for subdir in [
+        "blobs",
+        "content_manifests",
+        "atom_indexes",
+        "trace_graphs",
+        "fire_ledgers",
+        "resolution_ledgers",
+        "verifications",
+        "policies",
+        "commits",
+        "branches",
+    ] {
+        fs::create_dir_all(objects.join(subdir))?;
+    }
+    Ok(())
+}
+
+fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<(), CliError> {
+    if !src.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dest_path = dest.join(entry.file_name());
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            fs::create_dir_all(&dest_path)?;
+            copy_dir_recursive(&src_path, &dest_path)?;
+        } else if file_type.is_file() {
+            if let Some(parent) = dest_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::copy(src_path, dest_path)?;
+        }
+    }
     Ok(())
 }
 
@@ -3159,751 +3561,4 @@ fn civil_from_days(days_since_unix_epoch: i64) -> (i32, u32, u32) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::{json, Map};
-    use tempfile::tempdir;
-
-    #[test]
-    fn init_creates_python_compatible_repo_layout() {
-        let temp = tempdir().unwrap();
-        let repo_root = temp.path().join("repo");
-
-        let result = init_repo(&repo_root, false).unwrap();
-        let branches = list_branches(&repo_root).unwrap();
-
-        assert_eq!(result.repo_root, repo_root);
-        assert_eq!(branches.len(), 1);
-        assert_eq!(branches[0].name, "main");
-        assert_eq!(branches[0].head, result.main_commit);
-        assert_eq!(branches[0].state, "closed");
-        codefire_store::validate_sealed_commit(
-            &repo_root.join(".codefire").join("objects"),
-            &result.main_commit,
-        )
-        .unwrap();
-        assert!(init_repo(&repo_root, false).is_err());
-        init_repo(&repo_root, true).unwrap();
-    }
-
-    #[test]
-    fn open_materializes_manifest_and_updates_registry() {
-        let temp = tempdir().unwrap();
-        let repo_root = temp.path().join("repo");
-        let open_dir = temp.path().join("main-open");
-        init_repo(&repo_root, false).unwrap();
-        let objects = repo_root.join(".codefire").join("objects");
-        let commit_id = write_file_commit(&objects, "docs/readme.md", "hello\n");
-        let branch = json!({
-            "type": "branch",
-            "version": 1,
-            "name": "main",
-            "head": commit_id,
-            "state": "closed",
-            "created_at": "2026-06-04T00:00:00Z"
-        });
-        save_branch_record(&repo_root, &branch).unwrap();
-
-        let result = open_branch_from(
-            &repo_root,
-            &OpenOptions {
-                branch: "main".to_string(),
-                path: open_dir.clone(),
-            },
-        )
-        .unwrap();
-        let status = read_status(&open_dir).unwrap();
-        let branches = list_branches(&open_dir).unwrap();
-
-        assert_eq!(result.open_dir, open_dir);
-        assert_eq!(
-            fs::read_to_string(result.open_dir.join("docs").join("readme.md")).unwrap(),
-            "hello\n"
-        );
-        assert_eq!(
-            status,
-            Status {
-                branch: "main".to_string(),
-                state: "open-clean".to_string(),
-                base: commit_id.clone(),
-                open_fires: 0,
-            }
-        );
-        assert_eq!(branches[0].state, "open-clean");
-    }
-
-    #[test]
-    fn clone_branch_creates_closed_branch_and_rejects_burning_source() {
-        let temp = tempdir().unwrap();
-        let repo_root = temp.path().join("repo");
-        init_repo(&repo_root, false).unwrap();
-        let objects = repo_root.join(".codefire").join("objects");
-        let commit_id = write_file_commit(&objects, "docs/readme.md", "hello\n");
-        save_branch_record(
-            &repo_root,
-            &json!({
-                "type": "branch",
-                "version": 1,
-                "name": "main",
-                "head": commit_id,
-                "state": "closed",
-                "created_at": "2026-06-04T00:00:00Z"
-            }),
-        )
-        .unwrap();
-
-        clone_branch(
-            &repo_root,
-            &CloneOptions {
-                source: "main".to_string(),
-                new_branch: "feature/session".to_string(),
-            },
-        )
-        .unwrap();
-        let cloned = load_branch_record(&repo_root, "feature/session").unwrap();
-        assert_eq!(
-            required_string(&cloned, &["head"]).unwrap(),
-            required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap()
-        );
-        assert_eq!(cloned.get("state").and_then(Value::as_str), Some("closed"));
-
-        let mut burning = cloned;
-        burning["name"] = Value::String("burning".to_string());
-        burning["state"] = Value::String("open-burning".to_string());
-        save_branch_record(&repo_root, &burning).unwrap();
-        let error = clone_branch(
-            &repo_root,
-            &CloneOptions {
-                source: "burning".to_string(),
-                new_branch: "copy".to_string(),
-            },
-        )
-        .unwrap_err()
-        .to_string();
-        assert!(error.contains("cannot clone from branch 'burning' while it is open-burning"));
-    }
-
-    #[test]
-    fn show_and_diff_local_branches() {
-        let temp = tempdir().unwrap();
-        let repo_root = temp.path().join("repo");
-        init_repo(&repo_root, false).unwrap();
-        let objects = repo_root.join(".codefire").join("objects");
-        let main_commit =
-            write_file_commit(&objects, "src/session.py", "def ttl():\n    return 30\n");
-        let feature_commit =
-            write_file_commit(&objects, "src/session.py", "def ttl():\n    return 15\n");
-        save_branch_record(
-            &repo_root,
-            &json!({
-                "type": "branch",
-                "version": 1,
-                "name": "main",
-                "head": main_commit,
-                "state": "closed",
-                "created_at": "2026-06-04T00:00:00Z"
-            }),
-        )
-        .unwrap();
-        save_branch_record(
-            &repo_root,
-            &json!({
-                "type": "branch",
-                "version": 1,
-                "name": "feature-session",
-                "head": feature_commit,
-                "state": "closed",
-                "created_at": "2026-06-04T00:00:00Z"
-            }),
-        )
-        .unwrap();
-
-        let show = show_commitish(Some(&repo_root), "feature-session").unwrap();
-        assert!(show.contains("Object: feature-session@CF-COMMIT-"));
-        assert!(show.contains("Message: test commit"));
-        assert!(show.contains("Files: 1"));
-        assert!(show.contains("Certificate: consistent"));
-
-        let diff = diff_commitish(Some(&repo_root), "main", "feature-session").unwrap();
-        assert!(diff.contains("--- main@CF-COMMIT-"));
-        assert!(diff.contains("+++ feature-session@CF-COMMIT-"));
-        assert!(diff.contains("-    return 30"));
-        assert!(diff.contains("+    return 15"));
-    }
-
-    #[test]
-    fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
-        let temp = tempdir().unwrap();
-        let repo_root = temp.path().join("repo");
-        let clone_repo = temp.path().join("clone-repo");
-        let server = temp.path().join("server");
-        init_repo(&repo_root, false).unwrap();
-        init_repo(&clone_repo, false).unwrap();
-        let objects = repo_root.join(".codefire").join("objects");
-        let main_commit = write_file_commit(&objects, "docs/readme.md", "hello 30\n");
-        let feature_commit = write_file_commit_with_parents(
-            &objects,
-            "docs/readme.md",
-            "hello 15\n",
-            vec![main_commit.clone()],
-        );
-        save_branch_record(
-            &repo_root,
-            &json!({
-                "type": "branch",
-                "version": 1,
-                "name": "main",
-                "head": main_commit,
-                "state": "closed",
-                "created_at": "2026-06-04T00:00:00Z"
-            }),
-        )
-        .unwrap();
-        save_branch_record(
-            &repo_root,
-            &json!({
-                "type": "branch",
-                "version": 1,
-                "name": "feature-session",
-                "head": feature_commit,
-                "state": "closed",
-                "created_at": "2026-06-04T00:00:00Z"
-            }),
-        )
-        .unwrap();
-        let project_url = format!("cf://{}/org/app", server.display());
-        let main_url = format!("{project_url}/main");
-        let feature_url = format!("{project_url}/feature-session");
-
-        upload_branch(
-            &repo_root,
-            &UploadOptions {
-                branch: "main".to_string(),
-                remote_url: main_url.clone(),
-            },
-        )
-        .unwrap();
-        let branches = list_remote_branches(&project_url).unwrap();
-        assert_eq!(branches[0].name, "main");
-        assert_eq!(
-            branches[0].head,
-            load_branch_record(&repo_root, "main").unwrap()["head"]
-        );
-
-        clone_branch(
-            &clone_repo,
-            &CloneOptions {
-                source: main_url.clone(),
-                new_branch: "main-from-remote".to_string(),
-            },
-        )
-        .unwrap();
-        let cloned = load_branch_record(&clone_repo, "main-from-remote").unwrap();
-        assert_eq!(
-            required_string(&cloned, &["head"]).unwrap(),
-            required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap()
-        );
-
-        upload_branch(
-            &repo_root,
-            &UploadOptions {
-                branch: "feature-session".to_string(),
-                remote_url: feature_url.clone(),
-            },
-        )
-        .unwrap();
-        let show = show_commitish(None, &feature_url).unwrap();
-        assert!(show.contains(&format!("Object: {feature_url}@CF-COMMIT-")));
-        assert!(show.contains("Certificate: consistent"));
-        let diff = diff_commitish(None, &main_url, &feature_url).unwrap();
-        assert!(diff.contains(&format!("--- {main_url}@CF-COMMIT-")));
-        assert!(diff.contains(&format!("+++ {feature_url}@CF-COMMIT-")));
-        assert!(diff.contains("+hello 15"));
-
-        let mr = request_merge(&RequestMergeOptions {
-            source_url: feature_url.clone(),
-            target_url: main_url.clone(),
-        })
-        .unwrap();
-        assert!(mr.id.starts_with("MR-"));
-        let listed = list_merge_requests(&project_url).unwrap();
-        assert_eq!(listed[0].status, "open");
-        review_merge_request(&RequestReviewOptions {
-            project_url: project_url.clone(),
-            mr_id: mr.id.clone(),
-            reviewer: "alice".to_string(),
-            decision: "approve".to_string(),
-            comment: "sealed source is ready".to_string(),
-        })
-        .unwrap();
-        assert_eq!(
-            list_merge_requests(&project_url).unwrap()[0].status,
-            "approved"
-        );
-        let applied = apply_merge_request(&RequestApplyOptions {
-            project_url: project_url.clone(),
-            mr_id: mr.id,
-        })
-        .unwrap();
-        assert_eq!(applied.target_branch, "main");
-        assert_eq!(
-            applied.head,
-            required_string(
-                &load_remote_branch(&parse_cf_url(&feature_url).unwrap()).unwrap(),
-                &["head"]
-            )
-            .unwrap()
-        );
-        assert_eq!(
-            required_string(
-                &load_remote_branch(&parse_cf_url(&main_url).unwrap()).unwrap(),
-                &["head"]
-            )
-            .unwrap(),
-            applied.head
-        );
-    }
-
-    #[test]
-    fn merge_branch_writes_source_changes_and_marks_target_burning() {
-        let temp = tempdir().unwrap();
-        let repo_root = temp.path().join("repo");
-        let open_dir = temp.path().join("main-open");
-        init_repo(&repo_root, false).unwrap();
-        let objects = repo_root.join(".codefire").join("objects");
-        let base_commit = write_file_commit(
-            &objects,
-            "docs/spec/session.md",
-            "## REQ-session: Requirement\nTTL 30\n\n## DES-session: Design\nClock policy\n",
-        );
-        let feature_commit = write_file_commit_with_parents(
-            &objects,
-            "docs/spec/session.md",
-            "## REQ-session: Requirement\nTTL 15\n\n## DES-session: Design\nClock policy\n",
-            vec![base_commit.clone()],
-        );
-        save_branch_record(
-            &repo_root,
-            &json!({
-                "type": "branch",
-                "version": 1,
-                "name": "main",
-                "head": base_commit,
-                "state": "closed",
-                "created_at": "2026-06-04T00:00:00Z"
-            }),
-        )
-        .unwrap();
-        save_branch_record(
-            &repo_root,
-            &json!({
-                "type": "branch",
-                "version": 1,
-                "name": "feature-session",
-                "head": feature_commit,
-                "state": "closed",
-                "created_at": "2026-06-04T00:00:00Z"
-            }),
-        )
-        .unwrap();
-        open_branch_from(
-            &repo_root,
-            &OpenOptions {
-                branch: "main".to_string(),
-                path: open_dir.clone(),
-            },
-        )
-        .unwrap();
-
-        let result = merge_branch(
-            &repo_root,
-            &MergeOptions {
-                source_branch: "feature-session".to_string(),
-                target_branch: "main".to_string(),
-            },
-        )
-        .unwrap();
-
-        assert!(result.conflicts.is_empty());
-        assert_eq!(
-            fs::read_to_string(open_dir.join("docs/spec/session.md")).unwrap(),
-            "## REQ-session: Requirement\nTTL 15\n\n## DES-session: Design\nClock policy\n"
-        );
-        fs::write(
-            open_dir.join("codefire.links.yaml"),
-            "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
-        )
-        .unwrap();
-        let scan = run_scan(&open_dir).unwrap();
-        assert!(scan
-            .open_fires
-            .iter()
-            .any(|fire| fire.reason == "merge_changed"));
-        let status = read_status(&open_dir).unwrap();
-        assert_eq!(status.state, "open-burning");
-        let active_state_path = PathBuf::from(
-            required_string(
-                &read_json(&opened_registry_path(&repo_root, "main")).unwrap(),
-                &["open", "active_state_path"],
-            )
-            .unwrap(),
-        );
-        let state = read_json(&active_state_path.join("state.json")).unwrap();
-        let expected_parent = required_string(
-            &load_branch_record(&repo_root, "feature-session").unwrap(),
-            &["head"],
-        )
-        .unwrap();
-        assert_eq!(
-            state.get("pending_merge_parent").and_then(Value::as_str),
-            Some(expected_parent.as_str())
-        );
-    }
-
-    #[test]
-    fn merge_branch_writes_conflict_markers_for_divergent_changes() {
-        let temp = tempdir().unwrap();
-        let repo_root = temp.path().join("repo");
-        let open_dir = temp.path().join("main-open");
-        init_repo(&repo_root, false).unwrap();
-        let objects = repo_root.join(".codefire").join("objects");
-        let base_commit =
-            write_file_commit(&objects, "src/session.py", "def ttl():\n    return 30\n");
-        let target_commit = write_file_commit_with_parents(
-            &objects,
-            "src/session.py",
-            "def ttl():\n    return 45\n",
-            vec![base_commit.clone()],
-        );
-        let source_commit = write_file_commit_with_parents(
-            &objects,
-            "src/session.py",
-            "def ttl():\n    return 15\n",
-            vec![base_commit],
-        );
-        save_branch_record(
-            &repo_root,
-            &json!({
-                "type": "branch",
-                "version": 1,
-                "name": "main",
-                "head": target_commit,
-                "state": "closed",
-                "created_at": "2026-06-04T00:00:00Z"
-            }),
-        )
-        .unwrap();
-        save_branch_record(
-            &repo_root,
-            &json!({
-                "type": "branch",
-                "version": 1,
-                "name": "feature-session",
-                "head": source_commit,
-                "state": "closed",
-                "created_at": "2026-06-04T00:00:00Z"
-            }),
-        )
-        .unwrap();
-        open_branch_from(
-            &repo_root,
-            &OpenOptions {
-                branch: "main".to_string(),
-                path: open_dir.clone(),
-            },
-        )
-        .unwrap();
-
-        let result = merge_branch(
-            &repo_root,
-            &MergeOptions {
-                source_branch: "feature-session".to_string(),
-                target_branch: "main".to_string(),
-            },
-        )
-        .unwrap();
-
-        assert_eq!(result.conflicts, vec!["src/session.py".to_string()]);
-        let content = fs::read_to_string(open_dir.join("src").join("session.py")).unwrap();
-        assert!(content.contains("<<<<<<< target"));
-        assert!(content.contains("return 45"));
-        assert!(content.contains("return 15"));
-        assert!(content.contains(">>>>>>> source"));
-    }
-
-    #[test]
-    fn status_reads_python_compatible_open_directory() {
-        let temp = tempdir().unwrap();
-        let repo_root = temp.path();
-        let open_dir = repo_root.join("main");
-        let cf = repo_root.join(".codefire");
-        fs::create_dir_all(&open_dir).unwrap();
-        fs::create_dir_all(cf.join("opened")).unwrap();
-        fs::create_dir_all(cf.join("active").join("open_123")).unwrap();
-
-        let commit_id = write_valid_commit(&cf.join("objects"));
-        fs::write(
-            open_dir.join(".codefire-open"),
-            serde_json::to_string_pretty(&json!({
-                "version": 1,
-                "repository": {"path": cf, "repository_id": "repo_123"},
-                "branch": {"name": "main", "opened_from_commit": commit_id},
-                "open": {"open_instance_id": "open_123", "opened_at": "2026-06-04T00:00:00Z", "opened_path": open_dir}
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-        fs::write(
-            repo_root.join(".codefire").join("opened").join("main.json"),
-            serde_json::to_string_pretty(&json!({
-                "version": 1,
-                "branch": {"name": "main"},
-                "open": {
-                    "path": open_dir,
-                    "open_instance_id": "open_123",
-                    "opened_from_commit": commit_id,
-                    "current_base_commit": commit_id,
-                    "active_state_path": repo_root.join(".codefire").join("active").join("open_123")
-                },
-                "state": {"last_known": "open-consistent"}
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-        fs::write(
-            repo_root
-                .join(".codefire")
-                .join("active")
-                .join("open_123")
-                .join("fires.json"),
-            serde_json::to_string_pretty(&json!([
-                {"display_id": "FIRE-001", "status": "open"},
-                {"display_id": "FIRE-002", "status": "extinguished"}
-            ]))
-            .unwrap(),
-        )
-        .unwrap();
-
-        let status = read_status(&open_dir).unwrap();
-
-        assert_eq!(
-            status,
-            Status {
-                branch: "main".to_string(),
-                state: "open-consistent".to_string(),
-                base: commit_id,
-                open_fires: 1
-            }
-        );
-    }
-
-    #[test]
-    fn branch_list_reads_repo_from_open_marker_and_validates_heads() {
-        let temp = tempdir().unwrap();
-        let repo_root = temp.path().join("repo");
-        let open_dir = temp.path().join("worktree");
-        let cf = repo_root.join(".codefire");
-        fs::create_dir_all(cf.join("branches")).unwrap();
-        fs::create_dir_all(&open_dir).unwrap();
-
-        let commit_id = write_valid_commit(&cf.join("objects"));
-        let branch_name = "feature/a b%雪";
-        fs::write(
-            cf.join("branches")
-                .join(format!("{}.json", ref_file_name(branch_name))),
-            serde_json::to_string_pretty(&json!({
-                "type": "branch",
-                "version": 1,
-                "name": branch_name,
-                "head": commit_id,
-                "state": "open-clean",
-                "created_at": "2026-06-04T00:00:00Z"
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-        fs::write(
-            open_dir.join(".codefire-open"),
-            serde_json::to_string_pretty(&json!({
-                "version": 1,
-                "repository": {"path": cf, "repository_id": "repo_123"},
-                "branch": {"name": branch_name, "opened_from_commit": commit_id},
-                "open": {"open_instance_id": "open_123", "opened_at": "2026-06-04T00:00:00Z", "opened_path": open_dir}
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-
-        let branches = list_branches(&open_dir).unwrap();
-
-        assert_eq!(
-            branches,
-            vec![Branch {
-                name: branch_name.to_string(),
-                head: commit_id,
-                state: "open-clean".to_string()
-            }]
-        );
-    }
-
-    #[test]
-    fn ref_file_name_matches_python_quote_safe_empty() {
-        assert_eq!(
-            ref_file_name("feature/a b%雪"),
-            "feature%2Fa%20b%25%E9%9B%AA"
-        );
-    }
-
-    #[test]
-    fn unix_timestamp_format_uses_utc_iso_seconds() {
-        assert_eq!(format_unix_seconds_utc(0), "1970-01-01T00:00:00Z");
-        assert_eq!(format_unix_seconds_utc(951_782_400), "2000-02-29T00:00:00Z");
-    }
-
-    #[test]
-    fn base64_decoder_handles_padding_and_rejects_invalid_input() {
-        assert_eq!(decode_base64("aGVsbG8K").unwrap(), b"hello\n");
-        assert_eq!(decode_base64("Zg==").unwrap(), b"f");
-        assert!(decode_base64("Z===").is_err());
-    }
-
-    fn write_valid_commit(objects: &Path) -> String {
-        let roots = write_required_roots(objects);
-        let certificate = consistent_certificate();
-        let commit = codefire_store::commit_payload(vec![], roots, certificate);
-        codefire_store::store_object(objects, "commit", commit).unwrap()
-    }
-
-    fn write_file_commit(objects: &Path, path: &str, contents: &str) -> String {
-        write_file_commit_with_parents(objects, path, contents, vec![])
-    }
-
-    fn write_file_commit_with_parents(
-        objects: &Path,
-        path: &str,
-        contents: &str,
-        parents: Vec<String>,
-    ) -> String {
-        let blob = codefire_store::store_object(
-            objects,
-            "blob",
-            json!({
-                "type": "blob",
-                "version": 1,
-                "encoding": "base64",
-                "content": encode_base64(contents.as_bytes()),
-            }),
-        )
-        .unwrap();
-        let manifest = codefire_store::store_object(
-            objects,
-            "content_manifest",
-            json!({
-                "type": "content_manifest",
-                "version": 1,
-                "entries": [{"path": path, "kind": "file", "mode": "100644", "blob": blob}],
-            }),
-        )
-        .unwrap();
-        let mut roots = write_required_roots(objects);
-        roots.insert("content_manifest".to_string(), Value::String(manifest));
-        codefire_store::store_object(
-            objects,
-            "commit",
-            codefire_store::commit_payload(parents, roots, consistent_certificate()),
-        )
-        .unwrap()
-    }
-
-    fn encode_base64(bytes: &[u8]) -> String {
-        const ALPHABET: &[u8; 64] =
-            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        let mut encoded = String::with_capacity(bytes.len().div_ceil(3) * 4);
-        for chunk in bytes.chunks(3) {
-            let a = chunk[0];
-            let b = *chunk.get(1).unwrap_or(&0);
-            let c = *chunk.get(2).unwrap_or(&0);
-            encoded.push(ALPHABET[(a >> 2) as usize] as char);
-            encoded.push(ALPHABET[(((a & 0x03) << 4) | (b >> 4)) as usize] as char);
-            if chunk.len() >= 2 {
-                encoded.push(ALPHABET[(((b & 0x0f) << 2) | (c >> 6)) as usize] as char);
-            } else {
-                encoded.push('=');
-            }
-            if chunk.len() == 3 {
-                encoded.push(ALPHABET[(c & 0x3f) as usize] as char);
-            } else {
-                encoded.push('=');
-            }
-        }
-        encoded
-    }
-
-    fn write_required_roots(objects: &Path) -> Map<String, Value> {
-        let content_manifest = codefire_store::store_object(
-            objects,
-            "content_manifest",
-            json!({"type": "content_manifest", "version": 1, "entries": []}),
-        )
-        .unwrap();
-        let atom_index = codefire_store::store_object(
-            objects,
-            "atom_index",
-            json!({"type": "atom_index", "version": 1, "atoms": [], "duplicate_atom_ids": []}),
-        )
-        .unwrap();
-        let trace_graph = codefire_store::store_object(
-            objects,
-            "trace_graph",
-            json!({"type": "trace_graph", "version": 1, "links": []}),
-        )
-        .unwrap();
-        let fire_delta = codefire_store::store_object(
-            objects,
-            "fire_ledger",
-            json!({"type": "fire_ledger", "version": 1, "fires": []}),
-        )
-        .unwrap();
-        let verification = codefire_store::store_object(
-            objects,
-            "verification",
-            json!({"type": "verification", "version": 1, "checks": []}),
-        )
-        .unwrap();
-        let policy = codefire_store::store_object(
-            objects,
-            "policy",
-            json!({"type": "policy", "version": 1, "policy": {}}),
-        )
-        .unwrap();
-
-        let mut roots = Map::new();
-        roots.insert(
-            "content_manifest".to_string(),
-            Value::String(content_manifest),
-        );
-        roots.insert("atom_index".to_string(), Value::String(atom_index));
-        roots.insert("trace_graph".to_string(), Value::String(trace_graph));
-        roots.insert("fire_delta".to_string(), Value::String(fire_delta));
-        roots.insert("verification".to_string(), Value::String(verification));
-        roots.insert("policy".to_string(), Value::String(policy));
-        roots
-    }
-
-    fn consistent_certificate() -> Map<String, Value> {
-        let mut certificate = Map::new();
-        certificate.insert(
-            "result".to_string(),
-            Value::String("consistent".to_string()),
-        );
-        certificate.insert("open_required_fires".to_string(), Value::Number(0.into()));
-        certificate.insert("failed_checks".to_string(), Value::Number(0.into()));
-        certificate.insert(
-            "missing_required_links".to_string(),
-            Value::Number(0.into()),
-        );
-        certificate.insert("stale_resolutions".to_string(), Value::Number(0.into()));
-        certificate.insert("duplicate_atom_ids".to_string(), Value::Number(0.into()));
-        certificate
-    }
-}
+mod tests;
