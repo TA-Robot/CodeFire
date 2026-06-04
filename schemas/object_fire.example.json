@@ -1,0 +1,23 @@
+{
+  "type": "fire",
+  "version": 1,
+  "fire_uid": "fire_01HZXB7",
+  "display_id": "FIRE-001",
+  "status": "open",
+  "severity": "required",
+  "source": {
+    "atom_id": "CODE-SessionPolicy",
+    "content_hash_at_fire": "sha256:bbb222"
+  },
+  "target": {
+    "atom_id": "DES-AUTH-001",
+    "content_hash_at_fire": "sha256:ccc333"
+  },
+  "reason": "code_changed",
+  "trace_path": [
+    "CODE-SessionPolicy",
+    "DES-AUTH-001"
+  ],
+  "created_by": "scan",
+  "created_at": "2026-05-24T10:40:00+09:00"
+}

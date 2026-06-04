@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=59", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codefire-mvp"
+version = "0.2.0"
+description = "CodeFire MVP CLI"
+requires-python = ">=3.10"
+readme = "README.md"
+authors = [{name = "CodeFire MVP"}]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+]
+
+[tool.setuptools]
+packages = []
+script-files = ["codefire"]
+
+[tool.codefire]
+entrypoint = "codefire"

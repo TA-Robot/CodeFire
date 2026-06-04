@@ -1,0 +1,33 @@
+version: 1
+
+commit_policy:
+  require_no_required_fires: true
+  require_no_stale_resolutions: true
+  require_trace_completeness: true
+  require_verification_success: true
+  reject_duplicate_atom_ids: true
+
+required_links:
+  requirement:
+    - type: refined_by
+      target_kind: design
+      min: 1
+    - type: verified_by
+      target_kind: test
+      min: 1
+
+  design:
+    - type: implemented_by
+      target_kind: code
+      min: 1
+
+extinguish_policy:
+  no-change-required:
+    requires_rationale: true
+
+verification:
+  required:
+    - id: unit-tests
+      command: "python -m pytest"
+      cwd: "."
+

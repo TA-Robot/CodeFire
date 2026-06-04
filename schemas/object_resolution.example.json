@@ -1,0 +1,27 @@
+{
+  "type": "resolution",
+  "version": 1,
+  "resolution_uid": "res_01HZXB8",
+  "fire_uid": "fire_01HZXB7",
+  "resolution_type": "no-change-required",
+  "rationale": "内部処理の整理のみであり、外部仕様および設計責務に変更はない",
+  "basis": {
+    "source_atom": {
+      "atom_id": "CODE-SessionPolicy",
+      "content_hash": "sha256:bbb999"
+    },
+    "target_atom": {
+      "atom_id": "DES-AUTH-001",
+      "content_hash": "sha256:ccc333"
+    },
+    "trace_links": [
+      {
+        "link_id": "LINK-DES-AUTH-001-implemented_by-CODE-SessionPolicy",
+        "link_hash": "sha256:link111"
+      }
+    ],
+    "policy_hash": "sha256:policy111"
+  },
+  "resolved_by": "alice",
+  "resolved_at": "2026-05-24T11:00:00+09:00"
+}

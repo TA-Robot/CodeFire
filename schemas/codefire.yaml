@@ -1,0 +1,27 @@
+version: 1
+
+artifacts:
+  requirements:
+    - path: docs/spec/**/*.md
+      kind: requirement_document
+
+  designs:
+    - path: docs/design/**/*.md
+      kind: design_document
+
+  code:
+    - path: src/**/*.py
+      kind: python_code
+
+  tests:
+    - path: tests/**/*.py
+      kind: pytest_test
+
+atom_id:
+  require_explicit_ids_for:
+    - requirement
+    - design
+  allow_derived_ids_for:
+    - code
+    - test
+

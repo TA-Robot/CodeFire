@@ -1,0 +1,10 @@
+flowchart TD
+  A[Source sealed branch] --> M[merge]
+  B[Target open-clean branch] --> M
+  M --> C[Target open directory updated]
+  C --> D[Merge fires opened]
+  D --> E[Open-burning]
+  E --> F[Extinguish fires]
+  F --> G[Verify]
+  G --> H[Merge sealed commit]
+

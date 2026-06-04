@@ -1,0 +1,22 @@
+sequenceDiagram
+  participant U as User
+  participant CLI as CodeFire CLI
+  participant IDX as Indexer
+  participant FIRE as Fire Engine
+  participant POL as Policy Engine
+  participant VER as Verifier
+  participant STORE as Object Store
+
+  U->>CLI: codefire commit -m ...
+  CLI->>IDX: scan open directory
+  IDX-->>CLI: current atom index
+  CLI->>FIRE: update fires
+  FIRE-->>CLI: active fires
+  CLI->>POL: committable check
+  POL-->>CLI: pass/fail
+  CLI->>VER: run verification
+  VER-->>CLI: verification result
+  CLI->>STORE: write blobs/manifests/commit
+  STORE-->>CLI: commit id
+  CLI-->>U: sealed commit created
+

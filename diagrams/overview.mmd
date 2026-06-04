@@ -1,0 +1,12 @@
+flowchart TD
+  A[Specification] -->|Trace Link| B[Design]
+  B -->|Trace Link| C[Code]
+  A -->|Trace Link| D[Test]
+  C -->|Change detected| E[Fire Engine]
+  E --> F[Open Fires]
+  F --> G[Extinguish]
+  G --> H[Verify]
+  H --> I{Consistent?}
+  I -- yes --> J[Sealed Commit]
+  I -- no --> F
+

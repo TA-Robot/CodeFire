@@ -1,0 +1,38 @@
+{
+  "type": "commit",
+  "version": 1,
+  "commit_id": "CF-COMMIT-8f3a91d0c2",
+  "parents": [
+    "CF-COMMIT-21ab77aa00"
+  ],
+  "message": "Change session expiration policy",
+  "roots": {
+    "content_manifest": "CF-MANIFEST-aaa111",
+    "artifact_index": "CF-ARTIFACT-bbb222",
+    "atom_index": "CF-ATOMINDEX-ccc333",
+    "trace_graph": "CF-TRACE-ddd444",
+    "fire_delta": "CF-FIRELEDGER-eee555",
+    "verification": "CF-VERIFY-fff666",
+    "policy": "CF-POLICY-ggg777"
+  },
+  "certificate": {
+    "result": "consistent",
+    "open_required_fires": 0,
+    "failed_checks": 0,
+    "missing_required_links": 0,
+    "stale_resolutions": 0,
+    "duplicate_atom_ids": 0
+  },
+  "changed_atoms": [
+    "REQ-AUTH-001",
+    "DES-AUTH-001",
+    "CODE-SessionPolicy",
+    "TEST-session-expiration"
+  ],
+  "extinguished_fires": [
+    "fire_01HZXB7",
+    "fire_01HZXB8"
+  ],
+  "created_by": "alice",
+  "created_at": "2026-05-24T11:30:00+09:00"
+}

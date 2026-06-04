@@ -1,0 +1,15 @@
+version: 1
+
+links:
+  - from: REQ-AUTH-001
+    to: DES-AUTH-001
+    type: refined_by
+
+  - from: DES-AUTH-001
+    to: CODE-SessionPolicy
+    type: implemented_by
+
+  - from: REQ-AUTH-001
+    to: TEST-session-expiration
+    type: verified_by
+

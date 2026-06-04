@@ -1,0 +1,10 @@
+stateDiagram-v2
+  [*] --> closed
+  closed --> open_clean: open
+  open_clean --> open_burning: edit / scan / fire / merge
+  open_burning --> open_consistent: extinguish + verify
+  open_consistent --> open_clean: commit
+  open_clean --> closed: close
+  open_burning --> closed: close --discard
+  open_consistent --> closed: close --discard
+

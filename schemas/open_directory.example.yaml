@@ -1,0 +1,16 @@
+version: 1
+
+repository:
+  path: /workspace/project/.codefire
+  repository_id: repo_01HZX9Q5XJ3M8K7G2T
+
+branch:
+  name: feature-login
+  branch_id: br_01HZXA2AE2RPWZ7M2E
+  opened_from_commit: CF-COMMIT-abc123
+
+open:
+  open_instance_id: open_01HZXA3P99HHH3ZC8Q
+  opened_path: /workspace/project/feature-login
+  opened_at: 2026-05-24T10:30:00+09:00
+

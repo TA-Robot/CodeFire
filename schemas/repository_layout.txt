@@ -1,0 +1,35 @@
+project/
+  .codefire/
+    repo.yaml
+    objects/
+      blobs/
+      manifests/
+      artifacts/
+      atom_indexes/
+      trace_graphs/
+      fires/
+      resolutions/
+      verifications/
+      commits/
+    branches/
+      main.yaml
+      feature-login.yaml
+    opened/
+      main.yaml
+      feature-login.yaml
+    active/
+      open_01HXYZ.../
+        state.yaml
+        events.jsonl
+        fires.yaml
+        resolutions.yaml
+        verification.yaml
+        scan.sqlite
+    cache/
+      repo.sqlite
+    locks/
+    remotes/
+      servers.yaml
+  main/
+  feature-login/
+
