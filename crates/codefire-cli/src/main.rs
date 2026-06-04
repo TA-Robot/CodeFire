@@ -64,6 +64,20 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 Err(CliError::VerificationFailed)
             }
         }
+        Some("extinguish") => {
+            let options = parse_extinguish_args(&args[1..])?;
+            let result = run_extinguish(&options)?;
+            println!(
+                "{} {}",
+                if options.refresh {
+                    "refreshed"
+                } else {
+                    "extinguished"
+                },
+                result.display_id
+            );
+            Ok(())
+        }
         Some("init") => {
             let options = parse_init_args(&args[1..])?;
             let result = init_repo(&options.path, options.force)?;
@@ -235,6 +249,21 @@ struct VerifyOptions {
     details: bool,
 }
 
+#[derive(Debug)]
+struct ExtinguishOptions {
+    path: PathBuf,
+    fire_id: String,
+    resolution: String,
+    rationale: String,
+    evidence: String,
+    refresh: bool,
+}
+
+#[derive(Debug)]
+struct ExtinguishResult {
+    display_id: String,
+}
+
 struct OpenContext {
     repo_root: PathBuf,
     open_dir: PathBuf,
@@ -403,6 +432,66 @@ fn parse_verify_args(args: &[String]) -> Result<VerifyOptions, CliError> {
     Ok(VerifyOptions {
         path: path.unwrap_or(env::current_dir()?),
         details,
+    })
+}
+
+fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError> {
+    let mut path = None;
+    let mut fire_id = None;
+    let mut resolution = "addressed".to_string();
+    let mut rationale = String::new();
+    let mut evidence = String::new();
+    let mut refresh = false;
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--path" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--path requires a value".to_string()))?;
+                path = Some(PathBuf::from(value));
+            }
+            "--resolution" => {
+                index += 1;
+                resolution = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--resolution requires a value".to_string()))?
+                    .to_string();
+            }
+            "--rationale" => {
+                index += 1;
+                rationale = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--rationale requires a value".to_string()))?
+                    .to_string();
+            }
+            "--evidence" => {
+                index += 1;
+                evidence = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--evidence requires a value".to_string()))?
+                    .to_string();
+            }
+            "--refresh" => refresh = true,
+            value if fire_id.is_none() => fire_id = Some(value.to_string()),
+            value => {
+                return Err(CliError::Usage(format!(
+                    "unexpected extinguish argument: {value}"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(ExtinguishOptions {
+        path: path.unwrap_or(env::current_dir()?),
+        fire_id: fire_id.ok_or_else(|| {
+            CliError::Usage("usage: codefire-rs extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>)".to_string())
+        })?,
+        resolution,
+        rationale,
+        evidence,
+        refresh,
     })
 }
 
@@ -628,6 +717,86 @@ fn run_verify(start: &Path) -> Result<codefire_core::Verification, CliError> {
     };
     set_open_state(&context, &active_state_path, state)?;
     Ok(verification)
+}
+
+fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliError> {
+    let context = open_context(&options.path)?;
+    let active_state_path = PathBuf::from(required_string(
+        &context.registry,
+        &["open", "active_state_path"],
+    )?);
+    let policy = codefire_core::parse_verification_policy(&context.open_dir)?;
+    if options.resolution == "no-change-required"
+        && policy.no_change_required_requires_rationale
+        && options.rationale.is_empty()
+    {
+        return Err(CliError::Usage(
+            "no-change-required requires --rationale".to_string(),
+        ));
+    }
+    if options.rationale.is_empty() && options.evidence.is_empty() {
+        return Err(CliError::Usage(
+            "extinguish requires --rationale or --evidence".to_string(),
+        ));
+    }
+
+    let scan = run_scan(&context.open_dir)?;
+    let fires_path = active_state_path.join("fires.json");
+    let mut fires: Vec<codefire_core::Fire> = if fires_path.exists() {
+        serde_json::from_value(read_json(&fires_path)?)?
+    } else {
+        Vec::new()
+    };
+    let fire_index = fires
+        .iter()
+        .position(|fire| fire.display_id == options.fire_id || fire.fire_uid == options.fire_id)
+        .ok_or_else(|| CliError::Usage(format!("unknown fire: {}", options.fire_id)))?;
+    if fires[fire_index].status != "open" && !options.refresh {
+        return Err(CliError::Usage(format!(
+            "fire is not open: {}",
+            options.fire_id
+        )));
+    }
+
+    let resolved_at = now_iso_utc();
+    let resolution_uid = format!(
+        "res_{:012x}",
+        stable_hash_48(format!("{}:{resolved_at}", options.fire_id).as_bytes())
+    );
+    let resolution = codefire_core::build_resolution(
+        &fires[fire_index],
+        &scan.atom_index,
+        &scan.trace_graph,
+        &policy,
+        codefire_core::ResolutionRequest {
+            resolution_uid: resolution_uid.clone(),
+            resolution_type: options.resolution.clone(),
+            rationale: options.rationale.clone(),
+            evidence: options.evidence.clone(),
+            resolved_at,
+        },
+    )?;
+    let display_id = fires[fire_index].display_id.clone();
+    fires[fire_index].status = "extinguished".to_string();
+    fires[fire_index].resolution_uid = Some(resolution_uid);
+
+    let resolutions_path = active_state_path.join("resolutions.json");
+    let mut resolutions: Vec<codefire_core::Resolution> = if resolutions_path.exists() {
+        serde_json::from_value(read_json(&resolutions_path)?)?
+    } else {
+        Vec::new()
+    };
+    if options.refresh {
+        for existing in &mut resolutions {
+            if existing.fire_uid == fires[fire_index].fire_uid && existing.status == "active" {
+                existing.status = "superseded".to_string();
+            }
+        }
+    }
+    resolutions.push(resolution);
+    write_json_atomic(&fires_path, &serde_json::to_value(fires)?)?;
+    write_json_atomic(&resolutions_path, &serde_json::to_value(resolutions)?)?;
+    Ok(ExtinguishResult { display_id })
 }
 
 fn run_verification_commands(

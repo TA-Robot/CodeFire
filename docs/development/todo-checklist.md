@@ -177,6 +177,7 @@
 | CF-205 | Rust Trace | links parser、trace graph、required link policyをRustで実装する | CF-204 | done | `codefire-core::current_trace_graph`; `current_required_link_missing`; `codefire-rs trace-graph`/`missing-links`; real repo smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-206 | Rust Fire | scan、changed atom detection、fire ledgerをRustで実装する | CF-205 | done | `codefire-core::build_scan_result`; `codefire-rs scan`; active `scan.json`/`fires.json` smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-207 | Rust UX | interactive / batch extinguishをRust CLIで実装する | CF-206, CF-164 | todo | CFB-005 |
+| CF-207A | Rust Extinguish | Rust CLIで単一fire解消、resolution basis、resolution ledger更新を実装する | CF-206 | done | `codefire-core::Resolution`; `codefire-rs extinguish`; temp repo scan/extinguish/verify smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-208 | Rust Verify | verification engineとstructured diagnosticsをRustで実装する | CF-206, CF-165 | todo | CFB-006 |
 | CF-208A | Rust Verify | open fires、missing links、duplicate atoms、verification commandをRust `verify` で判定しactive verificationへ保存する | CF-206 | done | `codefire-core::build_verification`; `codefire-rs verify`; pass/fail temp repo smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-209 | Rust Commit | commit sealingとbranch head updateをRustで実装する | CF-208 | todo | v0.4 local parity |

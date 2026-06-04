@@ -103,23 +103,24 @@ pub struct RequiredLinkRule {
     pub min: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TracePolicy {
     pub required_links: BTreeMap<String, Vec<RequiredLinkRule>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationPolicy {
     pub require_no_required_fires: bool,
     pub require_no_stale_resolutions: bool,
     pub require_trace_completeness: bool,
     pub require_verification_success: bool,
     pub reject_duplicate_atom_ids: bool,
+    pub no_change_required_requires_rationale: bool,
     pub required_links: BTreeMap<String, Vec<RequiredLinkRule>>,
     pub verification: Vec<VerificationCommand>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationCommand {
     pub id: String,
     pub command: String,
@@ -160,6 +161,8 @@ pub struct Fire {
     pub key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub obsolete_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolution_uid: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -193,6 +196,50 @@ pub struct Verification {
     pub stale_resolutions: Vec<serde_json::Value>,
     pub duplicate_atom_ids: Vec<String>,
     pub verified_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResolutionAtomBasis {
+    pub atom_id: String,
+    pub content_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResolutionTraceLinkBasis {
+    pub link_id: String,
+    pub link_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResolutionBasis {
+    pub source_atom: ResolutionAtomBasis,
+    pub target_atom: ResolutionAtomBasis,
+    pub trace_links: Vec<ResolutionTraceLinkBasis>,
+    pub policy_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Resolution {
+    #[serde(rename = "type")]
+    pub type_tag: String,
+    pub version: u32,
+    pub resolution_uid: String,
+    pub fire_uid: String,
+    pub resolution_type: String,
+    pub rationale: String,
+    pub evidence: String,
+    pub basis: ResolutionBasis,
+    pub resolved_at: String,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolutionRequest {
+    pub resolution_uid: String,
+    pub resolution_type: String,
+    pub rationale: String,
+    pub evidence: String,
+    pub resolved_at: String,
 }
 
 pub fn build_atom_index(open_dir: &Path) -> Result<AtomIndex, CoreError> {
@@ -301,6 +348,8 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
     let mut required_links = BTreeMap::<String, Vec<RequiredLinkRule>>::new();
     let mut in_required_links = false;
     let mut in_commit_policy = false;
+    let mut in_extinguish_policy = false;
+    let mut in_no_change_required_policy = false;
     let mut in_verification = false;
     let mut current_kind = None::<String>;
     let mut current_rule = None::<RequiredLinkRuleDraft>;
@@ -326,6 +375,17 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
                 flush_verification_check(&mut checks, current_check.take())?;
                 in_required_links = false;
                 in_commit_policy = true;
+                in_extinguish_policy = false;
+                in_no_change_required_policy = false;
+                in_verification = false;
+                current_kind = None;
+            } else if stripped == "extinguish_policy:" {
+                flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
+                flush_verification_check(&mut checks, current_check.take())?;
+                in_required_links = false;
+                in_commit_policy = false;
+                in_extinguish_policy = true;
+                in_no_change_required_policy = false;
                 in_verification = false;
                 current_kind = None;
             } else if stripped == "verification:" {
@@ -333,6 +393,8 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
                 flush_verification_check(&mut checks, current_check.take())?;
                 in_required_links = false;
                 in_commit_policy = false;
+                in_extinguish_policy = false;
+                in_no_change_required_policy = false;
                 in_verification = true;
                 current_kind = None;
             } else {
@@ -340,6 +402,8 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
                 flush_verification_check(&mut checks, current_check.take())?;
                 in_required_links = false;
                 in_commit_policy = false;
+                in_extinguish_policy = false;
+                in_no_change_required_policy = false;
                 in_verification = false;
                 current_kind = None;
             }
@@ -350,6 +414,18 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
                 set_commit_policy_bool(&mut policy, key.trim(), value.trim())?;
             }
             continue;
+        }
+        if in_extinguish_policy {
+            if line.starts_with("  ") && stripped == "no-change-required:" {
+                in_no_change_required_policy = true;
+                continue;
+            }
+            if in_no_change_required_policy {
+                if let Some(value) = stripped.strip_prefix("requires_rationale:") {
+                    policy.no_change_required_requires_rationale = parse_bool_field(value.trim())?;
+                    continue;
+                }
+            }
         }
         if in_verification {
             if let Some(value) = stripped.strip_prefix("- id:") {
@@ -456,6 +532,7 @@ fn default_verification_policy() -> VerificationPolicy {
         require_trace_completeness: true,
         require_verification_success: true,
         reject_duplicate_atom_ids: true,
+        no_change_required_requires_rationale: true,
         required_links: default_trace_policy().required_links,
         verification: Vec::new(),
     }
@@ -527,6 +604,61 @@ pub fn build_verification(
         duplicate_atom_ids,
         verified_at: verified_at.to_string(),
     }
+}
+
+pub fn build_resolution(
+    fire: &Fire,
+    atom_index: &AtomIndex,
+    trace_graph: &TraceGraph,
+    policy: &VerificationPolicy,
+    request: ResolutionRequest,
+) -> Result<Resolution, CoreError> {
+    let atoms = atom_index
+        .atoms
+        .iter()
+        .map(|atom| (atom.atom_id.as_str(), atom.content_hash.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let source_id = fire.source.atom_id.clone();
+    let target_id = fire.target.atom_id.clone();
+    let trace_links = trace_graph
+        .links
+        .iter()
+        .filter(|link| {
+            (link.from == source_id && link.to == target_id)
+                || (link.from == target_id && link.to == source_id)
+        })
+        .map(|link| ResolutionTraceLinkBasis {
+            link_id: link.link_id.clone(),
+            link_hash: link.link_hash.clone(),
+        })
+        .collect::<Vec<_>>();
+    Ok(Resolution {
+        type_tag: "resolution".to_string(),
+        version: VERSION,
+        resolution_uid: request.resolution_uid,
+        fire_uid: fire.fire_uid.clone(),
+        resolution_type: request.resolution_type,
+        rationale: request.rationale,
+        evidence: request.evidence,
+        basis: ResolutionBasis {
+            source_atom: ResolutionAtomBasis {
+                atom_id: source_id.clone(),
+                content_hash: atoms.get(source_id.as_str()).cloned(),
+            },
+            target_atom: ResolutionAtomBasis {
+                atom_id: target_id.clone(),
+                content_hash: atoms.get(target_id.as_str()).cloned(),
+            },
+            trace_links,
+            policy_hash: policy_hash(policy)?,
+        },
+        resolved_at: request.resolved_at,
+        status: "active".to_string(),
+    })
+}
+
+pub fn policy_hash(policy: &VerificationPolicy) -> Result<String, CoreError> {
+    Ok(digest_bytes(&serde_json::to_vec(policy)?))
 }
 
 pub fn required_link_missing(
@@ -655,6 +787,7 @@ pub fn build_scan_result(
                 created_at: now.to_string(),
                 key,
                 obsolete_at: None,
+                resolution_uid: None,
             });
             fire_no += 1;
         }
@@ -1632,6 +1765,7 @@ mod tests {
             created_at: "2026-06-04T00:00:00Z".to_string(),
             key: "sha256:key".to_string(),
             obsolete_at: None,
+            resolution_uid: None,
         };
 
         let (scan, fires) = build_scan_result(
