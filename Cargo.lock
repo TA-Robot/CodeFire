@@ -30,6 +30,7 @@ dependencies = [
  "codefire-core",
  "codefire-store",
  "serde_json",
+ "sha2",
  "tempfile",
 ]
 

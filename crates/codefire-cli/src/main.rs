@@ -1,4 +1,5 @@
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fmt;
@@ -94,12 +95,64 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             println!("cloned {} -> {}", options.source, options.new_branch);
             Ok(())
         }
+        Some("upload") => {
+            let options = parse_upload_args(&args[1..])?;
+            let result = upload_branch(&env::current_dir()?, &options)?;
+            println!(
+                "uploaded {}@{} -> {}",
+                options.branch, result.head, options.remote_url
+            );
+            Ok(())
+        }
+        Some("list") => {
+            let options = parse_remote_project_args(&args[1..], "list")?;
+            let branches = list_remote_branches(&options.project_url)?;
+            for branch in branches {
+                println!("{}\t{}", branch.name, branch.head);
+            }
+            Ok(())
+        }
+        Some("request-merge") => {
+            let options = parse_request_merge_args(&args[1..])?;
+            let result = request_merge(&options)?;
+            println!("created {}", result.id);
+            println!("source: {}", result.source_head);
+            println!("target: {}", result.target_head);
+            Ok(())
+        }
+        Some("request-list") => {
+            let options = parse_remote_project_args(&args[1..], "request-list")?;
+            let requests = list_merge_requests(&options.project_url)?;
+            for request in requests {
+                println!(
+                    "{}\t{}\t{}\t{}",
+                    request.id, request.status, request.source_url, request.target_url
+                );
+            }
+            Ok(())
+        }
+        Some("request-review") => {
+            let options = parse_request_review_args(&args[1..])?;
+            let result = review_merge_request(&options)?;
+            println!(
+                "{}d {} by {}",
+                result.decision, options.mr_id, result.reviewer
+            );
+            Ok(())
+        }
+        Some("request-apply") => {
+            let options = parse_request_apply_args(&args[1..])?;
+            let result = apply_merge_request(&options)?;
+            println!("applied {}", options.mr_id);
+            println!("target: {}@{}", result.target_branch, result.head);
+            Ok(())
+        }
         Some("show") => {
             let target = args.get(1).ok_or_else(|| {
                 CliError::Usage("usage: codefire-rs show <branch-or-commit>".to_string())
             })?;
-            let repo_root = find_repo_root(&env::current_dir()?)?;
-            let output = show_commitish(&repo_root, target)?;
+            let repo_root = optional_repo_root(&env::current_dir()?);
+            let output = show_commitish(repo_root.as_deref(), target)?;
             print!("{output}");
             Ok(())
         }
@@ -112,8 +165,8 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     ))
                 }
             };
-            let repo_root = find_repo_root(&env::current_dir()?)?;
-            let output = diff_commitish(&repo_root, left, right)?;
+            let repo_root = optional_repo_root(&env::current_dir()?);
+            let output = diff_commitish(repo_root.as_deref(), left, right)?;
             print!("{output}");
             Ok(())
         }
@@ -338,6 +391,94 @@ struct CommitResult {
 struct CloneOptions {
     source: String,
     new_branch: String,
+}
+
+#[derive(Debug)]
+struct UploadOptions {
+    branch: String,
+    remote_url: String,
+}
+
+#[derive(Debug)]
+struct UploadResult {
+    head: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct RemoteBranch {
+    name: String,
+    head: String,
+}
+
+#[derive(Debug)]
+struct RemoteProjectOptions {
+    project_url: String,
+}
+
+#[derive(Debug)]
+struct RequestMergeOptions {
+    source_url: String,
+    target_url: String,
+}
+
+#[derive(Debug)]
+struct RequestMergeResult {
+    id: String,
+    source_head: String,
+    target_head: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct MergeRequestListItem {
+    id: String,
+    status: String,
+    source_url: String,
+    target_url: String,
+}
+
+#[derive(Debug)]
+struct RequestReviewOptions {
+    project_url: String,
+    mr_id: String,
+    reviewer: String,
+    decision: String,
+    comment: String,
+}
+
+#[derive(Debug)]
+struct RequestReviewResult {
+    reviewer: String,
+    decision: String,
+}
+
+#[derive(Debug)]
+struct RequestApplyOptions {
+    project_url: String,
+    mr_id: String,
+}
+
+#[derive(Debug)]
+struct RequestApplyResult {
+    target_branch: String,
+    head: String,
+}
+
+#[derive(Debug, Clone)]
+struct CfUrl {
+    project_root: PathBuf,
+    branch: String,
+}
+
+#[derive(Debug, Clone)]
+struct CfProjectUrl {
+    project_root: PathBuf,
+}
+
+#[derive(Debug)]
+struct ResolvedCommitish {
+    objects: PathBuf,
+    commit_id: String,
+    label: String,
 }
 
 #[derive(Debug)]
@@ -629,6 +770,146 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
     }
 }
 
+fn parse_upload_args(args: &[String]) -> Result<UploadOptions, CliError> {
+    let positional = positional_args(args)?;
+    match positional.as_slice() {
+        [branch, remote_url] => Ok(UploadOptions {
+            branch: branch.clone(),
+            remote_url: remote_url.clone(),
+        }),
+        _ => Err(CliError::Usage(
+            "usage: codefire-rs upload <branch> <cf-url>".to_string(),
+        )),
+    }
+}
+
+fn parse_remote_project_args(
+    args: &[String],
+    command: &str,
+) -> Result<RemoteProjectOptions, CliError> {
+    let positional = positional_args(args)?;
+    match positional.as_slice() {
+        [project_url] => Ok(RemoteProjectOptions {
+            project_url: project_url.clone(),
+        }),
+        _ => Err(CliError::Usage(format!(
+            "usage: codefire-rs {command} <cf-project-url>"
+        ))),
+    }
+}
+
+fn parse_request_merge_args(args: &[String]) -> Result<RequestMergeOptions, CliError> {
+    let positional = positional_args(args)?;
+    match positional.as_slice() {
+        [source_url, target_url] => Ok(RequestMergeOptions {
+            source_url: source_url.clone(),
+            target_url: target_url.clone(),
+        }),
+        _ => Err(CliError::Usage(
+            "usage: codefire-rs request-merge <source-url> <target-url>".to_string(),
+        )),
+    }
+}
+
+fn parse_request_review_args(args: &[String]) -> Result<RequestReviewOptions, CliError> {
+    let mut positional = Vec::new();
+    let mut reviewer = None;
+    let mut decision = "approve".to_string();
+    let mut comment = String::new();
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--reviewer" => {
+                index += 1;
+                reviewer = Some(
+                    args.get(index)
+                        .ok_or_else(|| CliError::Usage("--reviewer requires a value".to_string()))?
+                        .to_string(),
+                );
+            }
+            "--decision" => {
+                index += 1;
+                decision = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--decision requires a value".to_string()))?
+                    .to_string();
+            }
+            "--comment" => {
+                index += 1;
+                comment = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--comment requires a value".to_string()))?
+                    .to_string();
+            }
+            value if value.starts_with("--") => skip_ignored_option(args, &mut index)?,
+            value => positional.push(value.to_string()),
+        }
+        index += 1;
+    }
+    if decision != "approve" && decision != "reject" {
+        return Err(CliError::Usage(
+            "--decision must be approve or reject".to_string(),
+        ));
+    }
+    match positional.as_slice() {
+        [project_url, mr_id] => Ok(RequestReviewOptions {
+            project_url: project_url.clone(),
+            mr_id: mr_id.clone(),
+            reviewer: reviewer.unwrap_or_else(|| "reviewer".to_string()),
+            decision,
+            comment,
+        }),
+        _ => Err(CliError::Usage(
+            "usage: codefire-rs request-review <project-url> <mr-id> [--reviewer <name>] [--decision approve|reject] [--comment <text>]".to_string(),
+        )),
+    }
+}
+
+fn parse_request_apply_args(args: &[String]) -> Result<RequestApplyOptions, CliError> {
+    let positional = positional_args(args)?;
+    match positional.as_slice() {
+        [project_url, mr_id] => Ok(RequestApplyOptions {
+            project_url: project_url.clone(),
+            mr_id: mr_id.clone(),
+        }),
+        _ => Err(CliError::Usage(
+            "usage: codefire-rs request-apply <project-url> <mr-id>".to_string(),
+        )),
+    }
+}
+
+fn positional_args(args: &[String]) -> Result<Vec<String>, CliError> {
+    let mut positional = Vec::new();
+    let mut index = 0usize;
+    while index < args.len() {
+        let value = &args[index];
+        if value.starts_with("--") {
+            skip_ignored_option(args, &mut index)?;
+        } else {
+            positional.push(value.clone());
+        }
+        index += 1;
+    }
+    Ok(positional)
+}
+
+fn skip_ignored_option(args: &[String], index: &mut usize) -> Result<(), CliError> {
+    match args[*index].as_str() {
+        "--actor" | "--token" | "--request-key-id" | "--request-key" => {
+            *index += 1;
+            if args.get(*index).is_none() {
+                return Err(CliError::Usage(format!(
+                    "{} requires a value",
+                    args[*index - 1]
+                )));
+            }
+            Ok(())
+        }
+        "--dry-run" => Ok(()),
+        option => Err(CliError::Usage(format!("unsupported option: {option}"))),
+    }
+}
+
 fn parse_merge_args(args: &[String]) -> Result<MergeOptions, CliError> {
     match args {
         [source_branch, flag, target_branch] if flag == "--into" => Ok(MergeOptions {
@@ -698,6 +979,292 @@ fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
     Ok(InitResult {
         repo_root,
         main_commit: commit_id,
+    })
+}
+
+fn upload_branch(start: &Path, options: &UploadOptions) -> Result<UploadResult, CliError> {
+    let repo_root = find_repo_root(start)?;
+    let branch = load_branch_record(&repo_root, &options.branch)?;
+    let head = required_string(&branch, &["head"])?;
+    let local_objects = repo_root.join(".codefire").join("objects");
+    codefire_store::validate_sealed_commit(&local_objects, &head)?;
+    let registry_path = opened_registry_path(&repo_root, &options.branch);
+    if registry_path.exists() {
+        let registry = read_json(&registry_path)?;
+        let state = required_string(&registry, &["state", "last_known"])?;
+        if state != "open-clean" {
+            return Err(CliError::Usage(format!(
+                "branch is {state}; commit or discard before upload"
+            )));
+        }
+    }
+
+    let remote = parse_cf_url(&options.remote_url)?;
+    let remote_branch = remote.branch.clone();
+    ensure_remote_layout(&remote.project_root)?;
+    let _lock = FileLock::acquire(
+        remote_dirs(&remote.project_root)
+            .locks
+            .join(format!("branch-{}.lock", ref_file_name(&remote_branch))),
+    )?;
+    if let Some(current) =
+        read_optional_json(&remote_branch_path(&remote.project_root, &remote_branch))?
+    {
+        let current_head = required_string(&current, &["head"])?;
+        if !is_ancestor_in_objects(&local_objects, &current_head, &head)? {
+            return Err(CliError::Usage(
+                "upload rejected: remote branch is not an ancestor of local branch head"
+                    .to_string(),
+            ));
+        }
+    }
+    let generation = next_remote_generation(&remote.project_root)?;
+    copy_object_graph(
+        &local_objects,
+        &remote_dirs(&remote.project_root).objects,
+        &head,
+    )?;
+    write_json_atomic(
+        &remote_branch_path(&remote.project_root, &remote_branch),
+        &json!({
+            "version": 1,
+            "name": remote_branch,
+            "head": head,
+            "generation": generation,
+            "uploaded_from": options.branch,
+            "uploaded_by": "local",
+            "updated_at": now_iso_utc(),
+        }),
+    )?;
+    Ok(UploadResult { head })
+}
+
+fn list_remote_branches(project_url: &str) -> Result<Vec<RemoteBranch>, CliError> {
+    let project = parse_cf_project_url(project_url)?;
+    let dirs = remote_dirs(&project.project_root);
+    if !dirs.branches.exists() {
+        return Err(CliError::Usage(format!(
+            "remote project not found: {project_url}"
+        )));
+    }
+    let mut paths = Vec::new();
+    for entry in fs::read_dir(&dirs.branches)? {
+        let path = entry?.path();
+        if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
+            paths.push(path);
+        }
+    }
+    paths.sort();
+    let mut branches = Vec::with_capacity(paths.len());
+    for path in paths {
+        let branch = read_json(&path)?;
+        let name = required_string(&branch, &["name"])?;
+        let head = required_string(&branch, &["head"])?;
+        codefire_store::validate_sealed_commit(&dirs.objects, &head)?;
+        branches.push(RemoteBranch { name, head });
+    }
+    Ok(branches)
+}
+
+fn request_merge(options: &RequestMergeOptions) -> Result<RequestMergeResult, CliError> {
+    let source = parse_cf_url(&options.source_url)?;
+    let target = parse_cf_url(&options.target_url)?;
+    let source_branch = load_remote_branch(&source)?;
+    let target_branch = load_remote_branch(&target)?;
+    let source_head = required_string(&source_branch, &["head"])?;
+    let target_head = required_string(&target_branch, &["head"])?;
+    codefire_store::validate_sealed_commit(
+        &remote_dirs(&source.project_root).objects,
+        &source_head,
+    )?;
+    codefire_store::validate_sealed_commit(
+        &remote_dirs(&target.project_root).objects,
+        &target_head,
+    )?;
+    ensure_remote_layout(&target.project_root)?;
+    let mut mr_payload = json!({
+        "version": 1,
+        "source_url": options.source_url,
+        "source_head": source_head,
+        "target_url": options.target_url,
+        "target_head_at_request": target_head,
+        "status": "open",
+        "created_by": "local",
+        "created_at": now_iso_utc(),
+    });
+    let mr_id = format!(
+        "MR-{}",
+        &sha256_hex(&codefire_store::canonical_json(&mr_payload)?)[..12]
+    );
+    mr_payload["id"] = Value::String(mr_id.clone());
+    write_json_atomic(
+        &remote_dirs(&target.project_root)
+            .merge_requests
+            .join(format!("{mr_id}.json")),
+        &mr_payload,
+    )?;
+    Ok(RequestMergeResult {
+        id: mr_id,
+        source_head: required_string(&mr_payload, &["source_head"])?,
+        target_head: required_string(&mr_payload, &["target_head_at_request"])?,
+    })
+}
+
+fn list_merge_requests(project_url: &str) -> Result<Vec<MergeRequestListItem>, CliError> {
+    let project = parse_cf_project_url(project_url)?;
+    let dirs = remote_dirs(&project.project_root);
+    if !dirs.merge_requests.exists() {
+        return Err(CliError::Usage(format!(
+            "remote project not found: {project_url}"
+        )));
+    }
+    let mut paths = Vec::new();
+    for entry in fs::read_dir(&dirs.merge_requests)? {
+        let path = entry?.path();
+        if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
+            paths.push(path);
+        }
+    }
+    paths.sort();
+    let mut requests = Vec::with_capacity(paths.len());
+    for path in paths {
+        let mr = read_json(&path)?;
+        validate_merge_request_record(&mr)?;
+        let target = parse_cf_url(&required_string(&mr, &["target_url"])?)?;
+        let current_target =
+            read_optional_json(&remote_branch_path(&target.project_root, &target.branch))?;
+        let mut status = mr
+            .get("status")
+            .and_then(Value::as_str)
+            .unwrap_or("open")
+            .to_string();
+        if let Some(current_target) = current_target {
+            let current_head = required_string(&current_target, &["head"])?;
+            codefire_store::validate_sealed_commit(
+                &remote_dirs(&target.project_root).objects,
+                &current_head,
+            )?;
+            if current_head != required_string(&mr, &["target_head_at_request"])? {
+                status = "stale".to_string();
+            }
+        }
+        requests.push(MergeRequestListItem {
+            id: required_string(&mr, &["id"])?,
+            status,
+            source_url: required_string(&mr, &["source_url"])?,
+            target_url: required_string(&mr, &["target_url"])?,
+        });
+    }
+    Ok(requests)
+}
+
+fn review_merge_request(options: &RequestReviewOptions) -> Result<RequestReviewResult, CliError> {
+    let project = parse_cf_project_url(&options.project_url)?;
+    let mr_path = remote_dirs(&project.project_root)
+        .merge_requests
+        .join(format!("{}.json", options.mr_id));
+    let mut mr = read_optional_json(&mr_path)?
+        .ok_or_else(|| CliError::Usage(format!("merge request not found: {}", options.mr_id)))?;
+    validate_merge_request_record(&mr)?;
+    reject_stale_merge_request(&mut mr, &mr_path)?;
+    let review = json!({
+        "reviewer": options.reviewer,
+        "decision": options.decision,
+        "comment": options.comment,
+        "reviewed_at": now_iso_utc(),
+    });
+    let mut reviews = mr
+        .get("reviews")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    reviews.push(review);
+    mr["reviews"] = Value::Array(reviews);
+    mr["status"] = Value::String(if options.decision == "approve" {
+        "approved".to_string()
+    } else {
+        "rejected".to_string()
+    });
+    write_json_atomic(&mr_path, &mr)?;
+    Ok(RequestReviewResult {
+        reviewer: options.reviewer.clone(),
+        decision: options.decision.clone(),
+    })
+}
+
+fn apply_merge_request(options: &RequestApplyOptions) -> Result<RequestApplyResult, CliError> {
+    let project = parse_cf_project_url(&options.project_url)?;
+    let dirs = remote_dirs(&project.project_root);
+    let mr_path = dirs.merge_requests.join(format!("{}.json", options.mr_id));
+    let mut mr = read_optional_json(&mr_path)?
+        .ok_or_else(|| CliError::Usage(format!("merge request not found: {}", options.mr_id)))?;
+    validate_merge_request_record(&mr)?;
+    if mr.get("status").and_then(Value::as_str) != Some("approved") {
+        return Err(CliError::Usage(format!(
+            "merge request must be approved before apply: {}",
+            options.mr_id
+        )));
+    }
+    let source = parse_cf_url(&required_string(&mr, &["source_url"])?)?;
+    let target = parse_cf_url(&required_string(&mr, &["target_url"])?)?;
+    let source_branch = load_remote_branch(&source)?;
+    let target_branch = load_remote_branch(&target)?;
+    let source_head = required_string(&source_branch, &["head"])?;
+    let target_head = required_string(&target_branch, &["head"])?;
+    let target_head_at_request = required_string(&mr, &["target_head_at_request"])?;
+    if target_head != target_head_at_request {
+        mr["status"] = Value::String("stale".to_string());
+        write_json_atomic(&mr_path, &mr)?;
+        return Err(CliError::Usage(format!(
+            "merge request is stale: {}",
+            options.mr_id
+        )));
+    }
+    let source_objects = remote_dirs(&source.project_root).objects;
+    let target_objects = remote_dirs(&target.project_root).objects;
+    codefire_store::validate_sealed_commit(&source_objects, &source_head)?;
+    codefire_store::validate_sealed_commit(&target_objects, &target_head)?;
+    if !is_ancestor_in_objects(&source_objects, &target_head, &source_head)? {
+        return Err(CliError::Usage(
+            "request apply rejected: source is not a fast-forward of target".to_string(),
+        ));
+    }
+    let _lock = FileLock::acquire(
+        remote_dirs(&target.project_root)
+            .locks
+            .join(format!("branch-{}.lock", ref_file_name(&target.branch))),
+    )?;
+    let current_target = load_remote_branch(&target)?;
+    if required_string(&current_target, &["head"])? != target_head_at_request {
+        mr["status"] = Value::String("stale".to_string());
+        write_json_atomic(&mr_path, &mr)?;
+        return Err(CliError::Usage(format!(
+            "merge request is stale: {}",
+            options.mr_id
+        )));
+    }
+    let generation = next_remote_generation(&target.project_root)?;
+    copy_object_graph(&source_objects, &target_objects, &source_head)?;
+    write_json_atomic(
+        &remote_branch_path(&target.project_root, &target.branch),
+        &json!({
+            "version": 1,
+            "name": target.branch,
+            "head": source_head,
+            "generation": generation,
+            "applied_from": required_string(&mr, &["source_url"])?,
+            "applied_by": "local",
+            "updated_at": now_iso_utc(),
+        }),
+    )?;
+    mr["status"] = Value::String("applied".to_string());
+    mr["applied_at"] = Value::String(now_iso_utc());
+    mr["applied_by"] = Value::String("local".to_string());
+    mr["applied_head"] = Value::String(source_head.clone());
+    write_json_atomic(&mr_path, &mr)?;
+    Ok(RequestApplyResult {
+        target_branch: target.branch,
+        head: source_head,
     })
 }
 
@@ -802,6 +1369,29 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<(), CliError> {
             "branch already exists: {}",
             options.new_branch
         )));
+    }
+    if options.source.starts_with("cf://") {
+        let remote = parse_cf_url(&options.source)?;
+        let source = load_remote_branch(&remote)?;
+        let source_head = required_string(&source, &["head"])?;
+        let remote_objects = remote_dirs(&remote.project_root).objects;
+        codefire_store::validate_sealed_commit(&remote_objects, &source_head)?;
+        copy_object_graph(
+            &remote_objects,
+            &repo_root.join(".codefire").join("objects"),
+            &source_head,
+        )?;
+        let branch = json!({
+            "type": "branch",
+            "version": 1,
+            "name": options.new_branch,
+            "head": source_head,
+            "state": "closed",
+            "created_from": options.source,
+            "created_at": now_iso_utc(),
+        });
+        save_branch_record(&repo_root, &branch)?;
+        return Ok(());
     }
     let source = load_branch_record(&repo_root, &options.source)?;
     let source_head = required_string(&source, &["head"])?;
@@ -1433,12 +2023,11 @@ fn read_status(start: &Path) -> Result<Status, CliError> {
     })
 }
 
-fn show_commitish(repo_root: &Path, value: &str) -> Result<String, CliError> {
-    let objects = repo_root.join(".codefire").join("objects");
-    let (commit_id, label) = resolve_local_commitish(repo_root, value)?;
-    let commit = codefire_store::read_object(&objects, &commit_id)?;
-    let manifest = root_object(&objects, &commit, "content_manifest")?;
-    let atom_index = root_object(&objects, &commit, "atom_index")?;
+fn show_commitish(repo_root: Option<&Path>, value: &str) -> Result<String, CliError> {
+    let resolved = resolve_commitish_any(repo_root, value)?;
+    let commit = codefire_store::read_object(&resolved.objects, &resolved.commit_id)?;
+    let manifest = root_object(&resolved.objects, &commit, "content_manifest")?;
+    let atom_index = root_object(&resolved.objects, &commit, "atom_index")?;
     let files = manifest
         .get("entries")
         .and_then(Value::as_array)
@@ -1481,20 +2070,20 @@ fn show_commitish(repo_root: &Path, value: &str) -> Result<String, CliError> {
         .unwrap_or_else(|| "(none)".to_string());
 
     Ok(format!(
-        "Object: {label}\nCommit: {commit_id}\nMessage: {message}\nParents: {parents}\nFiles: {files}\nAtoms: {atoms}\nCertificate: {certificate}\nSignature: {signature}\n"
+        "Object: {}\nCommit: {}\nMessage: {message}\nParents: {parents}\nFiles: {files}\nAtoms: {atoms}\nCertificate: {certificate}\nSignature: {signature}\n",
+        resolved.label, resolved.commit_id
     ))
 }
 
-fn diff_commitish(repo_root: &Path, left: &str, right: &str) -> Result<String, CliError> {
-    let objects = repo_root.join(".codefire").join("objects");
-    let (left_id, left_label) = resolve_local_commitish(repo_root, left)?;
-    let (right_id, right_label) = resolve_local_commitish(repo_root, right)?;
-    let left_files = manifest_contents(&objects, &left_id)?;
-    let right_files = manifest_contents(&objects, &right_id)?;
+fn diff_commitish(repo_root: Option<&Path>, left: &str, right: &str) -> Result<String, CliError> {
+    let left = resolve_commitish_any(repo_root, left)?;
+    let right = resolve_commitish_any(repo_root, right)?;
+    let left_files = manifest_contents(&left.objects, &left.commit_id)?;
+    let right_files = manifest_contents(&right.objects, &right.commit_id)?;
     Ok(render_manifest_diff(
-        &left_label,
+        &left.label,
         &left_files,
-        &right_label,
+        &right.label,
         &right_files,
     ))
 }
@@ -1566,6 +2155,35 @@ fn resolve_local_commitish(repo_root: &Path, value: &str) -> Result<(String, Str
     let head = required_string(&branch, &["head"])?;
     codefire_store::validate_sealed_commit(&objects, &head)?;
     Ok((head.clone(), format!("{value}@{head}")))
+}
+
+fn resolve_commitish_any(
+    repo_root: Option<&Path>,
+    value: &str,
+) -> Result<ResolvedCommitish, CliError> {
+    if value.starts_with("cf://") {
+        let remote = parse_cf_url(value)?;
+        let branch = load_remote_branch(&remote)?;
+        let head = required_string(&branch, &["head"])?;
+        let objects = remote_dirs(&remote.project_root).objects;
+        codefire_store::validate_sealed_commit(&objects, &head)?;
+        return Ok(ResolvedCommitish {
+            objects,
+            commit_id: head.clone(),
+            label: format!("{value}@{head}"),
+        });
+    }
+    let repo_root = repo_root.ok_or_else(|| {
+        CliError::Usage(
+            "local branch or commit requires running inside a CodeFire repository".to_string(),
+        )
+    })?;
+    let (commit_id, label) = resolve_local_commitish(repo_root, value)?;
+    Ok(ResolvedCommitish {
+        objects: repo_root.join(".codefire").join("objects"),
+        commit_id,
+        label,
+    })
 }
 
 fn root_object(objects: &Path, commit: &Value, root_name: &str) -> Result<Value, CliError> {
@@ -1712,6 +2330,347 @@ fn conflict_content(target_data: Option<&[u8]>, source_data: Option<&[u8]>) -> V
 fn conflict_text(data: Option<&[u8]>) -> String {
     data.map(|bytes| String::from_utf8_lossy(bytes).into_owned())
         .unwrap_or_else(|| "<deleted>\n".to_string())
+}
+
+#[derive(Debug)]
+struct RemoteDirs {
+    objects: PathBuf,
+    branches: PathBuf,
+    merge_requests: PathBuf,
+    locks: PathBuf,
+}
+
+fn remote_dirs(project_root: &Path) -> RemoteDirs {
+    RemoteDirs {
+        objects: project_root.join("objects"),
+        branches: project_root.join("branches"),
+        merge_requests: project_root.join("merge_requests"),
+        locks: project_root.join("locks"),
+    }
+}
+
+fn ensure_remote_layout(project_root: &Path) -> Result<(), CliError> {
+    let dirs = remote_dirs(project_root);
+    for path in [
+        project_root.to_path_buf(),
+        dirs.objects.clone(),
+        dirs.branches,
+        dirs.merge_requests,
+        dirs.locks,
+        project_root.join("audit"),
+    ] {
+        fs::create_dir_all(path)?;
+    }
+    for subdir in [
+        "blobs",
+        "content_manifests",
+        "atom_indexes",
+        "trace_graphs",
+        "fire_ledgers",
+        "resolution_ledgers",
+        "verifications",
+        "policies",
+        "commits",
+        "branches",
+    ] {
+        fs::create_dir_all(dirs.objects.join(subdir))?;
+    }
+    Ok(())
+}
+
+fn parse_cf_url(url: &str) -> Result<CfUrl, CliError> {
+    if !url.starts_with("cf://") {
+        return Err(CliError::Usage(format!("not a CodeFire remote URL: {url}")));
+    }
+    let raw = &url["cf://".len()..];
+    if raw.is_empty() {
+        return Err(CliError::Usage("remote URL is empty".to_string()));
+    }
+    let parts = raw
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+    if parts.len() < 4 {
+        return Err(CliError::Usage(
+            "remote URL must be cf://<server-path>/<org>/<app>/<branch>".to_string(),
+        ));
+    }
+    let branch_part = parts[parts.len() - 1];
+    let app_part = parts[parts.len() - 2];
+    let org_part = parts[parts.len() - 3];
+    let suffix = format!("/{org_part}/{app_part}/{branch_part}");
+    let mut server_raw = raw
+        .strip_suffix(&suffix)
+        .unwrap_or_default()
+        .trim_end_matches('/')
+        .to_string();
+    if server_raw.is_empty() {
+        server_raw = ".".to_string();
+    }
+    let server_root = absolute_path(&PathBuf::from(server_raw))?;
+    let org = percent_decode(org_part)?;
+    let app = percent_decode(app_part)?;
+    Ok(CfUrl {
+        project_root: server_root
+            .join(".codefire-server")
+            .join("projects")
+            .join(org)
+            .join(app),
+        branch: percent_decode(branch_part)?,
+    })
+}
+
+fn parse_cf_project_url(url: &str) -> Result<CfProjectUrl, CliError> {
+    if !url.starts_with("cf://") {
+        return Err(CliError::Usage(format!("not a CodeFire remote URL: {url}")));
+    }
+    let raw = &url["cf://".len()..];
+    let parts = raw
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+    if parts.len() < 3 {
+        return Err(CliError::Usage(
+            "remote project URL must be cf://<server-path>/<org>/<app>".to_string(),
+        ));
+    }
+    let app_part = parts[parts.len() - 1];
+    let org_part = parts[parts.len() - 2];
+    let suffix = format!("/{org_part}/{app_part}");
+    let mut server_raw = raw
+        .strip_suffix(&suffix)
+        .unwrap_or_default()
+        .trim_end_matches('/')
+        .to_string();
+    if server_raw.is_empty() {
+        server_raw = ".".to_string();
+    }
+    let server_root = absolute_path(&PathBuf::from(server_raw))?;
+    Ok(CfProjectUrl {
+        project_root: server_root
+            .join(".codefire-server")
+            .join("projects")
+            .join(percent_decode(org_part)?)
+            .join(percent_decode(app_part)?),
+    })
+}
+
+fn percent_decode(value: &str) -> Result<String, CliError> {
+    let bytes = value.as_bytes();
+    let mut output = Vec::with_capacity(bytes.len());
+    let mut index = 0usize;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            let hi = bytes.get(index + 1).copied().ok_or_else(|| {
+                CliError::Usage(format!("invalid percent escape in remote URL: {value}"))
+            })?;
+            let lo = bytes.get(index + 2).copied().ok_or_else(|| {
+                CliError::Usage(format!("invalid percent escape in remote URL: {value}"))
+            })?;
+            output.push(hex_value(hi)? << 4 | hex_value(lo)?);
+            index += 3;
+        } else {
+            output.push(bytes[index]);
+            index += 1;
+        }
+    }
+    String::from_utf8(output)
+        .map_err(|_| CliError::Usage(format!("remote URL component is not UTF-8: {value}")))
+}
+
+fn hex_value(byte: u8) -> Result<u8, CliError> {
+    match byte {
+        b'0'..=b'9' => Ok(byte - b'0'),
+        b'a'..=b'f' => Ok(byte - b'a' + 10),
+        b'A'..=b'F' => Ok(byte - b'A' + 10),
+        _ => Err(CliError::Usage(
+            "invalid percent escape in remote URL".to_string(),
+        )),
+    }
+}
+
+fn remote_branch_path(project_root: &Path, branch: &str) -> PathBuf {
+    remote_dirs(project_root)
+        .branches
+        .join(format!("{}.json", ref_file_name(branch)))
+}
+
+fn load_remote_branch(remote: &CfUrl) -> Result<Value, CliError> {
+    read_optional_json(&remote_branch_path(&remote.project_root, &remote.branch))?
+        .ok_or_else(|| CliError::Usage(format!("remote branch not found: {}", remote.branch)))
+}
+
+fn read_optional_json(path: &Path) -> Result<Option<Value>, CliError> {
+    match fs::read_to_string(path) {
+        Ok(text) => Ok(Some(serde_json::from_str(&text)?)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(CliError::Io(error)),
+    }
+}
+
+fn copy_object_graph(
+    src_objects: &Path,
+    dest_objects: &Path,
+    root_id: &str,
+) -> Result<(), CliError> {
+    let mut seen = BTreeSet::new();
+    let mut stack = vec![root_id.to_string()];
+    while let Some(object_id) = stack.pop() {
+        if !seen.insert(object_id.clone()) {
+            continue;
+        }
+        let payload = codefire_store::read_object(src_objects, &object_id)?;
+        for reference in object_references(&payload) {
+            stack.push(reference);
+        }
+        copy_object_record(src_objects, dest_objects, &object_id)?;
+    }
+    Ok(())
+}
+
+fn copy_object_record(
+    src_objects: &Path,
+    dest_objects: &Path,
+    object_id: &str,
+) -> Result<(), CliError> {
+    let record = codefire_store::read_object_record(src_objects, object_id)?;
+    let subdir = codefire_store::object_subdir(&record.type_tag).ok_or_else(|| {
+        CliError::InvalidRepository(format!("unknown object type: {}", record.type_tag))
+    })?;
+    let dest = dest_objects.join(subdir).join(format!("{object_id}.json"));
+    if dest.exists() {
+        let existing = codefire_store::read_object_record(dest_objects, object_id)?;
+        if existing != record {
+            return Err(CliError::InvalidRepository(format!(
+                "remote object collision: {object_id}"
+            )));
+        }
+        return Ok(());
+    }
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&dest)?;
+    file.write_all(serde_json::to_string_pretty(&record)?.as_bytes())?;
+    file.write_all(b"\n")?;
+    Ok(())
+}
+
+fn object_references(payload: &Value) -> Vec<String> {
+    match payload.get("type").and_then(Value::as_str) {
+        Some("commit") => {
+            let mut refs = Vec::new();
+            if let Some(parents) = payload.get("parents").and_then(Value::as_array) {
+                refs.extend(
+                    parents
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .filter(|value| value.starts_with("CF-"))
+                        .map(str::to_string),
+                );
+            }
+            if let Some(roots) = payload.get("roots").and_then(Value::as_object) {
+                refs.extend(
+                    roots
+                        .values()
+                        .filter_map(Value::as_str)
+                        .filter(|value| value.starts_with("CF-"))
+                        .map(str::to_string),
+                );
+            }
+            refs
+        }
+        Some("content_manifest") => payload
+            .get("entries")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|entry| entry.get("blob").and_then(Value::as_str))
+            .map(str::to_string)
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn next_remote_generation(project_root: &Path) -> Result<u64, CliError> {
+    let path = project_root.join("gc_state.json");
+    let generation = read_optional_json(&path)?
+        .and_then(|value| value.get("current_generation").and_then(Value::as_u64))
+        .unwrap_or(0)
+        + 1;
+    write_json_atomic(&path, &json!({"current_generation": generation}))?;
+    Ok(generation)
+}
+
+fn validate_merge_request_record(mr: &Value) -> Result<(), CliError> {
+    let source = parse_cf_url(&required_string(mr, &["source_url"])?)?;
+    let target = parse_cf_url(&required_string(mr, &["target_url"])?)?;
+    let source_head = required_string(mr, &["source_head"])?;
+    let target_head = required_string(mr, &["target_head_at_request"])?;
+    codefire_store::validate_sealed_commit(
+        &remote_dirs(&source.project_root).objects,
+        &source_head,
+    )?;
+    codefire_store::validate_sealed_commit(
+        &remote_dirs(&target.project_root).objects,
+        &target_head,
+    )?;
+    if let Some(applied_head) = mr.get("applied_head").and_then(Value::as_str) {
+        codefire_store::validate_sealed_commit(
+            &remote_dirs(&target.project_root).objects,
+            applied_head,
+        )?;
+    }
+    Ok(())
+}
+
+fn reject_stale_merge_request(mr: &mut Value, mr_path: &Path) -> Result<(), CliError> {
+    let target = parse_cf_url(&required_string(mr, &["target_url"])?)?;
+    if let Some(current_target) =
+        read_optional_json(&remote_branch_path(&target.project_root, &target.branch))?
+    {
+        let current_head = required_string(&current_target, &["head"])?;
+        if current_head != required_string(mr, &["target_head_at_request"])? {
+            mr["status"] = Value::String("stale".to_string());
+            write_json_atomic(mr_path, mr)?;
+            return Err(CliError::Usage(format!(
+                "merge request is stale: {}",
+                required_string(mr, &["id"])?
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn is_ancestor_in_objects(
+    objects: &Path,
+    ancestor: &str,
+    commit_id: &str,
+) -> Result<bool, CliError> {
+    Ok(ancestor_distances(objects, commit_id)?.contains_key(ancestor))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hex_lower(&hasher.finalize())
+}
+
+fn hex_lower(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push(HEX[(byte >> 4) as usize] as char);
+        out.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    out
+}
+
+fn optional_repo_root(start: &Path) -> Option<PathBuf> {
+    find_repo_root(start).ok()
 }
 
 fn open_context(start: &Path) -> Result<OpenContext, CliError> {
@@ -2065,6 +3024,35 @@ impl Drop for RepoLock {
     }
 }
 
+struct FileLock {
+    path: PathBuf,
+}
+
+impl FileLock {
+    fn acquire(path: PathBuf) -> Result<Self, CliError> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(_) => Ok(Self { path }),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                Err(CliError::Usage("CodeFire resource is locked".to_string()))
+            }
+            Err(error) => Err(CliError::Io(error)),
+        }
+    }
+}
+
+impl Drop for FileLock {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
 fn find_repo_root(start: &Path) -> Result<PathBuf, CliError> {
     let mut current = start.canonicalize()?;
     if current.is_file() {
@@ -2330,17 +3318,150 @@ mod tests {
         )
         .unwrap();
 
-        let show = show_commitish(&repo_root, "feature-session").unwrap();
+        let show = show_commitish(Some(&repo_root), "feature-session").unwrap();
         assert!(show.contains("Object: feature-session@CF-COMMIT-"));
         assert!(show.contains("Message: test commit"));
         assert!(show.contains("Files: 1"));
         assert!(show.contains("Certificate: consistent"));
 
-        let diff = diff_commitish(&repo_root, "main", "feature-session").unwrap();
+        let diff = diff_commitish(Some(&repo_root), "main", "feature-session").unwrap();
         assert!(diff.contains("--- main@CF-COMMIT-"));
         assert!(diff.contains("+++ feature-session@CF-COMMIT-"));
         assert!(diff.contains("-    return 30"));
         assert!(diff.contains("+    return 15"));
+    }
+
+    #[test]
+    fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+        let clone_repo = temp.path().join("clone-repo");
+        let server = temp.path().join("server");
+        init_repo(&repo_root, false).unwrap();
+        init_repo(&clone_repo, false).unwrap();
+        let objects = repo_root.join(".codefire").join("objects");
+        let main_commit = write_file_commit(&objects, "docs/readme.md", "hello 30\n");
+        let feature_commit = write_file_commit_with_parents(
+            &objects,
+            "docs/readme.md",
+            "hello 15\n",
+            vec![main_commit.clone()],
+        );
+        save_branch_record(
+            &repo_root,
+            &json!({
+                "type": "branch",
+                "version": 1,
+                "name": "main",
+                "head": main_commit,
+                "state": "closed",
+                "created_at": "2026-06-04T00:00:00Z"
+            }),
+        )
+        .unwrap();
+        save_branch_record(
+            &repo_root,
+            &json!({
+                "type": "branch",
+                "version": 1,
+                "name": "feature-session",
+                "head": feature_commit,
+                "state": "closed",
+                "created_at": "2026-06-04T00:00:00Z"
+            }),
+        )
+        .unwrap();
+        let project_url = format!("cf://{}/org/app", server.display());
+        let main_url = format!("{project_url}/main");
+        let feature_url = format!("{project_url}/feature-session");
+
+        upload_branch(
+            &repo_root,
+            &UploadOptions {
+                branch: "main".to_string(),
+                remote_url: main_url.clone(),
+            },
+        )
+        .unwrap();
+        let branches = list_remote_branches(&project_url).unwrap();
+        assert_eq!(branches[0].name, "main");
+        assert_eq!(
+            branches[0].head,
+            load_branch_record(&repo_root, "main").unwrap()["head"]
+        );
+
+        clone_branch(
+            &clone_repo,
+            &CloneOptions {
+                source: main_url.clone(),
+                new_branch: "main-from-remote".to_string(),
+            },
+        )
+        .unwrap();
+        let cloned = load_branch_record(&clone_repo, "main-from-remote").unwrap();
+        assert_eq!(
+            required_string(&cloned, &["head"]).unwrap(),
+            required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap()
+        );
+
+        upload_branch(
+            &repo_root,
+            &UploadOptions {
+                branch: "feature-session".to_string(),
+                remote_url: feature_url.clone(),
+            },
+        )
+        .unwrap();
+        let show = show_commitish(None, &feature_url).unwrap();
+        assert!(show.contains(&format!("Object: {feature_url}@CF-COMMIT-")));
+        assert!(show.contains("Certificate: consistent"));
+        let diff = diff_commitish(None, &main_url, &feature_url).unwrap();
+        assert!(diff.contains(&format!("--- {main_url}@CF-COMMIT-")));
+        assert!(diff.contains(&format!("+++ {feature_url}@CF-COMMIT-")));
+        assert!(diff.contains("+hello 15"));
+
+        let mr = request_merge(&RequestMergeOptions {
+            source_url: feature_url.clone(),
+            target_url: main_url.clone(),
+        })
+        .unwrap();
+        assert!(mr.id.starts_with("MR-"));
+        let listed = list_merge_requests(&project_url).unwrap();
+        assert_eq!(listed[0].status, "open");
+        review_merge_request(&RequestReviewOptions {
+            project_url: project_url.clone(),
+            mr_id: mr.id.clone(),
+            reviewer: "alice".to_string(),
+            decision: "approve".to_string(),
+            comment: "sealed source is ready".to_string(),
+        })
+        .unwrap();
+        assert_eq!(
+            list_merge_requests(&project_url).unwrap()[0].status,
+            "approved"
+        );
+        let applied = apply_merge_request(&RequestApplyOptions {
+            project_url: project_url.clone(),
+            mr_id: mr.id,
+        })
+        .unwrap();
+        assert_eq!(applied.target_branch, "main");
+        assert_eq!(
+            applied.head,
+            required_string(
+                &load_remote_branch(&parse_cf_url(&feature_url).unwrap()).unwrap(),
+                &["head"]
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            required_string(
+                &load_remote_branch(&parse_cf_url(&main_url).unwrap()).unwrap(),
+                &["head"]
+            )
+            .unwrap(),
+            applied.head
+        );
     }
 
     #[test]

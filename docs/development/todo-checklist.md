@@ -183,7 +183,7 @@
 | CF-208B | Rust Verify | resolution basisからstale resolutionをRust `verify` で検出する | CF-207A, CF-208A | done | `codefire-core::stale_resolutions`; stale temp repo smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-209 | Rust Commit | commit sealingとbranch head updateをRustで実装する | CF-208 | done | `codefire-rs commit`; Rust init/open/scan/extinguish/verify/commit smoke; Python `doctor`/`branch list` compatibility; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-210 | Rust Merge | clone、show/diff、merge、merge firesをRustで実装する | CF-209 | done | `codefire-rs clone/show/diff/merge`; merge pending state drives `merge_changed` scan fires; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust local clone/show/diff/merge smoke |
-| CF-211 | Rust Remote | file-backed remoteとMR flowをRustで実装する | CF-210 | todo | v0.5 remote parity |
+| CF-211 | Rust Remote | file-backed remoteとMR flowをRustで実装する | CF-210 | done | `codefire-rs upload/list/clone/show/diff/request-merge/request-list/request-review/request-apply`; Rust file-backed remote/MR smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-212 | Rust Server | HTTP/HTTPS server parityをRustで実装する | CF-211 | todo | v0.5 remote parity |
 | CF-213 | Rust Security | commit/request signaturesとkey rotation parityをRustで実装する | CF-212 | todo | v0.5 remote parity |
 | CF-214 | Rust Observability | perf/metrics outputをRustで実装する | CF-208, CF-166 | todo | CFB-007 |
