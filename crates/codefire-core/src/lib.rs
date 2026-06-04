@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use sha1::Sha1;
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -114,6 +115,45 @@ pub struct MissingRequiredLink {
     pub target_kind: String,
     pub min: usize,
     pub found: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FireAtomRef {
+    pub atom_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_hash_at_fire: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Fire {
+    #[serde(rename = "type")]
+    pub type_tag: String,
+    pub version: u32,
+    pub fire_uid: String,
+    pub display_id: String,
+    pub status: String,
+    pub severity: String,
+    pub source: FireAtomRef,
+    pub target: FireAtomRef,
+    pub reason: String,
+    pub trace_path: Vec<String>,
+    pub created_by: String,
+    pub created_at: String,
+    pub key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub obsolete_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScanResult {
+    #[serde(rename = "type")]
+    pub type_tag: String,
+    pub version: u32,
+    pub base_commit: String,
+    pub atom_index: AtomIndex,
+    pub trace_graph: TraceGraph,
+    pub changed_atoms: Vec<String>,
+    pub open_fires: Vec<Fire>,
 }
 
 pub fn build_atom_index(open_dir: &Path) -> Result<AtomIndex, CoreError> {
@@ -323,6 +363,115 @@ pub fn current_required_link_missing(
     Ok(required_link_missing(&atom_index, &trace_graph, &policy))
 }
 
+pub fn changed_atoms(current: &AtomIndex, base: &AtomIndex) -> Vec<String> {
+    let old = base
+        .atoms
+        .iter()
+        .map(|atom| (atom.atom_id.as_str(), atom.content_hash.as_str()))
+        .collect::<BTreeMap<_, _>>();
+    let mut changed = current
+        .atoms
+        .iter()
+        .filter_map(|atom| {
+            (old.get(atom.atom_id.as_str()).copied() != Some(atom.content_hash.as_str()))
+                .then_some(atom.atom_id.clone())
+        })
+        .collect::<Vec<_>>();
+    changed.sort();
+    changed
+}
+
+pub fn build_scan_result(
+    current: AtomIndex,
+    base_index: AtomIndex,
+    trace_graph: TraceGraph,
+    mut fires: Vec<Fire>,
+    base_commit: String,
+    reason: &str,
+    now: &str,
+) -> Result<(ScanResult, Vec<Fire>), CoreError> {
+    let changed = changed_atoms(&current, &base_index);
+    let current_atoms = current
+        .atoms
+        .iter()
+        .map(|atom| (atom.atom_id.as_str(), atom))
+        .collect::<BTreeMap<_, _>>();
+    let mut existing_keys = fires
+        .iter()
+        .filter(|fire| fire.status != "obsolete")
+        .map(|fire| fire.key.clone())
+        .collect::<HashSet<_>>();
+    let mut fire_no = fires.len() + 1;
+
+    for source in &changed {
+        for (target, trace_path) in adjacent_atoms(source, &trace_graph) {
+            if target == *source {
+                continue;
+            }
+            let key = fire_key(source, &target, reason, &trace_path, &base_commit)?;
+            if !existing_keys.insert(key.clone()) {
+                continue;
+            }
+            let source_hash = current_atoms
+                .get(source.as_str())
+                .map(|atom| atom.content_hash.clone());
+            let target_hash = current_atoms
+                .get(target.as_str())
+                .map(|atom| atom.content_hash.clone());
+            fires.push(Fire {
+                type_tag: "fire".to_string(),
+                version: VERSION,
+                fire_uid: format!("fire_{}", &sha1_hex(key.as_bytes())[..12]),
+                display_id: format!("FIRE-{fire_no:03}"),
+                status: "open".to_string(),
+                severity: "required".to_string(),
+                source: FireAtomRef {
+                    atom_id: source.clone(),
+                    content_hash_at_fire: source_hash,
+                },
+                target: FireAtomRef {
+                    atom_id: target,
+                    content_hash_at_fire: target_hash,
+                },
+                reason: reason.to_string(),
+                trace_path,
+                created_by: "scan".to_string(),
+                created_at: now.to_string(),
+                key,
+                obsolete_at: None,
+            });
+            fire_no += 1;
+        }
+    }
+
+    let changed_set = changed.iter().map(String::as_str).collect::<HashSet<_>>();
+    for fire in &mut fires {
+        if fire.created_by == "scan"
+            && fire.status == "open"
+            && !changed_set.contains(fire.source.atom_id.as_str())
+        {
+            fire.status = "obsolete".to_string();
+            fire.obsolete_at = Some(now.to_string());
+        }
+    }
+
+    let open_fires = fires
+        .iter()
+        .filter(|fire| fire.status == "open" && fire.severity == "required")
+        .cloned()
+        .collect::<Vec<_>>();
+    let scan = ScanResult {
+        type_tag: "scan".to_string(),
+        version: VERSION,
+        base_commit,
+        atom_index: current,
+        trace_graph,
+        changed_atoms: changed,
+        open_fires,
+    };
+    Ok((scan, fires))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TraceLinkInput {
     pub from: String,
@@ -468,6 +617,36 @@ fn trace_link_hash(
         "link_id": link_id,
         "to": to,
         "type": link_type,
+    });
+    Ok(digest_bytes(&serde_json::to_vec(&value)?))
+}
+
+fn adjacent_atoms(atom_id: &str, trace_graph: &TraceGraph) -> Vec<(String, Vec<String>)> {
+    let mut adjacent = Vec::new();
+    for link in &trace_graph.links {
+        if link.from == atom_id {
+            adjacent.push((link.to.clone(), vec![link.from.clone(), link.to.clone()]));
+        } else if link.to == atom_id {
+            adjacent.push((link.from.clone(), vec![link.to.clone(), link.from.clone()]));
+        }
+    }
+    adjacent
+}
+
+fn fire_key(
+    source: &str,
+    target: &str,
+    reason: &str,
+    trace_path: &[String],
+    base_commit: &str,
+) -> Result<String, CoreError> {
+    let trace_path_hash = digest_bytes(&serde_json::to_vec(trace_path)?);
+    let value = serde_json::json!({
+        "source_atom_id": source,
+        "target_atom_id": target,
+        "reason": reason,
+        "trace_path_hash": trace_path_hash,
+        "base_commit": base_commit,
     });
     Ok(digest_bytes(&serde_json::to_vec(&value)?))
 }
@@ -634,6 +813,12 @@ fn digest_bytes(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     format!("sha256:{}", hex_lower(&hasher.finalize()))
+}
+
+fn sha1_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha1::new();
+    hasher.update(bytes);
+    hex_lower(&hasher.finalize())
 }
 
 fn read_text_lossy(path: &Path) -> Result<String, CoreError> {
@@ -1085,9 +1270,126 @@ mod tests {
         );
     }
 
+    #[test]
+    fn scan_result_detects_changed_atoms_and_creates_trace_fires() {
+        let current = AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: VERSION,
+            atoms: vec![
+                atom("DES-AUTH-001", "design", "sha256:design2"),
+                atom("REQ-AUTH-001", "requirement", "sha256:req2"),
+            ],
+            duplicate_atom_ids: Vec::new(),
+        };
+        let base = AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: VERSION,
+            atoms: vec![atom("REQ-AUTH-001", "requirement", "sha256:req1")],
+            duplicate_atom_ids: Vec::new(),
+        };
+        let trace_graph = TraceGraph {
+            type_tag: "trace_graph".to_string(),
+            version: VERSION,
+            links: vec![TraceLinkInput {
+                from: "REQ-AUTH-001".to_string(),
+                to: Some("DES-AUTH-001".to_string()),
+                link_type: Some("refined_by".to_string()),
+            }
+            .into_trace_link()
+            .unwrap()],
+        };
+
+        let (scan, fires) = build_scan_result(
+            current,
+            base,
+            trace_graph,
+            Vec::new(),
+            "CF-COMMIT-base".to_string(),
+            "atom_changed",
+            "2026-06-04T00:00:00Z",
+        )
+        .unwrap();
+
+        assert_eq!(scan.changed_atoms, vec!["DES-AUTH-001", "REQ-AUTH-001"]);
+        assert_eq!(scan.open_fires.len(), 2);
+        assert_eq!(fires[0].display_id, "FIRE-001");
+        assert_eq!(fires[0].status, "open");
+        assert_eq!(fires[0].severity, "required");
+        assert_eq!(fires[0].created_by, "scan");
+    }
+
+    #[test]
+    fn scan_result_obsoletes_scan_fires_when_source_is_no_longer_changed() {
+        let current = AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: VERSION,
+            atoms: vec![atom("REQ-AUTH-001", "requirement", "sha256:req1")],
+            duplicate_atom_ids: Vec::new(),
+        };
+        let base = current.clone();
+        let existing = Fire {
+            type_tag: "fire".to_string(),
+            version: VERSION,
+            fire_uid: "fire_existing".to_string(),
+            display_id: "FIRE-001".to_string(),
+            status: "open".to_string(),
+            severity: "required".to_string(),
+            source: FireAtomRef {
+                atom_id: "REQ-AUTH-001".to_string(),
+                content_hash_at_fire: Some("sha256:req1".to_string()),
+            },
+            target: FireAtomRef {
+                atom_id: "DES-AUTH-001".to_string(),
+                content_hash_at_fire: None,
+            },
+            reason: "atom_changed".to_string(),
+            trace_path: vec!["REQ-AUTH-001".to_string(), "DES-AUTH-001".to_string()],
+            created_by: "scan".to_string(),
+            created_at: "2026-06-04T00:00:00Z".to_string(),
+            key: "sha256:key".to_string(),
+            obsolete_at: None,
+        };
+
+        let (scan, fires) = build_scan_result(
+            current,
+            base,
+            TraceGraph {
+                type_tag: "trace_graph".to_string(),
+                version: VERSION,
+                links: Vec::new(),
+            },
+            vec![existing],
+            "CF-COMMIT-base".to_string(),
+            "atom_changed",
+            "2026-06-04T00:01:00Z",
+        )
+        .unwrap();
+
+        assert!(scan.changed_atoms.is_empty());
+        assert!(scan.open_fires.is_empty());
+        assert_eq!(fires[0].status, "obsolete");
+        assert_eq!(
+            fires[0].obsolete_at.as_deref(),
+            Some("2026-06-04T00:01:00Z")
+        );
+    }
+
     fn write_file(path: &Path, contents: &str) {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         let mut file = fs::File::create(path).unwrap();
         file.write_all(contents.as_bytes()).unwrap();
+    }
+
+    fn atom(atom_id: &str, kind: &str, content_hash: &str) -> Atom {
+        Atom {
+            atom_id: atom_id.to_string(),
+            kind: kind.to_string(),
+            artifact_path: "artifact".to_string(),
+            selector: Selector {
+                selector_type: "test".to_string(),
+                value: atom_id.to_string(),
+            },
+            content_hash: content_hash.to_string(),
+        }
     }
 }

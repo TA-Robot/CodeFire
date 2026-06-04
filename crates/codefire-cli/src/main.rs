@@ -42,6 +42,15 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             println!("{}", serde_json::to_string_pretty(&missing)?);
             Ok(())
         }
+        Some("scan") => {
+            let start = args
+                .get(1)
+                .map(PathBuf::from)
+                .unwrap_or(env::current_dir()?);
+            let scan = run_scan(&start)?;
+            print_scan(&scan);
+            Ok(())
+        }
         Some("init") => {
             let options = parse_init_args(&args[1..])?;
             let result = init_repo(&options.path, options.force)?;
@@ -196,6 +205,14 @@ struct OpenResult {
     open_dir: PathBuf,
 }
 
+struct OpenContext {
+    repo_root: PathBuf,
+    open_dir: PathBuf,
+    branch: String,
+    registry_path: PathBuf,
+    registry: Value,
+}
+
 fn print_status(status: &Status) {
     println!("Branch: {}", status.branch);
     println!("State: {}", status.state);
@@ -206,6 +223,26 @@ fn print_status(status: &Status) {
 fn print_branches(branches: &[Branch]) {
     for branch in branches {
         println!("{}\t{}\t{}", branch.name, branch.head, branch.state);
+    }
+}
+
+fn print_scan(scan: &codefire_core::ScanResult) {
+    let state = if scan.changed_atoms.is_empty() && scan.open_fires.is_empty() {
+        "open-clean"
+    } else {
+        "open-burning"
+    };
+    println!("Branch state: {state}");
+    println!("Changed atoms:");
+    for atom_id in &scan.changed_atoms {
+        println!("  {atom_id}");
+    }
+    println!("Open fires:");
+    for fire in &scan.open_fires {
+        println!(
+            "  {}  {} -> {}  {}",
+            fire.display_id, fire.source.atom_id, fire.target.atom_id, fire.reason
+        );
     }
 }
 
@@ -375,6 +412,91 @@ fn open_branch_from(start: &Path, options: &OpenOptions) -> Result<OpenResult, C
     })
 }
 
+fn run_scan(start: &Path) -> Result<codefire_core::ScanResult, CliError> {
+    let context = open_context(start)?;
+    let objects = context.repo_root.join(".codefire").join("objects");
+    let base_commit = required_string(&context.registry, &["open", "current_base_commit"])?;
+    let active_state_path = PathBuf::from(required_string(
+        &context.registry,
+        &["open", "active_state_path"],
+    )?);
+    let current = codefire_core::build_atom_index(&context.open_dir)?;
+    let base_index = load_base_atom_index(&objects, &base_commit)?;
+    let trace_graph = codefire_core::current_trace_graph(&context.open_dir)?;
+    let fires_path = active_state_path.join("fires.json");
+    let fires = if fires_path.exists() {
+        serde_json::from_value(read_json(&fires_path)?)?
+    } else {
+        Vec::new()
+    };
+    let state_path = active_state_path.join("state.json");
+    let state_data = if state_path.exists() {
+        read_json(&state_path)?
+    } else {
+        json!({"state": "open-clean"})
+    };
+    let reason = if state_data.get("pending_merge_parent").is_some() {
+        "merge_changed"
+    } else {
+        "atom_changed"
+    };
+    let now = now_iso_utc();
+    let (scan, fires) = codefire_core::build_scan_result(
+        current,
+        base_index,
+        trace_graph,
+        fires,
+        base_commit,
+        reason,
+        &now,
+    )?;
+    fs::create_dir_all(&active_state_path)?;
+    write_json_atomic(&fires_path, &serde_json::to_value(fires)?)?;
+    write_json_atomic(
+        &active_state_path.join("scan.json"),
+        &serde_json::to_value(&scan)?,
+    )?;
+    let state = if scan.changed_atoms.is_empty() && scan.open_fires.is_empty() {
+        "open-clean"
+    } else {
+        "open-burning"
+    };
+    set_open_state(&context, &active_state_path, state)?;
+    Ok(scan)
+}
+
+fn load_base_atom_index(
+    objects: &Path,
+    base_commit: &str,
+) -> Result<codefire_core::AtomIndex, CliError> {
+    let commit = codefire_store::read_object(objects, base_commit)?;
+    let atom_index_id = required_string(&commit, &["roots", "atom_index"])?;
+    let atom_index = codefire_store::read_object(objects, &atom_index_id)?;
+    Ok(serde_json::from_value(atom_index)?)
+}
+
+fn set_open_state(
+    context: &OpenContext,
+    active_state_path: &Path,
+    state: &str,
+) -> Result<(), CliError> {
+    let mut registry = context.registry.clone();
+    registry["state"]["last_known"] = Value::String(state.to_string());
+    write_json_atomic(&context.registry_path, &registry)?;
+    let state_path = active_state_path.join("state.json");
+    let mut active_state = if state_path.exists() {
+        read_json(&state_path)?
+    } else {
+        json!({})
+    };
+    active_state["state"] = Value::String(state.to_string());
+    write_json_atomic(&state_path, &active_state)?;
+    let mut branch = load_branch_record(&context.repo_root, &context.branch)?;
+    branch["state"] = Value::String(state.to_string());
+    save_branch_record(&context.repo_root, &branch)?;
+    Ok(())
+}
+
 fn initial_roots(objects: &Path, now: &str) -> Result<Value, CliError> {
     let content_manifest = codefire_store::store_object(
         objects,
@@ -503,39 +625,16 @@ fn write_json_atomic(path: &Path, value: &Value) -> Result<(), CliError> {
 }
 
 fn read_status(start: &Path) -> Result<Status, CliError> {
-    let marker_path =
-        find_open_marker(start)?.ok_or_else(|| CliError::NotOpen(start.to_path_buf()))?;
-    let marker: Value = read_json(&marker_path)?;
-    let open_dir = marker_path
-        .parent()
-        .ok_or_else(|| CliError::InvalidMarker("marker has no parent directory".to_string()))?;
-    let repo_dir = PathBuf::from(required_string(&marker, &["repository", "path"])?);
-    let repo_root = repo_dir
-        .parent()
-        .ok_or_else(|| CliError::InvalidMarker("repository path has no parent".to_string()))?;
-    let branch = required_string(&marker, &["branch", "name"])?;
-    let registry_path = opened_registry_path(repo_root, &branch);
-    let registry: Value = read_json(&registry_path)?;
-    let registry_open_path = PathBuf::from(required_string(&registry, &["open", "path"])?);
-    if registry_open_path != open_dir {
-        return Err(CliError::InvalidMarker(
-            "opened_path does not match registry".to_string(),
-        ));
-    }
-    let open_instance_id = required_string(&marker, &["open", "open_instance_id"])?;
-    let registry_open_instance_id = required_string(&registry, &["open", "open_instance_id"])?;
-    if open_instance_id != registry_open_instance_id {
-        return Err(CliError::InvalidMarker(
-            "open_instance_id does not match registry".to_string(),
-        ));
-    }
+    let context = open_context(start)?;
 
-    let base = required_string(&registry, &["open", "current_base_commit"])?;
-    let objects_root = repo_root.join(".codefire").join("objects");
+    let base = required_string(&context.registry, &["open", "current_base_commit"])?;
+    let objects_root = context.repo_root.join(".codefire").join("objects");
     codefire_store::validate_sealed_commit(&objects_root, &base)?;
-    let state = required_string(&registry, &["state", "last_known"])?;
-    let active_state_path =
-        PathBuf::from(required_string(&registry, &["open", "active_state_path"])?);
+    let state = required_string(&context.registry, &["state", "last_known"])?;
+    let active_state_path = PathBuf::from(required_string(
+        &context.registry,
+        &["open", "active_state_path"],
+    )?);
     let fires_path = active_state_path.join("fires.json");
     let open_fires = if fires_path.exists() {
         let fires: Value = read_json(&fires_path)?;
@@ -553,10 +652,48 @@ fn read_status(start: &Path) -> Result<Status, CliError> {
     };
 
     Ok(Status {
-        branch,
+        branch: context.branch,
         state,
         base,
         open_fires,
+    })
+}
+
+fn open_context(start: &Path) -> Result<OpenContext, CliError> {
+    let marker_path =
+        find_open_marker(start)?.ok_or_else(|| CliError::NotOpen(start.to_path_buf()))?;
+    let marker = read_json(&marker_path)?;
+    let open_dir = marker_path
+        .parent()
+        .ok_or_else(|| CliError::InvalidMarker("marker has no parent directory".to_string()))?
+        .to_path_buf();
+    let repo_dir = PathBuf::from(required_string(&marker, &["repository", "path"])?);
+    let repo_root = repo_dir
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| CliError::InvalidMarker("repository path has no parent".to_string()))?;
+    let branch = required_string(&marker, &["branch", "name"])?;
+    let registry_path = opened_registry_path(&repo_root, &branch);
+    let registry = read_json(&registry_path)?;
+    let registry_open_path = PathBuf::from(required_string(&registry, &["open", "path"])?);
+    if registry_open_path != open_dir {
+        return Err(CliError::InvalidMarker(
+            "opened_path does not match registry".to_string(),
+        ));
+    }
+    let open_instance_id = required_string(&marker, &["open", "open_instance_id"])?;
+    let registry_open_instance_id = required_string(&registry, &["open", "open_instance_id"])?;
+    if open_instance_id != registry_open_instance_id {
+        return Err(CliError::InvalidMarker(
+            "open_instance_id does not match registry".to_string(),
+        ));
+    }
+    Ok(OpenContext {
+        repo_root,
+        open_dir,
+        branch,
+        registry_path,
+        registry,
     })
 }
 

@@ -106,6 +106,7 @@
 | 2026-06-04 | Rust Repo | Rust CLIの `open` を追加し、manifest materialization、open marker、open registry、active state、branch state更新をPython-compatibleに生成できるようにした | `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust init/open + Python `status` / `doctor` / `branch list` smoke |
 | 2026-06-04 | Rust Index | Rust coreにMarkdown headingと明示 `cf-atom` のAtom extractorを追加し、AtomIndex JSONをCLIから出せるようにした | `crates/codefire-core`, `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `/workspace/algorithm-evolution-agent-lab/main` atom-index smoke |
 | 2026-06-04 | Rust Trace | Rust coreに `codefire.links.yaml` parser、TraceGraph生成、default/custom required link policy評価を追加した | `crates/codefire-core`, `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `/workspace/algorithm-evolution-agent-lab/main` trace-graph / missing-links smoke |
+| 2026-06-04 | Rust Fire | Rust coreにchanged atom検出、Trace隣接fire生成、obsolete化、ScanResult生成を追加し、Rust CLI `scan` でactive stateへ保存できるようにした | `crates/codefire-core`, `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust init/open/scan temp repo smoke |
 
 ## Current Decisions
 
