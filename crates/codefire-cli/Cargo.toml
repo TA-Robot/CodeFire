@@ -12,3 +12,8 @@ path = "src/main.rs"
 
 [dependencies]
 codefire-core = { path = "../codefire-core" }
+codefire-store = { path = "../codefire-store" }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "=3.10.1"

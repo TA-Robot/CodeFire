@@ -169,6 +169,7 @@
 | CF-202 | Rust Store | immutable object storeとsealed commit validationをRustで実装する | CF-201 | done | `validate_sealed_commit`; 10 Rust tests pass |
 | CF-202A | Rust Store | immutable object record write/read/validateをRustで実装する | CF-201 | done | `codefire-store::store_object`; tamper detection tests |
 | CF-203 | Rust Repo | init/open/status/branch registry互換をRustで実装する | CF-202 | todo | v0.3 exit |
+| CF-203A | Rust Repo | Python-created open directoryのread-only `status` 互換をRustで実装する | CF-202 | done | `codefire-rs status` fixture; real repo smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-204 | Rust Index | Markdownと明示 `cf-atom` extractorをRustで実装する | CF-203 | todo | v0.4 local parity |
 | CF-205 | Rust Trace | links parser、trace graph、required link policyをRustで実装する | CF-204 | todo | v0.4 local parity |
 | CF-206 | Rust Fire | scan、changed atom detection、fire ledgerをRustで実装する | CF-205 | todo | v0.4 local parity |
