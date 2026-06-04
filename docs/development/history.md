@@ -94,6 +94,7 @@
 | 2026-06-04 | Diagnostics | `codefire verify --details` を追加し、missing link、stale resolution、duplicate Atom ID、failed checkの対象をCLI上で確認できるようにした | `codefire`, `tests/test_codefire_cli.py`, docs | 87 tests pass; `./demo.sh`; install smoke |
 | 2026-06-04 | Dogfood | CodeFireの使いやすさ、診断ノイズ、性能可観測性、object store肥大化リスクをissue化した | `docs/development/bug-backlog.md`, `docs/development/todo-checklist.md` | CFB-005..CFB-008 |
 | 2026-06-04 | Planning | v0.6 Rust rewrite計画を追加し、高機能化テーマ、crate構成、migration sequence、CF-200..CF-217を定義した | `docs/development/v0.6-rust-rewrite-plan.md`, `docs/development/todo-checklist.md` | Rust rewrite planning |
+| 2026-06-04 | Planning | v0.6 Rust rewrite計画を詳細化し、product vision、success metrics、user stories、architecture flow、data model、feature matrix、release gates、first two weeks planを追加した | `docs/development/v0.6-rust-rewrite-plan.md` | Rich v0.6 plan |
 
 ## Current Decisions
 
