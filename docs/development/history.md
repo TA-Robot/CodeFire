@@ -95,11 +95,12 @@
 | 2026-06-04 | Dogfood | CodeFireの使いやすさ、診断ノイズ、性能可観測性、object store肥大化リスクをissue化した | `docs/development/bug-backlog.md`, `docs/development/todo-checklist.md` | CFB-005..CFB-008 |
 | 2026-06-04 | Planning | v0.6 Rust rewrite計画を追加し、高機能化テーマ、crate構成、migration sequence、CF-200..CF-217を定義した | `docs/development/v0.6-rust-rewrite-plan.md`, `docs/development/todo-checklist.md` | Rust rewrite planning |
 | 2026-06-04 | Planning | v0.6 Rust rewrite計画を詳細化し、product vision、success metrics、user stories、architecture flow、data model、feature matrix、release gates、first two weeks planを追加した | `docs/development/v0.6-rust-rewrite-plan.md` | Rich v0.6 plan |
+| 2026-06-04 | Scope | AI agent運用とmarketplaceをCodeFire本体の恒久的な対象外としてv0.6計画に明記した | `docs/development/v0.6-rust-rewrite-plan.md`, `docs/development/todo-checklist.md` | Product exclusion |
 
 ## Current Decisions
 
 - v0.2は local repository / local branch / open-close-clone / scan / fire / extinguish / verify / commit / merge / file-backed remote / merge request review/apply / remote GC / HTTP upload-list-clone / HTTP show-diff / HTTP merge request review/apply / HTTP doctor-gc / HTTPS transport / server verification cwd-env-timeout restrictions / hashed token storage / HMAC commit signatures / key rotation policy / HMAC request signatures / nonce replay cache までを実装範囲にする。
-- AI連携、GUI、semantic merge、hosted server isolationはv0.2対象外にする。多言語Atom抽出は標準ライブラリの限定パーサで扱う。
+- AI agent運用、marketplace、GUI、semantic merge、hosted server isolationはCodeFire本体の対象外にする。多言語Atom抽出は標準ライブラリの限定パーサの範囲からRust版で段階的に改善する。
 - `examples/` はこの devcontainer 基盤リポジトリには展開しない。必要なら CodeFire 実装用の別 repository または `project/` 内の明示的な target workspace で扱う。
 - v0.6ではRust実装をdefault CLIへ移行する計画とし、Python版はreference implementation / fallbackとして残す。
 

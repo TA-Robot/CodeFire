@@ -8,7 +8,7 @@
 - 完了時は `Evidence` に commit hash、テスト結果、または確認ログを残す。
 - 仕様判断が変わった場合は `docs/development/history.md` と ADR のどちらかに記録する。
 - 当初MVPのlocal flowは完了済み。現在はfile-backed remoteまでをv0.2実装範囲として管理する。
-- AI連携、GUI、semantic merge、hosted server isolationは対象外にする。
+- AI agent運用、marketplace、GUI、semantic merge、hosted server isolationは対象外にする。CodeFireは外部ツールの実行管理ではなく、整合性管理と履歴封印に集中する。
 
 ## Definition of Done
 
