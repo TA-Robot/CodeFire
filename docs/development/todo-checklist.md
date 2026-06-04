@@ -207,7 +207,7 @@
 | CF-231 | Impact | policy/fire impact diffとmachine-readable next actionsを実装する | CF-221, CF-230 | done | `codefire-rs diff --impact`; `codefire-rs diff --impact --json`; live impact/next_actions smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-232 | Merge | merge dry-run predictionとsemantic conflict candidate reportingを実装する | CF-210, CF-231 | done | `codefire-rs merge <source> --into <target> --dry-run`; `codefire-rs merge <source> --into <target> --dry-run --json`; `merge_dry_run_reports_plan_without_writing_target`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-233 | Review | file diff、Atom diff、Trace diff、verification、next actionsを含むreview-pack exportを実装する | CF-231, CF-232 | done | `codefire-rs review-pack <source> [--base <base>] [--output <path>]`; `review_pack_exports_file_atom_verification_and_next_actions`; live review-pack smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
-| CF-234 | Patch | review / remote workflow向けpatch export/importを実装する | CF-228, CF-233 | todo | v0.6 diff intelligence |
+| CF-234 | Patch | review / remote workflow向けpatch export/importを実装する | CF-228, CF-233 | done | `codefire-rs patch export <source> [--base <base>] [--output <path>]`; `codefire-rs patch import <patch-file> [--dry-run] [--json]`; `patch_export_import_applies_manifest_delta_to_open_directory`; live patch export/import smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-235 | Testing | diff/merge golden fixturesとGit comparison smoke testsを追加する | CF-228, CF-232 | todo | v0.6 diff intelligence |
 
 ## Immediate Next Actions

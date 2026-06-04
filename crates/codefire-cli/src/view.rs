@@ -81,6 +81,12 @@ pub(crate) struct ReviewPackOptions {
     pub(crate) rename_detection: bool,
 }
 
+#[derive(Debug)]
+pub(crate) struct PatchExportOptions {
+    pub(crate) source: String,
+    pub(crate) base: Option<String>,
+}
+
 pub(crate) fn show_commitish(repo_root: Option<&Path>, value: &str) -> Result<String, CliError> {
     let resolved = resolve_commitish_any(repo_root, value)?;
     let commit = codefire_store::read_object(&resolved.objects, &resolved.commit_id)?;
@@ -266,6 +272,55 @@ pub(crate) fn review_pack_with_options(
             "source": verification_summary(&source)?,
         },
         "next_actions": next_actions,
+    });
+    Ok(format!("{}\n", serde_json::to_string_pretty(&value)?))
+}
+
+pub(crate) fn patch_export_with_options(
+    repo_root: Option<&Path>,
+    options: &PatchExportOptions,
+) -> Result<String, CliError> {
+    let source = resolve_commitish_any(repo_root, &options.source)?;
+    let base = if let Some(base) = &options.base {
+        resolve_commitish_any(repo_root, base)?
+    } else {
+        first_parent_commitish(&source)?
+    };
+    let base_files = manifest_contents(&base.objects, &base.commit_id)?;
+    let source_files = manifest_contents(&source.objects, &source.commit_id)?;
+    let paths = base_files
+        .keys()
+        .chain(source_files.keys())
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut entries = Vec::new();
+    for path in paths {
+        let base_data = base_files.get(&path);
+        let source_data = source_files.get(&path);
+        if base_data == source_data {
+            continue;
+        }
+        if let Some(data) = source_data {
+            entries.push(json!({
+                "path": path,
+                "action": "write",
+                "encoding": "base64",
+                "content": encode_base64(data),
+                "bytes": data.len(),
+            }));
+        } else {
+            entries.push(json!({
+                "path": path,
+                "action": "delete",
+            }));
+        }
+    }
+    let value = json!({
+        "type": "codefire_patch",
+        "version": 1,
+        "base": commit_review_summary(&base)?,
+        "source": commit_review_summary(&source)?,
+        "entries": entries,
     });
     Ok(format!("{}\n", serde_json::to_string_pretty(&value)?))
 }

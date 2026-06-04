@@ -285,6 +285,30 @@ verificationにbase/sourceそれぞれのverification summaryを含める
 review-packはsealed commitから再現可能な情報だけで構成し、生成時刻などの非決定的値は含めない
 ```
 
+## 4.12C `patch`
+
+```bash
+codefire patch export feature-login --base main --output feature-login.cfpatch.json
+codefire patch export feature-login
+codefire patch import feature-login.cfpatch.json --dry-run --json
+codefire patch import feature-login.cfpatch.json
+```
+
+仕様：
+
+```text
+patch exportはbase/source sealed commit間のmanifest deltaをcodefire_patch JSONとして出力する
+--base省略時はsource commitのfirst parentをbaseにする
+patch entriesはwrite/delete actionを持つ
+write entryはbase64 contentとbyte数を持つ
+delete entryはpathだけを持つ
+patch importはopen directory内で実行する
+patch importはpatch base commitとopen directoryのcurrent_base_commitが一致しない場合に拒否する
+patch import --dry-runはpath検証とbase照合だけを行い、file / active state / branch stateを変更しない
+patch importは適用後にopen stateをopen-burningへ更新し、pending_patch_base、pending_patch_source、patch_pathsをactive stateへ記録する
+patch pathはmanifest pathと同じく相対pathだけを許可し、open directory外へescapeするpathを拒否する
+```
+
 ## 4.13 `request-merge`
 
 ```bash

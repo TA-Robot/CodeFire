@@ -356,6 +356,150 @@ fn review_pack_exports_file_atom_verification_and_next_actions() {
 }
 
 #[test]
+fn parse_patch_args_accept_export_and_import_options() {
+    let export = parse_patch_export_args(&[
+        "feature-session".to_string(),
+        "--base".to_string(),
+        "main".to_string(),
+        "--output".to_string(),
+        "change.cfpatch.json".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(export.patch.source, "feature-session");
+    assert_eq!(export.patch.base.as_deref(), Some("main"));
+    assert_eq!(export.output, Some(PathBuf::from("change.cfpatch.json")));
+
+    let import = parse_patch_import_args(&[
+        "change.cfpatch.json".to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(import.path, PathBuf::from("change.cfpatch.json"));
+    assert!(import.dry_run);
+    assert!(import.json_output);
+}
+
+#[test]
+fn patch_export_import_applies_manifest_delta_to_open_directory() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    let patch_path = temp.path().join("change.cfpatch.json");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit_with_atoms(
+        &objects,
+        &[
+            (
+                "docs/spec/session.md",
+                "## REQ-session: Requirement\nTTL 30\n",
+            ),
+            ("docs/obsolete.md", "old\n"),
+        ],
+        &[(
+            "REQ-session",
+            "requirement",
+            "docs/spec/session.md",
+            "sha256:req-base",
+        )],
+        vec![],
+    );
+    let feature_commit = write_file_commit_with_atoms(
+        &objects,
+        &[(
+            "docs/spec/session.md",
+            "## REQ-session: Requirement\nTTL 15\n",
+        )],
+        &[(
+            "REQ-session",
+            "requirement",
+            "docs/spec/session.md",
+            "sha256:req-feature",
+        )],
+        vec![base_commit.clone()],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": base_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-session",
+            "head": feature_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+        },
+    )
+    .unwrap();
+    let patch = patch_export_with_options(
+        Some(&repo_root),
+        &PatchExportOptions {
+            source: "feature-session".to_string(),
+            base: Some("main".to_string()),
+        },
+    )
+    .unwrap();
+    fs::write(&patch_path, &patch).unwrap();
+    let patch_json: Value = serde_json::from_str(&patch).unwrap();
+    assert_eq!(patch_json["type"], "codefire_patch");
+    assert_eq!(patch_json["entries"].as_array().unwrap().len(), 2);
+
+    let dry_run = import_patch(
+        &open_dir,
+        &PatchImportOptions {
+            path: patch_path.clone(),
+            dry_run: true,
+            json_output: true,
+        },
+    )
+    .unwrap();
+    assert_eq!(dry_run["applied"], false);
+    assert_eq!(
+        fs::read_to_string(open_dir.join("docs/spec/session.md")).unwrap(),
+        "## REQ-session: Requirement\nTTL 30\n"
+    );
+    assert!(open_dir.join("docs/obsolete.md").exists());
+    assert_eq!(read_status(&open_dir).unwrap().state, "open-clean");
+
+    let applied = import_patch(
+        &open_dir,
+        &PatchImportOptions {
+            path: patch_path,
+            dry_run: false,
+            json_output: false,
+        },
+    )
+    .unwrap();
+    assert_eq!(applied["applied"], true);
+    assert_eq!(
+        fs::read_to_string(open_dir.join("docs/spec/session.md")).unwrap(),
+        "## REQ-session: Requirement\nTTL 15\n"
+    );
+    assert!(!open_dir.join("docs/obsolete.md").exists());
+    assert_eq!(read_status(&open_dir).unwrap().state, "open-burning");
+}
+
+#[test]
 fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");

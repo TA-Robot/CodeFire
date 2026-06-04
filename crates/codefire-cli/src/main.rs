@@ -19,8 +19,9 @@ use remote::{
     RequestMergeOptions, RequestReviewOptions, UploadOptions,
 };
 use view::{
-    diff_commitish_with_options, manifest_contents, review_pack_with_options, show_commitish,
-    DiffAlgorithm, DiffOptions, ReviewPackOptions,
+    diff_commitish_with_options, manifest_contents, patch_export_with_options,
+    review_pack_with_options, show_commitish, DiffAlgorithm, DiffOptions, PatchExportOptions,
+    ReviewPackOptions,
 };
 
 fn main() {
@@ -200,6 +201,45 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             }
             Ok(())
         }
+        Some("patch") => match args.get(1).map(String::as_str) {
+            Some("export") => {
+                let options = parse_patch_export_args(&args[2..])?;
+                let repo_root = optional_repo_root(&env::current_dir()?);
+                let output = patch_export_with_options(repo_root.as_deref(), &options.patch)?;
+                if let Some(path) = options.output {
+                    if let Some(parent) = path.parent() {
+                        fs::create_dir_all(parent)?;
+                    }
+                    fs::write(path, output)?;
+                } else {
+                    print!("{output}");
+                }
+                Ok(())
+            }
+            Some("import") => {
+                let options = parse_patch_import_args(&args[2..])?;
+                let result = import_patch(&env::current_dir()?, &options)?;
+                if options.json_output {
+                    println!("{}", serde_json::to_string_pretty(&result)?);
+                } else if options.dry_run {
+                    println!(
+                        "patch dry-run: {} entries would apply to {}",
+                        result["entries"].as_u64().unwrap_or(0),
+                        result["branch"].as_str().unwrap_or("(unknown)")
+                    );
+                } else {
+                    println!(
+                        "applied patch: {} entries to {}",
+                        result["entries"].as_u64().unwrap_or(0),
+                        result["branch"].as_str().unwrap_or("(unknown)")
+                    );
+                }
+                Ok(())
+            }
+            _ => Err(CliError::Usage(
+                "usage: codefire-rs patch export <source> [--base <base>] [--output <path>] | codefire-rs patch import <patch-file> [--dry-run] [--json]".to_string(),
+            )),
+        },
         Some("merge") => {
             let options = parse_merge_args(&args[1..])?;
             let result = merge_branch(&env::current_dir()?, &options)?;
@@ -438,6 +478,19 @@ struct DiffArgs {
 struct ReviewPackArgs {
     review: ReviewPackOptions,
     output: Option<PathBuf>,
+}
+
+#[derive(Debug)]
+struct PatchExportArgs {
+    patch: PatchExportOptions,
+    output: Option<PathBuf>,
+}
+
+#[derive(Debug)]
+struct PatchImportOptions {
+    path: PathBuf,
+    dry_run: bool,
+    json_output: bool,
 }
 
 #[derive(Debug)]
@@ -902,6 +955,84 @@ fn parse_review_pack_args(args: &[String]) -> Result<ReviewPackArgs, CliError> {
             rename_detection,
         },
         output,
+    })
+}
+
+fn parse_patch_export_args(args: &[String]) -> Result<PatchExportArgs, CliError> {
+    let mut source = None;
+    let mut base = None;
+    let mut output = None;
+    let mut index = 0usize;
+    while index < args.len() {
+        let value = &args[index];
+        if value == "--base" {
+            index += 1;
+            base = Some(
+                args.get(index)
+                    .ok_or_else(|| CliError::Usage("--base requires a value".to_string()))?
+                    .to_string(),
+            );
+        } else if value == "--output" {
+            index += 1;
+            output = Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                CliError::Usage("--output requires a value".to_string())
+            })?));
+        } else if value.starts_with("--") {
+            return Err(CliError::Usage(format!(
+                "unsupported patch export option: {value}"
+            )));
+        } else if source.is_none() {
+            source = Some(value.clone());
+        } else {
+            return Err(CliError::Usage(format!(
+                "unexpected patch export argument: {value}"
+            )));
+        }
+        index += 1;
+    }
+    Ok(PatchExportArgs {
+        patch: PatchExportOptions {
+            source: source.ok_or_else(|| {
+                CliError::Usage(
+                    "usage: codefire-rs patch export <source> [--base <base>] [--output <path>]"
+                        .to_string(),
+                )
+            })?,
+            base,
+        },
+        output,
+    })
+}
+
+fn parse_patch_import_args(args: &[String]) -> Result<PatchImportOptions, CliError> {
+    let mut path = None;
+    let mut dry_run = false;
+    let mut json_output = false;
+    for value in args {
+        match value.as_str() {
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
+            value if value.starts_with("--") => {
+                return Err(CliError::Usage(format!(
+                    "unsupported patch import option: {value}"
+                )));
+            }
+            value if path.is_none() => path = Some(PathBuf::from(value)),
+            value => {
+                return Err(CliError::Usage(format!(
+                    "unexpected patch import argument: {value}"
+                )));
+            }
+        }
+    }
+    Ok(PatchImportOptions {
+        path: path.ok_or_else(|| {
+            CliError::Usage(
+                "usage: codefire-rs patch import <patch-file> [--dry-run] [--json]".to_string(),
+            )
+        })?,
+        dry_run,
+        json_output,
     })
 }
 
@@ -1508,6 +1639,96 @@ fn merge_next_actions(result: &MergeResult) -> Vec<Value> {
         }));
     }
     actions
+}
+
+fn import_patch(start: &Path, options: &PatchImportOptions) -> Result<Value, CliError> {
+    let context = open_context(start)?;
+    let _lock = RepoLock::acquire(&context.repo_root)?;
+    let patch = read_json(&options.path)?;
+    if patch.get("type").and_then(Value::as_str) != Some("codefire_patch") {
+        return Err(CliError::Usage(
+            "patch file type must be codefire_patch".to_string(),
+        ));
+    }
+    if patch.get("version").and_then(Value::as_u64) != Some(1) {
+        return Err(CliError::Usage(
+            "unsupported patch version; expected version 1".to_string(),
+        ));
+    }
+    let patch_base = required_string(&patch, &["base", "commit"])?;
+    let current_base = required_string(&context.registry, &["open", "current_base_commit"])?;
+    if patch_base != current_base {
+        return Err(CliError::Usage(format!(
+            "patch base {patch_base} does not match open directory base {current_base}"
+        )));
+    }
+    let entries = patch
+        .get("entries")
+        .and_then(Value::as_array)
+        .ok_or_else(|| CliError::Usage("patch entries must be a list".to_string()))?;
+    let mut paths = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let path = required_string(entry, &["path"])?;
+        safe_manifest_output_path(&context.open_dir, &path)?;
+        paths.push(path);
+    }
+
+    if !options.dry_run {
+        for entry in entries {
+            apply_patch_entry(&context.open_dir, entry)?;
+        }
+        let active_state_path = PathBuf::from(required_string(
+            &context.registry,
+            &["open", "active_state_path"],
+        )?);
+        let state_path = active_state_path.join("state.json");
+        let mut state = if state_path.exists() {
+            read_json(&state_path)?
+        } else {
+            json!({})
+        };
+        state["pending_patch_base"] = Value::String(patch_base.clone());
+        state["pending_patch_source"] = patch
+            .get("source")
+            .and_then(|source| source.get("commit"))
+            .cloned()
+            .unwrap_or_else(|| json!(null));
+        state["patch_paths"] = Value::Array(paths.iter().cloned().map(Value::String).collect());
+        write_json_atomic(&state_path, &state)?;
+        set_open_state(&context, &active_state_path, "open-burning")?;
+    }
+
+    Ok(json!({
+        "type": "codefire_patch_import",
+        "version": 1,
+        "dry_run": options.dry_run,
+        "applied": !options.dry_run,
+        "branch": &context.branch,
+        "base": patch_base,
+        "entries": entries.len(),
+        "paths": paths,
+    }))
+}
+
+fn apply_patch_entry(open_dir: &Path, entry: &Value) -> Result<(), CliError> {
+    let path = required_string(entry, &["path"])?;
+    match required_string(entry, &["action"])?.as_str() {
+        "write" => {
+            let encoding = required_string(entry, &["encoding"])?;
+            if encoding != "base64" {
+                return Err(CliError::Usage(format!(
+                    "unsupported patch entry encoding: {encoding}"
+                )));
+            }
+            let content = required_string(entry, &["content"])?;
+            let bytes = decode_base64(&content)?;
+            write_merged_file(open_dir, &path, Some(&bytes))
+        }
+        "delete" => write_merged_file(open_dir, &path, None),
+        action => Err(CliError::Usage(format!(
+            "unsupported patch entry action: {action}"
+        ))),
+    }
 }
 
 fn clone_branch(start: &Path, options: &CloneOptions) -> Result<(), CliError> {
