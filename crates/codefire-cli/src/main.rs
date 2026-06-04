@@ -4,12 +4,15 @@ use std::fmt;
 use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() {
     if let Err(error) = run(env::args().skip(1).collect()) {
-        eprintln!("error: {error}");
-        std::process::exit(2);
+        if !matches!(error, CliError::VerificationFailed) {
+            eprintln!("error: {error}");
+        }
+        std::process::exit(error.exit_code());
     }
 }
 
@@ -50,6 +53,16 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             let scan = run_scan(&start)?;
             print_scan(&scan);
             Ok(())
+        }
+        Some("verify") => {
+            let options = parse_verify_args(&args[1..])?;
+            let verification = run_verify(&options.path)?;
+            print_verification(&verification, options.details);
+            if verification.result == "passed" {
+                Ok(())
+            } else {
+                Err(CliError::VerificationFailed)
+            }
         }
         Some("init") => {
             let options = parse_init_args(&args[1..])?;
@@ -112,9 +125,19 @@ enum CliError {
     Core(codefire_core::CoreError),
     Store(codefire_store::StoreError),
     Usage(String),
+    VerificationFailed,
     NotOpen(PathBuf),
     InvalidMarker(String),
     InvalidRepository(String),
+}
+
+impl CliError {
+    fn exit_code(&self) -> i32 {
+        match self {
+            CliError::VerificationFailed => 1,
+            _ => 2,
+        }
+    }
 }
 
 impl fmt::Display for CliError {
@@ -125,6 +148,7 @@ impl fmt::Display for CliError {
             CliError::Core(error) => write!(f, "{error}"),
             CliError::Store(error) => write!(f, "{error}"),
             CliError::Usage(message) => write!(f, "{message}"),
+            CliError::VerificationFailed => write!(f, "verification failed"),
             CliError::NotOpen(path) => write!(
                 f,
                 "not inside an open CodeFire branch directory: {}",
@@ -205,6 +229,12 @@ struct OpenResult {
     open_dir: PathBuf,
 }
 
+#[derive(Debug)]
+struct VerifyOptions {
+    path: PathBuf,
+    details: bool,
+}
+
 struct OpenContext {
     repo_root: PathBuf,
     open_dir: PathBuf,
@@ -246,6 +276,86 @@ fn print_scan(scan: &codefire_core::ScanResult) {
     }
 }
 
+fn print_verification(verification: &codefire_core::Verification, details: bool) {
+    if verification.result == "passed" {
+        println!("Verification passed.");
+        return;
+    }
+    let mut blocking = Vec::new();
+    if verification.open_required_fires > 0 {
+        blocking.push("open fires");
+    }
+    if !verification.missing_required_links.is_empty() {
+        blocking.push("missing required links");
+    }
+    if !verification.stale_resolutions.is_empty() {
+        blocking.push("stale resolutions");
+    }
+    if !verification.duplicate_atom_ids.is_empty() {
+        blocking.push("duplicate atom ids");
+    }
+    if !verification.failed_checks.is_empty() {
+        blocking.push("failed checks");
+    }
+    println!("Verification failed.");
+    println!(
+        "Blocking checks: {}",
+        if blocking.is_empty() {
+            "none".to_string()
+        } else {
+            blocking.join(", ")
+        }
+    );
+    println!("Open fires: {}", verification.open_required_fires);
+    println!(
+        "Missing required links: {}",
+        verification.missing_required_links.len()
+    );
+    println!(
+        "Stale resolutions: {}",
+        verification.stale_resolutions.len()
+    );
+    println!(
+        "Duplicate atom ids: {}",
+        verification.duplicate_atom_ids.len()
+    );
+    println!("Failed checks: {}", verification.failed_checks.len());
+    if details {
+        print_verification_details(verification);
+    }
+}
+
+fn print_verification_details(verification: &codefire_core::Verification) {
+    if !verification.missing_required_links.is_empty() {
+        println!("Missing required link details:");
+        for item in verification.missing_required_links.iter().take(5) {
+            println!(
+                "  {} requires {} -> {} min {}",
+                item.atom_id, item.required_type, item.target_kind, item.min
+            );
+        }
+    }
+    if !verification.stale_resolutions.is_empty() {
+        println!("Stale resolution details:");
+        for item in verification.stale_resolutions.iter().take(5) {
+            println!("  {item}");
+        }
+    }
+    if !verification.duplicate_atom_ids.is_empty() {
+        println!("Duplicate Atom ID details:");
+        for atom_id in verification.duplicate_atom_ids.iter().take(5) {
+            println!("  {atom_id}");
+        }
+    }
+    if !verification.failed_checks.is_empty() {
+        println!("Failed check details:");
+        for item in verification.failed_checks.iter().take(5) {
+            let summary = item.output.trim().lines().next().unwrap_or_default();
+            println!("  {}: {} {}", item.id, item.command, summary);
+        }
+    }
+}
+
 fn parse_init_args(args: &[String]) -> Result<InitOptions, CliError> {
     let mut path = None;
     let mut force = false;
@@ -274,6 +384,26 @@ fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
             "usage: codefire-rs open <branch> <path>".to_string(),
         )),
     }
+}
+
+fn parse_verify_args(args: &[String]) -> Result<VerifyOptions, CliError> {
+    let mut path = None;
+    let mut details = false;
+    for arg in args {
+        if arg == "--details" {
+            details = true;
+        } else if path.is_none() {
+            path = Some(PathBuf::from(arg));
+        } else {
+            return Err(CliError::Usage(format!(
+                "unexpected verify argument: {arg}"
+            )));
+        }
+    }
+    Ok(VerifyOptions {
+        path: path.unwrap_or(env::current_dir()?),
+        details,
+    })
 }
 
 fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
@@ -463,6 +593,66 @@ fn run_scan(start: &Path) -> Result<codefire_core::ScanResult, CliError> {
     };
     set_open_state(&context, &active_state_path, state)?;
     Ok(scan)
+}
+
+fn run_verify(start: &Path) -> Result<codefire_core::Verification, CliError> {
+    let context = open_context(start)?;
+    let active_state_path = PathBuf::from(required_string(
+        &context.registry,
+        &["open", "active_state_path"],
+    )?);
+    let scan = run_scan(start)?;
+    let policy = codefire_core::parse_verification_policy(&context.open_dir)?;
+    let trace_policy = codefire_core::TracePolicy {
+        required_links: policy.required_links.clone(),
+    };
+    let missing_required_links =
+        codefire_core::required_link_missing(&scan.atom_index, &scan.trace_graph, &trace_policy);
+    let failed_checks = run_verification_commands(&context.open_dir, &policy)?;
+    let verification = codefire_core::build_verification(
+        &scan,
+        missing_required_links,
+        failed_checks,
+        Vec::new(),
+        &policy,
+        &now_iso_utc(),
+    );
+    write_json_atomic(
+        &active_state_path.join("verification.json"),
+        &serde_json::to_value(&verification)?,
+    )?;
+    let state = if verification.result == "passed" {
+        "open-consistent"
+    } else {
+        "open-burning"
+    };
+    set_open_state(&context, &active_state_path, state)?;
+    Ok(verification)
+}
+
+fn run_verification_commands(
+    open_dir: &Path,
+    policy: &codefire_core::VerificationPolicy,
+) -> Result<Vec<codefire_core::FailedCheck>, CliError> {
+    let mut failures = Vec::new();
+    for check in &policy.verification {
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(&check.command)
+            .current_dir(open_dir.join(&check.cwd))
+            .output()?;
+        if !output.status.success() {
+            let mut combined = String::new();
+            combined.push_str(&String::from_utf8_lossy(&output.stdout));
+            combined.push_str(&String::from_utf8_lossy(&output.stderr));
+            failures.push(codefire_core::FailedCheck {
+                id: check.id.clone(),
+                command: check.command.clone(),
+                output: combined,
+            });
+        }
+    }
+    Ok(failures)
 }
 
 fn load_base_atom_index(

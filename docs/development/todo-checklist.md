@@ -178,6 +178,7 @@
 | CF-206 | Rust Fire | scan、changed atom detection、fire ledgerをRustで実装する | CF-205 | done | `codefire-core::build_scan_result`; `codefire-rs scan`; active `scan.json`/`fires.json` smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-207 | Rust UX | interactive / batch extinguishをRust CLIで実装する | CF-206, CF-164 | todo | CFB-005 |
 | CF-208 | Rust Verify | verification engineとstructured diagnosticsをRustで実装する | CF-206, CF-165 | todo | CFB-006 |
+| CF-208A | Rust Verify | open fires、missing links、duplicate atoms、verification commandをRust `verify` で判定しactive verificationへ保存する | CF-206 | done | `codefire-core::build_verification`; `codefire-rs verify`; pass/fail temp repo smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-209 | Rust Commit | commit sealingとbranch head updateをRustで実装する | CF-208 | todo | v0.4 local parity |
 | CF-210 | Rust Merge | clone、show/diff、merge、merge firesをRustで実装する | CF-209 | todo | v0.4 local parity |
 | CF-211 | Rust Remote | file-backed remoteとMR flowをRustで実装する | CF-210 | todo | v0.5 remote parity |

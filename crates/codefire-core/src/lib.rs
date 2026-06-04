@@ -108,6 +108,24 @@ pub struct TracePolicy {
     pub required_links: BTreeMap<String, Vec<RequiredLinkRule>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationPolicy {
+    pub require_no_required_fires: bool,
+    pub require_no_stale_resolutions: bool,
+    pub require_trace_completeness: bool,
+    pub require_verification_success: bool,
+    pub reject_duplicate_atom_ids: bool,
+    pub required_links: BTreeMap<String, Vec<RequiredLinkRule>>,
+    pub verification: Vec<VerificationCommand>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationCommand {
+    pub id: String,
+    pub command: String,
+    pub cwd: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MissingRequiredLink {
     pub atom_id: String,
@@ -154,6 +172,27 @@ pub struct ScanResult {
     pub trace_graph: TraceGraph,
     pub changed_atoms: Vec<String>,
     pub open_fires: Vec<Fire>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FailedCheck {
+    pub id: String,
+    pub command: String,
+    pub output: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Verification {
+    #[serde(rename = "type")]
+    pub type_tag: String,
+    pub version: u32,
+    pub result: String,
+    pub open_required_fires: usize,
+    pub failed_checks: Vec<FailedCheck>,
+    pub missing_required_links: Vec<MissingRequiredLink>,
+    pub stale_resolutions: Vec<serde_json::Value>,
+    pub duplicate_atom_ids: Vec<String>,
+    pub verified_at: String,
 }
 
 pub fn build_atom_index(open_dir: &Path) -> Result<AtomIndex, CoreError> {
@@ -247,15 +286,26 @@ pub fn parse_links(path: &Path) -> Result<Vec<TraceLinkInput>, CoreError> {
 }
 
 pub fn parse_trace_policy(open_dir: &Path) -> Result<TracePolicy, CoreError> {
+    Ok(TracePolicy {
+        required_links: parse_verification_policy(open_dir)?.required_links,
+    })
+}
+
+pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, CoreError> {
     let path = open_dir.join("codefire.policy.yaml");
+    let mut policy = default_verification_policy();
     if !path.exists() {
-        return Ok(default_trace_policy());
+        return Ok(policy);
     }
 
     let mut required_links = BTreeMap::<String, Vec<RequiredLinkRule>>::new();
     let mut in_required_links = false;
+    let mut in_commit_policy = false;
+    let mut in_verification = false;
     let mut current_kind = None::<String>;
     let mut current_rule = None::<RequiredLinkRuleDraft>;
+    let mut current_check = None::<VerificationCommandDraft>;
+    let mut checks = Vec::new();
 
     for raw_line in read_text_lossy(&path)?.lines() {
         let line = raw_line.split('#').next().unwrap_or_default().trim_end();
@@ -266,12 +316,69 @@ pub fn parse_trace_policy(open_dir: &Path) -> Result<TracePolicy, CoreError> {
         if !raw_line.starts_with([' ', '\t']) {
             if stripped == "required_links:" {
                 flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
+                flush_verification_check(&mut checks, current_check.take())?;
                 in_required_links = true;
+                in_commit_policy = false;
+                in_verification = false;
+                current_kind = None;
+            } else if stripped == "commit_policy:" {
+                flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
+                flush_verification_check(&mut checks, current_check.take())?;
+                in_required_links = false;
+                in_commit_policy = true;
+                in_verification = false;
+                current_kind = None;
+            } else if stripped == "verification:" {
+                flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
+                flush_verification_check(&mut checks, current_check.take())?;
+                in_required_links = false;
+                in_commit_policy = false;
+                in_verification = true;
                 current_kind = None;
             } else {
                 flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
+                flush_verification_check(&mut checks, current_check.take())?;
                 in_required_links = false;
+                in_commit_policy = false;
+                in_verification = false;
                 current_kind = None;
+            }
+            continue;
+        }
+        if in_commit_policy {
+            if let Some((key, value)) = stripped.split_once(':') {
+                set_commit_policy_bool(&mut policy, key.trim(), value.trim())?;
+            }
+            continue;
+        }
+        if in_verification {
+            if let Some(value) = stripped.strip_prefix("- id:") {
+                flush_verification_check(&mut checks, current_check.take())?;
+                current_check = Some(VerificationCommandDraft {
+                    id: Some(unquote(value.trim())),
+                    command: None,
+                    cwd: Some(".".to_string()),
+                });
+                continue;
+            }
+            if let Some(value) = stripped.strip_prefix("- command:") {
+                flush_verification_check(&mut checks, current_check.take())?;
+                current_check = Some(VerificationCommandDraft {
+                    id: None,
+                    command: Some(unquote(value.trim())),
+                    cwd: Some(".".to_string()),
+                });
+                continue;
+            }
+            let Some(check) = current_check.as_mut() else {
+                continue;
+            };
+            if let Some(value) = stripped.strip_prefix("id:") {
+                check.id = Some(unquote(value.trim()));
+            } else if let Some(value) = stripped.strip_prefix("command:") {
+                check.command = Some(unquote(value.trim()));
+            } else if let Some(value) = stripped.strip_prefix("cwd:") {
+                check.cwd = Some(unquote(value.trim()));
             }
             continue;
         }
@@ -306,10 +413,119 @@ pub fn parse_trace_policy(open_dir: &Path) -> Result<TracePolicy, CoreError> {
         }
     }
     flush_required_rule(&mut required_links, &current_kind, current_rule)?;
+    flush_verification_check(&mut checks, current_check)?;
     if required_links.is_empty() {
-        Ok(default_trace_policy())
-    } else {
-        Ok(TracePolicy { required_links })
+        required_links = policy.required_links;
+    }
+    policy.required_links = required_links;
+    policy.verification = checks;
+    Ok(policy)
+}
+
+fn set_commit_policy_bool(
+    policy: &mut VerificationPolicy,
+    key: &str,
+    value: &str,
+) -> Result<(), CoreError> {
+    let parsed = parse_bool_field(value)?;
+    match key {
+        "require_no_required_fires" => policy.require_no_required_fires = parsed,
+        "require_no_stale_resolutions" => policy.require_no_stale_resolutions = parsed,
+        "require_trace_completeness" => policy.require_trace_completeness = parsed,
+        "require_verification_success" => policy.require_verification_success = parsed,
+        "reject_duplicate_atom_ids" => policy.reject_duplicate_atom_ids = parsed,
+        _ => {}
+    }
+    Ok(())
+}
+
+fn parse_bool_field(value: &str) -> Result<bool, CoreError> {
+    match unquote(value).trim().to_ascii_lowercase().as_str() {
+        "true" | "yes" | "on" | "1" => Ok(true),
+        "false" | "no" | "off" | "0" => Ok(false),
+        _ => Err(CoreError::Config(format!(
+            "invalid boolean value in policy: {value}"
+        ))),
+    }
+}
+
+fn default_verification_policy() -> VerificationPolicy {
+    VerificationPolicy {
+        require_no_required_fires: true,
+        require_no_stale_resolutions: true,
+        require_trace_completeness: true,
+        require_verification_success: true,
+        reject_duplicate_atom_ids: true,
+        required_links: default_trace_policy().required_links,
+        verification: Vec::new(),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct VerificationCommandDraft {
+    id: Option<String>,
+    command: Option<String>,
+    cwd: Option<String>,
+}
+
+fn flush_verification_check(
+    checks: &mut Vec<VerificationCommand>,
+    draft: Option<VerificationCommandDraft>,
+) -> Result<(), CoreError> {
+    let Some(draft) = draft else {
+        return Ok(());
+    };
+    let command = draft.command.ok_or_else(|| {
+        CoreError::Config(
+            "invalid codefire.policy.yaml: verification entry missing command".to_string(),
+        )
+    })?;
+    let id = draft
+        .id
+        .unwrap_or_else(|| format!("verification-{}", checks.len() + 1));
+    checks.push(VerificationCommand {
+        id,
+        command,
+        cwd: draft.cwd.unwrap_or_else(|| ".".to_string()),
+    });
+    Ok(())
+}
+
+pub fn build_verification(
+    scan: &ScanResult,
+    missing_required_links: Vec<MissingRequiredLink>,
+    failed_checks: Vec<FailedCheck>,
+    stale_resolutions: Vec<serde_json::Value>,
+    policy: &VerificationPolicy,
+    verified_at: &str,
+) -> Verification {
+    let duplicate_atom_ids = scan.atom_index.duplicate_atom_ids.clone();
+    let mut passed = true;
+    if policy.require_no_required_fires && !scan.open_fires.is_empty() {
+        passed = false;
+    }
+    if policy.require_trace_completeness && !missing_required_links.is_empty() {
+        passed = false;
+    }
+    if policy.require_no_stale_resolutions && !stale_resolutions.is_empty() {
+        passed = false;
+    }
+    if policy.require_verification_success && !failed_checks.is_empty() {
+        passed = false;
+    }
+    if policy.reject_duplicate_atom_ids && !duplicate_atom_ids.is_empty() {
+        passed = false;
+    }
+    Verification {
+        type_tag: "verification".to_string(),
+        version: VERSION,
+        result: if passed { "passed" } else { "failed" }.to_string(),
+        open_required_fires: scan.open_fires.len(),
+        failed_checks,
+        missing_required_links,
+        stale_resolutions,
+        duplicate_atom_ids,
+        verified_at: verified_at.to_string(),
     }
 }
 
@@ -1268,6 +1484,74 @@ mod tests {
                 found: 0,
             }]
         );
+    }
+
+    #[test]
+    fn verification_policy_parses_commit_booleans_and_commands() {
+        let temp = tempdir().unwrap();
+        write_file(
+            &temp.path().join("codefire.policy.yaml"),
+            "commit_policy:\n  require_no_required_fires: false\n  reject_duplicate_atom_ids: false\nverification:\n  - id: unit\n    command: cargo test\n    cwd: crates/app\n",
+        );
+
+        let policy = parse_verification_policy(temp.path()).unwrap();
+
+        assert!(!policy.require_no_required_fires);
+        assert!(!policy.reject_duplicate_atom_ids);
+        assert!(policy.require_trace_completeness);
+        assert_eq!(
+            policy.verification,
+            vec![VerificationCommand {
+                id: "unit".to_string(),
+                command: "cargo test".to_string(),
+                cwd: "crates/app".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn verification_result_respects_policy_booleans() {
+        let scan = ScanResult {
+            type_tag: "scan".to_string(),
+            version: VERSION,
+            base_commit: "CF-COMMIT-base".to_string(),
+            atom_index: AtomIndex {
+                type_tag: "atom_index".to_string(),
+                version: VERSION,
+                atoms: vec![atom("REQ-AUTH-001", "requirement", "sha256:req")],
+                duplicate_atom_ids: vec!["REQ-AUTH-001".to_string()],
+            },
+            trace_graph: TraceGraph {
+                type_tag: "trace_graph".to_string(),
+                version: VERSION,
+                links: Vec::new(),
+            },
+            changed_atoms: Vec::new(),
+            open_fires: Vec::new(),
+        };
+        let policy = VerificationPolicy {
+            reject_duplicate_atom_ids: false,
+            ..default_verification_policy()
+        };
+
+        let verification = build_verification(
+            &scan,
+            vec![MissingRequiredLink {
+                atom_id: "REQ-AUTH-001".to_string(),
+                required_type: "verified_by".to_string(),
+                target_kind: "test".to_string(),
+                min: 1,
+                found: 0,
+            }],
+            Vec::new(),
+            Vec::new(),
+            &policy,
+            "2026-06-04T00:00:00Z",
+        );
+
+        assert_eq!(verification.result, "failed");
+        assert_eq!(verification.duplicate_atom_ids, vec!["REQ-AUTH-001"]);
+        assert_eq!(verification.missing_required_links.len(), 1);
     }
 
     #[test]
