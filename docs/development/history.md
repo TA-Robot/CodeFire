@@ -110,6 +110,7 @@
 | 2026-06-04 | Rust Verify | Rust coreにVerification payload、commit policy boolean、verification command parserを追加し、Rust CLI `verify` がactive verificationとbranch stateを更新できるようにした | `crates/codefire-core`, `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust verify pass/fail temp repo smoke |
 | 2026-06-04 | Rust Extinguish | Rust coreにResolution payloadとbasis生成を追加し、Rust CLI `extinguish` がfireを解消してresolution ledgerを更新できるようにした | `crates/codefire-core`, `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust scan/extinguish/verify temp repo smoke |
 | 2026-06-04 | Rust Verify | Rust coreにstale resolution検出を追加し、Rust CLI `verify` がresolution basisのsource/target atom、trace link、policy hash変化をblockerにできるようにした | `crates/codefire-core`, `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust stale resolution temp repo smoke |
+| 2026-06-04 | Rust Commit | Rust CLI `commit` を追加し、manifest/blob保存、sealed commit生成、branch head/open registry更新、active state resetをPython-compatibleに実行できるようにした | `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust local commit E2E; Python `doctor` / `branch list` smoke |
 
 ## Current Decisions
 

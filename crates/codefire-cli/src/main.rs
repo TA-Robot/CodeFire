@@ -78,6 +78,15 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             );
             Ok(())
         }
+        Some("commit") => {
+            let options = parse_commit_args(&args[1..])?;
+            let result = run_commit(&options)?;
+            println!("Sealed commit created.");
+            println!("Commit: {}", result.commit_id);
+            println!("Branch: {}", result.branch);
+            println!("State: open-clean");
+            Ok(())
+        }
         Some("init") => {
             let options = parse_init_args(&args[1..])?;
             let result = init_repo(&options.path, options.force)?;
@@ -262,6 +271,18 @@ struct ExtinguishOptions {
 #[derive(Debug)]
 struct ExtinguishResult {
     display_id: String,
+}
+
+#[derive(Debug)]
+struct CommitOptions {
+    path: PathBuf,
+    message: String,
+}
+
+#[derive(Debug)]
+struct CommitResult {
+    commit_id: String,
+    branch: String,
 }
 
 struct OpenContext {
@@ -492,6 +513,41 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
         rationale,
         evidence,
         refresh,
+    })
+}
+
+fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
+    let mut path = None;
+    let mut message = None;
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--path" => {
+                index += 1;
+                path = Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                    CliError::Usage("--path requires a value".to_string())
+                })?));
+            }
+            "-m" | "--message" => {
+                index += 1;
+                message = Some(
+                    args.get(index)
+                        .ok_or_else(|| CliError::Usage("-m requires a value".to_string()))?
+                        .to_string(),
+                );
+            }
+            value if path.is_none() => path = Some(PathBuf::from(value)),
+            value => {
+                return Err(CliError::Usage(format!(
+                    "unexpected commit argument: {value}"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(CommitOptions {
+        path: path.unwrap_or(env::current_dir()?),
+        message: message.unwrap_or_else(|| "CodeFire commit".to_string()),
     })
 }
 
@@ -809,6 +865,132 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
     write_json_atomic(&fires_path, &serde_json::to_value(fires)?)?;
     write_json_atomic(&resolutions_path, &serde_json::to_value(resolutions)?)?;
     Ok(ExtinguishResult { display_id })
+}
+
+fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
+    let context = open_context(&options.path)?;
+    let _lock = RepoLock::acquire(&context.repo_root)?;
+    let active_state_path = PathBuf::from(required_string(
+        &context.registry,
+        &["open", "active_state_path"],
+    )?);
+    let verification = run_verify(&context.open_dir)?;
+    if verification.result != "passed" {
+        return Err(CliError::Usage(
+            "commit blocked: verification failed or consistency blockers remain".to_string(),
+        ));
+    }
+
+    let objects = context.repo_root.join(".codefire").join("objects");
+    let scan: codefire_core::ScanResult =
+        serde_json::from_value(read_json(&active_state_path.join("scan.json"))?)?;
+    let fires: Vec<codefire_core::Fire> = if active_state_path.join("fires.json").exists() {
+        serde_json::from_value(read_json(&active_state_path.join("fires.json"))?)?
+    } else {
+        Vec::new()
+    };
+    let extinguished_fires = fires
+        .iter()
+        .filter(|fire| fire.status == "extinguished")
+        .map(|fire| fire.fire_uid.clone())
+        .collect::<Vec<_>>();
+    let resolutions: Vec<codefire_core::Resolution> =
+        if active_state_path.join("resolutions.json").exists() {
+            serde_json::from_value(read_json(&active_state_path.join("resolutions.json"))?)?
+        } else {
+            Vec::new()
+        };
+    let policy = codefire_core::parse_verification_policy(&context.open_dir)?;
+
+    let manifest_id = codefire_store::store_object(
+        &objects,
+        "content_manifest",
+        build_manifest(&objects, &context.open_dir)?,
+    )?;
+    let atom_id = codefire_store::store_object(
+        &objects,
+        "atom_index",
+        serde_json::to_value(&scan.atom_index)?,
+    )?;
+    let trace_id = codefire_store::store_object(
+        &objects,
+        "trace_graph",
+        serde_json::to_value(&scan.trace_graph)?,
+    )?;
+    let fire_id = codefire_store::store_object(
+        &objects,
+        "fire_ledger",
+        json!({"type": "fire_ledger", "version": 1, "fires": fires}),
+    )?;
+    let resolution_id = codefire_store::store_object(
+        &objects,
+        "resolution_ledger",
+        json!({"type": "resolution_ledger", "version": 1, "resolutions": resolutions}),
+    )?;
+    let verification_id = codefire_store::store_object(
+        &objects,
+        "verification",
+        serde_json::to_value(&verification)?,
+    )?;
+    let policy_id = codefire_store::store_object(
+        &objects,
+        "policy",
+        json!({"type": "policy", "version": 1, "policy": policy}),
+    )?;
+
+    let mut parents = vec![required_string(
+        &context.registry,
+        &["open", "current_base_commit"],
+    )?];
+    let state_path = active_state_path.join("state.json");
+    if state_path.exists() {
+        let state = read_json(&state_path)?;
+        if let Some(parent) = state.get("pending_merge_parent").and_then(Value::as_str) {
+            parents.push(parent.to_string());
+        }
+    }
+    let commit = json!({
+        "type": "commit",
+        "version": 1,
+        "parents": parents,
+        "message": options.message,
+        "roots": {
+            "content_manifest": manifest_id,
+            "atom_index": atom_id,
+            "trace_graph": trace_id,
+            "fire_delta": fire_id,
+            "resolution_ledger": resolution_id,
+            "verification": verification_id,
+            "policy": policy_id,
+        },
+        "certificate": {
+            "result": "consistent",
+            "open_required_fires": verification.open_required_fires,
+            "failed_checks": verification.failed_checks.len(),
+            "missing_required_links": verification.missing_required_links.len(),
+            "stale_resolutions": verification.stale_resolutions.len(),
+            "duplicate_atom_ids": verification.duplicate_atom_ids.len(),
+        },
+        "changed_atoms": scan.changed_atoms,
+        "extinguished_fires": extinguished_fires,
+        "created_at": now_iso_utc(),
+    });
+    let commit_id = codefire_store::store_object(&objects, "commit", commit)?;
+
+    let mut branch = load_branch_record(&context.repo_root, &context.branch)?;
+    branch["head"] = Value::String(commit_id.clone());
+    branch["state"] = Value::String("open-clean".to_string());
+    save_branch_record(&context.repo_root, &branch)?;
+    let mut registry = context.registry.clone();
+    registry["open"]["current_base_commit"] = Value::String(commit_id.clone());
+    registry["state"]["last_known"] = Value::String("open-clean".to_string());
+    write_json_atomic(&context.registry_path, &registry)?;
+    reset_active(&active_state_path, "open-clean")?;
+
+    Ok(CommitResult {
+        commit_id,
+        branch: context.branch,
+    })
 }
 
 fn run_verification_commands(
@@ -1163,6 +1345,68 @@ fn materialize_commit(objects: &Path, commit_id: &str, target: &Path) -> Result<
     Ok(())
 }
 
+fn build_manifest(objects: &Path, open_dir: &Path) -> Result<Value, CliError> {
+    let mut entries = Vec::new();
+    for rel in rel_files(open_dir)? {
+        let data = fs::read(open_dir.join(&rel))?;
+        let blob_id = codefire_store::store_object(
+            objects,
+            "blob",
+            json!({
+                "type": "blob",
+                "version": 1,
+                "encoding": "base64",
+                "content": encode_base64(&data),
+            }),
+        )?;
+        entries.push(json!({
+            "path": to_posix(&rel),
+            "kind": "file",
+            "mode": "100644",
+            "blob": blob_id,
+        }));
+    }
+    Ok(json!({"type": "content_manifest", "version": 1, "entries": entries}))
+}
+
+fn rel_files(root: &Path) -> Result<Vec<PathBuf>, CliError> {
+    let mut files = Vec::new();
+    collect_rel_files(root, Path::new(""), &mut files)?;
+    files.sort_by_key(|path| to_posix(path));
+    Ok(files)
+}
+
+fn collect_rel_files(
+    root: &Path,
+    rel_dir: &Path,
+    files: &mut Vec<PathBuf>,
+) -> Result<(), CliError> {
+    let mut entries = fs::read_dir(root.join(rel_dir))?.collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let rel = rel_dir.join(name.as_ref());
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            if matches!(name.as_ref(), ".codefire" | "__pycache__" | ".pytest_cache") {
+                continue;
+            }
+            collect_rel_files(root, &rel, files)?;
+        } else if file_type.is_file() && to_posix(&rel) != ".codefire-open" {
+            files.push(rel);
+        }
+    }
+    Ok(())
+}
+
+fn to_posix(path: &Path) -> String {
+    path.components()
+        .map(|component| component.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 fn safe_manifest_output_path(target: &Path, rel_path: &str) -> Result<PathBuf, CliError> {
     let path = Path::new(rel_path);
     if path.is_absolute() {
@@ -1233,6 +1477,29 @@ fn decode_base64(input: &str) -> Result<Vec<u8>, CliError> {
     Ok(output)
 }
 
+fn encode_base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut encoded = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let a = chunk[0];
+        let b = *chunk.get(1).unwrap_or(&0);
+        let c = *chunk.get(2).unwrap_or(&0);
+        encoded.push(ALPHABET[(a >> 2) as usize] as char);
+        encoded.push(ALPHABET[(((a & 0x03) << 4) | (b >> 4)) as usize] as char);
+        if chunk.len() >= 2 {
+            encoded.push(ALPHABET[(((b & 0x0f) << 2) | (c >> 6)) as usize] as char);
+        } else {
+            encoded.push('=');
+        }
+        if chunk.len() == 3 {
+            encoded.push(ALPHABET[(c & 0x3f) as usize] as char);
+        } else {
+            encoded.push('=');
+        }
+    }
+    encoded
+}
+
 fn base64_value(byte: u8) -> Result<u8, CliError> {
     match byte {
         b'A'..=b'Z' => Ok(byte - b'A'),
@@ -1248,6 +1515,25 @@ fn base64_value(byte: u8) -> Result<u8, CliError> {
 
 fn is_empty_dir(path: &Path) -> Result<bool, CliError> {
     Ok(path.is_dir() && fs::read_dir(path)?.next().is_none())
+}
+
+fn reset_active(active_state_path: &Path, state: &str) -> Result<(), CliError> {
+    for name in [
+        "fires.json",
+        "resolutions.json",
+        "scan.json",
+        "verification.json",
+    ] {
+        let path = active_state_path.join(name);
+        if path.exists() {
+            fs::remove_file(path)?;
+        }
+    }
+    write_json_atomic(
+        &active_state_path.join("state.json"),
+        &json!({"state": state}),
+    )?;
+    Ok(())
 }
 
 struct RepoLock {
