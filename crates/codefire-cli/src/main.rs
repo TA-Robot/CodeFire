@@ -1,4 +1,5 @@
 use serde_json::{json, Value};
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fmt;
 use std::fs;
@@ -85,6 +86,54 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             println!("Commit: {}", result.commit_id);
             println!("Branch: {}", result.branch);
             println!("State: open-clean");
+            Ok(())
+        }
+        Some("clone") => {
+            let options = parse_clone_args(&args[1..])?;
+            clone_branch(&env::current_dir()?, &options)?;
+            println!("cloned {} -> {}", options.source, options.new_branch);
+            Ok(())
+        }
+        Some("show") => {
+            let target = args.get(1).ok_or_else(|| {
+                CliError::Usage("usage: codefire-rs show <branch-or-commit>".to_string())
+            })?;
+            let repo_root = find_repo_root(&env::current_dir()?)?;
+            let output = show_commitish(&repo_root, target)?;
+            print!("{output}");
+            Ok(())
+        }
+        Some("diff") => {
+            let (left, right) = match args.as_slice() {
+                [_, left, right] => (left, right),
+                _ => {
+                    return Err(CliError::Usage(
+                        "usage: codefire-rs diff <left> <right>".to_string(),
+                    ))
+                }
+            };
+            let repo_root = find_repo_root(&env::current_dir()?)?;
+            let output = diff_commitish(&repo_root, left, right)?;
+            print!("{output}");
+            Ok(())
+        }
+        Some("merge") => {
+            let options = parse_merge_args(&args[1..])?;
+            let result = merge_branch(&env::current_dir()?, &options)?;
+            if result.conflicts.is_empty() {
+                println!(
+                    "merged {} into {}; target is open-burning",
+                    options.source_branch, options.target_branch
+                );
+            } else {
+                println!(
+                    "merged {} into {} with conflicts; target is open-burning",
+                    options.source_branch, options.target_branch
+                );
+                for conflict in result.conflicts {
+                    println!("  conflict: {conflict}");
+                }
+            }
             Ok(())
         }
         Some("init") => {
@@ -283,6 +332,23 @@ struct CommitOptions {
 struct CommitResult {
     commit_id: String,
     branch: String,
+}
+
+#[derive(Debug)]
+struct CloneOptions {
+    source: String,
+    new_branch: String,
+}
+
+#[derive(Debug)]
+struct MergeOptions {
+    source_branch: String,
+    target_branch: String,
+}
+
+#[derive(Debug)]
+struct MergeResult {
+    conflicts: Vec<String>,
 }
 
 struct OpenContext {
@@ -551,6 +617,30 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
     })
 }
 
+fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
+    match args {
+        [source, new_branch] => Ok(CloneOptions {
+            source: source.to_string(),
+            new_branch: new_branch.to_string(),
+        }),
+        _ => Err(CliError::Usage(
+            "usage: codefire-rs clone <source-branch> <new-branch>".to_string(),
+        )),
+    }
+}
+
+fn parse_merge_args(args: &[String]) -> Result<MergeOptions, CliError> {
+    match args {
+        [source_branch, flag, target_branch] if flag == "--into" => Ok(MergeOptions {
+            source_branch: source_branch.to_string(),
+            target_branch: target_branch.to_string(),
+        }),
+        _ => Err(CliError::Usage(
+            "usage: codefire-rs merge <source-branch> --into <target-branch>".to_string(),
+        )),
+    }
+}
+
 fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
     let repo_root = absolute_path(path)?;
     let cf = repo_root.join(".codefire");
@@ -609,6 +699,137 @@ fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
         repo_root,
         main_commit: commit_id,
     })
+}
+
+fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, CliError> {
+    let repo_root = find_repo_root(start)?;
+    let _lock = RepoLock::acquire(&repo_root)?;
+    let objects = repo_root.join(".codefire").join("objects");
+    let source = load_branch_record(&repo_root, &options.source_branch)?;
+    let source_head = required_string(&source, &["head"])?;
+    let source_state = source
+        .get("state")
+        .and_then(Value::as_str)
+        .unwrap_or("closed");
+    if source_state == "open-burning" {
+        return Err(CliError::Usage(format!(
+            "cannot merge from branch '{}' while it is open-burning",
+            options.source_branch
+        )));
+    }
+    let target = load_branch_record(&repo_root, &options.target_branch)?;
+    let target_head = required_string(&target, &["head"])?;
+    codefire_store::validate_sealed_commit(&objects, &source_head)?;
+    codefire_store::validate_sealed_commit(&objects, &target_head)?;
+
+    let registry_path = opened_registry_path(&repo_root, &options.target_branch);
+    if !registry_path.exists() {
+        return Err(CliError::Usage(format!(
+            "target branch must be open: {}",
+            options.target_branch
+        )));
+    }
+    let registry = read_json(&registry_path)?;
+    if required_string(&registry, &["state", "last_known"])? != "open-clean" {
+        return Err(CliError::Usage(
+            "target branch must be open-clean before merge".to_string(),
+        ));
+    }
+    let base = common_ancestor(&objects, &source_head, &target_head)?
+        .ok_or_else(|| CliError::Usage("no common ancestor found".to_string()))?;
+    let target_dir = PathBuf::from(required_string(&registry, &["open", "path"])?);
+    let base_files = manifest_contents(&objects, &base)?;
+    let source_files = manifest_contents(&objects, &source_head)?;
+    let target_files = manifest_contents(&objects, &target_head)?;
+
+    let paths = base_files
+        .keys()
+        .chain(source_files.keys())
+        .chain(target_files.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut conflicts = Vec::new();
+    for path in paths {
+        let base_data = base_files.get(&path);
+        let source_data = source_files.get(&path);
+        let target_data = target_files.get(&path);
+        if source_data == base_data {
+            continue;
+        }
+        if target_data == base_data {
+            write_merged_file(&target_dir, &path, source_data.map(Vec::as_slice))?;
+            continue;
+        }
+        if source_data == target_data {
+            continue;
+        }
+        conflicts.push(path.clone());
+        let content = conflict_content(
+            target_data.map(Vec::as_slice),
+            source_data.map(Vec::as_slice),
+        );
+        write_merged_file(&target_dir, &path, Some(&content))?;
+    }
+
+    let active_state_path =
+        PathBuf::from(required_string(&registry, &["open", "active_state_path"])?);
+    let state_path = active_state_path.join("state.json");
+    let mut state = if state_path.exists() {
+        read_json(&state_path)?
+    } else {
+        json!({})
+    };
+    state["pending_merge_parent"] = Value::String(source_head);
+    state["pending_merge_base"] = Value::String(base);
+    state["merge_conflicts"] = Value::Array(conflicts.iter().cloned().map(Value::String).collect());
+    write_json_atomic(&state_path, &state)?;
+    let context = OpenContext {
+        repo_root,
+        open_dir: target_dir,
+        branch: options.target_branch.clone(),
+        registry_path,
+        registry,
+    };
+    set_open_state(&context, &active_state_path, "open-burning")?;
+    Ok(MergeResult { conflicts })
+}
+
+fn clone_branch(start: &Path, options: &CloneOptions) -> Result<(), CliError> {
+    let repo_root = find_repo_root(start)?;
+    let _lock = RepoLock::acquire(&repo_root)?;
+    if branch_record_path(&repo_root, &options.new_branch).exists() {
+        return Err(CliError::Usage(format!(
+            "branch already exists: {}",
+            options.new_branch
+        )));
+    }
+    let source = load_branch_record(&repo_root, &options.source)?;
+    let source_head = required_string(&source, &["head"])?;
+    let source_state = source
+        .get("state")
+        .and_then(Value::as_str)
+        .unwrap_or("closed");
+    if source_state == "open-burning" {
+        return Err(CliError::Usage(format!(
+            "cannot clone from branch '{}' while it is open-burning",
+            options.source
+        )));
+    }
+    codefire_store::validate_sealed_commit(
+        &repo_root.join(".codefire").join("objects"),
+        &source_head,
+    )?;
+    let branch = json!({
+        "type": "branch",
+        "version": 1,
+        "name": options.new_branch,
+        "head": source_head,
+        "state": "closed",
+        "created_from": options.source,
+        "created_at": now_iso_utc(),
+    });
+    save_branch_record(&repo_root, &branch)?;
+    Ok(())
 }
 
 fn open_branch(options: &OpenOptions) -> Result<OpenResult, CliError> {
@@ -1212,6 +1433,287 @@ fn read_status(start: &Path) -> Result<Status, CliError> {
     })
 }
 
+fn show_commitish(repo_root: &Path, value: &str) -> Result<String, CliError> {
+    let objects = repo_root.join(".codefire").join("objects");
+    let (commit_id, label) = resolve_local_commitish(repo_root, value)?;
+    let commit = codefire_store::read_object(&objects, &commit_id)?;
+    let manifest = root_object(&objects, &commit, "content_manifest")?;
+    let atom_index = root_object(&objects, &commit, "atom_index")?;
+    let files = manifest
+        .get("entries")
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len);
+    let atoms = atom_index
+        .get("atoms")
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len);
+    let message = commit.get("message").and_then(Value::as_str).unwrap_or("");
+    let parents = commit
+        .get("parents")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
+        .filter(|items| !items.is_empty())
+        .unwrap_or_else(|| "(none)".to_string());
+    let certificate = commit
+        .get("certificate")
+        .and_then(|value| value.get("result"))
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let signature = commit.get("signature").and_then(Value::as_object);
+    let signature = signature
+        .map(|item| {
+            format!(
+                "{} ({})",
+                item.get("signer")
+                    .and_then(Value::as_str)
+                    .unwrap_or("(unknown)"),
+                item.get("algorithm")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown")
+            )
+        })
+        .unwrap_or_else(|| "(none)".to_string());
+
+    Ok(format!(
+        "Object: {label}\nCommit: {commit_id}\nMessage: {message}\nParents: {parents}\nFiles: {files}\nAtoms: {atoms}\nCertificate: {certificate}\nSignature: {signature}\n"
+    ))
+}
+
+fn diff_commitish(repo_root: &Path, left: &str, right: &str) -> Result<String, CliError> {
+    let objects = repo_root.join(".codefire").join("objects");
+    let (left_id, left_label) = resolve_local_commitish(repo_root, left)?;
+    let (right_id, right_label) = resolve_local_commitish(repo_root, right)?;
+    let left_files = manifest_contents(&objects, &left_id)?;
+    let right_files = manifest_contents(&objects, &right_id)?;
+    Ok(render_manifest_diff(
+        &left_label,
+        &left_files,
+        &right_label,
+        &right_files,
+    ))
+}
+
+fn common_ancestor(objects: &Path, left: &str, right: &str) -> Result<Option<String>, CliError> {
+    let left_distances = ancestor_distances(objects, left)?;
+    let right_distances = ancestor_distances(objects, right)?;
+    Ok(left_distances
+        .keys()
+        .filter_map(|commit| {
+            let left_distance = left_distances.get(commit)?;
+            let right_distance = right_distances.get(commit)?;
+            Some((
+                *left_distance + *right_distance,
+                (*left_distance).max(*right_distance),
+                commit.clone(),
+            ))
+        })
+        .min()
+        .map(|(_, _, commit)| commit))
+}
+
+fn ancestor_distances(
+    objects: &Path,
+    commit_id: &str,
+) -> Result<BTreeMap<String, usize>, CliError> {
+    let mut distances = BTreeMap::new();
+    let mut queue = vec![(commit_id.to_string(), 0usize)];
+    let mut cursor = 0usize;
+    while cursor < queue.len() {
+        let (current, distance) = queue[cursor].clone();
+        cursor += 1;
+        if distances
+            .get(&current)
+            .is_some_and(|known| *known <= distance)
+        {
+            continue;
+        }
+        distances.insert(current.clone(), distance);
+        for parent in commit_parents(objects, &current)? {
+            queue.push((parent, distance + 1));
+        }
+    }
+    Ok(distances)
+}
+
+fn commit_parents(objects: &Path, commit_id: &str) -> Result<Vec<String>, CliError> {
+    let commit = codefire_store::read_object(objects, commit_id)?;
+    Ok(commit
+        .get("parents")
+        .and_then(Value::as_array)
+        .map(|parents| {
+            parents
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+fn resolve_local_commitish(repo_root: &Path, value: &str) -> Result<(String, String), CliError> {
+    let objects = repo_root.join(".codefire").join("objects");
+    if value.starts_with("CF-COMMIT-") {
+        codefire_store::validate_sealed_commit(&objects, value)?;
+        return Ok((value.to_string(), value.to_string()));
+    }
+    let branch = load_branch_record(repo_root, value)?;
+    let head = required_string(&branch, &["head"])?;
+    codefire_store::validate_sealed_commit(&objects, &head)?;
+    Ok((head.clone(), format!("{value}@{head}")))
+}
+
+fn root_object(objects: &Path, commit: &Value, root_name: &str) -> Result<Value, CliError> {
+    let object_id = required_string(commit, &["roots", root_name])?;
+    Ok(codefire_store::read_object(objects, &object_id)?)
+}
+
+fn manifest_contents(
+    objects: &Path,
+    commit_id: &str,
+) -> Result<BTreeMap<String, Vec<u8>>, CliError> {
+    let commit = codefire_store::read_object(objects, commit_id)?;
+    let manifest = root_object(objects, &commit, "content_manifest")?;
+    let entries = manifest
+        .get("entries")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            CliError::InvalidRepository("content manifest entries must be a list".to_string())
+        })?;
+    let mut contents = BTreeMap::new();
+    for entry in entries {
+        if entry.get("kind").and_then(Value::as_str) != Some("file") {
+            continue;
+        }
+        let rel_path = required_string(entry, &["path"])?;
+        let blob_id = required_string(entry, &["blob"])?;
+        let blob = codefire_store::read_object(objects, &blob_id)?;
+        let encoding = required_string(&blob, &["encoding"])?;
+        if encoding != "base64" {
+            return Err(CliError::InvalidRepository(format!(
+                "unsupported blob encoding: {encoding}"
+            )));
+        }
+        let content = required_string(&blob, &["content"])?;
+        contents.insert(rel_path, decode_base64(&content)?);
+    }
+    Ok(contents)
+}
+
+fn render_manifest_diff(
+    left_label: &str,
+    left: &BTreeMap<String, Vec<u8>>,
+    right_label: &str,
+    right: &BTreeMap<String, Vec<u8>>,
+) -> String {
+    let paths = left
+        .keys()
+        .chain(right.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut output = String::new();
+    let mut changed = false;
+    for path in paths {
+        let left_data = left.get(&path);
+        let right_data = right.get(&path);
+        if left_data == right_data {
+            continue;
+        }
+        changed = true;
+        let left_path = if left_data.is_some() {
+            format!("{left_label}/{path}")
+        } else {
+            format!("{left_label}/{path} (missing)")
+        };
+        let right_path = if right_data.is_some() {
+            format!("{right_label}/{path}")
+        } else {
+            format!("{right_label}/{path} (missing)")
+        };
+        output.push_str(&format!("--- {left_path}\n+++ {right_path}\n"));
+        render_line_delta(
+            left_data.map(Vec::as_slice).unwrap_or(&[]),
+            right_data.map(Vec::as_slice).unwrap_or(&[]),
+            &mut output,
+        );
+    }
+    if !changed {
+        output.push_str("No differences.\n");
+    }
+    output
+}
+
+fn render_line_delta(left: &[u8], right: &[u8], output: &mut String) {
+    let left_lines = split_lines_lossy(left);
+    let right_lines = split_lines_lossy(right);
+    let mut prefix = 0usize;
+    while prefix < left_lines.len()
+        && prefix < right_lines.len()
+        && left_lines[prefix] == right_lines[prefix]
+    {
+        prefix += 1;
+    }
+    let mut left_suffix = left_lines.len();
+    let mut right_suffix = right_lines.len();
+    while left_suffix > prefix
+        && right_suffix > prefix
+        && left_lines[left_suffix - 1] == right_lines[right_suffix - 1]
+    {
+        left_suffix -= 1;
+        right_suffix -= 1;
+    }
+    for line in &left_lines[prefix..left_suffix] {
+        push_diff_line(output, '-', line);
+    }
+    for line in &right_lines[prefix..right_suffix] {
+        push_diff_line(output, '+', line);
+    }
+}
+
+fn split_lines_lossy(bytes: &[u8]) -> Vec<String> {
+    String::from_utf8_lossy(bytes)
+        .split_inclusive('\n')
+        .map(str::to_string)
+        .collect()
+}
+
+fn push_diff_line(output: &mut String, prefix: char, line: &str) {
+    output.push(prefix);
+    output.push_str(line);
+    if !line.ends_with('\n') {
+        output.push('\n');
+    }
+}
+
+fn write_merged_file(root: &Path, rel_path: &str, data: Option<&[u8]>) -> Result<(), CliError> {
+    let path = safe_manifest_output_path(root, rel_path)?;
+    if let Some(data) = data {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, data)?;
+    } else if path.exists() {
+        fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
+fn conflict_content(target_data: Option<&[u8]>, source_data: Option<&[u8]>) -> Vec<u8> {
+    let target = conflict_text(target_data);
+    let source = conflict_text(source_data);
+    format!("<<<<<<< target\n{target}=======\n{source}>>>>>>> source\n").into_bytes()
+}
+
+fn conflict_text(data: Option<&[u8]>) -> String {
+    data.map(|bytes| String::from_utf8_lossy(bytes).into_owned())
+        .unwrap_or_else(|| "<deleted>\n".to_string())
+}
+
 fn open_context(start: &Path) -> Result<OpenContext, CliError> {
     let marker_path =
         find_open_marker(start)?.ok_or_else(|| CliError::NotOpen(start.to_path_buf()))?;
@@ -1743,6 +2245,272 @@ mod tests {
     }
 
     #[test]
+    fn clone_branch_creates_closed_branch_and_rejects_burning_source() {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+        init_repo(&repo_root, false).unwrap();
+        let objects = repo_root.join(".codefire").join("objects");
+        let commit_id = write_file_commit(&objects, "docs/readme.md", "hello\n");
+        save_branch_record(
+            &repo_root,
+            &json!({
+                "type": "branch",
+                "version": 1,
+                "name": "main",
+                "head": commit_id,
+                "state": "closed",
+                "created_at": "2026-06-04T00:00:00Z"
+            }),
+        )
+        .unwrap();
+
+        clone_branch(
+            &repo_root,
+            &CloneOptions {
+                source: "main".to_string(),
+                new_branch: "feature/session".to_string(),
+            },
+        )
+        .unwrap();
+        let cloned = load_branch_record(&repo_root, "feature/session").unwrap();
+        assert_eq!(
+            required_string(&cloned, &["head"]).unwrap(),
+            required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap()
+        );
+        assert_eq!(cloned.get("state").and_then(Value::as_str), Some("closed"));
+
+        let mut burning = cloned;
+        burning["name"] = Value::String("burning".to_string());
+        burning["state"] = Value::String("open-burning".to_string());
+        save_branch_record(&repo_root, &burning).unwrap();
+        let error = clone_branch(
+            &repo_root,
+            &CloneOptions {
+                source: "burning".to_string(),
+                new_branch: "copy".to_string(),
+            },
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("cannot clone from branch 'burning' while it is open-burning"));
+    }
+
+    #[test]
+    fn show_and_diff_local_branches() {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+        init_repo(&repo_root, false).unwrap();
+        let objects = repo_root.join(".codefire").join("objects");
+        let main_commit =
+            write_file_commit(&objects, "src/session.py", "def ttl():\n    return 30\n");
+        let feature_commit =
+            write_file_commit(&objects, "src/session.py", "def ttl():\n    return 15\n");
+        save_branch_record(
+            &repo_root,
+            &json!({
+                "type": "branch",
+                "version": 1,
+                "name": "main",
+                "head": main_commit,
+                "state": "closed",
+                "created_at": "2026-06-04T00:00:00Z"
+            }),
+        )
+        .unwrap();
+        save_branch_record(
+            &repo_root,
+            &json!({
+                "type": "branch",
+                "version": 1,
+                "name": "feature-session",
+                "head": feature_commit,
+                "state": "closed",
+                "created_at": "2026-06-04T00:00:00Z"
+            }),
+        )
+        .unwrap();
+
+        let show = show_commitish(&repo_root, "feature-session").unwrap();
+        assert!(show.contains("Object: feature-session@CF-COMMIT-"));
+        assert!(show.contains("Message: test commit"));
+        assert!(show.contains("Files: 1"));
+        assert!(show.contains("Certificate: consistent"));
+
+        let diff = diff_commitish(&repo_root, "main", "feature-session").unwrap();
+        assert!(diff.contains("--- main@CF-COMMIT-"));
+        assert!(diff.contains("+++ feature-session@CF-COMMIT-"));
+        assert!(diff.contains("-    return 30"));
+        assert!(diff.contains("+    return 15"));
+    }
+
+    #[test]
+    fn merge_branch_writes_source_changes_and_marks_target_burning() {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+        let open_dir = temp.path().join("main-open");
+        init_repo(&repo_root, false).unwrap();
+        let objects = repo_root.join(".codefire").join("objects");
+        let base_commit = write_file_commit(
+            &objects,
+            "docs/spec/session.md",
+            "## REQ-session: Requirement\nTTL 30\n\n## DES-session: Design\nClock policy\n",
+        );
+        let feature_commit = write_file_commit_with_parents(
+            &objects,
+            "docs/spec/session.md",
+            "## REQ-session: Requirement\nTTL 15\n\n## DES-session: Design\nClock policy\n",
+            vec![base_commit.clone()],
+        );
+        save_branch_record(
+            &repo_root,
+            &json!({
+                "type": "branch",
+                "version": 1,
+                "name": "main",
+                "head": base_commit,
+                "state": "closed",
+                "created_at": "2026-06-04T00:00:00Z"
+            }),
+        )
+        .unwrap();
+        save_branch_record(
+            &repo_root,
+            &json!({
+                "type": "branch",
+                "version": 1,
+                "name": "feature-session",
+                "head": feature_commit,
+                "state": "closed",
+                "created_at": "2026-06-04T00:00:00Z"
+            }),
+        )
+        .unwrap();
+        open_branch_from(
+            &repo_root,
+            &OpenOptions {
+                branch: "main".to_string(),
+                path: open_dir.clone(),
+            },
+        )
+        .unwrap();
+
+        let result = merge_branch(
+            &repo_root,
+            &MergeOptions {
+                source_branch: "feature-session".to_string(),
+                target_branch: "main".to_string(),
+            },
+        )
+        .unwrap();
+
+        assert!(result.conflicts.is_empty());
+        assert_eq!(
+            fs::read_to_string(open_dir.join("docs/spec/session.md")).unwrap(),
+            "## REQ-session: Requirement\nTTL 15\n\n## DES-session: Design\nClock policy\n"
+        );
+        fs::write(
+            open_dir.join("codefire.links.yaml"),
+            "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
+        )
+        .unwrap();
+        let scan = run_scan(&open_dir).unwrap();
+        assert!(scan
+            .open_fires
+            .iter()
+            .any(|fire| fire.reason == "merge_changed"));
+        let status = read_status(&open_dir).unwrap();
+        assert_eq!(status.state, "open-burning");
+        let active_state_path = PathBuf::from(
+            required_string(
+                &read_json(&opened_registry_path(&repo_root, "main")).unwrap(),
+                &["open", "active_state_path"],
+            )
+            .unwrap(),
+        );
+        let state = read_json(&active_state_path.join("state.json")).unwrap();
+        let expected_parent = required_string(
+            &load_branch_record(&repo_root, "feature-session").unwrap(),
+            &["head"],
+        )
+        .unwrap();
+        assert_eq!(
+            state.get("pending_merge_parent").and_then(Value::as_str),
+            Some(expected_parent.as_str())
+        );
+    }
+
+    #[test]
+    fn merge_branch_writes_conflict_markers_for_divergent_changes() {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+        let open_dir = temp.path().join("main-open");
+        init_repo(&repo_root, false).unwrap();
+        let objects = repo_root.join(".codefire").join("objects");
+        let base_commit =
+            write_file_commit(&objects, "src/session.py", "def ttl():\n    return 30\n");
+        let target_commit = write_file_commit_with_parents(
+            &objects,
+            "src/session.py",
+            "def ttl():\n    return 45\n",
+            vec![base_commit.clone()],
+        );
+        let source_commit = write_file_commit_with_parents(
+            &objects,
+            "src/session.py",
+            "def ttl():\n    return 15\n",
+            vec![base_commit],
+        );
+        save_branch_record(
+            &repo_root,
+            &json!({
+                "type": "branch",
+                "version": 1,
+                "name": "main",
+                "head": target_commit,
+                "state": "closed",
+                "created_at": "2026-06-04T00:00:00Z"
+            }),
+        )
+        .unwrap();
+        save_branch_record(
+            &repo_root,
+            &json!({
+                "type": "branch",
+                "version": 1,
+                "name": "feature-session",
+                "head": source_commit,
+                "state": "closed",
+                "created_at": "2026-06-04T00:00:00Z"
+            }),
+        )
+        .unwrap();
+        open_branch_from(
+            &repo_root,
+            &OpenOptions {
+                branch: "main".to_string(),
+                path: open_dir.clone(),
+            },
+        )
+        .unwrap();
+
+        let result = merge_branch(
+            &repo_root,
+            &MergeOptions {
+                source_branch: "feature-session".to_string(),
+                target_branch: "main".to_string(),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(result.conflicts, vec!["src/session.py".to_string()]);
+        let content = fs::read_to_string(open_dir.join("src").join("session.py")).unwrap();
+        assert!(content.contains("<<<<<<< target"));
+        assert!(content.contains("return 45"));
+        assert!(content.contains("return 15"));
+        assert!(content.contains(">>>>>>> source"));
+    }
+
+    #[test]
     fn status_reads_python_compatible_open_directory() {
         let temp = tempdir().unwrap();
         let repo_root = temp.path();
@@ -1886,6 +2654,15 @@ mod tests {
     }
 
     fn write_file_commit(objects: &Path, path: &str, contents: &str) -> String {
+        write_file_commit_with_parents(objects, path, contents, vec![])
+    }
+
+    fn write_file_commit_with_parents(
+        objects: &Path,
+        path: &str,
+        contents: &str,
+        parents: Vec<String>,
+    ) -> String {
         let blob = codefire_store::store_object(
             objects,
             "blob",
@@ -1912,7 +2689,7 @@ mod tests {
         codefire_store::store_object(
             objects,
             "commit",
-            codefire_store::commit_payload(vec![], roots, consistent_certificate()),
+            codefire_store::commit_payload(parents, roots, consistent_certificate()),
         )
         .unwrap()
     }

@@ -111,6 +111,7 @@
 | 2026-06-04 | Rust Extinguish | Rust coreにResolution payloadとbasis生成を追加し、Rust CLI `extinguish` がfireを解消してresolution ledgerを更新できるようにした | `crates/codefire-core`, `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust scan/extinguish/verify temp repo smoke |
 | 2026-06-04 | Rust Verify | Rust coreにstale resolution検出を追加し、Rust CLI `verify` がresolution basisのsource/target atom、trace link、policy hash変化をblockerにできるようにした | `crates/codefire-core`, `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust stale resolution temp repo smoke |
 | 2026-06-04 | Rust Commit | Rust CLI `commit` を追加し、manifest/blob保存、sealed commit生成、branch head/open registry更新、active state resetをPython-compatibleに実行できるようにした | `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust local commit E2E; Python `doctor` / `branch list` smoke |
+| 2026-06-04 | Rust Merge | Rust CLI `clone` / `show` / `diff` / `merge` を追加し、local branch clone、sealed commit summary、manifest diff、common ancestor based 3-way merge、conflict marker、merge後の`merge_changed` fire導線を実装した | `crates/codefire-cli`, docs | `cargo fmt --check`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust local clone/show/diff/merge smoke |
 
 ## Current Decisions
 
