@@ -1,0 +1,13 @@
+[workspace]
+members = [
+    "crates/codefire-cli",
+    "crates/codefire-core",
+    "crates/codefire-store",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/TA-Robot/CodeFire"
+rust-version = "1.75"
