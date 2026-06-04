@@ -768,7 +768,36 @@ class CodeFireCliTests(unittest.TestCase):
         )
         verify = self.run_cf("verify", cwd=main, check=False)
         self.assertNotEqual(verify.returncode, 0)
+        self.assertIn("Blocking checks:", verify.stdout)
+        self.assertIn("stale resolutions", verify.stdout)
         self.assertIn("Stale resolutions: 1", verify.stdout)
+        refreshed_fire = self.run_cf(
+            "extinguish",
+            fire_id,
+            "--resolution",
+            "no-change-required",
+            "--rationale",
+            "design change was reviewed after stale resolution detection",
+            "--refresh",
+            cwd=main,
+        )
+        self.assertIn(f"refreshed {fire_id}", refreshed_fire.stdout)
+        rescan = self.run_cf("scan", cwd=main)
+        for line in rescan.stdout.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("FIRE-"):
+                new_fire_id = stripped.split()[0]
+                self.run_cf(
+                    "extinguish",
+                    new_fire_id,
+                    "--resolution",
+                    "changed",
+                    "--evidence",
+                    "reviewed newly propagated design change",
+                    cwd=main,
+                )
+        refreshed = self.run_cf("verify", cwd=main, check=False)
+        self.assertEqual(refreshed.returncode, 0, refreshed.stdout + refreshed.stderr)
 
     def test_duplicate_atom_id_blocks_verify(self):
         self.run_cf("init")
@@ -782,7 +811,37 @@ class CodeFireCliTests(unittest.TestCase):
         )
         verify = self.run_cf("verify", cwd=main, check=False)
         self.assertNotEqual(verify.returncode, 0)
+        self.assertIn("Blocking checks:", verify.stdout)
+        self.assertIn("duplicate atom ids", verify.stdout)
         self.assertIn("Duplicate atom ids: 1", verify.stdout)
+
+    def test_python_methods_include_class_owner_in_derived_atom_id(self):
+        self.run_cf("init")
+        main = self.tmp / "main"
+        self.run_cf("open", "main", str(main))
+        (main / "src").mkdir(parents=True)
+        (main / "src/planners.py").write_text(
+            "class StaticPlanner:\n"
+            "    def propose(self):\n"
+            "        return []\n\n"
+            "class CodexPlanner:\n"
+            "    def propose(self):\n"
+            "        return []\n",
+            encoding="utf-8",
+        )
+        (main / "codefire.yaml").write_text(
+            "version: 1\n"
+            "artifacts:\n"
+            "  code:\n"
+            "    - path: src/**/*.py\n"
+            "      kind: python_code\n",
+            encoding="utf-8",
+        )
+        scan = self.run_cf("scan", cwd=main)
+        self.assertIn("CODE:src/planners.py::method:StaticPlanner.propose", scan.stdout)
+        self.assertIn("CODE:src/planners.py::method:CodexPlanner.propose", scan.stdout)
+        verify = self.run_cf("verify", cwd=main, check=False)
+        self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
 
     def test_policy_required_links_can_be_customized(self):
         self.run_cf("init")

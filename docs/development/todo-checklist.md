@@ -156,6 +156,9 @@
 | CF-151 | Remote | commit署名key rotation policyを実装する | CF-150 | done | `test_remote_commit_signature_key_rotation_policy` |
 | CF-152 | Remote | mutating remote operationのHMAC request署名を実装する | CF-135, CF-149 | done | `test_remote_request_signatures_gate_mutating_operations`, `test_http_remote_request_signature_required_on_upload` |
 | CF-153 | Remote | HMAC request署名のnonce replay cacheを実装する | CF-152 | done | `test_http_remote_request_signature_rejects_replayed_nonce` |
+| CF-160 | Extinguish | stale resolutionを通常CLIで再解消できる復旧導線を実装する | CF-073 | done | CFB-001; `test_stale_resolution_blocks_verify` |
+| CF-161 | Indexer | Python method派生IDにclass ownerを含める | CF-042 | done | CFB-002; `test_python_methods_include_class_owner_in_derived_atom_id` |
+| CF-162 | Verify | verify出力をblocking/non-blocking diagnosticsに分ける | CF-081 | done | CFB-003; verify failure tests |
 
 ## Immediate Next Actions
 

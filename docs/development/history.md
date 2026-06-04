@@ -89,6 +89,8 @@
 | 2026-06-04 | Indexer | Swift type/function/methodを `CODE-*` Atomとして抽出するようにした | `codefire`, `tests/test_codefire_cli.py`, docs | 84 tests pass; `./demo.sh` |
 | 2026-06-04 | Indexer | C/C++ type/function/methodを `CODE-*` Atomとして抽出するようにした | `codefire`, `tests/test_codefire_cli.py`, docs | 85 tests pass; `./demo.sh` |
 | 2026-06-04 | Release | completion planと既知制約をv0.2実装済み範囲に合わせて更新した | `README.md`, docs | TODO全件done、85 tests pass; `./demo.sh` |
+| 2026-06-04 | Dogfood | CodeFire実運用で見つかったstale resolution復旧UX、Python method派生ID重複、verify診断表示の課題をbug backlog化した | `docs/development/bug-backlog.md`, docs | `algorithm-evolution-agent-lab` dogfooding |
+| 2026-06-04 | Dogfood | stale resolution refresh、Python method owner派生ID、verify blocker表示を実装した | `codefire`, `tests/test_codefire_cli.py`, docs | targeted dogfood regression tests pass |
 
 ## Current Decisions
 

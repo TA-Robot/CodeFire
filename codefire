@@ -2244,11 +2244,14 @@ def extract_markdown_atoms(path: Path, rel: Path, fallback_kind: str) -> list[di
 
 def python_blocks(lines: list[str]) -> list[tuple[int, int, str, str]]:
     blocks: list[tuple[int, int, str, str]] = []
+    class_stack: list[tuple[int, str]] = []
     for i, line in enumerate(lines):
         m = re.match(r"^(\s*)(class|def)\s+([A-Za-z_][A-Za-z0-9_]*)", line)
         if not m:
             continue
         indent = len(m.group(1))
+        while class_stack and indent <= class_stack[-1][0]:
+            class_stack.pop()
         end = len(lines)
         for j in range(i + 1, len(lines)):
             text = lines[j]
@@ -2258,7 +2261,14 @@ def python_blocks(lines: list[str]) -> list[tuple[int, int, str, str]]:
             if current_indent <= indent and not text.lstrip().startswith(("#", "@")):
                 end = j
                 break
-        blocks.append((i, end, m.group(2), m.group(3)))
+        symbol_type = m.group(2)
+        name = m.group(3)
+        if symbol_type == "class":
+            class_stack.append((indent, name))
+        elif class_stack:
+            symbol_type = "method"
+            name = f"{class_stack[-1][1]}.{name}"
+        blocks.append((i, end, symbol_type, name))
     return blocks
 
 
@@ -4922,7 +4932,7 @@ def cmd_extinguish(args: argparse.Namespace) -> int:
     fire = next((f for f in fires if f["display_id"] == args.fire_id or f["fire_uid"] == args.fire_id), None)
     if not fire:
         raise CFError(f"unknown fire: {args.fire_id}")
-    if fire["status"] != "open":
+    if fire["status"] != "open" and not args.refresh:
         raise CFError(f"fire is not open: {args.fire_id}")
     source_id = fire["source"]["atom_id"]
     target_id = fire["target"]["atom_id"]
@@ -4949,11 +4959,16 @@ def cmd_extinguish(args: argparse.Namespace) -> int:
     }
     fire["status"] = "extinguished"
     fire["resolution_uid"] = resolution["resolution_uid"]
-    save_fires(repo_root, registry, fires)
     resolutions = load_resolutions(repo_root, registry)
+    if args.refresh:
+        for existing in resolutions:
+            if existing.get("fire_uid") == fire["fire_uid"] and existing.get("status") == "active":
+                existing["status"] = "superseded"
     resolutions.append(resolution)
+    save_fires(repo_root, registry, fires)
     save_resolutions(repo_root, registry, resolutions)
-    print(f"extinguished {fire['display_id']}")
+    verb = "refreshed" if args.refresh else "extinguished"
+    print(f"{verb} {fire['display_id']}")
     return 0
 
 
@@ -4962,7 +4977,21 @@ def cmd_verify(args: argparse.Namespace) -> int:
     if result["result"] == "passed":
         print("Verification passed.")
         return 0
+    _, open_dir, _, _ = open_context(Path.cwd())
+    policy = parse_policy(open_dir)
+    blocking = []
+    if policy_enabled(policy, "require_no_required_fires") and result["open_required_fires"]:
+        blocking.append("open fires")
+    if policy_enabled(policy, "require_trace_completeness") and result["missing_required_links"]:
+        blocking.append("missing required links")
+    if policy_enabled(policy, "require_no_stale_resolutions") and result["stale_resolutions"]:
+        blocking.append("stale resolutions")
+    if policy_enabled(policy, "reject_duplicate_atom_ids") and result["duplicate_atom_ids"]:
+        blocking.append("duplicate atom ids")
+    if policy_enabled(policy, "require_verification_success") and result["failed_checks"]:
+        blocking.append("failed checks")
     print("Verification failed.")
+    print(f"Blocking checks: {', '.join(blocking) if blocking else 'none'}")
     print(f"Open fires: {result['open_required_fires']}")
     print(f"Missing required links: {len(result['missing_required_links'])}")
     print(f"Stale resolutions: {len(result['stale_resolutions'])}")
@@ -5269,7 +5298,7 @@ _codefire_complete()
       COMPREPLY=( $(compgen -W "--reason" -- "$cur") )
       ;;
     extinguish)
-      COMPREPLY=( $(compgen -W "--resolution --rationale --evidence" -- "$cur") )
+      COMPREPLY=( $(compgen -W "--resolution --rationale --evidence --refresh" -- "$cur") )
       ;;
     commit)
       COMPREPLY=( $(compgen -W "-m --message --signer --key-id" -- "$cur") )
@@ -5318,7 +5347,7 @@ _codefire()
       _arguments '--reason[fire reason]'
       ;;
     extinguish)
-      _arguments '--resolution[resolution]:resolution:(changed verified no-change-required invalid-fire)' '--rationale[rationale]' '--evidence[evidence]'
+      _arguments '--resolution[resolution]:resolution:(changed verified no-change-required invalid-fire)' '--rationale[rationale]' '--evidence[evidence]' '--refresh[refresh an extinguished fire resolution basis]'
       ;;
     commit)
       _arguments '-m[message]' '--message[message]' '--signer[commit signer]' '--key-id[commit signing key id]'
@@ -5409,6 +5438,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--resolution", required=True, choices=["changed", "verified", "no-change-required", "invalid-fire"])
     p.add_argument("--rationale")
     p.add_argument("--evidence")
+    p.add_argument("--refresh", action="store_true", help="refresh resolution basis for an already extinguished fire")
     p.set_defaults(func=cmd_extinguish)
     p = sub.add_parser("verify")
     p.set_defaults(func=cmd_verify)

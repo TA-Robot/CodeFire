@@ -145,6 +145,11 @@ extinguishが必要
 codefire extinguish FIRE-001 \
   --resolution no-change-required \
   --rationale "外部仕様は変化していない"
+
+codefire extinguish FIRE-001 \
+  --resolution changed \
+  --evidence "stale resolutionを再確認した" \
+  --refresh
 ```
 
 仕様：
@@ -152,6 +157,7 @@ codefire extinguish FIRE-001 \
 ```text
 fireを解消する
 basisとしてsource/target/link/policy hashを保存する
+`--refresh` 指定時は、すでにextinguishedのfireについて現在のbasisでresolutionを更新する
 必要なrationale/evidenceがない場合は拒否する
 ```
 

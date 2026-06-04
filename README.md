@@ -15,6 +15,7 @@ MVP CLI 実装は `project/codefire` にあります。
 - `docs/development/history.md` - 開発履歴と判断ログ
 - `docs/development/completion-plan.md` - MVP完成計画
 - `docs/development/known-limitations.md` - 既知制約とv0.3以降の課題
+- `docs/development/bug-backlog.md` - 実運用で見つかった不具合/修正候補
 
 ## 現在の実装
 

@@ -127,3 +127,11 @@ policy hash at resolution
 
 これにより、後から前提が変わった場合にstale判定できる。
 
+staleになったresolutionは、同じfireを現在の前提で再確認したうえで `--refresh` により更新できる。
+
+```bash
+codefire extinguish FIRE-002 \
+  --resolution changed \
+  --evidence "stale resolutionを再確認した" \
+  --refresh
+```

@@ -68,6 +68,8 @@
 
 ## 既知制約
 
+実運用で見つかった不具合やバグに近いUXは `docs/development/bug-backlog.md` に分離して管理する。
+
 ### Config YAML subset
 
 現在は標準ライブラリのみで動かすため、`codefire.yaml`, `codefire.links.yaml`, `codefire.policy.yaml` はMVPに必要な形だけを読む限定YAML subsetとして処理している。
@@ -167,6 +169,8 @@ Atom抽出はMVP対象に限定している。
 - 明示IDがないC/C++ type/function/methodの派生ID
 
 DB schema parserは主要DDLのAtom抽出に対応しているが、dialect固有の全DDL、複雑なblock構文、各DDL内部要素の細分化までは未実装。Go/Java/C#/Rust/Kotlin/PHP/Ruby/Swift/C/C++以外の追加言語の詳細抽出も未実装。
+
+Python extractorはclass methodの派生IDにclass ownerを含める。より複雑なdecorator、dynamic class生成、入れ子class、metaprogrammingの完全解析は対象外である。
 
 ### Merge Semantics
 

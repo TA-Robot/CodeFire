@@ -342,6 +342,8 @@ repository / remote project の診断:
 - slash入りbranch名は使える。内部の `.codefire/branches/` と `.codefire/opened/` ではURLエンコードしたファイル名で保存される。
 - remote URLでslash入りbranch名を指す場合は `cf://.../feature%2Fsession` のようにbranch部分をURLエンコードする。
 - `commit blocked`: `codefire verify` の出力で open fire、missing link、stale resolution、duplicate Atom ID、failed check を確認する。
+- `Blocking checks:`: `codefire verify` がpolicy上commit blockerとして扱っている項目だけを列挙する。件数表示にはnon-blocking diagnosticsも含まれる。
+- `Stale resolutions: N`: 過去のfire解消後にsource/target/link/policyが変わっている。再確認済みなら `codefire extinguish FIRE-xxx --resolution changed --evidence ... --refresh` でresolution basisを更新する。
 - `cannot clone/merge from branch ... open-burning`: source branchをcommitするかdiscardして、sealed headが確定してから再実行する。
 - `sealed commit validation failed`: `codefire doctor` でbranch headやobject storeの不正を確認する。`branch list` / `list` / `open` / `clone` / `merge` / `show` / `diff` / `status` / `scan` / `fire` / `extinguish` / `verify` / `commit` / `request-list` / `request-review` / `request-apply` は壊れた履歴を通常操作や表示へ広げない。
 - `open registry current_base_commit is invalid` / `open branch head is invalid`: 既に開いている作業ディレクトリのregistryまたはbranch headが破損している。`codefire doctor` で診断し、必要なら正しいsealed commitから開き直す。
