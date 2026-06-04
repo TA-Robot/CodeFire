@@ -190,6 +190,7 @@ Current Rust operation plan coverage:
 ```text
 commit --dry-run --json
 extinguish --dry-run --json
+extinguish --batch <file> --dry-run --json
 open --dry-run --json
 clone --dry-run --json
 upload --dry-run --json

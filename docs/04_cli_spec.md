@@ -168,6 +168,8 @@ codefire extinguish FIRE-001 \
   --resolution addressed \
   --rationale "修正済み" \
   --dry-run --json
+
+codefire extinguish --batch .codefire/fires-to-extinguish.yaml --dry-run --json
 ```
 
 仕様：
@@ -178,6 +180,17 @@ basisとしてsource/target/link/policy hashを保存する
 `--refresh` 指定時は、すでにextinguishedのfireについて現在のbasisでresolutionを更新する
 必要なrationale/evidenceがない場合は拒否する
 --dry-runはfire/resolution ledgerを書き換えず、codefire_operation_planを返す
+--batchはversion/defaults/firesだけを持つstrict limited YAMLまたは同等JSONを受け取る
+--batchは全fire itemを事前検証し、unknown fire、重複fire id、必須rationale/evidence不足があればledgerを書き換えない
+--batch --dry-run --jsonはcommand=extinguish-batchのcodefire_operation_planを返し、全itemの単発extinguish validation planをitemsに含める
+--batchのYAML schema:
+version: 1
+defaults:
+  resolution: addressed
+  evidence: "cargo test --workspace: passed"
+fires:
+  - id: FIRE-001
+    rationale: "REQ/DES linkを確認した"
 ```
 
 ## 4.9 `verify`

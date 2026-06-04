@@ -9,6 +9,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod automation;
+mod batch;
 mod context;
 mod exit_code;
 mod http;
@@ -19,6 +20,7 @@ use automation::{
     status_data_json, status_next_actions, verification_data_json, verification_diagnostics_json,
     verification_next_actions,
 };
+use batch::{has_batch_extinguish_arg, parse_extinguish_batch_args, run_extinguish_batch};
 use context::{build_context_pack, parse_context_args, print_context_summary};
 use exit_code::{
     core_error_exit_code, store_error_exit_code, usage_exit_code, verification_exit_code, ExitCode,
@@ -145,30 +147,45 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             }
         }
         Some("extinguish") => {
-            let options = parse_extinguish_args(&args[1..])?;
-            let result = run_extinguish(&options)?;
-            if options.json_output {
-                println!("{}", serde_json::to_string_pretty(&result.plan)?);
-            } else if options.dry_run {
-                println!(
-                    "extinguish dry-run: {} would be {}",
-                    result.display_id,
-                    if options.refresh {
-                        "refreshed"
-                    } else {
-                        "extinguished"
-                    }
-                );
+            if has_batch_extinguish_arg(&args[1..]) {
+                let options = parse_extinguish_batch_args(&args[1..])?;
+                let result = run_extinguish_batch(&options)?;
+                if options.json_output {
+                    println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                } else if options.dry_run {
+                    println!(
+                        "extinguish batch dry-run: {} fires would be processed",
+                        result.item_count
+                    );
+                } else {
+                    println!("extinguished {} fires", result.item_count);
+                }
             } else {
-                println!(
-                    "{} {}",
-                    if options.refresh {
-                        "refreshed"
-                    } else {
-                        "extinguished"
-                    },
-                    result.display_id
-                );
+                let options = parse_extinguish_args(&args[1..])?;
+                let result = run_extinguish(&options)?;
+                if options.json_output {
+                    println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                } else if options.dry_run {
+                    println!(
+                        "extinguish dry-run: {} would be {}",
+                        result.display_id,
+                        if options.refresh {
+                            "refreshed"
+                        } else {
+                            "extinguished"
+                        }
+                    );
+                } else {
+                    println!(
+                        "{} {}",
+                        if options.refresh {
+                            "refreshed"
+                        } else {
+                            "extinguished"
+                        },
+                        result.display_id
+                    );
+                }
             }
             Ok(())
         }

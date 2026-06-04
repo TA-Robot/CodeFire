@@ -753,6 +753,103 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
 }
 
 #[test]
+fn extinguish_batch_validates_all_items_before_writing_ledgers() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    let batch_path = temp.path().join("fires.yaml");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design").join("session.md"),
+        "## DES-session: Design\nClock policy\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("codefire.links.yaml"),
+        "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
+    )
+    .unwrap();
+    fs::write(
+        &batch_path,
+        r#"version: 1
+defaults:
+  resolution: addressed
+  evidence: "cargo test --workspace: passed"
+fires:
+  - id: FIRE-001
+    rationale: "REQ to DES reviewed"
+  - id: FIRE-002
+    rationale: "DES to REQ reviewed"
+"#,
+    )
+    .unwrap();
+
+    let parsed = parse_extinguish_batch_args(&[
+        "--batch".to_string(),
+        batch_path.display().to_string(),
+        "--path".to_string(),
+        open_dir.display().to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(parsed.batch_path, batch_path);
+    assert_eq!(parsed.path, open_dir);
+    assert!(parsed.dry_run);
+    assert!(parsed.json_output);
+
+    let dry_run = run_extinguish_batch(&parsed).unwrap();
+    let active = active_state_path(&open_dir);
+    assert_eq!(dry_run.item_count, 2);
+    assert_eq!(dry_run.plan["type"], "codefire_operation_plan");
+    assert_eq!(dry_run.plan["command"], "extinguish-batch");
+    assert_eq!(dry_run.plan["dry_run"], true);
+    assert!(!active.join("fires.json").exists());
+    assert!(!active.join("resolutions.json").exists());
+
+    let applied = run_extinguish_batch(&batch::BatchExtinguishOptions {
+        path: open_dir.clone(),
+        batch_path: parsed.batch_path,
+        dry_run: false,
+        json_output: false,
+    })
+    .unwrap();
+    assert_eq!(applied.item_count, 2);
+    let fires: Vec<codefire_core::Fire> =
+        serde_json::from_value(read_json(&active.join("fires.json")).unwrap()).unwrap();
+    let resolutions: Vec<codefire_core::Resolution> =
+        serde_json::from_value(read_json(&active.join("resolutions.json")).unwrap()).unwrap();
+    assert_eq!(
+        fires
+            .iter()
+            .filter(|fire| fire.status == "extinguished")
+            .count(),
+        2
+    );
+    assert_eq!(resolutions.len(), 2);
+}
+
+#[test]
 fn parse_review_pack_args_accepts_base_output_and_algorithm() {
     let args = vec![
         "feature-session".to_string(),
