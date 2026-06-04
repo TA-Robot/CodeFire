@@ -88,13 +88,6 @@ pub(crate) struct CfProjectUrl {
     pub(crate) project_root: PathBuf,
 }
 
-#[derive(Debug)]
-pub(crate) struct ResolvedCommitish {
-    pub(crate) objects: PathBuf,
-    pub(crate) commit_id: String,
-    pub(crate) label: String,
-}
-
 pub(crate) fn upload_branch(
     start: &Path,
     options: &UploadOptions,
