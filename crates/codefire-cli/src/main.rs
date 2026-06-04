@@ -1,8 +1,10 @@
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::env;
 use std::fmt;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() {
     if let Err(error) = run(env::args().skip(1).collect()) {
@@ -13,6 +15,16 @@ fn main() {
 
 fn run(args: Vec<String>) -> Result<(), CliError> {
     match args.first().map(String::as_str) {
+        Some("init") => {
+            let options = parse_init_args(&args[1..])?;
+            let result = init_repo(&options.path, options.force)?;
+            println!(
+                "initialized CodeFire repository: {}",
+                result.repo_root.display()
+            );
+            println!("main: {}", result.main_commit);
+            Ok(())
+        }
         Some("branch") => match args.get(1).map(String::as_str) {
             Some("list") => {
                 let start = args
@@ -115,6 +127,18 @@ struct Branch {
     state: String,
 }
 
+#[derive(Debug)]
+struct InitOptions {
+    path: PathBuf,
+    force: bool,
+}
+
+#[derive(Debug)]
+struct InitResult {
+    repo_root: PathBuf,
+    main_commit: String,
+}
+
 fn print_status(status: &Status) {
     println!("Branch: {}", status.branch);
     println!("State: {}", status.state);
@@ -126,6 +150,204 @@ fn print_branches(branches: &[Branch]) {
     for branch in branches {
         println!("{}\t{}\t{}", branch.name, branch.head, branch.state);
     }
+}
+
+fn parse_init_args(args: &[String]) -> Result<InitOptions, CliError> {
+    let mut path = None;
+    let mut force = false;
+    for arg in args {
+        if arg == "--force" {
+            force = true;
+        } else if path.is_none() {
+            path = Some(PathBuf::from(arg));
+        } else {
+            return Err(CliError::Usage(format!("unexpected init argument: {arg}")));
+        }
+    }
+    Ok(InitOptions {
+        path: path.unwrap_or_else(|| PathBuf::from(".")),
+        force,
+    })
+}
+
+fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
+    let repo_root = absolute_path(path)?;
+    let cf = repo_root.join(".codefire");
+    if cf.exists() && !force {
+        return Err(CliError::Usage(".codefire already exists".to_string()));
+    }
+
+    ensure_repo_layout(&repo_root)?;
+    let now = now_iso_utc();
+    write_json_atomic(
+        &cf.join("repo.json"),
+        &json!({
+            "version": 1,
+            "repository_id": stable_repo_id(&repo_root),
+            "created_at": now,
+        }),
+    )?;
+
+    let objects = cf.join("objects");
+    let roots = initial_roots(&objects, &now)?;
+    let commit_payload = json!({
+        "type": "commit",
+        "version": 1,
+        "parents": [],
+        "message": "Initial empty CodeFire repository",
+        "roots": roots,
+        "certificate": {
+            "result": "consistent",
+            "open_required_fires": 0,
+            "failed_checks": 0,
+            "missing_required_links": 0,
+            "stale_resolutions": 0,
+            "duplicate_atom_ids": 0,
+        },
+        "changed_atoms": [],
+        "extinguished_fires": [],
+        "created_at": now,
+    });
+    let commit_id = codefire_store::store_object(&objects, "commit", commit_payload)?;
+    let branch = json!({
+        "type": "branch",
+        "version": 1,
+        "name": "main",
+        "head": commit_id,
+        "state": "closed",
+        "created_at": now,
+    });
+    write_json_atomic(
+        &cf.join("branches")
+            .join(format!("{}.json", ref_file_name("main"))),
+        &branch,
+    )?;
+    codefire_store::store_object(&objects, "branch", branch)?;
+
+    Ok(InitResult {
+        repo_root,
+        main_commit: commit_id,
+    })
+}
+
+fn initial_roots(objects: &Path, now: &str) -> Result<Value, CliError> {
+    let content_manifest = codefire_store::store_object(
+        objects,
+        "content_manifest",
+        json!({"type": "content_manifest", "version": 1, "entries": []}),
+    )?;
+    let atom_index = codefire_store::store_object(
+        objects,
+        "atom_index",
+        json!({"type": "atom_index", "version": 1, "atoms": [], "duplicate_atom_ids": []}),
+    )?;
+    let trace_graph = codefire_store::store_object(
+        objects,
+        "trace_graph",
+        json!({"type": "trace_graph", "version": 1, "links": []}),
+    )?;
+    let fire_delta = codefire_store::store_object(
+        objects,
+        "fire_ledger",
+        json!({"type": "fire_ledger", "version": 1, "fires": []}),
+    )?;
+    let verification = codefire_store::store_object(
+        objects,
+        "verification",
+        json!({
+            "type": "verification",
+            "version": 1,
+            "result": "passed",
+            "open_required_fires": 0,
+            "failed_checks": [],
+            "missing_required_links": [],
+            "stale_resolutions": [],
+            "duplicate_atom_ids": [],
+            "verified_at": now,
+        }),
+    )?;
+    let policy = codefire_store::store_object(
+        objects,
+        "policy",
+        json!({"type": "policy", "version": 1, "policy": {}}),
+    )?;
+    Ok(json!({
+        "content_manifest": content_manifest,
+        "atom_index": atom_index,
+        "trace_graph": trace_graph,
+        "fire_delta": fire_delta,
+        "verification": verification,
+        "policy": policy,
+    }))
+}
+
+fn ensure_repo_layout(repo_root: &Path) -> Result<(), CliError> {
+    let cf = repo_root.join(".codefire");
+    for path in [
+        cf.clone(),
+        cf.join("objects"),
+        cf.join("branches"),
+        cf.join("opened"),
+        cf.join("active"),
+        cf.join("cache"),
+        cf.join("locks"),
+        cf.join("remotes"),
+    ] {
+        fs::create_dir_all(path)?;
+    }
+    for subdir in [
+        "blobs",
+        "content_manifests",
+        "atom_indexes",
+        "trace_graphs",
+        "fire_ledgers",
+        "resolution_ledgers",
+        "verifications",
+        "policies",
+        "commits",
+        "branches",
+    ] {
+        fs::create_dir_all(cf.join("objects").join(subdir))?;
+    }
+    Ok(())
+}
+
+fn absolute_path(path: &Path) -> Result<PathBuf, CliError> {
+    if path.is_absolute() {
+        Ok(path.to_path_buf())
+    } else {
+        Ok(env::current_dir()?.join(path))
+    }
+}
+
+fn stable_repo_id(repo_root: &Path) -> String {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in repo_root.to_string_lossy().as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("repo_{:012x}", hash & 0x0000_ffff_ffff_ffff)
+}
+
+fn write_json_atomic(path: &Path, value: &Value) -> Result<(), CliError> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| CliError::Usage(format!("path has no parent: {}", path.display())))?;
+    fs::create_dir_all(parent)?;
+    let temp_path = path.with_extension(format!(
+        "{}tmp",
+        path.extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| format!("{extension}."))
+            .unwrap_or_default()
+    ));
+    {
+        let mut file = fs::File::create(&temp_path)?;
+        file.write_all(serde_json::to_string_pretty(value)?.as_bytes())?;
+        file.write_all(b"\n")?;
+    }
+    fs::rename(temp_path, path)?;
+    Ok(())
 }
 
 fn read_status(start: &Path) -> Result<Status, CliError> {
@@ -289,11 +511,67 @@ fn ref_file_name(name: &str) -> String {
     encoded
 }
 
+fn now_iso_utc() -> String {
+    let seconds = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or(0);
+    format_unix_seconds_utc(seconds)
+}
+
+fn format_unix_seconds_utc(seconds: i64) -> String {
+    let days = seconds.div_euclid(86_400);
+    let second_of_day = seconds.rem_euclid(86_400);
+    let (year, month, day) = civil_from_days(days);
+    let hour = second_of_day / 3_600;
+    let minute = second_of_day % 3_600 / 60;
+    let second = second_of_day % 60;
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
+}
+
+fn civil_from_days(days_since_unix_epoch: i64) -> (i32, u32, u32) {
+    let days = days_since_unix_epoch + 719_468;
+    let era = if days >= 0 { days } else { days - 146_096 }.div_euclid(146_097);
+    let day_of_era = days - era * 146_097;
+    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524
+        - day_of_era / 146_096)
+        .div_euclid(365);
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_part = (5 * day_of_year + 2).div_euclid(153);
+    let day = day_of_year - (153 * month_part + 2).div_euclid(5) + 1;
+    let month = month_part + if month_part < 10 { 3 } else { -9 };
+    let adjusted_year = year + if month <= 2 { 1 } else { 0 };
+    (adjusted_year as i32, month as u32, day as u32)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::{json, Map};
     use tempfile::tempdir;
+
+    #[test]
+    fn init_creates_python_compatible_repo_layout() {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+
+        let result = init_repo(&repo_root, false).unwrap();
+        let branches = list_branches(&repo_root).unwrap();
+
+        assert_eq!(result.repo_root, repo_root);
+        assert_eq!(branches.len(), 1);
+        assert_eq!(branches[0].name, "main");
+        assert_eq!(branches[0].head, result.main_commit);
+        assert_eq!(branches[0].state, "closed");
+        codefire_store::validate_sealed_commit(
+            &repo_root.join(".codefire").join("objects"),
+            &result.main_commit,
+        )
+        .unwrap();
+        assert!(init_repo(&repo_root, false).is_err());
+        init_repo(&repo_root, true).unwrap();
+    }
 
     #[test]
     fn status_reads_python_compatible_open_directory() {
@@ -416,6 +694,12 @@ mod tests {
             ref_file_name("feature/a b%雪"),
             "feature%2Fa%20b%25%E9%9B%AA"
         );
+    }
+
+    #[test]
+    fn unix_timestamp_format_uses_utc_iso_seconds() {
+        assert_eq!(format_unix_seconds_utc(0), "1970-01-01T00:00:00Z");
+        assert_eq!(format_unix_seconds_utc(951_782_400), "2000-02-29T00:00:00Z");
     }
 
     fn write_valid_commit(objects: &Path) -> String {

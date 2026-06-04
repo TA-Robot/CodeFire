@@ -171,6 +171,7 @@
 | CF-203 | Rust Repo | init/open/status/branch registry互換をRustで実装する | CF-202 | todo | v0.3 exit |
 | CF-203A | Rust Repo | Python-created open directoryのread-only `status` 互換をRustで実装する | CF-202 | done | `codefire-rs status` fixture; real repo smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-203B | Rust Repo | Python-created branch registryのread-only `branch list` 互換をRustで実装する | CF-203A | done | branch fixture with marker repo discovery; real repo smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
+| CF-203C | Rust Repo | Python-compatible `init` をRustで実装し、初期sealed commitとmain branchを生成する | CF-203B | done | Rust init unit test; Python `doctor`/`branch list` smoke; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |
 | CF-204 | Rust Index | Markdownと明示 `cf-atom` extractorをRustで実装する | CF-203 | todo | v0.4 local parity |
 | CF-205 | Rust Trace | links parser、trace graph、required link policyをRustで実装する | CF-204 | todo | v0.4 local parity |
 | CF-206 | Rust Fire | scan、changed atom detection、fire ledgerをRustで実装する | CF-205 | todo | v0.4 local parity |

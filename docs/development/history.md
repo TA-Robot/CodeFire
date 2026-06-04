@@ -102,6 +102,7 @@
 | 2026-06-04 | Rust Store | Rust版sealed commit validationを追加し、parent履歴、required roots、root type、certificateを検証できるようにした | `crates/codefire-store` | 10 Rust tests pass; `cargo clippy --workspace --all-targets -- -D warnings` |
 | 2026-06-04 | Rust Repo | Rust CLIのread-only `status` を追加し、Python-created open directoryのmarker、open registry、active fire ledger、sealed base commitを読めるようにした | `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `/workspace/algorithm-evolution-agent-lab/main` smoke |
 | 2026-06-04 | Rust Repo | Rust CLIのread-only `branch list` を追加し、Python-created branch registryをsealed head検証付きで読めるようにした | `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `/workspace/algorithm-evolution-agent-lab/main` smoke |
+| 2026-06-04 | Rust Repo | Rust CLIの `init` を追加し、Python-compatibleな初期object graph、sealed commit、main branchを生成できるようにした | `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Python `doctor` / `branch list` smoke |
 
 ## Current Decisions
 
