@@ -17,6 +17,10 @@
 | CFB-002 | fixed | Python Atom extraction | Python methodの派生Atom IDがownerなしの `CODE:path::def:<method>` になり、異なるclassの同名methodでduplicate Atom IDになる | `CodexPlanner.propose` と `StaticPlanner.propose` を同一fileに置いたとき | 正当なPython設計でもduplicate Atom IDでverify/commitが止まる | 明示 `# cf-atom:` でも回避可能 | Python extractorでclass ownerを追跡し、method派生IDを `method:Class.method` にした |
 | CFB-003 | fixed | Diagnostics | `verify` は `Missing required links` の件数を表示するが、`commit_policy.require_trace_completeness: false` の場合でも失敗原因に見えやすい | 仕様先行フェーズでtrace completenessを緩和した状態 | 実際のblockerがstale/duplicateでも、missing linkが主原因に見える | `Blocking checks:` 行を見る | verify出力にpolicy上のblockerだけを列挙する `Blocking checks:` を追加した |
 | CFB-004 | fixed | Diagnostics | `verify` の失敗件数から対象Atomやstale resolutionを直接確認できない | duplicate Atom IDやmissing linkの原因を調査するとき | active JSONやscan結果を読まないと次の操作対象を特定しづらい | `.codefire-open/state/active_verify.json` を読む | `codefire verify --details` で失敗diagnosticの代表例を表示する |
+| CFB-005 | open | UX / Extinguish | fire解消時の `--rationale` / `--evidence` 入力が長く、dogfooding中の人間操作コストが高い | `algorithm-evolution-agent-lab` で複数fireを解消しながらCodeFire commitしたとき | CodeFire処理時間より説明文入力の負担が支配的になり、連続作業の速度を落とす | shell historyや手書きテンプレートを使う | `codefire extinguish --interactive`、複数fire一括解消、直近テスト結果の自動evidence添付を検討する |
+| CFB-006 | open | UX / Trace completeness | 仕様先行フェーズでmissing required linksが多く、実際のblocker確認時にノイズになる | `algorithm-evolution-agent-lab` で `require_trace_completeness: false` の状態で `verify --details` を使ったとき | open fireは0でもmissing link詳細が大量に出て、次に見るべき問題の優先度が分かりにくい | `Blocking checks:` を見る | `verify --details --blocking-only` またはnon-blocking diagnosticsの折りたたみ/優先度表示を追加する |
+| CFB-007 | open | Performance / Observability | `status` / `scan` / `verify` の速度は現規模では軽いが、継続的に測るCLIがない | `algorithm-evolution-agent-lab` 現規模で `status` 約0.4s、`scan` 約0.45s、`verify --details` 約1.2sを手動計測したとき | repo拡大時に遅くなっても、どの処理がボトルネックか追跡しづらい | shellの `time` で手動測定する | `codefire doctor --metrics` または `codefire perf` でAtom数、object数、各phase時間を出す |
+| CFB-008 | open | Storage / Artifacts | sealed object storeは小規模では軽いが、ML実験artifactを入れると肥大化し得る | `algorithm-evolution-agent-lab` で `.codefire` 約2.1MB、objects約2.0MB、198 filesを確認したとき | 大きいmetrics/log/model artifactをCodeFire objectに直接入れる運用だとrepositoryが急増する | 重いartifactは外部パスや要約メタデータだけ管理する | artifact retention policy、object store size report、large artifact warning、external artifact reference仕様を追加する |
 
 ## Triage Notes
 
@@ -24,3 +28,4 @@
 - CFB-002は `test_python_methods_include_class_owner_in_derived_atom_id` で同名methodの派生ID衝突回避を確認する。
 - CFB-003は既存verify失敗系テストで `Blocking checks:` を確認する。
 - CFB-004は `test_verify_details_reports_missing_required_links` とduplicate Atom ID詳細表示で確認する。
+- CFB-005からCFB-008は、`algorithm-evolution-agent-lab` dogfoodingでの使いやすさ、速度、記憶領域観察から登録した改善issue。

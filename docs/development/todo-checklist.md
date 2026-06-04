@@ -160,9 +160,14 @@
 | CF-161 | Indexer | Python method派生IDにclass ownerを含める | CF-042 | done | CFB-002; `test_python_methods_include_class_owner_in_derived_atom_id` |
 | CF-162 | Verify | verify出力をblocking/non-blocking diagnosticsに分ける | CF-081 | done | CFB-003; verify failure tests |
 | CF-163 | Verify | verify失敗時の対象詳細をCLIで確認できるようにする | CF-162 | done | CFB-004; `test_verify_details_reports_missing_required_links` |
+| CF-164 | UX | fire解消のinteractive / batch UXを設計する | CF-163 | todo | CFB-005 |
+| CF-165 | Verify | `verify --details` でblocking-only表示またはnon-blocking折りたたみを実装する | CF-163 | todo | CFB-006 |
+| CF-166 | Observability | `status` / `scan` / `verify` のphase別時間とAtom/object数を表示するmetrics導線を追加する | CF-163 | todo | CFB-007 |
+| CF-167 | Storage | object store size report、large artifact warning、external artifact reference方針を実装/文書化する | CF-166 | todo | CFB-008 |
 
 ## Immediate Next Actions
 
-1. OS-level sandbox / process isolationの方針を決める。
-2. YAML parser とobject ID仕様の厳密化方針を決める。
-3. 単一ファイルCLIからmodule構成へ移行するか判断する。
+1. CFB-005/006のUX改善を先に実装し、dogfooding中の操作コストと診断ノイズを下げる。
+2. OS-level sandbox / process isolationの方針を決める。
+3. YAML parser とobject ID仕様の厳密化方針を決める。
+4. 単一ファイルCLIからmodule構成へ移行するか判断する。

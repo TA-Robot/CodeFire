@@ -92,6 +92,7 @@
 | 2026-06-04 | Dogfood | CodeFire実運用で見つかったstale resolution復旧UX、Python method派生ID重複、verify診断表示の課題をbug backlog化した | `docs/development/bug-backlog.md`, docs | `algorithm-evolution-agent-lab` dogfooding |
 | 2026-06-04 | Dogfood | stale resolution refresh、Python method owner派生ID、verify blocker表示を実装した | `codefire`, `tests/test_codefire_cli.py`, docs | targeted dogfood regression tests pass |
 | 2026-06-04 | Diagnostics | `codefire verify --details` を追加し、missing link、stale resolution、duplicate Atom ID、failed checkの対象をCLI上で確認できるようにした | `codefire`, `tests/test_codefire_cli.py`, docs | 87 tests pass; `./demo.sh`; install smoke |
+| 2026-06-04 | Dogfood | CodeFireの使いやすさ、診断ノイズ、性能可観測性、object store肥大化リスクをissue化した | `docs/development/bug-backlog.md`, `docs/development/todo-checklist.md` | CFB-005..CFB-008 |
 
 ## Current Decisions
 
@@ -105,6 +106,7 @@
 - 限定Atom extractorをどこまで各言語の完全な構文解析へ近づけるか。
 - OS-level sandbox / process isolationをどう設計するか。
 - canonical JSON の仕様を RFC 8785 準拠に寄せるか、CodeFire独自の最小仕様にするか。
+- fire解消UX、non-blocking diagnostics表示、performance metrics、large artifact retentionをどの順で実装するか。
 
 ## Change Template
 
