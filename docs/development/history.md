@@ -93,13 +93,14 @@
 | 2026-06-04 | Dogfood | stale resolution refresh、Python method owner派生ID、verify blocker表示を実装した | `codefire`, `tests/test_codefire_cli.py`, docs | targeted dogfood regression tests pass |
 | 2026-06-04 | Diagnostics | `codefire verify --details` を追加し、missing link、stale resolution、duplicate Atom ID、failed checkの対象をCLI上で確認できるようにした | `codefire`, `tests/test_codefire_cli.py`, docs | 87 tests pass; `./demo.sh`; install smoke |
 | 2026-06-04 | Dogfood | CodeFireの使いやすさ、診断ノイズ、性能可観測性、object store肥大化リスクをissue化した | `docs/development/bug-backlog.md`, `docs/development/todo-checklist.md` | CFB-005..CFB-008 |
+| 2026-06-04 | Planning | v0.6 Rust rewrite計画を追加し、高機能化テーマ、crate構成、migration sequence、CF-200..CF-217を定義した | `docs/development/v0.6-rust-rewrite-plan.md`, `docs/development/todo-checklist.md` | Rust rewrite planning |
 
 ## Current Decisions
 
 - v0.2は local repository / local branch / open-close-clone / scan / fire / extinguish / verify / commit / merge / file-backed remote / merge request review/apply / remote GC / HTTP upload-list-clone / HTTP show-diff / HTTP merge request review/apply / HTTP doctor-gc / HTTPS transport / server verification cwd-env-timeout restrictions / hashed token storage / HMAC commit signatures / key rotation policy / HMAC request signatures / nonce replay cache までを実装範囲にする。
 - AI連携、GUI、semantic merge、hosted server isolationはv0.2対象外にする。多言語Atom抽出は標準ライブラリの限定パーサで扱う。
 - `examples/` はこの devcontainer 基盤リポジトリには展開しない。必要なら CodeFire 実装用の別 repository または `project/` 内の明示的な target workspace で扱う。
-- 当面の実装言語はPython標準ライブラリのみ。Rust workspace構成案は将来の再構成候補として残す。
+- v0.6ではRust実装をdefault CLIへ移行する計画とし、Python版はreference implementation / fallbackとして残す。
 
 ## Open Questions
 
@@ -107,6 +108,7 @@
 - OS-level sandbox / process isolationをどう設計するか。
 - canonical JSON の仕様を RFC 8785 準拠に寄せるか、CodeFire独自の最小仕様にするか。
 - fire解消UX、non-blocking diagnostics表示、performance metrics、large artifact retentionをどの順で実装するか。
+- Rust workspaceでtree-sitter、YAML parser、async HTTP serverをdefault依存にするかfeature flagにするか。
 
 ## Change Template
 

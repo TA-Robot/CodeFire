@@ -164,10 +164,28 @@
 | CF-165 | Verify | `verify --details` でblocking-only表示またはnon-blocking折りたたみを実装する | CF-163 | todo | CFB-006 |
 | CF-166 | Observability | `status` / `scan` / `verify` のphase別時間とAtom/object数を表示するmetrics導線を追加する | CF-163 | todo | CFB-007 |
 | CF-167 | Storage | object store size report、large artifact warning、external artifact reference方針を実装/文書化する | CF-166 | todo | CFB-008 |
+| CF-200 | Rust | v0.6 Rust rewrite workspaceとcrate境界を作成する | CF-167 | todo | `docs/development/v0.6-rust-rewrite-plan.md` |
+| CF-201 | Rust Store | canonical JSON / object IDのgolden test付きRust実装を作る | CF-200 | todo | v0.6 milestone |
+| CF-202 | Rust Store | immutable object storeとsealed commit validationをRustで実装する | CF-201 | todo | v0.6 milestone |
+| CF-203 | Rust Repo | init/open/status/branch registry互換をRustで実装する | CF-202 | todo | v0.3 exit |
+| CF-204 | Rust Index | Markdownと明示 `cf-atom` extractorをRustで実装する | CF-203 | todo | v0.4 local parity |
+| CF-205 | Rust Trace | links parser、trace graph、required link policyをRustで実装する | CF-204 | todo | v0.4 local parity |
+| CF-206 | Rust Fire | scan、changed atom detection、fire ledgerをRustで実装する | CF-205 | todo | v0.4 local parity |
+| CF-207 | Rust UX | interactive / batch extinguishをRust CLIで実装する | CF-206, CF-164 | todo | CFB-005 |
+| CF-208 | Rust Verify | verification engineとstructured diagnosticsをRustで実装する | CF-206, CF-165 | todo | CFB-006 |
+| CF-209 | Rust Commit | commit sealingとbranch head updateをRustで実装する | CF-208 | todo | v0.4 local parity |
+| CF-210 | Rust Merge | clone、show/diff、merge、merge firesをRustで実装する | CF-209 | todo | v0.4 local parity |
+| CF-211 | Rust Remote | file-backed remoteとMR flowをRustで実装する | CF-210 | todo | v0.5 remote parity |
+| CF-212 | Rust Server | HTTP/HTTPS server parityをRustで実装する | CF-211 | todo | v0.5 remote parity |
+| CF-213 | Rust Security | commit/request signaturesとkey rotation parityをRustで実装する | CF-212 | todo | v0.5 remote parity |
+| CF-214 | Rust Observability | perf/metrics outputをRustで実装する | CF-208, CF-166 | todo | CFB-007 |
+| CF-215 | Rust Storage | storage reportとexternal artifact refsをRustで実装する | CF-202, CF-167 | todo | CFB-008 |
+| CF-216 | Migration | `migrate check/dry-run` を実装する | CF-209 | todo | v0.6 migration |
+| CF-217 | Release | installerをRust binary default + Python fallbackへ切り替える | CF-216 | todo | v0.6 release |
 
 ## Immediate Next Actions
 
-1. CFB-005/006のUX改善を先に実装し、dogfooding中の操作コストと診断ノイズを下げる。
-2. OS-level sandbox / process isolationの方針を決める。
-3. YAML parser とobject ID仕様の厳密化方針を決める。
-4. 単一ファイルCLIからmodule構成へ移行するか判断する。
+1. v0.6 Rust rewriteのcrate境界とgolden compatibility testsを先に作る。
+2. CFB-005/006のUX改善をRust CLI計画へ組み込み、dogfooding中の操作コストと診断ノイズを下げる。
+3. YAML parser とobject ID仕様の互換性方針をv0.6 Rust計画で確定する。
+4. OS-level sandbox / process isolationの方針を決める。
