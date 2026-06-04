@@ -9,6 +9,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod automation;
+mod context;
 mod exit_code;
 mod http;
 mod remote;
@@ -17,6 +18,7 @@ use automation::{
     command_result_envelope, scan_data_json, scan_diagnostics_json, status_data_json,
     verification_data_json, verification_diagnostics_json,
 };
+use context::{build_context_pack, parse_context_args, print_context_summary};
 use exit_code::{
     core_error_exit_code, store_error_exit_code, usage_exit_code, verification_exit_code, ExitCode,
 };
@@ -69,6 +71,27 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 .unwrap_or(env::current_dir()?);
             let missing = codefire_core::current_required_link_missing(&start)?;
             println!("{}", serde_json::to_string_pretty(&missing)?);
+            Ok(())
+        }
+        Some("context") => {
+            let options = parse_context_args(&args[1..])?;
+            let pack = build_context_pack(&options)?;
+            if options.json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "context",
+                        true,
+                        0,
+                        Some(&pack.repo_root),
+                        pack.data,
+                        Vec::new(),
+                        Vec::new(),
+                    ))?
+                );
+            } else {
+                print_context_summary(&pack.data);
+            }
             Ok(())
         }
         Some("scan") => {

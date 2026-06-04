@@ -451,6 +451,79 @@ fn cli_error_exit_codes_follow_stable_taxonomy() {
 }
 
 #[test]
+fn context_pack_returns_atom_changed_and_fire_views() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design").join("session.md"),
+        "## DES-session: Design\nClock policy\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("codefire.links.yaml"),
+        "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
+    )
+    .unwrap();
+
+    let atom_pack = context::build_context_pack(&context::ContextOptions {
+        path: open_dir.clone(),
+        selector: context::ContextSelector::Atom("REQ-session".to_string()),
+        depth: 1,
+        json_output: true,
+    })
+    .unwrap();
+    assert_eq!(atom_pack.data["type"], "codefire_context_pack");
+    assert_eq!(atom_pack.data["selector"]["kind"], "atom");
+    assert_eq!(atom_pack.data["atoms"].as_array().unwrap().len(), 2);
+    assert_eq!(atom_pack.data["trace_links"].as_array().unwrap().len(), 1);
+
+    let changed_pack = context::build_context_pack(&context::ContextOptions {
+        path: open_dir.clone(),
+        selector: context::ContextSelector::Changed,
+        depth: 1,
+        json_output: true,
+    })
+    .unwrap();
+    assert_eq!(
+        changed_pack.data["scan"]["changed_atoms"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+
+    let fire_pack = context::build_context_pack(&context::ContextOptions {
+        path: open_dir,
+        selector: context::ContextSelector::Fire("FIRE-001".to_string()),
+        depth: 1,
+        json_output: true,
+    })
+    .unwrap();
+    assert_eq!(fire_pack.data["selector"]["kind"], "fire");
+    assert_eq!(fire_pack.data["fires"].as_array().unwrap().len(), 1);
+}
+
+#[test]
 fn parse_merge_args_accepts_dry_run_json() {
     let args = vec![
         "feature-session".to_string(),

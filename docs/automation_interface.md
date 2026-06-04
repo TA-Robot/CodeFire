@@ -66,6 +66,10 @@ codefire status --json
 codefire scan --json
 codefire verify --json
 codefire verify --details --json
+codefire context --branch --json
+codefire context --changed --json
+codefire context --atom REQ-session --depth 2 --json
+codefire context --fire FIRE-001 --json
 ```
 
 `status --json` data:
@@ -104,6 +108,38 @@ codefire verify --details --json
 ```
 
 `verify --json` sets `exit_code` to the matching blocker code from the exit code taxonomy. For example, missing required links produce code `11`; failed configured verification commands produce code `14`.
+
+`context --json` data:
+
+```json
+{
+  "type": "codefire_context_pack",
+  "version": 1,
+  "selector": {"kind": "atom", "value": "REQ-session", "depth": 1},
+  "branch": {
+    "name": "main",
+    "open_dir": "/workspace/example-open",
+    "base_commit": "CF-COMMIT-..."
+  },
+  "scan": {
+    "branch_state": "open-burning",
+    "changed_atoms": ["REQ-session"],
+    "open_fires": []
+  },
+  "atoms": [],
+  "trace_links": [],
+  "fires": []
+}
+```
+
+Context selectors:
+
+```text
+--branch: branch/open-directory state summary
+--changed: changed Atom set and directly related trace/fire context
+--atom <atom-id> [--depth <n>]: selected Atom neighborhood through TraceGraph links
+--fire <fire-id>: selected fire, source/target atoms, trace path, and matching links
+```
 
 ## Diagnostics
 

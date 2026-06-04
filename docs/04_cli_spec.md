@@ -21,6 +21,9 @@ codefire fire <atom-id> --reason <text>
 codefire extinguish <fire-id> --resolution <type> [--rationale <text>] [--evidence <ref>]
 codefire verify
 codefire verify --json
+codefire context --changed --json
+codefire context --atom <atom-id> --depth <n> --json
+codefire context --fire <fire-id> --json
 codefire commit -m <message>
 
 codefire merge <source-branch> --into <target-branch>
@@ -188,7 +191,26 @@ verification objectをactive stateに保存する
 verify blockerのexit codeはopen fires=10、missing links=11、stale resolutions=12、duplicate Atom IDs=13、failed checks=14の優先順で決まる
 ```
 
-## 4.10 `commit`
+## 4.10 `context`
+
+```bash
+codefire context --branch --json
+codefire context --changed --json
+codefire context --atom REQ-AUTH-001 --depth 2 --json
+codefire context --fire FIRE-001 --json
+```
+
+仕様：
+
+```text
+open directoryから現在のAtomIndex、TraceGraph、baseとの差分、open firesを読み取りcontext packを返す
+contextはactive stateを書き換えない
+--jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_context_packを含める
+selectorは--branch、--changed、--atom、--fireのいずれか1つ
+--atomの--depthはTraceGraph上の近傍探索深さを指定する
+```
+
+## 4.11 `commit`
 
 ```bash
 codefire commit -m "Implement login handler"
@@ -204,7 +226,7 @@ active stateをresetする
 open stateをopen-cleanにする
 ```
 
-## 4.11 `merge`
+## 4.12 `merge`
 
 ```bash
 codefire merge feature-login --into main
@@ -225,7 +247,7 @@ semantic conflict candidateは同一Atom IDがsource/target双方でbaseから�
 semantic conflict candidateは自動解決しない
 ```
 
-## 4.12 `upload`
+## 4.13 `upload`
 
 ```bash
 codefire upload feature-login cf://server/alice/app/feature-login
@@ -241,7 +263,7 @@ server branchが進んでいたら拒否する
 force uploadは存在しない
 ```
 
-## 4.12A `show` / `diff`
+## 4.14 `show` / `diff`
 
 ```bash
 codefire show feature-login
@@ -273,7 +295,7 @@ binary fileはpayload diffを出さず、sizeとsha256 prefixのsummaryだけを
 --jsonはdiff結果をJSON objectとして出力し、impact有効時はmachine-readable next_actionsを含める
 ```
 
-## 4.12B `review-pack`
+## 4.15 `review-pack`
 
 ```bash
 codefire review-pack feature-login
@@ -295,7 +317,7 @@ verificationにbase/sourceそれぞれのverification summaryを含める
 review-packはsealed commitから再現可能な情報だけで構成し、生成時刻などの非決定的値は含めない
 ```
 
-## 4.12C `patch`
+## 4.16 `patch`
 
 ```bash
 codefire patch export feature-login --base main --output feature-login.cfpatch.json
@@ -319,7 +341,7 @@ patch importは適用後にopen stateをopen-burningへ更新し、pending_patch
 patch pathはmanifest pathと同じく相対pathだけを許可し、open directory外へescapeするpathを拒否する
 ```
 
-## 4.13 `request-merge`
+## 4.17 `request-merge`
 
 ```bash
 codefire request-merge \
