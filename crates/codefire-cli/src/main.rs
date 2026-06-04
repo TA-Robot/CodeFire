@@ -15,6 +15,15 @@ fn main() {
 
 fn run(args: Vec<String>) -> Result<(), CliError> {
     match args.first().map(String::as_str) {
+        Some("atom-index") => {
+            let start = args
+                .get(1)
+                .map(PathBuf::from)
+                .unwrap_or(env::current_dir()?);
+            let index = codefire_core::build_atom_index(&start)?;
+            println!("{}", serde_json::to_string_pretty(&index)?);
+            Ok(())
+        }
         Some("init") => {
             let options = parse_init_args(&args[1..])?;
             let result = init_repo(&options.path, options.force)?;
@@ -73,6 +82,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
 enum CliError {
     Io(std::io::Error),
     Json(serde_json::Error),
+    Core(codefire_core::CoreError),
     Store(codefire_store::StoreError),
     Usage(String),
     NotOpen(PathBuf),
@@ -85,6 +95,7 @@ impl fmt::Display for CliError {
         match self {
             CliError::Io(error) => write!(f, "{error}"),
             CliError::Json(error) => write!(f, "{error}"),
+            CliError::Core(error) => write!(f, "{error}"),
             CliError::Store(error) => write!(f, "{error}"),
             CliError::Usage(message) => write!(f, "{message}"),
             CliError::NotOpen(path) => write!(
@@ -113,6 +124,12 @@ impl From<std::io::Error> for CliError {
 impl From<serde_json::Error> for CliError {
     fn from(error: serde_json::Error) -> Self {
         CliError::Json(error)
+    }
+}
+
+impl From<codefire_core::CoreError> for CliError {
+    fn from(error: codefire_core::CoreError) -> Self {
+        CliError::Core(error)
     }
 }
 

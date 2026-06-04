@@ -104,6 +104,7 @@
 | 2026-06-04 | Rust Repo | Rust CLIのread-only `branch list` を追加し、Python-created branch registryをsealed head検証付きで読めるようにした | `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `/workspace/algorithm-evolution-agent-lab/main` smoke |
 | 2026-06-04 | Rust Repo | Rust CLIの `init` を追加し、Python-compatibleな初期object graph、sealed commit、main branchを生成できるようにした | `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Python `doctor` / `branch list` smoke |
 | 2026-06-04 | Rust Repo | Rust CLIの `open` を追加し、manifest materialization、open marker、open registry、active state、branch state更新をPython-compatibleに生成できるようにした | `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; Rust init/open + Python `status` / `doctor` / `branch list` smoke |
+| 2026-06-04 | Rust Index | Rust coreにMarkdown headingと明示 `cf-atom` のAtom extractorを追加し、AtomIndex JSONをCLIから出せるようにした | `crates/codefire-core`, `crates/codefire-cli` | `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `/workspace/algorithm-evolution-agent-lab/main` atom-index smoke |
 
 ## Current Decisions
 
