@@ -166,6 +166,7 @@ pub(crate) fn verification_data_json(verification: &codefire_core::Verification)
         "open_required_fires": verification.open_required_fires,
         "missing_required_links": &verification.missing_required_links,
         "stale_resolutions": &verification.stale_resolutions,
+        "missing_evidence_refs": &verification.missing_evidence_refs,
         "duplicate_atom_ids": &verification.duplicate_atom_ids,
         "failed_checks": &verification.failed_checks,
     })
@@ -199,6 +200,14 @@ pub(crate) fn verification_diagnostics_json(
             "severity": "error",
             "resolution_uid": &item.resolution_uid,
             "reason": &item.reason,
+        }));
+    }
+    for item in &verification.missing_evidence_refs {
+        diagnostics.push(json!({
+            "kind": "missing_evidence_ref",
+            "severity": "error",
+            "resolution_uid": &item.resolution_uid,
+            "evidence_id": &item.evidence_id,
         }));
     }
     for atom_id in &verification.duplicate_atom_ids {
@@ -270,6 +279,17 @@ pub(crate) fn verification_next_actions(verification: &codefire_core::Verificati
             json!({
                 "resolution_uid": &item.resolution_uid,
                 "reason": &item.reason,
+            }),
+        ));
+    }
+    for item in &verification.missing_evidence_refs {
+        actions.push(next_action(
+            "repair_evidence_ref",
+            "codefire-rs evidence add --artifact <path> --json",
+            "recreate or replace the missing evidence object referenced by the resolution",
+            json!({
+                "resolution_uid": &item.resolution_uid,
+                "evidence_id": &item.evidence_id,
             }),
         ));
     }
@@ -364,6 +384,10 @@ mod tests {
                 resolution_uid: "resolution_1".to_string(),
                 reason: "source changed".to_string(),
             }],
+            missing_evidence_refs: vec![codefire_core::MissingEvidenceRef {
+                resolution_uid: "resolution_1".to_string(),
+                evidence_id: "CF-EVIDENCE-missing".to_string(),
+            }],
             duplicate_atom_ids: vec!["REQ-session".to_string()],
             verified_at: "2026-06-04T00:00:00Z".to_string(),
         };
@@ -376,6 +400,7 @@ mod tests {
         assert!(kinds.contains(&"open_required_fires"));
         assert!(kinds.contains(&"missing_required_link"));
         assert!(kinds.contains(&"stale_resolution"));
+        assert!(kinds.contains(&"missing_evidence_ref"));
         assert!(kinds.contains(&"duplicate_atom_id"));
         assert!(kinds.contains(&"failed_check"));
     }
@@ -403,6 +428,10 @@ mod tests {
                 resolution_uid: "resolution_1".to_string(),
                 reason: "source changed".to_string(),
             }],
+            missing_evidence_refs: vec![codefire_core::MissingEvidenceRef {
+                resolution_uid: "resolution_1".to_string(),
+                evidence_id: "CF-EVIDENCE-missing".to_string(),
+            }],
             duplicate_atom_ids: vec!["REQ-session".to_string()],
             verified_at: "2026-06-04T00:00:00Z".to_string(),
         };
@@ -415,6 +444,7 @@ mod tests {
         assert!(kinds.contains(&"context_changed"));
         assert!(kinds.contains(&"context_atom"));
         assert!(kinds.contains(&"refresh_resolution"));
+        assert!(kinds.contains(&"repair_evidence_ref"));
         assert!(kinds.contains(&"rerun_check"));
         assert!(actions.iter().all(|item| item.get("command").is_some()));
         assert!(actions.iter().all(|item| item.get("target").is_some()));

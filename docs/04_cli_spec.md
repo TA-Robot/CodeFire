@@ -219,6 +219,10 @@ codefire extinguish FIRE-001 \
   --rationale "修正済み" \
   --idempotency-key request-2026-06-05-002
 
+codefire extinguish FIRE-001 \
+  --resolution addressed \
+  --evidence-ref CF-EVIDENCE-abc123
+
 codefire extinguish --batch .codefire/fires-to-extinguish.yaml --dry-run --json
 ```
 
@@ -228,19 +232,22 @@ codefire extinguish --batch .codefire/fires-to-extinguish.yaml --dry-run --json
 fireを解消する
 basisとしてsource/target/link/policy hashを保存する
 `--refresh` 指定時は、すでにextinguishedのfireについて現在のbasisでresolutionを更新する
-必要なrationale/evidenceがない場合は拒否する
+必要なrationale/evidence/evidence-refがない場合は拒否する
+--evidence-refは既存のevidence object IDを参照し、resolution.evidence_refsへ保存する
+--evidence-refが存在しない、またはevidence以外のobjectを指す場合は拒否する
 --dry-runはfire/resolution ledgerを書き換えず、codefire_operation_planを返す
 --idempotency-keyは成功したextinguish resultを.codefire/idempotency/extinguish/へ記録する
 同じ--idempotency-keyかつ同じextinguish request payloadは保存済みextinguish resultを返し、新しいledger entryを作らない
-同じ--idempotency-keyでfire/resolution/rationale/evidence/refresh/open_dir/branchが異なるpayloadはexit code 33で拒否する
+同じ--idempotency-keyでfire/resolution/rationale/evidence/evidence-ref/refresh/open_dir/branchが異なるpayloadはexit code 33で拒否する
 --batchはversion/defaults/firesだけを持つstrict limited YAMLまたは同等JSONを受け取る
---batchは全fire itemを事前検証し、unknown fire、重複fire id、必須rationale/evidence不足があればledgerを書き換えない
+--batchは全fire itemを事前検証し、unknown fire、重複fire id、必須rationale/evidence/evidence-ref不足があればledgerを書き換えない
 --batch --dry-run --jsonはcommand=extinguish-batchのcodefire_operation_planを返し、全itemの単発extinguish validation planをitemsに含める
 --batchのYAML schema:
 version: 1
 defaults:
   resolution: addressed
   evidence: "cargo test --workspace: passed"
+  evidence_ref: CF-EVIDENCE-abc123
 fires:
   - id: FIRE-001
     rationale: "REQ/DES linkを確認した"
@@ -264,10 +271,11 @@ scanを実行する
 policy checkを実行する
 required verification commandを実行する
 verification objectをactive stateに保存する
+resolution.evidence_refsが存在しないevidence objectを指す場合はmissing evidence refsとして失敗する
 `--details` 指定時は、失敗したdiagnosticsの代表例を最大5件ずつ出力する
 --jsonはcodefire.command_result.v1 envelopeを出力し、verification data、blocking diagnostics、next_actionsを含める
 --jsonのexit_codeはprocess exit codeと一致する
-verify blockerのexit codeはopen fires=10、missing links=11、stale resolutions=12、duplicate Atom IDs=13、failed checks=14の優先順で決まる
+verify blockerのexit codeはopen fires=10、missing links=11、stale resolutions=12、missing evidence refs=21、duplicate Atom IDs=13、failed checks=14の優先順で決まる
 next_actionsはcontext_changed、context_atom、refresh_resolution、rerun_check、commitなどの安定action kindを返す
 --metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
 ```
@@ -481,6 +489,7 @@ commandがnon-zero exitでもevidence capture自体は成功し、command_exit_c
 --batchはJSONまたは限定YAMLのversion/items形式を読み、全itemのartifact path/cwd/必須fieldを事前検証してからevidence objectを作る
 --batch --dry-runはartifact_ref/evidence objectを書き込まず、codefire_operation_planを返す
 batch itemはartifact、artifact_uri、from_command、cwd、label、max_output_bytesを持てる
+resolutionから参照されたevidence objectと、そのevidenceが参照するartifact_refはremote object graphに含めてupload/clone/request workflowで搬送する
 ```
 
 ## 4.19 `explain`

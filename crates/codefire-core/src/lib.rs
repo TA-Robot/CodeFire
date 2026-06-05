@@ -191,6 +191,12 @@ pub struct StaleResolution {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MissingEvidenceRef {
+    pub resolution_uid: String,
+    pub evidence_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Verification {
     #[serde(rename = "type")]
     pub type_tag: String,
@@ -200,6 +206,8 @@ pub struct Verification {
     pub failed_checks: Vec<FailedCheck>,
     pub missing_required_links: Vec<MissingRequiredLink>,
     pub stale_resolutions: Vec<StaleResolution>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub missing_evidence_refs: Vec<MissingEvidenceRef>,
     pub duplicate_atom_ids: Vec<String>,
     pub verified_at: String,
 }
@@ -234,6 +242,8 @@ pub struct Resolution {
     pub resolution_type: String,
     pub rationale: String,
     pub evidence: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence_refs: Vec<String>,
     pub basis: ResolutionBasis,
     pub resolved_at: String,
     pub status: String,
@@ -245,6 +255,7 @@ pub struct ResolutionRequest {
     pub resolution_type: String,
     pub rationale: String,
     pub evidence: String,
+    pub evidence_refs: Vec<String>,
     pub resolved_at: String,
 }
 
@@ -579,6 +590,7 @@ pub fn build_verification(
     missing_required_links: Vec<MissingRequiredLink>,
     failed_checks: Vec<FailedCheck>,
     stale_resolutions: Vec<StaleResolution>,
+    missing_evidence_refs: Vec<MissingEvidenceRef>,
     policy: &VerificationPolicy,
     verified_at: &str,
 ) -> Verification {
@@ -591,6 +603,9 @@ pub fn build_verification(
         passed = false;
     }
     if policy.require_no_stale_resolutions && !stale_resolutions.is_empty() {
+        passed = false;
+    }
+    if !missing_evidence_refs.is_empty() {
         passed = false;
     }
     if policy.require_verification_success && !failed_checks.is_empty() {
@@ -607,6 +622,7 @@ pub fn build_verification(
         failed_checks,
         missing_required_links,
         stale_resolutions,
+        missing_evidence_refs,
         duplicate_atom_ids,
         verified_at: verified_at.to_string(),
     }
@@ -704,6 +720,7 @@ pub fn build_resolution(
         resolution_type: request.resolution_type,
         rationale: request.rationale,
         evidence: request.evidence,
+        evidence_refs: request.evidence_refs,
         basis: ResolutionBasis {
             source_atom: ResolutionAtomBasis {
                 atom_id: source_id.clone(),
@@ -1742,6 +1759,7 @@ mod tests {
             }],
             Vec::new(),
             Vec::new(),
+            Vec::new(),
             &policy,
             "2026-06-04T00:00:00Z",
         );
@@ -1807,6 +1825,7 @@ mod tests {
                 resolution_type: "addressed".to_string(),
                 rationale: "checked".to_string(),
                 evidence: String::new(),
+                evidence_refs: Vec::new(),
                 resolved_at: "2026-06-04T00:00:00Z".to_string(),
             },
         )

@@ -50,6 +50,9 @@ pub(crate) fn verification_exit_code(verification: &codefire_core::Verification)
     if !verification.stale_resolutions.is_empty() {
         return ExitCode::StaleResolution;
     }
+    if !verification.missing_evidence_refs.is_empty() {
+        return ExitCode::ObjectReferenceInvalid;
+    }
     if !verification.duplicate_atom_ids.is_empty() {
         return ExitCode::DuplicateAtomId;
     }
@@ -116,6 +119,10 @@ mod tests {
                 resolution_uid: "resolution_1".to_string(),
                 reason: "source changed".to_string(),
             }],
+            missing_evidence_refs: vec![codefire_core::MissingEvidenceRef {
+                resolution_uid: "resolution_1".to_string(),
+                evidence_id: "CF-EVIDENCE-missing".to_string(),
+            }],
             duplicate_atom_ids: vec!["REQ-session".to_string()],
             verified_at: "2026-06-04T00:00:00Z".to_string(),
         };
@@ -123,6 +130,26 @@ mod tests {
         assert_eq!(
             verification_exit_code(&verification),
             ExitCode::MissingRequiredLinks
+        );
+
+        let missing_evidence_only = codefire_core::Verification {
+            type_tag: "verification".to_string(),
+            version: 1,
+            result: "failed".to_string(),
+            open_required_fires: 0,
+            failed_checks: Vec::new(),
+            missing_required_links: Vec::new(),
+            stale_resolutions: Vec::new(),
+            missing_evidence_refs: vec![codefire_core::MissingEvidenceRef {
+                resolution_uid: "resolution_1".to_string(),
+                evidence_id: "CF-EVIDENCE-missing".to_string(),
+            }],
+            duplicate_atom_ids: Vec::new(),
+            verified_at: "2026-06-04T00:00:00Z".to_string(),
+        };
+        assert_eq!(
+            verification_exit_code(&missing_evidence_only),
+            ExitCode::ObjectReferenceInvalid
         );
     }
 

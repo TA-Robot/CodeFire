@@ -944,6 +944,7 @@ struct ExtinguishOptions {
     resolution: String,
     rationale: String,
     evidence: String,
+    evidence_refs: Vec<String>,
     refresh: bool,
     dry_run: bool,
     json_output: bool,
@@ -1152,6 +1153,9 @@ fn print_verification(verification: &codefire_core::Verification, details: bool)
     if !verification.stale_resolutions.is_empty() {
         blocking.push("stale resolutions");
     }
+    if !verification.missing_evidence_refs.is_empty() {
+        blocking.push("missing evidence refs");
+    }
     if !verification.duplicate_atom_ids.is_empty() {
         blocking.push("duplicate atom ids");
     }
@@ -1177,6 +1181,10 @@ fn print_verification(verification: &codefire_core::Verification, details: bool)
         verification.stale_resolutions.len()
     );
     println!(
+        "Missing evidence refs: {}",
+        verification.missing_evidence_refs.len()
+    );
+    println!(
         "Duplicate atom ids: {}",
         verification.duplicate_atom_ids.len()
     );
@@ -1200,6 +1208,12 @@ fn print_verification_details(verification: &codefire_core::Verification) {
         println!("Stale resolution details:");
         for item in verification.stale_resolutions.iter().take(5) {
             println!("  {}: {}", item.resolution_uid, item.reason);
+        }
+    }
+    if !verification.missing_evidence_refs.is_empty() {
+        println!("Missing evidence ref details:");
+        for item in verification.missing_evidence_refs.iter().take(5) {
+            println!("  {}: {}", item.resolution_uid, item.evidence_id);
         }
     }
     if !verification.duplicate_atom_ids.is_empty() {
@@ -1378,6 +1392,7 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
     let mut resolution = "addressed".to_string();
     let mut rationale = String::new();
     let mut evidence = String::new();
+    let mut evidence_refs = Vec::new();
     let mut refresh = false;
     let mut dry_run = false;
     let mut json_output = false;
@@ -1418,6 +1433,16 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
                     .ok_or_else(|| CliError::Usage("--evidence requires a value".to_string()))?
                     .to_string();
             }
+            "--evidence-ref" => {
+                index += 1;
+                evidence_refs.push(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--evidence-ref requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
             "--refresh" => refresh = true,
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
@@ -1434,6 +1459,9 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
             value if value.starts_with("--idempotency-key=") => {
                 idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
             }
+            value if value.starts_with("--evidence-ref=") => {
+                evidence_refs.push(value.trim_start_matches("--evidence-ref=").to_string());
+            }
             value if fire_id.is_none() => fire_id = Some(value.to_string()),
             value => {
                 return Err(CliError::Usage(format!(
@@ -1446,11 +1474,12 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
     Ok(ExtinguishOptions {
         path: path.unwrap_or(env::current_dir()?),
         fire_id: fire_id.ok_or_else(|| {
-            CliError::Usage("usage: codefire-rs extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>)".to_string())
+            CliError::Usage("usage: codefire-rs extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>)".to_string())
         })?,
         resolution,
         rationale,
         evidence,
+        evidence_refs,
         refresh,
         dry_run,
         json_output,
@@ -3136,11 +3165,13 @@ fn compute_verify(start: &Path, persist: bool) -> Result<VerifyExecution, CliErr
         &policy,
         &resolutions,
     )?;
+    let missing_evidence_refs = collect_missing_evidence_refs(&context.repo_root, &resolutions);
     let verification = codefire_core::build_verification(
         &scan,
         missing_required_links,
         failed_checks,
         stale_resolutions,
+        missing_evidence_refs,
         &policy,
         &now_iso_utc(),
     );
@@ -3185,11 +3216,15 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
             "no-change-required requires --rationale".to_string(),
         ));
     }
-    if options.rationale.is_empty() && options.evidence.is_empty() {
+    if options.rationale.is_empty()
+        && options.evidence.is_empty()
+        && options.evidence_refs.is_empty()
+    {
         return Err(CliError::Usage(
-            "extinguish requires --rationale or --evidence".to_string(),
+            "extinguish requires --rationale, --evidence, or --evidence-ref".to_string(),
         ));
     }
+    validate_evidence_refs(&context.repo_root, &options.evidence_refs)?;
 
     let scan_execution = compute_scan(&context.open_dir, !options.dry_run)?;
     let scan = scan_execution.scan;
@@ -3221,6 +3256,7 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
             resolution_type: options.resolution.clone(),
             rationale: options.rationale.clone(),
             evidence: options.evidence.clone(),
+            evidence_refs: options.evidence_refs.clone(),
             resolved_at,
         },
     )?;
@@ -3270,8 +3306,52 @@ fn extinguish_idempotency_payload(options: &ExtinguishOptions, context: &OpenCon
         "resolution": &options.resolution,
         "rationale": &options.rationale,
         "evidence": &options.evidence,
+        "evidence_refs": &options.evidence_refs,
         "refresh": options.refresh,
     })
+}
+
+fn validate_evidence_refs(repo_root: &Path, refs: &[String]) -> Result<(), CliError> {
+    let objects = repo_root.join(".codefire").join("objects");
+    for evidence_id in refs {
+        if evidence_id.trim().is_empty() {
+            return Err(CliError::Usage(
+                "--evidence-ref requires a non-empty evidence id".to_string(),
+            ));
+        }
+        let payload = codefire_store::read_object(&objects, evidence_id)?;
+        if payload.get("type").and_then(Value::as_str) != Some("evidence") {
+            return Err(CliError::Usage(format!(
+                "--evidence-ref must point to an evidence object: {evidence_id}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn collect_missing_evidence_refs(
+    repo_root: &Path,
+    resolutions: &[codefire_core::Resolution],
+) -> Vec<codefire_core::MissingEvidenceRef> {
+    let objects = repo_root.join(".codefire").join("objects");
+    let mut missing = Vec::new();
+    for resolution in resolutions
+        .iter()
+        .filter(|resolution| resolution.status == "active")
+    {
+        for evidence_id in &resolution.evidence_refs {
+            let valid = codefire_store::read_object(&objects, evidence_id)
+                .map(|payload| payload.get("type").and_then(Value::as_str) == Some("evidence"))
+                .unwrap_or(false);
+            if !valid {
+                missing.push(codefire_core::MissingEvidenceRef {
+                    resolution_uid: resolution.resolution_uid.clone(),
+                    evidence_id: evidence_id.clone(),
+                });
+            }
+        }
+    }
+    missing
 }
 
 fn load_extinguish_idempotency(
@@ -3431,6 +3511,7 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
             "failed_checks": verification.failed_checks.len(),
             "missing_required_links": verification.missing_required_links.len(),
             "stale_resolutions": verification.stale_resolutions.len(),
+            "missing_evidence_refs": verification.missing_evidence_refs.len(),
             "duplicate_atom_ids": verification.duplicate_atom_ids.len(),
         },
         "changed_atoms": scan.changed_atoms,
@@ -3539,6 +3620,7 @@ fn extinguish_operation_plan(
             "refresh": options.refresh,
             "has_rationale": !options.rationale.is_empty(),
             "has_evidence": !options.evidence.is_empty(),
+            "evidence_refs": &options.evidence_refs,
         },
         "operations": [
             {"kind": "update_fire_status", "path": active_state_path.join("fires.json"), "status": "extinguished"},

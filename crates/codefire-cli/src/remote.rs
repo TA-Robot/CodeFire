@@ -808,6 +808,8 @@ pub(crate) fn ensure_remote_layout(project_root: &Path) -> Result<(), CliError> 
         "resolution_ledgers",
         "verifications",
         "policies",
+        "artifact_refs",
+        "evidence",
         "commits",
         "branches",
     ] {
@@ -1140,6 +1142,29 @@ fn object_references(payload: &Value) -> Vec<String> {
             .filter_map(|entry| entry.get("blob").and_then(Value::as_str))
             .map(str::to_string)
             .collect(),
+        Some("resolution_ledger") => payload
+            .get("resolutions")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .flat_map(|resolution| {
+                resolution
+                    .get("evidence_refs")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .filter(|value| value.starts_with("CF-"))
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .collect(),
+        Some("evidence") => payload
+            .get("artifact_ref")
+            .and_then(Value::as_str)
+            .filter(|value| value.starts_with("CF-"))
+            .map(|value| vec![value.to_string()])
+            .unwrap_or_default(),
         _ => Vec::new(),
     }
 }

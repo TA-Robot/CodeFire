@@ -24,6 +24,7 @@ struct BatchFireDefaults {
     resolution: Option<String>,
     rationale: Option<String>,
     evidence: Option<String>,
+    evidence_refs: Vec<String>,
     refresh: Option<bool>,
 }
 
@@ -33,6 +34,7 @@ struct BatchFireSpec {
     resolution: Option<String>,
     rationale: Option<String>,
     evidence: Option<String>,
+    evidence_refs: Vec<String>,
     refresh: Option<bool>,
 }
 
@@ -49,6 +51,7 @@ struct ResolvedBatchFire {
     resolution: String,
     rationale: String,
     evidence: String,
+    evidence_refs: Vec<String>,
     refresh: bool,
     validation_plan: Value,
 }
@@ -152,6 +155,11 @@ pub(super) fn run_extinguish_batch(
             .evidence
             .or_else(|| batch.defaults.evidence.clone())
             .unwrap_or_default();
+        let evidence_refs = if fire.evidence_refs.is_empty() {
+            batch.defaults.evidence_refs.clone()
+        } else {
+            fire.evidence_refs
+        };
         let refresh = fire.refresh.or(batch.defaults.refresh).unwrap_or(false);
         let validation = run_extinguish(&ExtinguishOptions {
             path: options.path.clone(),
@@ -159,6 +167,7 @@ pub(super) fn run_extinguish_batch(
             resolution: resolution.clone(),
             rationale: rationale.clone(),
             evidence: evidence.clone(),
+            evidence_refs: evidence_refs.clone(),
             refresh,
             dry_run: true,
             json_output: true,
@@ -170,6 +179,7 @@ pub(super) fn run_extinguish_batch(
             resolution,
             rationale,
             evidence,
+            evidence_refs,
             refresh,
             validation_plan: validation.plan,
         });
@@ -190,6 +200,7 @@ pub(super) fn run_extinguish_batch(
             resolution: fire.resolution.clone(),
             rationale: fire.rationale.clone(),
             evidence: fire.evidence.clone(),
+            evidence_refs: fire.evidence_refs.clone(),
             refresh: fire.refresh,
             dry_run: false,
             json_output: false,
@@ -217,6 +228,7 @@ fn batch_extinguish_operation_plan(
                 "refresh": fire.refresh,
                 "has_rationale": !fire.rationale.is_empty(),
                 "has_evidence": !fire.evidence.is_empty(),
+                "evidence_refs": &fire.evidence_refs,
                 "validation": &fire.validation_plan,
             })
         })
@@ -280,6 +292,11 @@ fn parse_json_defaults(value: Option<&Value>) -> Result<BatchFireDefaults, CliEr
         resolution: optional_json_string(object.get("resolution"), "defaults.resolution")?,
         rationale: optional_json_string(object.get("rationale"), "defaults.rationale")?,
         evidence: optional_json_string(object.get("evidence"), "defaults.evidence")?,
+        evidence_refs: optional_json_string_array(
+            object.get("evidence_refs"),
+            object.get("evidence_ref"),
+            "defaults.evidence_refs",
+        )?,
         refresh: optional_json_bool(object.get("refresh"), "defaults.refresh")?,
     })
 }
@@ -293,6 +310,11 @@ fn parse_json_fire(value: &Value) -> Result<BatchFireSpec, CliError> {
         resolution: optional_json_string(object.get("resolution"), "fire.resolution")?,
         rationale: optional_json_string(object.get("rationale"), "fire.rationale")?,
         evidence: optional_json_string(object.get("evidence"), "fire.evidence")?,
+        evidence_refs: optional_json_string_array(
+            object.get("evidence_refs"),
+            object.get("evidence_ref"),
+            "fire.evidence_refs",
+        )?,
         refresh: optional_json_bool(object.get("refresh"), "fire.refresh")?,
     })
 }
@@ -316,6 +338,35 @@ fn optional_json_bool(value: Option<&Value>, field: &str) -> Result<Option<bool>
                 .ok_or_else(|| CliError::Usage(format!("{field} must be a boolean")))
         })
         .transpose()
+}
+
+fn optional_json_string_array(
+    array_value: Option<&Value>,
+    single_value: Option<&Value>,
+    field: &str,
+) -> Result<Vec<String>, CliError> {
+    let mut values = Vec::new();
+    if let Some(value) = single_value {
+        values.push(
+            value
+                .as_str()
+                .ok_or_else(|| CliError::Usage(format!("{field} must be a string or array")))?
+                .to_string(),
+        );
+    }
+    if let Some(value) = array_value {
+        let array = value
+            .as_array()
+            .ok_or_else(|| CliError::Usage(format!("{field} must be an array")))?;
+        for item in array {
+            values.push(
+                item.as_str()
+                    .ok_or_else(|| CliError::Usage(format!("{field} entries must be strings")))?
+                    .to_string(),
+            );
+        }
+    }
+    Ok(values)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -422,6 +473,7 @@ fn apply_yaml_default(
         "resolution" => defaults.resolution = Some(value),
         "rationale" => defaults.rationale = Some(value),
         "evidence" => defaults.evidence = Some(value),
+        "evidence_ref" => defaults.evidence_refs.push(value),
         "refresh" => defaults.refresh = Some(parse_yaml_bool(&value, "refresh", line_number)?),
         _ => {
             return Err(CliError::Usage(format!(
@@ -443,6 +495,7 @@ fn apply_yaml_fire_field(
         "resolution" => fire.resolution = Some(value),
         "rationale" => fire.rationale = Some(value),
         "evidence" => fire.evidence = Some(value),
+        "evidence_ref" => fire.evidence_refs.push(value),
         "refresh" => fire.refresh = Some(parse_yaml_bool(&value, "refresh", line_number)?),
         _ => {
             return Err(CliError::Usage(format!(

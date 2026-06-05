@@ -565,6 +565,55 @@ fn context_pack_returns_atom_changed_and_fire_views() {
     let repo_root = temp.path().join("repo");
     let open_dir = temp.path().join("main-open");
     init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit_with_atoms(
+        &objects,
+        &[
+            (
+                "docs/requirements/session.md",
+                "## REQ-session: Requirement\nTTL 30\n",
+            ),
+            (
+                "docs/design/session.md",
+                "## DES-session: Design\nClock policy\n",
+            ),
+            (
+                "codefire.links.yaml",
+                "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
+            ),
+            (
+                "codefire.policy.yaml",
+                "commit_policy:\n  require_trace_completeness: false\n",
+            ),
+        ],
+        &[
+            (
+                "REQ-session",
+                "requirement",
+                "docs/requirements/session.md",
+                "sha256:req",
+            ),
+            (
+                "DES-session",
+                "design",
+                "docs/design/session.md",
+                "sha256:des",
+            ),
+        ],
+        Vec::new(),
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": base_commit,
+            "state": "closed",
+            "created_at": "2026-06-05T00:00:00Z"
+        }),
+    )
+    .unwrap();
     open_branch_from(
         &repo_root,
         &OpenOptions {
@@ -926,6 +975,8 @@ fn parse_mutating_dry_run_json_args() {
         "addressed".to_string(),
         "--rationale".to_string(),
         "fixed".to_string(),
+        "--evidence-ref".to_string(),
+        "CF-EVIDENCE-test".to_string(),
         "--dry-run".to_string(),
         "--json".to_string(),
         "--lock-timeout".to_string(),
@@ -937,6 +988,7 @@ fn parse_mutating_dry_run_json_args() {
     assert_eq!(extinguish.fire_id, "FIRE-001");
     assert!(extinguish.dry_run);
     assert!(extinguish.json_output);
+    assert_eq!(extinguish.evidence_refs, vec!["CF-EVIDENCE-test"]);
     assert!(extinguish.lock.wait);
     assert_eq!(extinguish.lock.timeout_ms, Some(2000));
     assert_eq!(extinguish.idempotency_key.as_deref(), Some("ext-key-1"));
@@ -1357,6 +1409,7 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
         resolution: "addressed".to_string(),
         rationale: "fixed".to_string(),
         evidence: String::new(),
+        evidence_refs: Vec::new(),
         refresh: false,
         dry_run: true,
         json_output: true,
@@ -1420,6 +1473,7 @@ fn extinguish_idempotency_key_replays_same_payload_and_rejects_conflict() {
         resolution: "addressed".to_string(),
         rationale: "fixed".to_string(),
         evidence: String::new(),
+        evidence_refs: Vec::new(),
         refresh: false,
         dry_run: false,
         json_output: false,
@@ -1435,6 +1489,7 @@ fn extinguish_idempotency_key_replays_same_payload_and_rejects_conflict() {
         resolution: "addressed".to_string(),
         rationale: "fixed".to_string(),
         evidence: String::new(),
+        evidence_refs: Vec::new(),
         refresh: false,
         dry_run: false,
         json_output: false,
@@ -1451,6 +1506,7 @@ fn extinguish_idempotency_key_replays_same_payload_and_rejects_conflict() {
         resolution: "addressed".to_string(),
         rationale: "different rationale".to_string(),
         evidence: String::new(),
+        evidence_refs: Vec::new(),
         refresh: false,
         dry_run: false,
         json_output: false,
@@ -1788,6 +1844,184 @@ fn evidence_batch_validates_all_items_before_writing_objects() {
         fs::read_dir(objects.join("evidence")).unwrap().count(),
         before_invalid_evidence_count
     );
+}
+
+#[test]
+fn extinguish_evidence_ref_links_resolution_and_verify_detects_missing_ref() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let evidence = run_evidence_add(&evidence::EvidenceAddOptions {
+        start: open_dir.clone(),
+        json_output: true,
+        dry_run: false,
+        batch_path: None,
+        label: Some("verify evidence".to_string()),
+        artifact_path: None,
+        artifact_uri: None,
+        command: Some("printf ok".to_string()),
+        command_cwd: None,
+        max_output_bytes: 128,
+    })
+    .unwrap();
+    let active = active_state_path(&open_dir);
+    write_json_atomic(
+        &active.join("fires.json"),
+        &json!([{
+            "type": "fire",
+            "version": 1,
+            "fire_uid": "fire_evidence_ref_test",
+            "display_id": "FIRE-001",
+            "status": "open",
+            "severity": "required",
+            "source": {"atom_id": "REQ-session"},
+            "target": {"atom_id": "DES-session"},
+            "reason": "needs explicit evidence",
+            "trace_path": [],
+            "created_by": "manual",
+            "created_at": "2026-06-05T00:00:00Z",
+            "key": "evidence-ref-test"
+        }]),
+    )
+    .unwrap();
+    run_extinguish(&ExtinguishOptions {
+        path: open_dir.clone(),
+        fire_id: "FIRE-001".to_string(),
+        resolution: "addressed".to_string(),
+        rationale: String::new(),
+        evidence: String::new(),
+        evidence_refs: vec![evidence.evidence_id.clone()],
+        refresh: false,
+        dry_run: false,
+        json_output: false,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+    })
+    .unwrap();
+
+    let resolutions: Vec<codefire_core::Resolution> = serde_json::from_value(
+        read_json(&active_state_path(&open_dir).join("resolutions.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        resolutions[0].evidence_refs,
+        vec![evidence.evidence_id.clone()]
+    );
+    let verification = run_verify(&open_dir).unwrap();
+    assert_eq!(verification.result, "passed");
+    assert!(verification.missing_evidence_refs.is_empty());
+
+    fs::remove_file(
+        repo_root
+            .join(".codefire")
+            .join("objects")
+            .join("evidence")
+            .join(format!("{}.json", evidence.evidence_id)),
+    )
+    .unwrap();
+    let verification = run_verify(&open_dir).unwrap();
+    assert_eq!(verification.result, "failed");
+    assert_eq!(verification.missing_evidence_refs.len(), 1);
+    assert_eq!(
+        verification_exit_code(&verification),
+        ExitCode::ObjectReferenceInvalid
+    );
+}
+
+#[test]
+fn remote_object_graph_copies_resolution_evidence_refs() {
+    let temp = tempdir().unwrap();
+    let source_objects = temp.path().join("source").join("objects");
+    let target_objects = temp.path().join("target").join("objects");
+    let artifact_ref = codefire_store::store_object(
+        &source_objects,
+        "artifact_ref",
+        json!({
+            "type": "artifact_ref",
+            "version": 1,
+            "path": "/tmp/model.bin",
+            "uri": "artifact://model.bin",
+            "hash_algorithm": "sha256",
+            "content_hash": "sha256:abc",
+            "size_bytes": 3,
+            "captured_at": "2026-06-05T00:00:00Z",
+        }),
+    )
+    .unwrap();
+    let evidence = codefire_store::store_object(
+        &source_objects,
+        "evidence",
+        json!({
+            "type": "evidence",
+            "version": 1,
+            "label": "remote evidence",
+            "artifact_ref": artifact_ref.clone(),
+            "command": null,
+            "created_at": "2026-06-05T00:00:00Z",
+        }),
+    )
+    .unwrap();
+    let resolution_ledger = codefire_store::store_object(
+        &source_objects,
+        "resolution_ledger",
+        json!({
+            "type": "resolution_ledger",
+            "version": 1,
+            "resolutions": [{
+                "type": "resolution",
+                "version": 1,
+                "resolution_uid": "res_remote_evidence",
+                "fire_uid": "fire_remote_evidence",
+                "resolution_type": "addressed",
+                "rationale": "",
+                "evidence": "",
+                "evidence_refs": [evidence.clone()],
+                "basis": {
+                    "source_atom": {"atom_id": "REQ-session", "content_hash": null},
+                    "target_atom": {"atom_id": "DES-session", "content_hash": null},
+                    "trace_links": [],
+                    "policy_hash": "sha256:policy"
+                },
+                "resolved_at": "2026-06-05T00:00:00Z",
+                "status": "active"
+            }]
+        }),
+    )
+    .unwrap();
+    let mut roots = write_required_roots(&source_objects);
+    roots.insert(
+        "resolution_ledger".to_string(),
+        Value::String(resolution_ledger),
+    );
+    let commit = codefire_store::store_object(
+        &source_objects,
+        "commit",
+        codefire_store::commit_payload(Vec::new(), roots, consistent_certificate()),
+    )
+    .unwrap();
+
+    copy_object_graph(&source_objects, &target_objects, &commit).unwrap();
+
+    let copied_commit = codefire_store::read_object(&target_objects, &commit).unwrap();
+    assert_eq!(copied_commit["type"], "commit");
+    let copied_evidence = codefire_store::read_object(&target_objects, &evidence).unwrap();
+    assert_eq!(copied_evidence["type"], "evidence");
+    let copied_artifact = codefire_store::read_object(&target_objects, &artifact_ref).unwrap();
+    assert_eq!(copied_artifact["type"], "artifact_ref");
 }
 
 #[test]

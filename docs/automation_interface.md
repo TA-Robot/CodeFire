@@ -68,7 +68,7 @@ CodeFire v0.6 uses a stable process exit code taxonomy. The `exit_code` field in
 | 14 | verification command failed | `verify` with failed configured checks |
 | 15 | merge conflict blocks operation | reserved for blocking operation plans |
 | 20 | repository corruption detected | invalid marker/repository JSON or structural corruption |
-| 21 | object hash or object reference invalid | object id/hash/reference validation failures |
+| 21 | object hash or object reference invalid | object id/hash/reference validation failures, including missing evidence refs in `verify` |
 | 22 | sealed commit validation failed | sealed commit graph/certificate validation failures |
 | 30 | lock contention | local repository/resource lock already held or `--lock-timeout` elapsed |
 | 31 | remote rejected request | HTTP remote error response |
@@ -77,7 +77,7 @@ CodeFire v0.6 uses a stable process exit code taxonomy. The `exit_code` field in
 | 40 | migration incompatibility | reserved for migration checks |
 | 50 | external artifact missing or hash mismatch | reserved for artifact validation |
 
-When multiple `verify` blockers are present, CodeFire reports the first blocker class in this order: open fires, missing required links, stale resolutions, duplicate Atom IDs, failed verification commands.
+When multiple `verify` blockers are present, CodeFire reports the first blocker class in this order: open fires, missing required links, stale resolutions, missing evidence refs, duplicate Atom IDs, failed verification commands.
 
 Mutating commands that acquire repository or remote resource locks accept `--wait-lock` and `--lock-timeout <duration>`.
 `--lock-timeout` accepts seconds (`2`, `2s`) or milliseconds (`250ms`) and returns exit code 30 when elapsed. If the lock file contains `pid` or `created_at`, human diagnostics include that owner metadata.
@@ -161,19 +161,20 @@ When `--metrics` is present on `status`, `scan`, or `verify`, the command data i
   "open_required_fires": 1,
   "missing_required_links": [],
   "stale_resolutions": [],
+  "missing_evidence_refs": [],
   "duplicate_atom_ids": [],
   "failed_checks": []
 }
 ```
 
-`verify --json` sets `exit_code` to the matching blocker code from the exit code taxonomy. For example, missing required links produce code `11`; failed configured verification commands produce code `14`.
+`verify --json` sets `exit_code` to the matching blocker code from the exit code taxonomy. For example, missing required links produce code `11`, missing evidence refs produce code `21`, and failed configured verification commands produce code `14`.
 
 `status --json`, `scan --json`, `verify --json`, and `storage report --json` include remediation-oriented `next_actions`:
 
 ```text
 status: verify, scan, context_changed, commit
 scan: context_changed, context_fire, extinguish_fire, verify
-verify: context_changed, scan, context_atom, refresh_resolution, rerun_check, commit
+verify: context_changed, scan, context_atom, refresh_resolution, repair_evidence_ref, rerun_check, commit
 storage report: inspect_storage_warnings
 migrate: review_migration_plan, inspect_migration_blockers
 ```
@@ -218,6 +219,8 @@ Rust `doctor` is still planned separately; its `next_actions` are added when tha
 `evidence add --batch <file> --json` data uses `type=codefire_evidence_batch_result`, includes `dry_run`, `item_count`, a `codefire_operation_plan`, and per-item evidence results when applied.
 
 Evidence capture stores command output as a sealed `evidence` object and external artifact metadata as an `artifact_ref` object. Artifact payload bytes are not copied into `.codefire/objects`; storage report exposes their referenced bytes separately from stored payload bytes.
+
+`extinguish --evidence-ref <CF-EVIDENCE-...>` links a resolution to sealed evidence through `resolution.evidence_refs`. `verify` reports `missing_evidence_refs` when a referenced evidence object is absent or not an evidence object. Remote object graph copy follows `resolution_ledger -> evidence_refs -> evidence -> artifact_ref` so evidence-linked resolutions survive upload/clone/request workflows.
 
 `explain --json` data:
 
