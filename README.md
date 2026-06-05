@@ -9,7 +9,7 @@ Git互換ツールではありません。Gitの上位レイヤでもありま�
 
 この作業コピーでは、devcontainer基盤リポジトリのルールに合わせて `examples/` は展開していません。
 開発管理用の文書は `docs/development/` に追加しています。
-MVP CLI 実装は `project/codefire` にあります。
+CLI実装は `project/codefire` と `project/crates/` にあります。
 
 - `docs/development/todo-checklist.md` - 実装TODOチェックリスト
 - `docs/development/history.md` - 開発履歴と判断ログ
@@ -22,25 +22,24 @@ MVP CLI 実装は `project/codefire` にあります。
 
 このリポジトリには2つの実装系統があります。
 
-- `./codefire`: Python v0.2 MVP。現在のインストーラ既定CLIで、remote HTTPS、HMAC署名、demoまで通すreference implementationです。
-- `./target/debug/codefire-rs`: Rust v0.6 rewrite。`crates/` 配下で開発中の次期既定CLIです。local workflow、file-backed remote、HTTP remote、diagnostics、metrics、storage report、migration check、diff/merge intelligence、interactive extinguish UXは実装済みです。
+- `./target/release/codefire-rs` / `./target/debug/codefire-rs`: Rust v0.6 CLI。`install.sh` の既定で `codefire` として配置されます。
+- `./codefire`: Python v0.2 reference implementation。`install.sh` では fallback として `codefire-py` に配置されます。
 
-v0.6の未完了ゲートは `docs/development/todo-checklist.md` の `CF-217` です。
+v0.6の完成判定と検証項目は `docs/development/v0.6-readiness.md` を参照してください。
 
 ```bash
-./codefire --help
+cargo build --workspace
+./target/debug/codefire-rs --help
 python3 -m unittest discover -s tests -v
 ./demo.sh
 ```
 
-実装済みのMVPコマンド:
+Rust v0.6 CLIの主要コマンド:
 
 ```text
 init
 branch list
 open
-close
-discard
 clone
 status
 scan
@@ -57,11 +56,18 @@ request-merge
 request-list
 request-review
 request-apply
-gc
+review-pack
+patch export
+patch import
+storage report
+evidence add
+explain
+context
+migrate check
+migrate dry-run
 doctor
 serve
 completion
-token-hash
 ```
 
 インストール例:
@@ -69,9 +75,16 @@ token-hash
 ```bash
 ./install.sh --prefix "$HOME/.local"
 codefire --help
+codefire-py --help
 ```
 
-Python packageとしてインストールする場合:
+`install.sh` はrelease Rust binaryをbuildまたは検出して `codefire` として配置し、Python reference implementationを `codefire-py` として配置します。prebuilt binaryを使う場合:
+
+```bash
+./install.sh --prefix "$HOME/.local" --binary ./target/release/codefire-rs
+```
+
+Python packageとしてreference implementationだけをインストールする場合:
 
 ```bash
 python3 -m pip install .
@@ -88,8 +101,8 @@ codefire completion zsh > ~/.local/share/zsh/site-functions/_codefire
 remote token hashを生成する場合:
 
 ```bash
-codefire token-hash my-token
-codefire token-hash my-token --salt my-salt
+codefire-py token-hash my-token
+codefire-py token-hash my-token --salt my-salt
 ```
 
 一気通貫デモ:
@@ -99,7 +112,7 @@ codefire token-hash my-token --salt my-salt
 ./demo.sh /tmp/codefire-demo
 ```
 
-Python v0.2はPython標準ライブラリのみを使う単一ファイルCLIです。Rust v0.6は `Cargo.toml` / `crates/codefire-*` のworkspaceとして実装を進めています。
+Python v0.2はPython標準ライブラリのみを使う単一ファイルCLIです。Rust v0.6は `Cargo.toml` / `crates/codefire-*` のworkspaceとして実装されています。
 
 現時点の主要な制約と未完了領域:
 
@@ -107,7 +120,7 @@ Python v0.2はPython標準ライブラリのみを使う単一ファイルCLIで
 - Markdown Atomは requirements / designs / ADR / ops runbook を抽出できます。OpenAPI JSON/YAML operation、SQL table/column/index/view/trigger/function/procedure/sequence/type、Python/JavaScript/TypeScript/Go/Java/C#/Rust/Kotlin/PHP/Ruby/Swift/C/C++ code symbol も `API-*` / `DB-*` / `CODE-*` Atomとして抽出できます。
 - object IDはcontent-addressed payloadに基づくMVP実装です。表示IDと自己参照を含むcommit payloadの厳密仕様は整理が必要です。
 - AI連携、GUI、semantic mergeはMVP対象外です。追加言語のAtom抽出は、標準ライブラリで実装した限定パーサの範囲で対応します。
-- Python v0.2 remote server はローカルファイル-backed実装に加えて、`codefire serve` によるHTTP/HTTPS transportを持ちます。file-backedは `cf:///tmp/server/org/app/main`、HTTPは `cf+http://127.0.0.1:8080/org/app/main`、HTTPSは `cf+https://127.0.0.1:8443/org/app/main` のようなURLを使います。
+- Python v0.2 remote server はローカルファイル-backed実装に加えて、`codefire-py serve` によるHTTP/HTTPS transportを持ちます。file-backedは `cf:///tmp/server/org/app/main`、HTTPは `cf+http://127.0.0.1:8080/org/app/main`、HTTPSは `cf+https://127.0.0.1:8443/org/app/main` のようなURLを使います。
 - Rust v0.6 remoteはfile-backed、`cf+http://`、`cf+https://` を実装済みです。
 - HTTP transportは現時点で `upload` / `list` / `clone` / `show` / `diff` / `request-merge` / `request-list` / `request-review` / `request-apply` / `doctor` / `gc` に対応します。
 - upload時にsealed commitのobject hash、parents/roots/certificate構造、parent履歴、root object type、certificate、verification rootを検証します。
@@ -123,11 +136,11 @@ Python v0.2はPython標準ライブラリのみを使う単一ファイルCLIで
 - `doctor` / `doctor cf://.../org/app` / `doctor cf+http://.../org/app` でobject recordのhash/id/filename不一致、構造化されたmissing object reference、branch/MRが指すsealed commit参照の不正を診断できます。
 - `server_policy.json` の `permissions` で upload / request / review / apply / gc を制御できます。
 - `server_policy.json` の `branch_protection` でbranch patternごとに upload / apply を制御できます。
-- `server_policy.json` の `auth.required` と `auth.tokens` で remote のトークン認証を有効化できます。CLIは `--token` または `CODEFIRE_TOKEN` を読みます。tokenは平文互換に加えて、`codefire token-hash` が生成する `sha256:<hex>` またはsalt付きhash objectで保存できます。
-- Python v0.2とRust v0.6では `CODEFIRE_SIGNING_KEY=... codefire commit --signer alice --key-id alice-2026-06` / `codefire-rs commit ...` でcommitにHMAC署名を付与できます。remote側は `server_policy.json` の `commit_signatures.required` と `commit_signatures.keys` で upload / apply されるbranch headの署名を要求できます。key objectの `not_before` / `not_after` / `status` / `signers` により鍵世代の並行運用と失効を扱えます。
+- `server_policy.json` の `auth.required` と `auth.tokens` で remote のトークン認証を有効化できます。CLIは `--token` または `CODEFIRE_TOKEN` を読みます。tokenは平文互換に加えて、Python fallbackの `codefire-py token-hash` が生成する `sha256:<hex>` またはsalt付きhash objectで保存できます。
+- Python v0.2とRust v0.6では `CODEFIRE_SIGNING_KEY=... codefire commit --signer alice --key-id alice-2026-06` / `codefire-py commit ...` でcommitにHMAC署名を付与できます。remote側は `server_policy.json` の `commit_signatures.required` と `commit_signatures.keys` で upload / apply されるbranch headの署名を要求できます。key objectの `not_before` / `not_after` / `status` / `signers` により鍵世代の並行運用と失効を扱えます。
 - Python v0.2とRust v0.6では `CODEFIRE_REQUEST_SIGNING_KEY=...` と `--request-key-id` でremote mutating operationにHMAC request署名を付与できます。remote側は `request_signatures.required` / `request_signatures.keys` / `max_skew_seconds` / `nonce_ttl_seconds` で upload / request / review / apply の署名とnonce replayを検証できます。Python v0.2のremote GC request署名も同じpolicyで扱います。
-- Python v0.2とRust v0.6では `codefire serve --tls-cert CERT --tls-key KEY` / `codefire-rs serve --tls-cert CERT --tls-key KEY` でHTTPS transportを有効化できます。自署名証明書をローカル検証する場合のみ `CODEFIRE_TLS_INSECURE=1` を使えます。
-- `gc cf://.../org/app` でremote object GCを実行できます。GC前にremoteのobject graphとsealed commit参照を検証し、`gc.retention_seconds` / `gc.retention_generations` により新しい到達不能objectを保護し、実行結果は `audit/gc.jsonl` に記録します。
+- Python v0.2とRust v0.6では `codefire serve --tls-cert CERT --tls-key KEY` / `codefire-py serve --tls-cert CERT --tls-key KEY` でHTTPS transportを有効化できます。自署名証明書をローカル検証する場合のみ `CODEFIRE_TLS_INSECURE=1` を使えます。
+- Python fallbackの `codefire-py gc cf://.../org/app` でremote object GCを実行できます。GC前にremoteのobject graphとsealed commit参照を検証し、`gc.retention_seconds` / `gc.retention_generations` により新しい到達不能objectを保護し、実行結果は `audit/gc.jsonl` に記録します。
 
 詳細は `docs/development/known-limitations.md` を参照してください。
 

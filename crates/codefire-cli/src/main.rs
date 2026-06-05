@@ -10,6 +10,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod automation;
 mod batch;
+mod completion;
 mod context;
 mod doctor;
 mod evidence;
@@ -36,6 +37,7 @@ use automation::{
     verification_diagnostics_json, verification_next_actions,
 };
 use batch::{has_batch_extinguish_arg, parse_extinguish_batch_args, run_extinguish_batch};
+use completion::{completion_script, help_text};
 use context::{build_context_pack, parse_context_args, print_context_summary};
 use doctor::{
     doctor_report_data_json, doctor_report_diagnostics_json, doctor_report_next_actions,
@@ -106,6 +108,20 @@ fn main() {
 
 fn run(args: Vec<String>) -> Result<(), CliError> {
     match args.first().map(String::as_str) {
+        Some("-h") | Some("--help") | Some("help") => {
+            print!("{}", help_text());
+            Ok(())
+        }
+        Some("completion") => {
+            let shell = args.get(1).ok_or_else(|| {
+                CliError::Usage("usage: codefire completion <bash|zsh>".to_string())
+            })?;
+            let script = completion_script(shell).ok_or_else(|| {
+                CliError::Usage("usage: codefire completion <bash|zsh>".to_string())
+            })?;
+            print!("{script}");
+            Ok(())
+        }
         Some("atom-index") => {
             let start = args
                 .get(1)
@@ -852,7 +868,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         }
         Some(command) => Err(CliError::Usage(format!("unsupported command: {command}"))),
         None => {
-            println!("codefire-rs foundation {}", codefire_core::VERSION);
+            print!("{}", help_text());
             Ok(())
         }
     }

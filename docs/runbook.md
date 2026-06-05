@@ -4,9 +4,9 @@
 
 ## セットアップ
 
-- Python v0.2 reference CLIは依存追加なし。Python 3.10+ の標準ライブラリだけで動く。
+- Rust v0.6 CLIは `project/crates/` 配下のCargo workspaceで、`install.sh` の既定CLIである。
+- Python v0.2 reference CLIは依存追加なし。Python 3.10+ の標準ライブラリだけで動き、`install.sh` では `codefire-py` fallbackとして配置される。
 - Python CLI本体は `project/codefire`。
-- Rust v0.6 rewriteは `project/crates/` 配下のCargo workspaceで、開発時は `cargo build --workspace` または `cargo run -p codefire-cli --bin codefire-rs -- ...` を使う。
 - 実行は `project/` 直下から行う。
 
 インストールする場合:
@@ -15,6 +15,7 @@
 cd /workspace/project
 ./install.sh --prefix "$HOME/.local"
 ./install.sh --prefix "$HOME/.local" --completion bash --completion-dir "$HOME/.local/share/bash-completion/completions"
+./install.sh --prefix "$HOME/.local" --binary ./target/release/codefire-rs
 python3 -m pip install .
 python3 -m pip install --no-build-isolation --no-deps .
 ```
@@ -30,15 +31,16 @@ cargo build --workspace
 ./target/debug/codefire-rs --help
 ```
 
-v0.6のinstaller切替が完了するまでは、`install.sh` の既定はPython `codefire` である。Rust binaryを既定の `codefire` にし、Python fallbackを `codefire-py` として残す作業は `CF-217` で追跡する。
+`install.sh` はrelease Rust binaryをbuildまたは検出して `PATH/bin/codefire` に配置し、Python reference implementationを `PATH/bin/codefire-py` として残す。`python3 -m pip install .` はPython reference implementationを `codefire` entrypointとして入れるため、Rust default installとは用途を分ける。
 
 ## 実行
 
 ```bash
 cd /workspace/project
+./target/debug/codefire-rs --help
+./target/debug/codefire-rs completion bash
+./target/debug/codefire-rs completion zsh
 ./codefire --help
-./codefire completion bash
-./codefire completion zsh
 ```
 
 一気通貫デモ:
@@ -55,17 +57,17 @@ cd /workspace/project
 ```bash
 tmp=$(mktemp -d)
 cd "$tmp"
-/workspace/project/codefire init
-/workspace/project/codefire open main "$tmp/main"
+/workspace/project/target/debug/codefire-rs init
+/workspace/project/target/debug/codefire-rs open main "$tmp/main"
 cd "$tmp/main"
 
 # codefire.yaml / codefire.links.yaml / codefire.policy.yaml と
 # docs/spec, docs/design, src, tests を作成する
 
-/workspace/project/codefire scan
-/workspace/project/codefire extinguish FIRE-001 --resolution changed --evidence initial-import
-/workspace/project/codefire verify
-/workspace/project/codefire commit -m "Initial consistent commit"
+/workspace/project/target/debug/codefire-rs scan
+/workspace/project/target/debug/codefire-rs extinguish FIRE-001 --resolution changed --evidence initial-import
+/workspace/project/target/debug/codefire-rs verify
+/workspace/project/target/debug/codefire-rs commit -m "Initial consistent commit"
 ```
 
 `codefire.policy.yaml` の verification command は複数指定できる:
@@ -131,7 +133,7 @@ mr_id=$(/workspace/project/codefire request-list "cf://$server/org/app" | awk 'N
 /workspace/project/codefire gc "cf://$server/org/app"
 ```
 
-remote HTTP server の例:
+remote HTTP server の例。`gc` はPython fallbackで実行する:
 
 ```bash
 storage=$(mktemp -d)

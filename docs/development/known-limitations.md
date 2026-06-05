@@ -70,6 +70,19 @@
 
 実運用で見つかった不具合やバグに近いUXは `docs/development/bug-backlog.md` に分離して管理する。
 
+### Rust default and Python fallback
+
+Rust v0.6 is the default installed `codefire` CLI. Python v0.2 remains the reference/fallback as installed `codefire-py` or repository-local `./codefire`.
+
+The Python fallback still owns Python-only maintenance commands that are not part of the Rust v0.6 default CLI surface yet:
+
+- `close`
+- `discard`
+- `gc`
+- `token-hash`
+
+Rust v0.6 covers the release-critical local workflow, file-backed/HTTP/HTTPS remote upload/list/clone/show/diff/MR operations, diagnostics, migration checks, signatures, automation JSON, storage/evidence, diff/merge intelligence, completion, and installer default behavior. Use Python fallback for remote GC and token hash generation until those maintenance commands are explicitly ported.
+
 ### Config YAML subset
 
 現在は標準ライブラリのみで動かすため、`codefire.yaml`, `codefire.links.yaml`, `codefire.policy.yaml` はMVPに必要な形だけを読む限定YAML subsetとして処理している。
@@ -180,6 +193,6 @@ semantic merge、Atom-level自動解決、AI提案は未実装。競合時はcon
 
 ### Packaging
 
-現在のinstall既定は `project/codefire` のPython単一ファイルCLIであり、`install.sh --prefix PATH` で `PATH/bin/codefire` に配置できる。`pyproject.toml` / `setup.py` はsetuptools script installに対応しており、`python3 -m pip install .` でも `codefire` を配置できる。`codefire completion bash|zsh` でshell completionを生成でき、`install.sh --completion bash|zsh` で配置できる。Rust v0.6で `codefire-rs` を `codefire` 既定にし、Python fallbackを `codefire-py` として残す切替は `CF-217` の残作業である。
+`install.sh --prefix PATH` はRust v0.6 binaryを `PATH/bin/codefire` に配置し、Python v0.2 reference implementationを `PATH/bin/codefire-py` に配置する。`codefire completion bash|zsh` でRust CLIのshell completionを生成でき、`install.sh --completion bash|zsh` で配置できる。`pyproject.toml` / `setup.py` はPython reference implementationのsetuptools script installに対応しており、`python3 -m pip install .` はPython版 `codefire` entrypointを配置するため、Rust default installとは別経路として扱う。
 
-Rust workspace自体は `Cargo.toml` / `crates/codefire-*` として作成済みで、`codefire-rs` binaryも開発中である。ただしpackage indexへの公開、署名付きrelease artifact、OS package、installerのRust default化は未実装である。
+Rust workspace自体は `Cargo.toml` / `crates/codefire-*` として作成済みで、installer defaultはRustへ切替済みである。ただしpackage indexへの公開、署名付きrelease artifact、OS packageは未実装である。

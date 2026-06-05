@@ -1,7 +1,29 @@
 use super::*;
+use crate::completion::{bash_completion_script, help_text, zsh_completion_script};
 use crate::doctor::DoctorOptions;
 use serde_json::{json, Map};
 use tempfile::tempdir;
+
+#[test]
+fn help_and_completion_scripts_cover_rust_default_cli() {
+    let help = help_text();
+    assert!(help.contains("usage: codefire <command> [args]"));
+    assert!(help.contains("codefire completion <bash|zsh>"));
+
+    let bash = bash_completion_script();
+    assert!(bash.contains("complete -F _codefire_complete codefire"));
+    assert!(bash.contains("request-apply"));
+    assert!(bash.contains("--details --blocking-only --json --metrics"));
+    assert!(bash.contains("--tls-cert --tls-key"));
+    assert!(!bash.contains("token-hash"));
+
+    let zsh = zsh_completion_script();
+    assert!(zsh.contains("#compdef codefire"));
+    assert!(zsh.contains("completion\\:completion"));
+    assert!(zsh.contains("--details[show failed verification diagnostic details]"));
+    assert!(zsh.contains("--request-key-id[remote request signing key id]"));
+    assert!(!zsh.contains("token-hash"));
+}
 
 #[test]
 fn init_creates_python_compatible_repo_layout() {
