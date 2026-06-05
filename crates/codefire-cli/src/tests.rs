@@ -1779,6 +1779,51 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
 }
 
 #[test]
+fn storage_report_counts_file_remote_project_storage() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let server = temp.path().join("server");
+    init_repo(&repo_root, false).unwrap();
+    let project_url = format!("cf://{}/org/app", server.display());
+    let remote_project_root = crate::remote::parse_cf_project_url(&project_url)
+        .unwrap()
+        .project_root;
+    let dirs = remote_dirs(&remote_project_root);
+    fs::create_dir_all(&dirs.objects).unwrap();
+    fs::create_dir_all(&dirs.branches).unwrap();
+    fs::create_dir_all(&dirs.merge_requests).unwrap();
+    fs::create_dir_all(&dirs.idempotency).unwrap();
+    fs::write(dirs.objects.join("object.json"), "{}\n").unwrap();
+    fs::write(dirs.branches.join("main.json"), "{}\n").unwrap();
+    fs::write(dirs.merge_requests.join("mr_1.json"), "{}\n").unwrap();
+    fs::write(dirs.idempotency.join("upload.json"), "{}\n").unwrap();
+
+    let parsed = parse_storage_report_args(&[
+        repo_root.to_string_lossy().into_owned(),
+        "--remote".to_string(),
+        project_url.clone(),
+        "--remote=cf:///tmp/missing/org/app".to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    let report = run_storage_report(&parsed).unwrap();
+    let data = storage_report_data_json(&report);
+
+    assert_eq!(parsed.remotes.len(), 2);
+    assert_eq!(report.remotes.len(), 2);
+    let remote = report
+        .remotes
+        .iter()
+        .find(|remote| remote.url == project_url)
+        .unwrap();
+    assert_eq!(remote.objects.files, 1);
+    assert_eq!(remote.branches.files, 1);
+    assert_eq!(remote.merge_requests.files, 1);
+    assert_eq!(remote.idempotency.files, 1);
+    assert_eq!(data["remotes"].as_array().unwrap().len(), 2);
+}
+
+#[test]
 fn evidence_add_records_artifact_ref_and_command_capture() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
@@ -1835,6 +1880,7 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
         start: repo_root,
         json_output: false,
         large_threshold_bytes: 1024,
+        remotes: Vec::new(),
     })
     .unwrap();
     assert_eq!(storage.external_artifacts.refs, 1);

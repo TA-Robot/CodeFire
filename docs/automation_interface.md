@@ -217,6 +217,16 @@ migrate: review_migration_plan, inspect_migration_blockers
   "active_state": {"files": 1, "bytes": 28},
   "idempotency": {"files": 0, "bytes": 0},
   "external_artifacts": {"refs": 0, "referenced_bytes": 0, "payload_bytes_stored": 0},
+  "remotes": [
+    {
+      "url": "cf:///srv/codefire/org/app",
+      "project_root": "/srv/codefire/.codefire-server/projects/org/app",
+      "objects": {"files": 20, "bytes": 8192},
+      "branches": {"files": 2, "bytes": 256},
+      "merge_requests": {"files": 1, "bytes": 512},
+      "idempotency": {"files": 0, "bytes": 0}
+    }
+  ],
   "warnings": []
 }
 ```

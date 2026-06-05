@@ -1,3 +1,4 @@
+use super::remote::{parse_cf_project_url, remote_dirs};
 use super::{find_repo_root, read_json, CliError};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -11,6 +12,7 @@ pub(crate) struct StorageReportOptions {
     pub(crate) start: PathBuf,
     pub(crate) json_output: bool,
     pub(crate) large_threshold_bytes: u64,
+    pub(crate) remotes: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -22,10 +24,11 @@ pub(crate) struct StorageReport {
     pub(crate) object_types: Vec<ObjectTypeStats>,
     pub(crate) largest_objects: Vec<ObjectFileStats>,
     pub(crate) external_artifacts: ExternalArtifactStats,
+    pub(crate) remotes: Vec<RemoteStorageStats>,
     pub(crate) warnings: Vec<StorageWarning>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct AreaStats {
     pub(crate) files: u64,
     pub(crate) bytes: u64,
@@ -54,6 +57,16 @@ pub(crate) struct ExternalArtifactStats {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RemoteStorageStats {
+    pub(crate) url: String,
+    pub(crate) project_root: PathBuf,
+    pub(crate) objects: AreaStats,
+    pub(crate) branches: AreaStats,
+    pub(crate) merge_requests: AreaStats,
+    pub(crate) idempotency: AreaStats,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StorageWarning {
     pub(crate) kind: String,
     pub(crate) message: String,
@@ -65,10 +78,18 @@ pub(crate) fn parse_storage_report_args(args: &[String]) -> Result<StorageReport
     let mut start = None;
     let mut json_output = false;
     let mut large_threshold_bytes = DEFAULT_LARGE_THRESHOLD_BYTES;
+    let mut remotes = Vec::new();
     let mut index = 0usize;
     while index < args.len() {
         match args[index].as_str() {
             "--json" => json_output = true,
+            "--remote" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--remote requires a value".to_string()))?;
+                remotes.push(value.to_string());
+            }
             "--large-threshold" => {
                 index += 1;
                 let value = args.get(index).ok_or_else(|| {
@@ -79,6 +100,9 @@ pub(crate) fn parse_storage_report_args(args: &[String]) -> Result<StorageReport
             value if value.starts_with("--large-threshold=") => {
                 large_threshold_bytes =
                     parse_byte_size(value.trim_start_matches("--large-threshold="))?;
+            }
+            value if value.starts_with("--remote=") => {
+                remotes.push(value.trim_start_matches("--remote=").to_string());
             }
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
@@ -98,6 +122,7 @@ pub(crate) fn parse_storage_report_args(args: &[String]) -> Result<StorageReport
         start: start.unwrap_or(std::env::current_dir()?),
         json_output,
         large_threshold_bytes,
+        remotes,
     })
 }
 
@@ -115,6 +140,7 @@ pub(crate) fn run_storage_report(
         object_types: object_scan.object_types,
         largest_objects: object_scan.largest_objects,
         external_artifacts: object_scan.external_artifacts,
+        remotes: scan_remote_storage(&options.remotes)?,
         warnings: object_scan.warnings,
     })
 }
@@ -143,6 +169,7 @@ pub(crate) fn storage_report_data_json(report: &StorageReport) -> Value {
             "referenced_bytes": report.external_artifacts.referenced_bytes,
             "payload_bytes_stored": report.external_artifacts.payload_bytes_stored,
         },
+        "remotes": report.remotes.iter().map(remote_storage_json).collect::<Vec<_>>(),
         "warnings": report.warnings.iter().map(storage_warning_json).collect::<Vec<_>>(),
     })
 }
@@ -191,6 +218,21 @@ pub(crate) fn print_storage_report(report: &StorageReport) {
         format_bytes(report.external_artifacts.referenced_bytes),
         format_bytes(report.external_artifacts.payload_bytes_stored)
     );
+    println!("remotes:");
+    if report.remotes.is_empty() {
+        println!("  none");
+    } else {
+        for remote in &report.remotes {
+            println!(
+                "  {}: objects {} files, {}; branches {}; merge requests {}",
+                remote.url,
+                remote.objects.files,
+                format_bytes(remote.objects.bytes),
+                remote.branches.files,
+                remote.merge_requests.files
+            );
+        }
+    }
     println!("largest object types:");
     if report.object_types.is_empty() {
         println!("  none");
@@ -344,6 +386,24 @@ fn scan_area(path: &Path) -> Result<AreaStats, CliError> {
     Ok(stats)
 }
 
+fn scan_remote_storage(remote_urls: &[String]) -> Result<Vec<RemoteStorageStats>, CliError> {
+    remote_urls
+        .iter()
+        .map(|url| {
+            let project = parse_cf_project_url(url)?;
+            let dirs = remote_dirs(&project.project_root);
+            Ok(RemoteStorageStats {
+                url: url.clone(),
+                project_root: project.project_root,
+                objects: scan_area(&dirs.objects)?,
+                branches: scan_area(&dirs.branches)?,
+                merge_requests: scan_area(&dirs.merge_requests)?,
+                idempotency: scan_area(&dirs.idempotency)?,
+            })
+        })
+        .collect()
+}
+
 fn collect_files(root: &Path) -> Result<Vec<PathBuf>, CliError> {
     if !root.exists() {
         return Ok(Vec::new());
@@ -388,6 +448,17 @@ fn storage_warning_json(warning: &StorageWarning) -> Value {
         "message": &warning.message,
         "path": &warning.path,
         "bytes": warning.bytes,
+    })
+}
+
+fn remote_storage_json(stats: &RemoteStorageStats) -> Value {
+    json!({
+        "url": &stats.url,
+        "project_root": &stats.project_root,
+        "objects": {"files": stats.objects.files, "bytes": stats.objects.bytes},
+        "branches": {"files": stats.branches.files, "bytes": stats.branches.bytes},
+        "merge_requests": {"files": stats.merge_requests.files, "bytes": stats.merge_requests.bytes},
+        "idempotency": {"files": stats.idempotency.files, "bytes": stats.idempotency.bytes},
     })
 }
 
