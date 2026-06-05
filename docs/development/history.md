@@ -159,6 +159,7 @@
 | 2026-06-05 | Rust Security | Rust CLIにcommit HMAC署名、commit signature policy検証、request HMAC署名、timestamp skew検証、nonce replay cacheを追加した | `crates/codefire-cli/src/signatures.rs`, `crates/codefire-cli/src/main.rs`, `crates/codefire-cli/src/remote.rs`, `crates/codefire-cli/src/http.rs`, docs | `cargo fmt --check`; `cargo clippy --workspace --all-targets -- -D warnings`; `cargo test --workspace`; `cargo build --workspace`; file-backed signed remote smoke; HTTP signed remote smoke; unsigned upload rejection smoke |
 | 2026-06-05 | Docs | Rust v0.6本流で単一ファイル肥大化を避けるため、module/file分割基準を専用文書化し、AGENTS/workflow/quality/backlogから参照した | `AGENTS.md`, `docs/development/module-boundaries.md`, `docs/development/agent-code-quality.md`, `docs/development/agent-workflow.md`, `docs/development/bug-backlog.md` | docs-only update |
 | 2026-06-05 | Release | Rust CLI completion/helpを追加し、`install.sh` をRust `codefire` default + Python `codefire-py` fallbackへ切り替えた | `crates/codefire-cli/src/completion.rs`, `crates/codefire-cli/src/main.rs`, `install.sh`, docs | `bash -n install.sh`; `cargo fmt --check`; `cargo clippy --workspace --all-targets -- -D warnings`; `cargo test --workspace`; `cargo build --workspace`; Python unittest 87 tests; `./demo.sh`; Rust local/file-backed/HTTP/HTTPS smoke; Rust signature live/unit smoke; temp prefix install smoke |
+| 2026-06-05 | Dogfood | `algorithm-evolution-agent-lab` のPhase 4作業で見えたstatus/scan予告差分とextinguish batch導線のUX課題をbug backlogへ追記した | `docs/development/bug-backlog.md` | docs-only update; CFB-010, CFB-011 |
 
 ## Current Decisions
 
