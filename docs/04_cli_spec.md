@@ -239,6 +239,17 @@ codefire extinguish FIRE-001 \
   --resolution addressed \
   --evidence-ref CF-EVIDENCE-abc123
 
+codefire extinguish FIRE-001 \
+  --resolution addressed \
+  --edit-rationale \
+  --evidence-ref CF-EVIDENCE-abc123
+
+codefire extinguish --interactive --json
+
+codefire extinguish --all-matching "REQ-session -> DES-session" \
+  --resolution addressed \
+  --rationale "同じsource/targetのfireを同一根拠で確認した"
+
 codefire extinguish --batch .codefire/fires-to-extinguish.yaml --dry-run --json
 ```
 
@@ -251,10 +262,15 @@ basisとしてsource/target/link/policy hashを保存する
 必要なrationale/evidence/evidence-refがない場合は拒否する
 --evidence-refは既存のevidence object IDを参照し、resolution.evidence_refsへ保存する
 --evidence-refが存在しない、またはevidence以外のobjectを指す場合は拒否する
+--edit-rationaleはCODEFIRE_EDITORまたはEDITORで一時draftを開き、保存後の本文をrationaleとして使う
 --dry-runはfire/resolution ledgerを書き換えず、codefire_operation_planを返す
 --idempotency-keyは成功したextinguish resultを.codefire/idempotency/extinguish/へ記録する
 同じ--idempotency-keyかつ同じextinguish request payloadは保存済みextinguish resultを返し、新しいledger entryを作らない
 同じ--idempotency-keyでfire/resolution/rationale/evidence/evidence-ref/refresh/open_dir/branchが異なるpayloadはexit code 33で拒否する
+--interactiveはopen fire、直近evidence object候補、editor付きdraft commandを返す
+--interactive --jsonはtype=codefire_extinguish_interactive_planを返す
+--all-matching "SOURCE -> TARGET"はsource_atom/target_atomが一致するopen fireを同じresolution/rationale/evidence/evidence-refで一括解消する
+--all-matching --dry-run --jsonはcommand=extinguish-all-matchingのcodefire_operation_planを返し、各fireの単発extinguish validation planをfiresに含める
 --batchはversion/defaults/firesだけを持つstrict limited YAMLまたは同等JSONを受け取る
 --batchは全fire itemを事前検証し、unknown fire、重複fire id、必須rationale/evidence/evidence-ref不足があればledgerを書き換えない
 --batch --dry-run --jsonはcommand=extinguish-batchのcodefire_operation_planを返し、全itemの単発extinguish validation planをitemsに含める

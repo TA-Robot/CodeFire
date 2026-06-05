@@ -15,6 +15,7 @@ mod doctor;
 mod evidence;
 mod exit_code;
 mod explain;
+mod extinguish_ux;
 mod fire;
 mod http;
 mod idempotency;
@@ -46,6 +47,12 @@ use exit_code::{
     core_error_exit_code, store_error_exit_code, usage_exit_code, verification_exit_code, ExitCode,
 };
 use explain::{parse_explain_args, print_explain_result, run_explain};
+use extinguish_ux::{
+    has_all_matching_extinguish_arg, has_interactive_extinguish_arg,
+    parse_all_matching_extinguish_args, parse_interactive_extinguish_args,
+    prepare_extinguish_options, print_all_matching_extinguish_result,
+    print_interactive_extinguish_result, run_all_matching_extinguish, run_interactive_extinguish,
+};
 use fire::{
     fire_batch_data_json, fire_data_json, parse_fire_args, parse_fire_batch_args,
     print_fire_result, run_fire, run_fire_batch,
@@ -261,7 +268,23 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("extinguish") => {
-            if has_batch_extinguish_arg(&args[1..]) {
+            if has_interactive_extinguish_arg(&args[1..]) {
+                let options = parse_interactive_extinguish_args(&args[1..])?;
+                let result = run_interactive_extinguish(&options)?;
+                if options.json_output {
+                    println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                } else {
+                    print_interactive_extinguish_result(&result);
+                }
+            } else if has_all_matching_extinguish_arg(&args[1..]) {
+                let options = parse_all_matching_extinguish_args(&args[1..])?;
+                let result = run_all_matching_extinguish(&options)?;
+                if options.json_output {
+                    println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                } else {
+                    print_all_matching_extinguish_result(&options, &result);
+                }
+            } else if has_batch_extinguish_arg(&args[1..]) {
                 let options = parse_extinguish_batch_args(&args[1..])?;
                 let result = run_extinguish_batch(&options)?;
                 if options.json_output {
@@ -275,7 +298,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     println!("extinguished {} fires", result.item_count);
                 }
             } else {
-                let options = parse_extinguish_args(&args[1..])?;
+                let options = prepare_extinguish_options(parse_extinguish_args(&args[1..])?)?;
                 let result = run_extinguish(&options)?;
                 if options.json_output {
                     println!("{}", serde_json::to_string_pretty(&result.plan)?);
@@ -987,6 +1010,7 @@ struct ExtinguishOptions {
     json_output: bool,
     lock: LockOptions,
     idempotency_key: Option<String>,
+    edit_rationale: bool,
 }
 
 #[derive(Debug)]
@@ -1314,6 +1338,7 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
     let mut json_output = false;
     let mut lock = LockOptions::default();
     let mut idempotency_key = None;
+    let mut edit_rationale = false;
     let mut index = 0usize;
     while index < args.len() {
         if parse_lock_option(args, &mut index, &mut lock)? {
@@ -1362,6 +1387,7 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
             "--refresh" => refresh = true,
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
+            "--edit-rationale" => edit_rationale = true,
             "--idempotency-key" => {
                 index += 1;
                 idempotency_key = Some(
@@ -1401,6 +1427,7 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
         json_output,
         lock,
         idempotency_key,
+        edit_rationale,
     })
 }
 

@@ -1516,6 +1516,7 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
         json_output: true,
         lock: LockOptions::default(),
         idempotency_key: None,
+        edit_rationale: false,
     })
     .unwrap();
     let active = active_state_path(&open_dir);
@@ -1580,6 +1581,7 @@ fn extinguish_idempotency_key_replays_same_payload_and_rejects_conflict() {
         json_output: false,
         lock: LockOptions::default(),
         idempotency_key: Some("extinguish-fire-once".to_string()),
+        edit_rationale: false,
     })
     .unwrap();
     assert_eq!(first.display_id, "FIRE-001");
@@ -1596,6 +1598,7 @@ fn extinguish_idempotency_key_replays_same_payload_and_rejects_conflict() {
         json_output: false,
         lock: LockOptions::default(),
         idempotency_key: Some("extinguish-fire-once".to_string()),
+        edit_rationale: false,
     })
     .unwrap();
     assert_eq!(replay.display_id, first.display_id);
@@ -1613,6 +1616,7 @@ fn extinguish_idempotency_key_replays_same_payload_and_rejects_conflict() {
         json_output: false,
         lock: LockOptions::default(),
         idempotency_key: Some("extinguish-fire-once".to_string()),
+        edit_rationale: false,
     })
     .unwrap_err();
     assert_eq!(conflict.exit_code(), ExitCode::IdempotencyConflict.code());
@@ -1716,6 +1720,191 @@ fires:
         2
     );
     assert_eq!(resolutions.len(), 2);
+}
+
+#[test]
+fn interactive_extinguish_plan_lists_open_fires_and_recent_evidence() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design").join("session.md"),
+        "## DES-session: Design\nClock policy\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("codefire.links.yaml"),
+        "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
+    )
+    .unwrap();
+    let evidence_id = codefire_store::store_object(
+        &repo_root.join(".codefire").join("objects"),
+        "evidence",
+        json!({
+            "type": "evidence",
+            "version": 1,
+            "label": "pytest",
+            "artifact_ref": null,
+            "command": {
+                "command": "pytest -q",
+                "exit_code": 0,
+                "success": true
+            },
+            "created_at": "2026-06-05T00:00:00Z"
+        }),
+    )
+    .unwrap();
+
+    let options = extinguish_ux::parse_interactive_extinguish_args(&[
+        "--interactive".to_string(),
+        "--path".to_string(),
+        open_dir.display().to_string(),
+        "--json".to_string(),
+        "--evidence-limit".to_string(),
+        "1".to_string(),
+    ])
+    .unwrap();
+    let result = extinguish_ux::run_interactive_extinguish(&options).unwrap();
+
+    assert_eq!(result.plan["type"], "codefire_extinguish_interactive_plan");
+    assert_eq!(result.plan["command"], "extinguish-interactive");
+    assert_eq!(result.plan["evidence_candidates"][0]["id"], evidence_id);
+    assert!(result.plan["open_fires"].as_array().unwrap().len() >= 2);
+    assert!(result.plan["draft_commands"][0]["command"]
+        .as_str()
+        .unwrap()
+        .contains(&evidence_id));
+}
+
+#[test]
+fn all_matching_extinguish_extinguishes_source_target_subset() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design").join("session.md"),
+        "## DES-session: Design\nClock policy\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("codefire.links.yaml"),
+        "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
+    )
+    .unwrap();
+
+    let options = extinguish_ux::parse_all_matching_extinguish_args(&[
+        "--all-matching".to_string(),
+        "REQ-session -> DES-session".to_string(),
+        "--path".to_string(),
+        open_dir.display().to_string(),
+        "--rationale".to_string(),
+        "source target link reviewed".to_string(),
+    ])
+    .unwrap();
+    let result = extinguish_ux::run_all_matching_extinguish(&options).unwrap();
+
+    assert_eq!(result.item_count, 1);
+    assert_eq!(result.plan["command"], "extinguish-all-matching");
+    let fires: Vec<codefire_core::Fire> = serde_json::from_value(
+        read_json(&active_state_path(&open_dir).join("fires.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        fires
+            .iter()
+            .filter(|fire| fire.status == "extinguished")
+            .count(),
+        1
+    );
+    assert!(fires.iter().any(|fire| fire.status == "open"));
+}
+
+#[test]
+fn all_matching_extinguish_args_accept_equals_form_and_editor_flag() {
+    let parsed = extinguish_ux::parse_all_matching_extinguish_args(&[
+        "--all-matching=REQ-session -> DES-session".to_string(),
+        "--path=/tmp/open".to_string(),
+        "--edit-rationale".to_string(),
+        "--evidence".to_string(),
+        "pytest passed".to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+
+    assert_eq!(parsed.query, "REQ-session -> DES-session");
+    assert_eq!(parsed.path, PathBuf::from("/tmp/open"));
+    assert!(parsed.edit_rationale);
+    assert!(parsed.dry_run);
+    assert!(parsed.json_output);
+}
+
+#[cfg(unix)]
+#[test]
+fn edit_rationale_reads_configured_editor_output() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = tempdir().unwrap();
+    let editor = temp.path().join("editor.sh");
+    fs::write(
+        &editor,
+        "#!/bin/sh\nprintf 'edited rationale from editor\\n' > \"$1\"\n",
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(&editor).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&editor, permissions).unwrap();
+
+    let rationale =
+        extinguish_ux::resolve_rationale_with_editor("initial rationale", &editor).unwrap();
+
+    assert_eq!(rationale, "edited rationale from editor");
 }
 
 #[test]
@@ -2086,6 +2275,7 @@ fn extinguish_evidence_ref_links_resolution_and_verify_detects_missing_ref() {
         json_output: false,
         lock: LockOptions::default(),
         idempotency_key: None,
+        edit_rationale: false,
     })
     .unwrap();
 
