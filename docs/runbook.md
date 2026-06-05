@@ -4,8 +4,9 @@
 
 ## セットアップ
 
-- 依存追加なし。Python 3.10+ の標準ライブラリだけで動く。
-- CLI本体は `project/codefire`。
+- Python v0.2 reference CLIは依存追加なし。Python 3.10+ の標準ライブラリだけで動く。
+- Python CLI本体は `project/codefire`。
+- Rust v0.6 rewriteは `project/crates/` 配下のCargo workspaceで、開発時は `cargo build --workspace` または `cargo run -p codefire-cli --bin codefire-rs -- ...` を使う。
 - 実行は `project/` 直下から行う。
 
 インストールする場合:
@@ -17,6 +18,19 @@ cd /workspace/project
 python3 -m pip install .
 python3 -m pip install --no-build-isolation --no-deps .
 ```
+
+Rust v0.6 rewriteを開発確認する場合:
+
+```bash
+cd /workspace/project
+cargo fmt --check
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo build --workspace
+./target/debug/codefire-rs --help
+```
+
+v0.6のinstaller切替が完了するまでは、`install.sh` の既定はPython `codefire` である。Rust binaryを既定の `codefire` にし、Python fallbackを `codefire-py` として残す作業は `CF-217` で追跡する。
 
 ## 実行
 
@@ -144,6 +158,8 @@ cd "$tmp"
 ```
 
 remote HTTPS server の例:
+
+この手順はPython v0.2 `codefire` のHTTPS確認用である。Rust v0.6 `codefire-rs serve` は現時点では `cf+http://` まで対応しており、`cf+https://` TLS transportは `CF-212` の残作業である。
 
 ```bash
 storage=$(mktemp -d)

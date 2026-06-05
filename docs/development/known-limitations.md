@@ -1,6 +1,6 @@
 # CodeFire Known Limitations
 
-このファイルは、現在の実装で意図的に残している制約と、v0.3以降で詰めるべき項目を明示する。
+このファイルは、Python v0.2 reference implementationとRust v0.6 rewriteで意図的に残している制約、互換性差分、release前に詰めるべき項目を明示する。
 
 ## MVPで実装済みの範囲
 
@@ -81,7 +81,7 @@
 
 この方針は `adr/ADR-007-limited-config-yaml-subset.md` に記録している。
 
-v0.3以降で一般YAML parserへ移行する余地は残す。
+将来的に一般YAML parserへ移行する余地は残す。
 
 ### Object ID and Commit ID
 
@@ -93,7 +93,7 @@ commit payload内に自身の `commit_id` を含めると循環参照になる�
 
 ### Remote Features
 
-remote機能は、ローカルファイル-backed serverと最小HTTP serverとして実装している。
+remote機能は、Python v0.2ではローカルファイル-backed server、HTTP server、HTTPS serverとして実装している。Rust v0.6 rewriteではfile-backed remoteと `cf+http://` serverは実装済みだが、`cf+https://` TLS transportは `CF-212` の残作業である。
 
 URL例:
 
@@ -103,9 +103,9 @@ cf+http://127.0.0.1:8080/org/app/main
 cf+https://127.0.0.1:8443/org/app/main
 ```
 
-server側は `.codefire-server/projects/<org>/<app>/` にsealed object、branch、merge requestを保存する。`codefire serve <storage-root>` は同じ保存形式をHTTP/HTTPS越しに公開する。
+server側は `.codefire-server/projects/<org>/<app>/` にsealed object、branch、merge requestを保存する。Python v0.2の `codefire serve <storage-root>` は同じ保存形式をHTTP/HTTPS越しに公開する。Rust v0.6の `codefire-rs serve <storage-root>` は現時点ではHTTP公開までで、TLSは未実装である。
 
-HTTP transportで実装済み:
+Python v0.2のHTTP/HTTPS transportとRust v0.6のHTTP transportで実装済み:
 
 - `upload`
 - `list`
@@ -119,7 +119,7 @@ HTTP transportで実装済み:
 - `doctor`
 - `gc`
 
-HTTPS transportは `codefire serve --tls-cert --tls-key` で有効化できる。通常のTLS証明書検証を使い、自署名証明書のローカル検証時のみ `CODEFIRE_TLS_INSECURE=1` で検証を無効化できる。
+Python v0.2のHTTPS transportは `codefire serve --tls-cert --tls-key` で有効化できる。通常のTLS証明書検証を使い、自署名証明書のローカル検証時のみ `CODEFIRE_TLS_INSECURE=1` で検証を無効化できる。Rust v0.6では同じCLI surfaceを復元する必要があり、TLS実装は `CF-212` で追跡する。
 
 server-side verificationは `server_policy.json` に書いたcommandをremote project root配下で実行する。checkごとに `cwd`、`env`、`timeout_seconds` を指定でき、`cwd` はremote project root配下に制限される。親プロセス環境は丸ごと渡さず、最小環境、CodeFire remote metadata、checkごとの `env` だけを渡す。OS-level sandboxやコンテナ隔離はまだ持たない。
 
@@ -129,8 +129,8 @@ permissionは `server_policy.json` の `permissions` で操作ごとにactor名�
 branch protectionは `server_policy.json` の `branch_protection` でbranch patternごとに `upload` / `apply` のactorを制御するfile-backed実装である。
 `auth.required` と `auth.tokens` を設定すると、mutating operationは `--token` または `CODEFIRE_TOKEN` の一致も要求する。
 tokenは既存互換の平文文字列に加えて、`sha256:<hex>` 文字列またはsalt付きhash objectとして保存できる。これはremote policy内の平文token保存を避けるためのMVP機能である。
-commitは `CODEFIRE_SIGNING_KEY` と `--signer` / `--key-id` でHMAC-SHA256署名を付与でき、remote policyの `commit_signatures.required` / `commit_signatures.keys` でupload/applyされるbranch headへの署名を要求できる。key objectの `not_before` / `not_after` / `status` / `signers` と `require_history` により、MVP範囲のkey rotationと失効検査を扱える。これは共有鍵署名であり、公開鍵署名と外部KMS連携はまだ持たない。
-remote mutating operationは `CODEFIRE_REQUEST_SIGNING_KEY` と `--request-key-id` でHMAC-SHA256 request署名を付与でき、remote policyの `request_signatures.required` / `request_signatures.keys` / `max_skew_seconds` / `nonce_ttl_seconds` で署名、timestampずれ、nonce replayを検証できる。これは共有鍵request署名であり、公開鍵署名、外部KMS連携、分散remote向けの共有nonce storeはまだ持たない。
+Python v0.2ではcommitは `CODEFIRE_SIGNING_KEY` と `--signer` / `--key-id` でHMAC-SHA256署名を付与でき、remote policyの `commit_signatures.required` / `commit_signatures.keys` でupload/applyされるbranch headへの署名を要求できる。key objectの `not_before` / `not_after` / `status` / `signers` と `require_history` により、MVP範囲のkey rotationと失効検査を扱える。Rust v0.6のcommit/request signature parityは `CF-213` の残作業である。これは共有鍵署名であり、公開鍵署名と外部KMS連携はまだ持たない。
+Python v0.2ではremote mutating operationは `CODEFIRE_REQUEST_SIGNING_KEY` と `--request-key-id` でHMAC-SHA256 request署名を付与でき、remote policyの `request_signatures.required` / `request_signatures.keys` / `max_skew_seconds` / `nonce_ttl_seconds` で署名、timestampずれ、nonce replayを検証できる。Rust v0.6のrequest signature parityは `CF-213` の残作業である。これは共有鍵request署名であり、公開鍵署名、外部KMS連携、分散remote向けの共有nonce storeはまだ持たない。
 
 GCは削除前にobject hash、missing object reference、sealed commit参照を検査する。健全なremoteでは到達不能objectを削除し、`gc.retention_seconds` と `gc.retention_generations` により新しい到達不能objectを保護できる。
 remote projectは `gc_state.json` に現在世代を保存し、branch head更新ごとに世代を進める。remote object recordには `remote.first_seen_generation` / `remote.last_seen_generation` を付与する。
@@ -180,6 +180,6 @@ semantic merge、Atom-level自動解決、AI提案は未実装。競合時はcon
 
 ### Packaging
 
-現在は `project/codefire` の単一ファイルCLIであり、`install.sh --prefix PATH` で `PATH/bin/codefire` に配置できる。`pyproject.toml` / `setup.py` はsetuptools script installに対応しており、`python3 -m pip install .` でも `codefire` を配置できる。`codefire completion bash|zsh` でshell completionを生成でき、`install.sh --completion bash|zsh` で配置できる。
+現在のinstall既定は `project/codefire` のPython単一ファイルCLIであり、`install.sh --prefix PATH` で `PATH/bin/codefire` に配置できる。`pyproject.toml` / `setup.py` はsetuptools script installに対応しており、`python3 -m pip install .` でも `codefire` を配置できる。`codefire completion bash|zsh` でshell completionを生成でき、`install.sh --completion bash|zsh` で配置できる。Rust v0.6で `codefire-rs` を `codefire` 既定にし、Python fallbackを `codefire-py` として残す切替は `CF-217` の残作業である。
 
-Rust workspace構成案は設計資料に残しているが、まだ移行していない。package indexへの公開、署名付きrelease artifact、OS packageは未実装。
+Rust workspace自体は `Cargo.toml` / `crates/codefire-*` として作成済みで、`codefire-rs` binaryも開発中である。ただしpackage indexへの公開、署名付きrelease artifact、OS package、installerのRust default化は未実装である。
