@@ -1,4 +1,5 @@
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fmt;
@@ -28,9 +29,9 @@ use exit_code::{
 use http::{http_json, http_remote_path, parse_cf_http_url, serve_http};
 use remote::{
     apply_merge_request, copy_object_graph, list_merge_requests, list_remote_branches,
-    load_remote_branch, parse_cf_url, remote_dirs, request_merge, review_merge_request,
-    upload_branch, write_object_records, RemoteProjectOptions, RequestApplyOptions,
-    RequestMergeOptions, RequestReviewOptions, UploadOptions,
+    load_remote_branch, parse_cf_url, read_optional_json, remote_dirs, request_merge,
+    review_merge_request, upload_branch, write_object_records, RemoteProjectOptions,
+    RequestApplyOptions, RequestMergeOptions, RequestReviewOptions, UploadOptions,
 };
 use view::{
     diff_commitish_with_options, manifest_contents, patch_export_with_options,
@@ -496,6 +497,7 @@ enum CliError {
     Core(codefire_core::CoreError),
     Store(codefire_store::StoreError),
     Usage(String),
+    IdempotencyConflict(String),
     VerificationFailed(ExitCode),
     NotOpen(PathBuf),
     InvalidMarker(String),
@@ -511,6 +513,7 @@ impl CliError {
             CliError::Core(error) => core_error_exit_code(error),
             CliError::Store(error) => store_error_exit_code(error),
             CliError::Usage(message) => usage_exit_code(message),
+            CliError::IdempotencyConflict(_) => ExitCode::IdempotencyConflict,
             CliError::VerificationFailed(exit_code) => *exit_code,
             CliError::NotOpen(_) => ExitCode::InvalidUsageOrConfig,
             CliError::InvalidMarker(_) | CliError::InvalidRepository(_) => {
@@ -530,6 +533,7 @@ impl fmt::Display for CliError {
             CliError::Core(error) => write!(f, "{error}"),
             CliError::Store(error) => write!(f, "{error}"),
             CliError::Usage(message) => write!(f, "{message}"),
+            CliError::IdempotencyConflict(message) => write!(f, "{message}"),
             CliError::VerificationFailed(_) => write!(f, "verification failed"),
             CliError::NotOpen(path) => write!(
                 f,
@@ -655,6 +659,7 @@ struct CommitOptions {
     dry_run: bool,
     json_output: bool,
     lock: LockOptions,
+    idempotency_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -1086,6 +1091,7 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
     let mut dry_run = false;
     let mut json_output = false;
     let mut lock = LockOptions::default();
+    let mut idempotency_key = None;
     let mut index = 0usize;
     while index < args.len() {
         if parse_lock_option(args, &mut index, &mut lock)? {
@@ -1107,6 +1113,19 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
                         .to_string(),
                 );
             }
+            "--idempotency-key" => {
+                index += 1;
+                idempotency_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--idempotency-key requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--idempotency-key=") => {
+                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+            }
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
             value if path.is_none() => path = Some(PathBuf::from(value)),
@@ -1124,6 +1143,7 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
         dry_run,
         json_output,
         lock,
+        idempotency_key,
     })
 }
 
@@ -2666,6 +2686,14 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
 fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
     let context = open_context(&options.path)?;
     let _lock = RepoLock::acquire_with_options(&context.repo_root, &options.lock)?;
+    let idempotency_payload = commit_idempotency_payload(options, &context);
+    if let Some(key) = options.idempotency_key.as_deref() {
+        if let Some(result) =
+            load_commit_idempotency(&context.repo_root, key, &idempotency_payload)?
+        {
+            return Ok(result);
+        }
+    }
     let active_state_path = PathBuf::from(required_string(
         &context.registry,
         &["open", "active_state_path"],
@@ -2788,11 +2816,119 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
     write_json_atomic(&context.registry_path, &registry)?;
     reset_active(&active_state_path, "open-clean")?;
 
-    Ok(CommitResult {
+    let result = CommitResult {
         commit_id,
         branch: context.branch,
         plan,
+    };
+    if let Some(key) = options.idempotency_key.as_deref() {
+        save_commit_idempotency(&context.repo_root, key, &idempotency_payload, &result)?;
+    }
+    Ok(result)
+}
+
+fn commit_idempotency_payload(options: &CommitOptions, context: &OpenContext) -> Value {
+    json!({
+        "command": "commit",
+        "branch": &context.branch,
+        "open_dir": &context.open_dir,
+        "message": &options.message,
     })
+}
+
+fn load_commit_idempotency(
+    repo_root: &Path,
+    key: &str,
+    payload: &Value,
+) -> Result<Option<CommitResult>, CliError> {
+    if key.is_empty() {
+        return Err(CliError::Usage(
+            "--idempotency-key must not be empty".to_string(),
+        ));
+    }
+    let path = idempotency_record_path(repo_root, "commit", key);
+    let Some(record) = read_optional_json(&path)? else {
+        return Ok(None);
+    };
+    let payload_hash = idempotency_payload_hash(payload)?;
+    let recorded_hash = required_string(&record, &["payload_hash"])?;
+    if recorded_hash != payload_hash {
+        return Err(CliError::IdempotencyConflict(format!(
+            "idempotency key conflict for commit: {key}"
+        )));
+    }
+    if required_string(&record, &["key"])? != key {
+        return Err(CliError::InvalidRepository(format!(
+            "idempotency record key mismatch: {}",
+            path.display()
+        )));
+    }
+    Ok(Some(CommitResult {
+        commit_id: required_string(&record, &["result", "commit_id"])?,
+        branch: required_string(&record, &["result", "branch"])?,
+        plan: record
+            .get("result")
+            .and_then(|result| result.get("plan"))
+            .cloned()
+            .ok_or_else(|| {
+                CliError::InvalidRepository(format!(
+                    "idempotency record missing result.plan: {}",
+                    path.display()
+                ))
+            })?,
+    }))
+}
+
+fn save_commit_idempotency(
+    repo_root: &Path,
+    key: &str,
+    payload: &Value,
+    result: &CommitResult,
+) -> Result<(), CliError> {
+    if key.is_empty() {
+        return Err(CliError::Usage(
+            "--idempotency-key must not be empty".to_string(),
+        ));
+    }
+    let path = idempotency_record_path(repo_root, "commit", key);
+    let record = json!({
+        "version": 1,
+        "command": "commit",
+        "key": key,
+        "payload_hash": idempotency_payload_hash(payload)?,
+        "payload": payload,
+        "result": {
+            "commit_id": &result.commit_id,
+            "branch": &result.branch,
+            "plan": &result.plan,
+        },
+        "created_at": now_iso_utc(),
+    });
+    write_json_atomic(&path, &record)
+}
+
+fn idempotency_record_path(repo_root: &Path, command: &str, key: &str) -> PathBuf {
+    repo_root
+        .join(".codefire")
+        .join("idempotency")
+        .join(command)
+        .join(format!("{}.json", ref_file_name(key)))
+}
+
+fn idempotency_payload_hash(payload: &Value) -> Result<String, CliError> {
+    let mut hasher = Sha256::new();
+    hasher.update(codefire_store::canonical_json(payload)?);
+    Ok(hex_lower(&hasher.finalize()))
+}
+
+fn hex_lower(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push(HEX[(byte >> 4) as usize] as char);
+        out.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    out
 }
 
 fn extinguish_operation_plan(

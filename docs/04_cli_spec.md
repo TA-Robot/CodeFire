@@ -258,6 +258,7 @@ selectorは--branch、--changed、--atom、--fireのいずれか1つ
 ```bash
 codefire commit -m "Implement login handler"
 codefire commit --dry-run --json -m "Implement login handler"
+codefire commit -m "Implement login handler" --idempotency-key request-2026-06-05-001
 ```
 
 仕様：
@@ -269,6 +270,9 @@ branch headを更新する
 active stateをresetする
 open stateをopen-cleanにする
 --dry-runはsealed object、branch head、open registry、active stateを書き換えず、codefire_operation_planを返す
+--idempotency-keyは成功したcommit resultを.codefire/idempotency/commit/へ記録する
+同じ--idempotency-keyかつ同じcommit request payloadは保存済みcommit resultを返し、新しいcommitを作らない
+同じ--idempotency-keyでmessage/open_dir/branchが異なるpayloadはexit code 33で拒否する
 ```
 
 ## 4.12 `merge`

@@ -436,6 +436,10 @@ fn cli_error_exit_codes_follow_stable_taxonomy() {
         ExitCode::LockContention.code()
     );
     assert_eq!(
+        CliError::IdempotencyConflict("conflict".to_string()).exit_code(),
+        ExitCode::IdempotencyConflict.code()
+    );
+    assert_eq!(
         CliError::InvalidRepository("missing branch head".to_string()).exit_code(),
         ExitCode::RepositoryCorruption.code()
     );
@@ -598,6 +602,8 @@ fn parse_mutating_dry_run_json_args() {
         "Seal".to_string(),
         "--wait-lock".to_string(),
         "--lock-timeout=250ms".to_string(),
+        "--idempotency-key".to_string(),
+        "commit-key-1".to_string(),
     ])
     .unwrap();
     assert_eq!(commit.path, PathBuf::from("/tmp/open"));
@@ -606,6 +612,7 @@ fn parse_mutating_dry_run_json_args() {
     assert!(commit.json_output);
     assert!(commit.lock.wait);
     assert_eq!(commit.lock.timeout_ms, Some(250));
+    assert_eq!(commit.idempotency_key.as_deref(), Some("commit-key-1"));
 
     let extinguish = parse_extinguish_args(&[
         "FIRE-001".to_string(),
@@ -736,6 +743,7 @@ fn commit_dry_run_returns_plan_without_updating_branch() {
         dry_run: true,
         json_output: true,
         lock: LockOptions::default(),
+        idempotency_key: None,
     })
     .unwrap();
     let after = load_branch_record(&repo_root, "main").unwrap();
@@ -749,6 +757,67 @@ fn commit_dry_run_returns_plan_without_updating_branch() {
     assert!(!active_state_path(&open_dir)
         .join("verification.json")
         .exists());
+}
+
+#[test]
+fn commit_idempotency_key_replays_same_payload_and_rejects_conflict() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap();
+
+    let first = run_commit(&CommitOptions {
+        path: open_dir.clone(),
+        message: "Seal once".to_string(),
+        dry_run: false,
+        json_output: false,
+        lock: LockOptions::default(),
+        idempotency_key: Some("seal-main-once".to_string()),
+    })
+    .unwrap();
+    let branch_after_first = load_branch_record(&repo_root, "main").unwrap();
+    assert_eq!(
+        required_string(&branch_after_first, &["head"]).unwrap(),
+        first.commit_id
+    );
+
+    let replay = run_commit(&CommitOptions {
+        path: open_dir.clone(),
+        message: "Seal once".to_string(),
+        dry_run: false,
+        json_output: false,
+        lock: LockOptions::default(),
+        idempotency_key: Some("seal-main-once".to_string()),
+    })
+    .unwrap();
+    assert_eq!(replay.commit_id, first.commit_id);
+    assert_eq!(replay.branch, first.branch);
+    assert_eq!(
+        required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap(),
+        first.commit_id
+    );
+
+    let conflict = run_commit(&CommitOptions {
+        path: open_dir,
+        message: "Different payload".to_string(),
+        dry_run: false,
+        json_output: false,
+        lock: LockOptions::default(),
+        idempotency_key: Some("seal-main-once".to_string()),
+    })
+    .unwrap_err();
+    assert_eq!(conflict.exit_code(), ExitCode::IdempotencyConflict.code());
 }
 
 #[test]
