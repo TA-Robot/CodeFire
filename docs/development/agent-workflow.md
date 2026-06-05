@@ -52,6 +52,8 @@ v0.6ではRust実装をdefault CLIへ移行する計画である。
 守ること:
 
 - Python版はreference implementation / fallbackとして残す。
+- Rust本流実装では `main.rs` を薄く保ち、command、remote、signature、verification、diff/merge、renderingを責務単位で分ける。
+- module/file分割の判断基準は `module-boundaries.md` を正とする。
 - Rust write pathの前にcanonical JSON / object ID golden testを作る。
 - Python-created repoをRustが読めることを先に保証する。
 - Rust-created objectをPython版が最低限 `doctor` / `show` できる互換性を保つ。

@@ -94,6 +94,8 @@ CodeFireでは特に、以下を妥協しない。
 ## 実装スタイル
 
 - parse、validate、plan、apply、renderを分ける。
+- `main.rs` はCLI dispatchに寄せ、command固有のdomain logicを詰め込まない。
+- 新しい責務が増える場合は、`module-boundaries.md` に沿ってmodule/fileを分割する。
 - filesystem writeの前にoperation planを作る。
 - domain logicとCLI表示を分ける。
 - human outputとmachine-readable outputを混同しない。

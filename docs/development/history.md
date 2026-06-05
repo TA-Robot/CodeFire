@@ -157,6 +157,7 @@
 | 2026-06-05 | Rust Server | Rust CLIに `serve --tls-cert --tls-key` と `cf+https://` transportを追加し、HTTP route処理を共有したままTLS処理を `http_tls.rs` へ分離した | `crates/codefire-cli/src/http_tls.rs`, `crates/codefire-cli/src/http.rs`, `crates/codefire-cli/src/remote.rs`, `crates/codefire-cli/src/main.rs`, `crates/codefire-cli/src/tests.rs`, docs | `parse_https_remote_urls_and_tls_serve_args`; live self-signed `cf+https://` upload/list/clone smoke |
 | 2026-06-05 | Docs | `AGENTS.md` の肥大化を解消し、CodeFire本体向け品質基準と作業運用を分割ドキュメントへ移した | `AGENTS.md`, `docs/development/agent-code-quality.md`, `docs/development/agent-workflow.md`, `docs/development/history.md` | docs-only update; `AGENTS.md` は短い入口にし、詳細基準を分割 |
 | 2026-06-05 | Rust Security | Rust CLIにcommit HMAC署名、commit signature policy検証、request HMAC署名、timestamp skew検証、nonce replay cacheを追加した | `crates/codefire-cli/src/signatures.rs`, `crates/codefire-cli/src/main.rs`, `crates/codefire-cli/src/remote.rs`, `crates/codefire-cli/src/http.rs`, docs | `cargo fmt --check`; `cargo clippy --workspace --all-targets -- -D warnings`; `cargo test --workspace`; `cargo build --workspace`; file-backed signed remote smoke; HTTP signed remote smoke; unsigned upload rejection smoke |
+| 2026-06-05 | Docs | Rust v0.6本流で単一ファイル肥大化を避けるため、module/file分割基準を専用文書化し、AGENTS/workflow/quality/backlogから参照した | `AGENTS.md`, `docs/development/module-boundaries.md`, `docs/development/agent-code-quality.md`, `docs/development/agent-workflow.md`, `docs/development/bug-backlog.md` | docs-only update |
 
 ## Current Decisions
 

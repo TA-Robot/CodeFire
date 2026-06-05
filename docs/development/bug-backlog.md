@@ -21,6 +21,7 @@
 | CFB-006 | open | UX / Trace completeness | 仕様先行フェーズでmissing required linksが多く、実際のblocker確認時にノイズになる | `algorithm-evolution-agent-lab` で `require_trace_completeness: false` の状態で `verify --details` を使ったとき | open fireは0でもmissing link詳細が大量に出て、次に見るべき問題の優先度が分かりにくい | `Blocking checks:` を見る | `verify --details --blocking-only` またはnon-blocking diagnosticsの折りたたみ/優先度表示を追加する |
 | CFB-007 | open | Performance / Observability | `status` / `scan` / `verify` の速度は現規模では軽いが、継続的に測るCLIがない | `algorithm-evolution-agent-lab` 現規模で `status` 約0.4s、`scan` 約0.45s、`verify --details` 約1.2sを手動計測したとき | repo拡大時に遅くなっても、どの処理がボトルネックか追跡しづらい | shellの `time` で手動測定する | `codefire doctor --metrics` または `codefire perf` でAtom数、object数、各phase時間を出す |
 | CFB-008 | open | Storage / Artifacts | sealed object storeは小規模では軽いが、ML実験artifactを入れると肥大化し得る | `algorithm-evolution-agent-lab` で `.codefire` 約2.1MB、objects約2.0MB、198 filesを確認したとき | 大きいmetrics/log/model artifactをCodeFire objectに直接入れる運用だとrepositoryが急増する | 重いartifactは外部パスや要約メタデータだけ管理する | artifact retention policy、object store size report、large artifact warning、external artifact reference仕様を追加する |
+| CFB-009 | open | Architecture / Maintainability | Rust CLIの機能追加時に `main.rs` へ責務が集まりやすく、module境界が曖昧になり得る | v0.6 Rust rewriteのinstaller/completion作業前レビュー | command dispatch、domain logic、rendering、policyが近接すると不変条件の所在が読みづらくなる | 新規作業前に `module-boundaries.md` を確認し、必要なら先に抽出commitを作る | `main.rs` のdispatch薄型化を継続し、commandごとのplanning/renderingを専用moduleへ分離する |
 
 ## Triage Notes
 
@@ -29,3 +30,4 @@
 - CFB-003は既存verify失敗系テストで `Blocking checks:` を確認する。
 - CFB-004は `test_verify_details_reports_missing_required_links` とduplicate Atom ID詳細表示で確認する。
 - CFB-005からCFB-008は、`algorithm-evolution-agent-lab` dogfoodingでの使いやすさ、速度、記憶領域観察から登録した改善issue。
+- CFB-009は、v0.6以降のRust本流で単一ファイル肥大化を防ぐための開発プロセス改善issue。

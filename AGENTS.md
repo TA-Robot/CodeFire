@@ -5,6 +5,7 @@
 ## まず読む
 
 - `docs/development/agent-code-quality.md`: AtCoder red レベルのコード品質、計算量、メモリ、アルゴリズム、不変条件。
+- `docs/development/module-boundaries.md`: module/file分割、責務境界、`main.rs` 肥大化防止。
 - `docs/development/agent-workflow.md`: 作業運用、Rust v0.6方針、diff/merge方針、テスト、禁止事項。
 - `docs/development/v0.6-readiness.md`: v0.6を完成と判断するための残ゲート。
 - `docs/development/todo-checklist.md`: 実装タスクと依存関係。
@@ -25,6 +26,7 @@
 - 常にコードは **AtCoder red レベルの最高レベルのコードを作成すること** を心がける。
 - 計算オーダとメモリ利用オーダを軽く扱わない。
 - `main.rs` や単一ファイルへ機能を詰め込まない。責務単位でmodule/fileを分割する。
+- 新規機能で責務境界が増える場合は、実装前に `docs/development/module-boundaries.md` の分割判断を確認する。
 - parse、validate、plan、apply、renderを混ぜない。
 - object identity、sealed commit、branch head atomicity、remote mutation policyの不変条件を壊さない。
 - AI agent運用機能、agent marketplace、prompt orchestrationはCodeFire本体へ入れない。
