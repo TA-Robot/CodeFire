@@ -148,9 +148,10 @@ status: verify, scan, context_changed, commit
 scan: context_changed, context_fire, extinguish_fire, verify
 verify: context_changed, scan, context_atom, refresh_resolution, rerun_check, commit
 storage report: inspect_storage_warnings
+migrate: review_migration_plan, inspect_migration_blockers
 ```
 
-Rust `doctor` and `migrate` commands are still planned separately; their `next_actions` are added when those command surfaces land.
+Rust `doctor` is still planned separately; its `next_actions` are added when that command surface lands.
 
 `storage report --json` data:
 
@@ -203,6 +204,27 @@ Evidence capture stores command output as a sealed `evidence` object and externa
 ```
 
 Supported explain targets are `fire <id>`, `atom <id>`, `verify-failure`, and `storage-warning`. The command is read-only and returns diagnostics plus next_actions appropriate to the target.
+
+`migrate check --json` / `migrate dry-run --json` data:
+
+```json
+{
+  "type": "codefire_migration_report",
+  "version": 1,
+  "mode": "check",
+  "target_format": "v0.6",
+  "repository_version": 1,
+  "compatible": true,
+  "checked_objects": 12,
+  "checked_branches": 1,
+  "blockers": [],
+  "warnings": [],
+  "planned_actions": [{"kind": "create_directory", "path": "/repo/.codefire/idempotency", "description": "create .codefire/idempotency"}],
+  "would_write": false
+}
+```
+
+When compatibility blockers exist, `migrate check --json` sets `ok=false` and `exit_code=40`.
 
 `context --json` data:
 

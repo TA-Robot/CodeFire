@@ -41,6 +41,8 @@ codefire doctor
 codefire storage report [path] [--json] [--large-threshold <bytes|KB|MB|GB>]
 codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>) [--label <text>] [--json]
 codefire explain (fire <id>|atom <id>|verify-failure|storage-warning) [--path <path>] [--json]
+codefire migrate check [path] [--json]
+codefire migrate dry-run [path] [--target-format v0.6] [--json]
 codefire serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>] [--tls-key <key>]
 codefire completion <bash|zsh>
 ```
@@ -443,7 +445,27 @@ storage-warningはstorage reportを実行し、large object/invalid JSON warning
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_explainを含める
 ```
 
-## 4.19 `patch`
+## 4.19 `migrate`
+
+```bash
+codefire migrate check
+codefire migrate check /path/to/repo --json
+codefire migrate dry-run /path/to/repo --target-format v0.6 --json
+```
+
+仕様：
+
+```text
+repository rootを探索し、repo.json、object record、branch head sealed commitを検証する
+checkは互換性blockerとwarningを返し、互換性がない場合はexit code 40で終了する
+dry-runはtarget format v0.6へ向けたplanned_actionsを返すが、file systemを書き換えない
+object recordはobject_id/hash/filenameとpayload canonical digestを再検証する
+branch recordはheadがvalid sealed commit graphを指していることを検証する
+v0.6で必要なmissing directoryはplanned_actions=create_directoryとして返す
+--jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_migration_reportを含める
+```
+
+## 4.20 `patch`
 
 ```bash
 codefire patch export feature-login --base main --output feature-login.cfpatch.json
@@ -467,7 +489,7 @@ patch importは適用後にopen stateをopen-burningへ更新し、pending_patch
 patch pathはmanifest pathと同じく相対pathだけを許可し、open directory外へescapeするpathを拒否する
 ```
 
-## 4.20 `request-merge`
+## 4.21 `request-merge`
 
 ```bash
 codefire request-merge \

@@ -16,6 +16,7 @@ mod exit_code;
 mod explain;
 mod http;
 mod idempotency;
+mod migration;
 mod remote;
 mod storage;
 mod view;
@@ -37,6 +38,10 @@ use http::{http_json, http_remote_path, parse_cf_http_url, serve_http};
 use idempotency::{
     idempotency_payload_hash, idempotency_record_path, require_idempotency_key,
     verify_idempotency_record,
+};
+use migration::{
+    migration_report_data_json, migration_report_diagnostics_json, migration_report_next_actions,
+    parse_migrate_args, print_migration_report, run_migrate,
 };
 use remote::{
     apply_merge_request, copy_object_graph, list_merge_requests, list_remote_branches,
@@ -572,6 +577,38 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             }
             Ok(())
         }
+        Some("migrate") => {
+            let options = parse_migrate_args(&args[1..])?;
+            let report = run_migrate(&options)?;
+            let exit_code = if report.compatible {
+                ExitCode::Success
+            } else {
+                ExitCode::MigrationIncompatibility
+            };
+            if options.json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "migrate",
+                        report.compatible,
+                        exit_code.code(),
+                        Some(&report.repo_root),
+                        migration_report_data_json(&report),
+                        migration_report_diagnostics_json(&report),
+                        migration_report_next_actions(&report),
+                    ))?
+                );
+            } else {
+                print_migration_report(&report);
+            }
+            if report.compatible {
+                Ok(())
+            } else {
+                Err(CliError::MigrationIncompatibility(
+                    "migration compatibility check failed".to_string(),
+                ))
+            }
+        }
         Some("--version") | Some("version") => {
             println!("codefire-rs foundation {}", codefire_core::VERSION);
             Ok(())
@@ -592,6 +629,7 @@ enum CliError {
     Store(codefire_store::StoreError),
     Usage(String),
     IdempotencyConflict(String),
+    MigrationIncompatibility(String),
     VerificationFailed(ExitCode),
     NotOpen(PathBuf),
     InvalidMarker(String),
@@ -608,6 +646,7 @@ impl CliError {
             CliError::Store(error) => store_error_exit_code(error),
             CliError::Usage(message) => usage_exit_code(message),
             CliError::IdempotencyConflict(_) => ExitCode::IdempotencyConflict,
+            CliError::MigrationIncompatibility(_) => ExitCode::MigrationIncompatibility,
             CliError::VerificationFailed(exit_code) => *exit_code,
             CliError::NotOpen(_) => ExitCode::InvalidUsageOrConfig,
             CliError::InvalidMarker(_) | CliError::InvalidRepository(_) => {
@@ -628,6 +667,7 @@ impl fmt::Display for CliError {
             CliError::Store(error) => write!(f, "{error}"),
             CliError::Usage(message) => write!(f, "{message}"),
             CliError::IdempotencyConflict(message) => write!(f, "{message}"),
+            CliError::MigrationIncompatibility(message) => write!(f, "{message}"),
             CliError::VerificationFailed(_) => write!(f, "verification failed"),
             CliError::NotOpen(path) => write!(
                 f,

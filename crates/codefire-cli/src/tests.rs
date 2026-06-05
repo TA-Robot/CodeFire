@@ -1294,6 +1294,70 @@ fn explain_fire_atom_verify_and_storage_targets_return_actions() {
 }
 
 #[test]
+fn migrate_check_and_dry_run_report_compatibility_and_blockers() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+
+    let parsed = parse_migrate_args(&[
+        "check".to_string(),
+        repo_root.to_string_lossy().into_owned(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(parsed.mode, migration::MigrateMode::Check);
+    assert!(parsed.json_output);
+    let report = run_migrate(&parsed).unwrap();
+    let data = migration_report_data_json(&report);
+
+    assert!(report.compatible);
+    assert!(report.checked_objects >= 8);
+    assert_eq!(report.checked_branches, 1);
+    assert_eq!(data["type"], "codefire_migration_report");
+    assert_eq!(data["compatible"], true);
+    assert!(migration_report_diagnostics_json(&report).is_empty());
+    assert!(!migration_report_next_actions(&report).is_empty());
+
+    let dry_run = run_migrate(
+        &parse_migrate_args(&[
+            "dry-run".to_string(),
+            repo_root.to_string_lossy().into_owned(),
+            "--target-format=v0.6".to_string(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(dry_run.mode, migration::MigrateMode::DryRun);
+    assert!(dry_run.compatible);
+    assert!(dry_run
+        .planned_actions
+        .iter()
+        .any(|action| action.kind == "create_directory"));
+
+    let branch = json!({
+        "type": "branch",
+        "version": 1,
+        "name": "broken",
+        "head": "CF-COMMIT-missing",
+        "state": "closed",
+        "created_at": "2026-06-05T00:00:00Z"
+    });
+    save_branch_record(&repo_root, &branch).unwrap();
+    let broken = run_migrate(&parsed).unwrap();
+
+    assert!(!broken.compatible);
+    assert!(broken
+        .blockers
+        .iter()
+        .any(|issue| issue.kind == "invalid_branch_head"));
+    assert!(!migration_report_diagnostics_json(&broken).is_empty());
+    assert_eq!(
+        migration_report_next_actions(&broken)[0]["id"],
+        "inspect_migration_blockers"
+    );
+}
+
+#[test]
 fn parse_review_pack_args_accepts_base_output_and_algorithm() {
     let args = vec![
         "feature-session".to_string(),
