@@ -739,6 +739,141 @@ fn link_batch_validates_all_items_before_writing_links() {
 }
 
 #[test]
+fn manual_fire_and_batch_validate_before_writing_fires() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::create_dir_all(open_dir.join("tests")).unwrap();
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design").join("session.md"),
+        "## DES-session: Design\nClock policy\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("tests").join("test_session.py"),
+        "# cf-atom: TEST-session\nassert True\n",
+    )
+    .unwrap();
+
+    let dry_run = fire::run_fire(&fire::FireOptions {
+        path: open_dir.clone(),
+        source_atom: "REQ-session".to_string(),
+        target_atom: "DES-session".to_string(),
+        reason: "manual concern".to_string(),
+        severity: "required".to_string(),
+        dry_run: true,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert_eq!(dry_run.item_count, 1);
+    assert!(dry_run.dry_run);
+    assert_eq!(dry_run.plan["type"], "codefire_operation_plan");
+    let active_path = active_state_path(&open_dir);
+    assert!(!active_path.join("fires.json").exists());
+
+    let applied = fire::run_fire(&fire::FireOptions {
+        path: open_dir.clone(),
+        source_atom: "REQ-session".to_string(),
+        target_atom: "DES-session".to_string(),
+        reason: "manual concern".to_string(),
+        severity: "required".to_string(),
+        dry_run: false,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert_eq!(applied.fires.len(), 1);
+    assert_eq!(applied.fires[0].created_by, "manual");
+    assert_eq!(read_status(&open_dir).unwrap().state, "open-burning");
+    let fires_after_single = read_active_fires(&open_dir);
+    assert_eq!(fires_after_single.len(), 1);
+
+    let batch_path = temp.path().join("fires.json");
+    fs::write(
+        &batch_path,
+        serde_json::to_string(&json!({
+            "version": 1,
+            "defaults": {"reason": "manual batch", "severity": "required"},
+            "fires": [
+                {"from": "REQ-session", "to": "TEST-session"}
+            ]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let batch_dry_run = fire::run_fire_batch(&fire::FireBatchOptions {
+        path: open_dir.clone(),
+        batch_path: batch_path.clone(),
+        dry_run: true,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert_eq!(batch_dry_run.item_count, 1);
+    assert_eq!(read_active_fires(&open_dir).len(), 1);
+
+    let batch_applied = fire::run_fire_batch(&fire::FireBatchOptions {
+        path: open_dir.clone(),
+        batch_path: batch_path.clone(),
+        dry_run: false,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert_eq!(batch_applied.fires.len(), 1);
+    assert_eq!(read_active_fires(&open_dir).len(), 2);
+
+    let invalid_path = temp.path().join("invalid-fires.json");
+    fs::write(
+        &invalid_path,
+        serde_json::to_string(&json!({
+            "version": 1,
+            "defaults": {"reason": "invalid batch"},
+            "fires": [
+                {"from": "DES-session", "to": "REQ-session"},
+                {"from": "REQ-session", "to": "TEST-missing"}
+            ]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let error = fire::run_fire_batch(&fire::FireBatchOptions {
+        path: open_dir.clone(),
+        batch_path: invalid_path,
+        dry_run: false,
+        json_output: false,
+        lock: LockOptions::default(),
+    })
+    .unwrap_err();
+    assert!(error.to_string().contains("TEST-missing"));
+    assert_eq!(read_active_fires(&open_dir).len(), 2);
+}
+
+#[test]
 fn parse_merge_args_accepts_dry_run_json() {
     let args = vec![
         "feature-session".to_string(),
@@ -3554,4 +3689,13 @@ fn active_state_path(open_dir: &Path) -> PathBuf {
     let branch = required_string(&marker, &["branch", "name"]).unwrap();
     let registry = read_json(&opened_registry_path(repo_root, &branch)).unwrap();
     PathBuf::from(required_string(&registry, &["open", "active_state_path"]).unwrap())
+}
+
+fn read_active_fires(open_dir: &Path) -> Vec<codefire_core::Fire> {
+    let path = active_state_path(open_dir).join("fires.json");
+    if path.exists() {
+        serde_json::from_value(read_json(&path).unwrap()).unwrap()
+    } else {
+        Vec::new()
+    }
 }

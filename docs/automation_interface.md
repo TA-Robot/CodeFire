@@ -213,6 +213,8 @@ Rust `doctor` is still planned separately; its `next_actions` are added when tha
 
 `link --batch <file> --json` data uses `type=codefire_link_batch_result`, includes `dry_run`, `item_count`, `links_file`, a `codefire_operation_plan`, and applied `added_links`. `--dry-run` validates Atom references and duplicate links without modifying `codefire.links.yaml`.
 
+`fire --json` data uses `type=codefire_fire_result`, includes `dry_run`, `item_count`, `branch`, `open_dir`, a `codefire_operation_plan`, and applied manual fires. `fire --batch <file> --json` uses `type=codefire_fire_batch_result` with the same shape and all-item validation. `--dry-run` validates Atom references and duplicate fire keys without modifying `fires.json` or branch state.
+
 `evidence add --batch <file> --json` data uses `type=codefire_evidence_batch_result`, includes `dry_run`, `item_count`, a `codefire_operation_plan`, and per-item evidence results when applied.
 
 Evidence capture stores command output as a sealed `evidence` object and external artifact metadata as an `artifact_ref` object. Artifact payload bytes are not copied into `.codefire/objects`; storage report exposes their referenced bytes separately from stored payload bytes.

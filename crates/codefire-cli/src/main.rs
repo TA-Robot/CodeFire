@@ -14,6 +14,7 @@ mod context;
 mod evidence;
 mod exit_code;
 mod explain;
+mod fire;
 mod http;
 mod idempotency;
 mod link_batch;
@@ -39,6 +40,10 @@ use exit_code::{
     core_error_exit_code, store_error_exit_code, usage_exit_code, verification_exit_code, ExitCode,
 };
 use explain::{parse_explain_args, print_explain_result, run_explain};
+use fire::{
+    fire_batch_data_json, fire_data_json, parse_fire_args, parse_fire_batch_args,
+    print_fire_result, run_fire, run_fire_batch,
+};
 use http::{http_json, http_remote_path, parse_cf_http_url, serve_http};
 use idempotency::{
     idempotency_payload_hash, idempotency_record_path, idempotency_result_plan,
@@ -195,6 +200,52 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             } else {
                 Err(CliError::VerificationFailed(exit_code))
             }
+        }
+        Some("fire") => {
+            if args
+                .iter()
+                .skip(1)
+                .any(|arg| arg == "--batch" || arg.starts_with("--batch="))
+            {
+                let options = parse_fire_batch_args(&args[1..])?;
+                let result = run_fire_batch(&options)?;
+                if options.json_output {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&command_result_envelope(
+                            "fire-batch",
+                            true,
+                            0,
+                            Some(&result.repo_root),
+                            fire_batch_data_json(&result),
+                            Vec::new(),
+                            Vec::new(),
+                        ))?
+                    );
+                } else {
+                    print_fire_result(&result);
+                }
+            } else {
+                let options = parse_fire_args(&args[1..])?;
+                let result = run_fire(&options)?;
+                if options.json_output {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&command_result_envelope(
+                            "fire",
+                            true,
+                            0,
+                            Some(&result.repo_root),
+                            fire_data_json(&result),
+                            Vec::new(),
+                            Vec::new(),
+                        ))?
+                    );
+                } else {
+                    print_fire_result(&result);
+                }
+            }
+            Ok(())
         }
         Some("extinguish") => {
             if has_batch_extinguish_arg(&args[1..]) {

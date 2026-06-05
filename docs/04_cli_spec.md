@@ -17,7 +17,8 @@ codefire status
 codefire status --json [--metrics]
 codefire scan
 codefire scan --json [--metrics]
-codefire fire <atom-id> --reason <text>
+codefire fire <source-atom> --to <target-atom> --reason <text> [--dry-run] [--json]
+codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--json]
 codefire extinguish <fire-id> --resolution <type> [--rationale <text>] [--evidence <ref>]
 codefire verify
 codefire verify --json [--metrics]
@@ -178,15 +179,22 @@ branch stateを更新する
 ## 4.7 `fire`
 
 ```bash
-codefire fire REQ-AUTH-001 --reason "仕様と実装が一致していない可能性がある"
+codefire fire REQ-AUTH-001 --to DES-AUTH-001 --reason "仕様と設計が一致していない可能性がある"
+codefire fire --batch fires-batch.yaml --dry-run --json
+codefire fire --batch fires-batch.json --path ./main-open --json
 ```
 
 仕様：
 
 ```text
-manual fireを立てる
+manual fireを立てる。source/target Atomはどちらも現在のopen directoryに存在する必要がある
 manual fireはrevertで自動消滅しない
 extinguishが必要
+--dry-runはfires.jsonやbranch stateを書き換えず、codefire_operation_planを返す
+--batchはJSONまたは限定YAMLのversion/fires形式を読み、全fireのfrom/to/reason/severity、Atom存在、batch内重複、既存fire重複を事前検証してから書き込む
+batch defaults.reason/defaults.severityを指定すると各fireの省略fieldへ適用する
+適用時はrepository lockを取得し、.codefire/active/<branch>/fires.jsonへmanual fireを追記し、open stateをopen-burningへ更新する
+--jsonはcodefire.command_result.v1 envelopeを出力し、単発はdata.type=codefire_fire_result、batchはdata.type=codefire_fire_batch_resultを含める
 ```
 
 ## 4.8 `extinguish`
