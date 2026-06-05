@@ -1,4 +1,4 @@
-use super::{run_extinguish, CliError, ExtinguishOptions};
+use super::{parse_lock_option, run_extinguish, CliError, ExtinguishOptions, LockOptions};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::fs;
@@ -10,6 +10,7 @@ pub(super) struct BatchExtinguishOptions {
     pub(super) batch_path: PathBuf,
     pub(super) dry_run: bool,
     pub(super) json_output: bool,
+    pub(super) lock: LockOptions,
 }
 
 #[derive(Debug)]
@@ -63,8 +64,13 @@ pub(super) fn parse_extinguish_batch_args(
     let mut batch_path = None;
     let mut dry_run = false;
     let mut json_output = false;
+    let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         match args[index].as_str() {
             "--batch" => {
                 index += 1;
@@ -105,6 +111,7 @@ pub(super) fn parse_extinguish_batch_args(
         })?,
         dry_run,
         json_output,
+        lock,
     })
 }
 
@@ -155,6 +162,7 @@ pub(super) fn run_extinguish_batch(
             refresh,
             dry_run: true,
             json_output: true,
+            lock: options.lock,
         })?;
         resolved.push(ResolvedBatchFire {
             id,
@@ -184,6 +192,7 @@ pub(super) fn run_extinguish_batch(
             refresh: fire.refresh,
             dry_run: false,
             json_output: false,
+            lock: options.lock,
         })?;
     }
 

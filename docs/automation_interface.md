@@ -70,7 +70,7 @@ CodeFire v0.6 uses a stable process exit code taxonomy. The `exit_code` field in
 | 20 | repository corruption detected | invalid marker/repository JSON or structural corruption |
 | 21 | object hash or object reference invalid | object id/hash/reference validation failures |
 | 22 | sealed commit validation failed | sealed commit graph/certificate validation failures |
-| 30 | lock contention | local repository/resource lock already held |
+| 30 | lock contention | local repository/resource lock already held or `--lock-timeout` elapsed |
 | 31 | remote rejected request | HTTP remote error response |
 | 32 | authentication or signature failure | reserved for signature enforcement |
 | 33 | idempotency conflict | reserved for idempotency keys |
@@ -78,6 +78,9 @@ CodeFire v0.6 uses a stable process exit code taxonomy. The `exit_code` field in
 | 50 | external artifact missing or hash mismatch | reserved for artifact validation |
 
 When multiple `verify` blockers are present, CodeFire reports the first blocker class in this order: open fires, missing required links, stale resolutions, duplicate Atom IDs, failed verification commands.
+
+Local mutating commands that acquire `repo.lock` accept `--wait-lock` and `--lock-timeout <duration>`.
+`--lock-timeout` accepts seconds (`2`, `2s`) or milliseconds (`250ms`) and returns exit code 30 when elapsed. If the lock file contains `pid` or `created_at`, human diagnostics include that owner metadata.
 
 ## Supported Commands
 

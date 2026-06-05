@@ -6,7 +6,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod automation;
 mod batch;
@@ -606,6 +606,7 @@ struct OpenOptions {
     path: PathBuf,
     dry_run: bool,
     json_output: bool,
+    lock: LockOptions,
 }
 
 #[derive(Debug)]
@@ -638,6 +639,7 @@ struct ExtinguishOptions {
     refresh: bool,
     dry_run: bool,
     json_output: bool,
+    lock: LockOptions,
 }
 
 #[derive(Debug)]
@@ -652,6 +654,7 @@ struct CommitOptions {
     message: String,
     dry_run: bool,
     json_output: bool,
+    lock: LockOptions,
 }
 
 #[derive(Debug)]
@@ -667,6 +670,7 @@ struct CloneOptions {
     new_branch: String,
     dry_run: bool,
     json_output: bool,
+    lock: LockOptions,
 }
 
 #[derive(Debug)]
@@ -698,6 +702,7 @@ struct PatchImportOptions {
     path: PathBuf,
     dry_run: bool,
     json_output: bool,
+    lock: LockOptions,
 }
 
 #[derive(Debug)]
@@ -713,6 +718,13 @@ struct MergeOptions {
     target_branch: String,
     dry_run: bool,
     json_output: bool,
+    lock: LockOptions,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct LockOptions {
+    wait: bool,
+    timeout_ms: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -914,7 +926,14 @@ fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
     let mut positional = Vec::new();
     let mut dry_run = false;
     let mut json_output = false;
-    for value in args {
+    let mut lock = LockOptions::default();
+    let mut index = 0usize;
+    while index < args.len() {
+        let value = &args[index];
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         match value.as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
@@ -925,6 +944,7 @@ fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
             }
             _ => positional.push(value.clone()),
         }
+        index += 1;
     }
     match positional.as_slice() {
         [branch, path] => Ok(OpenOptions {
@@ -932,9 +952,10 @@ fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
             path: PathBuf::from(path),
             dry_run,
             json_output,
+            lock,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs open <branch> <path> [--dry-run] [--json]".to_string(),
+            "usage: codefire-rs open <branch> <path> [--dry-run] [--json] [--wait-lock] [--lock-timeout <duration>]".to_string(),
         )),
     }
 }
@@ -996,8 +1017,13 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
     let mut refresh = false;
     let mut dry_run = false;
     let mut json_output = false;
+    let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         match args[index].as_str() {
             "--path" => {
                 index += 1;
@@ -1050,6 +1076,7 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
         refresh,
         dry_run,
         json_output,
+        lock,
     })
 }
 
@@ -1058,8 +1085,13 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
     let mut message = None;
     let mut dry_run = false;
     let mut json_output = false;
+    let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         match args[index].as_str() {
             "--path" => {
                 index += 1;
@@ -1091,6 +1123,7 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
         message: message.unwrap_or_else(|| "CodeFire commit".to_string()),
         dry_run,
         json_output,
+        lock,
     })
 }
 
@@ -1098,7 +1131,14 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
     let mut positional = Vec::new();
     let mut dry_run = false;
     let mut json_output = false;
-    for value in args {
+    let mut lock = LockOptions::default();
+    let mut index = 0usize;
+    while index < args.len() {
+        let value = &args[index];
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         match value.as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
@@ -1109,6 +1149,7 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
             }
             _ => positional.push(value.clone()),
         }
+        index += 1;
     }
     match positional.as_slice() {
         [source, new_branch] => Ok(CloneOptions {
@@ -1116,9 +1157,10 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
             new_branch: new_branch.to_string(),
             dry_run,
             json_output,
+            lock,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs clone <source-branch> <new-branch> [--dry-run] [--json]"
+            "usage: codefire-rs clone <source-branch> <new-branch> [--dry-run] [--json] [--wait-lock] [--lock-timeout <duration>]"
                 .to_string(),
         )),
     }
@@ -1297,7 +1339,14 @@ fn parse_patch_import_args(args: &[String]) -> Result<PatchImportOptions, CliErr
     let mut path = None;
     let mut dry_run = false;
     let mut json_output = false;
-    for value in args {
+    let mut lock = LockOptions::default();
+    let mut index = 0usize;
+    while index < args.len() {
+        let value = &args[index];
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         match value.as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
@@ -1313,15 +1362,17 @@ fn parse_patch_import_args(args: &[String]) -> Result<PatchImportOptions, CliErr
                 )));
             }
         }
+        index += 1;
     }
     Ok(PatchImportOptions {
         path: path.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs patch import <patch-file> [--dry-run] [--json]".to_string(),
+                "usage: codefire-rs patch import <patch-file> [--dry-run] [--json] [--wait-lock] [--lock-timeout <duration>]".to_string(),
             )
         })?,
         dry_run,
         json_output,
+        lock,
     })
 }
 
@@ -1564,13 +1615,72 @@ fn skip_ignored_option(args: &[String], index: &mut usize) -> Result<(), CliErro
     }
 }
 
+fn parse_lock_option(
+    args: &[String],
+    index: &mut usize,
+    lock: &mut LockOptions,
+) -> Result<bool, CliError> {
+    match args[*index].as_str() {
+        "--wait-lock" => {
+            lock.wait = true;
+            Ok(true)
+        }
+        "--lock-timeout" => {
+            *index += 1;
+            let value = args
+                .get(*index)
+                .ok_or_else(|| CliError::Usage("--lock-timeout requires a value".to_string()))?;
+            lock.timeout_ms = Some(parse_lock_timeout_ms(value)?);
+            lock.wait = true;
+            Ok(true)
+        }
+        value if value.starts_with("--lock-timeout=") => {
+            lock.timeout_ms = Some(parse_lock_timeout_ms(
+                value.trim_start_matches("--lock-timeout="),
+            )?);
+            lock.wait = true;
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
+}
+
+fn parse_lock_timeout_ms(value: &str) -> Result<u64, CliError> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(CliError::Usage(
+            "--lock-timeout requires a duration".to_string(),
+        ));
+    }
+    if let Some(ms) = value.strip_suffix("ms") {
+        return parse_u64_duration(ms, value);
+    }
+    if let Some(seconds) = value.strip_suffix('s') {
+        return parse_u64_duration(seconds, value).map(|seconds| seconds.saturating_mul(1000));
+    }
+    parse_u64_duration(value, value).map(|seconds| seconds.saturating_mul(1000))
+}
+
+fn parse_u64_duration(raw: &str, display: &str) -> Result<u64, CliError> {
+    raw.parse::<u64>().map_err(|_| {
+        CliError::Usage(format!(
+            "invalid --lock-timeout duration: {display}; use <seconds>, <seconds>s, or <milliseconds>ms"
+        ))
+    })
+}
+
 fn parse_merge_args(args: &[String]) -> Result<MergeOptions, CliError> {
     let mut source_branch = None;
     let mut target_branch = None;
     let mut dry_run = false;
     let mut json_output = false;
+    let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         match args[index].as_str() {
             "--into" => {
                 index += 1;
@@ -1593,18 +1703,19 @@ fn parse_merge_args(args: &[String]) -> Result<MergeOptions, CliError> {
     Ok(MergeOptions {
         source_branch: source_branch.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs merge <source-branch> --into <target-branch> [--dry-run] [--json]"
+                "usage: codefire-rs merge <source-branch> --into <target-branch> [--dry-run] [--json] [--wait-lock] [--lock-timeout <duration>]"
                     .to_string(),
             )
         })?,
         target_branch: target_branch.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs merge <source-branch> --into <target-branch> [--dry-run] [--json]"
+                "usage: codefire-rs merge <source-branch> --into <target-branch> [--dry-run] [--json] [--wait-lock] [--lock-timeout <duration>]"
                     .to_string(),
             )
         })?,
         dry_run,
         json_output,
+        lock,
     })
 }
 
@@ -1670,7 +1781,7 @@ fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
 
 fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, CliError> {
     let repo_root = find_repo_root(start)?;
-    let _lock = RepoLock::acquire(&repo_root)?;
+    let _lock = RepoLock::acquire_with_options(&repo_root, &options.lock)?;
     let mut result = build_merge_result(&repo_root, options)?;
     if options.dry_run {
         return Ok(result);
@@ -1982,7 +2093,7 @@ fn merge_next_actions(result: &MergeResult) -> Vec<Value> {
 
 fn import_patch(start: &Path, options: &PatchImportOptions) -> Result<Value, CliError> {
     let context = open_context(start)?;
-    let _lock = RepoLock::acquire(&context.repo_root)?;
+    let _lock = RepoLock::acquire_with_options(&context.repo_root, &options.lock)?;
     let patch = read_json(&options.path)?;
     if patch.get("type").and_then(Value::as_str) != Some("codefire_patch") {
         return Err(CliError::Usage(
@@ -2072,7 +2183,7 @@ fn apply_patch_entry(open_dir: &Path, entry: &Value) -> Result<(), CliError> {
 
 fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, CliError> {
     let repo_root = find_repo_root(start)?;
-    let _lock = RepoLock::acquire(&repo_root)?;
+    let _lock = RepoLock::acquire_with_options(&repo_root, &options.lock)?;
     if branch_record_path(&repo_root, &options.new_branch).exists() {
         return Err(CliError::Usage(format!(
             "branch already exists: {}",
@@ -2198,7 +2309,7 @@ fn open_branch(options: &OpenOptions) -> Result<OpenResult, CliError> {
 
 fn open_branch_from(start: &Path, options: &OpenOptions) -> Result<OpenResult, CliError> {
     let repo_root = find_repo_root(start)?;
-    let _lock = RepoLock::acquire(&repo_root)?;
+    let _lock = RepoLock::acquire_with_options(&repo_root, &options.lock)?;
     let cf = repo_root.join(".codefire");
     let objects = cf.join("objects");
     let mut branch = load_branch_record(&repo_root, &options.branch)?;
@@ -2466,6 +2577,7 @@ fn compute_verify(start: &Path, persist: bool) -> Result<VerifyExecution, CliErr
 
 fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliError> {
     let context = open_context(&options.path)?;
+    let _lock = RepoLock::acquire_with_options(&context.repo_root, &options.lock)?;
     let active_state_path = PathBuf::from(required_string(
         &context.registry,
         &["open", "active_state_path"],
@@ -2553,7 +2665,7 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
 
 fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
     let context = open_context(&options.path)?;
-    let _lock = RepoLock::acquire(&context.repo_root)?;
+    let _lock = RepoLock::acquire_with_options(&context.repo_root, &options.lock)?;
     let active_state_path = PathBuf::from(required_string(
         &context.registry,
         &["open", "active_state_path"],
@@ -3417,25 +3529,64 @@ fn reset_active(active_state_path: &Path, state: &str) -> Result<(), CliError> {
     Ok(())
 }
 
+#[derive(Debug)]
 struct RepoLock {
     path: PathBuf,
 }
 
 impl RepoLock {
-    fn acquire(repo_root: &Path) -> Result<Self, CliError> {
+    fn acquire_with_options(repo_root: &Path, options: &LockOptions) -> Result<Self, CliError> {
         let path = repo_root.join(".codefire").join("locks").join("repo.lock");
-        match fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-        {
-            Ok(_) => Ok(Self { path }),
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Err(
-                CliError::LockContention("CodeFire repository is locked".to_string()),
-            ),
-            Err(error) => Err(CliError::Io(error)),
+        let timeout = options.timeout_ms.map(Duration::from_millis);
+        let start = Instant::now();
+        loop {
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+            {
+                Ok(mut file) => {
+                    file.write_all(
+                        serde_json::to_string_pretty(&json!({
+                            "version": 1,
+                            "pid": std::process::id(),
+                            "created_at": now_iso_utc(),
+                        }))?
+                        .as_bytes(),
+                    )?;
+                    file.write_all(b"\n")?;
+                    return Ok(Self { path });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                    if !options.wait {
+                        return Err(repo_lock_contention(&path, options));
+                    }
+                    if timeout.is_some_and(|timeout| start.elapsed() >= timeout) {
+                        return Err(repo_lock_contention(&path, options));
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                Err(error) => return Err(CliError::Io(error)),
+            }
         }
     }
+}
+
+fn repo_lock_contention(path: &Path, options: &LockOptions) -> CliError {
+    let owner = read_json(path).ok();
+    let mut message = format!("CodeFire repository is locked: {}", path.display());
+    if let Some(timeout_ms) = options.timeout_ms {
+        message.push_str(&format!("; timed out after {timeout_ms}ms"));
+    }
+    if let Some(owner) = owner {
+        if let Some(pid) = owner.get("pid").and_then(Value::as_u64) {
+            message.push_str(&format!("; owner pid {pid}"));
+        }
+        if let Some(created_at) = owner.get("created_at").and_then(Value::as_str) {
+            message.push_str(&format!("; locked at {created_at}"));
+        }
+    }
+    CliError::LockContention(message)
 }
 
 impl Drop for RepoLock {

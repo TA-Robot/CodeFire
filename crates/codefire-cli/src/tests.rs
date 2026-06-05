@@ -49,6 +49,7 @@ fn open_materializes_manifest_and_updates_registry() {
             path: open_dir.clone(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -99,6 +100,7 @@ fn clone_branch_creates_closed_branch_and_rejects_burning_source() {
             new_branch: "feature/session".to_string(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -120,6 +122,7 @@ fn clone_branch_creates_closed_branch_and_rejects_burning_source() {
             new_branch: "copy".to_string(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap_err()
@@ -457,6 +460,38 @@ fn cli_error_exit_codes_follow_stable_taxonomy() {
 }
 
 #[test]
+fn repo_lock_wait_timeout_returns_lock_contention_with_owner_metadata() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let lock_path = repo_root.join(".codefire").join("locks").join("repo.lock");
+    fs::write(
+        lock_path,
+        serde_json::to_string_pretty(&json!({
+            "version": 1,
+            "pid": 4242,
+            "created_at": "2026-06-04T00:00:00Z",
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let error = RepoLock::acquire_with_options(
+        &repo_root,
+        &LockOptions {
+            wait: true,
+            timeout_ms: Some(0),
+        },
+    )
+    .unwrap_err();
+    let message = error.to_string();
+    assert_eq!(error.exit_code(), ExitCode::LockContention.code());
+    assert!(message.contains("timed out after 0ms"));
+    assert!(message.contains("owner pid 4242"));
+    assert!(message.contains("locked at 2026-06-04T00:00:00Z"));
+}
+
+#[test]
 fn context_pack_returns_atom_changed_and_fire_views() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
@@ -469,6 +504,7 @@ fn context_pack_returns_atom_changed_and_fire_views() {
             path: open_dir.clone(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -539,12 +575,16 @@ fn parse_merge_args_accepts_dry_run_json() {
         "main".to_string(),
         "--dry-run".to_string(),
         "--json".to_string(),
+        "--lock-timeout".to_string(),
+        "500ms".to_string(),
     ];
     let parsed = parse_merge_args(&args).unwrap();
     assert_eq!(parsed.source_branch, "feature-session");
     assert_eq!(parsed.target_branch, "main");
     assert!(parsed.dry_run);
     assert!(parsed.json_output);
+    assert!(parsed.lock.wait);
+    assert_eq!(parsed.lock.timeout_ms, Some(500));
 }
 
 #[test]
@@ -556,12 +596,16 @@ fn parse_mutating_dry_run_json_args() {
         "/tmp/open".to_string(),
         "-m".to_string(),
         "Seal".to_string(),
+        "--wait-lock".to_string(),
+        "--lock-timeout=250ms".to_string(),
     ])
     .unwrap();
     assert_eq!(commit.path, PathBuf::from("/tmp/open"));
     assert_eq!(commit.message, "Seal");
     assert!(commit.dry_run);
     assert!(commit.json_output);
+    assert!(commit.lock.wait);
+    assert_eq!(commit.lock.timeout_ms, Some(250));
 
     let extinguish = parse_extinguish_args(&[
         "FIRE-001".to_string(),
@@ -573,36 +617,46 @@ fn parse_mutating_dry_run_json_args() {
         "fixed".to_string(),
         "--dry-run".to_string(),
         "--json".to_string(),
+        "--lock-timeout".to_string(),
+        "2".to_string(),
     ])
     .unwrap();
     assert_eq!(extinguish.path, PathBuf::from("/tmp/open"));
     assert_eq!(extinguish.fire_id, "FIRE-001");
     assert!(extinguish.dry_run);
     assert!(extinguish.json_output);
+    assert!(extinguish.lock.wait);
+    assert_eq!(extinguish.lock.timeout_ms, Some(2000));
 
     let open = parse_open_args(&[
         "main".to_string(),
         "/tmp/open".to_string(),
         "--dry-run".to_string(),
         "--json".to_string(),
+        "--wait-lock".to_string(),
     ])
     .unwrap();
     assert_eq!(open.branch, "main");
     assert_eq!(open.path, PathBuf::from("/tmp/open"));
     assert!(open.dry_run);
     assert!(open.json_output);
+    assert!(open.lock.wait);
 
     let clone = parse_clone_args(&[
         "main".to_string(),
         "feature".to_string(),
         "--dry-run".to_string(),
         "--json".to_string(),
+        "--lock-timeout".to_string(),
+        "1s".to_string(),
     ])
     .unwrap();
     assert_eq!(clone.source, "main");
     assert_eq!(clone.new_branch, "feature");
     assert!(clone.dry_run);
     assert!(clone.json_output);
+    assert!(clone.lock.wait);
+    assert_eq!(clone.lock.timeout_ms, Some(1000));
 }
 
 #[test]
@@ -621,6 +675,7 @@ fn open_and_clone_dry_run_return_plans_without_structural_changes() {
             path: open_dir.clone(),
             dry_run: true,
             json_output: true,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -643,6 +698,7 @@ fn open_and_clone_dry_run_return_plans_without_structural_changes() {
             new_branch: "feature".to_string(),
             dry_run: true,
             json_output: true,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -667,6 +723,7 @@ fn commit_dry_run_returns_plan_without_updating_branch() {
             path: open_dir.clone(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -678,6 +735,7 @@ fn commit_dry_run_returns_plan_without_updating_branch() {
         message: "Dry run".to_string(),
         dry_run: true,
         json_output: true,
+        lock: LockOptions::default(),
     })
     .unwrap();
     let after = load_branch_record(&repo_root, "main").unwrap();
@@ -706,6 +764,7 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
             path: open_dir.clone(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -739,6 +798,7 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
         refresh: false,
         dry_run: true,
         json_output: true,
+        lock: LockOptions::default(),
     })
     .unwrap();
     let active = active_state_path(&open_dir);
@@ -766,6 +826,7 @@ fn extinguish_batch_validates_all_items_before_writing_ledgers() {
             path: open_dir.clone(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -832,6 +893,7 @@ fires:
         batch_path: parsed.batch_path,
         dry_run: false,
         json_output: false,
+        lock: LockOptions::default(),
     })
     .unwrap();
     assert_eq!(applied.item_count, 2);
@@ -1062,6 +1124,7 @@ fn patch_export_import_applies_manifest_delta_to_open_directory() {
             path: open_dir.clone(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -1084,6 +1147,7 @@ fn patch_export_import_applies_manifest_delta_to_open_directory() {
             path: patch_path.clone(),
             dry_run: true,
             json_output: true,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -1101,6 +1165,7 @@ fn patch_export_import_applies_manifest_delta_to_open_directory() {
             path: patch_path,
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -1196,6 +1261,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
             new_branch: "main-from-remote".to_string(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -1373,6 +1439,7 @@ fn merge_branch_writes_source_changes_and_marks_target_burning() {
             path: open_dir.clone(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -1384,6 +1451,7 @@ fn merge_branch_writes_source_changes_and_marks_target_burning() {
             target_branch: "main".to_string(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -1475,6 +1543,7 @@ fn merge_branch_writes_conflict_markers_for_divergent_changes() {
             path: open_dir.clone(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -1486,6 +1555,7 @@ fn merge_branch_writes_conflict_markers_for_divergent_changes() {
             target_branch: "main".to_string(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -1578,6 +1648,7 @@ fn merge_dry_run_reports_plan_without_writing_target() {
             path: open_dir.clone(),
             dry_run: false,
             json_output: false,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -1589,6 +1660,7 @@ fn merge_dry_run_reports_plan_without_writing_target() {
             target_branch: "main".to_string(),
             dry_run: true,
             json_output: true,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();

@@ -204,7 +204,8 @@
 | CF-223 | Batch | link/fire/extinguish/evidence/artifactのbatch操作とdry-run validationを実装する | CF-207, CF-222 | todo | extinguish batchはCF-223Aでdone。link/evidence/artifact batchは未対応 |
 | CF-223A | Batch | extinguish batch fileとdry-run validationを実装する | CF-207A, CF-222 | done | `extinguish --batch`; all-items-before-write validation; duplicate fire id rejection; strict limited YAML/JSON parser |
 | CF-224 | Safety | local/remote mutating operationにidempotency keyを実装する | CF-222, CF-211 | todo | v0.6 automation interface |
-| CF-225 | Safety | `--wait-lock` / `--lock-timeout` / JSON lock diagnosticsを実装する | CF-203, CF-219 | todo | v0.6 automation interface |
+| CF-225 | Safety | `--wait-lock` / `--lock-timeout` / JSON lock diagnosticsを実装する | CF-203, CF-219 | todo | local repo lock wait/timeoutはCF-225Aでdone。remote resource lock waitとJSON envelope diagnosticsは未対応 |
+| CF-225A | Safety | local repo mutatorに `--wait-lock` / `--lock-timeout` を実装する | CF-203, CF-219 | done | open/clone/extinguish/batch/commit/merge/patch import; `repo_lock_wait_timeout_returns_lock_contention_with_owner_metadata`; live lock timeout smoke |
 | CF-226 | Evidence | command outputとartifact hashを取り込むevidence capture APIを実装する | CF-215, CF-218 | todo | v0.6 automation interface |
 | CF-227 | Explain | fire/atom/verify failure/storage warning向けread-only `codefire explain` を実装する | CF-220, CF-221 | todo | v0.6 automation interface |
 | CF-228 | Diff | pluggable Myers / patience / histogram-style text diffを実装する | CF-210 | done | `codefire-rs diff --algorithm myers|patience|histogram`; `view::tests::*_diff_*`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings` |

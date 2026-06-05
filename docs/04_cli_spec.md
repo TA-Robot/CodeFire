@@ -42,6 +42,23 @@ codefire serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>
 codefire completion <bash|zsh>
 ```
 
+Local repository mutators that acquire the repository lock accept:
+
+```bash
+--wait-lock
+--lock-timeout <duration>
+```
+
+仕様:
+
+```text
+対象: open, clone, extinguish, extinguish --batch, commit, merge, patch import
+--wait-lockはrepo.lockが解放されるまで待機する
+--lock-timeoutは待機上限を指定し、指定時は--wait-lockを暗黙に有効化する
+durationは裸数または`s` suffixなら秒、`ms` suffixならミリ秒として扱う
+timeout時はexit code 30で失敗し、lock fileにpid/created_atがあれば人間向けdiagnosticに含める
+```
+
 ## 4.2 作らないコマンド
 
 ```text
@@ -62,6 +79,7 @@ force-upload
 ```bash
 codefire open main ./main
 codefire open main ./main --dry-run --json
+codefire open main ./main --wait-lock --lock-timeout 2s
 ```
 
 仕様：
