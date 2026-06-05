@@ -24,6 +24,7 @@
 | CFB-009 | open | Architecture / Maintainability | Rust CLIの機能追加時に `main.rs` へ責務が集まりやすく、module境界が曖昧になり得る | v0.6 Rust rewriteのinstaller/completion作業前レビュー | command dispatch、domain logic、rendering、policyが近接すると不変条件の所在が読みづらくなる | 新規作業前に `module-boundaries.md` を確認し、必要なら先に抽出commitを作る | `main.rs` のdispatch薄型化を継続し、commandごとのplanning/renderingを専用moduleへ分離する |
 | CFB-010 | open | UX / Status vs Scan | `status` が `open-consistent` でも、直後の `scan` で多数の `atom_changed` fireが発生する可能性を事前に示さない | `algorithm-evolution-agent-lab` で `status` は `open-consistent` / open fires 0 だったが、`scan` 後に33件のfireが出た | 人間には「今commit可能そう」に見え、scan後に大量fire処理へ進むため作業見積もりがずれる | commit前に必ず `scan` を走らせる | `status --staleness`、`status --predict-scan`、または `status` に `last_scan_base/current_worktree_dirty_atoms` の要約を追加する |
 | CFB-011 | open | UX / Extinguish Batch | `verify --details` が出したfire一覧から `extinguish --batch` 用テンプレートを直接生成できない | `algorithm-evolution-agent-lab` で33件のfireを同じテスト証跡で解消したとき | shell loopで `FIRE-001..033` を組み立てる必要があり、ID範囲ミスや証跡入力漏れが起きやすい | shell loopまたは手書きbatch fileを使う | `verify --json` のopen fire一覧から `codefire extinguish --batch-template --evidence-from-command <cmd>` を生成する |
+| CFB-012 | open | UX / State Label | 全fireをextinguishし `verify --details --blocking-only` が通った後でも、commit前の `status` が `open-burning` / `Open fires: 0` を表示する | `algorithm-evolution-agent-lab` で `MetricNormalizer`、`LeakageChecker`、`NoveltyReviewer` などを消火・verifyした直後 | blockingなしでcommit可能な状態なのに「burning」と読めるため、まだ未処理fireが残っているように見える | `Open fires: 0` と `verify --details --blocking-only` を優先して判断する | fire数0かつverify blockingなしの場合は `open-consistent` など非burning状態名にする、または `pending commit after extinguish` のような別状態を表示する |
 
 ## Triage Notes
 
@@ -34,5 +35,6 @@
 - CFB-005からCFB-008は、`algorithm-evolution-agent-lab` dogfoodingでの使いやすさ、速度、記憶領域観察から登録した改善issue。
 - CFB-009は、v0.6以降のRust本流で単一ファイル肥大化を防ぐための開発プロセス改善issue。
 - CFB-010とCFB-011は、v0.6 Rust defaultをインストールした後の `algorithm-evolution-agent-lab` Phase 4作業で再確認したdogfooding issue。
+- CFB-012は、連続して新Atomを追加し、各fireを消火してからcommitする運用で再現した。`open-burning` は内部的には「未sealed変更あり」を含む可能性があるが、fire数0のときは人間には未消火に見えやすい。
 - CFB-005の具体例として、同一evidenceで多数fireを解消する場合は `verify` からbatch templateを生成できると操作量が大きく減る。
 - CFB-006の具体例として、`require_trace_completeness: false` でもmissing link件数が表示されるため、`--blocking-only` とnon-blocking診断の優先度分離は引き続き重要である。
