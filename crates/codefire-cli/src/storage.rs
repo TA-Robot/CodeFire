@@ -21,6 +21,7 @@ pub(crate) struct StorageReport {
     pub(crate) idempotency: AreaStats,
     pub(crate) object_types: Vec<ObjectTypeStats>,
     pub(crate) largest_objects: Vec<ObjectFileStats>,
+    pub(crate) external_artifacts: ExternalArtifactStats,
     pub(crate) warnings: Vec<StorageWarning>,
 }
 
@@ -43,6 +44,13 @@ pub(crate) struct ObjectFileStats {
     pub(crate) type_tag: String,
     pub(crate) path: PathBuf,
     pub(crate) bytes: u64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ExternalArtifactStats {
+    pub(crate) refs: u64,
+    pub(crate) referenced_bytes: u64,
+    pub(crate) payload_bytes_stored: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,6 +114,7 @@ pub(crate) fn run_storage_report(
         objects: object_scan.area,
         object_types: object_scan.object_types,
         largest_objects: object_scan.largest_objects,
+        external_artifacts: object_scan.external_artifacts,
         warnings: object_scan.warnings,
     })
 }
@@ -130,8 +139,9 @@ pub(crate) fn storage_report_data_json(report: &StorageReport) -> Value {
             "bytes": report.idempotency.bytes,
         },
         "external_artifacts": {
-            "refs": 0,
-            "payload_bytes_stored": 0,
+            "refs": report.external_artifacts.refs,
+            "referenced_bytes": report.external_artifacts.referenced_bytes,
+            "payload_bytes_stored": report.external_artifacts.payload_bytes_stored,
         },
         "warnings": report.warnings.iter().map(storage_warning_json).collect::<Vec<_>>(),
     })
@@ -174,6 +184,12 @@ pub(crate) fn print_storage_report(report: &StorageReport) {
         "idempotency: {} files, {}",
         report.idempotency.files,
         format_bytes(report.idempotency.bytes)
+    );
+    println!(
+        "external artifacts: {} refs, {} referenced, {} payload bytes stored",
+        report.external_artifacts.refs,
+        format_bytes(report.external_artifacts.referenced_bytes),
+        format_bytes(report.external_artifacts.payload_bytes_stored)
     );
     println!("largest object types:");
     if report.object_types.is_empty() {
@@ -221,6 +237,7 @@ struct ObjectScan {
     area: AreaStats,
     object_types: Vec<ObjectTypeStats>,
     largest_objects: Vec<ObjectFileStats>,
+    external_artifacts: ExternalArtifactStats,
     warnings: Vec<StorageWarning>,
 }
 
@@ -228,6 +245,7 @@ fn scan_objects(objects_root: &Path, large_threshold_bytes: u64) -> Result<Objec
     let mut area = AreaStats::default();
     let mut by_type = BTreeMap::<String, AreaStats>::new();
     let mut largest_objects = Vec::new();
+    let mut external_artifacts = ExternalArtifactStats::default();
     let mut warnings = Vec::new();
     for path in collect_files(objects_root)? {
         let bytes = fs::metadata(&path)?.len();
@@ -263,6 +281,15 @@ fn scan_objects(objects_root: &Path, large_threshold_bytes: u64) -> Result<Objec
         let stats = by_type.entry(type_tag.clone()).or_default();
         stats.files += 1;
         stats.bytes += bytes;
+        if type_tag == "artifact_ref" {
+            external_artifacts.refs += 1;
+            external_artifacts.referenced_bytes += value
+                .get("payload")
+                .and_then(|payload| payload.get("size_bytes"))
+                .or_else(|| value.get("size_bytes"))
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
+        }
         if bytes >= large_threshold_bytes {
             warnings.push(StorageWarning {
                 kind: "large_object".to_string(),
@@ -303,6 +330,7 @@ fn scan_objects(objects_root: &Path, large_threshold_bytes: u64) -> Result<Objec
         area,
         object_types,
         largest_objects,
+        external_artifacts,
         warnings,
     })
 }

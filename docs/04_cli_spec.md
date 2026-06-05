@@ -39,6 +39,7 @@ codefire request-list <server-url>
 codefire discard <branch>
 codefire doctor
 codefire storage report [path] [--json] [--large-threshold <bytes|KB|MB|GB>]
+codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>) [--label <text>] [--json]
 codefire serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>] [--tls-key <key>]
 codefire completion <bash|zsh>
 ```
@@ -396,10 +397,32 @@ object storeはobject type別のfile数/bytesとlargest object上位を返す
 object JSONが読めない場合はinvalid_object_json warningとしてdiagnosticsに出し、report自体は継続する
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_storage_reportを含める
 warningがある場合、next_actionsにinspect_storage_warningsを含める
-external_artifactsはCF-226で実体参照を追加するまでrefs=0, payload_bytes_stored=0を返す
+external_artifactsはartifact_ref objectのrefs、referenced_bytes、payload_bytes_stored=0を返す
+artifact_refは外部artifact本体を.codefire/objectsへコピーせず、URI/path/hash/size metadataだけを保存する
 ```
 
-## 4.17 `patch`
+## 4.17 `evidence add`
+
+```bash
+codefire evidence add --artifact runs/model.bin --label "best checkpoint" --json
+codefire evidence add --from-command "cargo test --workspace" --json
+codefire evidence add --artifact runs/model.bin --from-command "python eval.py" --max-output-bytes 65536
+```
+
+仕様：
+
+```text
+repository rootを探索し、evidence objectを.codefire/objects/evidenceへ保存する
+--artifactはartifact_ref objectを.codefire/objects/artifact_refsへ保存する
+artifact_refはpath/uri/hash_algorithm/content_hash/size_bytes/captured_atを持ち、payload本体は保存しない
+--artifact-uri指定時はartifact_ref.uriへ保存し、未指定時はcanonical path文字列を保存する
+--from-commandはshell commandのstdout/stderr/exit_code/success/duration_ms/cwdを保存する
+stdout/stderrは--max-output-bytesでそれぞれtruncateされ、truncated flagを保存する
+commandがnon-zero exitでもevidence capture自体は成功し、command_exit_codeを返す
+--jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_evidence_add_resultを含める
+```
+
+## 4.18 `patch`
 
 ```bash
 codefire patch export feature-login --base main --output feature-login.cfpatch.json
@@ -423,7 +446,7 @@ patch importは適用後にopen stateをopen-burningへ更新し、pending_patch
 patch pathはmanifest pathと同じく相対pathだけを許可し、open directory外へescapeするpathを拒否する
 ```
 
-## 4.18 `request-merge`
+## 4.19 `request-merge`
 
 ```bash
 codefire request-merge \

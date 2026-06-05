@@ -1128,6 +1128,70 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
 }
 
 #[test]
+fn evidence_add_records_artifact_ref_and_command_capture() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let artifact_path = temp.path().join("model.bin");
+    init_repo(&repo_root, false).unwrap();
+    fs::write(&artifact_path, b"artifact-payload").unwrap();
+
+    let parsed = parse_evidence_add_args(&[
+        "--path".to_string(),
+        repo_root.to_string_lossy().into_owned(),
+        "--artifact".to_string(),
+        artifact_path.to_string_lossy().into_owned(),
+        "--from-command".to_string(),
+        "printf okay".to_string(),
+        "--label=training-smoke".to_string(),
+        "--max-output-bytes=2".to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    let result = run_evidence_add(&parsed).unwrap();
+    let data = evidence_add_data_json(&result);
+
+    assert!(parsed.json_output);
+    assert!(result.evidence_id.starts_with("CF-EVIDENCE-"));
+    let artifact_ref_id = result.artifact_ref_id.as_ref().unwrap();
+    assert!(artifact_ref_id.starts_with("CF-ARTIFACT-"));
+    assert_eq!(result.command_exit_code, Some(0));
+    assert_eq!(data["type"], "codefire_evidence_add_result");
+
+    let objects = repo_root.join(".codefire").join("objects");
+    let artifact_ref = codefire_store::read_object(&objects, artifact_ref_id).unwrap();
+    assert_eq!(artifact_ref["type"], "artifact_ref");
+    assert_eq!(artifact_ref["label"], "training-smoke");
+    assert_eq!(artifact_ref["size_bytes"], 16);
+    assert_eq!(
+        artifact_ref["content_hash"],
+        "sha256:5c6fd60a6ad0ce3fffdf2f2c61fbf1e9677f780c64a1ee33563bb2a40f29ef80"
+    );
+    let evidence = codefire_store::read_object(&objects, &result.evidence_id).unwrap();
+    assert_eq!(evidence["type"], "evidence");
+    assert_eq!(
+        evidence["artifact_ref"].as_str(),
+        Some(artifact_ref_id.as_str())
+    );
+    assert_eq!(evidence["command"]["exit_code"], 0);
+    assert_eq!(evidence["command"]["stdout"], "ok");
+    assert_eq!(evidence["command"]["stdout_truncated"], true);
+    assert!(!objects
+        .join("blobs")
+        .join(format!("{artifact_ref_id}.json"))
+        .exists());
+
+    let storage = run_storage_report(&storage::StorageReportOptions {
+        start: repo_root,
+        json_output: false,
+        large_threshold_bytes: 1024,
+    })
+    .unwrap();
+    assert_eq!(storage.external_artifacts.refs, 1);
+    assert_eq!(storage.external_artifacts.referenced_bytes, 16);
+    assert_eq!(storage.external_artifacts.payload_bytes_stored, 0);
+}
+
+#[test]
 fn parse_review_pack_args_accepts_base_output_and_algorithm() {
     let args = vec![
         "feature-session".to_string(),

@@ -100,6 +100,8 @@ pub fn object_prefix(type_tag: &str) -> &'static str {
         "resolution_ledger" => "CF-RESOLUTION",
         "verification" => "CF-VERIFY",
         "policy" => "CF-POLICY",
+        "artifact_ref" => "CF-ARTIFACT",
+        "evidence" => "CF-EVIDENCE",
         "commit" => "CF-COMMIT",
         "branch" => "CF-BRANCH",
         _ => "CF-OBJECT",
@@ -116,6 +118,8 @@ pub fn object_subdir(type_tag: &str) -> Option<&'static str> {
         "resolution_ledger" => Some("resolution_ledgers"),
         "verification" => Some("verifications"),
         "policy" => Some("policies"),
+        "artifact_ref" => Some("artifact_refs"),
+        "evidence" => Some("evidence"),
         "commit" => Some("commits"),
         "branch" => Some("branches"),
         _ => None,
@@ -506,6 +510,39 @@ mod tests {
         assert!(objects
             .join("policies")
             .join(format!("{first_id}.json"))
+            .exists());
+    }
+
+    #[test]
+    fn store_object_supports_artifact_ref_and_evidence_records() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let artifact = json!({
+            "type": "artifact_ref",
+            "version": 1,
+            "uri": "/tmp/model.bin",
+            "hash_algorithm": "sha256",
+            "content_hash": "sha256:abc",
+            "size_bytes": 3
+        });
+        let artifact_id = store_object(&objects, "artifact_ref", artifact.clone()).unwrap();
+        let evidence = json!({
+            "type": "evidence",
+            "version": 1,
+            "artifact_ref": artifact_id,
+            "created_at": "2026-06-05T00:00:00Z"
+        });
+        let evidence_id = store_object(&objects, "evidence", evidence).unwrap();
+
+        assert!(artifact_id.starts_with("CF-ARTIFACT-"));
+        assert!(evidence_id.starts_with("CF-EVIDENCE-"));
+        assert!(objects
+            .join("artifact_refs")
+            .join(format!("{artifact_id}.json"))
+            .exists());
+        assert!(objects
+            .join("evidence")
+            .join(format!("{evidence_id}.json"))
             .exists());
     }
 

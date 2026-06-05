@@ -166,10 +166,24 @@ Rust `doctor` and `migrate` commands are still planned separately; their `next_a
   },
   "active_state": {"files": 1, "bytes": 28},
   "idempotency": {"files": 0, "bytes": 0},
-  "external_artifacts": {"refs": 0, "payload_bytes_stored": 0},
+  "external_artifacts": {"refs": 0, "referenced_bytes": 0, "payload_bytes_stored": 0},
   "warnings": []
 }
 ```
+
+`evidence add --json` data:
+
+```json
+{
+  "type": "codefire_evidence_add_result",
+  "version": 1,
+  "evidence_id": "CF-EVIDENCE-...",
+  "artifact_ref_id": "CF-ARTIFACT-...",
+  "command_exit_code": 0
+}
+```
+
+Evidence capture stores command output as a sealed `evidence` object and external artifact metadata as an `artifact_ref` object. Artifact payload bytes are not copied into `.codefire/objects`; storage report exposes their referenced bytes separately from stored payload bytes.
 
 `context --json` data:
 
