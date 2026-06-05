@@ -1,4 +1,5 @@
 use super::*;
+use crate::doctor::DoctorOptions;
 use serde_json::{json, Map};
 use tempfile::tempdir;
 
@@ -22,6 +23,103 @@ fn init_creates_python_compatible_repo_layout() {
     .unwrap();
     assert!(init_repo(&repo_root, false).is_err());
     init_repo(&repo_root, true).unwrap();
+}
+
+#[test]
+fn doctor_reports_clean_repo_and_corrupted_object_record() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let init = init_repo(&repo_root, false).unwrap();
+
+    let clean = run_doctor(&DoctorOptions {
+        start: repo_root.clone(),
+        json_output: false,
+    })
+    .unwrap();
+    assert!(clean.ok);
+    assert!(clean.checked_objects > 0);
+    assert!(doctor_report_next_actions(&clean).is_empty());
+
+    let commit_path = codefire_store::object_record_path(
+        &repo_root.join(".codefire").join("objects"),
+        &init.main_commit,
+    )
+    .unwrap();
+    let mut commit_record = read_json(&commit_path).unwrap();
+    commit_record["hash"] = Value::String("sha256-corrupted".to_string());
+    write_json_atomic(&commit_path, &commit_record).unwrap();
+
+    let corrupted = run_doctor(&DoctorOptions {
+        start: repo_root,
+        json_output: false,
+    })
+    .unwrap();
+    assert!(!corrupted.ok);
+    assert!(corrupted
+        .issues
+        .iter()
+        .any(|issue| issue.kind == "object_integrity_error"));
+    assert!(doctor_report_diagnostics_json(&corrupted)
+        .iter()
+        .any(|issue| issue["kind"] == "object_integrity_error"));
+    assert!(doctor_report_next_actions(&corrupted)
+        .iter()
+        .any(|action| action["id"] == "inspect_object_store_corruption"));
+}
+
+#[test]
+fn doctor_detects_invalid_branch_head_and_open_registry() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let branch_path = branch_record_path(&repo_root, "main");
+    let mut branch = read_json(&branch_path).unwrap();
+    branch["head"] = Value::String("CF-COMMIT-missing".to_string());
+    write_json_atomic(&branch_path, &branch).unwrap();
+
+    let registry_path = opened_registry_path(&repo_root, "main");
+    let mut registry = read_json(&registry_path).unwrap();
+    registry["open"]["current_base_commit"] = Value::String("CF-COMMIT-missing".to_string());
+    registry["open"]["active_state_path"] =
+        Value::String(temp.path().join("missing-active").display().to_string());
+    write_json_atomic(&registry_path, &registry).unwrap();
+
+    let report = run_doctor(&DoctorOptions {
+        start: repo_root,
+        json_output: false,
+    })
+    .unwrap();
+    assert!(!report.ok);
+    for expected in [
+        "invalid_branch_head",
+        "invalid_open_base_commit",
+        "missing_active_state_dir",
+    ] {
+        assert!(
+            report.issues.iter().any(|issue| issue.kind == expected),
+            "missing doctor issue: {expected}"
+        );
+    }
+    assert!(doctor_report_next_actions(&report)
+        .iter()
+        .any(|action| action["id"] == "repair_branch_head"));
+    assert!(doctor_report_next_actions(&report)
+        .iter()
+        .any(|action| action["id"] == "reopen_branch_workspace"));
 }
 
 #[test]

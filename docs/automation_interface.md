@@ -169,17 +169,35 @@ When `--metrics` is present on `status`, `scan`, or `verify`, the command data i
 
 `verify --json` sets `exit_code` to the matching blocker code from the exit code taxonomy. For example, missing required links produce code `11`, missing evidence refs produce code `21`, and failed configured verification commands produce code `14`.
 
-`status --json`, `scan --json`, `verify --json`, and `storage report --json` include remediation-oriented `next_actions`:
+`status --json`, `scan --json`, `verify --json`, `doctor --json`, `storage report --json`, and `migrate ... --json` include remediation-oriented `next_actions`:
 
 ```text
 status: verify, scan, context_changed, commit
 scan: context_changed, context_fire, extinguish_fire, verify
 verify: context_changed, scan, context_atom, refresh_resolution, repair_evidence_ref, rerun_check, commit
+doctor: inspect_object_store_corruption, repair_branch_head, reopen_branch_workspace, inspect_doctor_report
 storage report: inspect_storage_warnings
 migrate: review_migration_plan, inspect_migration_blockers
 ```
 
-Rust `doctor` is still planned separately; its `next_actions` are added when that command surface lands.
+`doctor --json` data:
+
+```json
+{
+  "type": "codefire_doctor_report",
+  "version": 1,
+  "ok": false,
+  "checked": {"objects": 12, "branches": 1, "opened": 1, "active_files": 4},
+  "issues": [
+    {
+      "severity": "error",
+      "kind": "object_integrity_error",
+      "message": "object hash mismatch: expected ..., got ...",
+      "path": "/repo/.codefire/objects/commits/CF-COMMIT-....json"
+    }
+  ]
+}
+```
 
 `storage report --json` data:
 

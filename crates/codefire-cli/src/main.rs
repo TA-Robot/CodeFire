@@ -11,6 +11,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 mod automation;
 mod batch;
 mod context;
+mod doctor;
 mod evidence;
 mod exit_code;
 mod explain;
@@ -32,6 +33,10 @@ use automation::{
 };
 use batch::{has_batch_extinguish_arg, parse_extinguish_batch_args, run_extinguish_batch};
 use context::{build_context_pack, parse_context_args, print_context_summary};
+use doctor::{
+    doctor_report_data_json, doctor_report_diagnostics_json, doctor_report_next_actions,
+    parse_doctor_args, print_doctor_report, run_doctor,
+};
 use evidence::{
     evidence_add_data_json, evidence_batch_data_json, parse_evidence_add_args,
     print_evidence_add_result, run_evidence_add, run_evidence_batch,
@@ -642,6 +647,38 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 "usage: codefire-rs storage report [path] [--json] [--large-threshold <bytes|KB|MB|GB>]".to_string(),
             )),
         },
+        Some("doctor") => {
+            let options = parse_doctor_args(&args[1..])?;
+            let report = run_doctor(&options)?;
+            let exit_code = if report.ok {
+                ExitCode::Success
+            } else {
+                ExitCode::RepositoryCorruption
+            };
+            if options.json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "doctor",
+                        report.ok,
+                        exit_code.code(),
+                        Some(&report.repo_root),
+                        doctor_report_data_json(&report),
+                        doctor_report_diagnostics_json(&report),
+                        doctor_report_next_actions(&report),
+                    ))?
+                );
+            } else {
+                print_doctor_report(&report);
+            }
+            if report.ok {
+                Ok(())
+            } else {
+                Err(CliError::InvalidRepository(
+                    "doctor found repository problems".to_string(),
+                ))
+            }
+        }
         Some("link") => {
             let options = parse_link_batch_args(&args[1..])?;
             let result = run_link_batch(&options)?;

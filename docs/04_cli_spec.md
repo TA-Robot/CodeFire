@@ -83,7 +83,23 @@ reset --soft
 force-upload
 ```
 
-## 4.3 `open`
+## 4.3 `doctor`
+
+```bash
+codefire doctor [path] [--json]
+```
+
+仕様:
+
+```text
+repository layout、object record integrity、branch head sealed commit、opened registry、active state JSONをread-onlyで検査する
+object recordはhash/id/filename/type directoryの整合性を検査する
+branch headとopened registry current_base_commitはsealed commit validationを実行する
+opened registryのactive_state_pathは存在するディレクトリであることを検査する
+--jsonはcodefire.command_result.v1 envelopeを返し、破損時はok=false、exit_code=20、diagnosticsとnext_actionsを含める
+```
+
+## 4.4 `open`
 
 ```bash
 codefire open main ./main
@@ -106,7 +122,7 @@ open registryを更新する
 同じ--idempotency-keyでbranch/path/branch_head/repoが異なるpayloadはexit code 33で拒否する
 ```
 
-## 4.4 `close`
+## 4.5 `close`
 
 ```bash
 codefire close feature-login
@@ -125,7 +141,7 @@ open-burningまたはopen-consistentの場合は拒否する
 codefire close feature-login --discard
 ```
 
-## 4.5 `clone`
+## 4.6 `clone`
 
 ```bash
 codefire clone main feature-login
@@ -154,7 +170,7 @@ codefire clone cf+http://127.0.0.1:8080/org/app/main main-latest
 
 remote tracking branchは作らない。
 
-## 4.6 `scan`
+## 4.7 `scan`
 
 ```bash
 codefire scan
@@ -176,7 +192,7 @@ branch stateを更新する
 --metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
 ```
 
-## 4.7 `fire`
+## 4.8 `fire`
 
 ```bash
 codefire fire REQ-AUTH-001 --to DES-AUTH-001 --reason "仕様と設計が一致していない可能性がある"
@@ -197,7 +213,7 @@ batch defaults.reason/defaults.severityを指定すると各fireの省略field�
 --jsonはcodefire.command_result.v1 envelopeを出力し、単発はdata.type=codefire_fire_result、batchはdata.type=codefire_fire_batch_resultを含める
 ```
 
-## 4.8 `extinguish`
+## 4.9 `extinguish`
 
 ```bash
 codefire extinguish FIRE-001 \
@@ -253,7 +269,7 @@ fires:
     rationale: "REQ/DES linkを確認した"
 ```
 
-## 4.9 `verify`
+## 4.10 `verify`
 
 ```bash
 codefire verify
@@ -280,7 +296,7 @@ next_actionsはcontext_changed、context_atom、refresh_resolution、rerun_check
 --metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
 ```
 
-## 4.10 `context`
+## 4.11 `context`
 
 ```bash
 codefire context --branch --json
@@ -299,7 +315,7 @@ selectorは--branch、--changed、--atom、--fireのいずれか1つ
 --atomの--depthはTraceGraph上の近傍探索深さを指定する
 ```
 
-## 4.11 `commit`
+## 4.12 `commit`
 
 ```bash
 codefire commit -m "Implement login handler"
@@ -321,7 +337,7 @@ open stateをopen-cleanにする
 同じ--idempotency-keyでmessage/open_dir/branchが異なるpayloadはexit code 33で拒否する
 ```
 
-## 4.12 `merge`
+## 4.13 `merge`
 
 ```bash
 codefire merge feature-login --into main
@@ -346,7 +362,7 @@ semantic conflict candidateは同一Atom IDがsource/target双方でbaseから�
 semantic conflict candidateは自動解決しない
 ```
 
-## 4.13 `upload`
+## 4.14 `upload`
 
 ```bash
 codefire upload feature-login cf://server/alice/app/feature-login
@@ -372,7 +388,7 @@ cf+http dry-runはHTTP write requestを送らず、local object graph収集ま�
 cf+http uploadはserver側remote projectのidempotency recordで同じ規則を適用する
 ```
 
-## 4.14 `show` / `diff`
+## 4.15 `show` / `diff`
 
 ```bash
 codefire show feature-login
@@ -404,7 +420,7 @@ binary fileはpayload diffを出さず、sizeとsha256 prefixのsummaryだけを
 --jsonはdiff結果をJSON objectとして出力し、impact有効時はmachine-readable next_actionsを含める
 ```
 
-## 4.15 `review-pack`
+## 4.16 `review-pack`
 
 ```bash
 codefire review-pack feature-login
@@ -426,7 +442,7 @@ verificationにbase/sourceそれぞれのverification summaryを含める
 review-packはsealed commitから再現可能な情報だけで構成し、生成時刻などの非決定的値は含めない
 ```
 
-## 4.16 `storage report`
+## 4.17 `storage report`
 
 ```bash
 codefire storage report
@@ -447,7 +463,7 @@ external_artifactsはartifact_ref objectのrefs、referenced_bytes、payload_byt
 artifact_refは外部artifact本体を.codefire/objectsへコピーせず、URI/path/hash/size metadataだけを保存する
 ```
 
-## 4.17 `link --batch`
+## 4.18 `link --batch`
 
 ```bash
 codefire link --batch links-batch.yaml --dry-run --json
@@ -465,7 +481,7 @@ batch defaults.typeを指定すると各linkのtype省略時に使う
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_link_batch_resultを含める
 ```
 
-## 4.18 `evidence add`
+## 4.19 `evidence add`
 
 ```bash
 codefire evidence add --artifact runs/model.bin --label "best checkpoint" --json
@@ -492,7 +508,7 @@ batch itemはartifact、artifact_uri、from_command、cwd、label、max_output_b
 resolutionから参照されたevidence objectと、そのevidenceが参照するartifact_refはremote object graphに含めてupload/clone/request workflowで搬送する
 ```
 
-## 4.19 `explain`
+## 4.20 `explain`
 
 ```bash
 codefire explain fire FIRE-001 --path ./main-open --json
@@ -512,7 +528,7 @@ storage-warningはstorage reportを実行し、large object/invalid JSON warning
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_explainを含める
 ```
 
-## 4.19 `migrate`
+## 4.21 `migrate`
 
 ```bash
 codefire migrate check
@@ -532,7 +548,7 @@ v0.6で必要なmissing directoryはplanned_actions=create_directoryとして返
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_migration_reportを含める
 ```
 
-## 4.20 `patch`
+## 4.22 `patch`
 
 ```bash
 codefire patch export feature-login --base main --output feature-login.cfpatch.json
@@ -560,7 +576,7 @@ patch import --idempotency-keyは成功したimport resultを.codefire/idempoten
 patch pathはmanifest pathと同じく相対pathだけを許可し、open directory外へescapeするpathを拒否する
 ```
 
-## 4.21 `request-merge`
+## 4.23 `request-merge`
 
 ```bash
 codefire request-merge \
