@@ -1,3 +1,7 @@
+mod batch;
+
+pub(crate) use batch::{evidence_batch_data_json, run_evidence_batch};
+
 use super::{find_repo_root, now_iso_utc, CliError};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -13,6 +17,8 @@ const DEFAULT_MAX_OUTPUT_BYTES: usize = 64 * 1024;
 pub(crate) struct EvidenceAddOptions {
     pub(crate) start: PathBuf,
     pub(crate) json_output: bool,
+    pub(crate) dry_run: bool,
+    pub(crate) batch_path: Option<PathBuf>,
     pub(crate) label: Option<String>,
     pub(crate) artifact_path: Option<PathBuf>,
     pub(crate) artifact_uri: Option<String>,
@@ -32,6 +38,8 @@ pub(crate) struct EvidenceAddResult {
 pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOptions, CliError> {
     let mut start = None;
     let mut json_output = false;
+    let mut dry_run = false;
+    let mut batch_path = None;
     let mut label = None;
     let mut artifact_path = None;
     let mut artifact_uri = None;
@@ -42,6 +50,11 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
     while index < args.len() {
         match args[index].as_str() {
             "--json" => json_output = true,
+            "--dry-run" => dry_run = true,
+            "--batch" => {
+                index += 1;
+                batch_path = Some(PathBuf::from(required_arg(args, index, "--batch")?));
+            }
             "--path" => {
                 index += 1;
                 start = Some(PathBuf::from(required_arg(args, index, "--path")?));
@@ -72,6 +85,9 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
             }
             value if value.starts_with("--path=") => {
                 start = Some(PathBuf::from(value.trim_start_matches("--path=")));
+            }
+            value if value.starts_with("--batch=") => {
+                batch_path = Some(PathBuf::from(value.trim_start_matches("--batch=")));
             }
             value if value.starts_with("--label=") => {
                 label = Some(value.trim_start_matches("--label=").to_string());
@@ -105,7 +121,22 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
         }
         index += 1;
     }
-    if artifact_path.is_none() && command.is_none() {
+    if batch_path.is_some()
+        && (artifact_path.is_some()
+            || artifact_uri.is_some()
+            || command.is_some()
+            || command_cwd.is_some())
+    {
+        return Err(CliError::Usage(
+            "evidence add --batch cannot be combined with single-item capture options".to_string(),
+        ));
+    }
+    if batch_path.is_none() && dry_run {
+        return Err(CliError::Usage(
+            "evidence add --dry-run requires --batch".to_string(),
+        ));
+    }
+    if batch_path.is_none() && artifact_path.is_none() && command.is_none() {
         return Err(CliError::Usage(
             "evidence add requires --artifact or --from-command".to_string(),
         ));
@@ -113,6 +144,8 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
     Ok(EvidenceAddOptions {
         start: start.unwrap_or(std::env::current_dir()?),
         json_output,
+        dry_run,
+        batch_path,
         label,
         artifact_path,
         artifact_uri,
@@ -126,6 +159,7 @@ pub(crate) fn run_evidence_add(
     options: &EvidenceAddOptions,
 ) -> Result<EvidenceAddResult, CliError> {
     let repo_root = find_repo_root(&options.start)?;
+    validate_evidence_add_options(options)?;
     let objects = repo_root.join(".codefire").join("objects");
     let artifact_ref_id = match options.artifact_path.as_deref() {
         Some(path) => Some(store_artifact_ref(&objects, options, path)?),
@@ -156,6 +190,44 @@ pub(crate) fn run_evidence_add(
         artifact_ref_id,
         command_exit_code,
     })
+}
+
+pub(super) fn validate_evidence_add_options(options: &EvidenceAddOptions) -> Result<(), CliError> {
+    if options.artifact_path.is_none() && options.command.is_none() {
+        return Err(CliError::Usage(
+            "evidence add requires --artifact or --from-command".to_string(),
+        ));
+    }
+    if let Some(path) = options.artifact_path.as_deref() {
+        let absolute = absolute_existing_path(path).map_err(|error| {
+            CliError::Usage(format!(
+                "artifact path must exist: {} ({error})",
+                path.display()
+            ))
+        })?;
+        let metadata = fs::metadata(&absolute)?;
+        if !metadata.is_file() {
+            return Err(CliError::Usage(format!(
+                "artifact path must be a file: {}",
+                absolute.display()
+            )));
+        }
+    }
+    if let Some(cwd) = options.command_cwd.as_deref() {
+        let absolute = absolute_existing_path(cwd).map_err(|error| {
+            CliError::Usage(format!(
+                "command cwd must exist: {} ({error})",
+                cwd.display()
+            ))
+        })?;
+        if !absolute.is_dir() {
+            return Err(CliError::Usage(format!(
+                "command cwd must be a directory: {}",
+                absolute.display()
+            )));
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn evidence_add_data_json(result: &EvidenceAddResult) -> Value {

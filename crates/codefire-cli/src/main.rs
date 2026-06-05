@@ -31,7 +31,8 @@ use automation::{
 use batch::{has_batch_extinguish_arg, parse_extinguish_batch_args, run_extinguish_batch};
 use context::{build_context_pack, parse_context_args, print_context_summary};
 use evidence::{
-    evidence_add_data_json, parse_evidence_add_args, print_evidence_add_result, run_evidence_add,
+    evidence_add_data_json, evidence_batch_data_json, parse_evidence_add_args,
+    print_evidence_add_result, run_evidence_add, run_evidence_batch,
 };
 use exit_code::{
     core_error_exit_code, store_error_exit_code, usage_exit_code, verification_exit_code, ExitCode,
@@ -591,22 +592,47 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         Some("evidence") => match args.get(1).map(String::as_str) {
             Some("add") => {
                 let options = parse_evidence_add_args(&args[2..])?;
-                let result = run_evidence_add(&options)?;
-                if options.json_output {
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&command_result_envelope(
-                            "evidence-add",
-                            true,
-                            0,
-                            Some(&result.repo_root),
-                            evidence_add_data_json(&result),
-                            Vec::new(),
-                            Vec::new(),
-                        ))?
-                    );
+                if options.batch_path.is_some() {
+                    let result = run_evidence_batch(&options)?;
+                    if options.json_output {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&command_result_envelope(
+                                "evidence-add-batch",
+                                true,
+                                0,
+                                Some(&result.repo_root),
+                                evidence_batch_data_json(&result),
+                                Vec::new(),
+                                Vec::new(),
+                            ))?
+                        );
+                    } else if options.dry_run {
+                        println!(
+                            "evidence batch dry-run: {} items validated",
+                            result.item_count
+                        );
+                    } else {
+                        println!("recorded evidence batch: {} items", result.item_count);
+                    }
                 } else {
-                    print_evidence_add_result(&result);
+                    let result = run_evidence_add(&options)?;
+                    if options.json_output {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&command_result_envelope(
+                                "evidence-add",
+                                true,
+                                0,
+                                Some(&result.repo_root),
+                                evidence_add_data_json(&result),
+                                Vec::new(),
+                                Vec::new(),
+                            ))?
+                        );
+                    } else {
+                        print_evidence_add_result(&result);
+                    }
                 }
                 Ok(())
             }
@@ -614,7 +640,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 "unsupported evidence command: {command}"
             ))),
             None => Err(CliError::Usage(
-                "usage: codefire-rs evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>) [--label <text>] [--json]".to_string(),
+                "usage: codefire-rs evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>|--batch <file>) [--label <text>] [--dry-run] [--json]".to_string(),
             )),
         },
         Some("explain") => {

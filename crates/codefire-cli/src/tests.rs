@@ -1449,6 +1449,111 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
 }
 
 #[test]
+fn evidence_batch_validates_all_items_before_writing_objects() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let artifact_path = temp.path().join("model.bin");
+    let batch_path = temp.path().join("evidence-batch.json");
+    let invalid_batch_path = temp.path().join("invalid-evidence-batch.json");
+    init_repo(&repo_root, false).unwrap();
+    fs::write(&artifact_path, b"artifact-payload").unwrap();
+    fs::write(
+        &batch_path,
+        serde_json::to_string_pretty(&json!({
+            "version": 1,
+            "defaults": {"label": "batch-smoke", "max_output_bytes": 2},
+            "items": [
+                {"artifact": artifact_path, "artifact_uri": "artifact://model.bin"},
+                {"from_command": "printf okay", "label": "command-smoke"}
+            ]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        &invalid_batch_path,
+        serde_json::to_string_pretty(&json!({
+            "version": 1,
+            "items": [
+                {"from_command": "printf should-not-run"},
+                {"artifact": temp.path().join("missing.bin")}
+            ]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let parsed = parse_evidence_add_args(&[
+        "--path".to_string(),
+        repo_root.to_string_lossy().into_owned(),
+        "--batch".to_string(),
+        batch_path.to_string_lossy().into_owned(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    assert!(parsed.dry_run);
+    assert!(parsed.json_output);
+    assert_eq!(parsed.batch_path.as_deref(), Some(batch_path.as_path()));
+
+    let dry_run = run_evidence_batch(&parsed).unwrap();
+    let dry_run_data = evidence_batch_data_json(&dry_run);
+    assert_eq!(dry_run.item_count, 2);
+    assert_eq!(dry_run_data["type"], "codefire_evidence_batch_result");
+    assert_eq!(dry_run_data["dry_run"], true);
+    assert_eq!(dry_run_data["plan"]["command"], "evidence-add-batch");
+    let objects = repo_root.join(".codefire").join("objects");
+    assert_eq!(fs::read_dir(objects.join("evidence")).unwrap().count(), 0);
+    assert_eq!(
+        fs::read_dir(objects.join("artifact_refs")).unwrap().count(),
+        0
+    );
+
+    let applied = run_evidence_batch(&evidence::EvidenceAddOptions {
+        start: repo_root.clone(),
+        json_output: false,
+        dry_run: false,
+        batch_path: Some(batch_path),
+        label: None,
+        artifact_path: None,
+        artifact_uri: None,
+        command: None,
+        command_cwd: None,
+        max_output_bytes: 64 * 1024,
+    })
+    .unwrap();
+    assert_eq!(applied.item_count, 2);
+    assert_eq!(applied.results.len(), 2);
+    assert!(applied.results[0].artifact_ref_id.is_some());
+    assert_eq!(applied.results[1].command_exit_code, Some(0));
+    assert_eq!(fs::read_dir(objects.join("evidence")).unwrap().count(), 2);
+    assert_eq!(
+        fs::read_dir(objects.join("artifact_refs")).unwrap().count(),
+        1
+    );
+
+    let before_invalid_evidence_count = fs::read_dir(objects.join("evidence")).unwrap().count();
+    let invalid = run_evidence_batch(&evidence::EvidenceAddOptions {
+        start: repo_root,
+        json_output: false,
+        dry_run: false,
+        batch_path: Some(invalid_batch_path),
+        label: None,
+        artifact_path: None,
+        artifact_uri: None,
+        command: None,
+        command_cwd: None,
+        max_output_bytes: 64 * 1024,
+    })
+    .unwrap_err();
+    assert!(invalid.to_string().contains("missing.bin"));
+    assert_eq!(
+        fs::read_dir(objects.join("evidence")).unwrap().count(),
+        before_invalid_evidence_count
+    );
+}
+
+#[test]
 fn explain_fire_atom_verify_and_storage_targets_return_actions() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");

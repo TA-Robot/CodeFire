@@ -436,6 +436,8 @@ artifact_refは外部artifact本体を.codefire/objectsへコピーせず、URI/
 codefire evidence add --artifact runs/model.bin --label "best checkpoint" --json
 codefire evidence add --from-command "cargo test --workspace" --json
 codefire evidence add --artifact runs/model.bin --from-command "python eval.py" --max-output-bytes 65536
+codefire evidence add --batch evidence-batch.yaml --dry-run --json
+codefire evidence add --batch evidence-batch.json --json
 ```
 
 仕様：
@@ -449,6 +451,9 @@ artifact_refはpath/uri/hash_algorithm/content_hash/size_bytes/captured_atを持
 stdout/stderrは--max-output-bytesでそれぞれtruncateされ、truncated flagを保存する
 commandがnon-zero exitでもevidence capture自体は成功し、command_exit_codeを返す
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_evidence_add_resultを含める
+--batchはJSONまたは限定YAMLのversion/items形式を読み、全itemのartifact path/cwd/必須fieldを事前検証してからevidence objectを作る
+--batch --dry-runはartifact_ref/evidence objectを書き込まず、codefire_operation_planを返す
+batch itemはartifact、artifact_uri、from_command、cwd、label、max_output_bytesを持てる
 ```
 
 ## 4.18 `explain`
