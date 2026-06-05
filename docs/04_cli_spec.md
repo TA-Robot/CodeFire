@@ -38,6 +38,7 @@ codefire request-list <server-url>
 
 codefire discard <branch>
 codefire doctor
+codefire storage report [path] [--json] [--large-threshold <bytes|KB|MB|GB>]
 codefire serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>] [--tls-key <key>]
 codefire completion <bash|zsh>
 ```
@@ -378,7 +379,27 @@ verificationにbase/sourceそれぞれのverification summaryを含める
 review-packはsealed commitから再現可能な情報だけで構成し、生成時刻などの非決定的値は含めない
 ```
 
-## 4.16 `patch`
+## 4.16 `storage report`
+
+```bash
+codefire storage report
+codefire storage report /path/to/repo --json
+codefire storage report --large-threshold 16MB
+```
+
+仕様：
+
+```text
+repository rootを探索し、.codefire/objects、.codefire/active、.codefire/idempotencyのfile数とbytesを集計する
+object storeはobject type別のfile数/bytesとlargest object上位を返す
+--large-threshold以上のobjectはlarge_object warningとしてdiagnosticsに出す
+object JSONが読めない場合はinvalid_object_json warningとしてdiagnosticsに出し、report自体は継続する
+--jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_storage_reportを含める
+warningがある場合、next_actionsにinspect_storage_warningsを含める
+external_artifactsはCF-226で実体参照を追加するまでrefs=0, payload_bytes_stored=0を返す
+```
+
+## 4.17 `patch`
 
 ```bash
 codefire patch export feature-login --base main --output feature-login.cfpatch.json
@@ -402,7 +423,7 @@ patch importは適用後にopen stateをopen-burningへ更新し、pending_patch
 patch pathはmanifest pathと同じく相対pathだけを許可し、open directory外へescapeするpathを拒否する
 ```
 
-## 4.17 `request-merge`
+## 4.18 `request-merge`
 
 ```bash
 codefire request-merge \

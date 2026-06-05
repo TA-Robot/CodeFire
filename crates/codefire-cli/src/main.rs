@@ -15,6 +15,7 @@ mod exit_code;
 mod http;
 mod idempotency;
 mod remote;
+mod storage;
 mod view;
 use automation::{
     command_result_envelope, scan_data_json, scan_diagnostics_json, scan_next_actions,
@@ -36,6 +37,10 @@ use remote::{
     load_remote_branch, parse_cf_url, read_optional_json, remote_dirs, request_merge,
     review_merge_request, upload_branch, write_object_records, RemoteProjectOptions,
     RequestApplyOptions, RequestMergeOptions, RequestReviewOptions, UploadOptions,
+};
+use storage::{
+    parse_storage_report_args, print_storage_report, run_storage_report, storage_report_data_json,
+    storage_report_diagnostics_json, storage_report_next_actions,
 };
 use view::{
     diff_commitish_with_options, manifest_contents, patch_export_with_options,
@@ -482,6 +487,35 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             }
             Ok(())
         }
+        Some("storage") => match args.get(1).map(String::as_str) {
+            Some("report") => {
+                let options = parse_storage_report_args(&args[2..])?;
+                let report = run_storage_report(&options)?;
+                if options.json_output {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&command_result_envelope(
+                            "storage-report",
+                            true,
+                            0,
+                            Some(&report.repo_root),
+                            storage_report_data_json(&report),
+                            storage_report_diagnostics_json(&report),
+                            storage_report_next_actions(&report),
+                        ))?
+                    );
+                } else {
+                    print_storage_report(&report);
+                }
+                Ok(())
+            }
+            Some(command) => Err(CliError::Usage(format!(
+                "unsupported storage command: {command}"
+            ))),
+            None => Err(CliError::Usage(
+                "usage: codefire-rs storage report [path] [--json] [--large-threshold <bytes|KB|MB|GB>]".to_string(),
+            )),
+        },
         Some("--version") | Some("version") => {
             println!("codefire-rs foundation {}", codefire_core::VERSION);
             Ok(())

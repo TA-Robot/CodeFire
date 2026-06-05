@@ -1069,6 +1069,65 @@ fires:
 }
 
 #[test]
+fn storage_report_counts_objects_by_type_and_warns_large_objects() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap();
+    let blob_id = codefire_store::store_object(
+        &repo_root.join(".codefire").join("objects"),
+        "blob",
+        json!({"path": "large.bin", "content": "x".repeat(512)}),
+    )
+    .unwrap();
+
+    let parsed = parse_storage_report_args(&[
+        repo_root.to_string_lossy().into_owned(),
+        "--json".to_string(),
+        "--large-threshold=128".to_string(),
+    ])
+    .unwrap();
+    let report = run_storage_report(&parsed).unwrap();
+    let data = storage_report_data_json(&report);
+
+    assert!(parsed.json_output);
+    assert_eq!(parsed.large_threshold_bytes, 128);
+    assert!(report.objects.files >= 10);
+    assert!(report.active_state.files > 0);
+    assert!(report
+        .object_types
+        .iter()
+        .any(|stats| stats.type_tag == "blob" && stats.files == 1));
+    assert!(report
+        .largest_objects
+        .iter()
+        .any(|stats| stats.object_id == blob_id));
+    assert!(report
+        .warnings
+        .iter()
+        .any(|warning| warning.kind == "large_object"));
+    assert_eq!(data["type"], "codefire_storage_report");
+    assert!(data["objects"]["by_type"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|stats| stats["type"] == "blob"));
+    assert!(!storage_report_diagnostics_json(&report).is_empty());
+    assert!(!storage_report_next_actions(&report).is_empty());
+}
+
+#[test]
 fn parse_review_pack_args_accepts_base_output_and_algorithm() {
     let args = vec![
         "feature-session".to_string(),

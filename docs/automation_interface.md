@@ -141,15 +141,35 @@ codefire context --fire FIRE-001 --json
 
 `verify --json` sets `exit_code` to the matching blocker code from the exit code taxonomy. For example, missing required links produce code `11`; failed configured verification commands produce code `14`.
 
-`status --json`, `scan --json`, and `verify --json` include remediation-oriented `next_actions`:
+`status --json`, `scan --json`, `verify --json`, and `storage report --json` include remediation-oriented `next_actions`:
 
 ```text
 status: verify, scan, context_changed, commit
 scan: context_changed, context_fire, extinguish_fire, verify
 verify: context_changed, scan, context_atom, refresh_resolution, rerun_check, commit
+storage report: inspect_storage_warnings
 ```
 
-Rust `doctor`, `storage`, and `migrate` commands are still planned separately; their `next_actions` are added when those command surfaces land.
+Rust `doctor` and `migrate` commands are still planned separately; their `next_actions` are added when those command surfaces land.
+
+`storage report --json` data:
+
+```json
+{
+  "type": "codefire_storage_report",
+  "version": 1,
+  "objects": {
+    "files": 12,
+    "bytes": 4096,
+    "by_type": [{"type": "commit", "files": 1, "bytes": 512}],
+    "largest": [{"object_id": "CF-COMMIT-...", "type": "commit", "path": "/repo/.codefire/objects/commits/CF-COMMIT-....json", "bytes": 512}]
+  },
+  "active_state": {"files": 1, "bytes": 28},
+  "idempotency": {"files": 0, "bytes": 0},
+  "external_artifacts": {"refs": 0, "payload_bytes_stored": 0},
+  "warnings": []
+}
+```
 
 `context --json` data:
 

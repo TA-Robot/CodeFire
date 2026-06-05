@@ -1,0 +1,416 @@
+use super::{find_repo_root, read_json, CliError};
+use serde_json::{json, Value};
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+const DEFAULT_LARGE_THRESHOLD_BYTES: u64 = 1_048_576;
+
+#[derive(Debug)]
+pub(crate) struct StorageReportOptions {
+    pub(crate) start: PathBuf,
+    pub(crate) json_output: bool,
+    pub(crate) large_threshold_bytes: u64,
+}
+
+#[derive(Debug)]
+pub(crate) struct StorageReport {
+    pub(crate) repo_root: PathBuf,
+    pub(crate) objects: AreaStats,
+    pub(crate) active_state: AreaStats,
+    pub(crate) idempotency: AreaStats,
+    pub(crate) object_types: Vec<ObjectTypeStats>,
+    pub(crate) largest_objects: Vec<ObjectFileStats>,
+    pub(crate) warnings: Vec<StorageWarning>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct AreaStats {
+    pub(crate) files: u64,
+    pub(crate) bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ObjectTypeStats {
+    pub(crate) type_tag: String,
+    pub(crate) files: u64,
+    pub(crate) bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ObjectFileStats {
+    pub(crate) object_id: String,
+    pub(crate) type_tag: String,
+    pub(crate) path: PathBuf,
+    pub(crate) bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct StorageWarning {
+    pub(crate) kind: String,
+    pub(crate) message: String,
+    pub(crate) path: Option<PathBuf>,
+    pub(crate) bytes: Option<u64>,
+}
+
+pub(crate) fn parse_storage_report_args(args: &[String]) -> Result<StorageReportOptions, CliError> {
+    let mut start = None;
+    let mut json_output = false;
+    let mut large_threshold_bytes = DEFAULT_LARGE_THRESHOLD_BYTES;
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => json_output = true,
+            "--large-threshold" => {
+                index += 1;
+                let value = args.get(index).ok_or_else(|| {
+                    CliError::Usage("--large-threshold requires a value".to_string())
+                })?;
+                large_threshold_bytes = parse_byte_size(value)?;
+            }
+            value if value.starts_with("--large-threshold=") => {
+                large_threshold_bytes =
+                    parse_byte_size(value.trim_start_matches("--large-threshold="))?;
+            }
+            option if option.starts_with("--") => {
+                return Err(CliError::Usage(format!(
+                    "unsupported storage report option: {option}"
+                )));
+            }
+            value if start.is_none() => start = Some(PathBuf::from(value)),
+            value => {
+                return Err(CliError::Usage(format!(
+                    "unexpected storage report argument: {value}"
+                )));
+            }
+        }
+        index += 1;
+    }
+    Ok(StorageReportOptions {
+        start: start.unwrap_or(std::env::current_dir()?),
+        json_output,
+        large_threshold_bytes,
+    })
+}
+
+pub(crate) fn run_storage_report(
+    options: &StorageReportOptions,
+) -> Result<StorageReport, CliError> {
+    let repo_root = find_repo_root(&options.start)?;
+    let cf = repo_root.join(".codefire");
+    let object_scan = scan_objects(&cf.join("objects"), options.large_threshold_bytes)?;
+    Ok(StorageReport {
+        repo_root,
+        active_state: scan_area(&cf.join("active"))?,
+        idempotency: scan_area(&cf.join("idempotency"))?,
+        objects: object_scan.area,
+        object_types: object_scan.object_types,
+        largest_objects: object_scan.largest_objects,
+        warnings: object_scan.warnings,
+    })
+}
+
+pub(crate) fn storage_report_data_json(report: &StorageReport) -> Value {
+    json!({
+        "type": "codefire_storage_report",
+        "version": 1,
+        "repo_root": &report.repo_root,
+        "objects": {
+            "files": report.objects.files,
+            "bytes": report.objects.bytes,
+            "by_type": report.object_types.iter().map(object_type_json).collect::<Vec<_>>(),
+            "largest": report.largest_objects.iter().map(object_file_json).collect::<Vec<_>>(),
+        },
+        "active_state": {
+            "files": report.active_state.files,
+            "bytes": report.active_state.bytes,
+        },
+        "idempotency": {
+            "files": report.idempotency.files,
+            "bytes": report.idempotency.bytes,
+        },
+        "external_artifacts": {
+            "refs": 0,
+            "payload_bytes_stored": 0,
+        },
+        "warnings": report.warnings.iter().map(storage_warning_json).collect::<Vec<_>>(),
+    })
+}
+
+pub(crate) fn storage_report_diagnostics_json(report: &StorageReport) -> Vec<Value> {
+    report
+        .warnings
+        .iter()
+        .map(storage_warning_json)
+        .collect::<Vec<_>>()
+}
+
+pub(crate) fn storage_report_next_actions(report: &StorageReport) -> Vec<Value> {
+    if report.warnings.is_empty() {
+        return Vec::new();
+    }
+    vec![json!({
+        "id": "inspect_storage_warnings",
+        "command": "codefire-rs storage report --json",
+        "description": "inspect storage warnings and largest objects",
+        "context": {"warnings": report.warnings.len()},
+    })]
+}
+
+pub(crate) fn print_storage_report(report: &StorageReport) {
+    println!("CodeFire storage report");
+    println!("repo: {}", report.repo_root.display());
+    println!(
+        "objects: {} files, {}",
+        report.objects.files,
+        format_bytes(report.objects.bytes)
+    );
+    println!(
+        "active state: {} files, {}",
+        report.active_state.files,
+        format_bytes(report.active_state.bytes)
+    );
+    println!(
+        "idempotency: {} files, {}",
+        report.idempotency.files,
+        format_bytes(report.idempotency.bytes)
+    );
+    println!("largest object types:");
+    if report.object_types.is_empty() {
+        println!("  none");
+    } else {
+        for stats in &report.object_types {
+            println!(
+                "  {}: {} files, {}",
+                stats.type_tag,
+                stats.files,
+                format_bytes(stats.bytes)
+            );
+        }
+    }
+    println!("warnings:");
+    if report.warnings.is_empty() {
+        println!("  none");
+    } else {
+        for warning in &report.warnings {
+            match (&warning.path, warning.bytes) {
+                (Some(path), Some(bytes)) => {
+                    println!(
+                        "  {}: {} ({}, {})",
+                        warning.kind,
+                        warning.message,
+                        path.display(),
+                        format_bytes(bytes)
+                    );
+                }
+                (Some(path), None) => {
+                    println!(
+                        "  {}: {} ({})",
+                        warning.kind,
+                        warning.message,
+                        path.display()
+                    );
+                }
+                _ => println!("  {}: {}", warning.kind, warning.message),
+            }
+        }
+    }
+}
+
+struct ObjectScan {
+    area: AreaStats,
+    object_types: Vec<ObjectTypeStats>,
+    largest_objects: Vec<ObjectFileStats>,
+    warnings: Vec<StorageWarning>,
+}
+
+fn scan_objects(objects_root: &Path, large_threshold_bytes: u64) -> Result<ObjectScan, CliError> {
+    let mut area = AreaStats::default();
+    let mut by_type = BTreeMap::<String, AreaStats>::new();
+    let mut largest_objects = Vec::new();
+    let mut warnings = Vec::new();
+    for path in collect_files(objects_root)? {
+        let bytes = fs::metadata(&path)?.len();
+        area.files += 1;
+        area.bytes += bytes;
+        let value = match read_json(&path) {
+            Ok(value) => value,
+            Err(error) => {
+                warnings.push(StorageWarning {
+                    kind: "invalid_object_json".to_string(),
+                    message: error.to_string(),
+                    path: Some(path),
+                    bytes: Some(bytes),
+                });
+                continue;
+            }
+        };
+        let type_tag = value
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+            .to_string();
+        let object_id = value
+            .get("object_id")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .or_else(|| {
+                path.file_stem()
+                    .and_then(|name| name.to_str())
+                    .map(str::to_string)
+            })
+            .unwrap_or_else(|| "(unknown)".to_string());
+        let stats = by_type.entry(type_tag.clone()).or_default();
+        stats.files += 1;
+        stats.bytes += bytes;
+        if bytes >= large_threshold_bytes {
+            warnings.push(StorageWarning {
+                kind: "large_object".to_string(),
+                message: format!("{type_tag} object exceeds large threshold"),
+                path: Some(path.clone()),
+                bytes: Some(bytes),
+            });
+        }
+        largest_objects.push(ObjectFileStats {
+            object_id,
+            type_tag,
+            path,
+            bytes,
+        });
+    }
+    let mut object_types = by_type
+        .into_iter()
+        .map(|(type_tag, stats)| ObjectTypeStats {
+            type_tag,
+            files: stats.files,
+            bytes: stats.bytes,
+        })
+        .collect::<Vec<_>>();
+    object_types.sort_by(|left, right| {
+        right
+            .bytes
+            .cmp(&left.bytes)
+            .then_with(|| left.type_tag.cmp(&right.type_tag))
+    });
+    largest_objects.sort_by(|left, right| {
+        right
+            .bytes
+            .cmp(&left.bytes)
+            .then_with(|| left.object_id.cmp(&right.object_id))
+    });
+    largest_objects.truncate(10);
+    Ok(ObjectScan {
+        area,
+        object_types,
+        largest_objects,
+        warnings,
+    })
+}
+
+fn scan_area(path: &Path) -> Result<AreaStats, CliError> {
+    let mut stats = AreaStats::default();
+    for file in collect_files(path)? {
+        stats.files += 1;
+        stats.bytes += fs::metadata(file)?.len();
+    }
+    Ok(stats)
+}
+
+fn collect_files(root: &Path) -> Result<Vec<PathBuf>, CliError> {
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
+    let mut files = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(path) = stack.pop() {
+        for entry in fs::read_dir(&path)? {
+            let entry = entry?;
+            let file_type = entry.file_type()?;
+            if file_type.is_dir() {
+                stack.push(entry.path());
+            } else if file_type.is_file() {
+                files.push(entry.path());
+            }
+        }
+    }
+    files.sort();
+    Ok(files)
+}
+
+fn object_type_json(stats: &ObjectTypeStats) -> Value {
+    json!({
+        "type": &stats.type_tag,
+        "files": stats.files,
+        "bytes": stats.bytes,
+    })
+}
+
+fn object_file_json(stats: &ObjectFileStats) -> Value {
+    json!({
+        "object_id": &stats.object_id,
+        "type": &stats.type_tag,
+        "path": &stats.path,
+        "bytes": stats.bytes,
+    })
+}
+
+fn storage_warning_json(warning: &StorageWarning) -> Value {
+    json!({
+        "kind": &warning.kind,
+        "message": &warning.message,
+        "path": &warning.path,
+        "bytes": warning.bytes,
+    })
+}
+
+fn parse_byte_size(value: &str) -> Result<u64, CliError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(CliError::Usage(
+            "--large-threshold must not be empty".to_string(),
+        ));
+    }
+    let split_at = trimmed
+        .find(|ch: char| !ch.is_ascii_digit())
+        .unwrap_or(trimmed.len());
+    let (number, unit) = trimmed.split_at(split_at);
+    if number.is_empty() {
+        return Err(CliError::Usage(format!(
+            "invalid byte size for --large-threshold: {value}"
+        )));
+    }
+    let base = number.parse::<u64>().map_err(|_| {
+        CliError::Usage(format!("invalid byte size for --large-threshold: {value}"))
+    })?;
+    let multiplier = match unit.trim().to_ascii_lowercase().as_str() {
+        "" | "b" => 1,
+        "k" | "kb" | "kib" => 1024,
+        "m" | "mb" | "mib" => 1024 * 1024,
+        "g" | "gb" | "gib" => 1024 * 1024 * 1024,
+        _ => {
+            return Err(CliError::Usage(format!(
+                "unsupported byte size unit for --large-threshold: {value}"
+            )))
+        }
+    };
+    base.checked_mul(multiplier).ok_or_else(|| {
+        CliError::Usage(format!(
+            "byte size is too large for --large-threshold: {value}"
+        ))
+    })
+}
+
+fn format_bytes(bytes: u64) -> String {
+    const KIB: u64 = 1024;
+    const MIB: u64 = 1024 * 1024;
+    const GIB: u64 = 1024 * 1024 * 1024;
+    if bytes >= GIB {
+        format!("{:.1} GiB", bytes as f64 / GIB as f64)
+    } else if bytes >= MIB {
+        format!("{:.1} MiB", bytes as f64 / MIB as f64)
+    } else if bytes >= KIB {
+        format!("{:.1} KiB", bytes as f64 / KIB as f64)
+    } else {
+        format!("{bytes} B")
+    }
+}
