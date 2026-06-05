@@ -159,7 +159,7 @@ cd "$tmp"
 
 remote HTTPS server の例:
 
-この手順はPython v0.2 `codefire` のHTTPS確認用である。Rust v0.6 `codefire-rs serve` は現時点では `cf+http://` まで対応しており、`cf+https://` TLS transportは `CF-212` の残作業である。
+Python v0.2では `/workspace/project/codefire`、Rust v0.6では `/workspace/project/target/debug/codefire-rs` を使う。
 
 ```bash
 storage=$(mktemp -d)
@@ -179,6 +179,10 @@ openssl req -x509 -newkey rsa:2048 -nodes \
 # 自署名証明書のローカル検証時のみ使う
 CODEFIRE_TLS_INSECURE=1 \
   /workspace/project/codefire list "cf+https://127.0.0.1:8443/org/app"
+
+# Rust v0.6 rewriteで確認する場合
+CODEFIRE_TLS_INSECURE=1 \
+  /workspace/project/target/debug/codefire-rs list "cf+https://127.0.0.1:8443/org/app"
 ```
 
 server-side verification policy の例:

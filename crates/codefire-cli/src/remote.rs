@@ -1,4 +1,6 @@
-use super::http::{http_json, http_remote_path, parse_cf_http_project_url, parse_cf_http_url};
+use super::http::{
+    http_json, http_remote_path, is_cf_http_url, parse_cf_http_project_url, parse_cf_http_url,
+};
 use super::*;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -142,14 +144,15 @@ pub(crate) fn upload_branch(
         }
     }
 
-    if options.remote_url.starts_with("cf+http://") {
+    if is_cf_http_url(&options.remote_url) {
         let remote = parse_cf_http_url(&options.remote_url)?;
+        let transport = remote.endpoint_scheme();
         let object_count = collect_object_records(&local_objects, &head)?.len();
         let plan = upload_operation_plan(
             options,
             &repo_root,
             &head,
-            "http",
+            transport,
             remote.branch.as_str(),
             Some(object_count),
         );
@@ -253,7 +256,7 @@ pub(crate) fn upload_branch(
 }
 
 pub(crate) fn list_remote_branches(project_url: &str) -> Result<Vec<RemoteBranch>, CliError> {
-    if project_url.starts_with("cf+http://") {
+    if is_cf_http_url(project_url) {
         let project = parse_cf_http_project_url(project_url)?;
         let response = http_json(
             "GET",
@@ -305,22 +308,20 @@ pub(crate) fn list_remote_branches(project_url: &str) -> Result<Vec<RemoteBranch
 }
 
 pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMergeResult, CliError> {
-    if options.source_url.starts_with("cf+http://") || options.target_url.starts_with("cf+http://")
-    {
-        if !options.source_url.starts_with("cf+http://")
-            || !options.target_url.starts_with("cf+http://")
-        {
+    if is_cf_http_url(&options.source_url) || is_cf_http_url(&options.target_url) {
+        if !is_cf_http_url(&options.source_url) || !is_cf_http_url(&options.target_url) {
             return Err(CliError::Usage(
                 "request-merge requires both URLs to use the same remote transport".to_string(),
             ));
         }
+        let target = parse_cf_http_url(&options.target_url)?;
         let plan = request_merge_operation_plan(
             options,
             "",
             "",
             "pending",
-            "http",
-            &parse_cf_http_url(&options.target_url)?.branch,
+            target.endpoint_scheme(),
+            &target.branch,
         );
         if options.dry_run {
             return Ok(RequestMergeResult {
@@ -330,7 +331,6 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
                 plan,
             });
         }
-        let target = parse_cf_http_url(&options.target_url)?;
         let response = http_json(
             "POST",
             &http_remote_path(
@@ -443,7 +443,7 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
 pub(crate) fn list_merge_requests(
     project_url: &str,
 ) -> Result<Vec<MergeRequestListItem>, CliError> {
-    if project_url.starts_with("cf+http://") {
+    if is_cf_http_url(project_url) {
         let project = parse_cf_http_project_url(project_url)?;
         let response = http_json(
             "GET",
@@ -525,9 +525,9 @@ pub(crate) fn list_merge_requests(
 pub(crate) fn review_merge_request(
     options: &RequestReviewOptions,
 ) -> Result<RequestReviewResult, CliError> {
-    if options.project_url.starts_with("cf+http://") {
+    if is_cf_http_url(&options.project_url) {
         let project = parse_cf_http_project_url(&options.project_url)?;
-        let plan = request_review_operation_plan(options, "http", "");
+        let plan = request_review_operation_plan(options, project.endpoint_scheme(), "");
         if options.dry_run {
             return Ok(RequestReviewResult {
                 reviewer: options.reviewer.clone(),
@@ -632,9 +632,9 @@ pub(crate) fn review_merge_request(
 pub(crate) fn apply_merge_request(
     options: &RequestApplyOptions,
 ) -> Result<RequestApplyResult, CliError> {
-    if options.project_url.starts_with("cf+http://") {
+    if is_cf_http_url(&options.project_url) {
         let project = parse_cf_http_project_url(&options.project_url)?;
-        let plan = request_apply_operation_plan(options, "http", "", "");
+        let plan = request_apply_operation_plan(options, project.endpoint_scheme(), "", "");
         if options.dry_run {
             return Ok(RequestApplyResult {
                 target_branch: String::new(),

@@ -25,7 +25,7 @@ MVP CLI 実装は `project/codefire` にあります。
 - `./codefire`: Python v0.2 MVP。現在のインストーラ既定CLIで、remote HTTPS、HMAC署名、demoまで通すreference implementationです。
 - `./target/debug/codefire-rs`: Rust v0.6 rewrite。`crates/` 配下で開発中の次期既定CLIです。local workflow、file-backed remote、HTTP remote、diagnostics、metrics、storage report、migration check、diff/merge intelligence、interactive extinguish UXは実装済みです。
 
-v0.6の未完了ゲートは `docs/development/todo-checklist.md` の `CF-212`、`CF-213`、`CF-217` です。
+v0.6の未完了ゲートは `docs/development/todo-checklist.md` の `CF-213`、`CF-217` です。
 
 ```bash
 ./codefire --help
@@ -108,7 +108,7 @@ Python v0.2はPython標準ライブラリのみを使う単一ファイルCLIで
 - object IDはcontent-addressed payloadに基づくMVP実装です。表示IDと自己参照を含むcommit payloadの厳密仕様は整理が必要です。
 - AI連携、GUI、semantic mergeはMVP対象外です。追加言語のAtom抽出は、標準ライブラリで実装した限定パーサの範囲で対応します。
 - Python v0.2 remote server はローカルファイル-backed実装に加えて、`codefire serve` によるHTTP/HTTPS transportを持ちます。file-backedは `cf:///tmp/server/org/app/main`、HTTPは `cf+http://127.0.0.1:8080/org/app/main`、HTTPSは `cf+https://127.0.0.1:8443/org/app/main` のようなURLを使います。
-- Rust v0.6 remoteはfile-backedと `cf+http://` まで実装済みです。`cf+https://` TLS transportは `CF-212` の残作業です。
+- Rust v0.6 remoteはfile-backed、`cf+http://`、`cf+https://` を実装済みです。
 - HTTP transportは現時点で `upload` / `list` / `clone` / `show` / `diff` / `request-merge` / `request-list` / `request-review` / `request-apply` / `doctor` / `gc` に対応します。
 - upload時にsealed commitのobject hash、parents/roots/certificate構造、parent履歴、root object type、certificate、verification rootを検証します。
 - remote projectの `server_policy.json` により、upload時のserver-side verification commandを実行できます。server-side verificationは `cwd`、`env`、`timeout_seconds` を指定でき、`cwd` はremote project内に制限されます。
@@ -126,7 +126,7 @@ Python v0.2はPython標準ライブラリのみを使う単一ファイルCLIで
 - `server_policy.json` の `auth.required` と `auth.tokens` で remote のトークン認証を有効化できます。CLIは `--token` または `CODEFIRE_TOKEN` を読みます。tokenは平文互換に加えて、`codefire token-hash` が生成する `sha256:<hex>` またはsalt付きhash objectで保存できます。
 - Python v0.2では `CODEFIRE_SIGNING_KEY=... codefire commit --signer alice --key-id alice-2026-06` でcommitにHMAC署名を付与できます。remote側は `server_policy.json` の `commit_signatures.required` と `commit_signatures.keys` で upload / apply されるbranch headの署名を要求できます。key objectの `not_before` / `not_after` / `status` / `signers` により鍵世代の並行運用と失効を扱えます。Rust v0.6でのparityは `CF-213` の残作業です。
 - Python v0.2では `CODEFIRE_REQUEST_SIGNING_KEY=...` と `--request-key-id` でremote mutating operationにHMAC request署名を付与できます。remote側は `request_signatures.required` / `request_signatures.keys` / `max_skew_seconds` / `nonce_ttl_seconds` で upload / request / review / apply / gc の署名とnonce replayを検証できます。Rust v0.6でのparityは `CF-213` の残作業です。
-- Python v0.2では `codefire serve --tls-cert CERT --tls-key KEY` でHTTPS transportを有効化できます。自署名証明書をローカル検証する場合のみ `CODEFIRE_TLS_INSECURE=1` を使えます。Rust v0.6のTLS transportは `CF-212` の残作業です。
+- Python v0.2とRust v0.6では `codefire serve --tls-cert CERT --tls-key KEY` / `codefire-rs serve --tls-cert CERT --tls-key KEY` でHTTPS transportを有効化できます。自署名証明書をローカル検証する場合のみ `CODEFIRE_TLS_INSECURE=1` を使えます。
 - `gc cf://.../org/app` でremote object GCを実行できます。GC前にremoteのobject graphとsealed commit参照を検証し、`gc.retention_seconds` / `gc.retention_generations` により新しい到達不能objectを保護し、実行結果は `audit/gc.jsonl` に記録します。
 
 詳細は `docs/development/known-limitations.md` を参照してください。

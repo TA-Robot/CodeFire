@@ -18,6 +18,7 @@ mod explain;
 mod extinguish_ux;
 mod fire;
 mod http;
+mod http_tls;
 mod idempotency;
 mod link_batch;
 mod merge_patch_idempotency;
@@ -57,7 +58,7 @@ use fire::{
     fire_batch_data_json, fire_data_json, parse_fire_args, parse_fire_batch_args,
     print_fire_result, run_fire, run_fire_batch,
 };
-use http::{http_json, http_remote_path, parse_cf_http_url, serve_http};
+use http::{http_json, http_remote_path, is_cf_http_url, parse_cf_http_url, serve_http};
 use idempotency::{
     idempotency_payload_hash, idempotency_record_path, idempotency_result_plan,
     require_idempotency_key, verify_idempotency_record,
@@ -1084,6 +1085,8 @@ struct ServeOptions {
     storage_root: PathBuf,
     host: String,
     port: u16,
+    tls_cert: Option<PathBuf>,
+    tls_key: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -2018,6 +2021,8 @@ fn parse_serve_args(args: &[String]) -> Result<ServeOptions, CliError> {
     let mut storage_root = None;
     let mut host = "127.0.0.1".to_string();
     let mut port = 8080u16;
+    let mut tls_cert = None;
+    let mut tls_key = None;
     let mut index = 0usize;
     while index < args.len() {
         match args[index].as_str() {
@@ -2037,10 +2042,17 @@ fn parse_serve_args(args: &[String]) -> Result<ServeOptions, CliError> {
                     CliError::Usage("--port must be an integer from 0 to 65535".to_string())
                 })?;
             }
-            "--tls-cert" | "--tls-key" => {
-                return Err(CliError::Usage(
-                    "Rust HTTP server does not implement TLS yet; use cf+http".to_string(),
-                ));
+            "--tls-cert" => {
+                index += 1;
+                tls_cert = Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                    CliError::Usage("--tls-cert requires a value".to_string())
+                })?));
+            }
+            "--tls-key" => {
+                index += 1;
+                tls_key = Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                    CliError::Usage("--tls-key requires a value".to_string())
+                })?));
             }
             value if storage_root.is_none() => storage_root = Some(PathBuf::from(value)),
             value => {
@@ -2051,15 +2063,22 @@ fn parse_serve_args(args: &[String]) -> Result<ServeOptions, CliError> {
         }
         index += 1;
     }
+    if tls_cert.is_some() != tls_key.is_some() {
+        return Err(CliError::Usage(
+            "--tls-cert and --tls-key must be provided together".to_string(),
+        ));
+    }
     Ok(ServeOptions {
         storage_root: storage_root.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs serve <storage-root> [--host <host>] [--port <port>]"
+                "usage: codefire-rs serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>] [--tls-key <key>]"
                     .to_string(),
             )
         })?,
         host,
         port,
+        tls_cert,
+        tls_key,
     })
 }
 
@@ -2722,7 +2741,7 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, Cli
             options.new_branch
         )));
     }
-    if options.source.starts_with("cf+http://") {
+    if is_cf_http_url(&options.source) {
         let remote = parse_cf_http_url(&options.source)?;
         let bundle = http_json(
             "GET",
@@ -2759,7 +2778,8 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, Cli
             &repo_root.join(".codefire").join("objects"),
             &source_head,
         )?;
-        let plan = clone_operation_plan(options, &repo_root, &source_head, "cf+http");
+        let plan =
+            clone_operation_plan(options, &repo_root, &source_head, remote.endpoint_scheme());
         if options.dry_run {
             return Ok(CloneResult { plan });
         }

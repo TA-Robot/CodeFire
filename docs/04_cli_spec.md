@@ -52,7 +52,7 @@ codefire completion <bash|zsh>
 Implementation status note:
 
 - Python v0.2 `codefire` supports the full HTTPS serve surface shown above.
-- Rust v0.6 `codefire-rs` currently supports `serve <storage-root> [--host] [--port]` for `cf+http://`; `--tls-cert` / `--tls-key` and `cf+https://` are tracked by `CF-212`.
+- Rust v0.6 `codefire-rs` supports `serve <storage-root> [--host] [--port] [--tls-cert] [--tls-key]` for `cf+http://` and `cf+https://`.
 - Rust v0.6 signature parity for `--signer`, `--key-id`, `--request-key-id`, commit signature verification, and request nonce replay is tracked by `CF-213`.
 - Rust v0.6 installer switch from Python `codefire` to Rust `codefire` plus Python `codefire-py` fallback is tracked by `CF-217`.
 

@@ -1,3 +1,4 @@
+use super::http_tls;
 use super::remote::*;
 use super::*;
 use serde_json::{json, Value};
@@ -14,11 +15,31 @@ pub(crate) struct CfHttpUrl {
     pub(crate) branch: String,
 }
 
+impl CfHttpUrl {
+    pub(crate) fn endpoint_scheme(&self) -> &'static str {
+        endpoint_scheme(&self.endpoint)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct CfHttpProjectUrl {
     pub(crate) endpoint: String,
     pub(crate) org: String,
     pub(crate) app: String,
+}
+
+impl CfHttpProjectUrl {
+    pub(crate) fn endpoint_scheme(&self) -> &'static str {
+        endpoint_scheme(&self.endpoint)
+    }
+}
+
+fn endpoint_scheme(endpoint: &str) -> &'static str {
+    if endpoint.starts_with("https://") {
+        "https"
+    } else {
+        "http"
+    }
 }
 
 pub(crate) fn parse_cf_http_url(url: &str) -> Result<CfHttpUrl, CliError> {
@@ -41,9 +62,15 @@ pub(crate) fn parse_cf_http_project_url(url: &str) -> Result<CfHttpProjectUrl, C
 }
 
 fn parse_cf_http_parts(url: &str, min_parts: usize) -> Result<(String, Vec<String>), CliError> {
-    let raw = url
-        .strip_prefix("cf+http://")
-        .ok_or_else(|| CliError::Usage(format!("not a CodeFire HTTP remote URL: {url}")))?;
+    let (scheme, raw) = if let Some(raw) = url.strip_prefix("cf+http://") {
+        ("http", raw)
+    } else if let Some(raw) = url.strip_prefix("cf+https://") {
+        ("https", raw)
+    } else {
+        return Err(CliError::Usage(format!(
+            "not a CodeFire HTTP remote URL: {url}"
+        )));
+    };
     let (netloc, path) = raw
         .split_once('/')
         .ok_or_else(|| CliError::Usage(format!("not a CodeFire HTTP remote URL: {url}")))?;
@@ -59,12 +86,16 @@ fn parse_cf_http_parts(url: &str, min_parts: usize) -> Result<(String, Vec<Strin
         .collect::<Result<Vec<_>, _>>()?;
     if parts.len() < min_parts {
         return Err(CliError::Usage(if min_parts == 3 {
-            "HTTP remote URL must be cf+http://<host>/<org>/<app>/<branch>".to_string()
+            "HTTP remote URL must be cf+http://<host>/<org>/<app>/<branch> or cf+https://<host>/<org>/<app>/<branch>".to_string()
         } else {
-            "HTTP remote project URL must be cf+http://<host>/<org>/<app>".to_string()
+            "HTTP remote project URL must be cf+http://<host>/<org>/<app> or cf+https://<host>/<org>/<app>".to_string()
         }));
     }
-    Ok((format!("http://{netloc}"), parts))
+    Ok((format!("{scheme}://{netloc}"), parts))
+}
+
+pub(crate) fn is_cf_http_url(url: &str) -> bool {
+    url.starts_with("cf+http://") || url.starts_with("cf+https://")
 }
 
 pub(crate) fn http_remote_path(endpoint: &str, org: &str, app: &str, parts: &[&str]) -> String {
@@ -82,34 +113,46 @@ pub(crate) fn http_json(
     url: &str,
     payload: Option<Value>,
 ) -> Result<Value, CliError> {
-    let (host, port, path) = parse_http_url(url)?;
-    let mut stream = TcpStream::connect((host.as_str(), port))?;
-    let body = payload
+    let endpoint = parse_http_url(url)?;
+    let mut stream = TcpStream::connect((endpoint.host.as_str(), endpoint.port))?;
+    if endpoint.scheme == "https" {
+        let mut tls_stream = http_tls::connect_client(stream, &endpoint.host)?;
+        return http_json_stream(method, &endpoint, payload, &mut tls_stream);
+    }
+    http_json_stream(method, &endpoint, payload, &mut stream)
+}
+
+fn http_json_stream<S: Read + Write>(
+    method: &str,
+    endpoint: &HttpEndpoint,
+    payload: Option<Value>,
+    stream: &mut S,
+) -> Result<Value, CliError> {
+    let request_body = payload
         .map(|value| serde_json::to_vec(&value))
         .transpose()?
         .unwrap_or_default();
     let request = format!(
-        "{method} {path} HTTP/1.1\r\nHost: {host}:{port}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        body.len()
+        "{method} {} HTTP/1.1\r\nHost: {}:{}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        endpoint.path,
+        endpoint.host,
+        endpoint.port,
+        request_body.len()
     );
     stream.write_all(request.as_bytes())?;
-    stream.write_all(&body)?;
-    let mut response = Vec::new();
-    stream.read_to_end(&mut response)?;
-    let response = String::from_utf8_lossy(&response);
-    let (head, body) = response
-        .split_once("\r\n\r\n")
-        .ok_or_else(|| CliError::InvalidRepository("invalid HTTP response".to_string()))?;
+    stream.write_all(&request_body)?;
+    stream.flush()?;
+    let (head, response_body) = read_http_response(stream)?;
     let status = head
         .lines()
         .next()
         .and_then(|line| line.split_whitespace().nth(1))
         .and_then(|code| code.parse::<u16>().ok())
         .ok_or_else(|| CliError::InvalidRepository("invalid HTTP status line".to_string()))?;
-    let value = if body.trim().is_empty() {
+    let value = if response_body.is_empty() {
         json!({})
     } else {
-        serde_json::from_str(body)?
+        serde_json::from_slice(&response_body)?
     };
     if status >= 400 {
         let detail = value
@@ -128,10 +171,73 @@ pub(crate) fn http_json(
     Ok(value)
 }
 
-fn parse_http_url(url: &str) -> Result<(String, u16, String), CliError> {
-    let raw = url
-        .strip_prefix("http://")
-        .ok_or_else(|| CliError::Usage("only cf+http transport is supported".to_string()))?;
+fn read_http_response<S: Read + Write>(stream: &mut S) -> Result<(String, Vec<u8>), CliError> {
+    let mut buffer = Vec::new();
+    let mut temp = [0u8; 1024];
+    let header_end = loop {
+        let read = stream.read(&mut temp)?;
+        if read == 0 {
+            return Err(CliError::InvalidRepository(
+                "incomplete HTTP response".to_string(),
+            ));
+        }
+        buffer.extend_from_slice(&temp[..read]);
+        if let Some(position) = find_header_end(&buffer) {
+            break position;
+        }
+        if buffer.len() > 64 * 1024 {
+            return Err(CliError::Usage(
+                "HTTP response headers too large".to_string(),
+            ));
+        }
+    };
+    let head = String::from_utf8_lossy(&buffer[..header_end]).to_string();
+    let content_length = head
+        .lines()
+        .filter_map(|line| line.split_once(':'))
+        .find_map(|(name, value)| {
+            name.eq_ignore_ascii_case("content-length")
+                .then(|| value.trim().parse::<usize>().ok())
+                .flatten()
+        })
+        .unwrap_or(0);
+    let body_start = header_end + 4;
+    while buffer.len() < body_start + content_length {
+        let read = stream.read(&mut temp)?;
+        if read == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&temp[..read]);
+    }
+    if buffer.len() < body_start + content_length {
+        return Err(CliError::InvalidRepository(
+            "incomplete HTTP response body".to_string(),
+        ));
+    }
+    Ok((
+        head,
+        buffer[body_start..body_start + content_length].to_vec(),
+    ))
+}
+
+#[derive(Debug)]
+struct HttpEndpoint {
+    scheme: String,
+    host: String,
+    port: u16,
+    path: String,
+}
+
+fn parse_http_url(url: &str) -> Result<HttpEndpoint, CliError> {
+    let (scheme, raw) = if let Some(raw) = url.strip_prefix("http://") {
+        ("http", raw)
+    } else if let Some(raw) = url.strip_prefix("https://") {
+        ("https", raw)
+    } else {
+        return Err(CliError::Usage(
+            "only cf+http and cf+https transports are supported".to_string(),
+        ));
+    };
     let (authority, path) = raw.split_once('/').unwrap_or((raw, ""));
     let (host, port) = if let Some((host, port)) = authority.rsplit_once(':') {
         (
@@ -140,9 +246,15 @@ fn parse_http_url(url: &str) -> Result<(String, u16, String), CliError> {
                 .map_err(|_| CliError::Usage(format!("invalid HTTP port: {port}")))?,
         )
     } else {
-        (authority.to_string(), 80)
+        let port = if scheme == "http" { 80 } else { 443 };
+        (authority.to_string(), port)
     };
-    Ok((host, port, format!("/{path}")))
+    Ok(HttpEndpoint {
+        scheme: scheme.to_string(),
+        host,
+        port,
+        path: format!("/{path}"),
+    })
 }
 
 pub(crate) fn serve_http(options: &ServeOptions) -> Result<(), CliError> {
@@ -150,15 +262,37 @@ pub(crate) fn serve_http(options: &ServeOptions) -> Result<(), CliError> {
     fs::create_dir_all(&storage_root)?;
     let listener = TcpListener::bind((options.host.as_str(), options.port))?;
     let address = listener.local_addr()?;
+    let tls_config = match (&options.tls_cert, &options.tls_key) {
+        (Some(cert), Some(key)) => Some(http_tls::server_config(cert, key)?),
+        _ => None,
+    };
+    let scheme = if tls_config.is_some() {
+        "cf+https"
+    } else {
+        "cf+http"
+    };
     println!(
-        "serving CodeFire HTTP remote: cf+http://{}:{}",
+        "serving CodeFire HTTP remote: {scheme}://{}:{}",
         address.ip(),
         address.port()
     );
     for stream in listener.incoming() {
         match stream {
             Ok(mut stream) => {
-                let _ = handle_http_stream(&storage_root, &mut stream);
+                if let Some(config) = &tls_config {
+                    match http_tls::accept_server(stream, config.clone()) {
+                        Ok(mut tls_stream) => {
+                            if let Err(error) = handle_http_stream(&storage_root, &mut tls_stream) {
+                                eprintln!("HTTP request failed: {error}");
+                            }
+                        }
+                        Err(error) => {
+                            eprintln!("TLS handshake failed: {error}");
+                        }
+                    }
+                } else if let Err(error) = handle_http_stream(&storage_root, &mut stream) {
+                    eprintln!("HTTP request failed: {error}");
+                }
             }
             Err(error) => return Err(CliError::Io(error)),
         }
@@ -166,7 +300,10 @@ pub(crate) fn serve_http(options: &ServeOptions) -> Result<(), CliError> {
     Ok(())
 }
 
-fn handle_http_stream(storage_root: &Path, stream: &mut TcpStream) -> Result<(), CliError> {
+fn handle_http_stream<S: Read + Write>(
+    storage_root: &Path,
+    stream: &mut S,
+) -> Result<(), CliError> {
     let request = read_http_request(stream)?;
     let (status, payload) = match dispatch_http(storage_root, &request) {
         Ok(response) => response,
@@ -189,7 +326,7 @@ struct HttpRequest {
     body: Value,
 }
 
-fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, CliError> {
+fn read_http_request<S: Read + Write>(stream: &mut S) -> Result<HttpRequest, CliError> {
     let mut buffer = Vec::new();
     let mut temp = [0u8; 1024];
     let header_end = loop {
@@ -253,7 +390,11 @@ fn find_header_end(buffer: &[u8]) -> Option<usize> {
     buffer.windows(4).position(|window| window == b"\r\n\r\n")
 }
 
-fn write_http_json(stream: &mut TcpStream, status: u16, payload: &Value) -> Result<(), CliError> {
+fn write_http_json<S: Read + Write>(
+    stream: &mut S,
+    status: u16,
+    payload: &Value,
+) -> Result<(), CliError> {
     let body = serde_json::to_vec(payload)?;
     let reason = match status {
         200 => "OK",
@@ -268,6 +409,7 @@ fn write_http_json(stream: &mut TcpStream, status: u16, payload: &Value) -> Resu
     );
     stream.write_all(header.as_bytes())?;
     stream.write_all(&body)?;
+    stream.flush()?;
     Ok(())
 }
 

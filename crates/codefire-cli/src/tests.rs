@@ -1206,6 +1206,51 @@ fn parse_mutating_dry_run_json_args() {
 }
 
 #[test]
+fn parse_https_remote_urls_and_tls_serve_args() {
+    let branch_url = http::parse_cf_http_url("cf+https://127.0.0.1:8443/org/app/main").unwrap();
+    assert_eq!(branch_url.endpoint, "https://127.0.0.1:8443");
+    assert_eq!(branch_url.endpoint_scheme(), "https");
+    assert_eq!(branch_url.org, "org");
+    assert_eq!(branch_url.app, "app");
+    assert_eq!(branch_url.branch, "main");
+
+    let project_url = http::parse_cf_http_project_url("cf+https://127.0.0.1:8443/org/app").unwrap();
+    assert_eq!(project_url.endpoint, "https://127.0.0.1:8443");
+    assert_eq!(project_url.endpoint_scheme(), "https");
+    assert_eq!(project_url.org, "org");
+    assert_eq!(project_url.app, "app");
+    assert!(http::is_cf_http_url("cf+https://127.0.0.1:8443/org/app"));
+
+    let serve = parse_serve_args(&[
+        "/tmp/server".to_string(),
+        "--host".to_string(),
+        "127.0.0.1".to_string(),
+        "--port".to_string(),
+        "8443".to_string(),
+        "--tls-cert".to_string(),
+        "/tmp/server.crt".to_string(),
+        "--tls-key".to_string(),
+        "/tmp/server.key".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(serve.storage_root, PathBuf::from("/tmp/server"));
+    assert_eq!(serve.host, "127.0.0.1");
+    assert_eq!(serve.port, 8443);
+    assert_eq!(serve.tls_cert, Some(PathBuf::from("/tmp/server.crt")));
+    assert_eq!(serve.tls_key, Some(PathBuf::from("/tmp/server.key")));
+
+    let missing_key = parse_serve_args(&[
+        "/tmp/server".to_string(),
+        "--tls-cert".to_string(),
+        "/tmp/server.crt".to_string(),
+    ])
+    .unwrap_err();
+    assert!(missing_key
+        .to_string()
+        .contains("--tls-cert and --tls-key must be provided together"));
+}
+
+#[test]
 fn open_and_clone_dry_run_return_plans_without_structural_changes() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");

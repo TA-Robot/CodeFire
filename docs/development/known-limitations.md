@@ -93,7 +93,7 @@ commit payload内に自身の `commit_id` を含めると循環参照になる�
 
 ### Remote Features
 
-remote機能は、Python v0.2ではローカルファイル-backed server、HTTP server、HTTPS serverとして実装している。Rust v0.6 rewriteではfile-backed remoteと `cf+http://` serverは実装済みだが、`cf+https://` TLS transportは `CF-212` の残作業である。
+remote機能は、Python v0.2とRust v0.6 rewriteの両方でローカルファイル-backed server、HTTP server、HTTPS serverとして実装している。
 
 URL例:
 
@@ -103,9 +103,9 @@ cf+http://127.0.0.1:8080/org/app/main
 cf+https://127.0.0.1:8443/org/app/main
 ```
 
-server側は `.codefire-server/projects/<org>/<app>/` にsealed object、branch、merge requestを保存する。Python v0.2の `codefire serve <storage-root>` は同じ保存形式をHTTP/HTTPS越しに公開する。Rust v0.6の `codefire-rs serve <storage-root>` は現時点ではHTTP公開までで、TLSは未実装である。
+server側は `.codefire-server/projects/<org>/<app>/` にsealed object、branch、merge requestを保存する。Python v0.2の `codefire serve <storage-root>` とRust v0.6の `codefire-rs serve <storage-root>` は同じ保存形式をHTTP/HTTPS越しに公開する。
 
-Python v0.2のHTTP/HTTPS transportとRust v0.6のHTTP transportで実装済み:
+Python v0.2とRust v0.6のHTTP/HTTPS transportで実装済み:
 
 - `upload`
 - `list`
@@ -119,7 +119,7 @@ Python v0.2のHTTP/HTTPS transportとRust v0.6のHTTP transportで実装済み:
 - `doctor`
 - `gc`
 
-Python v0.2のHTTPS transportは `codefire serve --tls-cert --tls-key` で有効化できる。通常のTLS証明書検証を使い、自署名証明書のローカル検証時のみ `CODEFIRE_TLS_INSECURE=1` で検証を無効化できる。Rust v0.6では同じCLI surfaceを復元する必要があり、TLS実装は `CF-212` で追跡する。
+HTTPS transportは `codefire serve --tls-cert --tls-key` / `codefire-rs serve --tls-cert --tls-key` で有効化できる。通常のTLS証明書検証を使い、自署名証明書のローカル検証時のみ `CODEFIRE_TLS_INSECURE=1` で検証を無効化できる。
 
 server-side verificationは `server_policy.json` に書いたcommandをremote project root配下で実行する。checkごとに `cwd`、`env`、`timeout_seconds` を指定でき、`cwd` はremote project root配下に制限される。親プロセス環境は丸ごと渡さず、最小環境、CodeFire remote metadata、checkごとの `env` だけを渡す。OS-level sandboxやコンテナ隔離はまだ持たない。
 
