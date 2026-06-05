@@ -85,6 +85,8 @@ Local mutating commands that acquire `repo.lock` accept `--wait-lock` and `--loc
 Idempotency keys are implemented incrementally for mutating commands:
 
 ```text
+open --idempotency-key <key>
+clone --idempotency-key <key>
 commit --idempotency-key <key>
 extinguish --idempotency-key <key>
 ```

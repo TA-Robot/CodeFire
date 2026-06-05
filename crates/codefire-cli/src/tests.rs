@@ -50,6 +50,7 @@ fn open_materializes_manifest_and_updates_registry() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -101,6 +102,7 @@ fn clone_branch_creates_closed_branch_and_rejects_burning_source() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -123,6 +125,7 @@ fn clone_branch_creates_closed_branch_and_rejects_burning_source() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap_err()
@@ -516,6 +519,7 @@ fn context_pack_returns_atom_changed_and_fire_views() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -650,6 +654,7 @@ fn parse_mutating_dry_run_json_args() {
         "--dry-run".to_string(),
         "--json".to_string(),
         "--wait-lock".to_string(),
+        "--idempotency-key=open-key-1".to_string(),
     ])
     .unwrap();
     assert_eq!(open.branch, "main");
@@ -657,6 +662,7 @@ fn parse_mutating_dry_run_json_args() {
     assert!(open.dry_run);
     assert!(open.json_output);
     assert!(open.lock.wait);
+    assert_eq!(open.idempotency_key.as_deref(), Some("open-key-1"));
 
     let clone = parse_clone_args(&[
         "main".to_string(),
@@ -665,6 +671,8 @@ fn parse_mutating_dry_run_json_args() {
         "--json".to_string(),
         "--lock-timeout".to_string(),
         "1s".to_string(),
+        "--idempotency-key".to_string(),
+        "clone-key-1".to_string(),
     ])
     .unwrap();
     assert_eq!(clone.source, "main");
@@ -673,6 +681,7 @@ fn parse_mutating_dry_run_json_args() {
     assert!(clone.json_output);
     assert!(clone.lock.wait);
     assert_eq!(clone.lock.timeout_ms, Some(1000));
+    assert_eq!(clone.idempotency_key.as_deref(), Some("clone-key-1"));
 }
 
 #[test]
@@ -692,6 +701,7 @@ fn open_and_clone_dry_run_return_plans_without_structural_changes() {
             dry_run: true,
             json_output: true,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -715,6 +725,7 @@ fn open_and_clone_dry_run_return_plans_without_structural_changes() {
             dry_run: true,
             json_output: true,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -724,6 +735,108 @@ fn open_and_clone_dry_run_return_plans_without_structural_changes() {
     assert_eq!(clone_result.plan["dry_run"], true);
     assert_eq!(clone_result.plan["source"]["head"], main_head);
     assert!(!branch_record_path(&repo_root, "feature").exists());
+}
+
+#[test]
+fn open_and_clone_idempotency_replay_same_payload_and_reject_conflicts() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    let other_open_dir = temp.path().join("other-open");
+    init_repo(&repo_root, false).unwrap();
+
+    let first_open = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: Some("open-main-once".to_string()),
+        },
+    )
+    .unwrap();
+    assert_eq!(first_open.branch, "main");
+    assert!(open_dir.join(".codefire-open").exists());
+
+    let replay_open = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: Some("open-main-once".to_string()),
+        },
+    )
+    .unwrap();
+    assert_eq!(replay_open.open_dir, first_open.open_dir);
+    assert_eq!(replay_open.plan["command"], "open");
+
+    let open_conflict = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: other_open_dir,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: Some("open-main-once".to_string()),
+        },
+    )
+    .unwrap_err();
+    assert_eq!(
+        open_conflict.exit_code(),
+        ExitCode::IdempotencyConflict.code()
+    );
+
+    let first_clone = clone_branch(
+        &repo_root,
+        &CloneOptions {
+            source: "main".to_string(),
+            new_branch: "feature".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: Some("clone-feature-once".to_string()),
+        },
+    )
+    .unwrap();
+    assert_eq!(first_clone.plan["command"], "clone");
+    assert!(branch_record_path(&repo_root, "feature").exists());
+
+    let replay_clone = clone_branch(
+        &repo_root,
+        &CloneOptions {
+            source: "main".to_string(),
+            new_branch: "feature".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: Some("clone-feature-once".to_string()),
+        },
+    )
+    .unwrap();
+    assert_eq!(replay_clone.plan["command"], "clone");
+
+    let clone_conflict = clone_branch(
+        &repo_root,
+        &CloneOptions {
+            source: "main".to_string(),
+            new_branch: "other-feature".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: Some("clone-feature-once".to_string()),
+        },
+    )
+    .unwrap_err();
+    assert_eq!(
+        clone_conflict.exit_code(),
+        ExitCode::IdempotencyConflict.code()
+    );
 }
 
 #[test]
@@ -740,6 +853,7 @@ fn commit_dry_run_returns_plan_without_updating_branch() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -782,6 +896,7 @@ fn commit_idempotency_key_replays_same_payload_and_rejects_conflict() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -843,6 +958,7 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -905,6 +1021,7 @@ fn extinguish_idempotency_key_replays_same_payload_and_rejects_conflict() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -991,6 +1108,7 @@ fn extinguish_batch_validates_all_items_before_writing_ledgers() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -1089,6 +1207,7 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -1212,6 +1331,7 @@ fn explain_fire_atom_verify_and_storage_targets_return_actions() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -1578,6 +1698,7 @@ fn patch_export_import_applies_manifest_delta_to_open_directory() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -1715,6 +1836,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -1893,6 +2015,7 @@ fn merge_branch_writes_source_changes_and_marks_target_burning() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -1997,6 +2120,7 @@ fn merge_branch_writes_conflict_markers_for_divergent_changes() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -2102,6 +2226,7 @@ fn merge_dry_run_reports_plan_without_writing_target() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -2228,6 +2353,7 @@ fn metrics_attach_to_status_scan_and_verify_data() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();

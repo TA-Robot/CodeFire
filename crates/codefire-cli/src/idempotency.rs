@@ -43,6 +43,19 @@ pub(super) fn verify_idempotency_record(
     Ok(())
 }
 
+pub(super) fn idempotency_result_plan(record: &Value, path: &Path) -> Result<Value, CliError> {
+    record
+        .get("result")
+        .and_then(|result| result.get("plan"))
+        .cloned()
+        .ok_or_else(|| {
+            CliError::InvalidRepository(format!(
+                "idempotency record missing result.plan: {}",
+                path.display()
+            ))
+        })
+}
+
 pub(super) fn idempotency_payload_hash(payload: &Value) -> Result<String, CliError> {
     let mut hasher = Sha256::new();
     hasher.update(codefire_store::canonical_json(payload)?);

@@ -18,6 +18,7 @@ mod http;
 mod idempotency;
 mod metrics;
 mod migration;
+mod open_clone_idempotency;
 mod remote;
 mod storage;
 mod view;
@@ -37,13 +38,17 @@ use exit_code::{
 use explain::{parse_explain_args, print_explain_result, run_explain};
 use http::{http_json, http_remote_path, parse_cf_http_url, serve_http};
 use idempotency::{
-    idempotency_payload_hash, idempotency_record_path, require_idempotency_key,
-    verify_idempotency_record,
+    idempotency_payload_hash, idempotency_record_path, idempotency_result_plan,
+    require_idempotency_key, verify_idempotency_record,
 };
 use metrics::{attach_metrics, print_metrics, scan_metrics, status_metrics, verification_metrics};
 use migration::{
     migration_report_data_json, migration_report_diagnostics_json, migration_report_next_actions,
     parse_migrate_args, print_migration_report, run_migrate,
+};
+use open_clone_idempotency::{
+    clone_idempotency_payload, load_clone_idempotency, load_open_idempotency,
+    open_idempotency_payload, save_clone_idempotency, save_open_idempotency,
 };
 use remote::{
     apply_merge_request, copy_object_graph, list_merge_requests, list_remote_branches,
@@ -768,6 +773,7 @@ struct OpenOptions {
     dry_run: bool,
     json_output: bool,
     lock: LockOptions,
+    idempotency_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -836,6 +842,7 @@ struct CloneOptions {
     dry_run: bool,
     json_output: bool,
     lock: LockOptions,
+    idempotency_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -1092,6 +1099,7 @@ fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
     let mut dry_run = false;
     let mut json_output = false;
     let mut lock = LockOptions::default();
+    let mut idempotency_key = None;
     let mut index = 0usize;
     while index < args.len() {
         let value = &args[index];
@@ -1102,6 +1110,19 @@ fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
         match value.as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
+            "--idempotency-key" => {
+                index += 1;
+                idempotency_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--idempotency-key requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--idempotency-key=") => {
+                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+            }
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported open option: {option}"
@@ -1118,9 +1139,10 @@ fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
             dry_run,
             json_output,
             lock,
+            idempotency_key,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs open <branch> <path> [--dry-run] [--json] [--wait-lock] [--lock-timeout <duration>]".to_string(),
+            "usage: codefire-rs open <branch> <path> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
         )),
     }
 }
@@ -1335,6 +1357,7 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
     let mut dry_run = false;
     let mut json_output = false;
     let mut lock = LockOptions::default();
+    let mut idempotency_key = None;
     let mut index = 0usize;
     while index < args.len() {
         let value = &args[index];
@@ -1345,6 +1368,19 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
         match value.as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
+            "--idempotency-key" => {
+                index += 1;
+                idempotency_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--idempotency-key requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--idempotency-key=") => {
+                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+            }
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported clone option: {option}"
@@ -1361,9 +1397,10 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
             dry_run,
             json_output,
             lock,
+            idempotency_key,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs clone <source-branch> <new-branch> [--dry-run] [--json] [--wait-lock] [--lock-timeout <duration>]"
+            "usage: codefire-rs clone <source-branch> <new-branch> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
                 .to_string(),
         )),
     }
@@ -2387,6 +2424,14 @@ fn apply_patch_entry(open_dir: &Path, entry: &Value) -> Result<(), CliError> {
 fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, CliError> {
     let repo_root = find_repo_root(start)?;
     let _lock = RepoLock::acquire_with_options(&repo_root, &options.lock)?;
+    let idempotency_payload = clone_idempotency_payload(options, &repo_root);
+    if !options.dry_run {
+        if let Some(key) = options.idempotency_key.as_deref() {
+            if let Some(result) = load_clone_idempotency(&repo_root, key, &idempotency_payload)? {
+                return Ok(result);
+            }
+        }
+    }
     if branch_record_path(&repo_root, &options.new_branch).exists() {
         return Err(CliError::Usage(format!(
             "branch already exists: {}",
@@ -2444,7 +2489,11 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, Cli
             "created_at": now_iso_utc(),
         });
         save_branch_record(&repo_root, &branch)?;
-        return Ok(CloneResult { plan });
+        let result = CloneResult { plan };
+        if let Some(key) = options.idempotency_key.as_deref() {
+            save_clone_idempotency(&repo_root, key, &idempotency_payload, &result)?;
+        }
+        return Ok(result);
     }
     if options.source.starts_with("cf://") {
         let remote = parse_cf_url(&options.source)?;
@@ -2471,7 +2520,11 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, Cli
             "created_at": now_iso_utc(),
         });
         save_branch_record(&repo_root, &branch)?;
-        return Ok(CloneResult { plan });
+        let result = CloneResult { plan };
+        if let Some(key) = options.idempotency_key.as_deref() {
+            save_clone_idempotency(&repo_root, key, &idempotency_payload, &result)?;
+        }
+        return Ok(result);
     }
     let source = load_branch_record(&repo_root, &options.source)?;
     let source_head = required_string(&source, &["head"])?;
@@ -2503,7 +2556,11 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, Cli
         "created_at": now_iso_utc(),
     });
     save_branch_record(&repo_root, &branch)?;
-    Ok(CloneResult { plan })
+    let result = CloneResult { plan };
+    if let Some(key) = options.idempotency_key.as_deref() {
+        save_clone_idempotency(&repo_root, key, &idempotency_payload, &result)?;
+    }
+    Ok(result)
 }
 
 fn open_branch(options: &OpenOptions) -> Result<OpenResult, CliError> {
@@ -2520,6 +2577,14 @@ fn open_branch_from(start: &Path, options: &OpenOptions) -> Result<OpenResult, C
     codefire_store::validate_sealed_commit(&objects, &branch_head)?;
 
     let target = absolute_path(&options.path)?;
+    let idempotency_payload = open_idempotency_payload(options, &repo_root, &target, &branch_head);
+    if !options.dry_run {
+        if let Some(key) = options.idempotency_key.as_deref() {
+            if let Some(result) = load_open_idempotency(&repo_root, key, &idempotency_payload)? {
+                return Ok(result);
+            }
+        }
+    }
     if target.exists() && !is_empty_dir(&target)? {
         return Err(CliError::Usage(format!(
             "target path must not exist or must be empty: {}",
@@ -2591,11 +2656,15 @@ fn open_branch_from(start: &Path, options: &OpenOptions) -> Result<OpenResult, C
     branch["state"] = Value::String("open-clean".to_string());
     save_branch_record(&repo_root, &branch)?;
 
-    Ok(OpenResult {
+    let result = OpenResult {
         branch: options.branch.clone(),
         open_dir: target,
         plan,
-    })
+    };
+    if let Some(key) = options.idempotency_key.as_deref() {
+        save_open_idempotency(&repo_root, key, &idempotency_payload, &result)?;
+    }
+    Ok(result)
 }
 
 fn open_operation_plan(
@@ -2906,16 +2975,7 @@ fn load_extinguish_idempotency(
     verify_idempotency_record(&record, &path, "extinguish", key, payload)?;
     Ok(Some(ExtinguishResult {
         display_id: required_string(&record, &["result", "display_id"])?,
-        plan: record
-            .get("result")
-            .and_then(|result| result.get("plan"))
-            .cloned()
-            .ok_or_else(|| {
-                CliError::InvalidRepository(format!(
-                    "idempotency record missing result.plan: {}",
-                    path.display()
-                ))
-            })?,
+        plan: idempotency_result_plan(&record, &path)?,
     }))
 }
 
@@ -3111,16 +3171,7 @@ fn load_commit_idempotency(
     Ok(Some(CommitResult {
         commit_id: required_string(&record, &["result", "commit_id"])?,
         branch: required_string(&record, &["result", "branch"])?,
-        plan: record
-            .get("result")
-            .and_then(|result| result.get("plan"))
-            .cloned()
-            .ok_or_else(|| {
-                CliError::InvalidRepository(format!(
-                    "idempotency record missing result.plan: {}",
-                    path.display()
-                ))
-            })?,
+        plan: idempotency_result_plan(&record, &path)?,
     }))
 }
 

@@ -84,6 +84,7 @@ force-upload
 ```bash
 codefire open main ./main
 codefire open main ./main --dry-run --json
+codefire open main ./main --idempotency-key request-open-001
 codefire open main ./main --wait-lock --lock-timeout 2s
 ```
 
@@ -96,6 +97,9 @@ target pathは存在しないか空でなければならない
 .codefire-openを生成する
 open registryを更新する
 --dry-runはtarget materialization、open marker、registry、branch stateを書き換えず、codefire_operation_planを返す
+--idempotency-keyは成功したopen resultを.codefire/idempotency/open/へ記録する
+同じ--idempotency-keyかつ同じopen request payloadは保存済みopen resultを返し、多重open/target既存checkより先にreplayする
+同じ--idempotency-keyでbranch/path/branch_head/repoが異なるpayloadはexit code 33で拒否する
 ```
 
 ## 4.4 `close`
@@ -122,6 +126,7 @@ codefire close feature-login --discard
 ```bash
 codefire clone main feature-login
 codefire clone main feature-login --dry-run --json
+codefire clone main feature-login --idempotency-key request-clone-001
 ```
 
 仕様：
@@ -131,6 +136,9 @@ source branchのsealed headをtarget branchのheadとして設定する
 sourceがopen-burningの場合は拒否する
 target branchはclosed状態で作成される
 --dry-runはbranch recordやremote object graphを書き換えず、codefire_operation_planを返す
+--idempotency-keyは成功したclone resultを.codefire/idempotency/clone/へ記録する
+同じ--idempotency-keyかつ同じclone request payloadは保存済みclone resultを返し、target branch既存checkより先にreplayする
+同じ--idempotency-keyでsource/new_branch/repoが異なるpayloadはexit code 33で拒否する
 ```
 
 remoteから取得する場合：
