@@ -40,6 +40,7 @@ codefire discard <branch>
 codefire doctor
 codefire storage report [path] [--json] [--large-threshold <bytes|KB|MB|GB>]
 codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>) [--label <text>] [--json]
+codefire explain (fire <id>|atom <id>|verify-failure|storage-warning) [--path <path>] [--json]
 codefire serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>] [--tls-key <key>]
 codefire completion <bash|zsh>
 ```
@@ -422,7 +423,27 @@ commandがnon-zero exitでもevidence capture自体は成功し、command_exit_c
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_evidence_add_resultを含める
 ```
 
-## 4.18 `patch`
+## 4.18 `explain`
+
+```bash
+codefire explain fire FIRE-001 --path ./main-open --json
+codefire explain atom REQ-session --path ./main-open --depth 2 --json
+codefire explain verify-failure --path ./main-open --json
+codefire explain storage-warning --path ./repo --large-threshold 16MB --json
+```
+
+仕様：
+
+```text
+read-only診断コマンドで、open directoryまたはrepositoryを読み取り、active stateやobject storeを書き換えない
+fireはopen fireのsource/target/reason/trace_pathを説明し、context_fireとextinguish_fire next_actionsを返す
+atomはcontext packを内包し、近傍Atom、TraceLink、関連fireを説明する
+verify-failureはverifyをpersist=falseで実行し、blocker diagnosticsとverification next_actionsを返す
+storage-warningはstorage reportを実行し、large object/invalid JSON warning、largest objects、external artifact summaryを返す
+--jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_explainを含める
+```
+
+## 4.19 `patch`
 
 ```bash
 codefire patch export feature-login --base main --output feature-login.cfpatch.json
@@ -446,7 +467,7 @@ patch importは適用後にopen stateをopen-burningへ更新し、pending_patch
 patch pathはmanifest pathと同じく相対pathだけを許可し、open directory外へescapeするpathを拒否する
 ```
 
-## 4.19 `request-merge`
+## 4.20 `request-merge`
 
 ```bash
 codefire request-merge \

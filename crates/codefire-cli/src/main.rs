@@ -13,6 +13,7 @@ mod batch;
 mod context;
 mod evidence;
 mod exit_code;
+mod explain;
 mod http;
 mod idempotency;
 mod remote;
@@ -31,6 +32,7 @@ use evidence::{
 use exit_code::{
     core_error_exit_code, store_error_exit_code, usage_exit_code, verification_exit_code, ExitCode,
 };
+use explain::{parse_explain_args, print_explain_result, run_explain};
 use http::{http_json, http_remote_path, parse_cf_http_url, serve_http};
 use idempotency::{
     idempotency_payload_hash, idempotency_record_path, require_idempotency_key,
@@ -549,6 +551,27 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 "usage: codefire-rs evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>) [--label <text>] [--json]".to_string(),
             )),
         },
+        Some("explain") => {
+            let options = parse_explain_args(&args[1..])?;
+            let result = run_explain(&options)?;
+            if options.json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "explain",
+                        true,
+                        0,
+                        Some(&result.repo_root),
+                        result.data,
+                        result.diagnostics,
+                        result.next_actions,
+                    ))?
+                );
+            } else {
+                print_explain_result(&result);
+            }
+            Ok(())
+        }
         Some("--version") | Some("version") => {
             println!("codefire-rs foundation {}", codefire_core::VERSION);
             Ok(())

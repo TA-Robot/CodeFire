@@ -185,6 +185,25 @@ Rust `doctor` and `migrate` commands are still planned separately; their `next_a
 
 Evidence capture stores command output as a sealed `evidence` object and external artifact metadata as an `artifact_ref` object. Artifact payload bytes are not copied into `.codefire/objects`; storage report exposes their referenced bytes separately from stored payload bytes.
 
+`explain --json` data:
+
+```json
+{
+  "type": "codefire_explain",
+  "version": 1,
+  "target": {"kind": "fire", "value": "FIRE-001"},
+  "summary": "FIRE-001 links REQ-session to DES-session because atom_changed",
+  "fire": {
+    "display_id": "FIRE-001",
+    "source_atom": "REQ-session",
+    "target_atom": "DES-session",
+    "reason": "atom_changed"
+  }
+}
+```
+
+Supported explain targets are `fire <id>`, `atom <id>`, `verify-failure`, and `storage-warning`. The command is read-only and returns diagnostics plus next_actions appropriate to the target.
+
 `context --json` data:
 
 ```json

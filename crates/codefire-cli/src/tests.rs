@@ -1192,6 +1192,108 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
 }
 
 #[test]
+fn explain_fire_atom_verify_and_storage_targets_return_actions() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design").join("session.md"),
+        "## DES-session: Design\nClock policy\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("codefire.links.yaml"),
+        "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
+    )
+    .unwrap();
+
+    let fire_options = parse_explain_args(&[
+        "fire".to_string(),
+        "FIRE-001".to_string(),
+        "--path".to_string(),
+        open_dir.to_string_lossy().into_owned(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    assert!(fire_options.json_output);
+    assert_eq!(
+        fire_options.target,
+        explain::ExplainTarget::Fire("FIRE-001".to_string())
+    );
+    let fire = run_explain(&fire_options).unwrap();
+    assert_eq!(fire.data["type"], "codefire_explain");
+    assert_eq!(fire.data["target"]["kind"], "fire");
+    assert!(fire
+        .next_actions
+        .iter()
+        .any(|action| action["id"] == "extinguish_fire"));
+
+    let atom = run_explain(
+        &parse_explain_args(&[
+            "atom".to_string(),
+            "REQ-session".to_string(),
+            "--path".to_string(),
+            open_dir.to_string_lossy().into_owned(),
+            "--depth=2".to_string(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(atom.data["target"]["kind"], "atom");
+    assert!(atom.data["context"]["atoms"].as_array().unwrap().len() >= 2);
+
+    fs::remove_file(open_dir.join("codefire.links.yaml")).unwrap();
+    let verify = run_explain(
+        &parse_explain_args(&[
+            "verify-failure".to_string(),
+            "--path".to_string(),
+            open_dir.to_string_lossy().into_owned(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(verify.data["target"]["kind"], "verify-failure");
+    assert!(!verify.diagnostics.is_empty());
+    assert!(!verify.next_actions.is_empty());
+
+    let storage = run_explain(
+        &parse_explain_args(&[
+            "storage-warning".to_string(),
+            "--path".to_string(),
+            repo_root.to_string_lossy().into_owned(),
+            "--large-threshold=1".to_string(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(storage.data["target"]["kind"], "storage-warning");
+    assert!(!storage.diagnostics.is_empty());
+    assert!(!storage.next_actions.is_empty());
+}
+
+#[test]
 fn parse_review_pack_args_accepts_base_output_and_algorithm() {
     let args = vec![
         "feature-session".to_string(),
