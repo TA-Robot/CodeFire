@@ -637,6 +637,7 @@ fn remote_resource_lock_wait_timeout_returns_owner_metadata_and_json_diagnostics
             dry_run: false,
             json_output: true,
             idempotency_key: None,
+            request_key_id: None,
             lock: LockOptions {
                 wait: true,
                 timeout_ms: Some(0),
@@ -1433,6 +1434,8 @@ fn commit_dry_run_returns_plan_without_updating_branch() {
         json_output: true,
         lock: LockOptions::default(),
         idempotency_key: None,
+        signer: None,
+        key_id: None,
     })
     .unwrap();
     let after = load_branch_record(&repo_root, "main").unwrap();
@@ -1474,6 +1477,8 @@ fn commit_idempotency_key_replays_same_payload_and_rejects_conflict() {
         json_output: false,
         lock: LockOptions::default(),
         idempotency_key: Some("seal-main-once".to_string()),
+        signer: None,
+        key_id: None,
     })
     .unwrap();
     let branch_after_first = load_branch_record(&repo_root, "main").unwrap();
@@ -1489,6 +1494,8 @@ fn commit_idempotency_key_replays_same_payload_and_rejects_conflict() {
         json_output: false,
         lock: LockOptions::default(),
         idempotency_key: Some("seal-main-once".to_string()),
+        signer: None,
+        key_id: None,
     })
     .unwrap();
     assert_eq!(replay.commit_id, first.commit_id);
@@ -1505,6 +1512,8 @@ fn commit_idempotency_key_replays_same_payload_and_rejects_conflict() {
         json_output: false,
         lock: LockOptions::default(),
         idempotency_key: Some("seal-main-once".to_string()),
+        signer: None,
+        key_id: None,
     })
     .unwrap_err();
     assert_eq!(conflict.exit_code(), ExitCode::IdempotencyConflict.code());
@@ -3039,6 +3048,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
             dry_run: true,
             json_output: true,
             idempotency_key: None,
+            request_key_id: None,
             lock: LockOptions::default(),
         },
     )
@@ -3055,6 +3065,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
             dry_run: false,
             json_output: false,
             idempotency_key: None,
+            request_key_id: None,
             lock: LockOptions::default(),
         },
     )
@@ -3092,6 +3103,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
             dry_run: false,
             json_output: false,
             idempotency_key: None,
+            request_key_id: None,
             lock: LockOptions::default(),
         },
     )
@@ -3113,6 +3125,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         dry_run: true,
         json_output: true,
         idempotency_key: None,
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3126,6 +3139,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         dry_run: false,
         json_output: false,
         idempotency_key: None,
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3143,6 +3157,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         dry_run: true,
         json_output: true,
         idempotency_key: None,
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3157,6 +3172,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         dry_run: false,
         json_output: false,
         idempotency_key: None,
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3176,6 +3192,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         dry_run: true,
         json_output: true,
         idempotency_key: None,
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3195,6 +3212,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         dry_run: false,
         json_output: false,
         idempotency_key: None,
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3268,6 +3286,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
             dry_run: false,
             json_output: false,
             idempotency_key: Some("upload-main-once".to_string()),
+            request_key_id: None,
             lock: LockOptions::default(),
         },
     )
@@ -3280,6 +3299,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
             dry_run: false,
             json_output: false,
             idempotency_key: Some("upload-main-once".to_string()),
+            request_key_id: None,
             lock: LockOptions::default(),
         },
     )
@@ -3293,6 +3313,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
             dry_run: false,
             json_output: false,
             idempotency_key: Some("upload-main-once".to_string()),
+            request_key_id: None,
             lock: LockOptions::default(),
         },
     )
@@ -3310,6 +3331,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
             dry_run: false,
             json_output: false,
             idempotency_key: Some("upload-feature-once".to_string()),
+            request_key_id: None,
             lock: LockOptions::default(),
         },
     )
@@ -3321,6 +3343,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("request-merge-once".to_string()),
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3330,6 +3353,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("request-merge-once".to_string()),
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3340,6 +3364,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("request-merge-once".to_string()),
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap_err();
@@ -3360,6 +3385,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("review-once".to_string()),
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3372,6 +3398,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("review-once".to_string()),
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3392,6 +3419,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("review-once".to_string()),
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap_err();
@@ -3406,6 +3434,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("apply-once".to_string()),
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3415,6 +3444,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("apply-once".to_string()),
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3426,6 +3456,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("other-request-merge".to_string()),
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap();
@@ -3435,6 +3466,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("apply-once".to_string()),
+        request_key_id: None,
         lock: LockOptions::default(),
     })
     .unwrap_err();

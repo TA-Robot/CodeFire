@@ -30,6 +30,7 @@ pub(crate) struct UploadOptions {
     pub(crate) dry_run: bool,
     pub(crate) json_output: bool,
     pub(crate) idempotency_key: Option<String>,
+    pub(crate) request_key_id: Option<String>,
     pub(crate) lock: LockOptions,
 }
 
@@ -57,6 +58,7 @@ pub(crate) struct RequestMergeOptions {
     pub(crate) dry_run: bool,
     pub(crate) json_output: bool,
     pub(crate) idempotency_key: Option<String>,
+    pub(crate) request_key_id: Option<String>,
     pub(crate) lock: LockOptions,
 }
 
@@ -86,6 +88,7 @@ pub(crate) struct RequestReviewOptions {
     pub(crate) dry_run: bool,
     pub(crate) json_output: bool,
     pub(crate) idempotency_key: Option<String>,
+    pub(crate) request_key_id: Option<String>,
     pub(crate) lock: LockOptions,
 }
 
@@ -103,6 +106,7 @@ pub(crate) struct RequestApplyOptions {
     pub(crate) dry_run: bool,
     pub(crate) json_output: bool,
     pub(crate) idempotency_key: Option<String>,
+    pub(crate) request_key_id: Option<String>,
     pub(crate) lock: LockOptions,
 }
 
@@ -116,12 +120,16 @@ pub(crate) struct RequestApplyResult {
 #[derive(Debug, Clone)]
 pub(crate) struct CfUrl {
     pub(crate) project_root: PathBuf,
+    pub(crate) org: String,
+    pub(crate) app: String,
     pub(crate) branch: String,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct CfProjectUrl {
     pub(crate) project_root: PathBuf,
+    pub(crate) org: String,
+    pub(crate) app: String,
 }
 
 pub(crate) fn upload_branch(
@@ -159,6 +167,29 @@ pub(crate) fn upload_branch(
         if options.dry_run {
             return Ok(UploadResult { head, plan });
         }
+        let actor = "local";
+        let target = super::signatures::remote_request_target(
+            &remote.org,
+            &remote.app,
+            "upload",
+            Some(&remote.branch),
+            None,
+        );
+        let mut payload = json!({
+            "branch": options.branch,
+            "head": head,
+            "objects": collect_object_records(&local_objects, &required_string(&branch, &["head"])?)?,
+            "actor": actor,
+            "idempotency_key": &options.idempotency_key,
+            "lock": lock_options_json(&options.lock),
+        });
+        super::signatures::attach_remote_request_signature(
+            &mut payload,
+            "upload",
+            actor,
+            &target,
+            options.request_key_id.as_deref(),
+        )?;
         let response = http_json(
             "POST",
             &http_remote_path(
@@ -167,14 +198,7 @@ pub(crate) fn upload_branch(
                 &remote.app,
                 &["branches", &remote.branch, "upload"],
             ),
-            Some(json!({
-                "branch": options.branch,
-                "head": head,
-                "objects": collect_object_records(&local_objects, &required_string(&branch, &["head"])?)?,
-                "actor": "local",
-                "idempotency_key": &options.idempotency_key,
-                "lock": lock_options_json(&options.lock),
-            })),
+            Some(payload),
         )?;
         let response_head = required_string(&response, &["head"])?;
         return Ok(UploadResult {
@@ -185,6 +209,35 @@ pub(crate) fn upload_branch(
 
     let remote = parse_cf_url(&options.remote_url)?;
     let remote_branch = remote.branch.clone();
+    if !options.dry_run {
+        ensure_remote_layout(&remote.project_root)?;
+        let actor = "local";
+        let target = super::signatures::remote_request_target(
+            &remote.org,
+            &remote.app,
+            "upload",
+            Some(&remote_branch),
+            None,
+        );
+        let request_signature = super::signatures::sign_remote_request(
+            "upload",
+            actor,
+            &target,
+            options.request_key_id.as_deref(),
+        )?;
+        super::signatures::verify_remote_request_signature(
+            &remote.project_root,
+            "upload",
+            actor,
+            &target,
+            request_signature.as_ref(),
+        )?;
+        super::signatures::enforce_remote_commit_signature_policy(
+            &remote.project_root,
+            &local_objects,
+            &head,
+        )?;
+    }
     let idempotency_payload = remote_upload_payload(
         &remote.project_root,
         &remote_branch,
@@ -223,7 +276,6 @@ pub(crate) fn upload_branch(
     if options.dry_run {
         return Ok(UploadResult { head, plan });
     }
-    ensure_remote_layout(&remote.project_root)?;
     let _lock = FileLock::acquire_with_options(
         remote_dirs(&remote.project_root)
             .locks
@@ -331,6 +383,28 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
                 plan,
             });
         }
+        let actor = "local";
+        let target_string = super::signatures::remote_request_target(
+            &target.org,
+            &target.app,
+            "request_merge",
+            None,
+            None,
+        );
+        let mut payload = json!({
+            "source_url": options.source_url,
+            "target_url": options.target_url,
+            "actor": actor,
+            "idempotency_key": &options.idempotency_key,
+            "lock": lock_options_json(&options.lock),
+        });
+        super::signatures::attach_remote_request_signature(
+            &mut payload,
+            "request_merge",
+            actor,
+            &target_string,
+            options.request_key_id.as_deref(),
+        )?;
         let response = http_json(
             "POST",
             &http_remote_path(
@@ -339,13 +413,7 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
                 &target.app,
                 &["merge-requests"],
             ),
-            Some(json!({
-                "source_url": options.source_url,
-                "target_url": options.target_url,
-                "actor": "local",
-                "idempotency_key": &options.idempotency_key,
-                "lock": lock_options_json(&options.lock),
-            })),
+            Some(payload),
         )?;
         return Ok(RequestMergeResult {
             id: required_string(&response, &["id"])?,
@@ -356,6 +424,30 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
     }
     let source = parse_cf_url(&options.source_url)?;
     let target = parse_cf_url(&options.target_url)?;
+    if !options.dry_run {
+        ensure_remote_layout(&target.project_root)?;
+        let actor = "local";
+        let request_target = super::signatures::remote_request_target(
+            &target.org,
+            &target.app,
+            "request_merge",
+            None,
+            None,
+        );
+        let request_signature = super::signatures::sign_remote_request(
+            "request_merge",
+            actor,
+            &request_target,
+            options.request_key_id.as_deref(),
+        )?;
+        super::signatures::verify_remote_request_signature(
+            &target.project_root,
+            "request_merge",
+            actor,
+            &request_target,
+            request_signature.as_ref(),
+        )?;
+    }
     let source_branch = load_remote_branch(&source)?;
     let target_branch = load_remote_branch(&target)?;
     let source_head = required_string(&source_branch, &["head"])?;
@@ -415,7 +507,6 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
             plan,
         });
     }
-    ensure_remote_layout(&target.project_root)?;
     let _lock = FileLock::acquire_with_options(
         remote_dirs(&target.project_root)
             .locks
@@ -535,6 +626,29 @@ pub(crate) fn review_merge_request(
                 plan,
             });
         }
+        let actor = "local";
+        let target = super::signatures::remote_request_target(
+            &project.org,
+            &project.app,
+            "review",
+            None,
+            Some(&options.mr_id),
+        );
+        let mut payload = json!({
+            "reviewer": options.reviewer,
+            "decision": options.decision,
+            "comment": options.comment,
+            "actor": actor,
+            "idempotency_key": &options.idempotency_key,
+            "lock": lock_options_json(&options.lock),
+        });
+        super::signatures::attach_remote_request_signature(
+            &mut payload,
+            "review",
+            actor,
+            &target,
+            options.request_key_id.as_deref(),
+        )?;
         let response = http_json(
             "POST",
             &http_remote_path(
@@ -543,14 +657,7 @@ pub(crate) fn review_merge_request(
                 &project.app,
                 &["merge-requests", &options.mr_id, "review"],
             ),
-            Some(json!({
-                "reviewer": options.reviewer,
-                "decision": options.decision,
-                "comment": options.comment,
-                "actor": "local",
-                "idempotency_key": &options.idempotency_key,
-                "lock": lock_options_json(&options.lock),
-            })),
+            Some(payload),
         )?;
         return Ok(RequestReviewResult {
             reviewer: required_string(&response, &["reviewer"])?,
@@ -559,6 +666,30 @@ pub(crate) fn review_merge_request(
         });
     }
     let project = parse_cf_project_url(&options.project_url)?;
+    if !options.dry_run {
+        ensure_remote_layout(&project.project_root)?;
+        let actor = "local";
+        let request_target = super::signatures::remote_request_target(
+            &project.org,
+            &project.app,
+            "review",
+            None,
+            Some(&options.mr_id),
+        );
+        let request_signature = super::signatures::sign_remote_request(
+            "review",
+            actor,
+            &request_target,
+            options.request_key_id.as_deref(),
+        )?;
+        super::signatures::verify_remote_request_signature(
+            &project.project_root,
+            "review",
+            actor,
+            &request_target,
+            request_signature.as_ref(),
+        )?;
+    }
     let mr_path = remote_dirs(&project.project_root)
         .merge_requests
         .join(format!("{}.json", options.mr_id));
@@ -642,6 +773,26 @@ pub(crate) fn apply_merge_request(
                 plan,
             });
         }
+        let actor = "local";
+        let target = super::signatures::remote_request_target(
+            &project.org,
+            &project.app,
+            "apply",
+            None,
+            Some(&options.mr_id),
+        );
+        let mut payload = json!({
+            "actor": actor,
+            "idempotency_key": &options.idempotency_key,
+            "lock": lock_options_json(&options.lock),
+        });
+        super::signatures::attach_remote_request_signature(
+            &mut payload,
+            "apply",
+            actor,
+            &target,
+            options.request_key_id.as_deref(),
+        )?;
         let response = http_json(
             "POST",
             &http_remote_path(
@@ -650,11 +801,7 @@ pub(crate) fn apply_merge_request(
                 &project.app,
                 &["merge-requests", &options.mr_id, "apply"],
             ),
-            Some(json!({
-                "actor": "local",
-                "idempotency_key": &options.idempotency_key,
-                "lock": lock_options_json(&options.lock),
-            })),
+            Some(payload),
         )?;
         return Ok(RequestApplyResult {
             target_branch: required_string(&response, &["target_branch"])?,
@@ -663,6 +810,30 @@ pub(crate) fn apply_merge_request(
         });
     }
     let project = parse_cf_project_url(&options.project_url)?;
+    if !options.dry_run {
+        ensure_remote_layout(&project.project_root)?;
+        let actor = "local";
+        let request_target = super::signatures::remote_request_target(
+            &project.org,
+            &project.app,
+            "apply",
+            None,
+            Some(&options.mr_id),
+        );
+        let request_signature = super::signatures::sign_remote_request(
+            "apply",
+            actor,
+            &request_target,
+            options.request_key_id.as_deref(),
+        )?;
+        super::signatures::verify_remote_request_signature(
+            &project.project_root,
+            "apply",
+            actor,
+            &request_target,
+            request_signature.as_ref(),
+        )?;
+    }
     let dirs = remote_dirs(&project.project_root);
     let mr_path = dirs.merge_requests.join(format!("{}.json", options.mr_id));
     let mut mr = read_optional_json(&mr_path)?
@@ -709,6 +880,11 @@ pub(crate) fn apply_merge_request(
     let target_objects = remote_dirs(&target.project_root).objects;
     codefire_store::validate_sealed_commit(&source_objects, &source_head)?;
     codefire_store::validate_sealed_commit(&target_objects, &target_head)?;
+    super::signatures::enforce_remote_commit_signature_policy(
+        &target.project_root,
+        &source_objects,
+        &source_head,
+    )?;
     if !is_ancestor_in_objects(&source_objects, &target_head, &source_head)? {
         return Err(CliError::Usage(
             "request apply rejected: source is not a fast-forward of target".to_string(),
@@ -861,8 +1037,10 @@ pub(crate) fn parse_cf_url(url: &str) -> Result<CfUrl, CliError> {
         project_root: server_root
             .join(".codefire-server")
             .join("projects")
-            .join(org)
-            .join(app),
+            .join(&org)
+            .join(&app),
+        org,
+        app,
         branch: percent_decode(branch_part)?,
     })
 }
@@ -893,12 +1071,16 @@ pub(crate) fn parse_cf_project_url(url: &str) -> Result<CfProjectUrl, CliError> 
         server_raw = ".".to_string();
     }
     let server_root = absolute_path(&PathBuf::from(server_raw))?;
+    let org = percent_decode(org_part)?;
+    let app = percent_decode(app_part)?;
     Ok(CfProjectUrl {
         project_root: server_root
             .join(".codefire-server")
             .join("projects")
-            .join(percent_decode(org_part)?)
-            .join(percent_decode(app_part)?),
+            .join(&org)
+            .join(&app),
+        org,
+        app,
     })
 }
 

@@ -15,6 +15,8 @@ codefire-core = { path = "../codefire-core" }
 codefire-store = { path = "../codefire-store" }
 serde_json = "1"
 sha2 = "0.10"
+hmac = "0.12"
+getrandom = "0.2"
 rustls = { version = "0.21", features = ["dangerous_configuration"] }
 rustls-pemfile = "1"
 webpki-roots = "0.25"

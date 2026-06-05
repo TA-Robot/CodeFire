@@ -25,7 +25,7 @@ MVP CLI 実装は `project/codefire` にあります。
 - `./codefire`: Python v0.2 MVP。現在のインストーラ既定CLIで、remote HTTPS、HMAC署名、demoまで通すreference implementationです。
 - `./target/debug/codefire-rs`: Rust v0.6 rewrite。`crates/` 配下で開発中の次期既定CLIです。local workflow、file-backed remote、HTTP remote、diagnostics、metrics、storage report、migration check、diff/merge intelligence、interactive extinguish UXは実装済みです。
 
-v0.6の未完了ゲートは `docs/development/todo-checklist.md` の `CF-213`、`CF-217` です。
+v0.6の未完了ゲートは `docs/development/todo-checklist.md` の `CF-217` です。
 
 ```bash
 ./codefire --help
@@ -124,8 +124,8 @@ Python v0.2はPython標準ライブラリのみを使う単一ファイルCLIで
 - `server_policy.json` の `permissions` で upload / request / review / apply / gc を制御できます。
 - `server_policy.json` の `branch_protection` でbranch patternごとに upload / apply を制御できます。
 - `server_policy.json` の `auth.required` と `auth.tokens` で remote のトークン認証を有効化できます。CLIは `--token` または `CODEFIRE_TOKEN` を読みます。tokenは平文互換に加えて、`codefire token-hash` が生成する `sha256:<hex>` またはsalt付きhash objectで保存できます。
-- Python v0.2では `CODEFIRE_SIGNING_KEY=... codefire commit --signer alice --key-id alice-2026-06` でcommitにHMAC署名を付与できます。remote側は `server_policy.json` の `commit_signatures.required` と `commit_signatures.keys` で upload / apply されるbranch headの署名を要求できます。key objectの `not_before` / `not_after` / `status` / `signers` により鍵世代の並行運用と失効を扱えます。Rust v0.6でのparityは `CF-213` の残作業です。
-- Python v0.2では `CODEFIRE_REQUEST_SIGNING_KEY=...` と `--request-key-id` でremote mutating operationにHMAC request署名を付与できます。remote側は `request_signatures.required` / `request_signatures.keys` / `max_skew_seconds` / `nonce_ttl_seconds` で upload / request / review / apply / gc の署名とnonce replayを検証できます。Rust v0.6でのparityは `CF-213` の残作業です。
+- Python v0.2とRust v0.6では `CODEFIRE_SIGNING_KEY=... codefire commit --signer alice --key-id alice-2026-06` / `codefire-rs commit ...` でcommitにHMAC署名を付与できます。remote側は `server_policy.json` の `commit_signatures.required` と `commit_signatures.keys` で upload / apply されるbranch headの署名を要求できます。key objectの `not_before` / `not_after` / `status` / `signers` により鍵世代の並行運用と失効を扱えます。
+- Python v0.2とRust v0.6では `CODEFIRE_REQUEST_SIGNING_KEY=...` と `--request-key-id` でremote mutating operationにHMAC request署名を付与できます。remote側は `request_signatures.required` / `request_signatures.keys` / `max_skew_seconds` / `nonce_ttl_seconds` で upload / request / review / apply の署名とnonce replayを検証できます。Python v0.2のremote GC request署名も同じpolicyで扱います。
 - Python v0.2とRust v0.6では `codefire serve --tls-cert CERT --tls-key KEY` / `codefire-rs serve --tls-cert CERT --tls-key KEY` でHTTPS transportを有効化できます。自署名証明書をローカル検証する場合のみ `CODEFIRE_TLS_INSECURE=1` を使えます。
 - `gc cf://.../org/app` でremote object GCを実行できます。GC前にremoteのobject graphとsealed commit参照を検証し、`gc.retention_seconds` / `gc.retention_generations` により新しい到達不能objectを保護し、実行結果は `audit/gc.jsonl` に記録します。
 

@@ -166,6 +166,13 @@ fn http_json_stream<S: Read + Write>(
                 "HTTP remote error: {detail}"
             )));
         }
+        if value.get("exit_code").and_then(Value::as_i64)
+            == Some(ExitCode::AuthenticationOrSignatureFailure.code() as i64)
+        {
+            return Err(CliError::AuthenticationOrSignature(format!(
+                "HTTP remote error: {detail}"
+            )));
+        }
         return Err(CliError::Usage(format!("HTTP remote error: {detail}")));
     }
     Ok(value)
@@ -532,6 +539,19 @@ fn handle_http_upload(
             json!({"error": "upload request must include branch, head, and objects"}),
         ));
     }
+    let actor = request
+        .get("actor")
+        .and_then(Value::as_str)
+        .unwrap_or("local");
+    let target =
+        super::signatures::remote_request_target(org, app, "upload", Some(branch_name), None);
+    super::signatures::verify_remote_request_signature(
+        &project_root,
+        "upload",
+        actor,
+        &target,
+        request.get("request_signature"),
+    )?;
     let records_value = Value::Array(records.to_vec());
     let records_hash = sha256_hex(&codefire_store::canonical_json(&records_value)?);
     let idempotency_payload = remote_upload_payload(
@@ -573,6 +593,7 @@ fn handle_http_upload(
     copy_dir_recursive(&dirs.objects, &tmp_objects)?;
     write_object_records(&tmp_objects, records.iter().cloned())?;
     codefire_store::validate_sealed_commit(&tmp_objects, &head)?;
+    super::signatures::enforce_remote_commit_signature_policy(&project_root, &tmp_objects, &head)?;
     if let Some(current) = read_optional_json(&remote_branch_path(&project_root, branch_name))? {
         let current_head = required_string(&current, &["head"])?;
         if !is_ancestor_in_objects(&tmp_objects, &current_head, &head)? {
@@ -620,6 +641,19 @@ fn handle_http_request_merge(
 ) -> Result<(u16, Value), CliError> {
     let project_root = http_project_root(storage_root, org, app);
     ensure_remote_layout(&project_root)?;
+    let actor = request
+        .get("actor")
+        .and_then(Value::as_str)
+        .unwrap_or("local");
+    let request_target =
+        super::signatures::remote_request_target(org, app, "request_merge", None, None);
+    super::signatures::verify_remote_request_signature(
+        &project_root,
+        "request_merge",
+        actor,
+        &request_target,
+        request.get("request_signature"),
+    )?;
     let source_url = required_string(request, &["source_url"])?;
     let target_url = required_string(request, &["target_url"])?;
     let (_, source_root, source_branch) = http_remote_branch(storage_root, &source_url)?;
@@ -756,6 +790,19 @@ fn handle_http_request_review(
         return Ok((404, json!({"error": "merge request not found"})));
     };
     validate_http_merge_request_record(storage_root, &mr)?;
+    let actor = request
+        .get("actor")
+        .and_then(Value::as_str)
+        .unwrap_or("local");
+    let request_target =
+        super::signatures::remote_request_target(org, app, "review", None, Some(mr_id));
+    super::signatures::verify_remote_request_signature(
+        &project_root,
+        "review",
+        actor,
+        &request_target,
+        request.get("request_signature"),
+    )?;
     let decision = required_string(request, &["decision"])?;
     if decision != "approve" && decision != "reject" {
         return Ok((
@@ -838,6 +885,19 @@ fn handle_http_request_apply(
         return Ok((404, json!({"error": "merge request not found"})));
     };
     validate_http_merge_request_record(storage_root, &mr)?;
+    let actor = request
+        .get("actor")
+        .and_then(Value::as_str)
+        .unwrap_or("local");
+    let request_target =
+        super::signatures::remote_request_target(org, app, "apply", None, Some(mr_id));
+    super::signatures::verify_remote_request_signature(
+        &project_root,
+        "apply",
+        actor,
+        &request_target,
+        request.get("request_signature"),
+    )?;
     let idempotency_payload = remote_apply_payload(&project_root, &mr, mr_id)?;
     if let Some(key) = remote_idempotency_key(request) {
         if let Some(result) = load_remote_idempotency_result(
@@ -885,6 +945,11 @@ fn handle_http_request_apply(
             json!({"error": "request apply rejected: source is not a fast-forward of target"}),
         ));
     }
+    super::signatures::enforce_remote_commit_signature_policy(
+        &target_root,
+        &remote_dirs(&source_root).objects,
+        &source_head,
+    )?;
     let lock_options = http_lock_options(request)?;
     let _lock = FileLock::acquire_with_options(
         remote_dirs(&target_root).locks.join(format!(

@@ -26,6 +26,7 @@ mod metrics;
 mod migration;
 mod open_clone_idempotency;
 mod remote;
+mod signatures;
 mod storage;
 mod verification;
 mod view;
@@ -864,6 +865,7 @@ enum CliError {
     Core(codefire_core::CoreError),
     Store(codefire_store::StoreError),
     Usage(String),
+    AuthenticationOrSignature(String),
     IdempotencyConflict(String),
     MigrationIncompatibility(String),
     VerificationFailed(ExitCode),
@@ -881,6 +883,7 @@ impl CliError {
             CliError::Core(error) => core_error_exit_code(error),
             CliError::Store(error) => store_error_exit_code(error),
             CliError::Usage(message) => usage_exit_code(message),
+            CliError::AuthenticationOrSignature(_) => ExitCode::AuthenticationOrSignatureFailure,
             CliError::IdempotencyConflict(_) => ExitCode::IdempotencyConflict,
             CliError::MigrationIncompatibility(_) => ExitCode::MigrationIncompatibility,
             CliError::VerificationFailed(exit_code) => *exit_code,
@@ -902,6 +905,7 @@ impl fmt::Display for CliError {
             CliError::Core(error) => write!(f, "{error}"),
             CliError::Store(error) => write!(f, "{error}"),
             CliError::Usage(message) => write!(f, "{message}"),
+            CliError::AuthenticationOrSignature(message) => write!(f, "{message}"),
             CliError::IdempotencyConflict(message) => write!(f, "{message}"),
             CliError::MigrationIncompatibility(message) => write!(f, "{message}"),
             CliError::VerificationFailed(_) => write!(f, "verification failed"),
@@ -1028,6 +1032,8 @@ struct CommitOptions {
     json_output: bool,
     lock: LockOptions,
     idempotency_key: Option<String>,
+    signer: Option<String>,
+    key_id: Option<String>,
 }
 
 #[derive(Debug)]
@@ -1441,6 +1447,8 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
     let mut json_output = false;
     let mut lock = LockOptions::default();
     let mut idempotency_key = None;
+    let mut signer = None;
+    let mut key_id = None;
     let mut index = 0usize;
     while index < args.len() {
         if parse_lock_option(args, &mut index, &mut lock)? {
@@ -1475,6 +1483,28 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
             value if value.starts_with("--idempotency-key=") => {
                 idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
             }
+            "--signer" => {
+                index += 1;
+                signer = Some(
+                    args.get(index)
+                        .ok_or_else(|| CliError::Usage("--signer requires a value".to_string()))?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--signer=") => {
+                signer = Some(value.trim_start_matches("--signer=").to_string());
+            }
+            "--key-id" => {
+                index += 1;
+                key_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| CliError::Usage("--key-id requires a value".to_string()))?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--key-id=") => {
+                key_id = Some(value.trim_start_matches("--key-id=").to_string());
+            }
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
             value if path.is_none() => path = Some(PathBuf::from(value)),
@@ -1493,6 +1523,8 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
         json_output,
         lock,
         idempotency_key,
+        signer,
+        key_id,
     })
 }
 
@@ -1780,6 +1812,7 @@ fn parse_upload_args(args: &[String]) -> Result<UploadOptions, CliError> {
     let mut dry_run = false;
     let mut json_output = false;
     let mut idempotency_key = None;
+    let mut request_key_id = None;
     let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
@@ -1803,6 +1836,19 @@ fn parse_upload_args(args: &[String]) -> Result<UploadOptions, CliError> {
             value if value.starts_with("--idempotency-key=") => {
                 idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
             }
+            "--request-key-id" => {
+                index += 1;
+                request_key_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--request-key-id requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--request-key-id=") => {
+                request_key_id = Some(value.trim_start_matches("--request-key-id=").to_string());
+            }
             value if value.starts_with("--") => skip_ignored_option(args, &mut index)?,
             value => positional.push(value.to_string()),
         }
@@ -1815,6 +1861,7 @@ fn parse_upload_args(args: &[String]) -> Result<UploadOptions, CliError> {
             dry_run,
             json_output,
             idempotency_key,
+            request_key_id,
             lock,
         }),
         _ => Err(CliError::Usage(
@@ -1843,6 +1890,7 @@ fn parse_request_merge_args(args: &[String]) -> Result<RequestMergeOptions, CliE
     let mut dry_run = false;
     let mut json_output = false;
     let mut idempotency_key = None;
+    let mut request_key_id = None;
     let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
@@ -1866,6 +1914,19 @@ fn parse_request_merge_args(args: &[String]) -> Result<RequestMergeOptions, CliE
             value if value.starts_with("--idempotency-key=") => {
                 idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
             }
+            "--request-key-id" => {
+                index += 1;
+                request_key_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--request-key-id requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--request-key-id=") => {
+                request_key_id = Some(value.trim_start_matches("--request-key-id=").to_string());
+            }
             value if value.starts_with("--") => skip_ignored_option(args, &mut index)?,
             value => positional.push(value.to_string()),
         }
@@ -1878,6 +1939,7 @@ fn parse_request_merge_args(args: &[String]) -> Result<RequestMergeOptions, CliE
             dry_run,
             json_output,
             idempotency_key,
+            request_key_id,
             lock,
         }),
         _ => Err(CliError::Usage(
@@ -1895,6 +1957,7 @@ fn parse_request_review_args(args: &[String]) -> Result<RequestReviewOptions, Cl
     let mut dry_run = false;
     let mut json_output = false;
     let mut idempotency_key = None;
+    let mut request_key_id = None;
     let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
@@ -1917,6 +1980,19 @@ fn parse_request_review_args(args: &[String]) -> Result<RequestReviewOptions, Cl
             }
             value if value.starts_with("--idempotency-key=") => {
                 idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+            }
+            "--request-key-id" => {
+                index += 1;
+                request_key_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--request-key-id requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--request-key-id=") => {
+                request_key_id = Some(value.trim_start_matches("--request-key-id=").to_string());
             }
             "--reviewer" => {
                 index += 1;
@@ -1960,6 +2036,7 @@ fn parse_request_review_args(args: &[String]) -> Result<RequestReviewOptions, Cl
             dry_run,
             json_output,
             idempotency_key,
+            request_key_id,
             lock,
         }),
         _ => Err(CliError::Usage(
@@ -1973,6 +2050,7 @@ fn parse_request_apply_args(args: &[String]) -> Result<RequestApplyOptions, CliE
     let mut dry_run = false;
     let mut json_output = false;
     let mut idempotency_key = None;
+    let mut request_key_id = None;
     let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
@@ -1996,6 +2074,19 @@ fn parse_request_apply_args(args: &[String]) -> Result<RequestApplyOptions, CliE
             value if value.starts_with("--idempotency-key=") => {
                 idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
             }
+            "--request-key-id" => {
+                index += 1;
+                request_key_id = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--request-key-id requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--request-key-id=") => {
+                request_key_id = Some(value.trim_start_matches("--request-key-id=").to_string());
+            }
             value if value.starts_with("--") => skip_ignored_option(args, &mut index)?,
             value => positional.push(value.to_string()),
         }
@@ -2008,6 +2099,7 @@ fn parse_request_apply_args(args: &[String]) -> Result<RequestApplyOptions, CliE
             dry_run,
             json_output,
             idempotency_key,
+            request_key_id,
             lock,
         }),
         _ => Err(CliError::Usage(
@@ -3481,6 +3573,12 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         "extinguished_fires": extinguished_fires,
         "created_at": now_iso_utc(),
     });
+    let commit = signatures::maybe_sign_commit(
+        commit,
+        options.signer.as_deref(),
+        options.key_id.as_deref(),
+        commit_signature_required(&context.open_dir)?,
+    )?;
     let commit_id = codefire_store::store_object(&objects, "commit", commit)?;
 
     let mut branch = load_branch_record(&context.repo_root, &context.branch)?;
@@ -3510,7 +3608,50 @@ fn commit_idempotency_payload(options: &CommitOptions, context: &OpenContext) ->
         "branch": &context.branch,
         "open_dir": &context.open_dir,
         "message": &options.message,
+        "signer": &options.signer,
+        "key_id": &options.key_id,
     })
+}
+
+fn commit_signature_required(open_dir: &Path) -> Result<bool, CliError> {
+    let path = open_dir.join("codefire.policy.yaml");
+    if !path.exists() {
+        return Ok(false);
+    }
+    let contents = fs::read_to_string(path)?;
+    let mut in_commit_policy = false;
+    for raw_line in contents.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim_end();
+        let stripped = line.trim();
+        if stripped.is_empty() {
+            continue;
+        }
+        if !raw_line.starts_with([' ', '\t']) {
+            in_commit_policy = stripped == "commit_policy:";
+            continue;
+        }
+        if in_commit_policy {
+            if let Some(value) = stripped.strip_prefix("require_commit_signature:") {
+                return parse_policy_bool(value.trim());
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn parse_policy_bool(value: &str) -> Result<bool, CliError> {
+    match value
+        .trim_matches(['"', '\''])
+        .trim()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "true" | "yes" | "on" | "1" => Ok(true),
+        "false" | "no" | "off" | "0" => Ok(false),
+        _ => Err(CliError::Usage(format!(
+            "invalid boolean value in policy: {value}"
+        ))),
+    }
 }
 
 fn load_commit_idempotency(
