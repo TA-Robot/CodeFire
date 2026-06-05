@@ -25,11 +25,12 @@ mod migration;
 mod open_clone_idempotency;
 mod remote;
 mod storage;
+mod verification;
 mod view;
 use automation::{
     command_result_envelope, scan_data_json, scan_diagnostics_json, scan_next_actions,
-    status_data_json, status_next_actions, verification_data_json, verification_diagnostics_json,
-    verification_next_actions,
+    status_data_json, status_next_actions, verification_data_json_with_filter,
+    verification_diagnostics_json, verification_next_actions,
 };
 use batch::{has_batch_extinguish_arg, parse_extinguish_batch_args, run_extinguish_batch};
 use context::{build_context_pack, parse_context_args, print_context_summary};
@@ -78,6 +79,7 @@ use storage::{
     parse_storage_report_args, print_storage_report, run_storage_report, storage_report_data_json,
     storage_report_diagnostics_json, storage_report_next_actions,
 };
+use verification::{parse_verify_args, print_verification};
 use view::{
     diff_commitish_with_options, manifest_contents, patch_export_with_options,
     review_pack_with_options, show_commitish, DiffAlgorithm, DiffOptions, PatchExportOptions,
@@ -189,13 +191,19 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         verification.result == "passed",
                         exit_code.code(),
                         repo_root.as_deref(),
-                        attach_metrics(verification_data_json(&verification), metrics.as_ref()),
+                        attach_metrics(
+                            verification_data_json_with_filter(
+                                &verification,
+                                options.diagnostic_filter(),
+                            ),
+                            metrics.as_ref(),
+                        ),
                         verification_diagnostics_json(&verification),
                         verification_next_actions(&verification),
                     ))?
                 );
             } else {
-                print_verification(&verification, options.details);
+                print_verification(&verification, options.details, options.blocking_only);
                 if let Some(metrics) = metrics.as_ref() {
                     print_metrics(metrics);
                 }
@@ -960,14 +968,6 @@ struct OpenResult {
 }
 
 #[derive(Debug)]
-struct VerifyOptions {
-    path: PathBuf,
-    details: bool,
-    json_output: bool,
-    metrics: bool,
-}
-
-#[derive(Debug)]
 struct PathJsonOptions {
     path: PathBuf,
     json_output: bool,
@@ -1175,99 +1175,6 @@ fn print_scan(scan: &codefire_core::ScanResult) {
     }
 }
 
-fn print_verification(verification: &codefire_core::Verification, details: bool) {
-    if verification.result == "passed" {
-        println!("Verification passed.");
-        return;
-    }
-    let mut blocking = Vec::new();
-    if verification.open_required_fires > 0 {
-        blocking.push("open fires");
-    }
-    if !verification.missing_required_links.is_empty() {
-        blocking.push("missing required links");
-    }
-    if !verification.stale_resolutions.is_empty() {
-        blocking.push("stale resolutions");
-    }
-    if !verification.missing_evidence_refs.is_empty() {
-        blocking.push("missing evidence refs");
-    }
-    if !verification.duplicate_atom_ids.is_empty() {
-        blocking.push("duplicate atom ids");
-    }
-    if !verification.failed_checks.is_empty() {
-        blocking.push("failed checks");
-    }
-    println!("Verification failed.");
-    println!(
-        "Blocking checks: {}",
-        if blocking.is_empty() {
-            "none".to_string()
-        } else {
-            blocking.join(", ")
-        }
-    );
-    println!("Open fires: {}", verification.open_required_fires);
-    println!(
-        "Missing required links: {}",
-        verification.missing_required_links.len()
-    );
-    println!(
-        "Stale resolutions: {}",
-        verification.stale_resolutions.len()
-    );
-    println!(
-        "Missing evidence refs: {}",
-        verification.missing_evidence_refs.len()
-    );
-    println!(
-        "Duplicate atom ids: {}",
-        verification.duplicate_atom_ids.len()
-    );
-    println!("Failed checks: {}", verification.failed_checks.len());
-    if details {
-        print_verification_details(verification);
-    }
-}
-
-fn print_verification_details(verification: &codefire_core::Verification) {
-    if !verification.missing_required_links.is_empty() {
-        println!("Missing required link details:");
-        for item in verification.missing_required_links.iter().take(5) {
-            println!(
-                "  {} requires {} -> {} min {}",
-                item.atom_id, item.required_type, item.target_kind, item.min
-            );
-        }
-    }
-    if !verification.stale_resolutions.is_empty() {
-        println!("Stale resolution details:");
-        for item in verification.stale_resolutions.iter().take(5) {
-            println!("  {}: {}", item.resolution_uid, item.reason);
-        }
-    }
-    if !verification.missing_evidence_refs.is_empty() {
-        println!("Missing evidence ref details:");
-        for item in verification.missing_evidence_refs.iter().take(5) {
-            println!("  {}: {}", item.resolution_uid, item.evidence_id);
-        }
-    }
-    if !verification.duplicate_atom_ids.is_empty() {
-        println!("Duplicate Atom ID details:");
-        for atom_id in verification.duplicate_atom_ids.iter().take(5) {
-            println!("  {atom_id}");
-        }
-    }
-    if !verification.failed_checks.is_empty() {
-        println!("Failed check details:");
-        for item in verification.failed_checks.iter().take(5) {
-            let summary = item.output.trim().lines().next().unwrap_or_default();
-            println!("  {}: {} {}", item.id, item.command, summary);
-        }
-    }
-}
-
 fn print_lock_contention_json(command: &str, error: &CliError) -> Result<(), CliError> {
     println!(
         "{}",
@@ -1365,34 +1272,6 @@ fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
             "usage: codefire-rs open <branch> <path> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
         )),
     }
-}
-
-fn parse_verify_args(args: &[String]) -> Result<VerifyOptions, CliError> {
-    let mut path = None;
-    let mut details = false;
-    let mut json_output = false;
-    let mut metrics = false;
-    for arg in args {
-        if arg == "--details" {
-            details = true;
-        } else if arg == "--json" {
-            json_output = true;
-        } else if arg == "--metrics" {
-            metrics = true;
-        } else if path.is_none() {
-            path = Some(PathBuf::from(arg));
-        } else {
-            return Err(CliError::Usage(format!(
-                "unexpected verify argument: {arg}"
-            )));
-        }
-    }
-    Ok(VerifyOptions {
-        path: path.unwrap_or(env::current_dir()?),
-        details,
-        json_output,
-        metrics,
-    })
 }
 
 fn parse_path_json_args(args: &[String], command: &str) -> Result<PathJsonOptions, CliError> {

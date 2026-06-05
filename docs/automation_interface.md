@@ -109,6 +109,7 @@ codefire scan --json
 codefire scan --json --metrics
 codefire verify --json
 codefire verify --details --json
+codefire verify --details --blocking-only --json
 codefire verify --details --json --metrics
 codefire context --branch --json
 codefire context --changed --json
@@ -163,11 +164,13 @@ When `--metrics` is present on `status`, `scan`, or `verify`, the command data i
   "stale_resolutions": [],
   "missing_evidence_refs": [],
   "duplicate_atom_ids": [],
-  "failed_checks": []
+  "failed_checks": [],
+  "diagnostic_filter": "blocking_only"
 }
 ```
 
 `verify --json` sets `exit_code` to the matching blocker code from the exit code taxonomy. For example, missing required links produce code `11`, missing evidence refs produce code `21`, and failed configured verification commands produce code `14`.
+`diagnostic_filter` is `all` by default and `blocking_only` when `--blocking-only` is present.
 
 `status --json`, `scan --json`, `verify --json`, `doctor --json`, `storage report --json`, and `migrate ... --json` include remediation-oriented `next_actions`:
 

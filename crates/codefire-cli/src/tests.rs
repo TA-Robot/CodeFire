@@ -518,6 +518,7 @@ fn parse_state_diagnostic_json_args() {
 
     let verify = parse_verify_args(&[
         "--details".to_string(),
+        "--blocking-only".to_string(),
         "--json".to_string(),
         "--metrics".to_string(),
         "/tmp/example".to_string(),
@@ -525,6 +526,8 @@ fn parse_state_diagnostic_json_args() {
     .unwrap();
     assert_eq!(verify.path, PathBuf::from("/tmp/example"));
     assert!(verify.details);
+    assert!(verify.blocking_only);
+    assert_eq!(verify.diagnostic_filter(), "blocking_only");
     assert!(verify.json_output);
     assert!(verify.metrics);
 }
@@ -3673,12 +3676,13 @@ fn metrics_attach_to_status_scan_and_verify_data() {
 
     let verification = run_verify(&open_dir).unwrap();
     let verify_data = attach_metrics(
-        verification_data_json(&verification),
+        verification_data_json_with_filter(&verification, "blocking_only"),
         Some(&verification_metrics(
             Duration::from_millis(7),
             &verification,
         )),
     );
+    assert_eq!(verify_data["diagnostic_filter"], "blocking_only");
     assert_eq!(verify_data["metrics"]["command"], "verify");
     assert_eq!(verify_data["metrics"]["phase_timings"]["total_ms"], 7);
 }

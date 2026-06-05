@@ -161,7 +161,7 @@
 | CF-162 | Verify | verify出力をblocking/non-blocking diagnosticsに分ける | CF-081 | done | CFB-003; verify failure tests |
 | CF-163 | Verify | verify失敗時の対象詳細をCLIで確認できるようにする | CF-162 | done | CFB-004; `test_verify_details_reports_missing_required_links` |
 | CF-164 | UX | fire解消のinteractive / batch UXを設計する | CF-163 | todo | CFB-005 |
-| CF-165 | Verify | `verify --details` でblocking-only表示またはnon-blocking折りたたみを実装する | CF-163 | todo | CFB-006 |
+| CF-165 | Verify | `verify --details` でblocking-only表示またはnon-blocking折りたたみを実装する | CF-163 | done | `codefire-rs verify --details --blocking-only`; JSON `data.diagnostic_filter`; `parse_state_diagnostic_json_args`; live verify blocking-only smoke |
 | CF-166 | Observability | `status` / `scan` / `verify` のphase別時間とAtom/object数を表示するmetrics導線を追加する | CF-163 | todo | CFB-007 |
 | CF-167 | Storage | object store size report、large artifact warning、external artifact reference方針を実装/文書化する | CF-166 | todo | CFB-008 |
 | CF-200 | Rust | v0.6 Rust rewrite workspaceとcrate境界を作成する | CF-167 | done | `Cargo.toml`; `crates/codefire-*`; `cargo test --workspace` |

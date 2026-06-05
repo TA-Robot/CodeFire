@@ -172,6 +172,15 @@ pub(crate) fn verification_data_json(verification: &codefire_core::Verification)
     })
 }
 
+pub(crate) fn verification_data_json_with_filter(
+    verification: &codefire_core::Verification,
+    diagnostic_filter: &str,
+) -> Value {
+    let mut data = verification_data_json(verification);
+    data["diagnostic_filter"] = Value::String(diagnostic_filter.to_string());
+    data
+}
+
 pub(crate) fn verification_diagnostics_json(
     verification: &codefire_core::Verification,
 ) -> Vec<Value> {

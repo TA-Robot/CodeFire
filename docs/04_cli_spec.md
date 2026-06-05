@@ -274,10 +274,11 @@ fires:
 ```bash
 codefire verify
 codefire verify --details
+codefire verify --details --blocking-only
 codefire verify --json
-codefire verify --details --json
+codefire verify --details --blocking-only --json
 codefire verify --metrics
-codefire verify --details --json --metrics
+codefire verify --details --blocking-only --json --metrics
 ```
 
 仕様：
@@ -289,6 +290,7 @@ required verification commandを実行する
 verification objectをactive stateに保存する
 resolution.evidence_refsが存在しないevidence objectを指す場合はmissing evidence refsとして失敗する
 `--details` 指定時は、失敗したdiagnosticsの代表例を最大5件ずつ出力する
+--blocking-onlyはblocking diagnosticsだけを表示/返すことを明示する。現行のverify diagnosticsはすべてblockingで、JSON data.diagnostic_filterはblocking_onlyになる
 --jsonはcodefire.command_result.v1 envelopeを出力し、verification data、blocking diagnostics、next_actionsを含める
 --jsonのexit_codeはprocess exit codeと一致する
 verify blockerのexit codeはopen fires=10、missing links=11、stale resolutions=12、missing evidence refs=21、duplicate Atom IDs=13、failed checks=14の優先順で決まる
