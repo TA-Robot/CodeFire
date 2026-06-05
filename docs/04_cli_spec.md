@@ -24,6 +24,7 @@ codefire verify --json [--metrics]
 codefire context --changed --json
 codefire context --atom <atom-id> --depth <n> --json
 codefire context --fire <fire-id> --json
+codefire link --batch <file> [--path <open-dir>] [--dry-run] [--json]
 codefire commit -m <message>
 
 codefire merge <source-branch> --into <target-branch>
@@ -39,7 +40,7 @@ codefire request-list <server-url>
 codefire discard <branch>
 codefire doctor
 codefire storage report [path] [--json] [--large-threshold <bytes|KB|MB|GB>]
-codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>) [--label <text>] [--json]
+codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>|--batch <file>) [--label <text>] [--dry-run] [--json]
 codefire explain (fire <id>|atom <id>|verify-failure|storage-warning) [--path <path>] [--json]
 codefire migrate check [path] [--json]
 codefire migrate dry-run [path] [--target-format v0.6] [--json]
@@ -57,7 +58,7 @@ Local repository mutators that acquire the repository lock accept:
 仕様:
 
 ```text
-対象: open, clone, extinguish, extinguish --batch, commit, merge, patch import
+対象: open, clone, link --batch, extinguish, extinguish --batch, commit, merge, patch import
 --wait-lockはrepo.lockが解放されるまで待機する
 --lock-timeoutは待機上限を指定し、指定時は--wait-lockを暗黙に有効化する
 durationは裸数または`s` suffixなら秒、`ms` suffixならミリ秒として扱う
@@ -430,7 +431,25 @@ external_artifactsはartifact_ref objectのrefs、referenced_bytes、payload_byt
 artifact_refは外部artifact本体を.codefire/objectsへコピーせず、URI/path/hash/size metadataだけを保存する
 ```
 
-## 4.17 `evidence add`
+## 4.17 `link --batch`
+
+```bash
+codefire link --batch links-batch.yaml --dry-run --json
+codefire link --batch links-batch.json --path ./main-open --json
+```
+
+仕様：
+
+```text
+open directoryのcodefire.links.yamlへTrace Linkを追記する
+--batchはJSONまたは限定YAMLのversion/links形式を読み、全linkのfrom/to/type、Atom存在、batch内重複、既存link重複を事前検証してから書き込む
+--batch --dry-runはcodefire.links.yamlを書き換えず、codefire_operation_planを返す
+batch defaults.typeを指定すると各linkのtype省略時に使う
+適用時はrepository lockを取得し、codefire.links.yamlへquoted scalar形式で追記する
+--jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_link_batch_resultを含める
+```
+
+## 4.18 `evidence add`
 
 ```bash
 codefire evidence add --artifact runs/model.bin --label "best checkpoint" --json
@@ -456,7 +475,7 @@ commandがnon-zero exitでもevidence capture自体は成功し、command_exit_c
 batch itemはartifact、artifact_uri、from_command、cwd、label、max_output_bytesを持てる
 ```
 
-## 4.18 `explain`
+## 4.19 `explain`
 
 ```bash
 codefire explain fire FIRE-001 --path ./main-open --json

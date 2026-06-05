@@ -16,6 +16,7 @@ mod exit_code;
 mod explain;
 mod http;
 mod idempotency;
+mod link_batch;
 mod merge_patch_idempotency;
 mod metrics;
 mod migration;
@@ -43,6 +44,7 @@ use idempotency::{
     idempotency_payload_hash, idempotency_record_path, idempotency_result_plan,
     require_idempotency_key, verify_idempotency_record,
 };
+use link_batch::{link_batch_data_json, parse_link_batch_args, run_link_batch};
 use merge_patch_idempotency::{
     load_merge_idempotency, load_patch_import_idempotency, merge_idempotency_payload,
     patch_import_idempotency_payload, save_merge_idempotency, save_patch_import_idempotency,
@@ -589,6 +591,33 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 "usage: codefire-rs storage report [path] [--json] [--large-threshold <bytes|KB|MB|GB>]".to_string(),
             )),
         },
+        Some("link") => {
+            let options = parse_link_batch_args(&args[1..])?;
+            let result = run_link_batch(&options)?;
+            if options.json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "link-batch",
+                        true,
+                        0,
+                        Some(&result.repo_root),
+                        link_batch_data_json(&result),
+                        Vec::new(),
+                        Vec::new(),
+                    ))?
+                );
+            } else if options.dry_run {
+                println!("link batch dry-run: {} links validated", result.item_count);
+            } else {
+                println!(
+                    "recorded link batch: {} links in {}",
+                    result.item_count,
+                    result.links_file.display()
+                );
+            }
+            Ok(())
+        }
         Some("evidence") => match args.get(1).map(String::as_str) {
             Some("add") => {
                 let options = parse_evidence_add_args(&args[2..])?;

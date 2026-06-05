@@ -1,0 +1,580 @@
+use super::{open_context, parse_lock_option, CliError, LockOptions, RepoLock};
+use serde_json::{json, Value};
+use std::collections::BTreeSet;
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+
+#[derive(Debug)]
+pub(super) struct LinkBatchOptions {
+    pub(super) path: PathBuf,
+    pub(super) batch_path: PathBuf,
+    pub(super) dry_run: bool,
+    pub(super) json_output: bool,
+    pub(super) lock: LockOptions,
+}
+
+#[derive(Debug)]
+pub(super) struct LinkBatchResult {
+    pub(super) repo_root: PathBuf,
+    pub(super) open_dir: PathBuf,
+    pub(super) links_file: PathBuf,
+    pub(super) item_count: usize,
+    pub(super) dry_run: bool,
+    pub(super) plan: Value,
+    pub(super) added_links: Vec<LinkBatchLink>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct LinkBatchDefaults {
+    link_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(super) struct LinkBatchLink {
+    pub(super) from: String,
+    pub(super) to: String,
+    pub(super) link_type: String,
+}
+
+#[derive(Debug, Clone, Default)]
+struct LinkBatchLinkSpec {
+    from: Option<String>,
+    to: Option<String>,
+    link_type: Option<String>,
+}
+
+#[derive(Debug)]
+struct LinkBatchFile {
+    version: u64,
+    defaults: LinkBatchDefaults,
+    links: Vec<LinkBatchLinkSpec>,
+}
+
+pub(super) fn parse_link_batch_args(args: &[String]) -> Result<LinkBatchOptions, CliError> {
+    let mut path = None;
+    let mut batch_path = None;
+    let mut dry_run = false;
+    let mut json_output = false;
+    let mut lock = LockOptions::default();
+    let mut index = 0usize;
+    while index < args.len() {
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
+        match args[index].as_str() {
+            "--path" => {
+                index += 1;
+                path = Some(PathBuf::from(required_arg(args, index, "--path")?));
+            }
+            "--batch" => {
+                index += 1;
+                batch_path = Some(PathBuf::from(required_arg(args, index, "--batch")?));
+            }
+            "--dry-run" => dry_run = true,
+            "--json" => json_output = true,
+            value if value.starts_with("--path=") => {
+                path = Some(PathBuf::from(value.trim_start_matches("--path=")));
+            }
+            value if value.starts_with("--batch=") => {
+                batch_path = Some(PathBuf::from(value.trim_start_matches("--batch=")));
+            }
+            option if option.starts_with("--") => {
+                return Err(CliError::Usage(format!(
+                    "unsupported link option: {option}"
+                )));
+            }
+            value => {
+                return Err(CliError::Usage(format!(
+                    "unexpected link argument: {value}"
+                )));
+            }
+        }
+        index += 1;
+    }
+    Ok(LinkBatchOptions {
+        path: path.unwrap_or(std::env::current_dir()?),
+        batch_path: batch_path.ok_or_else(|| {
+            CliError::Usage(
+                "usage: codefire-rs link --batch <file> [--path <open-dir>] [--dry-run] [--json]"
+                    .to_string(),
+            )
+        })?,
+        dry_run,
+        json_output,
+        lock,
+    })
+}
+
+pub(super) fn run_link_batch(options: &LinkBatchOptions) -> Result<LinkBatchResult, CliError> {
+    let batch = parse_link_batch_file(&options.batch_path)?;
+    if batch.version != 1 {
+        return Err(CliError::Usage(format!(
+            "unsupported link batch version: {}",
+            batch.version
+        )));
+    }
+    if batch.links.is_empty() {
+        return Err(CliError::Usage(
+            "link batch requires at least one link".to_string(),
+        ));
+    }
+
+    let context = open_context(&options.path)?;
+    let _lock = if options.dry_run {
+        None
+    } else {
+        Some(RepoLock::acquire_with_options(
+            &context.repo_root,
+            &options.lock,
+        )?)
+    };
+    let resolved = resolve_links(&batch)?;
+    validate_links(&context.open_dir, &resolved)?;
+    let links_file = context.open_dir.join("codefire.links.yaml");
+    let plan = link_batch_operation_plan(options, &context.open_dir, &links_file, &resolved);
+
+    if !options.dry_run {
+        append_links(&links_file, &resolved)?;
+    }
+
+    Ok(LinkBatchResult {
+        repo_root: context.repo_root,
+        open_dir: context.open_dir,
+        links_file,
+        item_count: resolved.len(),
+        dry_run: options.dry_run,
+        plan,
+        added_links: if options.dry_run {
+            Vec::new()
+        } else {
+            resolved
+        },
+    })
+}
+
+pub(super) fn link_batch_data_json(result: &LinkBatchResult) -> Value {
+    json!({
+        "type": "codefire_link_batch_result",
+        "version": 1,
+        "dry_run": result.dry_run,
+        "item_count": result.item_count,
+        "open_dir": &result.open_dir,
+        "links_file": &result.links_file,
+        "plan": &result.plan,
+        "added_links": result.added_links.iter().map(link_json).collect::<Vec<_>>(),
+    })
+}
+
+fn required_arg<'a>(args: &'a [String], index: usize, option: &str) -> Result<&'a str, CliError> {
+    args.get(index)
+        .map(String::as_str)
+        .ok_or_else(|| CliError::Usage(format!("{option} requires a value")))
+}
+
+fn resolve_links(batch: &LinkBatchFile) -> Result<Vec<LinkBatchLink>, CliError> {
+    let mut links = Vec::with_capacity(batch.links.len());
+    for (index, spec) in batch.links.iter().enumerate() {
+        let from = required_link_field(spec.from.as_deref(), index, "from")?;
+        let to = required_link_field(spec.to.as_deref(), index, "to")?;
+        let link_type = spec
+            .link_type
+            .as_deref()
+            .or(batch.defaults.link_type.as_deref())
+            .ok_or_else(|| missing_link_field(index, "type"))?;
+        links.push(LinkBatchLink {
+            from: from.to_string(),
+            to: to.to_string(),
+            link_type: link_type.to_string(),
+        });
+    }
+    Ok(links)
+}
+
+fn required_link_field<'a>(
+    value: Option<&'a str>,
+    index: usize,
+    field: &str,
+) -> Result<&'a str, CliError> {
+    let value = value.ok_or_else(|| missing_link_field(index, field))?;
+    if value.trim().is_empty() {
+        return Err(missing_link_field(index, field));
+    }
+    Ok(value)
+}
+
+fn missing_link_field(index: usize, field: &str) -> CliError {
+    CliError::Usage(format!("link batch item {} missing {field}", index + 1))
+}
+
+fn validate_links(open_dir: &Path, links: &[LinkBatchLink]) -> Result<(), CliError> {
+    let atom_index = codefire_core::build_atom_index(open_dir)?;
+    let atom_ids = atom_index
+        .atoms
+        .iter()
+        .map(|atom| atom.atom_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let existing = codefire_core::current_trace_graph(open_dir)?
+        .links
+        .into_iter()
+        .map(|link| (link.from, link.to, link.link_type))
+        .collect::<BTreeSet<_>>();
+    let mut seen = BTreeSet::new();
+    for link in links {
+        if link.from == link.to {
+            return Err(CliError::Usage(format!(
+                "link batch self-link is not allowed: {}",
+                link.from
+            )));
+        }
+        if !atom_ids.contains(link.from.as_str()) {
+            return Err(CliError::Usage(format!(
+                "link batch references unknown from atom: {}",
+                link.from
+            )));
+        }
+        if !atom_ids.contains(link.to.as_str()) {
+            return Err(CliError::Usage(format!(
+                "link batch references unknown to atom: {}",
+                link.to
+            )));
+        }
+        let key = (link.from.clone(), link.to.clone(), link.link_type.clone());
+        if !seen.insert(key.clone()) {
+            return Err(CliError::Usage(format!(
+                "duplicate link batch item: {} --{}--> {}",
+                link.from, link.link_type, link.to
+            )));
+        }
+        if existing.contains(&key) {
+            return Err(CliError::Usage(format!(
+                "link already exists: {} --{}--> {}",
+                link.from, link.link_type, link.to
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn append_links(path: &Path, links: &[LinkBatchLink]) -> Result<(), CliError> {
+    let mut text = if path.exists() {
+        fs::read_to_string(path)?
+    } else {
+        String::new()
+    };
+    if text.trim().is_empty() {
+        text.push_str("version: 1\nlinks:\n");
+    } else {
+        if !text.ends_with('\n') {
+            text.push('\n');
+        }
+        if !text.lines().any(|line| line.trim() == "links:") {
+            text.push_str("links:\n");
+        }
+    }
+    for link in links {
+        text.push_str(&format!(
+            "  - from: {}\n    to: {}\n    type: {}\n",
+            yaml_quote(&link.from),
+            yaml_quote(&link.to),
+            yaml_quote(&link.link_type)
+        ));
+    }
+    let temp_path = path.with_extension("yaml.tmp");
+    {
+        let mut file = fs::File::create(&temp_path)?;
+        file.write_all(text.as_bytes())?;
+        file.sync_all()?;
+    }
+    fs::rename(temp_path, path)?;
+    Ok(())
+}
+
+fn yaml_quote(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+fn link_batch_operation_plan(
+    options: &LinkBatchOptions,
+    open_dir: &Path,
+    links_file: &Path,
+    links: &[LinkBatchLink],
+) -> Value {
+    json!({
+        "type": "codefire_operation_plan",
+        "version": 1,
+        "command": "link-batch",
+        "dry_run": options.dry_run,
+        "would_apply": !options.dry_run,
+        "open_dir": open_dir,
+        "batch_file": &options.batch_path,
+        "links_file": links_file,
+        "item_count": links.len(),
+        "items": links.iter().map(link_json).collect::<Vec<_>>(),
+        "operations": [
+            {"kind": "validate_all_batch_items", "count": links.len()},
+            {"kind": "validate_atom_references", "count": links.len()},
+            {"kind": "append_trace_links", "count": links.len()},
+        ],
+        "next_actions": [
+            {"kind": "verify", "command": "codefire-rs verify --details --json", "target": {"path": open_dir}},
+            {"kind": "trace_graph", "command": "codefire-rs trace-graph", "target": {"path": open_dir}},
+        ],
+    })
+}
+
+fn link_json(link: &LinkBatchLink) -> Value {
+    json!({
+        "from": &link.from,
+        "to": &link.to,
+        "type": &link.link_type,
+    })
+}
+
+fn parse_link_batch_file(path: &Path) -> Result<LinkBatchFile, CliError> {
+    let text = fs::read_to_string(path)?;
+    if text.trim_start().starts_with('{') {
+        parse_link_batch_json(&text)
+    } else {
+        parse_link_batch_yaml(&text)
+    }
+}
+
+fn parse_link_batch_json(text: &str) -> Result<LinkBatchFile, CliError> {
+    let value: Value = serde_json::from_str(text)?;
+    let version = value.get("version").and_then(Value::as_u64).unwrap_or(0);
+    let defaults = parse_json_defaults(value.get("defaults"))?;
+    let links = value
+        .get("links")
+        .and_then(Value::as_array)
+        .ok_or_else(|| CliError::Usage("link batch JSON missing links array".to_string()))?
+        .iter()
+        .map(parse_json_link)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(LinkBatchFile {
+        version,
+        defaults,
+        links,
+    })
+}
+
+fn parse_json_defaults(value: Option<&Value>) -> Result<LinkBatchDefaults, CliError> {
+    let Some(value) = value else {
+        return Ok(LinkBatchDefaults::default());
+    };
+    let object = value
+        .as_object()
+        .ok_or_else(|| CliError::Usage("link batch defaults must be an object".to_string()))?;
+    Ok(LinkBatchDefaults {
+        link_type: optional_json_string(object.get("type"), "defaults.type")?,
+    })
+}
+
+fn parse_json_link(value: &Value) -> Result<LinkBatchLinkSpec, CliError> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| CliError::Usage("link batch item must be an object".to_string()))?;
+    Ok(LinkBatchLinkSpec {
+        from: optional_json_string(object.get("from"), "link.from")?,
+        to: optional_json_string(object.get("to"), "link.to")?,
+        link_type: optional_json_string(object.get("type"), "link.type")?,
+    })
+}
+
+fn optional_json_string(value: Option<&Value>, field: &str) -> Result<Option<String>, CliError> {
+    value
+        .map(|value| {
+            value
+                .as_str()
+                .map(str::to_string)
+                .ok_or_else(|| CliError::Usage(format!("{field} must be a string")))
+        })
+        .transpose()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LinkBatchYamlSection {
+    Root,
+    Defaults,
+    Links,
+}
+
+fn parse_link_batch_yaml(text: &str) -> Result<LinkBatchFile, CliError> {
+    let mut version = None;
+    let mut defaults = LinkBatchDefaults::default();
+    let mut links = Vec::new();
+    let mut current_link = None;
+    let mut section = LinkBatchYamlSection::Root;
+
+    for (line_index, raw_line) in text.lines().enumerate() {
+        let line_number = line_index + 1;
+        if raw_line.contains('\t') {
+            return Err(CliError::Usage(format!(
+                "invalid link batch YAML: tabs are not supported at line {line_number}"
+            )));
+        }
+        let without_comment = strip_yaml_comment(raw_line);
+        if without_comment.trim().is_empty() {
+            continue;
+        }
+        let indent = without_comment
+            .as_bytes()
+            .iter()
+            .take_while(|byte| **byte == b' ')
+            .count();
+        let text = without_comment.trim();
+        match (indent, text, section) {
+            (0, "defaults:", _) => section = LinkBatchYamlSection::Defaults,
+            (0, "links:", _) => {
+                push_current_link(&mut links, &mut current_link);
+                section = LinkBatchYamlSection::Links;
+            }
+            (0, _, _) => {
+                let (key, value) = parse_yaml_key_value(text, line_number)?;
+                if key == "version" {
+                    version = Some(parse_yaml_u64(&value, "version", line_number)?);
+                    section = LinkBatchYamlSection::Root;
+                } else {
+                    return Err(CliError::Usage(format!(
+                        "invalid link batch YAML: unsupported root key '{key}' at line {line_number}"
+                    )));
+                }
+            }
+            (2, _, LinkBatchYamlSection::Defaults) => {
+                let (key, value) = parse_yaml_key_value(text, line_number)?;
+                apply_yaml_default(&mut defaults, &key, value, line_number)?;
+            }
+            (2, _, LinkBatchYamlSection::Links) if text.starts_with("- ") => {
+                push_current_link(&mut links, &mut current_link);
+                let rest = text[2..].trim();
+                let mut link = LinkBatchLinkSpec::default();
+                if !rest.is_empty() {
+                    let (key, value) = parse_yaml_key_value(rest, line_number)?;
+                    apply_yaml_link_field(&mut link, &key, value, line_number)?;
+                }
+                current_link = Some(link);
+            }
+            (4, _, LinkBatchYamlSection::Links) => {
+                let link = current_link.as_mut().ok_or_else(|| {
+                    CliError::Usage(format!(
+                        "invalid link batch YAML: link field before list item at line {line_number}"
+                    ))
+                })?;
+                let (key, value) = parse_yaml_key_value(text, line_number)?;
+                apply_yaml_link_field(link, &key, value, line_number)?;
+            }
+            _ => {
+                return Err(CliError::Usage(format!(
+                    "invalid link batch YAML indentation or section at line {line_number}"
+                )));
+            }
+        }
+    }
+    push_current_link(&mut links, &mut current_link);
+
+    Ok(LinkBatchFile {
+        version: version
+            .ok_or_else(|| CliError::Usage("link batch YAML missing version".to_string()))?,
+        defaults,
+        links,
+    })
+}
+
+fn push_current_link(links: &mut Vec<LinkBatchLinkSpec>, current: &mut Option<LinkBatchLinkSpec>) {
+    if let Some(link) = current.take() {
+        links.push(link);
+    }
+}
+
+fn apply_yaml_default(
+    defaults: &mut LinkBatchDefaults,
+    key: &str,
+    value: String,
+    line_number: usize,
+) -> Result<(), CliError> {
+    match key {
+        "type" => defaults.link_type = Some(value),
+        _ => {
+            return Err(CliError::Usage(format!(
+                "invalid link batch YAML: unsupported defaults key '{key}' at line {line_number}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn apply_yaml_link_field(
+    link: &mut LinkBatchLinkSpec,
+    key: &str,
+    value: String,
+    line_number: usize,
+) -> Result<(), CliError> {
+    match key {
+        "from" => link.from = Some(value),
+        "to" => link.to = Some(value),
+        "type" => link.link_type = Some(value),
+        _ => {
+            return Err(CliError::Usage(format!(
+                "invalid link batch YAML: unsupported link key '{key}' at line {line_number}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn parse_yaml_key_value(line: &str, line_number: usize) -> Result<(String, String), CliError> {
+    let colon = line.find(':').ok_or_else(|| {
+        CliError::Usage(format!(
+            "invalid link batch YAML: expected key: value at line {line_number}"
+        ))
+    })?;
+    let key = line[..colon].trim();
+    if key.is_empty() {
+        return Err(CliError::Usage(format!(
+            "invalid link batch YAML: empty key at line {line_number}"
+        )));
+    }
+    Ok((key.to_string(), parse_yaml_scalar(&line[colon + 1..])))
+}
+
+fn parse_yaml_scalar(raw: &str) -> String {
+    let value = raw.trim();
+    if value.len() >= 2 {
+        let bytes = value.as_bytes();
+        let quote = bytes[0];
+        if (quote == b'"' || quote == b'\'') && bytes[value.len() - 1] == quote {
+            return value[1..value.len() - 1]
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\");
+        }
+    }
+    value.to_string()
+}
+
+fn parse_yaml_u64(value: &str, field: &str, line_number: usize) -> Result<u64, CliError> {
+    value.parse::<u64>().map_err(|_| {
+        CliError::Usage(format!(
+            "invalid link batch YAML: {field} must be an integer at line {line_number}"
+        ))
+    })
+}
+
+fn strip_yaml_comment(line: &str) -> String {
+    let mut quote = None;
+    let mut previous_escape = false;
+    for (index, byte) in line.bytes().enumerate() {
+        match (byte, quote, previous_escape) {
+            (b'\\', Some(b'"'), false) => {
+                previous_escape = true;
+                continue;
+            }
+            (b'"' | b'\'', None, _) => quote = Some(byte),
+            (b'"' | b'\'', Some(current), false) if current == byte => quote = None,
+            (b'#', None, _) => return line[..index].to_string(),
+            _ => {}
+        }
+        previous_escape = false;
+    }
+    line.to_string()
+}

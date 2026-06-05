@@ -637,6 +637,108 @@ fn context_pack_returns_atom_changed_and_fire_views() {
 }
 
 #[test]
+fn link_batch_validates_all_items_before_writing_links() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design").join("session.md"),
+        "## DES-session: Design\nClock policy\n",
+    )
+    .unwrap();
+
+    let batch_path = temp.path().join("links.json");
+    fs::write(
+        &batch_path,
+        serde_json::to_string(&json!({
+            "version": 1,
+            "defaults": {"type": "refined_by"},
+            "links": [{"from": "REQ-session", "to": "DES-session"}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let dry_run = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
+        path: open_dir.clone(),
+        batch_path: batch_path.clone(),
+        dry_run: true,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert_eq!(dry_run.item_count, 1);
+    assert!(dry_run.dry_run);
+    assert_eq!(dry_run.plan["type"], "codefire_operation_plan");
+    assert!(!open_dir.join("codefire.links.yaml").exists());
+
+    let applied = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
+        path: open_dir.clone(),
+        batch_path: batch_path.clone(),
+        dry_run: false,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert_eq!(applied.item_count, 1);
+    assert_eq!(applied.added_links.len(), 1);
+    let graph = codefire_core::current_trace_graph(&open_dir).unwrap();
+    assert_eq!(graph.links.len(), 1);
+    assert_eq!(graph.links[0].from, "REQ-session");
+    assert_eq!(graph.links[0].to, "DES-session");
+    assert_eq!(graph.links[0].link_type, "refined_by");
+
+    let invalid_path = temp.path().join("invalid-links.json");
+    fs::write(
+        &invalid_path,
+        serde_json::to_string(&json!({
+            "version": 1,
+            "defaults": {"type": "verified_by"},
+            "links": [
+                {"from": "REQ-session", "to": "DES-session"},
+                {"from": "REQ-session", "to": "TEST-missing"}
+            ]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let error = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
+        path: open_dir.clone(),
+        batch_path: invalid_path,
+        dry_run: false,
+        json_output: false,
+        lock: LockOptions::default(),
+    })
+    .unwrap_err();
+    assert!(error.to_string().contains("TEST-missing"));
+    let graph_after_error = codefire_core::current_trace_graph(&open_dir).unwrap();
+    assert_eq!(graph_after_error.links.len(), 1);
+}
+
+#[test]
 fn parse_merge_args_accepts_dry_run_json() {
     let args = vec![
         "feature-session".to_string(),
