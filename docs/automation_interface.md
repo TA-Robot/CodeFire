@@ -87,6 +87,8 @@ Idempotency keys are implemented incrementally for mutating commands:
 ```text
 open --idempotency-key <key>
 clone --idempotency-key <key>
+merge --idempotency-key <key>
+patch import --idempotency-key <key>
 commit --idempotency-key <key>
 extinguish --idempotency-key <key>
 ```

@@ -16,6 +16,7 @@ mod exit_code;
 mod explain;
 mod http;
 mod idempotency;
+mod merge_patch_idempotency;
 mod metrics;
 mod migration;
 mod open_clone_idempotency;
@@ -40,6 +41,10 @@ use http::{http_json, http_remote_path, parse_cf_http_url, serve_http};
 use idempotency::{
     idempotency_payload_hash, idempotency_record_path, idempotency_result_plan,
     require_idempotency_key, verify_idempotency_record,
+};
+use merge_patch_idempotency::{
+    load_merge_idempotency, load_patch_import_idempotency, merge_idempotency_payload,
+    patch_import_idempotency_payload, save_merge_idempotency, save_patch_import_idempotency,
 };
 use metrics::{attach_metrics, print_metrics, scan_metrics, status_metrics, verification_metrics};
 use migration::{
@@ -428,7 +433,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 Ok(())
             }
             _ => Err(CliError::Usage(
-                "usage: codefire-rs patch export <source> [--base <base>] [--output <path>] | codefire-rs patch import <patch-file> [--dry-run] [--json]".to_string(),
+                "usage: codefire-rs patch export <source> [--base <base>] [--output <path>] | codefire-rs patch import <patch-file> [--dry-run] [--json] [--idempotency-key <key>]".to_string(),
             )),
         },
         Some("merge") => {
@@ -875,6 +880,7 @@ struct PatchImportOptions {
     dry_run: bool,
     json_output: bool,
     lock: LockOptions,
+    idempotency_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -891,6 +897,7 @@ struct MergeOptions {
     dry_run: bool,
     json_output: bool,
     lock: LockOptions,
+    idempotency_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -1580,6 +1587,7 @@ fn parse_patch_import_args(args: &[String]) -> Result<PatchImportOptions, CliErr
     let mut dry_run = false;
     let mut json_output = false;
     let mut lock = LockOptions::default();
+    let mut idempotency_key = None;
     let mut index = 0usize;
     while index < args.len() {
         let value = &args[index];
@@ -1590,6 +1598,19 @@ fn parse_patch_import_args(args: &[String]) -> Result<PatchImportOptions, CliErr
         match value.as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
+            "--idempotency-key" => {
+                index += 1;
+                idempotency_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--idempotency-key requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--idempotency-key=") => {
+                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+            }
             value if value.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported patch import option: {value}"
@@ -1607,12 +1628,13 @@ fn parse_patch_import_args(args: &[String]) -> Result<PatchImportOptions, CliErr
     Ok(PatchImportOptions {
         path: path.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs patch import <patch-file> [--dry-run] [--json] [--wait-lock] [--lock-timeout <duration>]".to_string(),
+                "usage: codefire-rs patch import <patch-file> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
             )
         })?,
         dry_run,
         json_output,
         lock,
+        idempotency_key,
     })
 }
 
@@ -1915,6 +1937,7 @@ fn parse_merge_args(args: &[String]) -> Result<MergeOptions, CliError> {
     let mut dry_run = false;
     let mut json_output = false;
     let mut lock = LockOptions::default();
+    let mut idempotency_key = None;
     let mut index = 0usize;
     while index < args.len() {
         if parse_lock_option(args, &mut index, &mut lock)? {
@@ -1931,6 +1954,19 @@ fn parse_merge_args(args: &[String]) -> Result<MergeOptions, CliError> {
             }
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
+            "--idempotency-key" => {
+                index += 1;
+                idempotency_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--idempotency-key requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--idempotency-key=") => {
+                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+            }
             value if source_branch.is_none() => source_branch = Some(value.to_string()),
             value => {
                 return Err(CliError::Usage(format!(
@@ -1943,19 +1979,20 @@ fn parse_merge_args(args: &[String]) -> Result<MergeOptions, CliError> {
     Ok(MergeOptions {
         source_branch: source_branch.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs merge <source-branch> --into <target-branch> [--dry-run] [--json] [--wait-lock] [--lock-timeout <duration>]"
+                "usage: codefire-rs merge <source-branch> --into <target-branch> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
                     .to_string(),
             )
         })?,
         target_branch: target_branch.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs merge <source-branch> --into <target-branch> [--dry-run] [--json] [--wait-lock] [--lock-timeout <duration>]"
+                "usage: codefire-rs merge <source-branch> --into <target-branch> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
                     .to_string(),
             )
         })?,
         dry_run,
         json_output,
         lock,
+        idempotency_key,
     })
 }
 
@@ -2022,11 +2059,22 @@ fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
 fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, CliError> {
     let repo_root = find_repo_root(start)?;
     let _lock = RepoLock::acquire_with_options(&repo_root, &options.lock)?;
+    let idempotency_payload = merge_idempotency_payload(&repo_root, options)?;
+    if !options.dry_run {
+        if let Some(key) = options.idempotency_key.as_deref() {
+            if let Some(result) = load_merge_idempotency(&repo_root, key, &idempotency_payload)? {
+                return Ok(result);
+            }
+        }
+    }
     let mut result = build_merge_result(&repo_root, options)?;
     if options.dry_run {
         return Ok(result);
     }
     apply_merge_result(&repo_root, &mut result)?;
+    if let Some(key) = options.idempotency_key.as_deref() {
+        save_merge_idempotency(&repo_root, key, &idempotency_payload, &result)?;
+    }
     Ok(result)
 }
 
@@ -2363,6 +2411,18 @@ fn import_patch(start: &Path, options: &PatchImportOptions) -> Result<Value, Cli
         paths.push(path);
     }
 
+    let idempotency_payload =
+        patch_import_idempotency_payload(options, &context, &patch, &patch_base, &paths)?;
+    if !options.dry_run {
+        if let Some(key) = options.idempotency_key.as_deref() {
+            if let Some(result) =
+                load_patch_import_idempotency(&context.repo_root, key, &idempotency_payload)?
+            {
+                return Ok(result);
+            }
+        }
+    }
+
     if !options.dry_run {
         for entry in entries {
             apply_patch_entry(&context.open_dir, entry)?;
@@ -2388,7 +2448,7 @@ fn import_patch(start: &Path, options: &PatchImportOptions) -> Result<Value, Cli
         set_open_state(&context, &active_state_path, "open-burning")?;
     }
 
-    Ok(json!({
+    let result = json!({
         "type": "codefire_patch_import",
         "version": 1,
         "dry_run": options.dry_run,
@@ -2397,7 +2457,13 @@ fn import_patch(start: &Path, options: &PatchImportOptions) -> Result<Value, Cli
         "base": patch_base,
         "entries": entries.len(),
         "paths": paths,
-    }))
+    });
+    if !options.dry_run {
+        if let Some(key) = options.idempotency_key.as_deref() {
+            save_patch_import_idempotency(&context.repo_root, key, &idempotency_payload, &result)?;
+        }
+    }
+    Ok(result)
 }
 
 fn apply_patch_entry(open_dir: &Path, entry: &Value) -> Result<(), CliError> {

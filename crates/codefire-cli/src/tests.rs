@@ -592,6 +592,7 @@ fn parse_merge_args_accepts_dry_run_json() {
         "--json".to_string(),
         "--lock-timeout".to_string(),
         "500ms".to_string(),
+        "--idempotency-key=merge-key-1".to_string(),
     ];
     let parsed = parse_merge_args(&args).unwrap();
     assert_eq!(parsed.source_branch, "feature-session");
@@ -600,6 +601,7 @@ fn parse_merge_args_accepts_dry_run_json() {
     assert!(parsed.json_output);
     assert!(parsed.lock.wait);
     assert_eq!(parsed.lock.timeout_ms, Some(500));
+    assert_eq!(parsed.idempotency_key.as_deref(), Some("merge-key-1"));
 }
 
 #[test]
@@ -1620,11 +1622,14 @@ fn parse_patch_args_accept_export_and_import_options() {
         "change.cfpatch.json".to_string(),
         "--dry-run".to_string(),
         "--json".to_string(),
+        "--idempotency-key".to_string(),
+        "patch-key-1".to_string(),
     ])
     .unwrap();
     assert_eq!(import.path, PathBuf::from("change.cfpatch.json"));
     assert!(import.dry_run);
     assert!(import.json_output);
+    assert_eq!(import.idempotency_key.as_deref(), Some("patch-key-1"));
 }
 
 #[test]
@@ -1722,6 +1727,7 @@ fn patch_export_import_applies_manifest_delta_to_open_directory() {
             dry_run: true,
             json_output: true,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -1740,6 +1746,7 @@ fn patch_export_import_applies_manifest_delta_to_open_directory() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -1750,6 +1757,117 @@ fn patch_export_import_applies_manifest_delta_to_open_directory() {
     );
     assert!(!open_dir.join("docs/obsolete.md").exists());
     assert_eq!(read_status(&open_dir).unwrap().state, "open-burning");
+}
+
+#[test]
+fn patch_import_idempotency_replays_same_payload_and_rejects_conflict() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    let patch_path = temp.path().join("change.cfpatch.json");
+    let other_patch_path = temp.path().join("other-change.cfpatch.json");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit(&objects, "docs/spec/session.md", "TTL 30\n");
+    let feature_commit = write_file_commit_with_parents(
+        &objects,
+        "docs/spec/session.md",
+        "TTL 15\n",
+        vec![base_commit.clone()],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": base_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-session",
+            "head": feature_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let patch = patch_export_with_options(
+        Some(&repo_root),
+        &PatchExportOptions {
+            source: "feature-session".to_string(),
+            base: Some("main".to_string()),
+        },
+    )
+    .unwrap();
+    fs::write(&patch_path, &patch).unwrap();
+    let mut other_patch: Value = serde_json::from_str(&patch).unwrap();
+    other_patch["source"]["commit"] = Value::String("CF-COMMIT-different".to_string());
+    fs::write(
+        &other_patch_path,
+        serde_json::to_string_pretty(&other_patch).unwrap(),
+    )
+    .unwrap();
+
+    let first = import_patch(
+        &open_dir,
+        &PatchImportOptions {
+            path: patch_path.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: Some("patch-import-once".to_string()),
+        },
+    )
+    .unwrap();
+    assert_eq!(first["applied"], true);
+    assert_eq!(read_status(&open_dir).unwrap().state, "open-burning");
+
+    let replay = import_patch(
+        &open_dir,
+        &PatchImportOptions {
+            path: patch_path,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: Some("patch-import-once".to_string()),
+        },
+    )
+    .unwrap();
+    assert_eq!(replay["applied"], true);
+    assert_eq!(replay["branch"], "main");
+
+    let conflict = import_patch(
+        &open_dir,
+        &PatchImportOptions {
+            path: other_patch_path,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: Some("patch-import-once".to_string()),
+        },
+    )
+    .unwrap_err();
+    assert_eq!(conflict.exit_code(), ExitCode::IdempotencyConflict.code());
 }
 
 #[test]
@@ -2028,6 +2146,7 @@ fn merge_branch_writes_source_changes_and_marks_target_burning() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -2066,6 +2185,121 @@ fn merge_branch_writes_source_changes_and_marks_target_burning() {
         state.get("pending_merge_parent").and_then(Value::as_str),
         Some(expected_parent.as_str())
     );
+}
+
+#[test]
+fn merge_idempotency_replays_same_payload_and_rejects_conflict() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let main_open_dir = temp.path().join("main-open");
+    let other_open_dir = temp.path().join("other-open");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit(&objects, "docs/spec/session.md", "TTL 30\n");
+    let feature_commit = write_file_commit_with_parents(
+        &objects,
+        "docs/spec/session.md",
+        "TTL 15\n",
+        vec![base_commit.clone()],
+    );
+    for branch in ["main", "other"] {
+        save_branch_record(
+            &repo_root,
+            &json!({
+                "type": "branch",
+                "version": 1,
+                "name": branch,
+                "head": base_commit,
+                "state": "closed",
+                "created_at": "2026-06-04T00:00:00Z"
+            }),
+        )
+        .unwrap();
+    }
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-session",
+            "head": feature_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: main_open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "other".to_string(),
+            path: other_open_dir,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let first = merge_branch(
+        &repo_root,
+        &MergeOptions {
+            source_branch: "feature-session".to_string(),
+            target_branch: "main".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: Some("merge-feature-once".to_string()),
+        },
+    )
+    .unwrap();
+    assert!(first.applied);
+    assert_eq!(read_status(&main_open_dir).unwrap().state, "open-burning");
+
+    let replay = merge_branch(
+        &repo_root,
+        &MergeOptions {
+            source_branch: "feature-session".to_string(),
+            target_branch: "main".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: Some("merge-feature-once".to_string()),
+        },
+    )
+    .unwrap();
+    assert!(replay.applied);
+    assert_eq!(replay.target_branch, "main");
+    assert_eq!(
+        replay.file_actions[0].content.as_deref(),
+        Some("TTL 15\n".as_bytes())
+    );
+
+    let conflict = merge_branch(
+        &repo_root,
+        &MergeOptions {
+            source_branch: "feature-session".to_string(),
+            target_branch: "other".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: Some("merge-feature-once".to_string()),
+        },
+    )
+    .unwrap_err();
+    assert_eq!(conflict.exit_code(), ExitCode::IdempotencyConflict.code());
 }
 
 #[test]
@@ -2133,6 +2367,7 @@ fn merge_branch_writes_conflict_markers_for_divergent_changes() {
             dry_run: false,
             json_output: false,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -2239,6 +2474,7 @@ fn merge_dry_run_reports_plan_without_writing_target() {
             dry_run: true,
             json_output: true,
             lock: LockOptions::default(),
+            idempotency_key: None,
         },
     )
     .unwrap();
