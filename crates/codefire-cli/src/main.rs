@@ -16,6 +16,7 @@ mod exit_code;
 mod explain;
 mod http;
 mod idempotency;
+mod metrics;
 mod migration;
 mod remote;
 mod storage;
@@ -39,6 +40,7 @@ use idempotency::{
     idempotency_payload_hash, idempotency_record_path, require_idempotency_key,
     verify_idempotency_record,
 };
+use metrics::{attach_metrics, print_metrics, scan_metrics, status_metrics, verification_metrics};
 use migration::{
     migration_report_data_json, migration_report_diagnostics_json, migration_report_next_actions,
     parse_migrate_args, print_migration_report, run_migrate,
@@ -120,7 +122,11 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         }
         Some("scan") => {
             let options = parse_path_json_args(&args[1..], "scan")?;
+            let started = Instant::now();
             let scan = run_scan(&options.path)?;
+            let metrics = options
+                .metrics
+                .then(|| scan_metrics(started.elapsed(), &scan));
             if options.json_output {
                 let repo_root = open_context(&options.path).ok().map(|context| context.repo_root);
                 println!(
@@ -130,19 +136,26 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         true,
                         0,
                         repo_root.as_deref(),
-                        scan_data_json(&scan),
+                        attach_metrics(scan_data_json(&scan), metrics.as_ref()),
                         scan_diagnostics_json(&scan),
                         scan_next_actions(&scan),
                     ))?
                 );
             } else {
                 print_scan(&scan);
+                if let Some(metrics) = metrics.as_ref() {
+                    print_metrics(metrics);
+                }
             }
             Ok(())
         }
         Some("verify") => {
             let options = parse_verify_args(&args[1..])?;
+            let started = Instant::now();
             let verification = run_verify(&options.path)?;
+            let metrics = options
+                .metrics
+                .then(|| verification_metrics(started.elapsed(), &verification));
             let exit_code = verification_exit_code(&verification);
             if options.json_output {
                 let repo_root = open_context(&options.path).ok().map(|context| context.repo_root);
@@ -153,13 +166,16 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         verification.result == "passed",
                         exit_code.code(),
                         repo_root.as_deref(),
-                        verification_data_json(&verification),
+                        attach_metrics(verification_data_json(&verification), metrics.as_ref()),
                         verification_diagnostics_json(&verification),
                         verification_next_actions(&verification),
                     ))?
                 );
             } else {
                 print_verification(&verification, options.details);
+                if let Some(metrics) = metrics.as_ref() {
+                    print_metrics(metrics);
+                }
             }
             if verification.result == "passed" {
                 Ok(())
@@ -478,7 +494,11 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         },
         Some("status") => {
             let options = parse_path_json_args(&args[1..], "status")?;
+            let started = Instant::now();
             let status = read_status(&options.path)?;
+            let metrics = options
+                .metrics
+                .then(|| status_metrics(started.elapsed(), &status));
             if options.json_output {
                 let repo_root = open_context(&options.path).ok().map(|context| context.repo_root);
                 println!(
@@ -488,13 +508,16 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         true,
                         0,
                         repo_root.as_deref(),
-                        status_data_json(&status),
+                        attach_metrics(status_data_json(&status), metrics.as_ref()),
                         Vec::new(),
                         status_next_actions(&status),
                     ))?
                 );
             } else {
                 print_status(&status);
+                if let Some(metrics) = metrics.as_ref() {
+                    print_metrics(metrics);
+                }
             }
             Ok(())
         }
@@ -759,12 +782,14 @@ struct VerifyOptions {
     path: PathBuf,
     details: bool,
     json_output: bool,
+    metrics: bool,
 }
 
 #[derive(Debug)]
 struct PathJsonOptions {
     path: PathBuf,
     json_output: bool,
+    metrics: bool,
 }
 
 #[derive(Debug)]
@@ -1104,11 +1129,14 @@ fn parse_verify_args(args: &[String]) -> Result<VerifyOptions, CliError> {
     let mut path = None;
     let mut details = false;
     let mut json_output = false;
+    let mut metrics = false;
     for arg in args {
         if arg == "--details" {
             details = true;
         } else if arg == "--json" {
             json_output = true;
+        } else if arg == "--metrics" {
+            metrics = true;
         } else if path.is_none() {
             path = Some(PathBuf::from(arg));
         } else {
@@ -1121,15 +1149,19 @@ fn parse_verify_args(args: &[String]) -> Result<VerifyOptions, CliError> {
         path: path.unwrap_or(env::current_dir()?),
         details,
         json_output,
+        metrics,
     })
 }
 
 fn parse_path_json_args(args: &[String], command: &str) -> Result<PathJsonOptions, CliError> {
     let mut path = None;
     let mut json_output = false;
+    let mut metrics = false;
     for arg in args {
         if arg == "--json" {
             json_output = true;
+        } else if arg == "--metrics" {
+            metrics = true;
         } else if arg.starts_with("--") {
             return Err(CliError::Usage(format!(
                 "unsupported {command} option: {arg}"
@@ -1145,6 +1177,7 @@ fn parse_path_json_args(args: &[String], command: &str) -> Result<PathJsonOption
     Ok(PathJsonOptions {
         path: path.unwrap_or(env::current_dir()?),
         json_output,
+        metrics,
     })
 }
 

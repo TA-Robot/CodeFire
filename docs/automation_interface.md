@@ -95,9 +95,12 @@ Same key + same payload returns the stored result. Same key + different payload 
 
 ```bash
 codefire status --json
+codefire status --json --metrics
 codefire scan --json
+codefire scan --json --metrics
 codefire verify --json
 codefire verify --details --json
+codefire verify --details --json --metrics
 codefire context --branch --json
 codefire context --changed --json
 codefire context --atom REQ-session --depth 2 --json
@@ -123,6 +126,21 @@ codefire context --fire FIRE-001 --json
   "base_commit": "CF-COMMIT-...",
   "changed_atoms": ["REQ-session"],
   "open_fires": []
+}
+```
+
+When `--metrics` is present on `status`, `scan`, or `verify`, the command data includes:
+
+```json
+{
+  "metrics": {
+    "type": "codefire_metrics",
+    "version": 1,
+    "command": "scan",
+    "phase_timings": {"total_ms": 12},
+    "counters": [{"name": "atoms", "value": 24}],
+    "cache": {"enabled": false}
+  }
 }
 ```
 

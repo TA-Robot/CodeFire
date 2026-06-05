@@ -403,22 +403,29 @@ fn parse_diff_args_accepts_algorithm_forms() {
 #[test]
 fn parse_state_diagnostic_json_args() {
     let status = parse_path_json_args(
-        &["/tmp/example".to_string(), "--json".to_string()],
+        &[
+            "/tmp/example".to_string(),
+            "--json".to_string(),
+            "--metrics".to_string(),
+        ],
         "status",
     )
     .unwrap();
     assert_eq!(status.path, PathBuf::from("/tmp/example"));
     assert!(status.json_output);
+    assert!(status.metrics);
 
     let verify = parse_verify_args(&[
         "--details".to_string(),
         "--json".to_string(),
+        "--metrics".to_string(),
         "/tmp/example".to_string(),
     ])
     .unwrap();
     assert_eq!(verify.path, PathBuf::from("/tmp/example"));
     assert!(verify.details);
     assert!(verify.json_output);
+    assert!(verify.metrics);
 }
 
 #[test]
@@ -2205,6 +2212,65 @@ fn status_reads_python_compatible_open_directory() {
             open_fires: 1
         }
     );
+}
+
+#[test]
+fn metrics_attach_to_status_scan_and_verify_data() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+
+    let status = read_status(&open_dir).unwrap();
+    let status_data = attach_metrics(
+        status_data_json(&status),
+        Some(&status_metrics(Duration::from_millis(3), &status)),
+    );
+    assert_eq!(status_data["metrics"]["type"], "codefire_metrics");
+    assert_eq!(status_data["metrics"]["command"], "status");
+
+    let scan = run_scan(&open_dir).unwrap();
+    let scan_data = attach_metrics(
+        scan_data_json(&scan),
+        Some(&scan_metrics(Duration::from_millis(5), &scan)),
+    );
+    assert_eq!(scan_data["metrics"]["command"], "scan");
+    assert!(scan_data["metrics"]["counters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|counter| counter["name"] == "atoms" && counter["value"] == 1));
+
+    let verification = run_verify(&open_dir).unwrap();
+    let verify_data = attach_metrics(
+        verification_data_json(&verification),
+        Some(&verification_metrics(
+            Duration::from_millis(7),
+            &verification,
+        )),
+    );
+    assert_eq!(verify_data["metrics"]["command"], "verify");
+    assert_eq!(verify_data["metrics"]["phase_timings"]["total_ms"], 7);
 }
 
 #[test]

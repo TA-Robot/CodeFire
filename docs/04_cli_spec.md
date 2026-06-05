@@ -14,13 +14,13 @@ codefire close <branch> --discard
 codefire clone <source-branch-or-url> <new-branch>
 
 codefire status
-codefire status --json
+codefire status --json [--metrics]
 codefire scan
-codefire scan --json
+codefire scan --json [--metrics]
 codefire fire <atom-id> --reason <text>
 codefire extinguish <fire-id> --resolution <type> [--rationale <text>] [--evidence <ref>]
 codefire verify
-codefire verify --json
+codefire verify --json [--metrics]
 codefire context --changed --json
 codefire context --atom <atom-id> --depth <n> --json
 codefire context --fire <fire-id> --json
@@ -147,6 +147,8 @@ remote tracking branchは作らない。
 ```bash
 codefire scan
 codefire scan --json
+codefire scan --metrics
+codefire scan --json --metrics
 ```
 
 仕様：
@@ -159,6 +161,7 @@ obsolete fireを整理する
 branch stateを更新する
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.changed_atoms、data.open_fires、diagnosticsを含める
 --jsonはchanged atoms、open fires、verifyに進むためのmachine-readable next_actionsを含める
+--metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
 ```
 
 ## 4.7 `fire`
@@ -231,6 +234,8 @@ codefire verify
 codefire verify --details
 codefire verify --json
 codefire verify --details --json
+codefire verify --metrics
+codefire verify --details --json --metrics
 ```
 
 仕様：
@@ -245,6 +250,7 @@ verification objectをactive stateに保存する
 --jsonのexit_codeはprocess exit codeと一致する
 verify blockerのexit codeはopen fires=10、missing links=11、stale resolutions=12、duplicate Atom IDs=13、failed checks=14の優先順で決まる
 next_actionsはcontext_changed、context_atom、refresh_resolution、rerun_check、commitなどの安定action kindを返す
+--metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
 ```
 
 ## 4.10 `context`
