@@ -1,5 +1,4 @@
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fmt;
@@ -14,6 +13,7 @@ mod batch;
 mod context;
 mod exit_code;
 mod http;
+mod idempotency;
 mod remote;
 mod view;
 use automation::{
@@ -27,6 +27,10 @@ use exit_code::{
     core_error_exit_code, store_error_exit_code, usage_exit_code, verification_exit_code, ExitCode,
 };
 use http::{http_json, http_remote_path, parse_cf_http_url, serve_http};
+use idempotency::{
+    idempotency_payload_hash, idempotency_record_path, require_idempotency_key,
+    verify_idempotency_record,
+};
 use remote::{
     apply_merge_request, copy_object_graph, list_merge_requests, list_remote_branches,
     load_remote_branch, parse_cf_url, read_optional_json, remote_dirs, request_merge,
@@ -644,6 +648,7 @@ struct ExtinguishOptions {
     dry_run: bool,
     json_output: bool,
     lock: LockOptions,
+    idempotency_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -1023,6 +1028,7 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
     let mut dry_run = false;
     let mut json_output = false;
     let mut lock = LockOptions::default();
+    let mut idempotency_key = None;
     let mut index = 0usize;
     while index < args.len() {
         if parse_lock_option(args, &mut index, &mut lock)? {
@@ -1061,6 +1067,19 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
             "--refresh" => refresh = true,
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
+            "--idempotency-key" => {
+                index += 1;
+                idempotency_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--idempotency-key requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--idempotency-key=") => {
+                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+            }
             value if fire_id.is_none() => fire_id = Some(value.to_string()),
             value => {
                 return Err(CliError::Usage(format!(
@@ -1082,6 +1101,7 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
         dry_run,
         json_output,
         lock,
+        idempotency_key,
     })
 }
 
@@ -2598,6 +2618,16 @@ fn compute_verify(start: &Path, persist: bool) -> Result<VerifyExecution, CliErr
 fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliError> {
     let context = open_context(&options.path)?;
     let _lock = RepoLock::acquire_with_options(&context.repo_root, &options.lock)?;
+    let idempotency_payload = extinguish_idempotency_payload(options, &context);
+    if !options.dry_run {
+        if let Some(key) = options.idempotency_key.as_deref() {
+            if let Some(result) =
+                load_extinguish_idempotency(&context.repo_root, key, &idempotency_payload)?
+            {
+                return Ok(result);
+            }
+        }
+    }
     let active_state_path = PathBuf::from(required_string(
         &context.registry,
         &["open", "active_state_path"],
@@ -2680,18 +2710,86 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
     resolutions.push(resolution);
     write_json_atomic(&fires_path, &serde_json::to_value(fires)?)?;
     write_json_atomic(&resolutions_path, &serde_json::to_value(resolutions)?)?;
-    Ok(ExtinguishResult { display_id, plan })
+    let result = ExtinguishResult { display_id, plan };
+    if let Some(key) = options.idempotency_key.as_deref() {
+        save_extinguish_idempotency(&context.repo_root, key, &idempotency_payload, &result)?;
+    }
+    Ok(result)
+}
+
+fn extinguish_idempotency_payload(options: &ExtinguishOptions, context: &OpenContext) -> Value {
+    json!({
+        "command": "extinguish",
+        "branch": &context.branch,
+        "open_dir": &context.open_dir,
+        "fire_id": &options.fire_id,
+        "resolution": &options.resolution,
+        "rationale": &options.rationale,
+        "evidence": &options.evidence,
+        "refresh": options.refresh,
+    })
+}
+
+fn load_extinguish_idempotency(
+    repo_root: &Path,
+    key: &str,
+    payload: &Value,
+) -> Result<Option<ExtinguishResult>, CliError> {
+    require_idempotency_key(key)?;
+    let path = idempotency_record_path(repo_root, "extinguish", key);
+    let Some(record) = read_optional_json(&path)? else {
+        return Ok(None);
+    };
+    verify_idempotency_record(&record, &path, "extinguish", key, payload)?;
+    Ok(Some(ExtinguishResult {
+        display_id: required_string(&record, &["result", "display_id"])?,
+        plan: record
+            .get("result")
+            .and_then(|result| result.get("plan"))
+            .cloned()
+            .ok_or_else(|| {
+                CliError::InvalidRepository(format!(
+                    "idempotency record missing result.plan: {}",
+                    path.display()
+                ))
+            })?,
+    }))
+}
+
+fn save_extinguish_idempotency(
+    repo_root: &Path,
+    key: &str,
+    payload: &Value,
+    result: &ExtinguishResult,
+) -> Result<(), CliError> {
+    require_idempotency_key(key)?;
+    let path = idempotency_record_path(repo_root, "extinguish", key);
+    let record = json!({
+        "version": 1,
+        "command": "extinguish",
+        "key": key,
+        "payload_hash": idempotency_payload_hash(payload)?,
+        "payload": payload,
+        "result": {
+            "display_id": &result.display_id,
+            "plan": &result.plan,
+        },
+        "created_at": now_iso_utc(),
+    });
+    write_json_atomic(&path, &record)
 }
 
 fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
     let context = open_context(&options.path)?;
     let _lock = RepoLock::acquire_with_options(&context.repo_root, &options.lock)?;
     let idempotency_payload = commit_idempotency_payload(options, &context);
-    if let Some(key) = options.idempotency_key.as_deref() {
-        if let Some(result) =
-            load_commit_idempotency(&context.repo_root, key, &idempotency_payload)?
-        {
-            return Ok(result);
+    if !options.dry_run {
+        if let Some(key) = options.idempotency_key.as_deref() {
+            if let Some(result) =
+                load_commit_idempotency(&context.repo_root, key, &idempotency_payload)?
+            {
+                return Ok(result);
+            }
         }
     }
     let active_state_path = PathBuf::from(required_string(
@@ -2841,28 +2939,12 @@ fn load_commit_idempotency(
     key: &str,
     payload: &Value,
 ) -> Result<Option<CommitResult>, CliError> {
-    if key.is_empty() {
-        return Err(CliError::Usage(
-            "--idempotency-key must not be empty".to_string(),
-        ));
-    }
+    require_idempotency_key(key)?;
     let path = idempotency_record_path(repo_root, "commit", key);
     let Some(record) = read_optional_json(&path)? else {
         return Ok(None);
     };
-    let payload_hash = idempotency_payload_hash(payload)?;
-    let recorded_hash = required_string(&record, &["payload_hash"])?;
-    if recorded_hash != payload_hash {
-        return Err(CliError::IdempotencyConflict(format!(
-            "idempotency key conflict for commit: {key}"
-        )));
-    }
-    if required_string(&record, &["key"])? != key {
-        return Err(CliError::InvalidRepository(format!(
-            "idempotency record key mismatch: {}",
-            path.display()
-        )));
-    }
+    verify_idempotency_record(&record, &path, "commit", key, payload)?;
     Ok(Some(CommitResult {
         commit_id: required_string(&record, &["result", "commit_id"])?,
         branch: required_string(&record, &["result", "branch"])?,
@@ -2885,11 +2967,7 @@ fn save_commit_idempotency(
     payload: &Value,
     result: &CommitResult,
 ) -> Result<(), CliError> {
-    if key.is_empty() {
-        return Err(CliError::Usage(
-            "--idempotency-key must not be empty".to_string(),
-        ));
-    }
+    require_idempotency_key(key)?;
     let path = idempotency_record_path(repo_root, "commit", key);
     let record = json!({
         "version": 1,
@@ -2905,30 +2983,6 @@ fn save_commit_idempotency(
         "created_at": now_iso_utc(),
     });
     write_json_atomic(&path, &record)
-}
-
-fn idempotency_record_path(repo_root: &Path, command: &str, key: &str) -> PathBuf {
-    repo_root
-        .join(".codefire")
-        .join("idempotency")
-        .join(command)
-        .join(format!("{}.json", ref_file_name(key)))
-}
-
-fn idempotency_payload_hash(payload: &Value) -> Result<String, CliError> {
-    let mut hasher = Sha256::new();
-    hasher.update(codefire_store::canonical_json(payload)?);
-    Ok(hex_lower(&hasher.finalize()))
-}
-
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        out.push(HEX[(byte >> 4) as usize] as char);
-        out.push(HEX[(byte & 0x0f) as usize] as char);
-    }
-    out
 }
 
 fn extinguish_operation_plan(

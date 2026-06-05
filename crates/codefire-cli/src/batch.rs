@@ -163,6 +163,7 @@ pub(super) fn run_extinguish_batch(
             dry_run: true,
             json_output: true,
             lock: options.lock,
+            idempotency_key: None,
         })?;
         resolved.push(ResolvedBatchFire {
             id,
@@ -193,6 +194,7 @@ pub(super) fn run_extinguish_batch(
             dry_run: false,
             json_output: false,
             lock: options.lock,
+            idempotency_key: None,
         })?;
     }
 

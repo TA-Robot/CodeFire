@@ -86,6 +86,7 @@ Idempotency keys are implemented incrementally for mutating commands:
 
 ```text
 commit --idempotency-key <key>
+extinguish --idempotency-key <key>
 ```
 
 Same key + same payload returns the stored result. Same key + different payload returns exit code 33.

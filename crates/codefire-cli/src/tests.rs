@@ -626,6 +626,7 @@ fn parse_mutating_dry_run_json_args() {
         "--json".to_string(),
         "--lock-timeout".to_string(),
         "2".to_string(),
+        "--idempotency-key=ext-key-1".to_string(),
     ])
     .unwrap();
     assert_eq!(extinguish.path, PathBuf::from("/tmp/open"));
@@ -634,6 +635,7 @@ fn parse_mutating_dry_run_json_args() {
     assert!(extinguish.json_output);
     assert!(extinguish.lock.wait);
     assert_eq!(extinguish.lock.timeout_ms, Some(2000));
+    assert_eq!(extinguish.idempotency_key.as_deref(), Some("ext-key-1"));
 
     let open = parse_open_args(&[
         "main".to_string(),
@@ -868,6 +870,7 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
         dry_run: true,
         json_output: true,
         lock: LockOptions::default(),
+        idempotency_key: None,
     })
     .unwrap();
     let active = active_state_path(&open_dir);
@@ -879,6 +882,91 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
     assert!(!active.join("fires.json").exists());
     assert!(!active.join("resolutions.json").exists());
     assert_eq!(read_status(&open_dir).unwrap().state, "open-clean");
+}
+
+#[test]
+fn extinguish_idempotency_key_replays_same_payload_and_rejects_conflict() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design").join("session.md"),
+        "## DES-session: Design\nClock policy\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("codefire.links.yaml"),
+        "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
+    )
+    .unwrap();
+
+    let first = run_extinguish(&ExtinguishOptions {
+        path: open_dir.clone(),
+        fire_id: "FIRE-001".to_string(),
+        resolution: "addressed".to_string(),
+        rationale: "fixed".to_string(),
+        evidence: String::new(),
+        refresh: false,
+        dry_run: false,
+        json_output: false,
+        lock: LockOptions::default(),
+        idempotency_key: Some("extinguish-fire-once".to_string()),
+    })
+    .unwrap();
+    assert_eq!(first.display_id, "FIRE-001");
+
+    let replay = run_extinguish(&ExtinguishOptions {
+        path: open_dir.clone(),
+        fire_id: "FIRE-001".to_string(),
+        resolution: "addressed".to_string(),
+        rationale: "fixed".to_string(),
+        evidence: String::new(),
+        refresh: false,
+        dry_run: false,
+        json_output: false,
+        lock: LockOptions::default(),
+        idempotency_key: Some("extinguish-fire-once".to_string()),
+    })
+    .unwrap();
+    assert_eq!(replay.display_id, first.display_id);
+    assert_eq!(replay.plan["command"], "extinguish");
+
+    let conflict = run_extinguish(&ExtinguishOptions {
+        path: open_dir,
+        fire_id: "FIRE-001".to_string(),
+        resolution: "addressed".to_string(),
+        rationale: "different rationale".to_string(),
+        evidence: String::new(),
+        refresh: false,
+        dry_run: false,
+        json_output: false,
+        lock: LockOptions::default(),
+        idempotency_key: Some("extinguish-fire-once".to_string()),
+    })
+    .unwrap_err();
+    assert_eq!(conflict.exit_code(), ExitCode::IdempotencyConflict.code());
 }
 
 #[test]

@@ -187,6 +187,11 @@ codefire extinguish FIRE-001 \
   --rationale "修正済み" \
   --dry-run --json
 
+codefire extinguish FIRE-001 \
+  --resolution addressed \
+  --rationale "修正済み" \
+  --idempotency-key request-2026-06-05-002
+
 codefire extinguish --batch .codefire/fires-to-extinguish.yaml --dry-run --json
 ```
 
@@ -198,6 +203,9 @@ basisとしてsource/target/link/policy hashを保存する
 `--refresh` 指定時は、すでにextinguishedのfireについて現在のbasisでresolutionを更新する
 必要なrationale/evidenceがない場合は拒否する
 --dry-runはfire/resolution ledgerを書き換えず、codefire_operation_planを返す
+--idempotency-keyは成功したextinguish resultを.codefire/idempotency/extinguish/へ記録する
+同じ--idempotency-keyかつ同じextinguish request payloadは保存済みextinguish resultを返し、新しいledger entryを作らない
+同じ--idempotency-keyでfire/resolution/rationale/evidence/refresh/open_dir/branchが異なるpayloadはexit code 33で拒否する
 --batchはversion/defaults/firesだけを持つstrict limited YAMLまたは同等JSONを受け取る
 --batchは全fire itemを事前検証し、unknown fire、重複fire id、必須rationale/evidence不足があればledgerを書き換えない
 --batch --dry-run --jsonはcommand=extinguish-batchのcodefire_operation_planを返し、全itemの単発extinguish validation planをitemsに含める
