@@ -28,6 +28,7 @@
 | CFB-013 | open | UX / Scan Output | clean状態の `scan` が `Changed atoms:` と `Open fires:` の空見出しだけを表示し、明示的に「なし」と言わない | `algorithm-evolution-agent-lab` で `CF-COMMIT-c28f651ba771` 直後に `status` / `verify` / `scan` を実行したとき | 正常にcleanなのか、表示欠落なのかを人間が推測する必要がある | `status` の `Open fires: 0` と `verify` 成功を合わせて判断する | 空の場合は `Changed atoms: none` / `Open fires: none` または `No changed atoms. No open fires.` を表示する |
 | CFB-014 | open | UX / State Label | `scan` でopen firesが作成された直後でも `status` が `open-consistent` / `Open fires: 4` を表示する場合がある | `algorithm-evolution-agent-lab` で `ConfigurationCapture` / `RunIdentityLedger` 追加後に `scan` で4件fireを作成し、直後に `status` を実行したとき | `open-consistent` という状態名と `Open fires: 4` が矛盾して見え、消火が必要か判断しづらい | `Open fires` の件数と `scan` 出力を優先して判断する | open fire数が1件以上なら状態名を `open-burning` などに統一し、状態算出をfire indexから一貫させる |
 | CFB-015 | open | UX / State Label | clean状態で `verify --details --blocking-only` を実行すると、直後の `status` が `open-clean` から `open-consistent` に変わる | `algorithm-evolution-agent-lab` で `CF-COMMIT-1cf6caf75deb` 後に `status` -> `verify --details --blocking-only` -> `status` -> `scan` -> `status` を実行したとき | worktreeに変更やfireがないのに状態名だけが変わり、clean判定がscan依存に見える | `scan` を実行して `open-clean` に戻るか確認する | `verify` がclean stateを劣化させないようにする、または `open-clean` / `open-consistent` の意味を明確化し状態遷移を安定させる |
+| CFB-016 | open | UX / State Label | `scan` でopen firesが作成された直後でも `status` が `open-clean` / `Open fires: 10` を表示する場合がある | `algorithm-evolution-agent-lab` で `LearningCurveAnalyzer` / `CandidatePromotionPolicy` 追加後に `scan` で10件fireを作成し、直後に `status` を実行したとき | `open-clean` は作業不要に見えるが、実際にはfire消火が必要で、状態名と件数の矛盾が非常に強い | `Open fires` の件数と `scan` 出力を優先して判断する | open fire数が1件以上なら `open-clean` を絶対に表示しない不変条件を追加する |
 
 ## Triage Notes
 
@@ -42,5 +43,6 @@
 - CFB-013は、clean branchの確認時に再現した。成功状態の出力ほど明示的なempty stateを持つ方が、サブエージェント運用時のログ解釈も安定する。
 - CFB-014は、CFB-012とは逆向きの状態ラベル不整合として記録した。fire数が正ならラベルも未消火状態を示すべきである。
 - CFB-015は、`verify` 自体が成功しているにもかかわらず状態名が変化する問題として記録した。`scan` 後には `open-clean` に戻るため、状態算出の入力がコマンドごとに揺れている可能性がある。
+- CFB-016は、CFB-014より強い矛盾として記録した。`open-clean` とopen fire数正の組み合わせは、状態名の意味を壊すためblocking相当のUX不具合として扱う。
 - CFB-005の具体例として、同一evidenceで多数fireを解消する場合は `verify` からbatch templateを生成できると操作量が大きく減る。
 - CFB-006の具体例として、`require_trace_completeness: false` でもmissing link件数が表示されるため、`--blocking-only` とnon-blocking診断の優先度分離は引き続き重要である。
