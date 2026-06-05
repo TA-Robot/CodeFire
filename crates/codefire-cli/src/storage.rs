@@ -64,6 +64,22 @@ pub(crate) struct RemoteStorageStats {
     pub(crate) branches: AreaStats,
     pub(crate) merge_requests: AreaStats,
     pub(crate) idempotency: AreaStats,
+    pub(crate) retention: RemoteRetentionStats,
+    pub(crate) objects_by_generation: Vec<RemoteGenerationStats>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct RemoteRetentionStats {
+    pub(crate) retention_seconds: u64,
+    pub(crate) retention_generations: u64,
+    pub(crate) current_generation: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RemoteGenerationStats {
+    pub(crate) generation: Option<u64>,
+    pub(crate) files: u64,
+    pub(crate) bytes: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -231,6 +247,12 @@ pub(crate) fn print_storage_report(report: &StorageReport) {
                 remote.branches.files,
                 remote.merge_requests.files
             );
+            println!(
+                "    retention: {}s, {} generation(s), current generation {}",
+                remote.retention.retention_seconds,
+                remote.retention.retention_generations,
+                remote.retention.current_generation
+            );
         }
     }
     println!("largest object types:");
@@ -391,17 +413,78 @@ fn scan_remote_storage(remote_urls: &[String]) -> Result<Vec<RemoteStorageStats>
         .iter()
         .map(|url| {
             let project = parse_cf_project_url(url)?;
-            let dirs = remote_dirs(&project.project_root);
+            let project_root = project.project_root;
+            let dirs = remote_dirs(&project_root);
             Ok(RemoteStorageStats {
                 url: url.clone(),
-                project_root: project.project_root,
+                project_root: project_root.clone(),
                 objects: scan_area(&dirs.objects)?,
                 branches: scan_area(&dirs.branches)?,
                 merge_requests: scan_area(&dirs.merge_requests)?,
                 idempotency: scan_area(&dirs.idempotency)?,
+                retention: scan_remote_retention(&project_root)?,
+                objects_by_generation: scan_remote_object_generations(&dirs.objects)?,
             })
         })
         .collect()
+}
+
+fn scan_remote_retention(project_root: &Path) -> Result<RemoteRetentionStats, CliError> {
+    let policy = read_optional_json_value(&project_root.join("server_policy.json"))?;
+    let state = read_optional_json_value(&project_root.join("gc_state.json"))?;
+    Ok(RemoteRetentionStats {
+        retention_seconds: policy
+            .as_ref()
+            .and_then(|policy| policy.get("gc"))
+            .and_then(|gc| gc.get("retention_seconds"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        retention_generations: policy
+            .as_ref()
+            .and_then(|policy| policy.get("gc"))
+            .and_then(|gc| gc.get("retention_generations"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        current_generation: state
+            .as_ref()
+            .and_then(|state| state.get("current_generation"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+    })
+}
+
+fn scan_remote_object_generations(
+    objects_root: &Path,
+) -> Result<Vec<RemoteGenerationStats>, CliError> {
+    let mut by_generation = BTreeMap::<Option<u64>, AreaStats>::new();
+    for path in collect_files(objects_root)? {
+        let bytes = fs::metadata(&path)?.len();
+        let generation = read_json(&path).ok().and_then(|value| {
+            value
+                .get("remote")
+                .and_then(|remote| remote.get("last_seen_generation"))
+                .and_then(Value::as_u64)
+        });
+        let stats = by_generation.entry(generation).or_default();
+        stats.files += 1;
+        stats.bytes += bytes;
+    }
+    Ok(by_generation
+        .into_iter()
+        .map(|(generation, stats)| RemoteGenerationStats {
+            generation,
+            files: stats.files,
+            bytes: stats.bytes,
+        })
+        .collect())
+}
+
+fn read_optional_json_value(path: &Path) -> Result<Option<Value>, CliError> {
+    match fs::read_to_string(path) {
+        Ok(text) => Ok(Some(serde_json::from_str(&text)?)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(CliError::Io(error)),
+    }
 }
 
 fn collect_files(root: &Path) -> Result<Vec<PathBuf>, CliError> {
@@ -459,6 +542,20 @@ fn remote_storage_json(stats: &RemoteStorageStats) -> Value {
         "branches": {"files": stats.branches.files, "bytes": stats.branches.bytes},
         "merge_requests": {"files": stats.merge_requests.files, "bytes": stats.merge_requests.bytes},
         "idempotency": {"files": stats.idempotency.files, "bytes": stats.idempotency.bytes},
+        "retention": {
+            "retention_seconds": stats.retention.retention_seconds,
+            "retention_generations": stats.retention.retention_generations,
+            "current_generation": stats.retention.current_generation,
+        },
+        "objects_by_generation": stats.objects_by_generation.iter().map(remote_generation_json).collect::<Vec<_>>(),
+    })
+}
+
+fn remote_generation_json(stats: &RemoteGenerationStats) -> Value {
+    json!({
+        "generation": stats.generation,
+        "files": stats.files,
+        "bytes": stats.bytes,
     })
 }
 

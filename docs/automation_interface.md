@@ -224,7 +224,9 @@ migrate: review_migration_plan, inspect_migration_blockers
       "objects": {"files": 20, "bytes": 8192},
       "branches": {"files": 2, "bytes": 256},
       "merge_requests": {"files": 1, "bytes": 512},
-      "idempotency": {"files": 0, "bytes": 0}
+      "idempotency": {"files": 0, "bytes": 0},
+      "retention": {"retention_seconds": 86400, "retention_generations": 2, "current_generation": 7},
+      "objects_by_generation": [{"generation": 7, "files": 20, "bytes": 8192}]
     }
   ],
   "warnings": []

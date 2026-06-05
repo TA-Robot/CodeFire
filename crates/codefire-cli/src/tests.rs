@@ -1793,7 +1793,24 @@ fn storage_report_counts_file_remote_project_storage() {
     fs::create_dir_all(&dirs.branches).unwrap();
     fs::create_dir_all(&dirs.merge_requests).unwrap();
     fs::create_dir_all(&dirs.idempotency).unwrap();
-    fs::write(dirs.objects.join("object.json"), "{}\n").unwrap();
+    write_json_atomic(
+        &remote_project_root.join("server_policy.json"),
+        &json!({"gc": {"retention_seconds": 3600, "retention_generations": 2}}),
+    )
+    .unwrap();
+    write_json_atomic(
+        &remote_project_root.join("gc_state.json"),
+        &json!({"current_generation": 7}),
+    )
+    .unwrap();
+    fs::write(
+        dirs.objects.join("object.json"),
+        serde_json::to_string_pretty(&json!({
+            "remote": {"last_seen_generation": 7}
+        }))
+        .unwrap(),
+    )
+    .unwrap();
     fs::write(dirs.branches.join("main.json"), "{}\n").unwrap();
     fs::write(dirs.merge_requests.join("mr_1.json"), "{}\n").unwrap();
     fs::write(dirs.idempotency.join("upload.json"), "{}\n").unwrap();
@@ -1820,7 +1837,19 @@ fn storage_report_counts_file_remote_project_storage() {
     assert_eq!(remote.branches.files, 1);
     assert_eq!(remote.merge_requests.files, 1);
     assert_eq!(remote.idempotency.files, 1);
+    assert_eq!(remote.retention.retention_seconds, 3600);
+    assert_eq!(remote.retention.retention_generations, 2);
+    assert_eq!(remote.retention.current_generation, 7);
+    assert!(remote
+        .objects_by_generation
+        .iter()
+        .any(|stats| stats.generation == Some(7) && stats.files == 1));
     assert_eq!(data["remotes"].as_array().unwrap().len(), 2);
+    assert_eq!(data["remotes"][0]["retention"]["current_generation"], 7);
+    assert_eq!(
+        data["remotes"][0]["objects_by_generation"][0]["generation"],
+        7
+    );
 }
 
 #[test]

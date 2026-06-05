@@ -460,7 +460,7 @@ repository rootを探索し、.codefire/objects、.codefire/active、.codefire/i
 object storeはobject type別のfile数/bytesとlargest object上位を返す
 --large-threshold以上のobjectはlarge_object warningとしてdiagnosticsに出す
 object JSONが読めない場合はinvalid_object_json warningとしてdiagnosticsに出し、report自体は継続する
---remoteはfile-backed remote project URLを追加で集計し、remote側objects/branches/merge_requests/idempotencyのfile数とbytesを返す
+--remoteはfile-backed remote project URLを追加で集計し、remote側objects/branches/merge_requests/idempotencyのfile数とbytes、gc retention policy、current generation、object generation別容量を返す
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_storage_reportを含める
 warningがある場合、next_actionsにinspect_storage_warningsを含める
 external_artifactsはartifact_ref objectのrefs、referenced_bytes、payload_bytes_stored=0を返す
