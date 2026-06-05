@@ -7,7 +7,15 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+mod idempotency;
 mod plans;
+pub(crate) use idempotency::{
+    load_remote_apply_idempotency, load_remote_idempotency_result, load_remote_merge_idempotency,
+    load_remote_review_idempotency, load_remote_upload_idempotency, remote_apply_payload,
+    remote_idempotency_key, remote_merge_payload, remote_review_payload, remote_upload_payload,
+    save_remote_apply_idempotency, save_remote_idempotency_result, save_remote_merge_idempotency,
+    save_remote_review_idempotency, save_remote_upload_idempotency,
+};
 use plans::{
     request_apply_operation_plan, request_merge_operation_plan, request_review_operation_plan,
     upload_operation_plan,
@@ -19,6 +27,7 @@ pub(crate) struct UploadOptions {
     pub(crate) remote_url: String,
     pub(crate) dry_run: bool,
     pub(crate) json_output: bool,
+    pub(crate) idempotency_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -44,6 +53,7 @@ pub(crate) struct RequestMergeOptions {
     pub(crate) target_url: String,
     pub(crate) dry_run: bool,
     pub(crate) json_output: bool,
+    pub(crate) idempotency_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -71,6 +81,7 @@ pub(crate) struct RequestReviewOptions {
     pub(crate) comment: String,
     pub(crate) dry_run: bool,
     pub(crate) json_output: bool,
+    pub(crate) idempotency_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -86,6 +97,7 @@ pub(crate) struct RequestApplyOptions {
     pub(crate) mr_id: String,
     pub(crate) dry_run: bool,
     pub(crate) json_output: bool,
+    pub(crate) idempotency_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -153,6 +165,7 @@ pub(crate) fn upload_branch(
                 "head": head,
                 "objects": collect_object_records(&local_objects, &required_string(&branch, &["head"])?)?,
                 "actor": "local",
+                "idempotency_key": &options.idempotency_key,
             })),
         )?;
         let response_head = required_string(&response, &["head"])?;
@@ -164,6 +177,22 @@ pub(crate) fn upload_branch(
 
     let remote = parse_cf_url(&options.remote_url)?;
     let remote_branch = remote.branch.clone();
+    let idempotency_payload = remote_upload_payload(
+        &remote.project_root,
+        &remote_branch,
+        &options.branch,
+        &head,
+        None,
+    );
+    if !options.dry_run {
+        if let Some(key) = options.idempotency_key.as_deref() {
+            if let Some(result) =
+                load_remote_upload_idempotency(&remote.project_root, key, &idempotency_payload)?
+            {
+                return Ok(result);
+            }
+        }
+    }
     if let Some(current) =
         read_optional_json(&remote_branch_path(&remote.project_root, &remote_branch))?
     {
@@ -210,7 +239,11 @@ pub(crate) fn upload_branch(
             "updated_at": now_iso_utc(),
         }),
     )?;
-    Ok(UploadResult { head, plan })
+    let result = UploadResult { head, plan };
+    if let Some(key) = options.idempotency_key.as_deref() {
+        save_remote_upload_idempotency(&remote.project_root, key, &idempotency_payload, &result)?;
+    }
+    Ok(result)
 }
 
 pub(crate) fn list_remote_branches(project_url: &str) -> Result<Vec<RemoteBranch>, CliError> {
@@ -304,6 +337,7 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
                 "source_url": options.source_url,
                 "target_url": options.target_url,
                 "actor": "local",
+                "idempotency_key": &options.idempotency_key,
             })),
         )?;
         return Ok(RequestMergeResult {
@@ -327,6 +361,22 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
         &remote_dirs(&target.project_root).objects,
         &target_head,
     )?;
+    let idempotency_payload = remote_merge_payload(
+        &target.project_root,
+        &options.source_url,
+        &source_head,
+        &options.target_url,
+        &target_head,
+    );
+    if !options.dry_run {
+        if let Some(key) = options.idempotency_key.as_deref() {
+            if let Some(result) =
+                load_remote_merge_idempotency(&target.project_root, key, &idempotency_payload)?
+            {
+                return Ok(result);
+            }
+        }
+    }
     let mut mr_payload = json!({
         "version": 1,
         "source_url": options.source_url,
@@ -365,12 +415,16 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
             .join(format!("{mr_id}.json")),
         &mr_payload,
     )?;
-    Ok(RequestMergeResult {
+    let result = RequestMergeResult {
         id: mr_id,
         source_head: required_string(&mr_payload, &["source_head"])?,
         target_head: required_string(&mr_payload, &["target_head_at_request"])?,
         plan,
-    })
+    };
+    if let Some(key) = options.idempotency_key.as_deref() {
+        save_remote_merge_idempotency(&target.project_root, key, &idempotency_payload, &result)?;
+    }
+    Ok(result)
 }
 
 pub(crate) fn list_merge_requests(
@@ -481,6 +535,7 @@ pub(crate) fn review_merge_request(
                 "decision": options.decision,
                 "comment": options.comment,
                 "actor": "local",
+                "idempotency_key": &options.idempotency_key,
             })),
         )?;
         return Ok(RequestReviewResult {
@@ -496,6 +551,14 @@ pub(crate) fn review_merge_request(
     let mut mr = read_optional_json(&mr_path)?
         .ok_or_else(|| CliError::Usage(format!("merge request not found: {}", options.mr_id)))?;
     validate_merge_request_record(&mr)?;
+    let idempotency_payload = remote_review_payload(
+        &project.project_root,
+        &mr,
+        &options.mr_id,
+        &options.reviewer,
+        &options.decision,
+        &options.comment,
+    )?;
     if options.dry_run {
         reject_stale_merge_request_read_only(&mr)?;
         let plan =
@@ -505,6 +568,13 @@ pub(crate) fn review_merge_request(
             decision: options.decision.clone(),
             plan,
         });
+    }
+    if let Some(key) = options.idempotency_key.as_deref() {
+        if let Some(result) =
+            load_remote_review_idempotency(&project.project_root, key, &idempotency_payload)?
+        {
+            return Ok(result);
+        }
     }
     reject_stale_merge_request(&mut mr, &mr_path)?;
     let plan = request_review_operation_plan(options, "file", &required_string(&mr, &["status"])?);
@@ -527,11 +597,15 @@ pub(crate) fn review_merge_request(
         "rejected".to_string()
     });
     write_json_atomic(&mr_path, &mr)?;
-    Ok(RequestReviewResult {
+    let result = RequestReviewResult {
         reviewer: options.reviewer.clone(),
         decision: options.decision.clone(),
         plan,
-    })
+    };
+    if let Some(key) = options.idempotency_key.as_deref() {
+        save_remote_review_idempotency(&project.project_root, key, &idempotency_payload, &result)?;
+    }
+    Ok(result)
 }
 
 pub(crate) fn apply_merge_request(
@@ -555,7 +629,7 @@ pub(crate) fn apply_merge_request(
                 &project.app,
                 &["merge-requests", &options.mr_id, "apply"],
             ),
-            Some(json!({"actor": "local"})),
+            Some(json!({"actor": "local", "idempotency_key": &options.idempotency_key})),
         )?;
         return Ok(RequestApplyResult {
             target_branch: required_string(&response, &["target_branch"])?,
@@ -569,6 +643,16 @@ pub(crate) fn apply_merge_request(
     let mut mr = read_optional_json(&mr_path)?
         .ok_or_else(|| CliError::Usage(format!("merge request not found: {}", options.mr_id)))?;
     validate_merge_request_record(&mr)?;
+    let idempotency_payload = remote_apply_payload(&project.project_root, &mr, &options.mr_id)?;
+    if !options.dry_run {
+        if let Some(key) = options.idempotency_key.as_deref() {
+            if let Some(result) =
+                load_remote_apply_idempotency(&project.project_root, key, &idempotency_payload)?
+            {
+                return Ok(result);
+            }
+        }
+    }
     if mr.get("status").and_then(Value::as_str) != Some("approved") {
         return Err(CliError::Usage(format!(
             "merge request must be approved before apply: {}",
@@ -646,11 +730,15 @@ pub(crate) fn apply_merge_request(
     mr["applied_by"] = Value::String("local".to_string());
     mr["applied_head"] = Value::String(source_head.clone());
     write_json_atomic(&mr_path, &mr)?;
-    Ok(RequestApplyResult {
+    let result = RequestApplyResult {
         target_branch: target.branch,
         head: source_head,
         plan,
-    })
+    };
+    if let Some(key) = options.idempotency_key.as_deref() {
+        save_remote_apply_idempotency(&project.project_root, key, &idempotency_payload, &result)?;
+    }
+    Ok(result)
 }
 
 #[derive(Debug)]
@@ -659,6 +747,7 @@ pub(crate) struct RemoteDirs {
     pub(crate) branches: PathBuf,
     pub(crate) merge_requests: PathBuf,
     pub(crate) locks: PathBuf,
+    pub(crate) idempotency: PathBuf,
 }
 
 pub(crate) fn remote_dirs(project_root: &Path) -> RemoteDirs {
@@ -667,6 +756,7 @@ pub(crate) fn remote_dirs(project_root: &Path) -> RemoteDirs {
         branches: project_root.join("branches"),
         merge_requests: project_root.join("merge_requests"),
         locks: project_root.join("locks"),
+        idempotency: project_root.join("idempotency"),
     }
 }
 
@@ -678,6 +768,7 @@ pub(crate) fn ensure_remote_layout(project_root: &Path) -> Result<(), CliError> 
         dirs.branches,
         dirs.merge_requests,
         dirs.locks,
+        dirs.idempotency,
         project_root.join("audit"),
     ] {
         fs::create_dir_all(path)?;

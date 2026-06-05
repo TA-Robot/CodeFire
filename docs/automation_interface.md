@@ -89,6 +89,10 @@ open --idempotency-key <key>
 clone --idempotency-key <key>
 merge --idempotency-key <key>
 patch import --idempotency-key <key>
+upload --idempotency-key <key>
+request-merge --idempotency-key <key>
+request-review --idempotency-key <key>
+request-apply --idempotency-key <key>
 commit --idempotency-key <key>
 extinguish --idempotency-key <key>
 ```

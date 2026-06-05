@@ -116,6 +116,13 @@ pub(crate) fn http_json(
             .get("error")
             .and_then(Value::as_str)
             .unwrap_or("HTTP remote error");
+        if value.get("exit_code").and_then(Value::as_i64)
+            == Some(ExitCode::IdempotencyConflict.code() as i64)
+        {
+            return Err(CliError::IdempotencyConflict(format!(
+                "HTTP remote error: {detail}"
+            )));
+        }
         return Err(CliError::Usage(format!("HTTP remote error: {detail}")));
     }
     Ok(value)
@@ -163,7 +170,14 @@ fn handle_http_stream(storage_root: &Path, stream: &mut TcpStream) -> Result<(),
     let request = read_http_request(stream)?;
     let (status, payload) = match dispatch_http(storage_root, &request) {
         Ok(response) => response,
-        Err(error) => (400, json!({"error": error.to_string()})),
+        Err(error) => (
+            if matches!(error, CliError::IdempotencyConflict(_)) {
+                409
+            } else {
+                400
+            },
+            json!({"error": error.to_string(), "exit_code": error.exit_code()}),
+        ),
     };
     write_http_json(stream, status, &payload)
 }
@@ -359,6 +373,25 @@ fn handle_http_upload(
             json!({"error": "upload request must include branch, head, and objects"}),
         ));
     }
+    let records_value = Value::Array(records.to_vec());
+    let records_hash = sha256_hex(&codefire_store::canonical_json(&records_value)?);
+    let idempotency_payload = remote_upload_payload(
+        &project_root,
+        branch_name,
+        &local_branch,
+        &head,
+        Some(&records_hash),
+    );
+    if let Some(key) = remote_idempotency_key(request) {
+        if let Some(result) = load_remote_idempotency_result(
+            &project_root,
+            "remote_upload",
+            &key,
+            &idempotency_payload,
+        )? {
+            return Ok((200, result));
+        }
+    }
     let dirs = remote_dirs(&project_root);
     let _lock = FileLock::acquire(
         dirs.locks
@@ -405,7 +438,17 @@ fn handle_http_upload(
         }),
     )?;
     let _ = fs::remove_dir_all(tmp_objects.parent().unwrap_or(&tmp_objects));
-    Ok((200, json!({"branch": branch_name, "head": head})))
+    let response = json!({"branch": branch_name, "head": head});
+    if let Some(key) = remote_idempotency_key(request) {
+        save_remote_idempotency_result(
+            &project_root,
+            "remote_upload",
+            &key,
+            &idempotency_payload,
+            &response,
+        )?;
+    }
+    Ok((200, response))
 }
 
 fn handle_http_request_merge(
@@ -430,6 +473,23 @@ fn handle_http_request_merge(
     let target_head = required_string(&target_branch, &["head"])?;
     codefire_store::validate_sealed_commit(&remote_dirs(&source_root).objects, &source_head)?;
     codefire_store::validate_sealed_commit(&remote_dirs(&target_root).objects, &target_head)?;
+    let idempotency_payload = remote_merge_payload(
+        &project_root,
+        &source_url,
+        &source_head,
+        &target_url,
+        &target_head,
+    );
+    if let Some(key) = remote_idempotency_key(request) {
+        if let Some(result) = load_remote_idempotency_result(
+            &project_root,
+            "remote_request_merge",
+            &key,
+            &idempotency_payload,
+        )? {
+            return Ok((200, result));
+        }
+    }
     let mut mr_payload = json!({
         "version": 1,
         "source_url": source_url,
@@ -451,10 +511,21 @@ fn handle_http_request_merge(
             .join(format!("{mr_id}.json")),
         &mr_payload,
     )?;
-    Ok((
-        200,
-        json!({"id": mr_id, "source": required_string(&mr_payload, &["source_head"])?, "target": required_string(&mr_payload, &["target_head_at_request"])?}),
-    ))
+    let response = json!({
+        "id": mr_id,
+        "source": required_string(&mr_payload, &["source_head"])?,
+        "target": required_string(&mr_payload, &["target_head_at_request"])?,
+    });
+    if let Some(key) = remote_idempotency_key(request) {
+        save_remote_idempotency_result(
+            &project_root,
+            "remote_request_merge",
+            &key,
+            &idempotency_payload,
+            &response,
+        )?;
+    }
+    Ok((200, response))
 }
 
 fn handle_http_request_list(
@@ -519,14 +590,6 @@ fn handle_http_request_review(
         return Ok((404, json!({"error": "merge request not found"})));
     };
     validate_http_merge_request_record(storage_root, &mr)?;
-    if http_merge_request_is_stale(storage_root, &mr)? {
-        mr["status"] = Value::String("stale".to_string());
-        write_json_atomic(&mr_path, &mr)?;
-        return Ok((
-            409,
-            json!({"error": format!("merge request is stale: {mr_id}")}),
-        ));
-    }
     let decision = required_string(request, &["decision"])?;
     if decision != "approve" && decision != "reject" {
         return Ok((
@@ -535,6 +598,27 @@ fn handle_http_request_review(
         ));
     }
     let reviewer = required_string(request, &["reviewer"])?;
+    let comment = request.get("comment").and_then(Value::as_str).unwrap_or("");
+    let idempotency_payload =
+        remote_review_payload(&project_root, &mr, mr_id, &reviewer, &decision, comment)?;
+    if let Some(key) = remote_idempotency_key(request) {
+        if let Some(result) = load_remote_idempotency_result(
+            &project_root,
+            "remote_request_review",
+            &key,
+            &idempotency_payload,
+        )? {
+            return Ok((200, result));
+        }
+    }
+    if http_merge_request_is_stale(storage_root, &mr)? {
+        mr["status"] = Value::String("stale".to_string());
+        write_json_atomic(&mr_path, &mr)?;
+        return Ok((
+            409,
+            json!({"error": format!("merge request is stale: {mr_id}")}),
+        ));
+    }
     let mut reviews = mr
         .get("reviews")
         .and_then(Value::as_array)
@@ -543,7 +627,7 @@ fn handle_http_request_review(
     reviews.push(json!({
         "reviewer": reviewer,
         "decision": decision,
-        "comment": request.get("comment").and_then(Value::as_str).unwrap_or(""),
+        "comment": comment,
         "reviewed_at": now_iso_utc(),
     }));
     mr["reviews"] = Value::Array(reviews);
@@ -553,10 +637,17 @@ fn handle_http_request_review(
         "rejected".to_string()
     });
     write_json_atomic(&mr_path, &mr)?;
-    Ok((
-        200,
-        json!({"id": mr_id, "decision": decision, "reviewer": reviewer}),
-    ))
+    let response = json!({"id": mr_id, "decision": decision, "reviewer": reviewer});
+    if let Some(key) = remote_idempotency_key(request) {
+        save_remote_idempotency_result(
+            &project_root,
+            "remote_request_review",
+            &key,
+            &idempotency_payload,
+            &response,
+        )?;
+    }
+    Ok((200, response))
 }
 
 fn handle_http_request_apply(
@@ -574,6 +665,17 @@ fn handle_http_request_apply(
         return Ok((404, json!({"error": "merge request not found"})));
     };
     validate_http_merge_request_record(storage_root, &mr)?;
+    let idempotency_payload = remote_apply_payload(&project_root, &mr, mr_id)?;
+    if let Some(key) = remote_idempotency_key(request) {
+        if let Some(result) = load_remote_idempotency_result(
+            &project_root,
+            "remote_request_apply",
+            &key,
+            &idempotency_payload,
+        )? {
+            return Ok((200, result));
+        }
+    }
     if mr.get("status").and_then(Value::as_str) != Some("approved") {
         return Ok((
             409,
@@ -644,10 +746,17 @@ fn handle_http_request_apply(
     );
     mr["applied_head"] = Value::String(source_head.clone());
     write_json_atomic(&mr_path, &mr)?;
-    Ok((
-        200,
-        json!({"id": mr_id, "target_branch": target_info.branch, "head": source_head}),
-    ))
+    let response = json!({"id": mr_id, "target_branch": target_info.branch, "head": source_head});
+    if let Some(key) = remote_idempotency_key(request) {
+        save_remote_idempotency_result(
+            &project_root,
+            "remote_request_apply",
+            &key,
+            &idempotency_payload,
+            &response,
+        )?;
+    }
+    Ok((200, response))
 }
 
 fn http_remote_branch(

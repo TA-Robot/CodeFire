@@ -333,6 +333,7 @@ semantic conflict candidateは自動解決しない
 codefire upload feature-login cf://server/alice/app/feature-login
 codefire upload feature-login cf+http://127.0.0.1:8080/alice/app/feature-login
 codefire upload feature-login cf://server/alice/app/feature-login --dry-run --json
+codefire upload feature-login cf://server/alice/app/feature-login --idempotency-key request-upload-001
 ```
 
 仕様：
@@ -345,6 +346,10 @@ force uploadは存在しない
 --dry-runはlocal branch、sealed commit、remote fast-forward条件を検証し、remote layout、object graph、branch record、generation stateを書き換えない
 --json併用時はcodefire_operation_planを返し、copy_object_graphとwrite_remote_branchの予定をoperationsに含める
 cf+http dry-runはHTTP write requestを送らず、local object graph収集まででoperation planを返す
+--idempotency-keyは成功したupload resultをremote projectのidempotency/remote_upload/へ記録する
+同じ--idempotency-keyかつ同じupload payloadは保存済みupload resultを返し、remote branch fast-forward checkより先にreplayする
+同じ--idempotency-keyでlocal branch/head/remote branch/project/object bundleが異なるpayloadはexit code 33で拒否する
+cf+http uploadはserver側remote projectのidempotency recordで同じ規則を適用する
 ```
 
 ## 4.14 `show` / `diff`
@@ -529,6 +534,9 @@ codefire request-merge \
 
 codefire request-review cf://server/org/app MR-abc123 --reviewer alice --decision approve --dry-run --json
 codefire request-apply cf://server/org/app MR-abc123 --dry-run --json
+codefire request-merge cf://server/alice/app/feature-login cf://server/org/app/main --idempotency-key request-mr-001
+codefire request-review cf://server/org/app MR-abc123 --reviewer alice --decision approve --idempotency-key request-review-001
+codefire request-apply cf://server/org/app MR-abc123 --idempotency-key request-apply-001
 ```
 
 仕様：
@@ -542,4 +550,8 @@ request-review --dry-runはmerge request、stale判定、decision値を検証し
 request-apply --dry-runはapproved status、stale判定、fast-forward条件、source/target object graphを検証し、target branch、object graph、merge request statusを書き換えない
 cf+http request-* dry-runはHTTP write requestを送らず、transport/URL/operation planだけを返す
 --json併用時は各commandのcodefire_operation_planを返し、write_merge_request、append_review、write_remote_branchなどの予定をoperationsに含める
+--idempotency-keyは成功したrequest-merge/review/apply resultをremote projectのidempotency/remote_request_*/へ記録する
+同じ--idempotency-keyかつ同じremote request payloadは保存済みresultを返し、MR status/stale/approved checkより先にreplayする
+同じ--idempotency-keyでsource/target/MR/reviewer/decision/comment/projectが異なるpayloadはexit code 33で拒否する
+cf+http request-* はserver側remote projectのidempotency recordで同じ規則を適用する
 ```

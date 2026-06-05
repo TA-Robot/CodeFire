@@ -1642,11 +1642,25 @@ fn parse_upload_args(args: &[String]) -> Result<UploadOptions, CliError> {
     let mut positional = Vec::new();
     let mut dry_run = false;
     let mut json_output = false;
+    let mut idempotency_key = None;
     let mut index = 0usize;
     while index < args.len() {
         match args[index].as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
+            "--idempotency-key" => {
+                index += 1;
+                idempotency_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--idempotency-key requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--idempotency-key=") => {
+                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+            }
             value if value.starts_with("--") => skip_ignored_option(args, &mut index)?,
             value => positional.push(value.to_string()),
         }
@@ -1658,9 +1672,10 @@ fn parse_upload_args(args: &[String]) -> Result<UploadOptions, CliError> {
             remote_url: remote_url.clone(),
             dry_run,
             json_output,
+            idempotency_key,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs upload <branch> <cf-url> [--dry-run] [--json]".to_string(),
+            "usage: codefire-rs upload <branch> <cf-url> [--dry-run] [--json] [--idempotency-key <key>]".to_string(),
         )),
     }
 }
@@ -1684,11 +1699,25 @@ fn parse_request_merge_args(args: &[String]) -> Result<RequestMergeOptions, CliE
     let mut positional = Vec::new();
     let mut dry_run = false;
     let mut json_output = false;
+    let mut idempotency_key = None;
     let mut index = 0usize;
     while index < args.len() {
         match args[index].as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
+            "--idempotency-key" => {
+                index += 1;
+                idempotency_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--idempotency-key requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--idempotency-key=") => {
+                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+            }
             value if value.starts_with("--") => skip_ignored_option(args, &mut index)?,
             value => positional.push(value.to_string()),
         }
@@ -1700,9 +1729,10 @@ fn parse_request_merge_args(args: &[String]) -> Result<RequestMergeOptions, CliE
             target_url: target_url.clone(),
             dry_run,
             json_output,
+            idempotency_key,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs request-merge <source-url> <target-url> [--dry-run] [--json]"
+            "usage: codefire-rs request-merge <source-url> <target-url> [--dry-run] [--json] [--idempotency-key <key>]"
                 .to_string(),
         )),
     }
@@ -1715,11 +1745,25 @@ fn parse_request_review_args(args: &[String]) -> Result<RequestReviewOptions, Cl
     let mut comment = String::new();
     let mut dry_run = false;
     let mut json_output = false;
+    let mut idempotency_key = None;
     let mut index = 0usize;
     while index < args.len() {
         match args[index].as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
+            "--idempotency-key" => {
+                index += 1;
+                idempotency_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--idempotency-key requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--idempotency-key=") => {
+                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+            }
             "--reviewer" => {
                 index += 1;
                 reviewer = Some(
@@ -1761,9 +1805,10 @@ fn parse_request_review_args(args: &[String]) -> Result<RequestReviewOptions, Cl
             comment,
             dry_run,
             json_output,
+            idempotency_key,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs request-review <project-url> <mr-id> [--reviewer <name>] [--decision approve|reject] [--comment <text>] [--dry-run] [--json]".to_string(),
+            "usage: codefire-rs request-review <project-url> <mr-id> [--reviewer <name>] [--decision approve|reject] [--comment <text>] [--dry-run] [--json] [--idempotency-key <key>]".to_string(),
         )),
     }
 }
@@ -1772,11 +1817,25 @@ fn parse_request_apply_args(args: &[String]) -> Result<RequestApplyOptions, CliE
     let mut positional = Vec::new();
     let mut dry_run = false;
     let mut json_output = false;
+    let mut idempotency_key = None;
     let mut index = 0usize;
     while index < args.len() {
         match args[index].as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
+            "--idempotency-key" => {
+                index += 1;
+                idempotency_key = Some(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--idempotency-key requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            value if value.starts_with("--idempotency-key=") => {
+                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+            }
             value if value.starts_with("--") => skip_ignored_option(args, &mut index)?,
             value => positional.push(value.to_string()),
         }
@@ -1788,9 +1847,10 @@ fn parse_request_apply_args(args: &[String]) -> Result<RequestApplyOptions, CliE
             mr_id: mr_id.clone(),
             dry_run,
             json_output,
+            idempotency_key,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs request-apply <project-url> <mr-id> [--dry-run] [--json]"
+            "usage: codefire-rs request-apply <project-url> <mr-id> [--dry-run] [--json] [--idempotency-key <key>]"
                 .to_string(),
         )),
     }

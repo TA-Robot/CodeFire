@@ -684,6 +684,69 @@ fn parse_mutating_dry_run_json_args() {
     assert!(clone.lock.wait);
     assert_eq!(clone.lock.timeout_ms, Some(1000));
     assert_eq!(clone.idempotency_key.as_deref(), Some("clone-key-1"));
+
+    let upload = parse_upload_args(&[
+        "main".to_string(),
+        "cf:///tmp/server/org/app/main".to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+        "--idempotency-key=upload-key-1".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(upload.branch, "main");
+    assert!(upload.dry_run);
+    assert!(upload.json_output);
+    assert_eq!(upload.idempotency_key.as_deref(), Some("upload-key-1"));
+
+    let request_merge = parse_request_merge_args(&[
+        "cf:///tmp/server/org/app/feature".to_string(),
+        "cf:///tmp/server/org/app/main".to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+        "--idempotency-key".to_string(),
+        "request-merge-key-1".to_string(),
+    ])
+    .unwrap();
+    assert!(request_merge.dry_run);
+    assert!(request_merge.json_output);
+    assert_eq!(
+        request_merge.idempotency_key.as_deref(),
+        Some("request-merge-key-1")
+    );
+
+    let request_review = parse_request_review_args(&[
+        "cf:///tmp/server/org/app".to_string(),
+        "MR-abc123".to_string(),
+        "--reviewer".to_string(),
+        "alice".to_string(),
+        "--decision".to_string(),
+        "approve".to_string(),
+        "--comment".to_string(),
+        "ready".to_string(),
+        "--idempotency-key=request-review-key-1".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(request_review.reviewer, "alice");
+    assert_eq!(request_review.decision, "approve");
+    assert_eq!(
+        request_review.idempotency_key.as_deref(),
+        Some("request-review-key-1")
+    );
+
+    let request_apply = parse_request_apply_args(&[
+        "cf:///tmp/server/org/app".to_string(),
+        "MR-abc123".to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+        "--idempotency-key=request-apply-key-1".to_string(),
+    ])
+    .unwrap();
+    assert!(request_apply.dry_run);
+    assert!(request_apply.json_output);
+    assert_eq!(
+        request_apply.idempotency_key.as_deref(),
+        Some("request-apply-key-1")
+    );
 }
 
 #[test]
@@ -1922,6 +1985,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
             remote_url: main_url.clone(),
             dry_run: true,
             json_output: true,
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -1936,6 +2000,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
             remote_url: main_url.clone(),
             dry_run: false,
             json_output: false,
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -1971,6 +2036,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
             remote_url: feature_url.clone(),
             dry_run: false,
             json_output: false,
+            idempotency_key: None,
         },
     )
     .unwrap();
@@ -1990,6 +2056,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         target_url: main_url.clone(),
         dry_run: true,
         json_output: true,
+        idempotency_key: None,
     })
     .unwrap();
     assert_eq!(mr_dry_run.plan["command"], "request-merge");
@@ -2001,6 +2068,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         target_url: main_url.clone(),
         dry_run: false,
         json_output: false,
+        idempotency_key: None,
     })
     .unwrap();
     assert!(mr.id.starts_with("MR-"));
@@ -2016,6 +2084,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         comment: "sealed source is ready".to_string(),
         dry_run: true,
         json_output: true,
+        idempotency_key: None,
     })
     .unwrap();
     assert_eq!(review_dry_run.plan["command"], "request-review");
@@ -2028,6 +2097,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         comment: "sealed source is ready".to_string(),
         dry_run: false,
         json_output: false,
+        idempotency_key: None,
     })
     .unwrap();
     assert_eq!(
@@ -2045,6 +2115,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         mr_id: mr.id.clone(),
         dry_run: true,
         json_output: true,
+        idempotency_key: None,
     })
     .unwrap();
     assert_eq!(apply_dry_run.plan["command"], "request-apply");
@@ -2062,6 +2133,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         mr_id: mr.id,
         dry_run: false,
         json_output: false,
+        idempotency_key: None,
     })
     .unwrap();
     assert_eq!(applied.target_branch, "main");
@@ -2080,6 +2152,219 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         )
         .unwrap(),
         applied.head
+    );
+}
+
+#[test]
+fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let server = temp.path().join("server");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let main_commit = write_file_commit(&objects, "docs/readme.md", "hello 30\n");
+    let feature_commit = write_file_commit_with_parents(
+        &objects,
+        "docs/readme.md",
+        "hello 15\n",
+        vec![main_commit.clone()],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": main_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-session",
+            "head": feature_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    let project_url = format!("cf://{}/org/app", server.display());
+    let main_url = format!("{project_url}/main");
+    let feature_url = format!("{project_url}/feature-session");
+    let remote_project_root = parse_cf_url(&main_url).unwrap().project_root;
+
+    let first_upload = upload_branch(
+        &repo_root,
+        &UploadOptions {
+            branch: "main".to_string(),
+            remote_url: main_url.clone(),
+            dry_run: false,
+            json_output: false,
+            idempotency_key: Some("upload-main-once".to_string()),
+        },
+    )
+    .unwrap();
+    let replay_upload = upload_branch(
+        &repo_root,
+        &UploadOptions {
+            branch: "main".to_string(),
+            remote_url: main_url.clone(),
+            dry_run: false,
+            json_output: false,
+            idempotency_key: Some("upload-main-once".to_string()),
+        },
+    )
+    .unwrap();
+    assert_eq!(replay_upload.head, first_upload.head);
+    let upload_conflict = upload_branch(
+        &repo_root,
+        &UploadOptions {
+            branch: "feature-session".to_string(),
+            remote_url: main_url.clone(),
+            dry_run: false,
+            json_output: false,
+            idempotency_key: Some("upload-main-once".to_string()),
+        },
+    )
+    .unwrap_err();
+    assert_eq!(
+        upload_conflict.exit_code(),
+        ExitCode::IdempotencyConflict.code()
+    );
+
+    upload_branch(
+        &repo_root,
+        &UploadOptions {
+            branch: "feature-session".to_string(),
+            remote_url: feature_url.clone(),
+            dry_run: false,
+            json_output: false,
+            idempotency_key: Some("upload-feature-once".to_string()),
+        },
+    )
+    .unwrap();
+
+    let first_merge = request_merge(&RequestMergeOptions {
+        source_url: feature_url.clone(),
+        target_url: main_url.clone(),
+        dry_run: false,
+        json_output: false,
+        idempotency_key: Some("request-merge-once".to_string()),
+    })
+    .unwrap();
+    let replay_merge = request_merge(&RequestMergeOptions {
+        source_url: feature_url.clone(),
+        target_url: main_url.clone(),
+        dry_run: false,
+        json_output: false,
+        idempotency_key: Some("request-merge-once".to_string()),
+    })
+    .unwrap();
+    assert_eq!(replay_merge.id, first_merge.id);
+    let merge_conflict = request_merge(&RequestMergeOptions {
+        source_url: main_url.clone(),
+        target_url: feature_url.clone(),
+        dry_run: false,
+        json_output: false,
+        idempotency_key: Some("request-merge-once".to_string()),
+    })
+    .unwrap_err();
+    assert_eq!(
+        merge_conflict.exit_code(),
+        ExitCode::IdempotencyConflict.code()
+    );
+
+    let mr_path = remote_dirs(&remote_project_root)
+        .merge_requests
+        .join(format!("{}.json", first_merge.id));
+    let first_review = review_merge_request(&RequestReviewOptions {
+        project_url: project_url.clone(),
+        mr_id: first_merge.id.clone(),
+        reviewer: "alice".to_string(),
+        decision: "approve".to_string(),
+        comment: "ready".to_string(),
+        dry_run: false,
+        json_output: false,
+        idempotency_key: Some("review-once".to_string()),
+    })
+    .unwrap();
+    let replay_review = review_merge_request(&RequestReviewOptions {
+        project_url: project_url.clone(),
+        mr_id: first_merge.id.clone(),
+        reviewer: "alice".to_string(),
+        decision: "approve".to_string(),
+        comment: "ready".to_string(),
+        dry_run: false,
+        json_output: false,
+        idempotency_key: Some("review-once".to_string()),
+    })
+    .unwrap();
+    assert_eq!(replay_review.decision, first_review.decision);
+    assert_eq!(
+        read_json(&mr_path).unwrap()["reviews"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    let review_conflict = review_merge_request(&RequestReviewOptions {
+        project_url: project_url.clone(),
+        mr_id: first_merge.id.clone(),
+        reviewer: "alice".to_string(),
+        decision: "approve".to_string(),
+        comment: "changed comment".to_string(),
+        dry_run: false,
+        json_output: false,
+        idempotency_key: Some("review-once".to_string()),
+    })
+    .unwrap_err();
+    assert_eq!(
+        review_conflict.exit_code(),
+        ExitCode::IdempotencyConflict.code()
+    );
+
+    let first_apply = apply_merge_request(&RequestApplyOptions {
+        project_url: project_url.clone(),
+        mr_id: first_merge.id.clone(),
+        dry_run: false,
+        json_output: false,
+        idempotency_key: Some("apply-once".to_string()),
+    })
+    .unwrap();
+    let replay_apply = apply_merge_request(&RequestApplyOptions {
+        project_url: project_url.clone(),
+        mr_id: first_merge.id,
+        dry_run: false,
+        json_output: false,
+        idempotency_key: Some("apply-once".to_string()),
+    })
+    .unwrap();
+    assert_eq!(replay_apply.head, first_apply.head);
+
+    let other_merge = request_merge(&RequestMergeOptions {
+        source_url: feature_url.clone(),
+        target_url: feature_url,
+        dry_run: false,
+        json_output: false,
+        idempotency_key: Some("other-request-merge".to_string()),
+    })
+    .unwrap();
+    let apply_conflict = apply_merge_request(&RequestApplyOptions {
+        project_url,
+        mr_id: other_merge.id,
+        dry_run: false,
+        json_output: false,
+        idempotency_key: Some("apply-once".to_string()),
+    })
+    .unwrap_err();
+    assert_eq!(
+        apply_conflict.exit_code(),
+        ExitCode::IdempotencyConflict.code()
     );
 }
 
