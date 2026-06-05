@@ -317,6 +317,23 @@ fn http_project_root(storage_root: &Path, org: &str, app: &str) -> PathBuf {
         .join(app)
 }
 
+fn http_lock_options(request: &Value) -> Result<LockOptions, CliError> {
+    let Some(lock) = request.get("lock") else {
+        return Ok(LockOptions::default());
+    };
+    let wait = lock.get("wait").and_then(Value::as_bool).unwrap_or(false);
+    let timeout_ms = match lock.get("timeout_ms") {
+        None | Some(Value::Null) => None,
+        Some(value) => Some(value.as_u64().ok_or_else(|| {
+            CliError::Usage("lock.timeout_ms must be an unsigned integer".to_string())
+        })?),
+    };
+    Ok(LockOptions {
+        wait: wait || timeout_ms.is_some(),
+        timeout_ms,
+    })
+}
+
 fn handle_http_list(storage_root: &Path, org: &str, app: &str) -> Result<(u16, Value), CliError> {
     let project_root = http_project_root(storage_root, org, app);
     let dirs = remote_dirs(&project_root);
@@ -393,9 +410,11 @@ fn handle_http_upload(
         }
     }
     let dirs = remote_dirs(&project_root);
-    let _lock = FileLock::acquire(
+    let lock_options = http_lock_options(request)?;
+    let _lock = FileLock::acquire_with_options(
         dirs.locks
             .join(format!("branch-{}.lock", ref_file_name(branch_name))),
+        &lock_options,
     )?;
     let tmp_objects = project_root
         .join("tmp")
@@ -490,6 +509,11 @@ fn handle_http_request_merge(
             return Ok((200, result));
         }
     }
+    let lock_options = http_lock_options(request)?;
+    let _lock = FileLock::acquire_with_options(
+        remote_dirs(&project_root).locks.join("merge-requests.lock"),
+        &lock_options,
+    )?;
     let mut mr_payload = json!({
         "version": 1,
         "source_url": source_url,
@@ -611,6 +635,13 @@ fn handle_http_request_review(
             return Ok((200, result));
         }
     }
+    let lock_options = http_lock_options(request)?;
+    let _lock = FileLock::acquire_with_options(
+        remote_dirs(&project_root)
+            .locks
+            .join(format!("merge-request-{}.lock", ref_file_name(mr_id))),
+        &lock_options,
+    )?;
     if http_merge_request_is_stale(storage_root, &mr)? {
         mr["status"] = Value::String("stale".to_string());
         write_json_atomic(&mr_path, &mr)?;
@@ -712,10 +743,14 @@ fn handle_http_request_apply(
             json!({"error": "request apply rejected: source is not a fast-forward of target"}),
         ));
     }
-    let _lock = FileLock::acquire(remote_dirs(&target_root).locks.join(format!(
-        "branch-{}.lock",
-        ref_file_name(&target_info.branch)
-    )))?;
+    let lock_options = http_lock_options(request)?;
+    let _lock = FileLock::acquire_with_options(
+        remote_dirs(&target_root).locks.join(format!(
+            "branch-{}.lock",
+            ref_file_name(&target_info.branch)
+        )),
+        &lock_options,
+    )?;
     let generation = next_remote_generation(&target_root)?;
     copy_object_graph(
         &remote_dirs(&source_root).objects,

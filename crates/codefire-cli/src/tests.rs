@@ -506,6 +506,60 @@ fn repo_lock_wait_timeout_returns_lock_contention_with_owner_metadata() {
 }
 
 #[test]
+fn remote_resource_lock_wait_timeout_returns_owner_metadata_and_json_diagnostics() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let server = temp.path().join("server");
+    init_repo(&repo_root, false).unwrap();
+    let main_url = format!("cf://{}/org/app/main", server.display());
+    let remote_project_root = parse_cf_url(&main_url).unwrap().project_root;
+    remote::ensure_remote_layout(&remote_project_root).unwrap();
+    let lock_path = remote_dirs(&remote_project_root)
+        .locks
+        .join("branch-main.lock");
+    fs::write(
+        lock_path,
+        serde_json::to_string_pretty(&json!({
+            "version": 1,
+            "pid": 7777,
+            "created_at": "2026-06-05T00:00:00Z",
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let error = upload_branch(
+        &repo_root,
+        &UploadOptions {
+            branch: "main".to_string(),
+            remote_url: main_url,
+            dry_run: false,
+            json_output: true,
+            idempotency_key: None,
+            lock: LockOptions {
+                wait: true,
+                timeout_ms: Some(0),
+            },
+        },
+    )
+    .unwrap_err();
+    let message = error.to_string();
+    assert_eq!(error.exit_code(), ExitCode::LockContention.code());
+    assert!(message.contains("CodeFire resource is locked"));
+    assert!(message.contains("timed out after 0ms"));
+    assert!(message.contains("owner pid 7777"));
+    assert!(message.contains("locked at 2026-06-05T00:00:00Z"));
+
+    let envelope = lock_contention_envelope("upload", &error);
+    assert_eq!(envelope["schema"], "codefire.command_result.v1");
+    assert_eq!(envelope["command"], "upload");
+    assert_eq!(envelope["ok"], false);
+    assert_eq!(envelope["exit_code"], ExitCode::LockContention.code());
+    assert_eq!(envelope["diagnostics"][0]["kind"], "lock_contention");
+    assert_eq!(envelope["next_actions"][0]["kind"], "retry_with_wait_lock");
+}
+
+#[test]
 fn context_pack_returns_atom_changed_and_fire_views() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
@@ -691,12 +745,15 @@ fn parse_mutating_dry_run_json_args() {
         "--dry-run".to_string(),
         "--json".to_string(),
         "--idempotency-key=upload-key-1".to_string(),
+        "--lock-timeout=750ms".to_string(),
     ])
     .unwrap();
     assert_eq!(upload.branch, "main");
     assert!(upload.dry_run);
     assert!(upload.json_output);
     assert_eq!(upload.idempotency_key.as_deref(), Some("upload-key-1"));
+    assert!(upload.lock.wait);
+    assert_eq!(upload.lock.timeout_ms, Some(750));
 
     let request_merge = parse_request_merge_args(&[
         "cf:///tmp/server/org/app/feature".to_string(),
@@ -705,6 +762,8 @@ fn parse_mutating_dry_run_json_args() {
         "--json".to_string(),
         "--idempotency-key".to_string(),
         "request-merge-key-1".to_string(),
+        "--lock-timeout".to_string(),
+        "2s".to_string(),
     ])
     .unwrap();
     assert!(request_merge.dry_run);
@@ -713,6 +772,8 @@ fn parse_mutating_dry_run_json_args() {
         request_merge.idempotency_key.as_deref(),
         Some("request-merge-key-1")
     );
+    assert!(request_merge.lock.wait);
+    assert_eq!(request_merge.lock.timeout_ms, Some(2000));
 
     let request_review = parse_request_review_args(&[
         "cf:///tmp/server/org/app".to_string(),
@@ -723,6 +784,7 @@ fn parse_mutating_dry_run_json_args() {
         "approve".to_string(),
         "--comment".to_string(),
         "ready".to_string(),
+        "--wait-lock".to_string(),
         "--idempotency-key=request-review-key-1".to_string(),
     ])
     .unwrap();
@@ -732,6 +794,7 @@ fn parse_mutating_dry_run_json_args() {
         request_review.idempotency_key.as_deref(),
         Some("request-review-key-1")
     );
+    assert!(request_review.lock.wait);
 
     let request_apply = parse_request_apply_args(&[
         "cf:///tmp/server/org/app".to_string(),
@@ -739,6 +802,7 @@ fn parse_mutating_dry_run_json_args() {
         "--dry-run".to_string(),
         "--json".to_string(),
         "--idempotency-key=request-apply-key-1".to_string(),
+        "--lock-timeout=1s".to_string(),
     ])
     .unwrap();
     assert!(request_apply.dry_run);
@@ -747,6 +811,8 @@ fn parse_mutating_dry_run_json_args() {
         request_apply.idempotency_key.as_deref(),
         Some("request-apply-key-1")
     );
+    assert!(request_apply.lock.wait);
+    assert_eq!(request_apply.lock.timeout_ms, Some(1000));
 }
 
 #[test]
@@ -1986,6 +2052,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
             dry_run: true,
             json_output: true,
             idempotency_key: None,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -2001,6 +2068,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
             dry_run: false,
             json_output: false,
             idempotency_key: None,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -2037,6 +2105,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
             dry_run: false,
             json_output: false,
             idempotency_key: None,
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -2057,6 +2126,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         dry_run: true,
         json_output: true,
         idempotency_key: None,
+        lock: LockOptions::default(),
     })
     .unwrap();
     assert_eq!(mr_dry_run.plan["command"], "request-merge");
@@ -2069,6 +2139,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         dry_run: false,
         json_output: false,
         idempotency_key: None,
+        lock: LockOptions::default(),
     })
     .unwrap();
     assert!(mr.id.starts_with("MR-"));
@@ -2085,6 +2156,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         dry_run: true,
         json_output: true,
         idempotency_key: None,
+        lock: LockOptions::default(),
     })
     .unwrap();
     assert_eq!(review_dry_run.plan["command"], "request-review");
@@ -2098,6 +2170,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         dry_run: false,
         json_output: false,
         idempotency_key: None,
+        lock: LockOptions::default(),
     })
     .unwrap();
     assert_eq!(
@@ -2116,6 +2189,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         dry_run: true,
         json_output: true,
         idempotency_key: None,
+        lock: LockOptions::default(),
     })
     .unwrap();
     assert_eq!(apply_dry_run.plan["command"], "request-apply");
@@ -2134,6 +2208,7 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         dry_run: false,
         json_output: false,
         idempotency_key: None,
+        lock: LockOptions::default(),
     })
     .unwrap();
     assert_eq!(applied.target_branch, "main");
@@ -2206,6 +2281,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
             dry_run: false,
             json_output: false,
             idempotency_key: Some("upload-main-once".to_string()),
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -2217,6 +2293,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
             dry_run: false,
             json_output: false,
             idempotency_key: Some("upload-main-once".to_string()),
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -2229,6 +2306,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
             dry_run: false,
             json_output: false,
             idempotency_key: Some("upload-main-once".to_string()),
+            lock: LockOptions::default(),
         },
     )
     .unwrap_err();
@@ -2245,6 +2323,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
             dry_run: false,
             json_output: false,
             idempotency_key: Some("upload-feature-once".to_string()),
+            lock: LockOptions::default(),
         },
     )
     .unwrap();
@@ -2255,6 +2334,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("request-merge-once".to_string()),
+        lock: LockOptions::default(),
     })
     .unwrap();
     let replay_merge = request_merge(&RequestMergeOptions {
@@ -2263,6 +2343,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("request-merge-once".to_string()),
+        lock: LockOptions::default(),
     })
     .unwrap();
     assert_eq!(replay_merge.id, first_merge.id);
@@ -2272,6 +2353,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("request-merge-once".to_string()),
+        lock: LockOptions::default(),
     })
     .unwrap_err();
     assert_eq!(
@@ -2291,6 +2373,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("review-once".to_string()),
+        lock: LockOptions::default(),
     })
     .unwrap();
     let replay_review = review_merge_request(&RequestReviewOptions {
@@ -2302,6 +2385,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("review-once".to_string()),
+        lock: LockOptions::default(),
     })
     .unwrap();
     assert_eq!(replay_review.decision, first_review.decision);
@@ -2321,6 +2405,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("review-once".to_string()),
+        lock: LockOptions::default(),
     })
     .unwrap_err();
     assert_eq!(
@@ -2334,6 +2419,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("apply-once".to_string()),
+        lock: LockOptions::default(),
     })
     .unwrap();
     let replay_apply = apply_merge_request(&RequestApplyOptions {
@@ -2342,6 +2428,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("apply-once".to_string()),
+        lock: LockOptions::default(),
     })
     .unwrap();
     assert_eq!(replay_apply.head, first_apply.head);
@@ -2352,6 +2439,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("other-request-merge".to_string()),
+        lock: LockOptions::default(),
     })
     .unwrap();
     let apply_conflict = apply_merge_request(&RequestApplyOptions {
@@ -2360,6 +2448,7 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
         dry_run: false,
         json_output: false,
         idempotency_key: Some("apply-once".to_string()),
+        lock: LockOptions::default(),
     })
     .unwrap_err();
     assert_eq!(

@@ -28,6 +28,7 @@ pub(crate) struct UploadOptions {
     pub(crate) dry_run: bool,
     pub(crate) json_output: bool,
     pub(crate) idempotency_key: Option<String>,
+    pub(crate) lock: LockOptions,
 }
 
 #[derive(Debug)]
@@ -54,6 +55,7 @@ pub(crate) struct RequestMergeOptions {
     pub(crate) dry_run: bool,
     pub(crate) json_output: bool,
     pub(crate) idempotency_key: Option<String>,
+    pub(crate) lock: LockOptions,
 }
 
 #[derive(Debug)]
@@ -82,6 +84,7 @@ pub(crate) struct RequestReviewOptions {
     pub(crate) dry_run: bool,
     pub(crate) json_output: bool,
     pub(crate) idempotency_key: Option<String>,
+    pub(crate) lock: LockOptions,
 }
 
 #[derive(Debug)]
@@ -98,6 +101,7 @@ pub(crate) struct RequestApplyOptions {
     pub(crate) dry_run: bool,
     pub(crate) json_output: bool,
     pub(crate) idempotency_key: Option<String>,
+    pub(crate) lock: LockOptions,
 }
 
 #[derive(Debug)]
@@ -166,6 +170,7 @@ pub(crate) fn upload_branch(
                 "objects": collect_object_records(&local_objects, &required_string(&branch, &["head"])?)?,
                 "actor": "local",
                 "idempotency_key": &options.idempotency_key,
+                "lock": lock_options_json(&options.lock),
             })),
         )?;
         let response_head = required_string(&response, &["head"])?;
@@ -216,10 +221,11 @@ pub(crate) fn upload_branch(
         return Ok(UploadResult { head, plan });
     }
     ensure_remote_layout(&remote.project_root)?;
-    let _lock = FileLock::acquire(
+    let _lock = FileLock::acquire_with_options(
         remote_dirs(&remote.project_root)
             .locks
             .join(format!("branch-{}.lock", ref_file_name(&remote_branch))),
+        &options.lock,
     )?;
     let generation = next_remote_generation(&remote.project_root)?;
     copy_object_graph(
@@ -338,6 +344,7 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
                 "target_url": options.target_url,
                 "actor": "local",
                 "idempotency_key": &options.idempotency_key,
+                "lock": lock_options_json(&options.lock),
             })),
         )?;
         return Ok(RequestMergeResult {
@@ -409,6 +416,12 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
         });
     }
     ensure_remote_layout(&target.project_root)?;
+    let _lock = FileLock::acquire_with_options(
+        remote_dirs(&target.project_root)
+            .locks
+            .join("merge-requests.lock"),
+        &options.lock,
+    )?;
     write_json_atomic(
         &remote_dirs(&target.project_root)
             .merge_requests
@@ -536,6 +549,7 @@ pub(crate) fn review_merge_request(
                 "comment": options.comment,
                 "actor": "local",
                 "idempotency_key": &options.idempotency_key,
+                "lock": lock_options_json(&options.lock),
             })),
         )?;
         return Ok(RequestReviewResult {
@@ -576,6 +590,13 @@ pub(crate) fn review_merge_request(
             return Ok(result);
         }
     }
+    let _lock = FileLock::acquire_with_options(
+        remote_dirs(&project.project_root).locks.join(format!(
+            "merge-request-{}.lock",
+            ref_file_name(&options.mr_id)
+        )),
+        &options.lock,
+    )?;
     reject_stale_merge_request(&mut mr, &mr_path)?;
     let plan = request_review_operation_plan(options, "file", &required_string(&mr, &["status"])?);
     let review = json!({
@@ -629,7 +650,11 @@ pub(crate) fn apply_merge_request(
                 &project.app,
                 &["merge-requests", &options.mr_id, "apply"],
             ),
-            Some(json!({"actor": "local", "idempotency_key": &options.idempotency_key})),
+            Some(json!({
+                "actor": "local",
+                "idempotency_key": &options.idempotency_key,
+                "lock": lock_options_json(&options.lock),
+            })),
         )?;
         return Ok(RequestApplyResult {
             target_branch: required_string(&response, &["target_branch"])?,
@@ -697,10 +722,11 @@ pub(crate) fn apply_merge_request(
             plan,
         });
     }
-    let _lock = FileLock::acquire(
+    let _lock = FileLock::acquire_with_options(
         remote_dirs(&target.project_root)
             .locks
             .join(format!("branch-{}.lock", ref_file_name(&target.branch))),
+        &options.lock,
     )?;
     let current_target = load_remote_branch(&target)?;
     if required_string(&current_target, &["head"])? != target_head_at_request {
@@ -788,6 +814,13 @@ pub(crate) fn ensure_remote_layout(project_root: &Path) -> Result<(), CliError> 
         fs::create_dir_all(dirs.objects.join(subdir))?;
     }
     Ok(())
+}
+
+fn lock_options_json(options: &LockOptions) -> Value {
+    json!({
+        "wait": options.wait,
+        "timeout_ms": options.timeout_ms,
+    })
 }
 
 pub(crate) fn parse_cf_url(url: &str) -> Result<CfUrl, CliError> {

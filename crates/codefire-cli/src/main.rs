@@ -272,7 +272,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         }
         Some("upload") => {
             let options = parse_upload_args(&args[1..])?;
-            let result = upload_branch(&env::current_dir()?, &options)?;
+            let result = match upload_branch(&env::current_dir()?, &options) {
+                Ok(result) => result,
+                Err(error) if options.json_output && matches!(error, CliError::LockContention(_)) => {
+                    print_lock_contention_json("upload", &error)?;
+                    return Err(error);
+                }
+                Err(error) => return Err(error),
+            };
             if options.json_output {
                 println!("{}", serde_json::to_string_pretty(&result.plan)?);
             } else if options.dry_run {
@@ -298,7 +305,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         }
         Some("request-merge") => {
             let options = parse_request_merge_args(&args[1..])?;
-            let result = request_merge(&options)?;
+            let result = match request_merge(&options) {
+                Ok(result) => result,
+                Err(error) if options.json_output && matches!(error, CliError::LockContention(_)) => {
+                    print_lock_contention_json("request-merge", &error)?;
+                    return Err(error);
+                }
+                Err(error) => return Err(error),
+            };
             if options.json_output {
                 println!("{}", serde_json::to_string_pretty(&result.plan)?);
             } else if options.dry_run {
@@ -326,7 +340,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         }
         Some("request-review") => {
             let options = parse_request_review_args(&args[1..])?;
-            let result = review_merge_request(&options)?;
+            let result = match review_merge_request(&options) {
+                Ok(result) => result,
+                Err(error) if options.json_output && matches!(error, CliError::LockContention(_)) => {
+                    print_lock_contention_json("request-review", &error)?;
+                    return Err(error);
+                }
+                Err(error) => return Err(error),
+            };
             if options.json_output {
                 println!("{}", serde_json::to_string_pretty(&result.plan)?);
             } else if options.dry_run {
@@ -344,7 +365,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         }
         Some("request-apply") => {
             let options = parse_request_apply_args(&args[1..])?;
-            let result = apply_merge_request(&options)?;
+            let result = match apply_merge_request(&options) {
+                Ok(result) => result,
+                Err(error) if options.json_output && matches!(error, CliError::LockContention(_)) => {
+                    print_lock_contention_json("request-apply", &error)?;
+                    return Err(error);
+                }
+                Err(error) => return Err(error),
+            };
             if options.json_output {
                 println!("{}", serde_json::to_string_pretty(&result.plan)?);
             } else if options.dry_run {
@@ -1083,6 +1111,34 @@ fn print_verification_details(verification: &codefire_core::Verification) {
     }
 }
 
+fn print_lock_contention_json(command: &str, error: &CliError) -> Result<(), CliError> {
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&lock_contention_envelope(command, error))?
+    );
+    Ok(())
+}
+
+fn lock_contention_envelope(command: &str, error: &CliError) -> Value {
+    command_result_envelope(
+        command,
+        false,
+        error.exit_code(),
+        None,
+        json!({}),
+        vec![json!({
+            "kind": "lock_contention",
+            "severity": "blocking",
+            "message": error.to_string(),
+        })],
+        vec![json!({
+            "kind": "retry_with_wait_lock",
+            "command": format!("codefire-rs {command} ... --wait-lock --lock-timeout 2s"),
+            "description": "retry after the remote resource lock is released or wait up to a bounded timeout",
+        })],
+    )
+}
+
 fn parse_init_args(args: &[String]) -> Result<InitOptions, CliError> {
     let mut path = None;
     let mut force = false;
@@ -1643,8 +1699,13 @@ fn parse_upload_args(args: &[String]) -> Result<UploadOptions, CliError> {
     let mut dry_run = false;
     let mut json_output = false;
     let mut idempotency_key = None;
+    let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         match args[index].as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
@@ -1673,9 +1734,10 @@ fn parse_upload_args(args: &[String]) -> Result<UploadOptions, CliError> {
             dry_run,
             json_output,
             idempotency_key,
+            lock,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs upload <branch> <cf-url> [--dry-run] [--json] [--idempotency-key <key>]".to_string(),
+            "usage: codefire-rs upload <branch> <cf-url> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
         )),
     }
 }
@@ -1700,8 +1762,13 @@ fn parse_request_merge_args(args: &[String]) -> Result<RequestMergeOptions, CliE
     let mut dry_run = false;
     let mut json_output = false;
     let mut idempotency_key = None;
+    let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         match args[index].as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
@@ -1730,9 +1797,10 @@ fn parse_request_merge_args(args: &[String]) -> Result<RequestMergeOptions, CliE
             dry_run,
             json_output,
             idempotency_key,
+            lock,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs request-merge <source-url> <target-url> [--dry-run] [--json] [--idempotency-key <key>]"
+            "usage: codefire-rs request-merge <source-url> <target-url> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
                 .to_string(),
         )),
     }
@@ -1746,8 +1814,13 @@ fn parse_request_review_args(args: &[String]) -> Result<RequestReviewOptions, Cl
     let mut dry_run = false;
     let mut json_output = false;
     let mut idempotency_key = None;
+    let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         match args[index].as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
@@ -1806,9 +1879,10 @@ fn parse_request_review_args(args: &[String]) -> Result<RequestReviewOptions, Cl
             dry_run,
             json_output,
             idempotency_key,
+            lock,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs request-review <project-url> <mr-id> [--reviewer <name>] [--decision approve|reject] [--comment <text>] [--dry-run] [--json] [--idempotency-key <key>]".to_string(),
+            "usage: codefire-rs request-review <project-url> <mr-id> [--reviewer <name>] [--decision approve|reject] [--comment <text>] [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
         )),
     }
 }
@@ -1818,8 +1892,13 @@ fn parse_request_apply_args(args: &[String]) -> Result<RequestApplyOptions, CliE
     let mut dry_run = false;
     let mut json_output = false;
     let mut idempotency_key = None;
+    let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         match args[index].as_str() {
             "--dry-run" => dry_run = true,
             "--json" => json_output = true,
@@ -1848,9 +1927,10 @@ fn parse_request_apply_args(args: &[String]) -> Result<RequestApplyOptions, CliE
             dry_run,
             json_output,
             idempotency_key,
+            lock,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs request-apply <project-url> <mr-id> [--dry-run] [--json] [--idempotency-key <key>]"
+            "usage: codefire-rs request-apply <project-url> <mr-id> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
                 .to_string(),
         )),
     }
@@ -4132,22 +4212,60 @@ struct FileLock {
 }
 
 impl FileLock {
-    fn acquire(path: PathBuf) -> Result<Self, CliError> {
+    fn acquire_with_options(path: PathBuf, options: &LockOptions) -> Result<Self, CliError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        match fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-        {
-            Ok(_) => Ok(Self { path }),
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Err(
-                CliError::LockContention("CodeFire resource is locked".to_string()),
-            ),
-            Err(error) => Err(CliError::Io(error)),
+        let timeout = options.timeout_ms.map(Duration::from_millis);
+        let start = Instant::now();
+        loop {
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+            {
+                Ok(mut file) => {
+                    file.write_all(
+                        serde_json::to_string_pretty(&json!({
+                            "version": 1,
+                            "pid": std::process::id(),
+                            "created_at": now_iso_utc(),
+                        }))?
+                        .as_bytes(),
+                    )?;
+                    file.write_all(b"\n")?;
+                    return Ok(Self { path });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                    if !options.wait {
+                        return Err(file_lock_contention(&path, options));
+                    }
+                    if timeout.is_some_and(|timeout| start.elapsed() >= timeout) {
+                        return Err(file_lock_contention(&path, options));
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                Err(error) => return Err(CliError::Io(error)),
+            }
         }
     }
+}
+
+fn file_lock_contention(path: &Path, options: &LockOptions) -> CliError {
+    let owner = read_json(path).ok();
+    let mut message = format!("CodeFire resource is locked: {}", path.display());
+    if let Some(timeout_ms) = options.timeout_ms {
+        message.push_str(&format!("; timed out after {timeout_ms}ms"));
+    }
+    if let Some(owner) = owner {
+        if let Some(pid) = owner.get("pid").and_then(Value::as_u64) {
+            message.push_str(&format!("; owner pid {pid}"));
+        }
+        if let Some(created_at) = owner.get("created_at").and_then(Value::as_str) {
+            message.push_str(&format!("; locked at {created_at}"));
+        }
+    }
+    CliError::LockContention(message)
 }
 
 impl Drop for FileLock {

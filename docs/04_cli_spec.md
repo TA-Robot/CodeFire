@@ -62,6 +62,8 @@ Local repository mutators that acquire the repository lock accept:
 --lock-timeoutは待機上限を指定し、指定時は--wait-lockを暗黙に有効化する
 durationは裸数または`s` suffixなら秒、`ms` suffixならミリ秒として扱う
 timeout時はexit code 30で失敗し、lock fileにpid/created_atがあれば人間向けdiagnosticに含める
+remote mutatorのupload/request-merge/request-review/request-applyも同じoptionを受け付け、remote project resource lockに適用する
+remote mutatorで--json併用時にlock contentionが発生した場合はcodefire.command_result.v1 envelopeをstdoutに出し、diagnosticsにlock_contention、next_actionsにretry_with_wait_lockを含める
 ```
 
 ## 4.2 作らないコマンド
@@ -334,6 +336,7 @@ codefire upload feature-login cf://server/alice/app/feature-login
 codefire upload feature-login cf+http://127.0.0.1:8080/alice/app/feature-login
 codefire upload feature-login cf://server/alice/app/feature-login --dry-run --json
 codefire upload feature-login cf://server/alice/app/feature-login --idempotency-key request-upload-001
+codefire upload feature-login cf://server/alice/app/feature-login --wait-lock --lock-timeout 2s
 ```
 
 仕様：
@@ -537,6 +540,7 @@ codefire request-apply cf://server/org/app MR-abc123 --dry-run --json
 codefire request-merge cf://server/alice/app/feature-login cf://server/org/app/main --idempotency-key request-mr-001
 codefire request-review cf://server/org/app MR-abc123 --reviewer alice --decision approve --idempotency-key request-review-001
 codefire request-apply cf://server/org/app MR-abc123 --idempotency-key request-apply-001
+codefire request-apply cf://server/org/app MR-abc123 --wait-lock --lock-timeout 2s
 ```
 
 仕様：

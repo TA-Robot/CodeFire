@@ -79,8 +79,9 @@ CodeFire v0.6 uses a stable process exit code taxonomy. The `exit_code` field in
 
 When multiple `verify` blockers are present, CodeFire reports the first blocker class in this order: open fires, missing required links, stale resolutions, duplicate Atom IDs, failed verification commands.
 
-Local mutating commands that acquire `repo.lock` accept `--wait-lock` and `--lock-timeout <duration>`.
+Mutating commands that acquire repository or remote resource locks accept `--wait-lock` and `--lock-timeout <duration>`.
 `--lock-timeout` accepts seconds (`2`, `2s`) or milliseconds (`250ms`) and returns exit code 30 when elapsed. If the lock file contains `pid` or `created_at`, human diagnostics include that owner metadata.
+When a remote mutator is run with `--json`, lock contention prints a `codefire.command_result.v1` envelope with a `lock_contention` diagnostic and `retry_with_wait_lock` next action before exiting with code 30.
 
 Idempotency keys are implemented incrementally for mutating commands:
 
