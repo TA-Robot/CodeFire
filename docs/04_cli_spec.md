@@ -74,6 +74,9 @@ durationは裸数または`s` suffixなら秒、`ms` suffixならミリ秒とし
 timeout時はexit code 30で失敗し、lock fileにpid/created_atがあれば人間向けdiagnosticに含める
 remote mutatorのupload/request-merge/request-review/request-applyも同じoptionを受け付け、remote project resource lockに適用する
 remote mutatorで--json併用時にlock contentionが発生した場合はcodefire.command_result.v1 envelopeをstdoutに出し、diagnosticsにlock_contention、next_actionsにretry_with_wait_lockを含める
+HTTP clientはconnect/read/write timeoutを持ち、defaultは30000ms。`CODEFIRE_HTTP_TIMEOUT_MS` に正の整数を指定すると調整できる
+HTTP authorityはIPv4/hostnameとbracketed IPv6 (`[::1]:8080`) を受け付け、bracketなしIPv6 literalは拒否する
+HTTP server requestはGET/POSTとHTTP/1.1だけを受け付け、invalid percent escapeやdecode後に`/`、`\`、`.`、`..`を含むpath componentを400で拒否する
 ```
 
 ## 4.2 作らないコマンド
@@ -416,6 +419,7 @@ cf+http dry-runはHTTP write requestを送らず、local object graph収集ま�
 同じ--idempotency-keyかつ同じupload payloadは保存済みupload resultを返し、remote branch fast-forward checkより先にreplayする
 同じ--idempotency-keyでlocal branch/head/remote branch/project/object bundleが異なるpayloadはexit code 33で拒否する
 cf+http uploadはserver側remote projectのidempotency recordで同じ規則を適用する
+cf+http uploadのserver側tmp object directoryはrequestごとに一意化され、cleanupは自分のrequest directoryだけを対象にする
 ```
 
 ## 4.15 `show` / `diff`

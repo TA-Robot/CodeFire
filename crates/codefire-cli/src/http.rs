@@ -4,10 +4,15 @@ use super::*;
 use serde_json::{json, Value};
 use std::fs;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 const MAX_HTTP_BODY_BYTES: usize = 16 * 1024 * 1024;
+const DEFAULT_HTTP_TIMEOUT_MS: u64 = 30_000;
+
+static HTTP_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone)]
 pub(crate) struct CfHttpUrl {
@@ -84,7 +89,7 @@ fn parse_cf_http_parts(url: &str, exact_parts: usize) -> Result<(String, Vec<Str
     let parts = path
         .split('/')
         .filter(|part| !part.is_empty())
-        .map(percent_decode)
+        .map(decode_http_path_component)
         .collect::<Result<Vec<_>, _>>()?;
     if parts.len() != exact_parts {
         return Err(CliError::Usage(if exact_parts == 3 {
@@ -116,7 +121,16 @@ pub(crate) fn http_json(
     payload: Option<Value>,
 ) -> Result<Value, CliError> {
     let endpoint = parse_http_url(url)?;
-    let mut stream = TcpStream::connect((endpoint.host.as_str(), endpoint.port))?;
+    let timeout = http_timeout();
+    let address = (endpoint.host.as_str(), endpoint.port)
+        .to_socket_addrs()?
+        .next()
+        .ok_or_else(|| {
+            CliError::Usage(format!("unable to resolve HTTP host: {}", endpoint.host))
+        })?;
+    let mut stream = TcpStream::connect_timeout(&address, timeout)?;
+    stream.set_read_timeout(Some(timeout))?;
+    stream.set_write_timeout(Some(timeout))?;
     if endpoint.scheme == "https" {
         let mut tls_stream = http_tls::connect_client(stream, &endpoint.host)?;
         return http_json_stream(method, &endpoint, payload, &mut tls_stream);
@@ -135,10 +149,9 @@ fn http_json_stream<S: Read + Write>(
         .transpose()?
         .unwrap_or_default();
     let request = format!(
-        "{method} {} HTTP/1.1\r\nHost: {}:{}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "{method} {} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         endpoint.path,
-        endpoint.host,
-        endpoint.port,
+        endpoint.host_header(),
         request_body.len()
     );
     stream.write_all(request.as_bytes())?;
@@ -237,6 +250,16 @@ struct HttpEndpoint {
     path: String,
 }
 
+impl HttpEndpoint {
+    fn host_header(&self) -> String {
+        if self.host.contains(':') {
+            format!("[{}]:{}", self.host, self.port)
+        } else {
+            format!("{}:{}", self.host, self.port)
+        }
+    }
+}
+
 fn parse_http_url(url: &str) -> Result<HttpEndpoint, CliError> {
     let (scheme, raw) = if let Some(raw) = url.strip_prefix("http://") {
         ("http", raw)
@@ -248,22 +271,70 @@ fn parse_http_url(url: &str) -> Result<HttpEndpoint, CliError> {
         ));
     };
     let (authority, path) = raw.split_once('/').unwrap_or((raw, ""));
-    let (host, port) = if let Some((host, port)) = authority.rsplit_once(':') {
-        (
-            host.to_string(),
-            port.parse::<u16>()
-                .map_err(|_| CliError::Usage(format!("invalid HTTP port: {port}")))?,
-        )
-    } else {
-        let port = if scheme == "http" { 80 } else { 443 };
-        (authority.to_string(), port)
-    };
+    let (host, port) = parse_http_authority(scheme, authority)?;
     Ok(HttpEndpoint {
         scheme: scheme.to_string(),
         host,
         port,
         path: format!("/{path}"),
     })
+}
+
+fn parse_http_authority(scheme: &str, authority: &str) -> Result<(String, u16), CliError> {
+    if authority.is_empty() {
+        return Err(CliError::Usage("HTTP URL authority is empty".to_string()));
+    }
+    let default_port = if scheme == "http" { 80 } else { 443 };
+    if let Some(rest) = authority.strip_prefix('[') {
+        let Some((host, after_host)) = rest.split_once(']') else {
+            return Err(CliError::Usage(format!(
+                "invalid bracketed IPv6 authority: {authority}"
+            )));
+        };
+        if host.is_empty() {
+            return Err(CliError::Usage("HTTP IPv6 host is empty".to_string()));
+        }
+        let port = if after_host.is_empty() {
+            default_port
+        } else {
+            let raw_port = after_host.strip_prefix(':').ok_or_else(|| {
+                CliError::Usage(format!("invalid HTTP authority suffix: {authority}"))
+            })?;
+            parse_http_port(raw_port)?
+        };
+        return Ok((host.to_string(), port));
+    }
+    if authority.matches(':').count() > 1 {
+        return Err(CliError::Usage(
+            "IPv6 HTTP authority must use [addr]:port syntax".to_string(),
+        ));
+    }
+    if let Some((host, raw_port)) = authority.rsplit_once(':') {
+        if host.is_empty() {
+            return Err(CliError::Usage("HTTP host is empty".to_string()));
+        }
+        Ok((host.to_string(), parse_http_port(raw_port)?))
+    } else {
+        Ok((authority.to_string(), default_port))
+    }
+}
+
+fn parse_http_port(raw_port: &str) -> Result<u16, CliError> {
+    if raw_port.is_empty() {
+        return Err(CliError::Usage("HTTP port is empty".to_string()));
+    }
+    raw_port
+        .parse::<u16>()
+        .map_err(|_| CliError::Usage(format!("invalid HTTP port: {raw_port}")))
+}
+
+fn http_timeout() -> Duration {
+    std::env::var("CODEFIRE_HTTP_TIMEOUT_MS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .map(Duration::from_millis)
+        .unwrap_or_else(|| Duration::from_millis(DEFAULT_HTTP_TIMEOUT_MS))
 }
 
 pub(crate) fn serve_http(options: &ServeOptions) -> Result<(), CliError> {
@@ -362,15 +433,7 @@ fn read_http_request<S: Read + Write>(stream: &mut S) -> Result<HttpRequest, Cli
     let request_line = lines
         .next()
         .ok_or_else(|| CliError::InvalidRepository("missing HTTP request line".to_string()))?;
-    let mut request_parts = request_line.split_whitespace();
-    let method = request_parts
-        .next()
-        .ok_or_else(|| CliError::InvalidRepository("missing HTTP method".to_string()))?
-        .to_string();
-    let path = request_parts
-        .next()
-        .ok_or_else(|| CliError::InvalidRepository("missing HTTP path".to_string()))?
-        .to_string();
+    let (method, path) = parse_http_request_line(request_line)?;
     let content_length = lines
         .filter_map(|line| line.split_once(':'))
         .find_map(|(name, value)| {
@@ -404,6 +467,51 @@ fn read_http_request<S: Read + Write>(stream: &mut S) -> Result<HttpRequest, Cli
         serde_json::from_slice(body_bytes)?
     };
     Ok(HttpRequest { method, path, body })
+}
+
+fn parse_http_request_line(request_line: &str) -> Result<(String, String), CliError> {
+    let parts = request_line.split_whitespace().collect::<Vec<_>>();
+    if parts.len() != 3 {
+        return Err(CliError::InvalidRepository(
+            "invalid HTTP request line".to_string(),
+        ));
+    }
+    let method = parts[0];
+    if !matches!(method, "GET" | "POST") {
+        return Err(CliError::Usage(format!(
+            "unsupported HTTP method: {method}"
+        )));
+    }
+    if parts[2] != "HTTP/1.1" {
+        return Err(CliError::Usage(format!(
+            "unsupported HTTP version: {}",
+            parts[2]
+        )));
+    }
+    let path = normalize_http_request_path(parts[1])?;
+    Ok((method.to_string(), path))
+}
+
+fn normalize_http_request_path(raw_path: &str) -> Result<String, CliError> {
+    if !raw_path.starts_with('/') {
+        return Err(CliError::Usage("HTTP path must be absolute".to_string()));
+    }
+    if raw_path.contains('\\')
+        || raw_path.contains("://")
+        || raw_path.as_bytes().iter().any(u8::is_ascii_control)
+    {
+        return Err(CliError::Usage("invalid HTTP path".to_string()));
+    }
+    let (path, query) = raw_path
+        .split_once('?')
+        .map_or((raw_path, None), |(path, query)| (path, Some(query)));
+    for part in path.split('/').filter(|part| !part.is_empty()) {
+        let _ = decode_http_path_component(part)?;
+    }
+    Ok(match query {
+        Some(query) => format!("{path}?{query}"),
+        None => path.to_string(),
+    })
 }
 
 fn find_header_end(buffer: &[u8]) -> Option<usize> {
@@ -464,12 +572,28 @@ fn http_project_parts(path: &str) -> Result<(String, String, Vec<String>), CliEr
     let parts = path
         .split('/')
         .filter(|part| !part.is_empty())
-        .map(percent_decode)
+        .map(decode_http_path_component)
         .collect::<Result<Vec<_>, _>>()?;
     if parts.len() < 4 || parts[0] != "v1" || parts[1] != "projects" {
         return Err(CliError::Usage("unknown endpoint".to_string()));
     }
     Ok((parts[2].clone(), parts[3].clone(), parts[4..].to_vec()))
+}
+
+fn decode_http_path_component(value: &str) -> Result<String, CliError> {
+    let decoded = percent_decode(value)?;
+    if decoded.is_empty()
+        || decoded == "."
+        || decoded == ".."
+        || decoded.contains('/')
+        || decoded.contains('\\')
+        || decoded.as_bytes().iter().any(u8::is_ascii_control)
+    {
+        return Err(CliError::Usage(format!(
+            "invalid HTTP path component: {value}"
+        )));
+    }
+    Ok(decoded)
 }
 
 fn http_project_root(storage_root: &Path, org: &str, app: &str) -> PathBuf {
@@ -592,17 +716,8 @@ fn handle_http_upload(
             .join(format!("branch-{}.lock", ref_file_name(branch_name))),
         &lock_options,
     )?;
-    let tmp_objects = project_root
-        .join("tmp")
-        .join(format!(
-            "upload-{}-{}",
-            std::process::id(),
-            stable_hash_48(head.as_bytes())
-        ))
-        .join("objects");
-    if tmp_objects.exists() {
-        fs::remove_dir_all(&tmp_objects)?;
-    }
+    let tmp_upload_dir = unique_http_upload_tmp_dir(&project_root, &head);
+    let tmp_objects = tmp_upload_dir.join("objects");
     ensure_object_dirs(&tmp_objects)?;
     copy_dir_recursive(&dirs.objects, &tmp_objects)?;
     write_object_records(&tmp_objects, records.iter().cloned())?;
@@ -611,7 +726,7 @@ fn handle_http_upload(
     if let Some(current) = read_optional_json(&remote_branch_path(&project_root, branch_name))? {
         let current_head = required_string(&current, &["head"])?;
         if !is_ancestor_in_objects(&tmp_objects, &current_head, &head)? {
-            let _ = fs::remove_dir_all(tmp_objects.parent().unwrap_or(&tmp_objects));
+            let _ = fs::remove_dir_all(&tmp_upload_dir);
             return Ok((
                 409,
                 json!({"error": "upload rejected: remote branch is not an ancestor of local branch head"}),
@@ -633,7 +748,7 @@ fn handle_http_upload(
             "updated_at": now_iso_utc(),
         }),
     )?;
-    let _ = fs::remove_dir_all(tmp_objects.parent().unwrap_or(&tmp_objects));
+    let _ = fs::remove_dir_all(&tmp_upload_dir);
     let response = json!({"branch": branch_name, "head": head});
     if let Some(key) = remote_idempotency_key(request) {
         save_remote_idempotency_result(
@@ -645,6 +760,16 @@ fn handle_http_upload(
         )?;
     }
     Ok((200, response))
+}
+
+fn unique_http_upload_tmp_dir(project_root: &Path, head: &str) -> PathBuf {
+    let counter = HTTP_TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    project_root.join("tmp").join(format!(
+        "upload-{}-{}-{}",
+        std::process::id(),
+        stable_hash_48(head.as_bytes()),
+        counter
+    ))
 }
 
 fn handle_http_request_merge(
@@ -1079,5 +1204,51 @@ mod tests {
         );
         let error = read_http_request(&mut Cursor::new(request.into_bytes())).unwrap_err();
         assert!(matches!(error, CliError::HttpPayloadTooLarge(_)));
+    }
+
+    #[test]
+    fn parse_http_url_accepts_bracketed_ipv6_authority() {
+        let endpoint = parse_http_url("https://[::1]:9443/v1/projects/org/app").unwrap();
+
+        assert_eq!(endpoint.scheme, "https");
+        assert_eq!(endpoint.host, "::1");
+        assert_eq!(endpoint.port, 9443);
+        assert_eq!(endpoint.host_header(), "[::1]:9443");
+        assert!(parse_http_url("https://::1:9443/v1").is_err());
+        assert!(parse_http_url("https://[::1:9443/v1").is_err());
+    }
+
+    #[test]
+    fn http_timeout_uses_positive_env_override() {
+        std::env::set_var("CODEFIRE_HTTP_TIMEOUT_MS", "1234");
+        assert_eq!(http_timeout(), Duration::from_millis(1234));
+        std::env::set_var("CODEFIRE_HTTP_TIMEOUT_MS", "0");
+        assert_eq!(
+            http_timeout(),
+            Duration::from_millis(DEFAULT_HTTP_TIMEOUT_MS)
+        );
+        std::env::remove_var("CODEFIRE_HTTP_TIMEOUT_MS");
+    }
+
+    #[test]
+    fn http_request_rejects_unsupported_method_and_invalid_path() {
+        let lowercase = b"get /v1/projects/org/app/branches HTTP/1.1\r\nContent-Length: 0\r\n\r\n";
+        let error = read_http_request(&mut Cursor::new(lowercase.to_vec())).unwrap_err();
+        assert!(error.to_string().contains("unsupported HTTP method"));
+
+        let bad_percent =
+            b"GET /v1/projects/org/%2Fapp/branches HTTP/1.1\r\nContent-Length: 0\r\n\r\n";
+        let error = read_http_request(&mut Cursor::new(bad_percent.to_vec())).unwrap_err();
+        assert!(error.to_string().contains("invalid HTTP path component"));
+    }
+
+    #[test]
+    fn http_upload_tmp_dirs_are_unique_for_same_head() {
+        let project_root = Path::new("/tmp/codefire-http-test");
+        let first = unique_http_upload_tmp_dir(project_root, "CF-COMMIT-same");
+        let second = unique_http_upload_tmp_dir(project_root, "CF-COMMIT-same");
+
+        assert_ne!(first, second);
+        assert_eq!(first.parent(), second.parent());
     }
 }
