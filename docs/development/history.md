@@ -169,6 +169,7 @@
 | 2026-06-06 | v0.7 Hardening | Batch 5の一部としてdiff rename/copy similarity候補上限、exact hash rename fast path、巨大file similarity guard、LCS match候補guard、text diff出力byte上限を実装した | `crates/codefire-cli/src/view/file_diff.rs`, `docs/04_cli_spec.md`, docs | `cargo test -p codefire-cli --bin codefire-rs view::file_diff::tests -- --nocapture`; CFR-025, CFR-026 fixed; CFR-027 partial |
 | 2026-06-06 | v0.7 Hardening | Batch 7の一部としてevidence command captureにtimeoutを追加し、timeout結果とshell mode metadataを保存し、未指定cwdをrepository rootへ寄せた | `crates/codefire-cli/src/evidence.rs`, `crates/codefire-cli/src/evidence/batch.rs`, `crates/codefire-cli/src/tests.rs`, docs | `cargo test -p codefire-cli --bin codefire-rs evidence -- --nocapture`; CFR-041, CFR-043 fixed; CFR-042 partial |
 | 2026-06-06 | v0.7 Hardening | Batch 6の一部としてHTTP client timeout、IPv6 authority parser、HTTP request method/path validation、upload tmp directory一意化を実装した | `crates/codefire-cli/src/http.rs`, `docs/04_cli_spec.md`, docs | `cargo test -p codefire-cli --bin codefire-rs http::tests -- --nocapture`; CFR-030, CFR-034, CFR-078, CFR-079 fixed |
+| 2026-06-06 | v0.7 Hardening | Batch 3の追加としてsealed commit root配下のmanifest/evidence/artifact参照検証をstoreへ追加し、scan生成fireのUID/display IDをSHA-256由来のstable identityへ移行した | `crates/codefire-store/src/lib.rs`, `crates/codefire-core/src/lib.rs`, `crates/codefire-cli/src/main.rs`, `crates/codefire-cli/src/tests.rs`, docs | `cargo fmt --check`; `cargo clippy --workspace --all-targets -- -D warnings`; `cargo test --workspace`; CFR-014, CFR-017, CFR-018 fixed |
 
 ## Current Decisions
 

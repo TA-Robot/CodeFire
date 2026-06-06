@@ -396,8 +396,8 @@ fn validate_sealed_commit_inner(
                 "root {root} must be an object id"
             )));
         }
+        let payload = read_object(objects_root, object_id)?;
         if let Some(expected_type) = expected_root_type(root) {
-            let payload = read_object(objects_root, object_id)?;
             let actual_type = payload
                 .get("type")
                 .and_then(Value::as_str)
@@ -408,6 +408,7 @@ fn validate_sealed_commit_inner(
                 )));
             }
         }
+        validate_root_references(objects_root, root, &payload)?;
     }
 
     let certificate = commit
@@ -444,6 +445,156 @@ fn expected_root_type(root: &str) -> Option<&'static str> {
         "policy" => Some("policy"),
         _ => None,
     }
+}
+
+fn validate_root_references(
+    objects_root: &Path,
+    root: &str,
+    payload: &Value,
+) -> Result<(), StoreError> {
+    match root {
+        "content_manifest" => validate_manifest_references(objects_root, payload),
+        "resolution_ledger" => validate_resolution_ledger_references(objects_root, payload),
+        "verification" => validate_verification_references(objects_root, payload),
+        _ => Ok(()),
+    }
+}
+
+fn validate_manifest_references(objects_root: &Path, manifest: &Value) -> Result<(), StoreError> {
+    let entries = optional_array(manifest, "entries")?;
+    for (index, entry) in entries.iter().enumerate() {
+        if entry.get("kind").and_then(Value::as_str) != Some("file") {
+            continue;
+        }
+        let blob_id =
+            required_reference(entry, "blob", &format!("content_manifest.entries[{index}]"))?;
+        read_typed_reference(
+            objects_root,
+            blob_id,
+            "blob",
+            &format!("content_manifest.entries[{index}].blob"),
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_resolution_ledger_references(
+    objects_root: &Path,
+    ledger: &Value,
+) -> Result<(), StoreError> {
+    let resolutions = optional_array(ledger, "resolutions")?;
+    for (resolution_index, resolution) in resolutions.iter().enumerate() {
+        let evidence_refs = optional_array(resolution, "evidence_refs")?;
+        for (evidence_index, evidence_ref) in evidence_refs.iter().enumerate() {
+            let evidence_id = evidence_ref.as_str().ok_or_else(|| {
+                StoreError::InvalidSealedCommit(format!(
+                    "resolution_ledger.resolutions[{resolution_index}].evidence_refs[{evidence_index}] must be an evidence object id"
+                ))
+            })?;
+            let evidence = read_typed_reference(
+                objects_root,
+                evidence_id,
+                "evidence",
+                &format!(
+                    "resolution_ledger.resolutions[{resolution_index}].evidence_refs[{evidence_index}]"
+                ),
+            )?;
+            validate_evidence_references(objects_root, evidence_id, &evidence)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_verification_references(
+    objects_root: &Path,
+    verification: &Value,
+) -> Result<(), StoreError> {
+    let missing_refs = optional_array(verification, "missing_evidence_refs")?;
+    for (index, missing_ref) in missing_refs.iter().enumerate() {
+        let evidence_id = required_reference(
+            missing_ref,
+            "evidence_id",
+            &format!("verification.missing_evidence_refs[{index}]"),
+        )?;
+        read_typed_reference(
+            objects_root,
+            evidence_id,
+            "evidence",
+            &format!("verification.missing_evidence_refs[{index}].evidence_id"),
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_evidence_references(
+    objects_root: &Path,
+    evidence_id: &str,
+    evidence: &Value,
+) -> Result<(), StoreError> {
+    let Some(artifact_ref) = evidence.get("artifact_ref") else {
+        return Ok(());
+    };
+    if artifact_ref.is_null() {
+        return Ok(());
+    }
+    let artifact_id = artifact_ref.as_str().ok_or_else(|| {
+        StoreError::InvalidSealedCommit(format!(
+            "evidence {evidence_id} artifact_ref must be an artifact_ref object id"
+        ))
+    })?;
+    read_typed_reference(
+        objects_root,
+        artifact_id,
+        "artifact_ref",
+        &format!("evidence {evidence_id}.artifact_ref"),
+    )?;
+    Ok(())
+}
+
+fn optional_array<'a>(payload: &'a Value, field: &str) -> Result<&'a [Value], StoreError> {
+    match payload.get(field) {
+        Some(Value::Array(values)) => Ok(values),
+        Some(_) => Err(StoreError::InvalidSealedCommit(format!(
+            "{field} must be a list"
+        ))),
+        None => Ok(&[]),
+    }
+}
+
+fn required_reference<'a>(
+    payload: &'a Value,
+    field: &str,
+    context: &str,
+) -> Result<&'a str, StoreError> {
+    payload.get(field).and_then(Value::as_str).ok_or_else(|| {
+        StoreError::InvalidSealedCommit(format!("{context}.{field} must be an object id"))
+    })
+}
+
+fn read_typed_reference(
+    objects_root: &Path,
+    object_id: &str,
+    expected_type: &str,
+    context: &str,
+) -> Result<Value, StoreError> {
+    if !object_id.starts_with("CF-") {
+        return Err(StoreError::InvalidSealedCommit(format!(
+            "{context} must be an object id"
+        )));
+    }
+    let payload = read_object(objects_root, object_id).map_err(|error| {
+        StoreError::InvalidSealedCommit(format!("{context} invalid reference {object_id}: {error}"))
+    })?;
+    let actual_type = payload
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or("(missing)");
+    if actual_type != expected_type {
+        return Err(StoreError::InvalidSealedCommit(format!(
+            "{context} has type {actual_type}, expected {expected_type}"
+        )));
+    }
+    Ok(payload)
 }
 
 pub fn commit_payload(
@@ -730,6 +881,119 @@ mod tests {
 
         assert!(
             matches!(error, StoreError::InvalidSealedCommit(message) if message.contains("root verification has type policy"))
+        );
+    }
+
+    #[test]
+    fn validate_sealed_commit_rejects_missing_manifest_blob() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let mut roots = write_required_roots(&objects);
+        let manifest = store_object(
+            &objects,
+            "content_manifest",
+            json!({
+                "type": "content_manifest",
+                "version": 1,
+                "entries": [
+                    {
+                        "path": "docs/spec.md",
+                        "kind": "file",
+                        "mode": "100644",
+                        "blob": "CF-BLOB-missing"
+                    }
+                ]
+            }),
+        )
+        .unwrap();
+        roots.insert("content_manifest".to_string(), Value::String(manifest));
+        let commit = commit_payload(vec![], roots, consistent_certificate());
+        let commit_id = store_object(&objects, "commit", commit).unwrap();
+
+        let error = validate_sealed_commit(&objects, &commit_id).unwrap_err();
+
+        assert!(
+            matches!(error, StoreError::InvalidSealedCommit(message) if message.contains("content_manifest.entries[0].blob invalid reference CF-BLOB-missing"))
+        );
+    }
+
+    #[test]
+    fn validate_sealed_commit_rejects_missing_resolution_evidence() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let mut roots = write_required_roots(&objects);
+        let resolution_ledger = store_object(
+            &objects,
+            "resolution_ledger",
+            json!({
+                "type": "resolution_ledger",
+                "version": 1,
+                "resolutions": [
+                    {
+                        "resolution_uid": "res_001",
+                        "fire_uid": "fire_old",
+                        "evidence_refs": ["CF-EVIDENCE-missing"]
+                    }
+                ]
+            }),
+        )
+        .unwrap();
+        roots.insert(
+            "resolution_ledger".to_string(),
+            Value::String(resolution_ledger),
+        );
+        let commit = commit_payload(vec![], roots, consistent_certificate());
+        let commit_id = store_object(&objects, "commit", commit).unwrap();
+
+        let error = validate_sealed_commit(&objects, &commit_id).unwrap_err();
+
+        assert!(
+            matches!(error, StoreError::InvalidSealedCommit(message) if message.contains("resolution_ledger.resolutions[0].evidence_refs[0] invalid reference CF-EVIDENCE-missing"))
+        );
+    }
+
+    #[test]
+    fn validate_sealed_commit_rejects_missing_evidence_artifact_ref() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let mut roots = write_required_roots(&objects);
+        let evidence = store_object(
+            &objects,
+            "evidence",
+            json!({
+                "type": "evidence",
+                "version": 1,
+                "artifact_ref": "CF-ARTIFACT-missing"
+            }),
+        )
+        .unwrap();
+        let resolution_ledger = store_object(
+            &objects,
+            "resolution_ledger",
+            json!({
+                "type": "resolution_ledger",
+                "version": 1,
+                "resolutions": [
+                    {
+                        "resolution_uid": "res_001",
+                        "fire_uid": "fire_old",
+                        "evidence_refs": [evidence]
+                    }
+                ]
+            }),
+        )
+        .unwrap();
+        roots.insert(
+            "resolution_ledger".to_string(),
+            Value::String(resolution_ledger),
+        );
+        let commit = commit_payload(vec![], roots, consistent_certificate());
+        let commit_id = store_object(&objects, "commit", commit).unwrap();
+
+        let error = validate_sealed_commit(&objects, &commit_id).unwrap_err();
+
+        assert!(
+            matches!(error, StoreError::InvalidSealedCommit(message) if message.contains("evidence") && message.contains("artifact_ref invalid reference CF-ARTIFACT-missing"))
         );
     }
 

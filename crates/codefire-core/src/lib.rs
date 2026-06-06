@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
@@ -830,8 +829,6 @@ pub fn build_scan_result(
         .filter(|fire| fire.status != "obsolete")
         .map(|fire| fire.key.clone())
         .collect::<HashSet<_>>();
-    let mut fire_no = fires.len() + 1;
-
     for source in &changed {
         for (target, trace_path) in adjacent_atoms(source, &trace_graph) {
             if target == *source {
@@ -847,11 +844,12 @@ pub fn build_scan_result(
             let target_hash = current_atoms
                 .get(target.as_str())
                 .map(|atom| atom.content_hash.clone());
+            let fire_digest = fire_digest_hex(&key);
             fires.push(Fire {
                 type_tag: "fire".to_string(),
                 version: VERSION,
-                fire_uid: format!("fire_{}", &sha1_hex(key.as_bytes())[..12]),
-                display_id: format!("FIRE-{fire_no:03}"),
+                fire_uid: fire_uid_from_digest(&fire_digest),
+                display_id: fire_display_id_from_digest(&fire_digest),
                 status: "open".to_string(),
                 severity: "required".to_string(),
                 source: FireAtomRef {
@@ -870,7 +868,6 @@ pub fn build_scan_result(
                 obsolete_at: None,
                 resolution_uid: None,
             });
-            fire_no += 1;
         }
     }
 
@@ -1245,10 +1242,24 @@ fn digest_bytes(bytes: &[u8]) -> String {
     format!("sha256:{}", hex_lower(&hasher.finalize()))
 }
 
-fn sha1_hex(bytes: &[u8]) -> String {
-    let mut hasher = Sha1::new();
-    hasher.update(bytes);
+const FIRE_UID_HEX_LENGTH: usize = 32;
+const FIRE_DISPLAY_HEX_LENGTH: usize = 12;
+
+fn fire_digest_hex(key: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(key.as_bytes());
     hex_lower(&hasher.finalize())
+}
+
+fn fire_uid_from_digest(digest: &str) -> String {
+    format!("fire_sha256_{}", &digest[..FIRE_UID_HEX_LENGTH])
+}
+
+fn fire_display_id_from_digest(digest: &str) -> String {
+    format!(
+        "FIRE-{}",
+        digest[..FIRE_DISPLAY_HEX_LENGTH].to_ascii_uppercase()
+    )
 }
 
 fn read_text_lossy(path: &Path) -> Result<String, CoreError> {
@@ -1905,10 +1916,75 @@ mod tests {
 
         assert_eq!(scan.changed_atoms, vec!["DES-AUTH-001", "REQ-AUTH-001"]);
         assert_eq!(scan.open_fires.len(), 2);
-        assert_eq!(fires[0].display_id, "FIRE-001");
+        assert!(fires[0].fire_uid.starts_with("fire_sha256_"));
+        assert_eq!(fires[0].fire_uid.len(), "fire_sha256_".len() + 32);
+        assert!(fires[0].display_id.starts_with("FIRE-"));
+        assert_eq!(fires[0].display_id.len(), "FIRE-".len() + 12);
         assert_eq!(fires[0].status, "open");
         assert_eq!(fires[0].severity, "required");
         assert_eq!(fires[0].created_by, "scan");
+    }
+
+    #[test]
+    fn scan_result_uses_stable_sha256_fire_identity() {
+        let current = AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: VERSION,
+            atoms: vec![
+                atom("REQ-AUTH-001", "requirement", "sha256:req2"),
+                atom("DES-AUTH-001", "design", "sha256:design2"),
+            ],
+            duplicate_atom_ids: Vec::new(),
+        };
+        let base = AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: VERSION,
+            atoms: vec![atom("REQ-AUTH-001", "requirement", "sha256:req1")],
+            duplicate_atom_ids: Vec::new(),
+        };
+        let trace_graph = TraceGraph {
+            type_tag: "trace_graph".to_string(),
+            version: VERSION,
+            links: vec![TraceLinkInput {
+                from: "REQ-AUTH-001".to_string(),
+                to: Some("DES-AUTH-001".to_string()),
+                link_type: Some("refined_by".to_string()),
+            }
+            .into_trace_link()
+            .unwrap()],
+        };
+
+        let first = build_scan_result(
+            current.clone(),
+            base.clone(),
+            trace_graph.clone(),
+            Vec::new(),
+            "CF-COMMIT-base".to_string(),
+            "atom_changed",
+            "2026-06-04T00:00:00Z",
+        )
+        .unwrap()
+        .1;
+        let with_obsolete = vec![Fire {
+            status: "obsolete".to_string(),
+            obsolete_at: Some("2026-06-05T00:00:00Z".to_string()),
+            ..first[0].clone()
+        }];
+        let second = build_scan_result(
+            current,
+            base,
+            trace_graph,
+            with_obsolete,
+            "CF-COMMIT-base".to_string(),
+            "atom_changed",
+            "2026-06-06T00:00:00Z",
+        )
+        .unwrap()
+        .1;
+
+        assert_eq!(first[0].fire_uid, second[1].fire_uid);
+        assert_eq!(first[0].display_id, second[1].display_id);
+        assert!(first[0].fire_uid.starts_with("fire_sha256_"));
     }
 
     #[test]

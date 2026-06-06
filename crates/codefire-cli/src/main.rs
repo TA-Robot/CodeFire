@@ -339,8 +339,9 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     println!("{}", serde_json::to_string_pretty(&result.plan)?);
                 } else if options.dry_run {
                     println!(
-                        "extinguish dry-run: {} would be {}",
+                        "extinguish dry-run: {} ({}) would be {}",
                         result.display_id,
+                        result.fire_uid,
                         if options.refresh {
                             "refreshed"
                         } else {
@@ -349,13 +350,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     );
                 } else {
                     println!(
-                        "{} {}",
+                        "{} {} ({})",
                         if options.refresh {
                             "refreshed"
                         } else {
                             "extinguished"
                         },
-                        result.display_id
+                        result.display_id,
+                        result.fire_uid
                     );
                 }
             }
@@ -1057,6 +1059,7 @@ struct ExtinguishOptions {
 #[derive(Debug)]
 struct ExtinguishResult {
     display_id: String,
+    fire_uid: String,
     plan: Value,
 }
 
@@ -1246,8 +1249,12 @@ fn render_scan(scan: &codefire_core::ScanResult) -> String {
         output.push_str("Open fires:\n");
         for fire in &scan.open_fires {
             output.push_str(&format!(
-                "  {}  {} -> {}  {}",
-                fire.display_id, fire.source.atom_id, fire.target.atom_id, fire.reason
+                "  {} ({})  {} -> {}  {}",
+                fire.display_id,
+                fire.fire_uid,
+                fire.source.atom_id,
+                fire.target.atom_id,
+                fire.reason
             ));
             output.push('\n');
         }
@@ -3359,6 +3366,7 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
         },
     )?;
     let display_id = fires[fire_index].display_id.clone();
+    let fire_uid = fires[fire_index].fire_uid.clone();
     let plan = extinguish_operation_plan(
         options,
         &context,
@@ -3367,7 +3375,11 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
         &resolution_uid,
     );
     if options.dry_run {
-        return Ok(ExtinguishResult { display_id, plan });
+        return Ok(ExtinguishResult {
+            display_id,
+            fire_uid,
+            plan,
+        });
     }
     fires[fire_index].status = "extinguished".to_string();
     fires[fire_index].resolution_uid = Some(resolution_uid);
@@ -3388,7 +3400,11 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
     resolutions.push(resolution);
     write_json_atomic(&fires_path, &serde_json::to_value(fires)?)?;
     write_json_atomic(&resolutions_path, &serde_json::to_value(resolutions)?)?;
-    let result = ExtinguishResult { display_id, plan };
+    let result = ExtinguishResult {
+        display_id,
+        fire_uid,
+        plan,
+    };
     if let Some(key) = options.idempotency_key.as_deref() {
         save_extinguish_idempotency(&context.repo_root, key, &idempotency_payload, &result)?;
     }
@@ -3463,9 +3479,16 @@ fn load_extinguish_idempotency(
         return Ok(None);
     };
     verify_idempotency_record(&record, &path, "extinguish", key, payload)?;
+    let plan = idempotency_result_plan(&record, &path)?;
+    let fire_uid = record
+        .pointer("/result/fire_uid")
+        .and_then(Value::as_str)
+        .or_else(|| plan.pointer("/fire/fire_uid").and_then(Value::as_str))
+        .unwrap_or("(unknown)");
     Ok(Some(ExtinguishResult {
         display_id: required_string(&record, &["result", "display_id"])?,
-        plan: idempotency_result_plan(&record, &path)?,
+        fire_uid: fire_uid.to_string(),
+        plan,
     }))
 }
 
@@ -3485,6 +3508,7 @@ fn save_extinguish_idempotency(
         "payload": payload,
         "result": {
             "display_id": &result.display_id,
+            "fire_uid": &result.fire_uid,
             "plan": &result.plan,
         },
         "created_at": now_iso_utc(),

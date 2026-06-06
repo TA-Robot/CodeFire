@@ -811,9 +811,17 @@ fn context_pack_returns_atom_changed_and_fire_views() {
         2
     );
 
+    let fire_id = compute_scan(&open_dir, false)
+        .unwrap()
+        .scan
+        .open_fires
+        .first()
+        .unwrap()
+        .display_id
+        .clone();
     let fire_pack = context::build_context_pack(&context::ContextOptions {
         path: open_dir,
-        selector: context::ContextSelector::Fire("FIRE-001".to_string()),
+        selector: context::ContextSelector::Fire(fire_id),
         depth: 1,
         limit: 100,
         json_output: true,
@@ -1690,9 +1698,16 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
     )
     .unwrap();
 
+    let fire = compute_scan(&open_dir, false)
+        .unwrap()
+        .scan
+        .open_fires
+        .first()
+        .unwrap()
+        .clone();
     let result = run_extinguish(&ExtinguishOptions {
         path: open_dir.clone(),
-        fire_id: "FIRE-001".to_string(),
+        fire_id: fire.display_id.clone(),
         resolution: "addressed".to_string(),
         rationale: "fixed".to_string(),
         evidence: String::new(),
@@ -1707,7 +1722,8 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
     .unwrap();
     let active = active_state_path(&open_dir);
 
-    assert_eq!(result.display_id, "FIRE-001");
+    assert_eq!(result.display_id, fire.display_id);
+    assert_eq!(result.fire_uid, fire.fire_uid);
     assert_eq!(result.plan["type"], "codefire_operation_plan");
     assert_eq!(result.plan["command"], "extinguish");
     assert_eq!(result.plan["dry_run"], true);
@@ -1755,9 +1771,16 @@ fn extinguish_idempotency_key_replays_same_payload_and_rejects_conflict() {
     )
     .unwrap();
 
+    let fire = compute_scan(&open_dir, false)
+        .unwrap()
+        .scan
+        .open_fires
+        .first()
+        .unwrap()
+        .clone();
     let first = run_extinguish(&ExtinguishOptions {
         path: open_dir.clone(),
-        fire_id: "FIRE-001".to_string(),
+        fire_id: fire.display_id.clone(),
         resolution: "addressed".to_string(),
         rationale: "fixed".to_string(),
         evidence: String::new(),
@@ -1770,11 +1793,12 @@ fn extinguish_idempotency_key_replays_same_payload_and_rejects_conflict() {
         edit_rationale: false,
     })
     .unwrap();
-    assert_eq!(first.display_id, "FIRE-001");
+    assert_eq!(first.display_id, fire.display_id);
+    assert_eq!(first.fire_uid, fire.fire_uid);
 
     let replay = run_extinguish(&ExtinguishOptions {
         path: open_dir.clone(),
-        fire_id: "FIRE-001".to_string(),
+        fire_id: fire.display_id.clone(),
         resolution: "addressed".to_string(),
         rationale: "fixed".to_string(),
         evidence: String::new(),
@@ -1788,11 +1812,12 @@ fn extinguish_idempotency_key_replays_same_payload_and_rejects_conflict() {
     })
     .unwrap();
     assert_eq!(replay.display_id, first.display_id);
+    assert_eq!(replay.fire_uid, first.fire_uid);
     assert_eq!(replay.plan["command"], "extinguish");
 
     let conflict = run_extinguish(&ExtinguishOptions {
         path: open_dir,
-        fire_id: "FIRE-001".to_string(),
+        fire_id: fire.display_id,
         resolution: "addressed".to_string(),
         rationale: "different rationale".to_string(),
         evidence: String::new(),
@@ -1847,18 +1872,23 @@ fn extinguish_batch_validates_all_items_before_writing_ledgers() {
         "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
     )
     .unwrap();
+    let scan = compute_scan(&open_dir, false).unwrap().scan;
+    let first_fire = scan.open_fires.first().unwrap().display_id.clone();
+    let second_fire = scan.open_fires.get(1).unwrap().display_id.clone();
     fs::write(
         &batch_path,
-        r#"version: 1
+        format!(
+            r#"version: 1
 defaults:
   resolution: addressed
   evidence: "cargo test --workspace: passed"
 fires:
-  - id: FIRE-001
+  - id: {first_fire}
     rationale: "REQ to DES reviewed"
-  - id: FIRE-002
+  - id: {second_fire}
     rationale: "DES to REQ reviewed"
-"#,
+"#
+        ),
     )
     .unwrap();
 
@@ -2653,19 +2683,24 @@ fn explain_fire_atom_verify_and_storage_targets_return_actions() {
     )
     .unwrap();
 
+    let fire_id = compute_scan(&open_dir, false)
+        .unwrap()
+        .scan
+        .open_fires
+        .first()
+        .unwrap()
+        .display_id
+        .clone();
     let fire_options = parse_explain_args(&[
         "fire".to_string(),
-        "FIRE-001".to_string(),
+        fire_id.clone(),
         "--path".to_string(),
         open_dir.to_string_lossy().into_owned(),
         "--json".to_string(),
     ])
     .unwrap();
     assert!(fire_options.json_output);
-    assert_eq!(
-        fire_options.target,
-        explain::ExplainTarget::Fire("FIRE-001".to_string())
-    );
+    assert_eq!(fire_options.target, explain::ExplainTarget::Fire(fire_id));
     let fire = run_explain(&fire_options).unwrap();
     assert_eq!(fire.data["type"], "codefire_explain");
     assert_eq!(fire.data["target"]["kind"], "fire");

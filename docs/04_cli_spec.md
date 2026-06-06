@@ -196,6 +196,8 @@ codefire scan --json --metrics
 open directoryをindexする
 Atom単位で変更を検出する
 Trace Graphに基づきfireを生成する
+scan生成fireのfire_uidはSHA-256由来のstable IDで、display_idもfire key由来のstable短縮IDになる
+text出力のopen fire行はdisplay_idとfire_uidを併記する
 obsolete fireを整理する
 branch stateを更新する
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.changed_atoms、data.open_fires、diagnosticsを含める
@@ -268,6 +270,8 @@ codefire extinguish --batch .codefire/fires-to-extinguish.yaml --dry-run --json
 
 ```text
 fireを解消する
+fire-idにはdisplay_idまたはfire_uidを指定できる
+text成功出力はdisplay_idとfire_uidを併記する
 basisとしてsource/target/link/policy hashを保存する
 `--refresh` 指定時は、すでにextinguishedのfireについて現在のbasisでresolutionを更新する
 必要なrationale/evidence/evidence-refがない場合は拒否する
