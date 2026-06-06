@@ -83,7 +83,7 @@ pub(crate) fn parse_fire_batch_args(args: &[String]) -> Result<FireBatchOptions,
         path: path.unwrap_or(std::env::current_dir()?),
         batch_path: batch_path.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs fire --batch <file> [--path <open-dir>] [--dry-run] [--json]"
+                "usage: codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--json]"
                     .to_string(),
             )
         })?,

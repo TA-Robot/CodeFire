@@ -15,12 +15,13 @@
 - High: 15
 - Medium: 64
 - Low: 1
-- Fixed in v0.7 batch 1: 9
-- Remaining open: 71
+- Fixed in v0.7: 16
+- Remaining open: 64
 
 ## v0.7 Progress
 
 - Batch 1 fixed: [CFR-005](code-review-issues/cfr-005.md), [CFR-006](code-review-issues/cfr-006.md), [CFR-010](code-review-issues/cfr-010.md), [CFR-031](code-review-issues/cfr-031.md), [CFR-032](code-review-issues/cfr-032.md), [CFR-047](code-review-issues/cfr-047.md), [CFR-058](code-review-issues/cfr-058.md), [CFR-067](code-review-issues/cfr-067.md), [CFR-077](code-review-issues/cfr-077.md)
+- Batch 2/8 partial fixed: [CFR-003](code-review-issues/cfr-003.md), [CFR-009](code-review-issues/cfr-009.md), [CFR-057](code-review-issues/cfr-057.md), [CFR-071](code-review-issues/cfr-071.md), [CFR-072](code-review-issues/cfr-072.md), [CFR-075](code-review-issues/cfr-075.md), [CFR-076](code-review-issues/cfr-076.md)
 - Plan: [v0.7-issue-improvement-plan.md](v0.7-issue-improvement-plan.md)
 
 ## Priority Buckets

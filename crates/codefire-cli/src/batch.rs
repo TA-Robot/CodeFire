@@ -108,7 +108,7 @@ pub(super) fn parse_extinguish_batch_args(
         path: path.unwrap_or(std::env::current_dir()?),
         batch_path: batch_path.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs extinguish --batch <file> [--path <open-dir>] [--dry-run] [--json]"
+                "usage: codefire extinguish --batch <file> [--path <open-dir>] [--dry-run] [--json]"
                     .to_string(),
             )
         })?,
@@ -251,7 +251,7 @@ fn batch_extinguish_operation_plan(
             {"kind": "append_resolutions", "count": fires.len()},
         ],
         "next_actions": [
-            {"kind": "verify", "command": "codefire-rs verify --details --json", "target": {"path": &options.path}},
+            {"kind": "verify", "command": "codefire verify --details --json", "target": {"path": &options.path}},
         ],
     })
 }

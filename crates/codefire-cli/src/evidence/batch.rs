@@ -158,8 +158,8 @@ fn evidence_batch_operation_plan(
             {"kind": "store_evidence_objects", "count": items.len()},
         ],
         "next_actions": [
-            {"kind": "storage_report", "command": "codefire-rs storage report --json"},
-            {"kind": "verify", "command": "codefire-rs verify --details --json"},
+            {"kind": "storage_report", "command": "codefire storage report --json"},
+            {"kind": "verify", "command": "codefire verify --details --json"},
         ],
     })
 }

@@ -100,7 +100,7 @@ pub(super) fn parse_link_batch_args(args: &[String]) -> Result<LinkBatchOptions,
         path: path.unwrap_or(std::env::current_dir()?),
         batch_path: batch_path.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs link --batch <file> [--path <open-dir>] [--dry-run] [--json]"
+                "usage: codefire link --batch <file> [--path <open-dir>] [--dry-run] [--json]"
                     .to_string(),
             )
         })?,
@@ -329,8 +329,8 @@ fn link_batch_operation_plan(
             {"kind": "append_trace_links", "count": links.len()},
         ],
         "next_actions": [
-            {"kind": "verify", "command": "codefire-rs verify --details --json", "target": {"path": open_dir}},
-            {"kind": "trace_graph", "command": "codefire-rs trace-graph", "target": {"path": open_dir}},
+            {"kind": "verify", "command": "codefire verify --details --json", "target": {"path": open_dir}},
+            {"kind": "trace_graph", "command": "codefire trace-graph", "target": {"path": open_dir}},
         ],
     })
 }

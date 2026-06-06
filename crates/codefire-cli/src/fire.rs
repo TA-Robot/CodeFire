@@ -245,7 +245,7 @@ pub(crate) fn default_manual_fire_severity() -> String {
 
 fn single_fire_usage() -> CliError {
     CliError::Usage(
-        "usage: codefire-rs fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--severity required] [--dry-run] [--json]"
+        "usage: codefire fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--severity required] [--dry-run] [--json]"
             .to_string(),
     )
 }
@@ -445,8 +445,8 @@ fn fire_operation_plan(
             {"kind": "set_open_state", "state": "open-burning"},
         ],
         "next_actions": [
-            {"kind": "verify", "command": "codefire-rs verify --details --json", "target": {"branch": &context.context.branch}},
-            {"kind": "extinguish", "command": "codefire-rs extinguish <fire-id> --resolution addressed --rationale <text>", "target": {"branch": &context.context.branch}},
+            {"kind": "verify", "command": "codefire verify --details --json", "target": {"branch": &context.context.branch}},
+            {"kind": "extinguish", "command": "codefire extinguish <fire-id> --resolution addressed --rationale <text>", "target": {"branch": &context.context.branch}},
         ],
     })
 }

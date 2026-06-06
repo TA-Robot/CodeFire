@@ -33,7 +33,7 @@ mod storage;
 mod verification;
 mod view;
 use automation::{
-    command_result_envelope, scan_data_json, scan_diagnostics_json, scan_next_actions,
+    cli_command, command_result_envelope, scan_data_json, scan_diagnostics_json, scan_next_actions,
     status_data_json, status_next_actions, verification_data_json_with_filter,
     verification_diagnostics_json, verification_next_actions,
 };
@@ -517,7 +517,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         }
         Some("show") => {
             let target = args.get(1).ok_or_else(|| {
-                CliError::Usage("usage: codefire-rs show <branch-or-commit>".to_string())
+                CliError::Usage("usage: codefire show <branch-or-commit>".to_string())
             })?;
             let repo_root = optional_repo_root(&env::current_dir()?);
             let output = show_commitish(repo_root.as_deref(), target)?;
@@ -586,7 +586,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 Ok(())
             }
             _ => Err(CliError::Usage(
-                "usage: codefire-rs patch export <source> [--base <base>] [--output <path>] | codefire-rs patch import <patch-file> [--dry-run] [--json] [--idempotency-key <key>]".to_string(),
+                "usage: codefire patch export <source> [--base <base>] [--output <path>] | codefire patch import <patch-file> [--dry-run] [--json] [--idempotency-key <key>]".to_string(),
             )),
         },
         Some("merge") => {
@@ -710,7 +710,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 "unsupported storage command: {command}"
             ))),
             None => Err(CliError::Usage(
-                "usage: codefire-rs storage report [path] [--json] [--large-threshold <bytes|KB|MB|GB>] [--remote <cf://server/org/app>]".to_string(),
+                "usage: codefire storage report [path] [--json] [--large-threshold <bytes|KB|MB|GB>] [--remote <cf://server/org/app>]".to_string(),
             )),
         },
         Some("doctor") => {
@@ -823,7 +823,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 "unsupported evidence command: {command}"
             ))),
             None => Err(CliError::Usage(
-                "usage: codefire-rs evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>|--batch <file>) [--label <text>] [--dry-run] [--json]".to_string(),
+                "usage: codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>|--batch <file>) [--label <text>] [--dry-run] [--json]".to_string(),
             )),
         },
         Some("explain") => {
@@ -880,7 +880,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             }
         }
         Some("--version") | Some("version") => {
-            println!("codefire-rs foundation {}", codefire_core::VERSION);
+            println!("codefire foundation {}", codefire_core::VERSION);
             Ok(())
         }
         Some(command) => Err(CliError::Usage(format!("unsupported command: {command}"))),
@@ -1277,7 +1277,7 @@ fn lock_contention_envelope(command: &str, error: &CliError) -> Value {
         })],
         vec![json!({
             "kind": "retry_with_wait_lock",
-            "command": format!("codefire-rs {command} ... --wait-lock --lock-timeout 2s"),
+            "command": cli_command(format!("{command} ... --wait-lock --lock-timeout 2s")),
             "description": "retry after the remote resource lock is released or wait up to a bounded timeout",
         })],
     )
@@ -1349,7 +1349,7 @@ fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
             idempotency_key,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs open <branch> <path> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
+            "usage: codefire open <branch> <path> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
         )),
     }
 }
@@ -1472,7 +1472,7 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
     Ok(ExtinguishOptions {
         path: path.unwrap_or(env::current_dir()?),
         fire_id: fire_id.ok_or_else(|| {
-            CliError::Usage("usage: codefire-rs extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>)".to_string())
+            CliError::Usage("usage: codefire extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>)".to_string())
         })?,
         resolution,
         rationale,
@@ -1623,7 +1623,7 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
             idempotency_key,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs clone <source-branch> <new-branch> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
+            "usage: codefire clone <source-branch> <new-branch> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
                 .to_string(),
         )),
     }
@@ -1679,7 +1679,7 @@ fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
             },
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs diff [--algorithm myers|patience|histogram] [--rename-detection] [--atoms] [--trace] [--impact] [--json] <left> <right>".to_string(),
+            "usage: codefire diff [--algorithm myers|patience|histogram] [--rename-detection] [--atoms] [--trace] [--impact] [--json] <left> <right>".to_string(),
         )),
     }
 }
@@ -1740,7 +1740,7 @@ fn parse_review_pack_args(args: &[String]) -> Result<ReviewPackArgs, CliError> {
         review: ReviewPackOptions {
             source: source.ok_or_else(|| {
                 CliError::Usage(
-                    "usage: codefire-rs review-pack <source> [--base <base>] [--output <path>] [--algorithm myers|patience|histogram] [--no-rename-detection]"
+                    "usage: codefire review-pack <source> [--base <base>] [--output <path>] [--algorithm myers|patience|histogram] [--no-rename-detection]"
                         .to_string(),
                 )
             })?,
@@ -1788,7 +1788,7 @@ fn parse_patch_export_args(args: &[String]) -> Result<PatchExportArgs, CliError>
         patch: PatchExportOptions {
             source: source.ok_or_else(|| {
                 CliError::Usage(
-                    "usage: codefire-rs patch export <source> [--base <base>] [--output <path>]"
+                    "usage: codefire patch export <source> [--base <base>] [--output <path>]"
                         .to_string(),
                 )
             })?,
@@ -1844,7 +1844,7 @@ fn parse_patch_import_args(args: &[String]) -> Result<PatchImportOptions, CliErr
     Ok(PatchImportOptions {
         path: path.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs patch import <patch-file> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
+                "usage: codefire patch import <patch-file> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
             )
         })?,
         dry_run,
@@ -1912,7 +1912,7 @@ fn parse_upload_args(args: &[String]) -> Result<UploadOptions, CliError> {
             lock,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs upload <branch> <cf-url> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
+            "usage: codefire upload <branch> <cf-url> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
         )),
     }
 }
@@ -1927,7 +1927,7 @@ fn parse_remote_project_args(
             project_url: project_url.clone(),
         }),
         _ => Err(CliError::Usage(format!(
-            "usage: codefire-rs {command} <cf-project-url>"
+            "usage: codefire {command} <cf-project-url>"
         ))),
     }
 }
@@ -1990,7 +1990,7 @@ fn parse_request_merge_args(args: &[String]) -> Result<RequestMergeOptions, CliE
             lock,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs request-merge <source-url> <target-url> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
+            "usage: codefire request-merge <source-url> <target-url> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
                 .to_string(),
         )),
     }
@@ -2087,7 +2087,7 @@ fn parse_request_review_args(args: &[String]) -> Result<RequestReviewOptions, Cl
             lock,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs request-review <project-url> <mr-id> [--reviewer <name>] [--decision approve|reject] [--comment <text>] [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
+            "usage: codefire request-review <project-url> <mr-id> [--reviewer <name>] [--decision approve|reject] [--comment <text>] [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
         )),
     }
 }
@@ -2150,7 +2150,7 @@ fn parse_request_apply_args(args: &[String]) -> Result<RequestApplyOptions, CliE
             lock,
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire-rs request-apply <project-url> <mr-id> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
+            "usage: codefire request-apply <project-url> <mr-id> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
                 .to_string(),
         )),
     }
@@ -2210,7 +2210,7 @@ fn parse_serve_args(args: &[String]) -> Result<ServeOptions, CliError> {
     Ok(ServeOptions {
         storage_root: storage_root.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>] [--tls-key <key>]"
+                "usage: codefire serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>] [--tls-key <key>]"
                     .to_string(),
             )
         })?,
@@ -2355,13 +2355,13 @@ fn parse_merge_args(args: &[String]) -> Result<MergeOptions, CliError> {
     Ok(MergeOptions {
         source_branch: source_branch.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs merge <source-branch> --into <target-branch> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
+                "usage: codefire merge <source-branch> --into <target-branch> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
                     .to_string(),
             )
         })?,
         target_branch: target_branch.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs merge <source-branch> --into <target-branch> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
+                "usage: codefire merge <source-branch> --into <target-branch> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]"
                     .to_string(),
             )
         })?,
@@ -3136,7 +3136,7 @@ fn open_operation_plan(
             {"kind": "update_branch_state", "branch": &options.branch, "state": "open-clean"},
         ],
         "next_actions": [
-            {"kind": "status", "command": "codefire-rs status --json", "target": {"path": target}},
+            {"kind": "status", "command": "codefire status --json", "target": {"path": target}},
         ],
     })
 }
@@ -3165,7 +3165,7 @@ fn clone_operation_plan(
             {"kind": "write_branch_record", "branch": &options.new_branch, "head": source_head, "state": "closed"},
         ],
         "next_actions": [
-            {"kind": "open", "command": format!("codefire-rs open {} <path>", options.new_branch), "target": {"branch": &options.new_branch}},
+            {"kind": "open", "command": format!("codefire open {} <path>", options.new_branch), "target": {"branch": &options.new_branch}},
         ],
     })
 }
@@ -3774,7 +3774,7 @@ fn extinguish_operation_plan(
             {"kind": "append_resolution", "path": active_state_path.join("resolutions.json"), "resolution_uid": resolution_uid},
         ],
         "next_actions": [
-            {"kind": "verify", "command": "codefire-rs verify --details --json", "target": {"branch": &context.branch}},
+            {"kind": "verify", "command": "codefire verify --details --json", "target": {"branch": &context.branch}},
         ],
     })
 }
@@ -3823,7 +3823,7 @@ fn commit_operation_plan(
             {"kind": "reset_active_state", "path": active_state_path},
         ],
         "next_actions": [
-            {"kind": "apply_commit", "command": "codefire-rs commit -m <message>", "target": {"branch": &context.branch}},
+            {"kind": "apply_commit", "command": "codefire commit -m <message>", "target": {"branch": &context.branch}},
         ],
     })
 }

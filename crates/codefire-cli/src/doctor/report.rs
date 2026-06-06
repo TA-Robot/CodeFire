@@ -1,4 +1,5 @@
 use super::{DoctorIssue, DoctorReport, DoctorSeverity};
+use crate::automation::cli_command;
 use serde_json::{json, Value};
 
 pub(crate) fn doctor_report_data_json(report: &DoctorReport) -> Value {
@@ -36,7 +37,7 @@ pub(crate) fn doctor_report_next_actions(report: &DoctorReport) -> Vec<Value> {
     }) {
         actions.push(next_action(
             "inspect_object_store_corruption",
-            "codefire-rs doctor --json",
+            cli_command("doctor --json"),
             "inspect object record integrity errors before opening or uploading branches",
             json!({"affected": count_kinds(report, &["invalid_object_record", "object_integrity_error", "object_type_directory_mismatch", "unknown_object_type"])}),
         ));
@@ -49,7 +50,7 @@ pub(crate) fn doctor_report_next_actions(report: &DoctorReport) -> Vec<Value> {
     }) {
         actions.push(next_action(
             "repair_branch_head",
-            "codefire-rs branch list",
+            cli_command("branch list"),
             "identify branch heads that no longer point to valid sealed commits",
             json!({"affected": count_kinds(report, &["invalid_branch_record", "missing_branch_head", "invalid_branch_head"])}),
         ));
@@ -67,7 +68,7 @@ pub(crate) fn doctor_report_next_actions(report: &DoctorReport) -> Vec<Value> {
     }) {
         actions.push(next_action(
             "reopen_branch_workspace",
-            "codefire-rs open <branch> <path>",
+            cli_command("open <branch> <path>"),
             "reopen affected workspaces from a valid sealed commit after preserving local edits",
             json!({"affected": count_kinds(report, &["invalid_open_registry", "invalid_open_base_commit", "missing_open_base_commit", "missing_active_state_path", "missing_active_state_dir", "invalid_active_state_json"])}),
         ));
@@ -75,7 +76,7 @@ pub(crate) fn doctor_report_next_actions(report: &DoctorReport) -> Vec<Value> {
     if actions.is_empty() {
         actions.push(next_action(
             "inspect_doctor_report",
-            "codefire-rs doctor --json",
+            cli_command("doctor --json"),
             "inspect repository diagnostics",
             json!({"issues": report.issues.len()}),
         ));
@@ -132,7 +133,7 @@ fn issue_json(issue: &DoctorIssue) -> Value {
     })
 }
 
-fn next_action(id: &str, command: &str, description: &str, context: Value) -> Value {
+fn next_action(id: &str, command: String, description: &str, context: Value) -> Value {
     json!({
         "id": id,
         "command": command,

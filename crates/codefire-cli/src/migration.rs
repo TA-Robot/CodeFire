@@ -1,4 +1,5 @@
 use super::{find_repo_root, read_json, CliError};
+use crate::automation::cli_command;
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -56,7 +57,7 @@ pub(crate) fn parse_migrate_args(args: &[String]) -> Result<MigrateOptions, CliE
                 )))
             }
             None => return Err(CliError::Usage(
-                "usage: codefire-rs migrate (check|dry-run) [path] [--json] [--target-format v0.6]"
+                "usage: codefire migrate (check|dry-run) [path] [--json] [--target-format v0.6]"
                     .to_string(),
             )),
         };
@@ -164,14 +165,14 @@ pub(crate) fn migration_report_next_actions(report: &MigrationReport) -> Vec<Val
         }
         return vec![next_action(
             "review_migration_plan",
-            "codefire-rs migrate dry-run --json",
+            cli_command("migrate dry-run --json"),
             "review v0.6 migration planned actions",
             json!({"planned_actions": report.planned_actions.len()}),
         )];
     }
     vec![next_action(
         "inspect_migration_blockers",
-        "codefire-rs migrate check --json",
+        cli_command("migrate check --json"),
         "inspect migration compatibility blockers",
         json!({"blockers": report.blockers.len()}),
     )]
@@ -396,7 +397,7 @@ fn action_json(action: &MigrationAction) -> Value {
     })
 }
 
-fn next_action(id: &str, command: &str, description: &str, context: Value) -> Value {
+fn next_action(id: &str, command: String, description: &str, context: Value) -> Value {
     json!({
         "id": id,
         "command": command,

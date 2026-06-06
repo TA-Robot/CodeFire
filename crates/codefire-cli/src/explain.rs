@@ -1,5 +1,5 @@
 use super::automation::{verification_diagnostics_json, verification_next_actions};
-use super::context::{build_context_pack, ContextOptions, ContextSelector};
+use super::context::{build_context_pack, ContextOptions, ContextSelector, DEFAULT_CONTEXT_LIMIT};
 use super::storage::{
     run_storage_report, storage_report_diagnostics_json, storage_report_next_actions,
     StorageReportOptions,
@@ -91,7 +91,7 @@ pub(crate) fn parse_explain_args(args: &[String]) -> Result<ExplainOptions, CliE
         [kind] if kind == "storage-warning" => ExplainTarget::StorageWarning,
         _ => {
             return Err(CliError::Usage(
-                "usage: codefire-rs explain (fire <id>|atom <id>|verify-failure|storage-warning) [--path <path>] [--json]".to_string(),
+                "usage: codefire explain (fire <id>|atom <id>|verify-failure|storage-warning) [--path <path>] [--json]".to_string(),
             ))
         }
     };
@@ -173,14 +173,14 @@ fn explain_fire(options: &ExplainOptions, value: &str) -> Result<ExplainResult, 
         next_actions: vec![
             next_action(
                 "context_fire",
-                format!("codefire-rs context --fire {} --json", fire.display_id),
+                format!("codefire context --fire {} --json", fire.display_id),
                 "inspect source, target, and trace context for this fire",
                 json!({"display_id": &fire.display_id}),
             ),
             next_action(
                 "extinguish_fire",
                 format!(
-                    "codefire-rs extinguish {} --resolution <type> --rationale <text>",
+                    "codefire extinguish {} --resolution <type> --rationale <text>",
                     fire.display_id
                 ),
                 "record the resolution when the fire is addressed",
@@ -196,6 +196,7 @@ fn explain_atom(options: &ExplainOptions, value: &str) -> Result<ExplainResult, 
         path: options.path.clone(),
         selector: ContextSelector::Atom(value.to_string()),
         depth: options.depth,
+        limit: DEFAULT_CONTEXT_LIMIT,
         json_output: true,
     })?;
     let atoms = pack.data["atoms"].as_array().map(Vec::len).unwrap_or(0);
@@ -213,7 +214,7 @@ fn explain_atom(options: &ExplainOptions, value: &str) -> Result<ExplainResult, 
         next_actions: vec![next_action(
             "context_atom",
             format!(
-                "codefire-rs context --atom {value} --depth {} --json",
+                "codefire context --atom {value} --depth {} --json",
                 options.depth
             ),
             "inspect neighboring trace context for this atom",

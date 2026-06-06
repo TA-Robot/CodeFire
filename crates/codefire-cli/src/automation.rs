@@ -2,6 +2,10 @@ use crate::{scan_branch_state, Status};
 use serde_json::{json, Value};
 use std::path::Path;
 
+pub(crate) const COMMAND_RESULT_SCHEMA: &str = "codefire.command_result.v1";
+pub(crate) const CLI_DISPLAY_NAME: &str = "codefire";
+pub(crate) const MAX_NEXT_ACTIONS: usize = 12;
+
 pub(crate) fn command_result_envelope(
     command: &str,
     ok: bool,
@@ -11,8 +15,9 @@ pub(crate) fn command_result_envelope(
     diagnostics: Vec<Value>,
     next_actions: Vec<Value>,
 ) -> Value {
+    let next_actions = bounded_next_actions(next_actions);
     json!({
-        "schema": "codefire.command_result.v1",
+        "schema": COMMAND_RESULT_SCHEMA,
         "command": command,
         "ok": ok,
         "exit_code": exit_code,
@@ -21,6 +26,15 @@ pub(crate) fn command_result_envelope(
         "diagnostics": diagnostics,
         "next_actions": next_actions,
     })
+}
+
+pub(crate) fn cli_command(args: impl AsRef<str>) -> String {
+    let args = args.as_ref();
+    if args.is_empty() {
+        CLI_DISPLAY_NAME.to_string()
+    } else {
+        format!("{CLI_DISPLAY_NAME} {args}")
+    }
 }
 
 pub(crate) fn status_data_json(status: &Status) -> Value {
@@ -37,33 +51,33 @@ pub(crate) fn status_next_actions(status: &Status) -> Vec<Value> {
     match status.state.as_str() {
         "open-clean" => actions.push(next_action(
             "verify",
-            "codefire-rs verify --json",
+            cli_command("verify --json"),
             "confirm the open branch is consistent before commit",
             json!({"branch": &status.branch}),
         )),
         "open-burning" => {
             actions.push(next_action(
                 "scan",
-                "codefire-rs scan --json",
+                cli_command("scan --json"),
                 "refresh changed atoms and open fire diagnostics",
                 json!({"branch": &status.branch}),
             ));
             actions.push(next_action(
                 "verify",
-                "codefire-rs verify --details --json",
+                cli_command("verify --details --json"),
                 "inspect blocking verification diagnostics",
                 json!({"branch": &status.branch}),
             ));
         }
         "open-consistent" => actions.push(next_action(
             "commit",
-            "codefire-rs commit -m <message>",
+            cli_command("commit -m <message>"),
             "seal the verified open branch",
             json!({"branch": &status.branch, "base": &status.base}),
         )),
         _ => actions.push(next_action(
             "inspect_status",
-            "codefire-rs status --json",
+            cli_command("status --json"),
             "inspect the current open branch state",
             json!({"branch": &status.branch, "state": &status.state}),
         )),
@@ -71,7 +85,7 @@ pub(crate) fn status_next_actions(status: &Status) -> Vec<Value> {
     if status.open_fires > 0 {
         actions.push(next_action(
             "context_changed",
-            "codefire-rs context --changed --json",
+            cli_command("context --changed --json"),
             "inspect changed atoms related to open fires",
             json!({"open_fires": status.open_fires}),
         ));
@@ -109,13 +123,13 @@ pub(crate) fn scan_next_actions(scan: &codefire_core::ScanResult) -> Vec<Value> 
     if !scan.changed_atoms.is_empty() {
         actions.push(next_action(
             "context_changed",
-            "codefire-rs context --changed --json",
+            cli_command("context --changed --json"),
             "inspect changed atoms and related trace context",
             json!({"changed_atoms": &scan.changed_atoms}),
         ));
         actions.push(next_action(
             "verify",
-            "codefire-rs verify --details --json",
+            cli_command("verify --details --json"),
             "run policy checks against the changed branch",
             json!({"base_commit": &scan.base_commit}),
         ));
@@ -123,7 +137,7 @@ pub(crate) fn scan_next_actions(scan: &codefire_core::ScanResult) -> Vec<Value> 
     for fire in &scan.open_fires {
         actions.push(next_action(
             "context_fire",
-            format!("codefire-rs context --fire {} --json", fire.display_id),
+            cli_command(format!("context --fire {} --json", fire.display_id)),
             "inspect the fire source, target, and trace path",
             json!({
                 "display_id": &fire.display_id,
@@ -134,10 +148,10 @@ pub(crate) fn scan_next_actions(scan: &codefire_core::ScanResult) -> Vec<Value> 
         ));
         actions.push(next_action(
             "extinguish_fire",
-            format!(
-                "codefire-rs extinguish {} --resolution <type> --rationale <text>",
+            cli_command(format!(
+                "extinguish {} --resolution <type> --rationale <text>",
                 fire.display_id
-            ),
+            )),
             "record a resolution for the open fire",
             json!({
                 "display_id": &fire.display_id,
@@ -148,7 +162,7 @@ pub(crate) fn scan_next_actions(scan: &codefire_core::ScanResult) -> Vec<Value> 
     if actions.is_empty() {
         actions.push(next_action(
             "verify",
-            "codefire-rs verify --json",
+            cli_command("verify --json"),
             "confirm the clean scan satisfies verification policy",
             json!({"base_commit": &scan.base_commit}),
         ));
@@ -239,7 +253,7 @@ pub(crate) fn verification_next_actions(verification: &codefire_core::Verificati
     if verification.result == "passed" {
         actions.push(next_action(
             "commit",
-            "codefire-rs commit -m <message>",
+            cli_command("commit -m <message>"),
             "seal the verified open branch",
             json!({}),
         ));
@@ -248,13 +262,13 @@ pub(crate) fn verification_next_actions(verification: &codefire_core::Verificati
     if verification.open_required_fires > 0 {
         actions.push(next_action(
             "context_changed",
-            "codefire-rs context --changed --json",
+            cli_command("context --changed --json"),
             "inspect changed atoms and open fire context",
             json!({"open_required_fires": verification.open_required_fires}),
         ));
         actions.push(next_action(
             "scan",
-            "codefire-rs scan --json",
+            cli_command("scan --json"),
             "refresh open fire diagnostics before extinguishing",
             json!({}),
         ));
@@ -262,10 +276,7 @@ pub(crate) fn verification_next_actions(verification: &codefire_core::Verificati
     for item in &verification.missing_required_links {
         actions.push(next_action(
             "context_atom",
-            format!(
-                "codefire-rs context --atom {} --depth 2 --json",
-                item.atom_id
-            ),
+            cli_command(format!("context --atom {} --depth 2 --json", item.atom_id)),
             "inspect the atom and nearby trace graph before adding the missing link",
             json!({
                 "atom_id": &item.atom_id,
@@ -279,7 +290,7 @@ pub(crate) fn verification_next_actions(verification: &codefire_core::Verificati
     for item in &verification.stale_resolutions {
         actions.push(next_action(
             "refresh_resolution",
-            "codefire-rs extinguish <fire-id> --refresh --resolution <type> --rationale <text>",
+            cli_command("extinguish <fire-id> --refresh --resolution <type> --rationale <text>"),
             "refresh the stale resolution against the current atom and trace basis",
             json!({
                 "resolution_uid": &item.resolution_uid,
@@ -290,7 +301,7 @@ pub(crate) fn verification_next_actions(verification: &codefire_core::Verificati
     for item in &verification.missing_evidence_refs {
         actions.push(next_action(
             "repair_evidence_ref",
-            "codefire-rs evidence add --artifact <path> --json",
+            cli_command("evidence add --artifact <path> --json"),
             "recreate or replace the missing evidence object referenced by the resolution",
             json!({
                 "resolution_uid": &item.resolution_uid,
@@ -301,7 +312,7 @@ pub(crate) fn verification_next_actions(verification: &codefire_core::Verificati
     for atom_id in &verification.duplicate_atom_ids {
         actions.push(next_action(
             "context_atom",
-            format!("codefire-rs context --atom {atom_id} --depth 1 --json"),
+            cli_command(format!("context --atom {atom_id} --depth 1 --json")),
             "inspect duplicate Atom ID declarations and rename conflicting atoms",
             json!({"atom_id": atom_id}),
         ));
@@ -317,6 +328,24 @@ pub(crate) fn verification_next_actions(verification: &codefire_core::Verificati
             }),
         ));
     }
+    actions
+}
+
+pub(crate) fn bounded_next_actions(mut actions: Vec<Value>) -> Vec<Value> {
+    if actions.len() <= MAX_NEXT_ACTIONS {
+        return actions;
+    }
+    let omitted = actions.len() - (MAX_NEXT_ACTIONS - 1);
+    actions.truncate(MAX_NEXT_ACTIONS - 1);
+    actions.push(next_action(
+        "next_actions_omitted",
+        cli_command("status --json"),
+        "additional next actions were omitted to keep the command result bounded",
+        json!({
+            "omitted": omitted,
+            "limit": MAX_NEXT_ACTIONS,
+        }),
+    ));
     actions
 }
 
@@ -356,7 +385,7 @@ mod tests {
             Vec::new(),
         );
 
-        assert_eq!(envelope["schema"], "codefire.command_result.v1");
+        assert_eq!(envelope["schema"], COMMAND_RESULT_SCHEMA);
         assert_eq!(envelope["command"], "status");
         assert_eq!(envelope["ok"], true);
         assert_eq!(envelope["exit_code"], 0);
@@ -364,6 +393,33 @@ mod tests {
         assert_eq!(envelope["data"]["branch"], "main");
         assert!(envelope["diagnostics"].as_array().unwrap().is_empty());
         assert!(envelope["next_actions"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn command_result_envelope_bounds_next_actions_with_omission_summary() {
+        let actions = (0..20)
+            .map(|index| {
+                json!({
+                    "kind": format!("action_{index}"),
+                    "command": cli_command("status --json"),
+                    "target": {"index": index},
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let envelope =
+            command_result_envelope("scan", true, 0, None, json!({}), Vec::new(), actions);
+        let bounded = envelope["next_actions"].as_array().unwrap();
+        assert_eq!(bounded.len(), MAX_NEXT_ACTIONS);
+        assert_eq!(
+            bounded[MAX_NEXT_ACTIONS - 1]["kind"],
+            "next_actions_omitted"
+        );
+        assert_eq!(bounded[MAX_NEXT_ACTIONS - 1]["target"]["omitted"], 9);
+        assert_eq!(
+            bounded[MAX_NEXT_ACTIONS - 1]["target"]["limit"],
+            MAX_NEXT_ACTIONS
+        );
     }
 
     #[test]

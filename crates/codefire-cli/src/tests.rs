@@ -776,11 +776,15 @@ fn context_pack_returns_atom_changed_and_fire_views() {
         path: open_dir.clone(),
         selector: context::ContextSelector::Atom("REQ-session".to_string()),
         depth: 1,
+        limit: 100,
         json_output: true,
     })
     .unwrap();
     assert_eq!(atom_pack.data["type"], "codefire_context_pack");
     assert_eq!(atom_pack.data["selector"]["kind"], "atom");
+    assert_eq!(atom_pack.data["limits"]["limit"], 100);
+    assert_eq!(atom_pack.data["truncated"]["atoms"], false);
+    assert_eq!(atom_pack.data["scan"]["fire_source"], "preview");
     assert_eq!(atom_pack.data["atoms"].as_array().unwrap().len(), 2);
     assert_eq!(atom_pack.data["trace_links"].as_array().unwrap().len(), 1);
 
@@ -788,6 +792,7 @@ fn context_pack_returns_atom_changed_and_fire_views() {
         path: open_dir.clone(),
         selector: context::ContextSelector::Changed,
         depth: 1,
+        limit: 100,
         json_output: true,
     })
     .unwrap();
@@ -803,6 +808,7 @@ fn context_pack_returns_atom_changed_and_fire_views() {
         path: open_dir,
         selector: context::ContextSelector::Fire("FIRE-001".to_string()),
         depth: 1,
+        limit: 100,
         json_output: true,
     })
     .unwrap();

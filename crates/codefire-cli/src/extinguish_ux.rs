@@ -119,7 +119,7 @@ pub(super) fn parse_interactive_extinguish_args(
     }
     if !saw_interactive {
         return Err(CliError::Usage(
-            "usage: codefire-rs extinguish --interactive [--path <open-dir>] [--json] [--dry-run]"
+            "usage: codefire extinguish --interactive [--path <open-dir>] [--json] [--dry-run]"
                 .to_string(),
         ));
     }
@@ -166,7 +166,7 @@ pub(super) fn run_interactive_extinguish(
         .filter(|fire| fire.status == "open")
         .map(|fire| {
             let mut command = format!(
-                "codefire-rs extinguish {} --resolution addressed --edit-rationale",
+                "codefire extinguish {} --resolution addressed --edit-rationale",
                 fire.display_id
             );
             if let Some(evidence_id) = &first_evidence_id {
@@ -194,9 +194,9 @@ pub(super) fn run_interactive_extinguish(
         },
         "draft_commands": draft_commands,
         "next_actions": [
-            {"kind": "extinguish", "command": "codefire-rs extinguish FIRE-001 --resolution addressed --edit-rationale --evidence-ref <CF-EVIDENCE-id>"},
-            {"kind": "multi_extinguish", "command": "codefire-rs extinguish --all-matching \"REQ-id -> DES-id\" --resolution addressed --edit-rationale --evidence-ref <CF-EVIDENCE-id>"},
-            {"kind": "verify", "command": "codefire-rs verify --details --json"},
+            {"kind": "extinguish", "command": "codefire extinguish FIRE-001 --resolution addressed --edit-rationale --evidence-ref <CF-EVIDENCE-id>"},
+            {"kind": "multi_extinguish", "command": "codefire extinguish --all-matching \"REQ-id -> DES-id\" --resolution addressed --edit-rationale --evidence-ref <CF-EVIDENCE-id>"},
+            {"kind": "verify", "command": "codefire verify --details --json"},
         ],
     });
     Ok(InteractiveExtinguishResult { plan })
@@ -296,7 +296,7 @@ pub(super) fn parse_all_matching_extinguish_args(
         path: path.unwrap_or(env::current_dir()?),
         query: query.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire-rs extinguish --all-matching \"SOURCE -> TARGET\" [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>)".to_string(),
+                "usage: codefire extinguish --all-matching \"SOURCE -> TARGET\" [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>)".to_string(),
             )
         })?,
         resolution,
@@ -588,7 +588,7 @@ fn all_matching_operation_plan(
             })
         }).collect::<Vec<_>>(),
         "next_actions": [
-            {"kind": "verify", "command": "codefire-rs verify --details --json"},
+            {"kind": "verify", "command": "codefire verify --details --json"},
         ],
     })
 }

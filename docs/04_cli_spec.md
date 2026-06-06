@@ -52,7 +52,7 @@ codefire completion <bash|zsh>
 Implementation status note:
 
 - Python v0.2 `codefire` supports the full HTTPS serve surface shown above.
-- Rust v0.6 `codefire-rs` supports `serve <storage-root> [--host] [--port] [--tls-cert] [--tls-key]` for `cf+http://` and `cf+https://`.
+- Rust v0.6 `codefire` supports `serve <storage-root> [--host] [--port] [--tls-cert] [--tls-key]` for `cf+http://` and `cf+https://`.
 - Rust v0.6 supports `--signer`, `--key-id`, `--request-key-id`, commit signature verification, key rotation/revocation policy, request timestamp skew checks, and request nonce replay cache for file-backed and HTTP remote mutators.
 - `install.sh` installs Rust v0.6 as the default `codefire` command and keeps Python v0.2 as `codefire-py`.
 - Python-only maintenance commands such as remote `gc` and token hash generation remain available through `codefire-py` / `./codefire` while Rust v0.6 is the default install CLI.
@@ -319,6 +319,7 @@ resolution.evidence_refsが存在しないevidence objectを指す場合はmissi
 --jsonのexit_codeはprocess exit codeと一致する
 verify blockerのexit codeはopen fires=10、missing links=11、stale resolutions=12、missing evidence refs=21、duplicate Atom IDs=13、failed checks=14の優先順で決まる
 next_actionsはcontext_changed、context_atom、refresh_resolution、rerun_check、commitなどの安定action kindを返す
+next_actionsは最大12件に制限され、超過時はnext_actions_omitted actionに省略件数とlimitを含める
 --metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
 ```
 
@@ -328,6 +329,7 @@ next_actionsはcontext_changed、context_atom、refresh_resolution、rerun_check
 codefire context --branch --json
 codefire context --changed --json
 codefire context --atom REQ-AUTH-001 --depth 2 --json
+codefire context --atom REQ-AUTH-001 --depth 2 --limit 25 --json
 codefire context --fire FIRE-001 --json
 ```
 
@@ -339,6 +341,8 @@ contextはactive stateを書き換えない
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_context_packを含める
 selectorは--branch、--changed、--atom、--fireのいずれか1つ
 --atomの--depthはTraceGraph上の近傍探索深さを指定する
+--depthは最大8に制限され、--limitはatoms/trace_links/firesの出力上限を指定する
+context packはlimitsとtruncatedを含め、preview scan由来のfire metadataはscan.fire_sourceで区別する
 ```
 
 ## 4.12 `commit`

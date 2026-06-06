@@ -1,5 +1,6 @@
 use super::remote::{parse_cf_project_url, remote_dirs};
 use super::{find_repo_root, read_json, CliError};
+use crate::automation::cli_command;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::fs;
@@ -204,7 +205,7 @@ pub(crate) fn storage_report_next_actions(report: &StorageReport) -> Vec<Value> 
     }
     vec![json!({
         "id": "inspect_storage_warnings",
-        "command": "codefire-rs storage report --json",
+        "command": cli_command("storage report --json"),
         "description": "inspect storage warnings and largest objects",
         "context": {"warnings": report.warnings.len()},
     })]

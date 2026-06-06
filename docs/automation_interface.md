@@ -1,6 +1,7 @@
 # Automation Interface
 
 CodeFire v0.6 exposes stable JSON output for state and diagnostic commands through a shared command result envelope.
+The schema identifier is implemented as `COMMAND_RESULT_SCHEMA` in `crates/codefire-cli/src/automation.rs` and currently has the value `codefire.command_result.v1`.
 
 ## Command Result Envelope
 
@@ -31,13 +32,14 @@ next_actions: machine-readable remediation hints
 ```
 
 Human output may change between releases. JSON output with the same schema version must remain backward compatible.
+Suggested commands use the installed CLI display name `codefire`.
 
 `next_actions` entries use this shape:
 
 ```json
 {
   "kind": "context_atom",
-  "command": "codefire-rs context --atom REQ-session --depth 2 --json",
+  "command": "codefire context --atom REQ-session --depth 2 --json",
   "reason": "inspect the atom and nearby trace graph before adding the missing link",
   "target": {"atom_id": "REQ-session"}
 }
@@ -51,6 +53,8 @@ command: suggested command or shell command
 reason: short machine-readable remediation reason
 target: action-specific target object
 ```
+
+`next_actions` is bounded to at most 12 entries per command result envelope. When additional actions are available, the final entry has `kind: "next_actions_omitted"` and includes `target.omitted` plus `target.limit`.
 
 ## Exit Codes
 

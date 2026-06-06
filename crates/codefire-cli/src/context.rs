@@ -7,11 +7,15 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::env;
 use std::path::{Path, PathBuf};
 
+pub(crate) const DEFAULT_CONTEXT_LIMIT: usize = 100;
+const MAX_CONTEXT_DEPTH: usize = 8;
+
 #[derive(Debug)]
 pub(crate) struct ContextOptions {
     pub(crate) path: PathBuf,
     pub(crate) selector: ContextSelector,
     pub(crate) depth: usize,
+    pub(crate) limit: usize,
     pub(crate) json_output: bool,
 }
 
@@ -31,12 +35,19 @@ pub(crate) struct ContextPack {
 struct ContextSnapshot {
     open: OpenContext,
     scan: codefire_core::ScanResult,
+    scan_fire_source: &'static str,
+}
+
+struct Selection {
+    atom_ids: BTreeSet<String>,
+    truncated_atoms: bool,
 }
 
 pub(crate) fn parse_context_args(args: &[String]) -> Result<ContextOptions, CliError> {
     let mut path = None;
     let mut selector = None;
     let mut depth = 1usize;
+    let mut limit = DEFAULT_CONTEXT_LIMIT;
     let mut json_output = false;
     let mut index = 0usize;
     while index < args.len() {
@@ -67,6 +78,20 @@ pub(crate) fn parse_context_args(args: &[String]) -> Result<ContextOptions, CliE
                     CliError::Usage("--depth must be a non-negative integer".to_string())
                 })?;
             }
+            "--limit" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--limit requires a value".to_string()))?;
+                limit = value.parse::<usize>().map_err(|_| {
+                    CliError::Usage("--limit must be a positive integer".to_string())
+                })?;
+                if limit == 0 {
+                    return Err(CliError::Usage(
+                        "--limit must be a positive integer".to_string(),
+                    ));
+                }
+            }
             "--path" => {
                 index += 1;
                 let value = args
@@ -91,14 +116,15 @@ pub(crate) fn parse_context_args(args: &[String]) -> Result<ContextOptions, CliE
     Ok(ContextOptions {
         path: path.unwrap_or(env::current_dir()?),
         selector: selector.unwrap_or(ContextSelector::Branch),
-        depth,
+        depth: depth.min(MAX_CONTEXT_DEPTH),
+        limit,
         json_output,
     })
 }
 
 pub(crate) fn build_context_pack(options: &ContextOptions) -> Result<ContextPack, CliError> {
     let snapshot = context_snapshot(&options.path)?;
-    let data = context_data_json(&snapshot, &options.selector, options.depth)?;
+    let data = context_data_json(&snapshot, &options.selector, options.depth, options.limit)?;
     Ok(ContextPack {
         repo_root: snapshot.open.repo_root,
         data,
@@ -180,27 +206,24 @@ fn context_snapshot(start: &Path) -> Result<ContextSnapshot, CliError> {
         fires,
         base_commit,
         reason,
-        "1970-01-01T00:00:00Z",
+        "preview-context",
     )?;
-    Ok(ContextSnapshot { open, scan })
+    Ok(ContextSnapshot {
+        open,
+        scan,
+        scan_fire_source: "preview",
+    })
 }
 
 fn context_data_json(
     snapshot: &ContextSnapshot,
     selector: &ContextSelector,
     depth: usize,
+    limit: usize,
 ) -> Result<Value, CliError> {
-    let selected_atom_ids = selected_atom_ids(&snapshot.scan, selector, depth)?;
-    let selected_atoms = selected_atom_ids
-        .iter()
-        .filter_map(|atom_id| {
-            atom_by_id(&snapshot.scan.atom_index)
-                .get(atom_id.as_str())
-                .copied()
-        })
-        .map(atom_json)
-        .collect::<Vec<_>>();
-    let trace_links = snapshot
+    let selection = selected_atom_ids(&snapshot.scan, selector, depth, limit)?;
+    let selected_atom_ids = selection.atom_ids;
+    let all_trace_links = snapshot
         .scan
         .trace_graph
         .links
@@ -208,9 +231,8 @@ fn context_data_json(
         .filter(|link| {
             selected_atom_ids.contains(&link.from) || selected_atom_ids.contains(&link.to)
         })
-        .map(trace_link_json)
         .collect::<Vec<_>>();
-    let fires = snapshot
+    let all_fires = snapshot
         .scan
         .open_fires
         .iter()
@@ -226,12 +248,63 @@ fn context_data_json(
             }
             ContextSelector::Branch => true,
         })
+        .collect::<Vec<_>>();
+    let atom_count_before_limit = selected_atom_ids.len();
+    let selected_atoms = selected_atom_ids
+        .iter()
+        .filter_map(|atom_id| {
+            atom_by_id(&snapshot.scan.atom_index)
+                .get(atom_id.as_str())
+                .copied()
+        })
+        .take(limit)
+        .map(atom_json)
+        .collect::<Vec<_>>();
+    let trace_links = all_trace_links
+        .iter()
+        .take(limit)
+        .map(|link| trace_link_json(link))
+        .collect::<Vec<_>>();
+    let fires = all_fires
+        .iter()
+        .take(limit)
+        .map(|fire| fire_json(fire))
+        .collect::<Vec<_>>();
+    let scan_changed_atoms = snapshot
+        .scan
+        .changed_atoms
+        .iter()
+        .take(limit)
+        .cloned()
+        .collect::<Vec<_>>();
+    let scan_open_fires = snapshot
+        .scan
+        .open_fires
+        .iter()
+        .take(limit)
         .map(fire_json)
         .collect::<Vec<_>>();
+    let atoms_truncated =
+        selection.truncated_atoms || atom_count_before_limit > selected_atoms.len();
+    let trace_links_truncated = all_trace_links.len() > trace_links.len();
+    let fires_truncated = all_fires.len() > fires.len();
+    let scan_changed_atoms_truncated = snapshot.scan.changed_atoms.len() > scan_changed_atoms.len();
+    let scan_open_fires_truncated = snapshot.scan.open_fires.len() > scan_open_fires.len();
     Ok(json!({
         "type": "codefire_context_pack",
         "version": 1,
         "selector": selector_json(selector, depth),
+        "limits": {
+            "max_depth": MAX_CONTEXT_DEPTH,
+            "limit": limit,
+        },
+        "truncated": {
+            "atoms": atoms_truncated,
+            "trace_links": trace_links_truncated,
+            "fires": fires_truncated,
+            "scan_changed_atoms": scan_changed_atoms_truncated,
+            "scan_open_fires": scan_open_fires_truncated,
+        },
         "branch": {
             "name": &snapshot.open.branch,
             "open_dir": snapshot.open.open_dir,
@@ -239,8 +312,9 @@ fn context_data_json(
         },
         "scan": {
             "branch_state": scan_branch_state(snapshot.scan.changed_atoms.len(), snapshot.scan.open_fires.len()),
-            "changed_atoms": &snapshot.scan.changed_atoms,
-            "open_fires": snapshot.scan.open_fires.iter().map(fire_json).collect::<Vec<_>>(),
+            "fire_source": snapshot.scan_fire_source,
+            "changed_atoms": scan_changed_atoms,
+            "open_fires": scan_open_fires,
         },
         "atoms": selected_atoms,
         "trace_links": trace_links,
@@ -252,15 +326,22 @@ fn selected_atom_ids(
     scan: &codefire_core::ScanResult,
     selector: &ContextSelector,
     depth: usize,
-) -> Result<BTreeSet<String>, CliError> {
+    limit: usize,
+) -> Result<Selection, CliError> {
     match selector {
-        ContextSelector::Branch => Ok(BTreeSet::new()),
-        ContextSelector::Changed => Ok(scan.changed_atoms.iter().cloned().collect()),
+        ContextSelector::Branch => Ok(selection(BTreeSet::new(), false)),
+        ContextSelector::Changed => {
+            let total = scan.changed_atoms.len();
+            Ok(selection(
+                scan.changed_atoms.iter().take(limit).cloned().collect(),
+                total > limit,
+            ))
+        }
         ContextSelector::Atom(atom_id) => {
             if !atom_by_id(&scan.atom_index).contains_key(atom_id.as_str()) {
                 return Err(CliError::Usage(format!("unknown atom: {atom_id}")));
             }
-            Ok(atom_neighborhood(&scan.trace_graph, atom_id, depth))
+            Ok(atom_neighborhood(&scan.trace_graph, atom_id, depth, limit))
         }
         ContextSelector::Fire(value) => {
             let fire = scan
@@ -274,8 +355,19 @@ fn selected_atom_ids(
             for atom_id in &fire.trace_path {
                 ids.insert(atom_id.clone());
             }
-            Ok(ids)
+            let total = ids.len();
+            if total > limit {
+                ids = ids.into_iter().take(limit).collect();
+            }
+            Ok(selection(ids, total > limit))
         }
+    }
+}
+
+fn selection(atom_ids: BTreeSet<String>, truncated_atoms: bool) -> Selection {
+    Selection {
+        atom_ids,
+        truncated_atoms,
     }
 }
 
@@ -283,10 +375,12 @@ fn atom_neighborhood(
     trace_graph: &codefire_core::TraceGraph,
     start: &str,
     depth: usize,
-) -> BTreeSet<String> {
+    limit: usize,
+) -> Selection {
     let adjacency = trace_adjacency(trace_graph);
     let mut seen = BTreeSet::new();
     let mut queue = VecDeque::new();
+    let mut truncated = false;
     seen.insert(start.to_string());
     queue.push_back((start.to_string(), 0usize));
     while let Some((atom_id, distance)) = queue.pop_front() {
@@ -296,12 +390,17 @@ fn atom_neighborhood(
         if let Some(next) = adjacency.get(atom_id.as_str()) {
             for neighbor in next {
                 if seen.insert(neighbor.clone()) {
+                    if seen.len() > limit {
+                        seen.remove(neighbor);
+                        truncated = true;
+                        continue;
+                    }
                     queue.push_back((neighbor.clone(), distance + 1));
                 }
             }
         }
     }
-    seen
+    selection(seen, truncated)
 }
 
 fn trace_adjacency(trace_graph: &codefire_core::TraceGraph) -> BTreeMap<&str, Vec<String>> {
@@ -387,7 +486,9 @@ mod tests {
             "--atom".to_string(),
             "REQ-session".to_string(),
             "--depth".to_string(),
-            "2".to_string(),
+            "99".to_string(),
+            "--limit".to_string(),
+            "7".to_string(),
             "--path".to_string(),
             "/tmp/open".to_string(),
             "--json".to_string(),
@@ -397,7 +498,8 @@ mod tests {
             parsed.selector,
             ContextSelector::Atom("REQ-session".to_string())
         );
-        assert_eq!(parsed.depth, 2);
+        assert_eq!(parsed.depth, MAX_CONTEXT_DEPTH);
+        assert_eq!(parsed.limit, 7);
         assert_eq!(parsed.path, PathBuf::from("/tmp/open"));
         assert!(parsed.json_output);
     }
@@ -426,16 +528,44 @@ mod tests {
         };
 
         assert_eq!(
-            atom_neighborhood(&trace_graph, "REQ-session", 1),
+            atom_neighborhood(&trace_graph, "REQ-session", 1, DEFAULT_CONTEXT_LIMIT).atom_ids,
             BTreeSet::from(["DES-session".to_string(), "REQ-session".to_string()])
         );
         assert_eq!(
-            atom_neighborhood(&trace_graph, "REQ-session", 2),
+            atom_neighborhood(&trace_graph, "REQ-session", 2, DEFAULT_CONTEXT_LIMIT).atom_ids,
             BTreeSet::from([
                 "CODE-session".to_string(),
                 "DES-session".to_string(),
                 "REQ-session".to_string(),
             ])
         );
+    }
+
+    #[test]
+    fn atom_neighborhood_reports_truncation_when_limit_is_reached() {
+        let trace_graph = codefire_core::TraceGraph {
+            type_tag: "trace_graph".to_string(),
+            version: 1,
+            links: vec![
+                codefire_core::TraceLink {
+                    from: "REQ-session".to_string(),
+                    to: "DES-session".to_string(),
+                    link_type: "refined_by".to_string(),
+                    link_id: "REQ-session->DES-session:refined_by".to_string(),
+                    link_hash: "h1".to_string(),
+                },
+                codefire_core::TraceLink {
+                    from: "REQ-session".to_string(),
+                    to: "TEST-session".to_string(),
+                    link_type: "verified_by".to_string(),
+                    link_id: "REQ-session->TEST-session:verified_by".to_string(),
+                    link_hash: "h2".to_string(),
+                },
+            ],
+        };
+
+        let selection = atom_neighborhood(&trace_graph, "REQ-session", 1, 2);
+        assert_eq!(selection.atom_ids.len(), 2);
+        assert!(selection.truncated_atoms);
     }
 }

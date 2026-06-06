@@ -29,7 +29,7 @@ pub(super) fn upload_operation_plan(
             {"kind": "write_remote_branch", "branch": remote_branch, "head": head},
         ],
         "next_actions": [
-            {"kind": "list_remote", "command": "codefire-rs list <cf-project-url>", "target": {"remote_url": &options.remote_url}},
+            {"kind": "list_remote", "command": "codefire list <cf-project-url>", "target": {"remote_url": &options.remote_url}},
         ],
     })
 }
@@ -60,7 +60,7 @@ pub(super) fn request_merge_operation_plan(
             {"kind": "write_merge_request", "id": mr_id},
         ],
         "next_actions": [
-            {"kind": "request_review", "command": format!("codefire-rs request-review <project-url> {mr_id} --decision approve"), "target": {"merge_request_id": mr_id}},
+            {"kind": "request_review", "command": format!("codefire request-review <project-url> {mr_id} --decision approve"), "target": {"merge_request_id": mr_id}},
         ],
     })
 }
@@ -88,7 +88,7 @@ pub(super) fn request_review_operation_plan(
             {"kind": "update_merge_request_status", "status": if options.decision == "approve" { "approved" } else { "rejected" }},
         ],
         "next_actions": [
-            {"kind": "request_apply", "command": format!("codefire-rs request-apply {} {}", options.project_url, options.mr_id), "target": {"merge_request_id": &options.mr_id}},
+            {"kind": "request_apply", "command": format!("codefire request-apply {} {}", options.project_url, options.mr_id), "target": {"merge_request_id": &options.mr_id}},
         ],
     })
 }
@@ -118,7 +118,7 @@ pub(super) fn request_apply_operation_plan(
             {"kind": "update_merge_request_status", "status": "applied"},
         ],
         "next_actions": [
-            {"kind": "clone", "command": format!("codefire-rs clone <cf-url> {}", target_branch), "target": {"branch": target_branch}},
+            {"kind": "clone", "command": format!("codefire clone <cf-url> {}", target_branch), "target": {"branch": target_branch}},
         ],
     })
 }
