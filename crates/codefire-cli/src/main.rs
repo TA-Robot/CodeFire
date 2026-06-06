@@ -2,7 +2,7 @@ use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fmt;
-use std::fs;
+use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
@@ -3968,20 +3968,7 @@ fn ensure_repo_layout(repo_root: &Path) -> Result<(), CliError> {
     ] {
         fs::create_dir_all(path)?;
     }
-    for subdir in [
-        "blobs",
-        "content_manifests",
-        "atom_indexes",
-        "trace_graphs",
-        "fire_ledgers",
-        "resolution_ledgers",
-        "verifications",
-        "policies",
-        "artifact_refs",
-        "evidence",
-        "commits",
-        "branches",
-    ] {
+    for subdir in codefire_store::known_object_subdirs() {
         fs::create_dir_all(cf.join("objects").join(subdir))?;
     }
     Ok(())
@@ -4026,8 +4013,10 @@ fn write_json_atomic(path: &Path, value: &Value) -> Result<(), CliError> {
             .open(&temp_path)?;
         file.write_all(serde_json::to_string_pretty(value)?.as_bytes())?;
         file.write_all(b"\n")?;
+        file.sync_all()?;
     }
     fs::rename(temp_path, path)?;
+    sync_directory_best_effort(parent)?;
     Ok(())
 }
 
@@ -4039,6 +4028,17 @@ fn unique_temp_path(path: &Path) -> PathBuf {
         .map(|extension| format!("{extension}."))
         .unwrap_or_default();
     path.with_extension(format!("{extension}{}.{}.tmp", std::process::id(), counter))
+}
+
+fn sync_directory_best_effort(path: &Path) -> Result<(), CliError> {
+    match File::open(path) {
+        Ok(dir) => {
+            let _ = dir.sync_all();
+            Ok(())
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => Ok(()),
+        Err(error) => Err(CliError::Io(error)),
+    }
 }
 
 fn read_status(start: &Path) -> Result<Status, CliError> {

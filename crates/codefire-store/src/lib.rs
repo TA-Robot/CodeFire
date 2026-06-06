@@ -4,9 +4,44 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fmt;
-use std::fs::{self, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+pub const OBJECT_ID_DIGEST_HEX_LENGTH: usize = 12;
+
+const OBJECT_KINDS: &[ObjectKind] = &[
+    ObjectKind::new("blob", "CF-BLOB", "blobs"),
+    ObjectKind::new("content_manifest", "CF-MANIFEST", "content_manifests"),
+    ObjectKind::new("atom_index", "CF-ATOMINDEX", "atom_indexes"),
+    ObjectKind::new("trace_graph", "CF-TRACE", "trace_graphs"),
+    ObjectKind::new("fire_ledger", "CF-FIRELEDGER", "fire_ledgers"),
+    ObjectKind::new("resolution_ledger", "CF-RESOLUTION", "resolution_ledgers"),
+    ObjectKind::new("verification", "CF-VERIFY", "verifications"),
+    ObjectKind::new("policy", "CF-POLICY", "policies"),
+    ObjectKind::new("artifact_ref", "CF-ARTIFACT", "artifact_refs"),
+    ObjectKind::new("evidence", "CF-EVIDENCE", "evidence"),
+    ObjectKind::new("commit", "CF-COMMIT", "commits"),
+    ObjectKind::new("branch", "CF-BRANCH", "branches"),
+];
+
+#[derive(Debug, Clone, Copy)]
+struct ObjectKind {
+    type_tag: &'static str,
+    prefix: &'static str,
+    subdir: &'static str,
+}
+
+impl ObjectKind {
+    const fn new(type_tag: &'static str, prefix: &'static str, subdir: &'static str) -> Self {
+        Self {
+            type_tag,
+            prefix,
+            subdir,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum StoreError {
@@ -87,43 +122,40 @@ pub fn object_digest(type_tag: &str, payload: &Value) -> Result<String, serde_js
 
 pub fn object_id(type_tag: &str, payload: &Value) -> Result<String, serde_json::Error> {
     let digest = object_digest(type_tag, payload)?;
-    Ok(format!("{}-{}", object_prefix(type_tag), &digest[..12]))
+    Ok(format!(
+        "{}-{}",
+        object_prefix(type_tag),
+        &digest[..OBJECT_ID_DIGEST_HEX_LENGTH]
+    ))
 }
 
 pub fn object_prefix(type_tag: &str) -> &'static str {
-    match type_tag {
-        "blob" => "CF-BLOB",
-        "content_manifest" => "CF-MANIFEST",
-        "atom_index" => "CF-ATOMINDEX",
-        "trace_graph" => "CF-TRACE",
-        "fire_ledger" => "CF-FIRELEDGER",
-        "resolution_ledger" => "CF-RESOLUTION",
-        "verification" => "CF-VERIFY",
-        "policy" => "CF-POLICY",
-        "artifact_ref" => "CF-ARTIFACT",
-        "evidence" => "CF-EVIDENCE",
-        "commit" => "CF-COMMIT",
-        "branch" => "CF-BRANCH",
-        _ => "CF-OBJECT",
-    }
+    object_kind_by_type(type_tag)
+        .map(|kind| kind.prefix)
+        .unwrap_or("CF-OBJECT")
 }
 
 pub fn object_subdir(type_tag: &str) -> Option<&'static str> {
-    match type_tag {
-        "blob" => Some("blobs"),
-        "content_manifest" => Some("content_manifests"),
-        "atom_index" => Some("atom_indexes"),
-        "trace_graph" => Some("trace_graphs"),
-        "fire_ledger" => Some("fire_ledgers"),
-        "resolution_ledger" => Some("resolution_ledgers"),
-        "verification" => Some("verifications"),
-        "policy" => Some("policies"),
-        "artifact_ref" => Some("artifact_refs"),
-        "evidence" => Some("evidence"),
-        "commit" => Some("commits"),
-        "branch" => Some("branches"),
-        _ => None,
-    }
+    object_kind_by_type(type_tag).map(|kind| kind.subdir)
+}
+
+pub fn known_object_subdirs() -> impl Iterator<Item = &'static str> {
+    OBJECT_KINDS.iter().map(|kind| kind.subdir)
+}
+
+fn object_kind_by_type(type_tag: &str) -> Option<ObjectKind> {
+    OBJECT_KINDS
+        .iter()
+        .copied()
+        .find(|kind| kind.type_tag == type_tag)
+}
+
+fn object_subdir_by_id(object_id: &str) -> Option<&'static str> {
+    OBJECT_KINDS
+        .iter()
+        .filter(|kind| object_id.starts_with(kind.prefix))
+        .max_by_key(|kind| kind.prefix.len())
+        .map(|kind| kind.subdir)
 }
 
 pub fn object_record(type_tag: &str, payload: Value) -> Result<ObjectRecord, StoreError> {
@@ -186,6 +218,13 @@ pub fn validate_object_record(
 }
 
 pub fn object_record_path(objects_root: &Path, object_id: &str) -> Option<PathBuf> {
+    if let Some(subdir) = object_subdir_by_id(object_id) {
+        let candidate = objects_root.join(subdir).join(format!("{object_id}.json"));
+        if candidate.exists() {
+            return Some(candidate);
+        }
+        return None;
+    }
     for entry in fs::read_dir(objects_root).ok()? {
         let entry = entry.ok()?;
         let file_type = entry.file_type().ok()?;
@@ -219,18 +258,33 @@ pub fn store_object(
         return Ok(record.object_id);
     }
 
-    let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
-        Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-            let existing = read_object_record_path(&path)?;
-            validate_object_record(&existing, Some(&record.object_id), Some(&path))?;
-            return Ok(record.object_id);
-        }
-        Err(error) => return Err(StoreError::Io(error)),
-    };
+    let temp_path = unique_temp_path(&path);
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp_path)?;
     let rendered = serde_json::to_string_pretty(&record)?;
     file.write_all(rendered.as_bytes())?;
     file.write_all(b"\n")?;
+    file.sync_all()?;
+    drop(file);
+    let temp_record = read_object_record_path(&temp_path)?;
+    validate_object_record(&temp_record, Some(&record.object_id), None)?;
+    match fs::hard_link(&temp_path, &path) {
+        Ok(()) => {
+            fs::remove_file(&temp_path)?;
+            sync_directory_best_effort(path.parent().expect("object path must have parent"))?;
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            fs::remove_file(&temp_path)?;
+            let existing = read_object_record_path(&path)?;
+            validate_object_record(&existing, Some(&record.object_id), Some(&path))?;
+        }
+        Err(error) => {
+            let _ = fs::remove_file(&temp_path);
+            return Err(StoreError::Io(error));
+        }
+    }
     Ok(record.object_id)
 }
 
@@ -252,6 +306,32 @@ pub fn read_object_record(
 fn read_object_record_path(path: &Path) -> Result<ObjectRecord, StoreError> {
     let text = fs::read_to_string(path)?;
     Ok(serde_json::from_str(&text)?)
+}
+
+static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+fn unique_temp_path(path: &Path) -> PathBuf {
+    let counter = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("object.json");
+    path.with_file_name(format!(
+        ".{file_name}.{}.{}.tmp",
+        std::process::id(),
+        counter
+    ))
+}
+
+fn sync_directory_best_effort(path: &Path) -> Result<(), StoreError> {
+    match File::open(path) {
+        Ok(dir) => {
+            let _ = dir.sync_all();
+            Ok(())
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => Ok(()),
+        Err(error) => Err(StoreError::Io(error)),
+    }
 }
 
 pub fn validate_sealed_commit(objects_root: &Path, commit_id: &str) -> Result<(), StoreError> {
@@ -495,6 +575,31 @@ mod tests {
     }
 
     #[test]
+    fn known_object_subdirs_are_single_source_of_truth() {
+        let subdirs = known_object_subdirs().collect::<Vec<_>>();
+        assert!(subdirs.contains(&"blobs"));
+        assert!(subdirs.contains(&"commits"));
+        assert!(subdirs.contains(&"evidence"));
+        assert_eq!(object_subdir("commit"), Some("commits"));
+        assert_eq!(object_prefix("commit"), "CF-COMMIT");
+        assert_eq!(OBJECT_ID_DIGEST_HEX_LENGTH, 12);
+    }
+
+    #[test]
+    fn object_record_path_routes_known_prefix_to_subdir() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let commits = objects.join("commits");
+        fs::create_dir_all(&commits).unwrap();
+        let commit_id = "CF-COMMIT-123456789abc";
+        let path = commits.join(format!("{commit_id}.json"));
+        fs::write(&path, "{}\n").unwrap();
+
+        assert_eq!(object_record_path(&objects, commit_id), Some(path));
+        assert_eq!(object_record_path(&objects, "CF-COMMIT-missing"), None);
+    }
+
+    #[test]
     fn store_object_writes_and_reuses_immutable_record() {
         let temp = tempdir().unwrap();
         let objects = temp.path().join("objects");
@@ -511,6 +616,12 @@ mod tests {
             .join("policies")
             .join(format!("{first_id}.json"))
             .exists());
+        let leftovers = fs::read_dir(objects.join("policies"))
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name().to_string_lossy().contains(".tmp"))
+            .count();
+        assert_eq!(leftovers, 0);
     }
 
     #[test]

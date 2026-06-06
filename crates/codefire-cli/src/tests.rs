@@ -39,6 +39,13 @@ fn init_creates_python_compatible_repo_layout() {
     assert_eq!(branches[0].name, "main");
     assert_eq!(branches[0].head, result.main_commit);
     assert_eq!(branches[0].state, "closed");
+    for subdir in codefire_store::known_object_subdirs() {
+        assert!(repo_root
+            .join(".codefire")
+            .join("objects")
+            .join(subdir)
+            .is_dir());
+    }
     codefire_store::validate_sealed_commit(
         &repo_root.join(".codefire").join("objects"),
         &result.main_commit,
