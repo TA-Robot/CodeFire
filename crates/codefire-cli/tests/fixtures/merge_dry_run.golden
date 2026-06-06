@@ -3,7 +3,7 @@ merge dry-run feature-session into main; target unchanged
   source: <SOURCE>
   target: <TARGET>
   target dir: <TARGET_DIR>
-  file actions: 1 conflicts: 1 semantic candidates: 1
+  file actions: 1 conflicts: 1 binary conflicts: 0 semantic candidates: 1
   write_conflict_markers: docs/spec/session.md
 Semantic conflict candidates:
   REQ-session source=sha256:req-source target=sha256:req-target

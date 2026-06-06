@@ -1160,6 +1160,7 @@ struct MergeResult {
     target_dir: PathBuf,
     file_actions: Vec<MergeFileAction>,
     conflicts: Vec<String>,
+    binary_conflicts: Vec<BinaryMergeConflict>,
     semantic_conflicts: Vec<SemanticConflictCandidate>,
     dry_run: bool,
     applied: bool,
@@ -1172,11 +1173,21 @@ struct MergeFileAction {
     content: Option<Vec<u8>>,
 }
 
+#[derive(Debug, Clone)]
+struct BinaryMergeConflict {
+    path: String,
+    target_path: Option<String>,
+    source_path: Option<String>,
+    target_bytes: Option<usize>,
+    source_bytes: Option<usize>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MergeAction {
     WriteSource,
     DeleteTarget,
     WriteConflictMarkers,
+    WriteConflictSide,
 }
 
 impl MergeAction {
@@ -1185,6 +1196,7 @@ impl MergeAction {
             Self::WriteSource => "write_source",
             Self::DeleteTarget => "delete_target",
             Self::WriteConflictMarkers => "write_conflict_markers",
+            Self::WriteConflictSide => "write_conflict_side",
         }
     }
 }
@@ -2523,6 +2535,7 @@ fn build_merge_result(repo_root: &Path, options: &MergeOptions) -> Result<MergeR
         .cloned()
         .collect::<BTreeSet<_>>();
     let mut conflicts = Vec::new();
+    let mut binary_conflicts = Vec::new();
     let mut file_actions = Vec::new();
     for path in paths {
         let base_data = base_files.get(&path);
@@ -2547,15 +2560,33 @@ fn build_merge_result(repo_root: &Path, options: &MergeOptions) -> Result<MergeR
             continue;
         }
         conflicts.push(path.clone());
-        let content = conflict_content(
-            target_data.map(Vec::as_slice),
-            source_data.map(Vec::as_slice),
-        );
-        file_actions.push(MergeFileAction {
-            path,
-            action: MergeAction::WriteConflictMarkers,
-            content: Some(content),
-        });
+        let target_bytes = target_data.map(Vec::as_slice);
+        let source_bytes = source_data.map(Vec::as_slice);
+        if conflict_markers_are_safe(target_bytes, source_bytes) {
+            let content = conflict_content(target_bytes, source_bytes);
+            file_actions.push(MergeFileAction {
+                path,
+                action: MergeAction::WriteConflictMarkers,
+                content: Some(content),
+            });
+        } else {
+            let conflict = binary_merge_conflict(&path, target_bytes, source_bytes);
+            if let (Some(side_path), Some(bytes)) = (&conflict.target_path, target_bytes) {
+                file_actions.push(MergeFileAction {
+                    path: side_path.clone(),
+                    action: MergeAction::WriteConflictSide,
+                    content: Some(bytes.to_vec()),
+                });
+            }
+            if let (Some(side_path), Some(bytes)) = (&conflict.source_path, source_bytes) {
+                file_actions.push(MergeFileAction {
+                    path: side_path.clone(),
+                    action: MergeAction::WriteConflictSide,
+                    content: Some(bytes.to_vec()),
+                });
+            }
+            binary_conflicts.push(conflict);
+        }
     }
 
     let semantic_conflicts =
@@ -2569,6 +2600,7 @@ fn build_merge_result(repo_root: &Path, options: &MergeOptions) -> Result<MergeR
         target_dir,
         file_actions,
         conflicts,
+        binary_conflicts,
         semantic_conflicts,
         dry_run: options.dry_run,
         applied: false,
@@ -2597,6 +2629,13 @@ fn apply_merge_result(repo_root: &Path, result: &mut MergeResult) -> Result<(), 
             .iter()
             .cloned()
             .map(Value::String)
+            .collect(),
+    );
+    state["binary_merge_conflicts"] = Value::Array(
+        result
+            .binary_conflicts
+            .iter()
+            .map(binary_merge_conflict_json)
             .collect(),
     );
     state["semantic_conflict_candidates"] = Value::Array(
@@ -2680,9 +2719,10 @@ fn render_merge_dry_run(result: &MergeResult) -> String {
     output.push_str(&format!("  target: {}\n", result.target_head));
     output.push_str(&format!("  target dir: {}\n", result.target_dir.display()));
     output.push_str(&format!(
-        "  file actions: {} conflicts: {} semantic candidates: {}\n",
+        "  file actions: {} conflicts: {} binary conflicts: {} semantic candidates: {}\n",
         result.file_actions.len(),
         result.conflicts.len(),
+        result.binary_conflicts.len(),
         result.semantic_conflicts.len()
     ));
     if result.file_actions.is_empty() {
@@ -2690,6 +2730,17 @@ fn render_merge_dry_run(result: &MergeResult) -> String {
     } else {
         for action in &result.file_actions {
             output.push_str(&format!("  {}: {}\n", action.action.as_str(), action.path));
+        }
+    }
+    if !result.binary_conflicts.is_empty() {
+        output.push_str("Binary conflicts:\n");
+        for conflict in &result.binary_conflicts {
+            output.push_str(&format!(
+                "  {} target={} source={}\n",
+                conflict.path,
+                conflict.target_path.as_deref().unwrap_or("(deleted)"),
+                conflict.source_path.as_deref().unwrap_or("(deleted)")
+            ));
         }
     }
     if !result.semantic_conflicts.is_empty() {
@@ -2724,6 +2775,7 @@ fn render_merge_result_json(result: &MergeResult) -> Result<String, CliError> {
         "base": {"commit": &result.base},
         "file_actions": result.file_actions.iter().map(merge_file_action_json).collect::<Vec<_>>(),
         "conflicts": &result.conflicts,
+        "binary_conflicts": result.binary_conflicts.iter().map(binary_merge_conflict_json).collect::<Vec<_>>(),
         "semantic_conflicts": result.semantic_conflicts.iter().map(semantic_conflict_json).collect::<Vec<_>>(),
         "next_actions": merge_next_actions(result),
     });
@@ -2735,6 +2787,16 @@ fn merge_file_action_json(action: &MergeFileAction) -> Value {
         "path": &action.path,
         "action": action.action.as_str(),
         "bytes": action.content.as_ref().map(Vec::len),
+    })
+}
+
+fn binary_merge_conflict_json(conflict: &BinaryMergeConflict) -> Value {
+    json!({
+        "path": &conflict.path,
+        "target_path": &conflict.target_path,
+        "source_path": &conflict.source_path,
+        "target_bytes": conflict.target_bytes,
+        "source_bytes": conflict.source_bytes,
     })
 }
 
@@ -2760,10 +2822,21 @@ fn merge_next_actions(result: &MergeResult) -> Vec<Value> {
         }));
     }
     for conflict in &result.conflicts {
+        let binary = result
+            .binary_conflicts
+            .iter()
+            .find(|item| item.path == *conflict);
         actions.push(json!({
             "kind": "resolve_file_conflict",
             "path": conflict,
-            "hint": format!("merge writes conflict markers for {conflict}; resolve them before commit"),
+            "binary": binary.is_some(),
+            "target_path": binary.and_then(|item| item.target_path.as_ref()),
+            "source_path": binary.and_then(|item| item.source_path.as_ref()),
+            "hint": if binary.is_some() {
+                format!("merge saved binary conflict sides for {conflict}; choose or reconstruct the target file before commit")
+            } else {
+                format!("merge writes conflict markers for {conflict}; resolve them before commit")
+            },
         }));
     }
     for candidate in &result.semantic_conflicts {
@@ -4190,6 +4263,34 @@ fn conflict_content(target_data: Option<&[u8]>, source_data: Option<&[u8]>) -> V
     let target = conflict_text(target_data);
     let source = conflict_text(source_data);
     format!("<<<<<<< target\n{target}=======\n{source}>>>>>>> source\n").into_bytes()
+}
+
+fn conflict_markers_are_safe(target_data: Option<&[u8]>, source_data: Option<&[u8]>) -> bool {
+    let target_safe = target_data.map_or(true, is_text_conflict_side);
+    let source_safe = source_data.map_or(true, is_text_conflict_side);
+    target_safe && source_safe
+}
+
+fn is_text_conflict_side(data: &[u8]) -> bool {
+    !data.contains(&0) && std::str::from_utf8(data).is_ok()
+}
+
+fn binary_merge_conflict(
+    path: &str,
+    target_data: Option<&[u8]>,
+    source_data: Option<&[u8]>,
+) -> BinaryMergeConflict {
+    BinaryMergeConflict {
+        path: path.to_string(),
+        target_path: target_data.map(|_| conflict_side_path(path, "target")),
+        source_path: source_data.map(|_| conflict_side_path(path, "source")),
+        target_bytes: target_data.map(<[u8]>::len),
+        source_bytes: source_data.map(<[u8]>::len),
+    }
+}
+
+fn conflict_side_path(path: &str, side: &str) -> String {
+    format!(".codefire-conflicts/{path}/{side}")
 }
 
 fn conflict_text(data: Option<&[u8]>) -> String {

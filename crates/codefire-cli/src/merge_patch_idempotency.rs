@@ -4,8 +4,9 @@ use super::idempotency::{
 };
 use super::{
     absolute_path, common_ancestor, load_branch_record, opened_registry_path, read_json,
-    read_optional_json, required_string, write_json_atomic, CliError, MergeAction, MergeFileAction,
-    MergeOptions, MergeResult, OpenContext, PatchImportOptions, SemanticConflictCandidate,
+    read_optional_json, required_string, write_json_atomic, BinaryMergeConflict, CliError,
+    MergeAction, MergeFileAction, MergeOptions, MergeResult, OpenContext, PatchImportOptions,
+    SemanticConflictCandidate,
 };
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -153,6 +154,7 @@ fn merge_result_json(result: &MergeResult) -> Value {
         "target_dir": &result.target_dir,
         "file_actions": result.file_actions.iter().map(merge_file_action_record).collect::<Vec<_>>(),
         "conflicts": &result.conflicts,
+        "binary_conflicts": result.binary_conflicts.iter().map(binary_merge_conflict_record).collect::<Vec<_>>(),
         "semantic_conflicts": result.semantic_conflicts.iter().map(semantic_conflict_record).collect::<Vec<_>>(),
         "dry_run": result.dry_run,
         "applied": result.applied,
@@ -170,6 +172,7 @@ fn merge_result_from_record(record: &Value, path: &Path) -> Result<MergeResult, 
         target_dir: PathBuf::from(required_string(&result, &["target_dir"])?),
         file_actions: merge_file_actions_from_result(&result, path)?,
         conflicts: string_array(&result, "conflicts", path)?,
+        binary_conflicts: binary_conflicts_from_result(&result, path)?,
         semantic_conflicts: semantic_conflicts_from_result(&result, path)?,
         dry_run: required_bool(&result, "dry_run", path)?,
         applied: required_bool(&result, "applied", path)?,
@@ -181,6 +184,16 @@ fn merge_file_action_record(action: &MergeFileAction) -> Value {
         "path": &action.path,
         "action": action.action.as_str(),
         "content": &action.content,
+    })
+}
+
+fn binary_merge_conflict_record(conflict: &BinaryMergeConflict) -> Value {
+    json!({
+        "path": &conflict.path,
+        "target_path": &conflict.target_path,
+        "source_path": &conflict.source_path,
+        "target_bytes": conflict.target_bytes,
+        "source_bytes": conflict.source_bytes,
     })
 }
 
@@ -210,6 +223,30 @@ fn merge_file_actions_from_result(
                 path: required_string(action, &["path"])?,
                 action: merge_action_from_str(&required_string(action, &["action"])?)?,
                 content: optional_byte_array(action.get("content"), record_path)?,
+            })
+        })
+        .collect()
+}
+
+fn binary_conflicts_from_result(
+    result: &Value,
+    record_path: &Path,
+) -> Result<Vec<BinaryMergeConflict>, CliError> {
+    let Some(conflicts) = result.get("binary_conflicts") else {
+        return Ok(Vec::new());
+    };
+    let conflicts = conflicts.as_array().ok_or_else(|| {
+        invalid_record(record_path, "merge result binary_conflicts must be a list")
+    })?;
+    conflicts
+        .iter()
+        .map(|conflict| {
+            Ok(BinaryMergeConflict {
+                path: required_string(conflict, &["path"])?,
+                target_path: optional_string(conflict.get("target_path"), record_path)?,
+                source_path: optional_string(conflict.get("source_path"), record_path)?,
+                target_bytes: optional_usize(conflict.get("target_bytes"), record_path)?,
+                source_bytes: optional_usize(conflict.get("source_bytes"), record_path)?,
             })
         })
         .collect()
@@ -248,6 +285,7 @@ fn merge_action_from_str(value: &str) -> Result<MergeAction, CliError> {
         "write_source" => Ok(MergeAction::WriteSource),
         "delete_target" => Ok(MergeAction::DeleteTarget),
         "write_conflict_markers" => Ok(MergeAction::WriteConflictMarkers),
+        "write_conflict_side" => Ok(MergeAction::WriteConflictSide),
         _ => Err(CliError::InvalidRepository(format!(
             "unknown merge action in idempotency record: {value}"
         ))),
@@ -283,6 +321,24 @@ fn required_bool(value: &Value, key: &str, record_path: &Path) -> Result<bool, C
         .get(key)
         .and_then(Value::as_bool)
         .ok_or_else(|| invalid_record(record_path, &format!("{key} must be a boolean")))
+}
+
+fn optional_usize(value: Option<&Value>, record_path: &Path) -> Result<Option<usize>, CliError> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Number(value)) => {
+            let number = value.as_u64().ok_or_else(|| {
+                invalid_record(record_path, "optional field must be a non-negative integer")
+            })?;
+            usize::try_from(number)
+                .map(Some)
+                .map_err(|_| invalid_record(record_path, "optional integer does not fit usize"))
+        }
+        Some(_) => Err(invalid_record(
+            record_path,
+            "optional field must be an integer",
+        )),
+    }
 }
 
 fn optional_string(value: Option<&Value>, record_path: &Path) -> Result<Option<String>, CliError> {

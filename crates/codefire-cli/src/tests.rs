@@ -3984,6 +3984,118 @@ fn merge_branch_writes_conflict_markers_for_divergent_changes() {
 }
 
 #[test]
+fn merge_branch_writes_binary_conflict_sides_without_lossy_markers() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_bytes_commit(&objects, "assets/model.bin", b"\x00base");
+    let target_commit = write_file_bytes_commit_with_parents(
+        &objects,
+        "assets/model.bin",
+        b"\x00target",
+        vec![base_commit.clone()],
+    );
+    let source_commit = write_file_bytes_commit_with_parents(
+        &objects,
+        "assets/model.bin",
+        b"\x00source",
+        vec![base_commit],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": target_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-binary",
+            "head": source_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let result = merge_branch(
+        &repo_root,
+        &MergeOptions {
+            source_branch: "feature-binary".to_string(),
+            target_branch: "main".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.conflicts, vec!["assets/model.bin".to_string()]);
+    assert_eq!(result.binary_conflicts.len(), 1);
+    let conflict = &result.binary_conflicts[0];
+    assert_eq!(conflict.target_bytes, Some(7));
+    assert_eq!(conflict.source_bytes, Some(7));
+    assert_eq!(
+        fs::read(open_dir.join("assets").join("model.bin")).unwrap(),
+        b"\x00target"
+    );
+    assert_eq!(
+        fs::read(
+            open_dir
+                .join(".codefire-conflicts")
+                .join("assets")
+                .join("model.bin")
+                .join("target")
+        )
+        .unwrap(),
+        b"\x00target"
+    );
+    assert_eq!(
+        fs::read(
+            open_dir
+                .join(".codefire-conflicts")
+                .join("assets")
+                .join("model.bin")
+                .join("source")
+        )
+        .unwrap(),
+        b"\x00source"
+    );
+    let state = read_json(&active_state_path(&open_dir).join("state.json")).unwrap();
+    assert_eq!(
+        state["binary_merge_conflicts"][0]["path"],
+        "assets/model.bin"
+    );
+    let rendered = render_merge_result_json(&result).unwrap();
+    let json: Value = serde_json::from_str(&rendered).unwrap();
+    assert_eq!(json["binary_conflicts"][0]["path"], "assets/model.bin");
+    assert_eq!(json["next_actions"][0]["binary"], true);
+}
+
+#[test]
 fn merge_dry_run_reports_plan_without_writing_target() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
@@ -4393,6 +4505,47 @@ fn write_file_commit_with_parents(
             "version": 1,
             "encoding": "base64",
             "content": encode_base64(contents.as_bytes()),
+        }),
+    )
+    .unwrap();
+    let manifest = codefire_store::store_object(
+        objects,
+        "content_manifest",
+        json!({
+            "type": "content_manifest",
+            "version": 1,
+            "entries": [{"path": path, "kind": "file", "mode": "100644", "blob": blob}],
+        }),
+    )
+    .unwrap();
+    let mut roots = write_required_roots(objects);
+    roots.insert("content_manifest".to_string(), Value::String(manifest));
+    codefire_store::store_object(
+        objects,
+        "commit",
+        codefire_store::commit_payload(parents, roots, consistent_certificate()),
+    )
+    .unwrap()
+}
+
+fn write_file_bytes_commit(objects: &Path, path: &str, contents: &[u8]) -> String {
+    write_file_bytes_commit_with_parents(objects, path, contents, vec![])
+}
+
+fn write_file_bytes_commit_with_parents(
+    objects: &Path,
+    path: &str,
+    contents: &[u8],
+    parents: Vec<String>,
+) -> String {
+    let blob = codefire_store::store_object(
+        objects,
+        "blob",
+        json!({
+            "type": "blob",
+            "version": 1,
+            "encoding": "base64",
+            "content": encode_base64(contents),
         }),
     )
     .unwrap();

@@ -391,12 +391,14 @@ targetはopen-cleanでなければならない
 merge実行時点ではcommitを作らない
 merge fireを生成し、targetをopen-burningにする
 --dry-runは共通祖先、file action、file conflict、semantic conflict candidateを予測し、target file / active state / branch stateを変更しない
---jsonはcodefire_merge_plan envelopeを出力し、file_actions、conflicts、semantic_conflicts、next_actionsを含める
+--jsonはcodefire_merge_plan envelopeを出力し、file_actions、conflicts、binary_conflicts、semantic_conflicts、next_actionsを含める
 --idempotency-keyは成功したmerge resultを.codefire/idempotency/merge/へ記録する
 同じ--idempotency-keyかつ同じmerge request payloadは保存済みmerge resultを返し、target open-burning checkより先にreplayする
 同じ--idempotency-keyでsource/target/source_head/target_head/base/target_dir/repoが異なるpayloadはexit code 33で拒否する
 semantic conflict candidateは同一Atom IDがsource/target双方でbaseから変わり、最終content_hashが異なる場合に報告する
 semantic conflict candidateは自動解決しない
+text conflictはtarget fileへconflict markerを書き込む
+binaryまたは非UTF-8 conflictはtarget fileへlossy markerを書かず、`.codefire-conflicts/<path>/target` と `.codefire-conflicts/<path>/source` に復元用bytesを保存し、binary_conflicts metadataへ記録する
 ```
 
 ## 4.14 `upload`
