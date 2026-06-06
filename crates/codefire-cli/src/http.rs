@@ -1287,7 +1287,7 @@ fn http_merge_request_is_stale(storage_root: &Path, mr: &Value) -> Result<bool, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{Cursor, Read, Write};
+    use std::io::{Cursor, ErrorKind, Read, Write};
     use std::net::TcpStream;
     use std::thread;
     use std::time::{Duration, Instant};
@@ -1414,7 +1414,13 @@ mod tests {
             .unwrap();
 
         let mut response = [0u8; 128];
-        let read = fast_client.read(&mut response).unwrap();
+        let read = loop {
+            match fast_client.read(&mut response) {
+                Ok(read) => break read,
+                Err(error) if error.kind() == ErrorKind::Interrupted => continue,
+                Err(error) => panic!("fast HTTP client read failed: {error}"),
+            }
+        };
 
         assert!(started_at.elapsed() < Duration::from_secs(2));
         assert!(std::str::from_utf8(&response[..read])

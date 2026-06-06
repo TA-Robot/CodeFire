@@ -2428,6 +2428,36 @@ fn evidence_command_timeout_kills_child_and_records_timeout() {
 }
 
 #[test]
+fn evidence_argv_command_capture_avoids_shell_expansion() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+
+    let parsed = parse_evidence_add_args(&[
+        "--path".to_string(),
+        repo_root.to_string_lossy().into_owned(),
+        "--from-argv".to_string(),
+        "printf".to_string(),
+        "--argv=%s".to_string(),
+        "--argv".to_string(),
+        "literal; echo injected".to_string(),
+    ])
+    .unwrap();
+    let result = run_evidence_add(&parsed).unwrap();
+
+    assert_eq!(result.command_exit_code, Some(0));
+    let objects = repo_root.join(".codefire").join("objects");
+    let evidence = codefire_store::read_object(&objects, &result.evidence_id).unwrap();
+    assert_eq!(evidence["command"]["mode"], "argv");
+    assert_eq!(evidence["command"]["shell"], false);
+    assert_eq!(
+        evidence["command"]["argv"],
+        json!(["printf", "%s", "literal; echo injected"])
+    );
+    assert_eq!(evidence["command"]["stdout"], "literal; echo injected");
+}
+
+#[test]
 fn evidence_batch_validates_all_items_before_writing_objects() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
@@ -2443,7 +2473,8 @@ fn evidence_batch_validates_all_items_before_writing_objects() {
             "defaults": {"label": "batch-smoke", "max_output_bytes": 2},
             "items": [
                 {"artifact": artifact_path, "artifact_uri": "artifact://model.bin"},
-                {"from_command": "printf okay", "label": "command-smoke"}
+                {"from_command": "printf okay", "label": "command-smoke"},
+                {"from_argv": ["printf", "%s", "argv-okay"], "label": "argv-smoke"}
             ]
         }))
         .unwrap(),
@@ -2477,7 +2508,7 @@ fn evidence_batch_validates_all_items_before_writing_objects() {
 
     let dry_run = run_evidence_batch(&parsed).unwrap();
     let dry_run_data = evidence_batch_data_json(&dry_run);
-    assert_eq!(dry_run.item_count, 2);
+    assert_eq!(dry_run.item_count, 3);
     assert_eq!(dry_run_data["type"], "codefire_evidence_batch_result");
     assert_eq!(dry_run_data["dry_run"], true);
     assert_eq!(dry_run_data["plan"]["command"], "evidence-add-batch");
@@ -2497,16 +2528,18 @@ fn evidence_batch_validates_all_items_before_writing_objects() {
         artifact_path: None,
         artifact_uri: None,
         command: None,
+        command_argv: None,
         command_cwd: None,
         command_timeout_ms: 300_000,
         max_output_bytes: 64 * 1024,
     })
     .unwrap();
-    assert_eq!(applied.item_count, 2);
-    assert_eq!(applied.results.len(), 2);
+    assert_eq!(applied.item_count, 3);
+    assert_eq!(applied.results.len(), 3);
     assert!(applied.results[0].artifact_ref_id.is_some());
     assert_eq!(applied.results[1].command_exit_code, Some(0));
-    assert_eq!(fs::read_dir(objects.join("evidence")).unwrap().count(), 2);
+    assert_eq!(applied.results[2].command_exit_code, Some(0));
+    assert_eq!(fs::read_dir(objects.join("evidence")).unwrap().count(), 3);
     assert_eq!(
         fs::read_dir(objects.join("artifact_refs")).unwrap().count(),
         1
@@ -2522,6 +2555,7 @@ fn evidence_batch_validates_all_items_before_writing_objects() {
         artifact_path: None,
         artifact_uri: None,
         command: None,
+        command_argv: None,
         command_cwd: None,
         command_timeout_ms: 300_000,
         max_output_bytes: 64 * 1024,
@@ -2562,6 +2596,7 @@ fn extinguish_evidence_ref_links_resolution_and_verify_detects_missing_ref() {
         artifact_path: None,
         artifact_uri: None,
         command: Some("printf ok".to_string()),
+        command_argv: None,
         command_cwd: None,
         command_timeout_ms: 300_000,
         max_output_bytes: 128,

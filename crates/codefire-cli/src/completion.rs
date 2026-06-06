@@ -112,7 +112,7 @@ _codefire_complete()
       if [[ $COMP_CWORD -eq 2 ]]; then
         COMPREPLY=( $(compgen -W "add" -- "$cur") )
       else
-        COMPREPLY=( $(compgen -W "--path --artifact --from-command --batch --label --dry-run --json" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--path --artifact --from-command --from-argv --argv --batch --label --dry-run --json" -- "$cur") )
       fi
       ;;
     explain)
@@ -187,7 +187,7 @@ _codefire()
       _arguments '1:storage command:(report)' '--json[emit JSON]' '--large-threshold[large object threshold]' '--remote[remote project URL]'
       ;;
     evidence)
-      _arguments '1:evidence command:(add)' '--path[repo or open path]' '--artifact[artifact path]' '--from-command[command]' '--batch[batch file]' '--label[label]' '--dry-run[dry run]' '--json[emit JSON]'
+      _arguments '1:evidence command:(add)' '--path[repo or open path]' '--artifact[artifact path]' '--from-command[shell command]' '--from-argv[program]' '--argv[argv argument]' '--batch[batch file]' '--label[label]' '--dry-run[dry run]' '--json[emit JSON]'
       ;;
     explain)
       _arguments '1:explain subject:(fire atom verify-failure storage-warning)'

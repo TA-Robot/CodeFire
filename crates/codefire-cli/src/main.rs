@@ -826,7 +826,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 "unsupported evidence command: {command}"
             ))),
             None => Err(CliError::Usage(
-                "usage: codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>|--batch <file>) [--label <text>] [--cwd <dir>] [--timeout <duration>] [--max-output-bytes <bytes>] [--dry-run] [--json]".to_string(),
+                "usage: codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>|--from-argv <program> [--argv <arg>...]|--batch <file>) [--label <text>] [--cwd <dir>] [--timeout <duration>] [--max-output-bytes <bytes>] [--dry-run] [--json]".to_string(),
             )),
         },
         Some("explain") => {

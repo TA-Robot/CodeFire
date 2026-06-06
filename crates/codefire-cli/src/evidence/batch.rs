@@ -30,6 +30,7 @@ struct EvidenceBatchItem {
     artifact_path: Option<PathBuf>,
     artifact_uri: Option<String>,
     command: Option<String>,
+    command_argv: Option<Vec<String>>,
     command_cwd: Option<PathBuf>,
     command_timeout_ms: Option<u64>,
     max_output_bytes: Option<usize>,
@@ -130,6 +131,7 @@ fn resolve_item(
         artifact_path: item.artifact_path.clone(),
         artifact_uri: item.artifact_uri.clone(),
         command: item.command.clone(),
+        command_argv: item.command_argv.clone(),
         command_cwd: item
             .command_cwd
             .clone()
@@ -179,6 +181,8 @@ fn evidence_batch_item_plan(item: &EvidenceAddOptions) -> Value {
         "artifact_uri": &item.artifact_uri,
         "has_command": item.command.is_some(),
         "command": &item.command,
+        "has_command_argv": item.command_argv.is_some(),
+        "command_argv": &item.command_argv,
         "cwd": &item.command_cwd,
         "timeout_ms": item.command_timeout_ms,
         "max_output_bytes": item.max_output_bytes,
@@ -242,6 +246,7 @@ fn parse_json_item(value: &Value) -> Result<EvidenceBatchItem, CliError> {
         artifact_path: optional_json_path(object.get("artifact"), "item.artifact")?,
         artifact_uri: optional_json_string(object.get("artifact_uri"), "item.artifact_uri")?,
         command: optional_json_string(object.get("from_command"), "item.from_command")?,
+        command_argv: optional_json_string_array(object.get("from_argv"), "item.from_argv")?,
         command_cwd: optional_json_path(object.get("cwd"), "item.cwd")?,
         command_timeout_ms: optional_json_duration_ms(object.get("timeout_ms"), "item.timeout_ms")?,
         max_output_bytes: optional_json_usize(
@@ -249,6 +254,30 @@ fn parse_json_item(value: &Value) -> Result<EvidenceBatchItem, CliError> {
             "item.max_output_bytes",
         )?,
     })
+}
+
+fn optional_json_string_array(
+    value: Option<&Value>,
+    field: &str,
+) -> Result<Option<Vec<String>>, CliError> {
+    value
+        .map(|value| {
+            let items = value
+                .as_array()
+                .ok_or_else(|| CliError::Usage(format!("{field} must be a string array")))?;
+            if items.is_empty() {
+                return Err(CliError::Usage(format!("{field} must not be empty")));
+            }
+            items
+                .iter()
+                .map(|item| {
+                    item.as_str()
+                        .map(str::to_string)
+                        .ok_or_else(|| CliError::Usage(format!("{field} must be a string array")))
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()
 }
 
 fn optional_json_string(value: Option<&Value>, field: &str) -> Result<Option<String>, CliError> {
@@ -419,6 +448,9 @@ fn apply_yaml_item_field(
         "artifact" => item.artifact_path = Some(PathBuf::from(value)),
         "artifact_uri" => item.artifact_uri = Some(value),
         "from_command" => item.command = Some(value),
+        "from_argv" => {
+            item.command_argv = Some(parse_yaml_string_array(&value, "from_argv", line_number)?);
+        }
         "cwd" => item.command_cwd = Some(PathBuf::from(value)),
         "timeout_ms" => item.command_timeout_ms = Some(parse_duration_ms(&value)?),
         "max_output_bytes" => {
@@ -432,6 +464,23 @@ fn apply_yaml_item_field(
         }
     }
     Ok(())
+}
+
+fn parse_yaml_string_array(
+    value: &str,
+    field: &str,
+    line_number: usize,
+) -> Result<Vec<String>, CliError> {
+    let parsed = serde_json::from_str::<Value>(value).map_err(|_| {
+        CliError::Usage(format!(
+            "invalid evidence batch YAML: {field} must be an inline JSON string array at line {line_number}"
+        ))
+    })?;
+    optional_json_string_array(Some(&parsed), field)?.ok_or_else(|| {
+        CliError::Usage(format!(
+            "invalid evidence batch YAML: {field} must not be empty at line {line_number}"
+        ))
+    })
 }
 
 fn parse_yaml_key_value(line: &str, line_number: usize) -> Result<(String, String), CliError> {

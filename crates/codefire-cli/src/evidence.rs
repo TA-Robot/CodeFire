@@ -25,6 +25,7 @@ pub(crate) struct EvidenceAddOptions {
     pub(crate) artifact_path: Option<PathBuf>,
     pub(crate) artifact_uri: Option<String>,
     pub(crate) command: Option<String>,
+    pub(crate) command_argv: Option<Vec<String>>,
     pub(crate) command_cwd: Option<PathBuf>,
     pub(crate) command_timeout_ms: u64,
     pub(crate) max_output_bytes: usize,
@@ -48,6 +49,7 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
     let mut artifact_path = None;
     let mut artifact_uri = None;
     let mut command = None;
+    let mut command_argv = None::<Vec<String>>;
     let mut command_cwd = None;
     let mut command_timeout_ms = DEFAULT_COMMAND_TIMEOUT_MS;
     let mut max_output_bytes = DEFAULT_MAX_OUTPUT_BYTES;
@@ -80,6 +82,18 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
                 index += 1;
                 command = Some(required_arg(args, index, "--from-command")?.to_string());
             }
+            "--from-argv" => {
+                index += 1;
+                command_argv = Some(vec![required_arg(args, index, "--from-argv")?.to_string()]);
+            }
+            "--argv" => {
+                index += 1;
+                let value = required_arg(args, index, "--argv")?.to_string();
+                let argv = command_argv.as_mut().ok_or_else(|| {
+                    CliError::Usage("--argv requires --from-argv first".to_string())
+                })?;
+                argv.push(value);
+            }
             "--cwd" => {
                 index += 1;
                 command_cwd = Some(PathBuf::from(required_arg(args, index, "--cwd")?));
@@ -109,6 +123,15 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
             }
             value if value.starts_with("--from-command=") => {
                 command = Some(value.trim_start_matches("--from-command=").to_string());
+            }
+            value if value.starts_with("--from-argv=") => {
+                command_argv = Some(vec![value.trim_start_matches("--from-argv=").to_string()]);
+            }
+            value if value.starts_with("--argv=") => {
+                let argv = command_argv.as_mut().ok_or_else(|| {
+                    CliError::Usage("--argv requires --from-argv first".to_string())
+                })?;
+                argv.push(value.trim_start_matches("--argv=").to_string());
             }
             value if value.starts_with("--cwd=") => {
                 command_cwd = Some(PathBuf::from(value.trim_start_matches("--cwd=")));
@@ -140,6 +163,7 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
         && (artifact_path.is_some()
             || artifact_uri.is_some()
             || command.is_some()
+            || command_argv.is_some()
             || command_cwd.is_some())
     {
         return Err(CliError::Usage(
@@ -151,9 +175,18 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
             "evidence add --dry-run requires --batch".to_string(),
         ));
     }
-    if batch_path.is_none() && artifact_path.is_none() && command.is_none() {
+    if command.is_some() && command_argv.is_some() {
         return Err(CliError::Usage(
-            "evidence add requires --artifact or --from-command".to_string(),
+            "evidence add cannot combine --from-command and --from-argv".to_string(),
+        ));
+    }
+    if batch_path.is_none()
+        && artifact_path.is_none()
+        && command.is_none()
+        && command_argv.is_none()
+    {
+        return Err(CliError::Usage(
+            "evidence add requires --artifact, --from-command, or --from-argv".to_string(),
         ));
     }
     Ok(EvidenceAddOptions {
@@ -165,6 +198,7 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
         artifact_path,
         artifact_uri,
         command,
+        command_argv,
         command_cwd,
         command_timeout_ms,
         max_output_bytes,
@@ -181,9 +215,12 @@ pub(crate) fn run_evidence_add(
         Some(path) => Some(store_artifact_ref(&objects, options, path)?),
         None => None,
     };
-    let command_capture = match options.command.as_deref() {
-        Some(command) => Some(capture_command(command, options, &repo_root)?),
-        None => None,
+    let command_capture = if let Some(command) = options.command.as_deref() {
+        Some(capture_shell_command(command, options, &repo_root)?)
+    } else if let Some(argv) = options.command_argv.as_deref() {
+        Some(capture_argv_command(argv, options, &repo_root)?)
+    } else {
+        None
     };
     let command_exit_code = command_capture
         .as_ref()
@@ -213,10 +250,25 @@ pub(crate) fn run_evidence_add(
 }
 
 pub(super) fn validate_evidence_add_options(options: &EvidenceAddOptions) -> Result<(), CliError> {
-    if options.artifact_path.is_none() && options.command.is_none() {
+    if options.command.is_some() && options.command_argv.is_some() {
         return Err(CliError::Usage(
-            "evidence add requires --artifact or --from-command".to_string(),
+            "evidence add cannot combine --from-command and --from-argv".to_string(),
         ));
+    }
+    if options.artifact_path.is_none()
+        && options.command.is_none()
+        && options.command_argv.is_none()
+    {
+        return Err(CliError::Usage(
+            "evidence add requires --artifact, --from-command, or --from-argv".to_string(),
+        ));
+    }
+    if let Some(argv) = options.command_argv.as_deref() {
+        if argv.is_empty() || argv[0].trim().is_empty() {
+            return Err(CliError::Usage(
+                "evidence add --from-argv requires a program".to_string(),
+            ));
+        }
     }
     if let Some(path) = options.artifact_path.as_deref() {
         let absolute = absolute_existing_path(path).map_err(|error| {
@@ -313,6 +365,7 @@ fn store_artifact_ref(
 #[derive(Debug)]
 struct CommandCapture {
     command: String,
+    argv: Option<Vec<String>>,
     cwd: PathBuf,
     mode: &'static str,
     shell: bool,
@@ -331,6 +384,7 @@ impl CommandCapture {
     fn to_json(&self) -> Value {
         json!({
             "command": &self.command,
+            "argv": &self.argv,
             "cwd": &self.cwd,
             "mode": self.mode,
             "shell": self.shell,
@@ -347,7 +401,7 @@ impl CommandCapture {
     }
 }
 
-fn capture_command(
+fn capture_shell_command(
     command: &str,
     options: &EvidenceAddOptions,
     repo_root: &Path,
@@ -356,7 +410,6 @@ fn capture_command(
         .command_cwd
         .clone()
         .unwrap_or_else(|| repo_root.to_path_buf());
-    let start = Instant::now();
     let mut command_process = Command::new("sh");
     command_process
         .arg("-c")
@@ -364,7 +417,60 @@ fn capture_command(
         .current_dir(&cwd)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut child = command_process.spawn()?;
+    let child = command_process.spawn()?;
+    finish_command_capture(
+        command.to_string(),
+        None,
+        "shell",
+        true,
+        cwd,
+        child,
+        options,
+    )
+}
+
+fn capture_argv_command(
+    argv: &[String],
+    options: &EvidenceAddOptions,
+    repo_root: &Path,
+) -> Result<CommandCapture, CliError> {
+    let cwd = options
+        .command_cwd
+        .clone()
+        .unwrap_or_else(|| repo_root.to_path_buf());
+    let Some((program, args)) = argv.split_first() else {
+        return Err(CliError::Usage(
+            "evidence add --from-argv requires a program".to_string(),
+        ));
+    };
+    let mut command_process = Command::new(program);
+    command_process
+        .args(args)
+        .current_dir(&cwd)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let child = command_process.spawn()?;
+    finish_command_capture(
+        argv.join(" "),
+        Some(argv.to_vec()),
+        "argv",
+        false,
+        cwd,
+        child,
+        options,
+    )
+}
+
+fn finish_command_capture(
+    command: String,
+    argv: Option<Vec<String>>,
+    mode: &'static str,
+    shell: bool,
+    cwd: PathBuf,
+    mut child: std::process::Child,
+    options: &EvidenceAddOptions,
+) -> Result<CommandCapture, CliError> {
+    let start = Instant::now();
     let timeout = Duration::from_millis(options.command_timeout_ms);
     let mut timed_out = false;
     while child.try_wait()?.is_none() {
@@ -380,10 +486,11 @@ fn capture_command(
     let (stdout, stdout_truncated) = lossy_truncated(&output.stdout, options.max_output_bytes);
     let (stderr, stderr_truncated) = lossy_truncated(&output.stderr, options.max_output_bytes);
     Ok(CommandCapture {
-        command: command.to_string(),
+        command,
+        argv,
         cwd,
-        mode: "shell",
-        shell: true,
+        mode,
+        shell,
         exit_code: output.status.code(),
         success: output.status.success() && !timed_out,
         timed_out,
