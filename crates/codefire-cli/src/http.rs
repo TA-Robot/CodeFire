@@ -5,12 +5,14 @@ use serde_json::{json, Value};
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
-use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 const MAX_HTTP_BODY_BYTES: usize = 16 * 1024 * 1024;
 const DEFAULT_HTTP_TIMEOUT_MS: u64 = 30_000;
+const MAX_HTTP_SERVER_CONNECTIONS: usize = 32;
 
 static HTTP_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -338,8 +340,8 @@ fn http_timeout() -> Duration {
 }
 
 pub(crate) fn serve_http(options: &ServeOptions) -> Result<(), CliError> {
-    let storage_root = absolute_path(&options.storage_root)?;
-    fs::create_dir_all(&storage_root)?;
+    let storage_root = Arc::new(absolute_path(&options.storage_root)?);
+    fs::create_dir_all(storage_root.as_path())?;
     let listener = TcpListener::bind((options.host.as_str(), options.port))?;
     let address = listener.local_addr()?;
     let tls_config = match (&options.tls_cert, &options.tls_key) {
@@ -356,28 +358,124 @@ pub(crate) fn serve_http(options: &ServeOptions) -> Result<(), CliError> {
         address.ip(),
         address.port()
     );
+    let connection_limiter = Arc::new(ServerConnectionLimiter::new(MAX_HTTP_SERVER_CONNECTIONS));
     for stream in listener.incoming() {
         match stream {
-            Ok(mut stream) => {
-                if let Some(config) = &tls_config {
-                    match http_tls::accept_server(stream, config.clone()) {
-                        Ok(mut tls_stream) => {
-                            if let Err(error) = handle_http_stream(&storage_root, &mut tls_stream) {
-                                eprintln!("HTTP request failed: {error}");
-                            }
-                        }
-                        Err(error) => {
-                            eprintln!("TLS handshake failed: {error}");
-                        }
-                    }
-                } else if let Err(error) = handle_http_stream(&storage_root, &mut stream) {
-                    eprintln!("HTTP request failed: {error}");
+            Ok(stream) => {
+                if let Some(permit) = connection_limiter.try_acquire() {
+                    spawn_http_connection_handler(
+                        Arc::clone(&storage_root),
+                        tls_config.clone(),
+                        stream,
+                        permit,
+                    )?;
+                } else {
+                    reject_overloaded_http_connection(stream, tls_config.is_some());
                 }
             }
             Err(error) => return Err(CliError::Io(error)),
         }
     }
     Ok(())
+}
+
+#[derive(Debug)]
+struct ServerConnectionLimiter {
+    active: AtomicUsize,
+    max: usize,
+}
+
+impl ServerConnectionLimiter {
+    fn new(max: usize) -> Self {
+        Self {
+            active: AtomicUsize::new(0),
+            max: max.max(1),
+        }
+    }
+
+    fn try_acquire(self: &Arc<Self>) -> Option<ServerConnectionPermit> {
+        loop {
+            let active = self.active.load(Ordering::Acquire);
+            if active >= self.max {
+                return None;
+            }
+            if self
+                .active
+                .compare_exchange(active, active + 1, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                return Some(ServerConnectionPermit {
+                    limiter: Arc::clone(self),
+                });
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn active(&self) -> usize {
+        self.active.load(Ordering::Acquire)
+    }
+}
+
+#[derive(Debug)]
+struct ServerConnectionPermit {
+    limiter: Arc<ServerConnectionLimiter>,
+}
+
+impl Drop for ServerConnectionPermit {
+    fn drop(&mut self) {
+        self.limiter.active.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+fn spawn_http_connection_handler(
+    storage_root: Arc<PathBuf>,
+    tls_config: Option<Arc<rustls::ServerConfig>>,
+    stream: TcpStream,
+    permit: ServerConnectionPermit,
+) -> Result<(), CliError> {
+    std::thread::Builder::new()
+        .name("codefire-http-connection".to_string())
+        .spawn(move || {
+            let _permit = permit;
+            if let Err(error) = handle_tcp_http_connection(&storage_root, tls_config, stream) {
+                eprintln!("HTTP request failed: {error}");
+            }
+        })?;
+    Ok(())
+}
+
+fn handle_tcp_http_connection(
+    storage_root: &Path,
+    tls_config: Option<Arc<rustls::ServerConfig>>,
+    stream: TcpStream,
+) -> Result<(), CliError> {
+    configure_http_server_stream(&stream)?;
+    if let Some(config) = tls_config {
+        let mut tls_stream = http_tls::accept_server(stream, config)?;
+        handle_http_stream(storage_root, &mut tls_stream)
+    } else {
+        let mut stream = stream;
+        handle_http_stream(storage_root, &mut stream)
+    }
+}
+
+fn configure_http_server_stream(stream: &TcpStream) -> Result<(), CliError> {
+    let timeout = http_timeout();
+    stream.set_read_timeout(Some(timeout))?;
+    stream.set_write_timeout(Some(timeout))?;
+    Ok(())
+}
+
+fn reject_overloaded_http_connection(mut stream: TcpStream, tls_enabled: bool) {
+    let _ = configure_http_server_stream(&stream);
+    if !tls_enabled {
+        let _ = write_http_json(
+            &mut stream,
+            503,
+            &json!({"error": "CodeFire HTTP server connection limit reached"}),
+        );
+    }
 }
 
 fn handle_http_stream<S: Read + Write>(
@@ -530,6 +628,7 @@ fn write_http_json<S: Read + Write>(
         404 => "Not Found",
         409 => "Conflict",
         413 => "Payload Too Large",
+        503 => "Service Unavailable",
         _ => "Error",
     };
     let header = format!(
@@ -1186,7 +1285,10 @@ fn http_merge_request_is_stale(storage_root: &Path, mr: &Value) -> Result<bool, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
+    use std::io::{Cursor, Read, Write};
+    use std::net::TcpStream;
+    use std::thread;
+    use std::time::{Duration, Instant};
 
     #[test]
     fn http_request_rejects_truncated_body() {
@@ -1250,5 +1352,80 @@ mod tests {
 
         assert_ne!(first, second);
         assert_eq!(first.parent(), second.parent());
+    }
+
+    #[test]
+    fn server_connection_limiter_caps_and_releases_active_connections() {
+        let limiter = Arc::new(ServerConnectionLimiter::new(2));
+        let first = limiter.try_acquire().unwrap();
+        let second = limiter.try_acquire().unwrap();
+
+        assert_eq!(limiter.active(), 2);
+        assert!(limiter.try_acquire().is_none());
+
+        drop(first);
+        assert_eq!(limiter.active(), 1);
+        let third = limiter.try_acquire().unwrap();
+        assert_eq!(limiter.active(), 2);
+
+        drop(second);
+        drop(third);
+        assert_eq!(limiter.active(), 0);
+    }
+
+    #[test]
+    fn spawned_http_handler_keeps_slow_connection_from_blocking_next_request() {
+        let storage_root = Arc::new(test_storage_root("concurrent-server"));
+        fs::create_dir_all(storage_root.as_path()).unwrap();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let limiter = Arc::new(ServerConnectionLimiter::new(2));
+        let server_storage_root = Arc::clone(&storage_root);
+        let server_limiter = Arc::clone(&limiter);
+
+        let server = thread::spawn(move || {
+            for _ in 0..2 {
+                let (stream, _) = listener.accept().unwrap();
+                let permit = server_limiter.try_acquire().unwrap();
+                spawn_http_connection_handler(
+                    Arc::clone(&server_storage_root),
+                    None,
+                    stream,
+                    permit,
+                )
+                .unwrap();
+            }
+        });
+
+        let mut slow_client = TcpStream::connect(address).unwrap();
+        slow_client
+            .write_all(b"POST /v1/projects/org/app/branches/main/upload HTTP/1.1\r\n")
+            .unwrap();
+
+        let started_at = Instant::now();
+        let mut fast_client = TcpStream::connect(address).unwrap();
+        fast_client
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        fast_client
+            .write_all(b"GET /invalid HTTP/1.1\r\nContent-Length: 0\r\n\r\n")
+            .unwrap();
+
+        let mut response = [0u8; 128];
+        let read = fast_client.read(&mut response).unwrap();
+
+        assert!(started_at.elapsed() < Duration::from_secs(2));
+        assert!(std::str::from_utf8(&response[..read])
+            .unwrap()
+            .starts_with("HTTP/1.1 400 Bad Request"));
+
+        drop(slow_client);
+        server.join().unwrap();
+        let _ = fs::remove_dir_all(storage_root.as_path());
+    }
+
+    fn test_storage_root(label: &str) -> PathBuf {
+        let suffix = HTTP_TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("codefire-{label}-{}-{suffix}", std::process::id()))
     }
 }
