@@ -2239,7 +2239,11 @@ fn storage_report_counts_file_remote_project_storage() {
     fs::create_dir_all(&dirs.idempotency).unwrap();
     write_json_atomic(
         &remote_project_root.join("server_policy.json"),
-        &json!({"gc": {"retention_seconds": 3600, "retention_generations": 2}}),
+        &json!({"gc": {
+            "retention_seconds": 3600,
+            "retention_generations": 2,
+            "idempotency_retention_seconds": 1
+        }}),
     )
     .unwrap();
     write_json_atomic(
@@ -2257,7 +2261,23 @@ fn storage_report_counts_file_remote_project_storage() {
     .unwrap();
     fs::write(dirs.branches.join("main.json"), "{}\n").unwrap();
     fs::write(dirs.merge_requests.join("mr_1.json"), "{}\n").unwrap();
-    fs::write(dirs.idempotency.join("upload.json"), "{}\n").unwrap();
+    fs::create_dir_all(dirs.idempotency.join("remote_upload")).unwrap();
+    fs::write(
+        dirs.idempotency
+            .join("remote_upload")
+            .join("old-upload.json"),
+        serde_json::to_string_pretty(&json!({
+            "version": 1,
+            "command": "remote_upload",
+            "key": "old-upload",
+            "payload_hash": "sha256-old",
+            "payload_mode": "hash_only",
+            "result": {"head": "CF-COMMIT-old"},
+            "created_at": "1970-01-01T00:00:00Z"
+        }))
+        .unwrap(),
+    )
+    .unwrap();
 
     let parsed = parse_storage_report_args(&[
         repo_root.to_string_lossy().into_owned(),
@@ -2283,13 +2303,24 @@ fn storage_report_counts_file_remote_project_storage() {
     assert_eq!(remote.idempotency.files, 1);
     assert_eq!(remote.retention.retention_seconds, 3600);
     assert_eq!(remote.retention.retention_generations, 2);
+    assert_eq!(remote.retention.idempotency_retention_seconds, 1);
     assert_eq!(remote.retention.current_generation, 7);
+    assert_eq!(remote.idempotency_retention.expired_files, 1);
+    assert_eq!(
+        remote.idempotency_retention.oldest_created_at.as_deref(),
+        Some("1970-01-01T00:00:00Z")
+    );
     assert!(remote
         .objects_by_generation
         .iter()
         .any(|stats| stats.generation == Some(7) && stats.files == 1));
+    assert!(report
+        .warnings
+        .iter()
+        .any(|warning| warning.kind == "remote_idempotency_retention"));
     assert_eq!(data["remotes"].as_array().unwrap().len(), 2);
     assert_eq!(data["remotes"][0]["retention"]["current_generation"], 7);
+    assert_eq!(data["remotes"][0]["idempotency"]["expired_files"], 1);
     assert_eq!(
         data["remotes"][0]["objects_by_generation"][0]["generation"],
         7
@@ -3549,6 +3580,17 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
     )
     .unwrap();
     assert_eq!(replay_upload.head, first_upload.head);
+    assert_eq!(replay_upload.plan["replayed"], true);
+    let upload_record = read_json(
+        &remote_dirs(&remote_project_root)
+            .idempotency
+            .join("remote_upload")
+            .join("upload-main-once.json"),
+    )
+    .unwrap();
+    assert_eq!(upload_record["payload_mode"], "hash_only");
+    assert!(upload_record.get("payload").is_none());
+    assert!(upload_record["result"].get("plan").is_none());
     let upload_conflict = upload_branch(
         &repo_root,
         &UploadOptions {

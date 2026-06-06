@@ -101,12 +101,14 @@ pub(crate) fn load_remote_idempotency_result(
         return Ok(None);
     };
     verify_idempotency_record(&record, &path, command, key, payload)?;
-    Ok(Some(
-        record
-            .get("result")
-            .cloned()
-            .ok_or_else(|| missing_result_error(&path))?,
-    ))
+    let mut result = record
+        .get("result")
+        .cloned()
+        .ok_or_else(|| missing_result_error(&path))?;
+    if let Some(result) = result.as_object_mut() {
+        result.insert("replayed".to_string(), Value::Bool(true));
+    }
+    Ok(Some(result))
 }
 
 pub(crate) fn save_remote_idempotency_result(
@@ -123,8 +125,8 @@ pub(crate) fn save_remote_idempotency_result(
         "command": command,
         "key": key,
         "payload_hash": idempotency_payload_hash(payload)?,
-        "payload": payload,
         "result": result,
+        "payload_mode": "hash_only",
         "created_at": now_iso_utc(),
     });
     write_json_atomic(&path, &record)
@@ -139,7 +141,7 @@ pub(crate) fn load_remote_upload_idempotency(
         .map(|result| {
             Ok(UploadResult {
                 head: required_string(&result, &["head"])?,
-                plan: result_plan(&result, project_root, "remote_upload", key)?,
+                plan: replay_plan("remote_upload", key),
             })
         })
         .transpose()
@@ -156,7 +158,7 @@ pub(crate) fn save_remote_upload_idempotency(
         "remote_upload",
         key,
         payload,
-        &json!({"head": &result.head, "plan": &result.plan}),
+        &json!({"head": &result.head}),
     )
 }
 
@@ -171,7 +173,7 @@ pub(crate) fn load_remote_merge_idempotency(
                 id: required_string(&result, &["id"])?,
                 source_head: required_string(&result, &["source_head"])?,
                 target_head: required_string(&result, &["target_head"])?,
-                plan: result_plan(&result, project_root, "remote_request_merge", key)?,
+                plan: replay_plan("remote_request_merge", key),
             })
         })
         .transpose()
@@ -192,7 +194,6 @@ pub(crate) fn save_remote_merge_idempotency(
             "id": &result.id,
             "source_head": &result.source_head,
             "target_head": &result.target_head,
-            "plan": &result.plan,
         }),
     )
 }
@@ -207,7 +208,7 @@ pub(crate) fn load_remote_review_idempotency(
             Ok(RequestReviewResult {
                 reviewer: required_string(&result, &["reviewer"])?,
                 decision: required_string(&result, &["decision"])?,
-                plan: result_plan(&result, project_root, "remote_request_review", key)?,
+                plan: replay_plan("remote_request_review", key),
             })
         })
         .transpose()
@@ -227,7 +228,6 @@ pub(crate) fn save_remote_review_idempotency(
         &json!({
             "reviewer": &result.reviewer,
             "decision": &result.decision,
-            "plan": &result.plan,
         }),
     )
 }
@@ -242,7 +242,7 @@ pub(crate) fn load_remote_apply_idempotency(
             Ok(RequestApplyResult {
                 target_branch: required_string(&result, &["target_branch"])?,
                 head: required_string(&result, &["head"])?,
-                plan: result_plan(&result, project_root, "remote_request_apply", key)?,
+                plan: replay_plan("remote_request_apply", key),
             })
         })
         .transpose()
@@ -262,7 +262,6 @@ pub(crate) fn save_remote_apply_idempotency(
         &json!({
             "target_branch": &result.target_branch,
             "head": &result.head,
-            "plan": &result.plan,
         }),
     )
 }
@@ -274,14 +273,12 @@ fn remote_idempotency_record_path(project_root: &Path, command: &str, key: &str)
         .join(format!("{}.json", ref_file_name(key)))
 }
 
-fn result_plan(
-    result: &Value,
-    project_root: &Path,
-    command: &str,
-    key: &str,
-) -> Result<Value, CliError> {
-    result.get("plan").cloned().ok_or_else(|| {
-        missing_result_error(&remote_idempotency_record_path(project_root, command, key))
+fn replay_plan(command: &str, key: &str) -> Value {
+    json!({
+        "type": "codefire_remote_idempotency_replay",
+        "command": command,
+        "replayed": true,
+        "idempotency_key": key,
     })
 }
 

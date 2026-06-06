@@ -5,6 +5,7 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_LARGE_THRESHOLD_BYTES: u64 = 1_048_576;
 
@@ -65,14 +66,24 @@ pub(crate) struct RemoteStorageStats {
     pub(crate) branches: AreaStats,
     pub(crate) merge_requests: AreaStats,
     pub(crate) idempotency: AreaStats,
+    pub(crate) idempotency_retention: RemoteIdempotencyRetentionStats,
     pub(crate) retention: RemoteRetentionStats,
     pub(crate) objects_by_generation: Vec<RemoteGenerationStats>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct RemoteIdempotencyRetentionStats {
+    pub(crate) retention_seconds: u64,
+    pub(crate) oldest_created_at: Option<String>,
+    pub(crate) expired_files: u64,
+    pub(crate) expired_bytes: u64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct RemoteRetentionStats {
     pub(crate) retention_seconds: u64,
     pub(crate) retention_generations: u64,
+    pub(crate) idempotency_retention_seconds: u64,
     pub(crate) current_generation: u64,
 }
 
@@ -149,6 +160,9 @@ pub(crate) fn run_storage_report(
     let repo_root = find_repo_root(&options.start)?;
     let cf = repo_root.join(".codefire");
     let object_scan = scan_objects(&cf.join("objects"), options.large_threshold_bytes)?;
+    let remote_scan = scan_remote_storage(&options.remotes)?;
+    let mut warnings = object_scan.warnings;
+    warnings.extend(remote_scan.warnings);
     Ok(StorageReport {
         repo_root,
         active_state: scan_area(&cf.join("active"))?,
@@ -157,8 +171,8 @@ pub(crate) fn run_storage_report(
         object_types: object_scan.object_types,
         largest_objects: object_scan.largest_objects,
         external_artifacts: object_scan.external_artifacts,
-        remotes: scan_remote_storage(&options.remotes)?,
-        warnings: object_scan.warnings,
+        remotes: remote_scan.remotes,
+        warnings,
     })
 }
 
@@ -249,10 +263,12 @@ pub(crate) fn print_storage_report(report: &StorageReport) {
                 remote.merge_requests.files
             );
             println!(
-                "    retention: {}s, {} generation(s), current generation {}",
+                "    retention: {}s, {} generation(s), current generation {}; idempotency {}s, expired {}",
                 remote.retention.retention_seconds,
                 remote.retention.retention_generations,
-                remote.retention.current_generation
+                remote.retention.current_generation,
+                remote.idempotency_retention.retention_seconds,
+                remote.idempotency_retention.expired_files
             );
         }
     }
@@ -409,25 +425,48 @@ fn scan_area(path: &Path) -> Result<AreaStats, CliError> {
     Ok(stats)
 }
 
-fn scan_remote_storage(remote_urls: &[String]) -> Result<Vec<RemoteStorageStats>, CliError> {
-    remote_urls
-        .iter()
-        .map(|url| {
-            let project = parse_cf_project_url(url)?;
-            let project_root = project.project_root;
-            let dirs = remote_dirs(&project_root);
-            Ok(RemoteStorageStats {
-                url: url.clone(),
-                project_root: project_root.clone(),
-                objects: scan_area(&dirs.objects)?,
-                branches: scan_area(&dirs.branches)?,
-                merge_requests: scan_area(&dirs.merge_requests)?,
-                idempotency: scan_area(&dirs.idempotency)?,
-                retention: scan_remote_retention(&project_root)?,
-                objects_by_generation: scan_remote_object_generations(&dirs.objects)?,
-            })
-        })
-        .collect()
+struct RemoteStorageScan {
+    remotes: Vec<RemoteStorageStats>,
+    warnings: Vec<StorageWarning>,
+}
+
+fn scan_remote_storage(remote_urls: &[String]) -> Result<RemoteStorageScan, CliError> {
+    let mut remotes = Vec::new();
+    let mut warnings = Vec::new();
+    for url in remote_urls {
+        let project = parse_cf_project_url(url)?;
+        let project_root = project.project_root;
+        let dirs = remote_dirs(&project_root);
+        let retention = scan_remote_retention(&project_root)?;
+        let idempotency = scan_area(&dirs.idempotency)?;
+        let idempotency_retention = scan_remote_idempotency_retention(
+            &dirs.idempotency,
+            retention.idempotency_retention_seconds,
+        )?;
+        if idempotency_retention.expired_files > 0 {
+            warnings.push(StorageWarning {
+                kind: "remote_idempotency_retention".to_string(),
+                message: format!(
+                    "{} remote idempotency record(s) exceed retention {}s",
+                    idempotency_retention.expired_files, idempotency_retention.retention_seconds
+                ),
+                path: Some(dirs.idempotency.clone()),
+                bytes: Some(idempotency_retention.expired_bytes),
+            });
+        }
+        remotes.push(RemoteStorageStats {
+            url: url.clone(),
+            project_root: project_root.clone(),
+            objects: scan_area(&dirs.objects)?,
+            branches: scan_area(&dirs.branches)?,
+            merge_requests: scan_area(&dirs.merge_requests)?,
+            idempotency,
+            idempotency_retention,
+            retention,
+            objects_by_generation: scan_remote_object_generations(&dirs.objects)?,
+        });
+    }
+    Ok(RemoteStorageScan { remotes, warnings })
 }
 
 fn scan_remote_retention(project_root: &Path) -> Result<RemoteRetentionStats, CliError> {
@@ -446,12 +485,54 @@ fn scan_remote_retention(project_root: &Path) -> Result<RemoteRetentionStats, Cl
             .and_then(|gc| gc.get("retention_generations"))
             .and_then(Value::as_u64)
             .unwrap_or(0),
+        idempotency_retention_seconds: policy
+            .as_ref()
+            .and_then(|policy| policy.get("gc"))
+            .and_then(|gc| gc.get("idempotency_retention_seconds"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
         current_generation: state
             .as_ref()
             .and_then(|state| state.get("current_generation"))
             .and_then(Value::as_u64)
             .unwrap_or(0),
     })
+}
+
+fn scan_remote_idempotency_retention(
+    idempotency_root: &Path,
+    retention_seconds: u64,
+) -> Result<RemoteIdempotencyRetentionStats, CliError> {
+    let now = unix_now_seconds();
+    let mut stats = RemoteIdempotencyRetentionStats {
+        retention_seconds,
+        ..RemoteIdempotencyRetentionStats::default()
+    };
+    for path in collect_files(idempotency_root)? {
+        let bytes = fs::metadata(&path)?.len();
+        let Ok(record) = read_json(&path) else {
+            continue;
+        };
+        let Some(created_at) = record.get("created_at").and_then(Value::as_str) else {
+            continue;
+        };
+        let is_oldest = match stats.oldest_created_at.as_deref() {
+            Some(oldest) => created_at < oldest,
+            None => true,
+        };
+        if is_oldest {
+            stats.oldest_created_at = Some(created_at.to_string());
+        }
+        if retention_seconds > 0 {
+            if let Some(created_at_seconds) = parse_iso_utc_seconds(created_at) {
+                if now.saturating_sub(created_at_seconds) > retention_seconds as i64 {
+                    stats.expired_files += 1;
+                    stats.expired_bytes += bytes;
+                }
+            }
+        }
+    }
+    Ok(stats)
 }
 
 fn scan_remote_object_generations(
@@ -478,6 +559,57 @@ fn scan_remote_object_generations(
             bytes: stats.bytes,
         })
         .collect())
+}
+
+fn unix_now_seconds() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+fn parse_iso_utc_seconds(value: &str) -> Option<i64> {
+    if value.len() != 20
+        || !value.ends_with('Z')
+        || &value[4..5] != "-"
+        || &value[7..8] != "-"
+        || &value[10..11] != "T"
+        || &value[13..14] != ":"
+        || &value[16..17] != ":"
+    {
+        return None;
+    }
+    let year = value[0..4].parse::<i32>().ok()?;
+    let month = value[5..7].parse::<u32>().ok()?;
+    let day = value[8..10].parse::<u32>().ok()?;
+    let hour = value[11..13].parse::<u32>().ok()?;
+    let minute = value[14..16].parse::<u32>().ok()?;
+    let second = value[17..19].parse::<u32>().ok()?;
+    if !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || hour > 23
+        || minute > 59
+        || second > 59
+    {
+        return None;
+    }
+    Some(
+        days_from_civil(year, month, day) * 86_400
+            + i64::from(hour) * 3_600
+            + i64::from(minute) * 60
+            + i64::from(second),
+    )
+}
+
+fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
+    let year = i64::from(year) - i64::from(month <= 2);
+    let era = if year >= 0 { year } else { year - 399 }.div_euclid(400);
+    let yoe = year - era * 400;
+    let month = i64::from(month);
+    let doy =
+        (153 * (month + if month > 2 { -3 } else { 9 }) + 2).div_euclid(5) + i64::from(day) - 1;
+    let doe = yoe * 365 + yoe.div_euclid(4) - yoe.div_euclid(100) + doy;
+    era * 146_097 + doe - 719_468
 }
 
 fn read_optional_json_value(path: &Path) -> Result<Option<Value>, CliError> {
@@ -542,10 +674,18 @@ fn remote_storage_json(stats: &RemoteStorageStats) -> Value {
         "objects": {"files": stats.objects.files, "bytes": stats.objects.bytes},
         "branches": {"files": stats.branches.files, "bytes": stats.branches.bytes},
         "merge_requests": {"files": stats.merge_requests.files, "bytes": stats.merge_requests.bytes},
-        "idempotency": {"files": stats.idempotency.files, "bytes": stats.idempotency.bytes},
+        "idempotency": {
+            "files": stats.idempotency.files,
+            "bytes": stats.idempotency.bytes,
+            "retention_seconds": stats.idempotency_retention.retention_seconds,
+            "oldest_created_at": stats.idempotency_retention.oldest_created_at,
+            "expired_files": stats.idempotency_retention.expired_files,
+            "expired_bytes": stats.idempotency_retention.expired_bytes,
+        },
         "retention": {
             "retention_seconds": stats.retention.retention_seconds,
             "retention_generations": stats.retention.retention_generations,
+            "idempotency_retention_seconds": stats.retention.idempotency_retention_seconds,
             "current_generation": stats.retention.current_generation,
         },
         "objects_by_generation": stats.objects_by_generation.iter().map(remote_generation_json).collect::<Vec<_>>(),

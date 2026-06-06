@@ -426,6 +426,7 @@ cf+http dry-runはHTTP write requestを送らず、local object graph収集ま�
 --idempotency-keyは成功したupload resultをremote projectのidempotency/remote_upload/へ記録する
 同じ--idempotency-keyかつ同じupload payloadは保存済みupload resultを返し、remote branch fast-forward checkより先にreplayする
 同じ--idempotency-keyでlocal branch/head/remote branch/project/object bundleが異なるpayloadはexit code 33で拒否する
+remote idempotency recordはhash-onlyで保存し、payload全文や署名metadata、operation planは保存しない。file-backed replay planは`replayed: true`を持つ軽量metadataになり、HTTP replay responseにも`replayed: true`を含める
 cf+http uploadはserver側remote projectのidempotency recordで同じ規則を適用する
 cf+http uploadのserver側tmp object directoryはrequestごとに一意化され、cleanupは自分のrequest directoryだけを対象にする
 ```
@@ -505,6 +506,7 @@ object storeはobject type別のfile数/bytesとlargest object上位を返す
 --large-threshold以上のobjectはlarge_object warningとしてdiagnosticsに出す
 object JSONが読めない場合はinvalid_object_json warningとしてdiagnosticsに出し、report自体は継続する
 --remoteはfile-backed remote project URLを追加で集計し、remote側objects/branches/merge_requests/idempotencyのfile数とbytes、gc retention policy、current generation、object generation別容量を返す
+remote `server_policy.json` の `gc.idempotency_retention_seconds` が正なら、storage reportはremote idempotency recordのexpired_files/expired_bytes/oldest_created_atを返し、期限超過recordをremote_idempotency_retention warningとして出す
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_storage_reportを含める
 warningがある場合、next_actionsにinspect_storage_warningsを含める
 external_artifactsはartifact_ref objectのrefs、referenced_bytes、payload_bytes_stored=0を返す
@@ -664,5 +666,6 @@ cf+http request-* dry-runはHTTP write requestを送らず、transport/URL/opera
 --idempotency-keyは成功したrequest-merge/review/apply resultをremote projectのidempotency/remote_request_*/へ記録する
 同じ--idempotency-keyかつ同じremote request payloadは保存済みresultを返し、MR status/stale/approved checkより先にreplayする
 同じ--idempotency-keyでsource/target/MR/reviewer/decision/comment/projectが異なるpayloadはexit code 33で拒否する
+remote request idempotency recordもhash-only保存で、payload全文やoperation planを保存しない。replay responseは`replayed: true`で識別できる
 cf+http request-* はserver側remote projectのidempotency recordで同じ規則を適用する
 ```
