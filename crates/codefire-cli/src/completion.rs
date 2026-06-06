@@ -96,7 +96,7 @@ _codefire_complete()
       COMPREPLY=( $(compgen -W "--details --blocking-only --json --metrics" -- "$cur") )
       ;;
     diff)
-      COMPREPLY=( $(compgen -W "--algorithm --rename-detection --atoms --trace --impact --json" -- "$cur") )
+      COMPREPLY=( $(compgen -W "--algorithm --context --rename-detection --atoms --trace --impact --json" -- "$cur") )
       ;;
     review-pack)
       COMPREPLY=( $(compgen -W "--base --output --algorithm --no-rename-detection" -- "$cur") )
@@ -178,7 +178,7 @@ _codefire()
       _arguments '--details[show failed verification diagnostic details]' '--blocking-only[show only blocking diagnostics]' '--json[emit JSON]' '--metrics[show metrics]'
       ;;
     diff)
-      _arguments '--algorithm[diff algorithm]:algorithm:(myers patience histogram)' '--rename-detection[detect renames and copies]' '--atoms[include Atom diff]' '--trace[include TraceGraph diff]' '--impact[include policy and fire impact]' '--json[emit JSON]'
+      _arguments '--algorithm[diff algorithm]:algorithm:(myers patience histogram)' '--context[context lines]:lines:' '--rename-detection[detect renames and copies]' '--atoms[include Atom diff]' '--trace[include TraceGraph diff]' '--impact[include policy and fire impact]' '--json[emit JSON]'
       ;;
     review-pack)
       _arguments '--base[base commitish]' '--output[output file]' '--algorithm[diff algorithm]:algorithm:(myers patience histogram)' '--no-rename-detection[disable rename detection]'

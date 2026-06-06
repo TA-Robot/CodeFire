@@ -489,6 +489,8 @@ fn parse_diff_args_accepts_algorithm_forms() {
     let args = vec![
         "--algorithm".to_string(),
         "patience".to_string(),
+        "--context".to_string(),
+        "2".to_string(),
         "--rename-detection".to_string(),
         "--atoms".to_string(),
         "--trace".to_string(),
@@ -501,6 +503,7 @@ fn parse_diff_args_accepts_algorithm_forms() {
     assert_eq!(parsed.left, "main");
     assert_eq!(parsed.right, "feature");
     assert_eq!(parsed.diff.algorithm, DiffAlgorithm::Patience);
+    assert_eq!(parsed.diff.context_lines, 2);
     assert!(parsed.diff.rename_detection);
     assert!(parsed.diff.atom_diff);
     assert!(parsed.diff.trace_diff);
@@ -511,9 +514,11 @@ fn parse_diff_args_accepts_algorithm_forms() {
         "main".to_string(),
         "feature".to_string(),
         "--algorithm=histogram".to_string(),
+        "--context=1".to_string(),
     ];
     let parsed = parse_diff_args(&args).unwrap();
     assert_eq!(parsed.diff.algorithm, DiffAlgorithm::Histogram);
+    assert_eq!(parsed.diff.context_lines, 1);
     assert!(!parsed.diff.rename_detection);
     assert!(!parsed.diff.atom_diff);
     assert!(!parsed.diff.trace_diff);

@@ -35,7 +35,7 @@ codefire request-merge <source-url> <target-url> [--dry-run] [--json]
 
 codefire list <server-url>
 codefire show <branch-or-url>
-codefire diff [--algorithm myers|patience|histogram] [--rename-detection] [--atoms] [--trace] [--impact] [--json] <branch-or-url> <branch-or-url>
+codefire diff [--algorithm myers|patience|histogram] [--context <lines>] [--rename-detection] [--atoms] [--trace] [--impact] [--json] <branch-or-url> <branch-or-url>
 codefire request-list <server-url>
 
 codefire discard <branch>
@@ -433,6 +433,7 @@ codefire show feature-login
 codefire diff main feature-login
 codefire diff --algorithm patience main feature-login
 codefire diff main feature-login --algorithm=histogram
+codefire diff --context 1 main feature-login
 codefire diff --rename-detection main feature-login
 codefire diff --atoms --trace main feature-login
 codefire diff --impact main feature-login
@@ -446,6 +447,7 @@ local branch、sealed commit ID、cf:// URL、cf+http:// URLを参照できる
 参照先のsealed commit妥当性を検証してから表示する
 diffのdefault algorithmはmyers
 --algorithmはmyers、patience、histogramを受け付ける
+--contextはtext diff hunkに含める前後context行数を指定する。defaultは3
 myersはexact text diff baselineとして使う
 patienceはunique line anchorを優先してrefactor時の可読性を上げる
 histogramは低頻度line anchorを優先して繰り返しの多いfileの差分を安定させる
@@ -456,7 +458,7 @@ binary fileはpayload diffを出さず、sizeとsha256 prefixのsummaryだけを
 --traceはsealed commit内のTraceGraphを比較し、TraceLink IDのadded/removed/changedを表示する
 --impactはrequired-link policy上のmissing link増減と、changed Atomから予測されるfire impactを表示する
 --jsonはdiff結果をJSON objectとして出力し、impact有効時はmachine-readable next_actionsを含める
-text diff payloadはfile単位の最大出力byte数でboundedになり、超過時は省略したchanged line数を表示する
+text diff payloadはunified hunk headerを持ち、file単位の最大出力byte数でboundedになり、超過時は省略したchanged line数を表示する
 --rename-detectionはexact hash renameを先に検出し、candidate pair数が上限を超えるinexact similarity計算はwarning付きでskipする
 ```
 

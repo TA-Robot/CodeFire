@@ -40,7 +40,7 @@ pub(super) fn render_manifest_diff(
             &format!("{right_label}/{}", rename.target),
             right.get(&rename.target),
             &mut output,
-            options.algorithm,
+            options,
         );
     }
 
@@ -61,7 +61,7 @@ pub(super) fn render_manifest_diff(
             &format!("{right_label}/{}", copy.target),
             right.get(&copy.target),
             &mut output,
-            options.algorithm,
+            options,
         );
     }
 
@@ -91,7 +91,7 @@ pub(super) fn render_manifest_diff(
             &right_path,
             right_data,
             &mut output,
-            options.algorithm,
+            options,
         );
     }
     if !changed {
@@ -106,7 +106,7 @@ fn render_file_delta(
     right_path: &str,
     right_data: Option<&Vec<u8>>,
     output: &mut String,
-    algorithm: DiffAlgorithm,
+    options: &DiffOptions,
 ) {
     output.push_str(&format!("--- {left_path}\n+++ {right_path}\n"));
     let left_bytes = left_data.map(Vec::as_slice).unwrap_or(&[]);
@@ -119,7 +119,13 @@ fn render_file_delta(
         ));
         return;
     }
-    render_line_delta(left_bytes, right_bytes, output, algorithm);
+    render_line_delta(
+        left_bytes,
+        right_bytes,
+        output,
+        options.algorithm,
+        options.context_lines,
+    );
 }
 
 #[derive(Debug, Default)]
@@ -342,19 +348,31 @@ fn binary_summary(data: Option<&Vec<u8>>) -> String {
     format!("{} bytes sha256:{}", data.len(), &sha256_hex(data)[..12])
 }
 
-fn render_line_delta(left: &[u8], right: &[u8], output: &mut String, algorithm: DiffAlgorithm) {
+fn render_line_delta(
+    left: &[u8],
+    right: &[u8],
+    output: &mut String,
+    algorithm: DiffAlgorithm,
+    context_lines: usize,
+) {
     let left_lines = split_lines_lossy(left);
     let right_lines = split_lines_lossy(right);
+    let ops = diff_lines(&left_lines, &right_lines, algorithm);
     let start_len = output.len();
     let mut omitted_changed_lines = 0usize;
-    for op in diff_lines(&left_lines, &right_lines, algorithm) {
-        match op {
-            DiffOp::Equal(_) => {}
-            DiffOp::Delete(line) => {
-                push_diff_line_bounded(output, '-', line, start_len, &mut omitted_changed_lines)
-            }
-            DiffOp::Insert(line) => {
-                push_diff_line_bounded(output, '+', line, start_len, &mut omitted_changed_lines)
+    for hunk in diff_hunks(&ops, context_lines) {
+        let hunk_ops = &ops[hunk.start..hunk.end];
+        let header = hunk_header(&ops, hunk);
+        push_hunk_header_bounded(output, &header, start_len);
+        for op in hunk_ops {
+            match op {
+                DiffOp::Equal(line) => push_context_line_bounded(output, line, start_len),
+                DiffOp::Delete(line) => {
+                    push_diff_line_bounded(output, '-', line, start_len, &mut omitted_changed_lines)
+                }
+                DiffOp::Insert(line) => {
+                    push_diff_line_bounded(output, '+', line, start_len, &mut omitted_changed_lines)
+                }
             }
         }
     }
@@ -362,6 +380,105 @@ fn render_line_delta(left: &[u8], right: &[u8], output: &mut String, algorithm: 
         output.push_str(&format!(
             "... diff output truncated, omitted {omitted_changed_lines} changed lines\n"
         ));
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DiffHunk {
+    start: usize,
+    end: usize,
+}
+
+fn diff_hunks(ops: &[DiffOp<'_>], context_lines: usize) -> Vec<DiffHunk> {
+    let mut hunks: Vec<DiffHunk> = Vec::new();
+    for (index, op) in ops.iter().enumerate() {
+        if matches!(op, DiffOp::Equal(_)) {
+            continue;
+        }
+        let start = hunk_context_start(ops, index, context_lines);
+        let end = hunk_context_end(ops, index, context_lines);
+        if let Some(last) = hunks.last_mut() {
+            if start <= last.end {
+                last.end = last.end.max(end);
+                continue;
+            }
+        }
+        hunks.push(DiffHunk { start, end });
+    }
+    hunks
+}
+
+fn hunk_context_start(ops: &[DiffOp<'_>], index: usize, context_lines: usize) -> usize {
+    let mut start = index;
+    let mut context = 0usize;
+    while start > 0 && context < context_lines {
+        if matches!(ops[start - 1], DiffOp::Equal(_)) {
+            context += 1;
+        }
+        start -= 1;
+    }
+    start
+}
+
+fn hunk_context_end(ops: &[DiffOp<'_>], index: usize, context_lines: usize) -> usize {
+    let mut end = index + 1;
+    let mut context = 0usize;
+    while end < ops.len() && context < context_lines {
+        if matches!(ops[end], DiffOp::Equal(_)) {
+            context += 1;
+        }
+        end += 1;
+    }
+    end
+}
+
+fn hunk_header(ops: &[DiffOp<'_>], hunk: DiffHunk) -> String {
+    let mut left_line = 1usize;
+    let mut right_line = 1usize;
+    for op in &ops[..hunk.start] {
+        match op {
+            DiffOp::Equal(_) => {
+                left_line += 1;
+                right_line += 1;
+            }
+            DiffOp::Delete(_) => left_line += 1,
+            DiffOp::Insert(_) => right_line += 1,
+        }
+    }
+    let left_start = left_line;
+    let right_start = right_line;
+    let mut left_count = 0usize;
+    let mut right_count = 0usize;
+    for op in &ops[hunk.start..hunk.end] {
+        match op {
+            DiffOp::Equal(_) => {
+                left_count += 1;
+                right_count += 1;
+                left_line += 1;
+                right_line += 1;
+            }
+            DiffOp::Delete(_) => {
+                left_count += 1;
+                left_line += 1;
+            }
+            DiffOp::Insert(_) => {
+                right_count += 1;
+                right_line += 1;
+            }
+        }
+    }
+    format!(
+        "@@ -{} +{} @@",
+        hunk_range(left_start, left_count),
+        hunk_range(right_start, right_count)
+    )
+}
+
+fn hunk_range(start: usize, count: usize) -> String {
+    if count == 1 {
+        start.to_string()
+    } else {
+        format!("{start},{count}")
     }
 }
 
@@ -616,13 +733,43 @@ fn push_diff_line_bounded(
     push_diff_line(output, prefix, line);
 }
 
+fn push_context_line_bounded(output: &mut String, line: &str, start_len: usize) {
+    if output.len().saturating_sub(start_len) >= MAX_TEXT_DIFF_BYTES_PER_FILE {
+        return;
+    }
+    push_diff_line(output, ' ', line);
+}
+
+fn push_hunk_header_bounded(output: &mut String, header: &str, start_len: usize) {
+    if output.len().saturating_sub(start_len) >= MAX_TEXT_DIFF_BYTES_PER_FILE {
+        return;
+    }
+    output.push_str(header);
+    output.push('\n');
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn diff_text(left: &str, right: &str, algorithm: DiffAlgorithm) -> String {
+        diff_text_with_context(left, right, algorithm, DiffOptions::default().context_lines)
+    }
+
+    fn diff_text_with_context(
+        left: &str,
+        right: &str,
+        algorithm: DiffAlgorithm,
+        context_lines: usize,
+    ) -> String {
         let mut output = String::new();
-        render_line_delta(left.as_bytes(), right.as_bytes(), &mut output, algorithm);
+        render_line_delta(
+            left.as_bytes(),
+            right.as_bytes(),
+            &mut output,
+            algorithm,
+            context_lines,
+        );
         output
     }
 
@@ -640,7 +787,7 @@ mod tests {
             "alpha\nkeep\nnew\nomega\n",
             DiffAlgorithm::Myers,
         );
-        assert_eq!(diff, "-old\n+new\n");
+        assert_eq!(diff, "@@ -1,4 +1,4 @@\n alpha\n keep\n-old\n+new\n omega\n");
     }
 
     #[test]
@@ -650,7 +797,10 @@ mod tests {
             "header\nsame\nright only\nsame\nfooter\n",
             DiffAlgorithm::Patience,
         );
-        assert_eq!(diff, "-left only\n+right only\n");
+        assert_eq!(
+            diff,
+            "@@ -1,5 +1,5 @@\n header\n same\n-left only\n+right only\n same\n footer\n"
+        );
     }
 
     #[test]
@@ -660,7 +810,24 @@ mod tests {
             "block\nanchor\nnew\nblock\n",
             DiffAlgorithm::Histogram,
         );
-        assert_eq!(diff, "-old\n+new\n");
+        assert_eq!(
+            diff,
+            "@@ -1,4 +1,4 @@\n block\n anchor\n-old\n+new\n block\n"
+        );
+    }
+
+    #[test]
+    fn text_diff_context_limits_hunk_context_lines() {
+        let diff = diff_text_with_context(
+            "a\nb\nc\nold\nd\ne\nf\n",
+            "a\nb\nc\nnew\nd\ne\nf\n",
+            DiffAlgorithm::Myers,
+            1,
+        );
+
+        assert_eq!(diff, "@@ -3,3 +3,3 @@\n c\n-old\n+new\n d\n");
+        assert!(!diff.contains(" a\n"));
+        assert!(!diff.contains(" f\n"));
     }
 
     #[test]

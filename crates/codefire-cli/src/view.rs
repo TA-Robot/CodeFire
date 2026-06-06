@@ -46,6 +46,7 @@ impl DiffAlgorithm {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DiffOptions {
     pub(crate) algorithm: DiffAlgorithm,
+    pub(crate) context_lines: usize,
     pub(crate) rename_detection: bool,
     pub(crate) atom_diff: bool,
     pub(crate) trace_diff: bool,
@@ -57,6 +58,7 @@ impl Default for DiffOptions {
     fn default() -> Self {
         Self {
             algorithm: DiffAlgorithm::Myers,
+            context_lines: 3,
             rename_detection: false,
             atom_diff: false,
             trace_diff: false,
@@ -242,6 +244,7 @@ pub(crate) fn review_pack_with_options(
         trace_diff: true,
         impact_diff: true,
         json_output: true,
+        ..DiffOptions::default()
     };
     let file_diff_text = diff_resolved_commitish_with_options(&base, &source, &file_options)?;
     let semantic_diff_text =

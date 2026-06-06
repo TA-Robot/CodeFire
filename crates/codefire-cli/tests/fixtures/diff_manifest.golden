@@ -1,7 +1,10 @@
 --- <LEFT>/docs/spec/session.md
 +++ <RIGHT>/docs/spec/session.md
+@@ -1,2 +1,2 @@
+ ## REQ-session: Requirement
 -TTL 30
 +TTL 15
 --- <LEFT>/src/app.py (missing)
 +++ <RIGHT>/src/app.py
+@@ -1,0 +1 @@
 +print('hi')

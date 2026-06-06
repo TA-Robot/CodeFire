@@ -1639,6 +1639,7 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
 fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
     let mut positional = Vec::new();
     let mut algorithm = DiffAlgorithm::Myers;
+    let mut context_lines = DiffOptions::default().context_lines;
     let mut rename_detection = false;
     let mut atom_diff = false;
     let mut trace_diff = false;
@@ -1655,6 +1656,14 @@ fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
             algorithm = parse_diff_algorithm(name)?;
         } else if let Some(name) = value.strip_prefix("--algorithm=") {
             algorithm = parse_diff_algorithm(name)?;
+        } else if value == "--context" {
+            index += 1;
+            let raw = args
+                .get(index)
+                .ok_or_else(|| CliError::Usage("--context requires a value".to_string()))?;
+            context_lines = parse_diff_context(raw)?;
+        } else if let Some(raw) = value.strip_prefix("--context=") {
+            context_lines = parse_diff_context(raw)?;
         } else if value == "--rename-detection" {
             rename_detection = true;
         } else if value == "--atoms" {
@@ -1678,6 +1687,7 @@ fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
             right: right.clone(),
             diff: DiffOptions {
                 algorithm,
+                context_lines,
                 rename_detection,
                 atom_diff,
                 trace_diff,
@@ -1686,9 +1696,15 @@ fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
             },
         }),
         _ => Err(CliError::Usage(
-            "usage: codefire diff [--algorithm myers|patience|histogram] [--rename-detection] [--atoms] [--trace] [--impact] [--json] <left> <right>".to_string(),
+            "usage: codefire diff [--algorithm myers|patience|histogram] [--context <lines>] [--rename-detection] [--atoms] [--trace] [--impact] [--json] <left> <right>".to_string(),
         )),
     }
+}
+
+fn parse_diff_context(value: &str) -> Result<usize, CliError> {
+    value
+        .parse::<usize>()
+        .map_err(|_| CliError::Usage("--context requires a non-negative integer".to_string()))
 }
 
 fn parse_diff_algorithm(value: &str) -> Result<DiffAlgorithm, CliError> {
