@@ -1,8 +1,9 @@
 use super::*;
 use crate::completion::{bash_completion_script, help_text, zsh_completion_script};
 use crate::doctor::DoctorOptions;
-use crate::remote::remote_idempotency_key;
+use crate::remote::{next_remote_generation, remote_idempotency_key, RemoteGenerationLock};
 use serde_json::{json, Map};
+use std::sync::{Arc, Barrier};
 use tempfile::tempdir;
 
 #[test]
@@ -694,6 +695,39 @@ fn remote_resource_lock_wait_timeout_returns_owner_metadata_and_json_diagnostics
     assert_eq!(envelope["exit_code"], ExitCode::LockContention.code());
     assert_eq!(envelope["diagnostics"][0]["kind"], "lock_contention");
     assert_eq!(envelope["next_actions"][0]["kind"], "retry_with_wait_lock");
+}
+
+#[test]
+fn remote_generation_allocation_is_locked_across_threads() {
+    let temp = tempdir().unwrap();
+    let project_root = temp.path().join("remote").join("org").join("app");
+    remote::ensure_remote_layout(&project_root).unwrap();
+    let workers = 16;
+    let barrier = Arc::new(Barrier::new(workers));
+    let options = LockOptions {
+        wait: true,
+        timeout_ms: Some(5_000),
+    };
+    let handles = (0..workers)
+        .map(|_| {
+            let project_root = project_root.clone();
+            let barrier = Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                barrier.wait();
+                let lock = RemoteGenerationLock::acquire(&project_root, &options).unwrap();
+                next_remote_generation(&lock).unwrap()
+            })
+        })
+        .collect::<Vec<_>>();
+    let mut generations = handles
+        .into_iter()
+        .map(|handle| handle.join().unwrap())
+        .collect::<Vec<_>>();
+
+    generations.sort_unstable();
+    assert_eq!(generations, (1..=workers as u64).collect::<Vec<_>>());
+    let state = read_json(&project_root.join("gc_state.json")).unwrap();
+    assert_eq!(state["current_generation"], workers);
 }
 
 #[test]

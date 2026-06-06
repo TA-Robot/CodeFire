@@ -832,7 +832,8 @@ fn handle_http_upload(
             ));
         }
     }
-    let generation = next_remote_generation(&project_root)?;
+    let generation_lock = RemoteGenerationLock::acquire(&project_root, &lock_options)?;
+    let generation = next_remote_generation(&generation_lock)?;
     write_object_records(&dirs.objects, records.iter().cloned())?;
     write_json_atomic(
         &remote_branch_path(&project_root, branch_name),
@@ -1196,7 +1197,8 @@ fn handle_http_request_apply(
         )),
         &lock_options,
     )?;
-    let generation = next_remote_generation(&target_root)?;
+    let generation_lock = RemoteGenerationLock::acquire(&target_root, &lock_options)?;
+    let generation = next_remote_generation(&generation_lock)?;
     copy_object_graph(
         &remote_dirs(&source_root).objects,
         &remote_dirs(&target_root).objects,

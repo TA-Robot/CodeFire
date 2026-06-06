@@ -132,6 +132,27 @@ pub(crate) struct CfProjectUrl {
     pub(crate) app: String,
 }
 
+pub(crate) struct RemoteGenerationLock {
+    project_root: PathBuf,
+    _lock: FileLock,
+}
+
+impl RemoteGenerationLock {
+    pub(crate) fn acquire(
+        project_root: &Path,
+        options: &LockOptions,
+    ) -> Result<RemoteGenerationLock, CliError> {
+        let lock = FileLock::acquire_with_options(
+            remote_dirs(project_root).locks.join("generation.lock"),
+            options,
+        )?;
+        Ok(RemoteGenerationLock {
+            project_root: project_root.to_path_buf(),
+            _lock: lock,
+        })
+    }
+}
+
 pub(crate) fn upload_branch(
     start: &Path,
     options: &UploadOptions,
@@ -282,7 +303,8 @@ pub(crate) fn upload_branch(
             .join(format!("branch-{}.lock", ref_file_name(&remote_branch))),
         &options.lock,
     )?;
-    let generation = next_remote_generation(&remote.project_root)?;
+    let generation_lock = RemoteGenerationLock::acquire(&remote.project_root, &options.lock)?;
+    let generation = next_remote_generation(&generation_lock)?;
     copy_object_graph(
         &local_objects,
         &remote_dirs(&remote.project_root).objects,
@@ -913,7 +935,8 @@ pub(crate) fn apply_merge_request(
             options.mr_id
         )));
     }
-    let generation = next_remote_generation(&target.project_root)?;
+    let generation_lock = RemoteGenerationLock::acquire(&target.project_root, &options.lock)?;
+    let generation = next_remote_generation(&generation_lock)?;
     copy_object_graph(&source_objects, &target_objects, &source_head)?;
     write_json_atomic(
         &remote_branch_path(&target.project_root, &target.branch),
@@ -1351,8 +1374,8 @@ fn object_references(payload: &Value) -> Vec<String> {
     }
 }
 
-pub(crate) fn next_remote_generation(project_root: &Path) -> Result<u64, CliError> {
-    let path = project_root.join("gc_state.json");
+pub(crate) fn next_remote_generation(lock: &RemoteGenerationLock) -> Result<u64, CliError> {
+    let path = lock.project_root.join("gc_state.json");
     let generation = read_optional_json(&path)?
         .and_then(|value| value.get("current_generation").and_then(Value::as_u64))
         .unwrap_or(0)

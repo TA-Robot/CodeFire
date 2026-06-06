@@ -73,6 +73,7 @@ Local repository mutators that acquire the repository lock accept:
 durationは裸数または`s` suffixなら秒、`ms` suffixならミリ秒として扱う
 timeout時はexit code 30で失敗し、lock fileにpid/created_atがあれば人間向けdiagnosticに含める
 remote mutatorのupload/request-merge/request-review/request-applyも同じoptionを受け付け、remote project resource lockに適用する
+remote branch head更新はbranch resource lockで直列化し、remote generation採番はproject単位の`generation.lock`で直列化する。generation採番APIはlock guard経由でのみ呼び出す
 remote mutatorで--json併用時にlock contentionが発生した場合はcodefire.command_result.v1 envelopeをstdoutに出し、diagnosticsにlock_contention、next_actionsにretry_with_wait_lockを含める
 HTTP clientはconnect/read/write timeoutを持ち、defaultは30000ms。`CODEFIRE_HTTP_TIMEOUT_MS` に正の整数を指定すると調整できる
 HTTP serverはbounded per-connection handlerでrequestを処理し、server-side read/write timeoutを同じ値で設定する。cleartext HTTPで同時接続上限を超えた場合は503を返す
