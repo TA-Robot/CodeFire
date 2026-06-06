@@ -520,7 +520,7 @@ batch defaults.typeを指定すると各linkのtype省略時に使う
 ```bash
 codefire evidence add --artifact runs/model.bin --label "best checkpoint" --json
 codefire evidence add --from-command "cargo test --workspace" --json
-codefire evidence add --artifact runs/model.bin --from-command "python eval.py" --max-output-bytes 65536
+codefire evidence add --artifact runs/model.bin --from-command "python eval.py" --timeout 30s --max-output-bytes 65536
 codefire evidence add --batch evidence-batch.yaml --dry-run --json
 codefire evidence add --batch evidence-batch.json --json
 ```
@@ -532,13 +532,15 @@ repository rootを探索し、evidence objectを.codefire/objects/evidenceへ保
 --artifactはartifact_ref objectを.codefire/objects/artifact_refsへ保存する
 artifact_refはpath/uri/hash_algorithm/content_hash/size_bytes/captured_atを持ち、payload本体は保存しない
 --artifact-uri指定時はartifact_ref.uriへ保存し、未指定時はcanonical path文字列を保存する
---from-commandはshell commandのstdout/stderr/exit_code/success/duration_ms/cwdを保存する
+--from-commandはshell commandのstdout/stderr/exit_code/success/timed_out/timeout_ms/duration_ms/cwd/mode/shellを保存する
+--timeoutまたは--timeout-msはcommand captureの待機上限を指定する。未指定時は300000ms
+--cwd未指定時のcommand cwdは探索されたrepository root
 stdout/stderrは--max-output-bytesでそれぞれtruncateされ、truncated flagを保存する
-commandがnon-zero exitでもevidence capture自体は成功し、command_exit_codeを返す
+commandがnon-zeroまたはtimeoutでもevidence capture自体は成功し、command_exit_codeとcommand_timed_outを返す
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_evidence_add_resultを含める
 --batchはJSONまたは限定YAMLのversion/items形式を読み、全itemのartifact path/cwd/必須fieldを事前検証してからevidence objectを作る
 --batch --dry-runはartifact_ref/evidence objectを書き込まず、codefire_operation_planを返す
-batch itemはartifact、artifact_uri、from_command、cwd、label、max_output_bytesを持てる
+batch itemはartifact、artifact_uri、from_command、cwd、timeout_ms、label、max_output_bytesを持てる
 resolutionから参照されたevidence objectと、そのevidenceが参照するartifact_refはremote object graphに含めてupload/clone/request workflowで搬送する
 ```
 

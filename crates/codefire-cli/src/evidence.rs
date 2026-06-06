@@ -8,10 +8,12 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::Instant;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
-const DEFAULT_MAX_OUTPUT_BYTES: usize = 64 * 1024;
+pub(super) const DEFAULT_MAX_OUTPUT_BYTES: usize = 64 * 1024;
+pub(super) const DEFAULT_COMMAND_TIMEOUT_MS: u64 = 300_000;
 
 #[derive(Debug)]
 pub(crate) struct EvidenceAddOptions {
@@ -24,6 +26,7 @@ pub(crate) struct EvidenceAddOptions {
     pub(crate) artifact_uri: Option<String>,
     pub(crate) command: Option<String>,
     pub(crate) command_cwd: Option<PathBuf>,
+    pub(crate) command_timeout_ms: u64,
     pub(crate) max_output_bytes: usize,
 }
 
@@ -33,6 +36,7 @@ pub(crate) struct EvidenceAddResult {
     pub(crate) evidence_id: String,
     pub(crate) artifact_ref_id: Option<String>,
     pub(crate) command_exit_code: Option<i32>,
+    pub(crate) command_timed_out: bool,
 }
 
 pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOptions, CliError> {
@@ -45,6 +49,7 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
     let mut artifact_uri = None;
     let mut command = None;
     let mut command_cwd = None;
+    let mut command_timeout_ms = DEFAULT_COMMAND_TIMEOUT_MS;
     let mut max_output_bytes = DEFAULT_MAX_OUTPUT_BYTES;
     let mut index = 0usize;
     while index < args.len() {
@@ -79,6 +84,10 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
                 index += 1;
                 command_cwd = Some(PathBuf::from(required_arg(args, index, "--cwd")?));
             }
+            "--timeout" | "--timeout-ms" => {
+                index += 1;
+                command_timeout_ms = parse_duration_ms(required_arg(args, index, "--timeout")?)?;
+            }
             "--max-output-bytes" => {
                 index += 1;
                 max_output_bytes = parse_usize(required_arg(args, index, "--max-output-bytes")?)?;
@@ -103,6 +112,12 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
             }
             value if value.starts_with("--cwd=") => {
                 command_cwd = Some(PathBuf::from(value.trim_start_matches("--cwd=")));
+            }
+            value if value.starts_with("--timeout=") => {
+                command_timeout_ms = parse_duration_ms(value.trim_start_matches("--timeout="))?;
+            }
+            value if value.starts_with("--timeout-ms=") => {
+                command_timeout_ms = parse_duration_ms(value.trim_start_matches("--timeout-ms="))?;
             }
             value if value.starts_with("--max-output-bytes=") => {
                 max_output_bytes = parse_usize(value.trim_start_matches("--max-output-bytes="))?;
@@ -151,6 +166,7 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
         artifact_uri,
         command,
         command_cwd,
+        command_timeout_ms,
         max_output_bytes,
     })
 }
@@ -166,7 +182,7 @@ pub(crate) fn run_evidence_add(
         None => None,
     };
     let command_capture = match options.command.as_deref() {
-        Some(command) => Some(capture_command(command, options)?),
+        Some(command) => Some(capture_command(command, options, &repo_root)?),
         None => None,
     };
     let command_exit_code = command_capture
@@ -189,6 +205,10 @@ pub(crate) fn run_evidence_add(
         evidence_id,
         artifact_ref_id,
         command_exit_code,
+        command_timed_out: command_capture
+            .as_ref()
+            .map(|capture| capture.timed_out)
+            .unwrap_or(false),
     })
 }
 
@@ -237,6 +257,7 @@ pub(crate) fn evidence_add_data_json(result: &EvidenceAddResult) -> Value {
         "evidence_id": &result.evidence_id,
         "artifact_ref_id": &result.artifact_ref_id,
         "command_exit_code": result.command_exit_code,
+        "command_timed_out": result.command_timed_out,
     })
 }
 
@@ -247,6 +268,9 @@ pub(crate) fn print_evidence_add_result(result: &EvidenceAddResult) {
     }
     if let Some(exit_code) = result.command_exit_code {
         println!("command exit code: {exit_code}");
+    }
+    if result.command_timed_out {
+        println!("command timed out: true");
     }
 }
 
@@ -290,8 +314,12 @@ fn store_artifact_ref(
 struct CommandCapture {
     command: String,
     cwd: PathBuf,
+    mode: &'static str,
+    shell: bool,
     exit_code: Option<i32>,
     success: bool,
+    timed_out: bool,
+    timeout_ms: u64,
     duration_ms: u128,
     stdout: String,
     stdout_truncated: bool,
@@ -304,8 +332,12 @@ impl CommandCapture {
         json!({
             "command": &self.command,
             "cwd": &self.cwd,
+            "mode": self.mode,
+            "shell": self.shell,
             "exit_code": self.exit_code,
             "success": self.success,
+            "timed_out": self.timed_out,
+            "timeout_ms": self.timeout_ms,
             "duration_ms": self.duration_ms,
             "stdout": &self.stdout,
             "stdout_truncated": self.stdout_truncated,
@@ -318,25 +350,44 @@ impl CommandCapture {
 fn capture_command(
     command: &str,
     options: &EvidenceAddOptions,
+    repo_root: &Path,
 ) -> Result<CommandCapture, CliError> {
     let cwd = options
         .command_cwd
         .clone()
-        .unwrap_or(std::env::current_dir()?);
+        .unwrap_or_else(|| repo_root.to_path_buf());
     let start = Instant::now();
-    let output = Command::new("sh")
+    let mut command_process = Command::new("sh");
+    command_process
         .arg("-c")
         .arg(command)
         .current_dir(&cwd)
-        .output()?;
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = command_process.spawn()?;
+    let timeout = Duration::from_millis(options.command_timeout_ms);
+    let mut timed_out = false;
+    while child.try_wait()?.is_none() {
+        if start.elapsed() >= timeout {
+            timed_out = true;
+            let _ = child.kill();
+            break;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    let output = child.wait_with_output()?;
     let duration_ms = start.elapsed().as_millis();
     let (stdout, stdout_truncated) = lossy_truncated(&output.stdout, options.max_output_bytes);
     let (stderr, stderr_truncated) = lossy_truncated(&output.stderr, options.max_output_bytes);
     Ok(CommandCapture {
         command: command.to_string(),
         cwd,
+        mode: "shell",
+        shell: true,
         exit_code: output.status.code(),
-        success: output.status.success(),
+        success: output.status.success() && !timed_out,
+        timed_out,
+        timeout_ms: options.command_timeout_ms,
         duration_ms,
         stdout,
         stdout_truncated,
@@ -383,6 +434,25 @@ fn parse_usize(value: &str) -> Result<usize, CliError> {
     value
         .parse::<usize>()
         .map_err(|_| CliError::Usage(format!("invalid usize value: {value}")))
+}
+
+pub(super) fn parse_duration_ms(value: &str) -> Result<u64, CliError> {
+    let parsed = if let Some(milliseconds) = value.strip_suffix("ms") {
+        milliseconds.parse::<u64>().ok()
+    } else if let Some(seconds) = value.strip_suffix('s') {
+        seconds
+            .parse::<u64>()
+            .ok()
+            .and_then(|seconds| seconds.checked_mul(1000))
+    } else {
+        value.parse::<u64>().ok()
+    };
+    match parsed {
+        Some(0) | None => Err(CliError::Usage(format!(
+            "invalid timeout duration: {value}"
+        ))),
+        Some(milliseconds) => Ok(milliseconds),
+    }
 }
 
 fn required_arg<'a>(args: &'a [String], index: usize, option: &str) -> Result<&'a str, CliError> {

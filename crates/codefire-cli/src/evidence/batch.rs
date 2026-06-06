@@ -1,6 +1,6 @@
 use super::{
-    parse_usize, run_evidence_add, validate_evidence_add_options, EvidenceAddOptions,
-    EvidenceAddResult, DEFAULT_MAX_OUTPUT_BYTES,
+    parse_duration_ms, parse_usize, run_evidence_add, validate_evidence_add_options,
+    EvidenceAddOptions, EvidenceAddResult, DEFAULT_MAX_OUTPUT_BYTES,
 };
 use crate::{find_repo_root, CliError};
 use serde_json::{json, Value};
@@ -20,6 +20,7 @@ pub(crate) struct EvidenceBatchResult {
 struct EvidenceBatchDefaults {
     label: Option<String>,
     command_cwd: Option<PathBuf>,
+    command_timeout_ms: Option<u64>,
     max_output_bytes: Option<usize>,
 }
 
@@ -30,6 +31,7 @@ struct EvidenceBatchItem {
     artifact_uri: Option<String>,
     command: Option<String>,
     command_cwd: Option<PathBuf>,
+    command_timeout_ms: Option<u64>,
     max_output_bytes: Option<usize>,
 }
 
@@ -110,6 +112,7 @@ fn evidence_result_json(result: &EvidenceAddResult) -> Value {
         "evidence_id": &result.evidence_id,
         "artifact_ref_id": &result.artifact_ref_id,
         "command_exit_code": result.command_exit_code,
+        "command_timed_out": result.command_timed_out,
     })
 }
 
@@ -131,6 +134,10 @@ fn resolve_item(
             .command_cwd
             .clone()
             .or_else(|| defaults.command_cwd.clone()),
+        command_timeout_ms: item
+            .command_timeout_ms
+            .or(defaults.command_timeout_ms)
+            .unwrap_or(options.command_timeout_ms),
         max_output_bytes: item
             .max_output_bytes
             .or(defaults.max_output_bytes)
@@ -173,6 +180,7 @@ fn evidence_batch_item_plan(item: &EvidenceAddOptions) -> Value {
         "has_command": item.command.is_some(),
         "command": &item.command,
         "cwd": &item.command_cwd,
+        "timeout_ms": item.command_timeout_ms,
         "max_output_bytes": item.max_output_bytes,
     })
 }
@@ -214,6 +222,10 @@ fn parse_json_defaults(value: Option<&Value>) -> Result<EvidenceBatchDefaults, C
     Ok(EvidenceBatchDefaults {
         label: optional_json_string(object.get("label"), "defaults.label")?,
         command_cwd: optional_json_path(object.get("cwd"), "defaults.cwd")?,
+        command_timeout_ms: optional_json_duration_ms(
+            object.get("timeout_ms"),
+            "defaults.timeout_ms",
+        )?,
         max_output_bytes: optional_json_usize(
             object.get("max_output_bytes"),
             "defaults.max_output_bytes",
@@ -231,6 +243,7 @@ fn parse_json_item(value: &Value) -> Result<EvidenceBatchItem, CliError> {
         artifact_uri: optional_json_string(object.get("artifact_uri"), "item.artifact_uri")?,
         command: optional_json_string(object.get("from_command"), "item.from_command")?,
         command_cwd: optional_json_path(object.get("cwd"), "item.cwd")?,
+        command_timeout_ms: optional_json_duration_ms(object.get("timeout_ms"), "item.timeout_ms")?,
         max_output_bytes: optional_json_usize(
             object.get("max_output_bytes"),
             "item.max_output_bytes",
@@ -260,6 +273,17 @@ fn optional_json_usize(value: Option<&Value>, field: &str) -> Result<Option<usiz
                 .as_u64()
                 .and_then(|value| usize::try_from(value).ok())
                 .ok_or_else(|| CliError::Usage(format!("{field} must be an unsigned integer")))
+        })
+        .transpose()
+}
+
+fn optional_json_duration_ms(value: Option<&Value>, field: &str) -> Result<Option<u64>, CliError> {
+    value
+        .map(|value| {
+            value
+                .as_u64()
+                .filter(|value| *value > 0)
+                .ok_or_else(|| CliError::Usage(format!("{field} must be a positive integer")))
         })
         .transpose()
 }
@@ -370,6 +394,7 @@ fn apply_yaml_default(
     match key {
         "label" => defaults.label = Some(value),
         "cwd" => defaults.command_cwd = Some(PathBuf::from(value)),
+        "timeout_ms" => defaults.command_timeout_ms = Some(parse_duration_ms(&value)?),
         "max_output_bytes" => {
             defaults.max_output_bytes =
                 Some(parse_yaml_usize(&value, "max_output_bytes", line_number)?);
@@ -395,6 +420,7 @@ fn apply_yaml_item_field(
         "artifact_uri" => item.artifact_uri = Some(value),
         "from_command" => item.command = Some(value),
         "cwd" => item.command_cwd = Some(PathBuf::from(value)),
+        "timeout_ms" => item.command_timeout_ms = Some(parse_duration_ms(&value)?),
         "max_output_bytes" => {
             item.max_output_bytes =
                 Some(parse_yaml_usize(&value, "max_output_bytes", line_number)?);

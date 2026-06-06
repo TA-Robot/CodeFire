@@ -245,7 +245,8 @@ migrate: review_migration_plan, inspect_migration_blockers
   "version": 1,
   "evidence_id": "CF-EVIDENCE-...",
   "artifact_ref_id": "CF-ARTIFACT-...",
-  "command_exit_code": 0
+  "command_exit_code": 0,
+  "command_timed_out": false
 }
 ```
 

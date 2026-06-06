@@ -2255,7 +2255,9 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
     let artifact_ref_id = result.artifact_ref_id.as_ref().unwrap();
     assert!(artifact_ref_id.starts_with("CF-ARTIFACT-"));
     assert_eq!(result.command_exit_code, Some(0));
+    assert!(!result.command_timed_out);
     assert_eq!(data["type"], "codefire_evidence_add_result");
+    assert_eq!(data["command_timed_out"], false);
 
     let objects = repo_root.join(".codefire").join("objects");
     let artifact_ref = codefire_store::read_object(&objects, artifact_ref_id).unwrap();
@@ -2273,6 +2275,14 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
         Some(artifact_ref_id.as_str())
     );
     assert_eq!(evidence["command"]["exit_code"], 0);
+    assert_eq!(evidence["command"]["mode"], "shell");
+    assert_eq!(evidence["command"]["shell"], true);
+    assert_eq!(evidence["command"]["timed_out"], false);
+    assert_eq!(evidence["command"]["timeout_ms"], 300000);
+    assert_eq!(
+        evidence["command"]["cwd"].as_str(),
+        Some(repo_root.to_string_lossy().as_ref())
+    );
     assert_eq!(evidence["command"]["stdout"], "ok");
     assert_eq!(evidence["command"]["stdout_truncated"], true);
     assert!(!objects
@@ -2290,6 +2300,31 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
     assert_eq!(storage.external_artifacts.refs, 1);
     assert_eq!(storage.external_artifacts.referenced_bytes, 16);
     assert_eq!(storage.external_artifacts.payload_bytes_stored, 0);
+}
+
+#[test]
+fn evidence_command_timeout_kills_child_and_records_timeout() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+
+    let parsed = parse_evidence_add_args(&[
+        "--path".to_string(),
+        repo_root.to_string_lossy().into_owned(),
+        "--from-command".to_string(),
+        "while :; do :; done".to_string(),
+        "--timeout-ms=20".to_string(),
+    ])
+    .unwrap();
+    let result = run_evidence_add(&parsed).unwrap();
+
+    assert_eq!(result.command_exit_code, None);
+    assert!(result.command_timed_out);
+    let objects = repo_root.join(".codefire").join("objects");
+    let evidence = codefire_store::read_object(&objects, &result.evidence_id).unwrap();
+    assert_eq!(evidence["command"]["timed_out"], true);
+    assert_eq!(evidence["command"]["success"], false);
+    assert_eq!(evidence["command"]["timeout_ms"], 20);
 }
 
 #[test]
@@ -2363,6 +2398,7 @@ fn evidence_batch_validates_all_items_before_writing_objects() {
         artifact_uri: None,
         command: None,
         command_cwd: None,
+        command_timeout_ms: 300_000,
         max_output_bytes: 64 * 1024,
     })
     .unwrap();
@@ -2387,6 +2423,7 @@ fn evidence_batch_validates_all_items_before_writing_objects() {
         artifact_uri: None,
         command: None,
         command_cwd: None,
+        command_timeout_ms: 300_000,
         max_output_bytes: 64 * 1024,
     })
     .unwrap_err();
@@ -2426,6 +2463,7 @@ fn extinguish_evidence_ref_links_resolution_and_verify_detects_missing_ref() {
         artifact_uri: None,
         command: Some("printf ok".to_string()),
         command_cwd: None,
+        command_timeout_ms: 300_000,
         max_output_bytes: 128,
     })
     .unwrap();
