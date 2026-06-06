@@ -15,14 +15,15 @@
 - High: 15
 - Medium: 64
 - Low: 1
-- Fixed in v0.7: 20
-- Remaining open: 60
+- Fixed in v0.7: 22
+- Remaining open: 58
 
 ## v0.7 Progress
 
 - Batch 1 fixed: [CFR-005](code-review-issues/cfr-005.md), [CFR-006](code-review-issues/cfr-006.md), [CFR-010](code-review-issues/cfr-010.md), [CFR-031](code-review-issues/cfr-031.md), [CFR-032](code-review-issues/cfr-032.md), [CFR-047](code-review-issues/cfr-047.md), [CFR-058](code-review-issues/cfr-058.md), [CFR-067](code-review-issues/cfr-067.md), [CFR-077](code-review-issues/cfr-077.md)
 - Batch 2/8 partial fixed: [CFR-003](code-review-issues/cfr-003.md), [CFR-009](code-review-issues/cfr-009.md), [CFR-057](code-review-issues/cfr-057.md), [CFR-071](code-review-issues/cfr-071.md), [CFR-072](code-review-issues/cfr-072.md), [CFR-075](code-review-issues/cfr-075.md), [CFR-076](code-review-issues/cfr-076.md)
 - Batch 3 partial fixed: [CFR-011](code-review-issues/cfr-011.md), [CFR-012](code-review-issues/cfr-012.md), [CFR-013](code-review-issues/cfr-013.md), [CFR-015](code-review-issues/cfr-015.md)
+- Batch 5 partial fixed: [CFR-025](code-review-issues/cfr-025.md), [CFR-026](code-review-issues/cfr-026.md); [CFR-027](code-review-issues/cfr-027.md) has bounded output partial progress but remains open for `--context <n>`.
 - Plan: [v0.7-issue-improvement-plan.md](v0.7-issue-improvement-plan.md)
 
 ## Priority Buckets

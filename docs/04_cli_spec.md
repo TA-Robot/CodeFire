@@ -448,6 +448,8 @@ binary fileはpayload diffを出さず、sizeとsha256 prefixのsummaryだけを
 --traceはsealed commit内のTraceGraphを比較し、TraceLink IDのadded/removed/changedを表示する
 --impactはrequired-link policy上のmissing link増減と、changed Atomから予測されるfire impactを表示する
 --jsonはdiff結果をJSON objectとして出力し、impact有効時はmachine-readable next_actionsを含める
+text diff payloadはfile単位の最大出力byte数でboundedになり、超過時は省略したchanged line数を表示する
+--rename-detectionはexact hash renameを先に検出し、candidate pair数が上限を超えるinexact similarity計算はwarning付きでskipする
 ```
 
 ## 4.16 `review-pack`

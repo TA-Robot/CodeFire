@@ -2,6 +2,12 @@ use super::{DiffAlgorithm, DiffOptions};
 use crate::remote::sha256_hex;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+const MAX_RENAME_CANDIDATE_PAIRS: usize = 4_096;
+const MAX_SIMILARITY_BYTES: usize = 512 * 1024;
+const MAX_SIMILARITY_LINES: usize = 10_000;
+const MAX_LCS_MATCH_CANDIDATES: usize = 1_000_000;
+const MAX_TEXT_DIFF_BYTES_PER_FILE: usize = 256 * 1024;
+
 pub(super) fn render_manifest_diff(
     left_label: &str,
     left: &BTreeMap<String, Vec<u8>>,
@@ -36,6 +42,11 @@ pub(super) fn render_manifest_diff(
             &mut output,
             options.algorithm,
         );
+    }
+
+    for warning in &file_moves.warnings {
+        changed = true;
+        output.push_str(&format!("warning: {warning}\n"));
     }
 
     for copy in &file_moves.copies {
@@ -116,6 +127,7 @@ struct FileMoveDetection {
     renames: Vec<FileMove>,
     copies: Vec<FileMove>,
     skip_paths: BTreeSet<String>,
+    warnings: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -145,11 +157,39 @@ fn detect_file_moves(
     let mut used_deleted = BTreeSet::new();
     let mut used_added = BTreeSet::new();
     let mut rename_candidates = Vec::new();
-    for source in &deleted {
-        for target in &added {
-            let score = similarity_score(&left[source], &right[target]);
-            if score >= MIN_SIMILARITY {
-                rename_candidates.push((score, source.clone(), target.clone()));
+
+    detect_exact_renames_by_hash(
+        left,
+        right,
+        &deleted,
+        &added,
+        &mut detection,
+        &mut used_deleted,
+        &mut used_added,
+    );
+
+    let remaining_deleted = deleted
+        .iter()
+        .filter(|source| !used_deleted.contains(*source))
+        .collect::<Vec<_>>();
+    let remaining_added = added
+        .iter()
+        .filter(|target| !used_added.contains(*target))
+        .collect::<Vec<_>>();
+    let candidate_pairs = remaining_deleted
+        .len()
+        .saturating_mul(remaining_added.len());
+    if candidate_pairs > MAX_RENAME_CANDIDATE_PAIRS {
+        detection.warnings.push(format!(
+            "rename similarity detection skipped {candidate_pairs} candidate pairs above limit {MAX_RENAME_CANDIDATE_PAIRS}; exact hash renames were still detected"
+        ));
+    } else {
+        for source in &remaining_deleted {
+            for target in &remaining_added {
+                let score = similarity_score(&left[*source], &right[*target]);
+                if score >= MIN_SIMILARITY {
+                    rename_candidates.push((score, (*source).clone(), (*target).clone()));
+                }
             }
         }
     }
@@ -172,8 +212,18 @@ fn detect_file_moves(
         }
     }
 
+    let copy_candidate_pairs = left.len().saturating_mul(added.len());
+    let skip_inexact_copies = copy_candidate_pairs > MAX_RENAME_CANDIDATE_PAIRS;
+    if skip_inexact_copies {
+        detection.warnings.push(format!(
+            "copy similarity detection skipped {copy_candidate_pairs} candidate pairs above limit {MAX_RENAME_CANDIDATE_PAIRS}"
+        ));
+    }
     for target in added {
         if used_added.contains(&target) {
+            continue;
+        }
+        if skip_inexact_copies {
             continue;
         }
         let Some((source, score)) = best_copy_source(left, right, &target, MIN_SIMILARITY) else {
@@ -200,6 +250,49 @@ fn detect_file_moves(
     detection
 }
 
+fn detect_exact_renames_by_hash(
+    left: &BTreeMap<String, Vec<u8>>,
+    right: &BTreeMap<String, Vec<u8>>,
+    deleted: &[String],
+    added: &[String],
+    detection: &mut FileMoveDetection,
+    used_deleted: &mut BTreeSet<String>,
+    used_added: &mut BTreeSet<String>,
+) {
+    let mut deleted_by_hash: BTreeMap<String, Vec<&String>> = BTreeMap::new();
+    for source in deleted {
+        deleted_by_hash
+            .entry(sha256_hex(&left[source]))
+            .or_default()
+            .push(source);
+    }
+    for sources in deleted_by_hash.values_mut() {
+        sources.sort();
+    }
+    for target in added {
+        let hash = sha256_hex(&right[target]);
+        let Some(sources) = deleted_by_hash.get(&hash) else {
+            continue;
+        };
+        let Some(source) = sources
+            .iter()
+            .copied()
+            .find(|source| !used_deleted.contains(*source))
+        else {
+            continue;
+        };
+        used_deleted.insert(source.clone());
+        used_added.insert(target.clone());
+        detection.skip_paths.insert(source.clone());
+        detection.skip_paths.insert(target.clone());
+        detection.renames.push(FileMove {
+            source: source.clone(),
+            target: target.clone(),
+            score: 100,
+        });
+    }
+}
+
 fn best_copy_source(
     left: &BTreeMap<String, Vec<u8>>,
     right: &BTreeMap<String, Vec<u8>>,
@@ -222,9 +315,15 @@ fn similarity_score(left: &[u8], right: &[u8]) -> u8 {
     if left.is_empty() || right.is_empty() || is_binary(left) || is_binary(right) {
         return 0;
     }
+    if left.len() > MAX_SIMILARITY_BYTES || right.len() > MAX_SIMILARITY_BYTES {
+        return 0;
+    }
     let left_lines = split_lines_lossy(left);
     let right_lines = split_lines_lossy(right);
     if left_lines.is_empty() || right_lines.is_empty() {
+        return 0;
+    }
+    if left_lines.len() > MAX_SIMILARITY_LINES || right_lines.len() > MAX_SIMILARITY_LINES {
         return 0;
     }
     let common = lcs_pairs(&left_lines, &right_lines, None).len();
@@ -246,12 +345,23 @@ fn binary_summary(data: Option<&Vec<u8>>) -> String {
 fn render_line_delta(left: &[u8], right: &[u8], output: &mut String, algorithm: DiffAlgorithm) {
     let left_lines = split_lines_lossy(left);
     let right_lines = split_lines_lossy(right);
+    let start_len = output.len();
+    let mut omitted_changed_lines = 0usize;
     for op in diff_lines(&left_lines, &right_lines, algorithm) {
         match op {
             DiffOp::Equal(_) => {}
-            DiffOp::Delete(line) => push_diff_line(output, '-', line),
-            DiffOp::Insert(line) => push_diff_line(output, '+', line),
+            DiffOp::Delete(line) => {
+                push_diff_line_bounded(output, '-', line, start_len, &mut omitted_changed_lines)
+            }
+            DiffOp::Insert(line) => {
+                push_diff_line_bounded(output, '+', line, start_len, &mut omitted_changed_lines)
+            }
         }
+    }
+    if omitted_changed_lines > 0 {
+        output.push_str(&format!(
+            "... diff output truncated, omitted {omitted_changed_lines} changed lines\n"
+        ));
     }
 }
 
@@ -417,6 +527,7 @@ fn lcs_pairs(
     let mut tails: Vec<usize> = Vec::new();
     let mut tail_nodes: Vec<usize> = Vec::new();
     let mut nodes: Vec<LcsNode> = Vec::new();
+    let mut match_candidates = 0usize;
     for (left_index, line) in left.iter().enumerate() {
         if !predicate_allows(allowed, line) {
             continue;
@@ -424,6 +535,10 @@ fn lcs_pairs(
         let Some(positions) = right_positions.get(line.as_str()) else {
             continue;
         };
+        match_candidates = match_candidates.saturating_add(positions.len());
+        if match_candidates > MAX_LCS_MATCH_CANDIDATES {
+            return Vec::new();
+        }
         for &right_index in positions.iter().rev() {
             let length_index = tails.partition_point(|&value| value < right_index);
             let previous = length_index
@@ -485,6 +600,20 @@ fn push_diff_line(output: &mut String, prefix: char, line: &str) {
     if !line.ends_with('\n') {
         output.push('\n');
     }
+}
+
+fn push_diff_line_bounded(
+    output: &mut String,
+    prefix: char,
+    line: &str,
+    start_len: usize,
+    omitted_changed_lines: &mut usize,
+) {
+    if output.len().saturating_sub(start_len) >= MAX_TEXT_DIFF_BYTES_PER_FILE {
+        *omitted_changed_lines += 1;
+        return;
+    }
+    push_diff_line(output, prefix, line);
 }
 
 #[cfg(test)]
@@ -556,6 +685,59 @@ mod tests {
     }
 
     #[test]
+    fn rename_detection_uses_hash_for_exact_renames_above_candidate_limit() {
+        let mut left_items = Vec::new();
+        let mut right_items = Vec::new();
+        left_items.push(("src/exact_old.rs".to_string(), b"same\nbody\n".to_vec()));
+        right_items.push(("src/exact_new.rs".to_string(), b"same\nbody\n".to_vec()));
+        for index in 0..70 {
+            left_items.push((
+                format!("old/{index}.txt"),
+                format!("left {index}\n").into_bytes(),
+            ));
+            right_items.push((
+                format!("new/{index}.txt"),
+                format!("right {index}\n").into_bytes(),
+            ));
+        }
+        let left = left_items.into_iter().collect::<BTreeMap<_, _>>();
+        let right = right_items.into_iter().collect::<BTreeMap<_, _>>();
+
+        let output = render_manifest_diff(
+            "left",
+            &left,
+            "right",
+            &right,
+            &DiffOptions {
+                algorithm: DiffAlgorithm::Myers,
+                rename_detection: true,
+                ..DiffOptions::default()
+            },
+        );
+
+        assert!(output.contains("rename src/exact_old.rs -> src/exact_new.rs (100% similarity)"));
+        assert!(output.contains("warning: rename similarity detection skipped"));
+    }
+
+    #[test]
+    fn similarity_score_skips_huge_non_identical_files() {
+        let left = "left\n".repeat(MAX_SIMILARITY_LINES + 1);
+        let right = "right\n".repeat(MAX_SIMILARITY_LINES + 1);
+
+        assert_eq!(similarity_score(left.as_bytes(), right.as_bytes()), 0);
+    }
+
+    #[test]
+    fn lcs_pairs_returns_empty_when_match_candidates_exceed_limit() {
+        let repeated = "same\n".to_string();
+        let line_count = 1_100usize;
+        let left = vec![repeated.clone(); line_count];
+        let right = vec![repeated; line_count];
+
+        assert!(lcs_pairs(&left, &right, None).is_empty());
+    }
+
+    #[test]
     fn copy_detection_reports_added_file_from_existing_source() {
         let left = manifest(&[("src/base.rs", b"shared\nbody\n")]);
         let right = manifest(&[
@@ -575,6 +757,18 @@ mod tests {
         );
         assert!(output.contains("copy src/base.rs -> src/copied.rs (100% similarity)"));
         assert!(!output.contains("src/copied.rs (missing)"));
+    }
+
+    #[test]
+    fn text_diff_output_is_bounded_with_omission_summary() {
+        let long_line = format!("{}\n", "x".repeat(1024));
+        let left = long_line.repeat(400);
+        let right = String::new();
+
+        let diff = diff_text(&left, &right, DiffAlgorithm::Myers);
+
+        assert!(diff.len() < MAX_TEXT_DIFF_BYTES_PER_FILE + 4096);
+        assert!(diff.contains("diff output truncated"));
     }
 
     #[test]
