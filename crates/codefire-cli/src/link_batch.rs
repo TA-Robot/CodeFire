@@ -4,6 +4,9 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static LINK_BATCH_TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
 pub(super) struct LinkBatchOptions {
@@ -281,14 +284,22 @@ fn append_links(path: &Path, links: &[LinkBatchLink]) -> Result<(), CliError> {
             yaml_quote(&link.link_type)
         ));
     }
-    let temp_path = path.with_extension("yaml.tmp");
+    let temp_path = unique_yaml_temp_path(path);
     {
-        let mut file = fs::File::create(&temp_path)?;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)?;
         file.write_all(text.as_bytes())?;
         file.sync_all()?;
     }
     fs::rename(temp_path, path)?;
     Ok(())
+}
+
+fn unique_yaml_temp_path(path: &Path) -> PathBuf {
+    let counter = LINK_BATCH_TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    path.with_extension(format!("yaml.{}.{}.tmp", std::process::id(), counter))
 }
 
 fn yaml_quote(value: &str) -> String {
@@ -577,4 +588,19 @@ fn strip_yaml_comment(line: &str) -> String {
         previous_escape = false;
     }
     line.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn link_batch_temp_paths_are_unique_for_same_target() {
+        let path = PathBuf::from("codefire.links.yaml");
+        let first = unique_yaml_temp_path(&path);
+        let second = unique_yaml_temp_path(&path);
+        assert_ne!(first, second);
+        assert!(first.to_string_lossy().contains(".tmp"));
+        assert!(second.to_string_lossy().contains(".tmp"));
+    }
 }

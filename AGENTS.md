@@ -20,6 +20,7 @@
 - インストール/包装: `install.sh`, `pyproject.toml`, `setup.py`
 - ドキュメント: `README.md`, `docs/`, `adr/`, `schemas/`
 - 開発管理: `docs/development/`
+- 実験サブプロジェクト: `subprojects/`
 
 ## 最重要ルール
 
@@ -30,6 +31,7 @@
 - parse、validate、plan、apply、renderを混ぜない。
 - object identity、sealed commit、branch head atomicity、remote mutation policyの不変条件を壊さない。
 - AI agent運用機能、agent marketplace、prompt orchestrationはCodeFire本体へ入れない。
+- `subprojects/` はCodeFire dogfooding用の対象プロジェクトとして扱い、CodeFire本体のCLI/Store/Core実装と責務を混ぜない。
 - ユーザーの未コミット変更を勝手に戻さない。
 - `git reset --hard` や `git checkout --` で破壊的に戻さない。
 

@@ -6,6 +6,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod automation;
@@ -96,6 +97,22 @@ use view::{
     review_pack_with_options, show_commitish, DiffAlgorithm, DiffOptions, PatchExportOptions,
     ReviewPackOptions,
 };
+
+pub(crate) fn scan_branch_state(changed_atoms: usize, open_fires: usize) -> &'static str {
+    if changed_atoms == 0 && open_fires == 0 {
+        "open-clean"
+    } else {
+        "open-burning"
+    }
+}
+
+fn status_state(raw_state: &str, open_fires: usize) -> String {
+    if open_fires > 0 {
+        "open-burning".to_string()
+    } else {
+        raw_state.to_string()
+    }
+}
 
 fn main() {
     if let Err(error) = run(env::args().skip(1).collect()) {
@@ -883,6 +900,7 @@ enum CliError {
     Usage(String),
     AuthenticationOrSignature(String),
     IdempotencyConflict(String),
+    HttpPayloadTooLarge(String),
     MigrationIncompatibility(String),
     VerificationFailed(ExitCode),
     NotOpen(PathBuf),
@@ -901,6 +919,7 @@ impl CliError {
             CliError::Usage(message) => usage_exit_code(message),
             CliError::AuthenticationOrSignature(_) => ExitCode::AuthenticationOrSignatureFailure,
             CliError::IdempotencyConflict(_) => ExitCode::IdempotencyConflict,
+            CliError::HttpPayloadTooLarge(_) => ExitCode::InvalidUsageOrConfig,
             CliError::MigrationIncompatibility(_) => ExitCode::MigrationIncompatibility,
             CliError::VerificationFailed(exit_code) => *exit_code,
             CliError::NotOpen(_) => ExitCode::InvalidUsageOrConfig,
@@ -923,6 +942,7 @@ impl fmt::Display for CliError {
             CliError::Usage(message) => write!(f, "{message}"),
             CliError::AuthenticationOrSignature(message) => write!(f, "{message}"),
             CliError::IdempotencyConflict(message) => write!(f, "{message}"),
+            CliError::HttpPayloadTooLarge(message) => write!(f, "{message}"),
             CliError::MigrationIncompatibility(message) => write!(f, "{message}"),
             CliError::VerificationFailed(_) => write!(f, "verification failed"),
             CliError::NotOpen(path) => write!(
@@ -1205,23 +1225,34 @@ fn print_branches(branches: &[Branch]) {
 }
 
 fn print_scan(scan: &codefire_core::ScanResult) {
-    let state = if scan.changed_atoms.is_empty() && scan.open_fires.is_empty() {
-        "open-clean"
+    print!("{}", render_scan(scan));
+}
+
+fn render_scan(scan: &codefire_core::ScanResult) -> String {
+    let state = scan_branch_state(scan.changed_atoms.len(), scan.open_fires.len());
+    let mut output = String::new();
+    output.push_str(&format!("Branch state: {state}\n"));
+    if scan.changed_atoms.is_empty() {
+        output.push_str("Changed atoms: none\n");
     } else {
-        "open-burning"
-    };
-    println!("Branch state: {state}");
-    println!("Changed atoms:");
-    for atom_id in &scan.changed_atoms {
-        println!("  {atom_id}");
+        output.push_str("Changed atoms:\n");
+        for atom_id in &scan.changed_atoms {
+            output.push_str(&format!("  {atom_id}\n"));
+        }
     }
-    println!("Open fires:");
-    for fire in &scan.open_fires {
-        println!(
-            "  {}  {} -> {}  {}",
-            fire.display_id, fire.source.atom_id, fire.target.atom_id, fire.reason
-        );
+    if scan.open_fires.is_empty() {
+        output.push_str("Open fires: none\n");
+    } else {
+        output.push_str("Open fires:\n");
+        for fire in &scan.open_fires {
+            output.push_str(&format!(
+                "  {}  {} -> {}  {}",
+                fire.display_id, fire.source.atom_id, fire.target.atom_id, fire.reason
+            ));
+            output.push('\n');
+        }
     }
+    output
 }
 
 fn print_lock_contention_json(command: &str, error: &CliError) -> Result<(), CliError> {
@@ -3188,11 +3219,7 @@ fn compute_scan(start: &Path, persist: bool) -> Result<ScanExecution, CliError> 
             &active_state_path.join("scan.json"),
             &serde_json::to_value(&scan)?,
         )?;
-        let state = if scan.changed_atoms.is_empty() && scan.open_fires.is_empty() {
-            "open-clean"
-        } else {
-            "open-burning"
-        };
+        let state = scan_branch_state(scan.changed_atoms.len(), scan.open_fires.len());
         set_open_state(&context, &active_state_path, state)?;
     }
     Ok(ScanExecution {
@@ -3984,25 +4011,34 @@ fn stable_hash_48(bytes: &[u8]) -> u64 {
     hash & 0x0000_ffff_ffff_ffff
 }
 
+static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
 fn write_json_atomic(path: &Path, value: &Value) -> Result<(), CliError> {
     let parent = path
         .parent()
         .ok_or_else(|| CliError::Usage(format!("path has no parent: {}", path.display())))?;
     fs::create_dir_all(parent)?;
-    let temp_path = path.with_extension(format!(
-        "{}tmp",
-        path.extension()
-            .and_then(|extension| extension.to_str())
-            .map(|extension| format!("{extension}."))
-            .unwrap_or_default()
-    ));
+    let temp_path = unique_temp_path(path);
     {
-        let mut file = fs::File::create(&temp_path)?;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)?;
         file.write_all(serde_json::to_string_pretty(value)?.as_bytes())?;
         file.write_all(b"\n")?;
     }
     fs::rename(temp_path, path)?;
     Ok(())
+}
+
+fn unique_temp_path(path: &Path) -> PathBuf {
+    let counter = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| format!("{extension}."))
+        .unwrap_or_default();
+    path.with_extension(format!("{extension}{}.{}.tmp", std::process::id(), counter))
 }
 
 fn read_status(start: &Path) -> Result<Status, CliError> {
@@ -4011,7 +4047,7 @@ fn read_status(start: &Path) -> Result<Status, CliError> {
     let base = required_string(&context.registry, &["open", "current_base_commit"])?;
     let objects_root = context.repo_root.join(".codefire").join("objects");
     codefire_store::validate_sealed_commit(&objects_root, &base)?;
-    let state = required_string(&context.registry, &["state", "last_known"])?;
+    let raw_state = required_string(&context.registry, &["state", "last_known"])?;
     let active_state_path = PathBuf::from(required_string(
         &context.registry,
         &["open", "active_state_path"],
@@ -4034,7 +4070,7 @@ fn read_status(start: &Path) -> Result<Status, CliError> {
 
     Ok(Status {
         branch: context.branch,
-        state,
+        state: status_state(&raw_state, open_fires),
         base,
         open_fires,
     })

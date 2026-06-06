@@ -60,44 +60,68 @@ pub(crate) fn print_verification(
     details: bool,
     blocking_only: bool,
 ) {
+    print!(
+        "{}",
+        render_verification(verification, details, blocking_only)
+    );
+}
+
+pub(crate) fn render_verification(
+    verification: &codefire_core::Verification,
+    details: bool,
+    blocking_only: bool,
+) -> String {
+    let mut output = String::new();
     if verification.result == "passed" {
-        println!("Verification passed.");
-        return;
+        output.push_str("Verification passed.\n");
+    } else {
+        output.push_str("Verification failed.\n");
     }
     let blocking = blocking_check_names(verification);
-    println!("Verification failed.");
-    println!(
+    output.push_str(&format!(
         "Blocking checks: {}",
         if blocking.is_empty() {
             "none".to_string()
         } else {
             blocking.join(", ")
         }
-    );
-    println!("Open fires: {}", verification.open_required_fires);
-    println!(
+    ));
+    output.push('\n');
+    output.push_str(&format!(
+        "Open fires: {}\n",
+        verification.open_required_fires
+    ));
+    output.push_str(&format!(
         "Missing required links: {}",
         verification.missing_required_links.len()
-    );
-    println!(
+    ));
+    output.push('\n');
+    output.push_str(&format!(
         "Stale resolutions: {}",
         verification.stale_resolutions.len()
-    );
-    println!(
+    ));
+    output.push('\n');
+    output.push_str(&format!(
         "Missing evidence refs: {}",
         verification.missing_evidence_refs.len()
-    );
-    println!(
+    ));
+    output.push('\n');
+    output.push_str(&format!(
         "Duplicate atom ids: {}",
         verification.duplicate_atom_ids.len()
-    );
-    println!("Failed checks: {}", verification.failed_checks.len());
+    ));
+    output.push('\n');
+    output.push_str(&format!(
+        "Failed checks: {}\n",
+        verification.failed_checks.len()
+    ));
     if details {
         if blocking_only {
-            println!("Detail filter: blocking-only");
+            output.push_str("Detail filter: blocking-only\n");
         }
-        print_blocking_verification_details(verification);
+        render_blocking_verification_details(verification, &mut output);
     }
+    output
 }
 
 fn blocking_check_names(verification: &codefire_core::Verification) -> Vec<&'static str> {
@@ -123,39 +147,46 @@ fn blocking_check_names(verification: &codefire_core::Verification) -> Vec<&'sta
     blocking
 }
 
-fn print_blocking_verification_details(verification: &codefire_core::Verification) {
+fn render_blocking_verification_details(
+    verification: &codefire_core::Verification,
+    output: &mut String,
+) {
     if !verification.missing_required_links.is_empty() {
-        println!("Missing required link details:");
+        output.push_str("Missing required link details:\n");
         for item in verification.missing_required_links.iter().take(5) {
-            println!(
+            output.push_str(&format!(
                 "  {} requires {} -> {} min {}",
                 item.atom_id, item.required_type, item.target_kind, item.min
-            );
+            ));
+            output.push('\n');
         }
     }
     if !verification.stale_resolutions.is_empty() {
-        println!("Stale resolution details:");
+        output.push_str("Stale resolution details:\n");
         for item in verification.stale_resolutions.iter().take(5) {
-            println!("  {}: {}", item.resolution_uid, item.reason);
+            output.push_str(&format!("  {}: {}\n", item.resolution_uid, item.reason));
         }
     }
     if !verification.missing_evidence_refs.is_empty() {
-        println!("Missing evidence ref details:");
+        output.push_str("Missing evidence ref details:\n");
         for item in verification.missing_evidence_refs.iter().take(5) {
-            println!("  {}: {}", item.resolution_uid, item.evidence_id);
+            output.push_str(&format!(
+                "  {}: {}\n",
+                item.resolution_uid, item.evidence_id
+            ));
         }
     }
     if !verification.duplicate_atom_ids.is_empty() {
-        println!("Duplicate Atom ID details:");
+        output.push_str("Duplicate Atom ID details:\n");
         for atom_id in verification.duplicate_atom_ids.iter().take(5) {
-            println!("  {atom_id}");
+            output.push_str(&format!("  {atom_id}\n"));
         }
     }
     if !verification.failed_checks.is_empty() {
-        println!("Failed check details:");
+        output.push_str("Failed check details:\n");
         for item in verification.failed_checks.iter().take(5) {
             let summary = item.output.trim().lines().next().unwrap_or_default();
-            println!("  {}: {} {}", item.id, item.command, summary);
+            output.push_str(&format!("  {}: {} {}\n", item.id, item.command, summary));
         }
     }
 }

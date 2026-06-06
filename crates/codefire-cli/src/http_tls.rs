@@ -4,6 +4,7 @@ use rustls::{
     Certificate, ClientConfig, ClientConnection, Error as TlsError, OwnedTrustAnchor, PrivateKey,
     RootCertStore, ServerConfig, ServerConnection, ServerName, StreamOwned,
 };
+use std::ffi::OsStr;
 use std::fs;
 use std::io::BufReader;
 use std::net::TcpStream;
@@ -17,7 +18,7 @@ pub(crate) type TlsServerStream = StreamOwned<ServerConnection, TcpStream>;
 pub(crate) fn connect_client(stream: TcpStream, host: &str) -> Result<TlsClientStream, CliError> {
     let server_name = ServerName::try_from(host)
         .map_err(|_| CliError::Usage(format!("invalid TLS server name: {host}")))?;
-    let config = if std::env::var_os("CODEFIRE_TLS_INSECURE").is_some() {
+    let config = if tls_insecure_enabled() {
         ClientConfig::builder()
             .with_safe_defaults()
             .with_custom_certificate_verifier(Arc::new(InsecureVerifier))
@@ -31,6 +32,14 @@ pub(crate) fn connect_client(stream: TcpStream, host: &str) -> Result<TlsClientS
     let connection = ClientConnection::new(Arc::new(config), server_name)
         .map_err(|error| CliError::Usage(format!("TLS client error: {error}")))?;
     Ok(StreamOwned::new(connection, stream))
+}
+
+pub(crate) fn tls_insecure_enabled() -> bool {
+    insecure_env_value_enabled(std::env::var_os("CODEFIRE_TLS_INSECURE").as_deref())
+}
+
+pub(crate) fn insecure_env_value_enabled(value: Option<&OsStr>) -> bool {
+    value.is_some_and(|value| value == "1" || value == "true")
 }
 
 pub(crate) fn server_config(

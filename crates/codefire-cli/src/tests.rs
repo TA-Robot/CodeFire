@@ -1,6 +1,7 @@
 use super::*;
 use crate::completion::{bash_completion_script, help_text, zsh_completion_script};
 use crate::doctor::DoctorOptions;
+use crate::remote::remote_idempotency_key;
 use serde_json::{json, Map};
 use tempfile::tempdir;
 
@@ -1271,6 +1272,102 @@ fn parse_https_remote_urls_and_tls_serve_args() {
     assert!(missing_key
         .to_string()
         .contains("--tls-cert and --tls-key must be provided together"));
+}
+
+#[test]
+fn http_remote_urls_reject_extra_path_segments() {
+    let branch_error =
+        http::parse_cf_http_url("cf+https://127.0.0.1:8443/org/app/main/extra").unwrap_err();
+    assert!(branch_error.to_string().contains("HTTP remote URL must be"));
+
+    let project_error =
+        http::parse_cf_http_project_url("cf+https://127.0.0.1:8443/org/app/extra").unwrap_err();
+    assert!(project_error
+        .to_string()
+        .contains("HTTP remote project URL must be"));
+}
+
+#[test]
+fn tls_insecure_env_requires_explicit_truthy_value() {
+    assert!(!http_tls::insecure_env_value_enabled(None));
+    assert!(!http_tls::insecure_env_value_enabled(Some(
+        std::ffi::OsStr::new("")
+    )));
+    assert!(!http_tls::insecure_env_value_enabled(Some(
+        std::ffi::OsStr::new("0")
+    )));
+    assert!(http_tls::insecure_env_value_enabled(Some(
+        std::ffi::OsStr::new("1")
+    )));
+    assert!(http_tls::insecure_env_value_enabled(Some(
+        std::ffi::OsStr::new("true")
+    )));
+}
+
+#[test]
+fn remote_idempotency_key_ignores_empty_string() {
+    assert_eq!(remote_idempotency_key(&json!({})), None);
+    assert_eq!(
+        remote_idempotency_key(&json!({"idempotency_key": ""})),
+        None
+    );
+    assert_eq!(
+        remote_idempotency_key(&json!({"idempotency_key": "remote-once"})).as_deref(),
+        Some("remote-once")
+    );
+}
+
+#[test]
+fn json_atomic_temp_paths_are_unique_for_same_target() {
+    let path = PathBuf::from("state.json");
+    let first = unique_temp_path(&path);
+    let second = unique_temp_path(&path);
+    assert_ne!(first, second);
+    assert!(first.to_string_lossy().contains(".tmp"));
+    assert!(second.to_string_lossy().contains(".tmp"));
+}
+
+#[test]
+fn scan_and_verify_text_outputs_include_empty_summaries() {
+    let scan = codefire_core::ScanResult {
+        type_tag: "scan".to_string(),
+        version: 1,
+        base_commit: "CF-COMMIT-base".to_string(),
+        atom_index: codefire_core::AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: 1,
+            atoms: Vec::new(),
+            duplicate_atom_ids: Vec::new(),
+        },
+        trace_graph: codefire_core::TraceGraph {
+            type_tag: "trace_graph".to_string(),
+            version: 1,
+            links: Vec::new(),
+        },
+        changed_atoms: Vec::new(),
+        open_fires: Vec::new(),
+    };
+    let scan_text = render_scan(&scan);
+    assert!(scan_text.contains("Changed atoms: none"));
+    assert!(scan_text.contains("Open fires: none"));
+
+    let verification = codefire_core::Verification {
+        type_tag: "verification".to_string(),
+        version: 1,
+        result: "passed".to_string(),
+        open_required_fires: 0,
+        failed_checks: Vec::new(),
+        missing_required_links: Vec::new(),
+        stale_resolutions: Vec::new(),
+        missing_evidence_refs: Vec::new(),
+        duplicate_atom_ids: Vec::new(),
+        verified_at: "2026-06-06T00:00:00Z".to_string(),
+    };
+    let verify_text = verification::render_verification(&verification, false, false);
+    assert!(verify_text.contains("Verification passed."));
+    assert!(verify_text.contains("Blocking checks: none"));
+    assert!(verify_text.contains("Open fires: 0"));
+    assert!(verify_text.contains("Failed checks: 0"));
 }
 
 #[test]
@@ -3983,7 +4080,7 @@ fn status_reads_python_compatible_open_directory() {
         status,
         Status {
             branch: "main".to_string(),
-            state: "open-consistent".to_string(),
+            state: "open-burning".to_string(),
             base: commit_id,
             open_fires: 1
         }

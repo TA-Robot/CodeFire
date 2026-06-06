@@ -7,6 +7,8 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 
+const MAX_HTTP_BODY_BYTES: usize = 16 * 1024 * 1024;
+
 #[derive(Debug, Clone)]
 pub(crate) struct CfHttpUrl {
     pub(crate) endpoint: String,
@@ -61,7 +63,7 @@ pub(crate) fn parse_cf_http_project_url(url: &str) -> Result<CfHttpProjectUrl, C
     })
 }
 
-fn parse_cf_http_parts(url: &str, min_parts: usize) -> Result<(String, Vec<String>), CliError> {
+fn parse_cf_http_parts(url: &str, exact_parts: usize) -> Result<(String, Vec<String>), CliError> {
     let (scheme, raw) = if let Some(raw) = url.strip_prefix("cf+http://") {
         ("http", raw)
     } else if let Some(raw) = url.strip_prefix("cf+https://") {
@@ -84,8 +86,8 @@ fn parse_cf_http_parts(url: &str, min_parts: usize) -> Result<(String, Vec<Strin
         .filter(|part| !part.is_empty())
         .map(percent_decode)
         .collect::<Result<Vec<_>, _>>()?;
-    if parts.len() < min_parts {
-        return Err(CliError::Usage(if min_parts == 3 {
+    if parts.len() != exact_parts {
+        return Err(CliError::Usage(if exact_parts == 3 {
             "HTTP remote URL must be cf+http://<host>/<org>/<app>/<branch> or cf+https://<host>/<org>/<app>/<branch>".to_string()
         } else {
             "HTTP remote project URL must be cf+http://<host>/<org>/<app> or cf+https://<host>/<org>/<app>".to_string()
@@ -317,6 +319,8 @@ fn handle_http_stream<S: Read + Write>(
         Err(error) => (
             if matches!(error, CliError::IdempotencyConflict(_)) {
                 409
+            } else if matches!(error, CliError::HttpPayloadTooLarge(_)) {
+                413
             } else {
                 400
             },
@@ -375,6 +379,11 @@ fn read_http_request<S: Read + Write>(stream: &mut S) -> Result<HttpRequest, Cli
                 .flatten()
         })
         .unwrap_or(0);
+    if content_length > MAX_HTTP_BODY_BYTES {
+        return Err(CliError::HttpPayloadTooLarge(format!(
+            "HTTP request body too large: {content_length} bytes exceeds {MAX_HTTP_BODY_BYTES} bytes"
+        )));
+    }
     let body_start = header_end + 4;
     while buffer.len() < body_start + content_length {
         let read = stream.read(&mut temp)?;
@@ -383,8 +392,12 @@ fn read_http_request<S: Read + Write>(stream: &mut S) -> Result<HttpRequest, Cli
         }
         buffer.extend_from_slice(&temp[..read]);
     }
-    let body_bytes =
-        &buffer[body_start..body_start + content_length.min(buffer.len() - body_start)];
+    if buffer.len() < body_start + content_length {
+        return Err(CliError::InvalidRepository(
+            "incomplete HTTP request body".to_string(),
+        ));
+    }
+    let body_bytes = &buffer[body_start..body_start + content_length];
     let body = if body_bytes.is_empty() {
         json!({})
     } else {
@@ -408,6 +421,7 @@ fn write_http_json<S: Read + Write>(
         400 => "Bad Request",
         404 => "Not Found",
         409 => "Conflict",
+        413 => "Payload Too Large",
         _ => "Error",
     };
     let header = format!(
@@ -1042,4 +1056,28 @@ fn http_merge_request_is_stale(storage_root: &Path, mr: &Value) -> Result<bool, 
         .is_some_and(|head| {
             head != required_string(mr, &["target_head_at_request"]).unwrap_or_default()
         }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn http_request_rejects_truncated_body() {
+        let request =
+            b"POST /v1/projects/org/app/branches/main/upload HTTP/1.1\r\nContent-Length: 7\r\n\r\n{}";
+        let error = read_http_request(&mut Cursor::new(request.to_vec())).unwrap_err();
+        assert!(error.to_string().contains("incomplete HTTP request body"));
+    }
+
+    #[test]
+    fn http_request_rejects_oversized_body_before_reading_body() {
+        let request = format!(
+            "POST /v1/projects/org/app/branches/main/upload HTTP/1.1\r\nContent-Length: {}\r\n\r\n",
+            MAX_HTTP_BODY_BYTES + 1
+        );
+        let error = read_http_request(&mut Cursor::new(request.into_bytes())).unwrap_err();
+        assert!(matches!(error, CliError::HttpPayloadTooLarge(_)));
+    }
 }

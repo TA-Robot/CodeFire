@@ -1,5 +1,6 @@
 use crate::{
-    load_base_atom_index, open_context, read_json, required_string, CliError, OpenContext,
+    load_base_atom_index, open_context, read_json, required_string, scan_branch_state, CliError,
+    OpenContext,
 };
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -237,11 +238,7 @@ fn context_data_json(
             "base_commit": &snapshot.scan.base_commit,
         },
         "scan": {
-            "branch_state": if snapshot.scan.changed_atoms.is_empty() && snapshot.scan.open_fires.is_empty() {
-                "open-clean"
-            } else {
-                "open-burning"
-            },
+            "branch_state": scan_branch_state(snapshot.scan.changed_atoms.len(), snapshot.scan.open_fires.len()),
             "changed_atoms": &snapshot.scan.changed_atoms,
             "open_fires": snapshot.scan.open_fires.iter().map(fire_json).collect::<Vec<_>>(),
         },

@@ -1,0 +1,29 @@
+{
+  "challenge_id": "toy-tabular-sample-efficiency",
+  "task": "Improve sample efficiency on small tabular classification",
+  "dataset": "toy-tabular-v1",
+  "metric": "validation_score",
+  "split": "fixed-seed-validation",
+  "target_improvement": 0.02,
+  "allowed_compute": {
+    "max_hours": 1.0,
+    "max_trials": 20
+  },
+  "baselines": [
+    {
+      "name": "linear-threshold",
+      "metric_value": 0.78,
+      "source": "local_fixture_seed_1"
+    },
+    {
+      "name": "regularized-polynomial",
+      "metric_value": 0.81,
+      "source": "local_fixture_seed_2"
+    }
+  ],
+  "disallowed_shortcuts": [
+    "using validation labels during training",
+    "tuning repeatedly on hidden test results",
+    "reporting a single lucky seed without repeated-run evidence"
+  ]
+}

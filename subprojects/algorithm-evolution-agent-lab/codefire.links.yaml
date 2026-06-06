@@ -1,0 +1,644 @@
+version: 1
+links:
+  - from: REQ-AGENT-001
+    to: DES-AGENT-001
+    type: refined_by
+  - from: DES-AGENT-001
+    to: CODE-EvolutionAgent
+    type: implemented_by
+  - from: REQ-AGENT-001
+    to: TEST-evolution-agent-selects-best-candidate
+    type: verified_by
+  - from: REQ-SCORING-001
+    to: DES-SCORING-001
+    type: refined_by
+  - from: DES-SCORING-001
+    to: CODE-CandidateScoring
+    type: implemented_by
+  - from: REQ-SCORING-001
+    to: TEST-candidate-scoring-uses-quality-and-cost
+    type: verified_by
+  - from: REQ-SAFETY-001
+    to: DES-SAFETY-001
+    type: refined_by
+  - from: DES-SAFETY-001
+    to: CODE-SotaClaimGate
+    type: implemented_by
+  - from: REQ-SAFETY-001
+    to: TEST-sota-claim-requires-evidence
+    type: verified_by
+  - from: REQ-PLANNER-001
+    to: DES-PLANNER-001
+    type: refined_by
+  - from: DES-PLANNER-001
+    to: CODE-CodexPlanner
+    type: implemented_by
+  - from: DES-PLANNER-001
+    to: CODE-StaticPlanner
+    type: implemented_by
+  - from: REQ-PLANNER-001
+    to: TEST-codex-planner-parses-json-hypotheses
+    type: verified_by
+  - from: REQ-PLANNER-001
+    to: TEST-static-planner-proposes-hypotheses
+    type: verified_by
+  - from: REQ-PRODUCT-001
+    to: DES-PRODUCT-001
+    type: refined_by
+  - from: REQ-PRODUCT-001
+    to: CODE-ResearchProgressMeter
+    type: implemented_by
+  - from: REQ-PRODUCT-001
+    to: TEST-research-progress-meter-scores-sustained-progress
+    type: verified_by
+  - from: REQ-PRODUCT-002
+    to: DES-SOTA-001
+    type: refined_by
+  - from: REQ-PRODUCT-002
+    to: CODE-SotaPursuitFramer
+    type: implemented_by
+  - from: REQ-PRODUCT-002
+    to: TEST-sota-pursuit-framer-keeps-weak-evidence-as-hypothesis
+    type: verified_by
+  - from: REQ-PRODUCT-003
+    to: DES-PRODUCT-001
+    type: refined_by
+  - from: DES-PRODUCT-001
+    to: CODE-ResearchProgram
+    type: implemented_by
+  - from: REQ-PRODUCT-003
+    to: TEST-research-program-records-runs-and-evidence
+    type: verified_by
+  - from: REQ-PRODUCT-004
+    to: DES-PRODUCT-001
+    type: refined_by
+  - from: REQ-PRODUCT-004
+    to: CODE-ObjectiveDecomposer
+    type: implemented_by
+  - from: REQ-PRODUCT-004
+    to: TEST-objective-decomposer-creates-measurable-subgoals
+    type: verified_by
+  - from: REQ-PRODUCT-005
+    to: DES-PRODUCT-003
+    type: refined_by
+  - from: DES-PRODUCT-003
+    to: CODE-HypothesisLineage
+    type: implemented_by
+  - from: REQ-PRODUCT-005
+    to: TEST-durable-research-identities-and-lineage
+    type: verified_by
+  - from: REQ-PRODUCT-006
+    to: DES-PRODUCT-002
+    type: refined_by
+  - from: REQ-PRODUCT-006
+    to: CODE-ExperimentAutomationSurfaceGuard
+    type: implemented_by
+  - from: REQ-PRODUCT-006
+    to: TEST-experiment-automation-surface-guard-prioritizes-automation
+    type: verified_by
+  - from: REQ-PRODUCT-007
+    to: DES-SOTA-002
+    type: refined_by
+  - from: REQ-PRODUCT-007
+    to: CODE-EvidenceLedger
+    type: implemented_by
+  - from: REQ-PRODUCT-007
+    to: TEST-evidence-ledger-links-claims-to-runs
+    type: verified_by
+  - from: REQ-PRODUCT-008
+    to: DES-AUTO-008
+    type: refined_by
+  - from: REQ-PRODUCT-008
+    to: CODE-NegativeResultArchive
+    type: implemented_by
+  - from: REQ-PRODUCT-008
+    to: TEST-negative-result-archive-retains-failed-paths
+    type: verified_by
+  - from: REQ-PRODUCT-009
+    to: DES-AUTO-003
+    type: refined_by
+  - from: REQ-PRODUCT-009
+    to: CODE-ReproductionChecklist
+    type: implemented_by
+  - from: REQ-PRODUCT-009
+    to: TEST-reproduction-checklist-detects-missing-evidence
+    type: verified_by
+  - from: REQ-PRODUCT-010
+    to: DES-PRODUCT-002
+    type: refined_by
+  - from: REQ-PRODUCT-010
+    to: CODE-HumanOverrideLedger
+    type: implemented_by
+  - from: REQ-PRODUCT-010
+    to: TEST-human-override-ledger-preserves-audit-trail
+    type: verified_by
+  - from: REQ-PRODUCT-011
+    to: DES-PRODUCT-001
+    type: refined_by
+  - from: REQ-PRODUCT-011
+    to: CODE-ResearchMemoryIndex
+    type: implemented_by
+  - from: REQ-PRODUCT-011
+    to: TEST-research-memory-index-queries-by-tag-kind-and-text
+    type: verified_by
+  - from: REQ-PRODUCT-012
+    to: DES-PRODUCT-004
+    type: refined_by
+  - from: REQ-PRODUCT-012
+    to: CODE-BudgetAwarePlanner
+    type: implemented_by
+  - from: REQ-PRODUCT-012
+    to: TEST-budget-aware-planner-prefers-cheap-informative-candidates
+    type: verified_by
+  - from: REQ-PRODUCT-013
+    to: DES-PRODUCT-002
+    type: refined_by
+  - from: REQ-PRODUCT-013
+    to: DES-PLANNER-001
+    type: refined_by
+  - from: REQ-PRODUCT-013
+    to: CODE-RoleRegistry
+    type: implemented_by
+  - from: REQ-PRODUCT-013
+    to: TEST-role-registry-registers-extensible-components
+    type: verified_by
+  - from: REQ-PRODUCT-014
+    to: DES-PRODUCT-006
+    type: refined_by
+  - from: REQ-PRODUCT-014
+    to: CODE-CodeFireTraceAudit
+    type: implemented_by
+  - from: REQ-PRODUCT-014
+    to: TEST-codefire-trace-audit-connects-requirements-code-tests
+    type: verified_by
+  - from: REQ-PRODUCT-015
+    to: DES-AUTO-005
+    type: refined_by
+  - from: REQ-PRODUCT-015
+    to: CODE-BenchmarkDomainCatalog
+    type: implemented_by
+  - from: REQ-PRODUCT-015
+    to: TEST-benchmark-domain-catalog-supports-multiple-domains
+    type: verified_by
+  - from: REQ-PRODUCT-016
+    to: DES-PRODUCT-003
+    type: refined_by
+  - from: REQ-PRODUCT-017
+    to: DES-SOTA-001
+    type: refined_by
+  - from: REQ-PRODUCT-017
+    to: CODE-ClaimDisciplineClassifier
+    type: implemented_by
+  - from: REQ-PRODUCT-017
+    to: TEST-claim-discipline-distinguishes-sota-from-internal-score
+    type: verified_by
+  - from: REQ-PRODUCT-018
+    to: DES-SOTA-005
+    type: refined_by
+  - from: DES-SOTA-005
+    to: CODE-LivingResearchReport
+    type: implemented_by
+  - from: REQ-PRODUCT-018
+    to: TEST-living-research-report-summarizes-program
+    type: verified_by
+  - from: REQ-PRODUCT-019
+    to: DES-AUTO-002
+    type: refined_by
+  - from: REQ-PRODUCT-019
+    to: CODE-SafeAutomationPolicy
+    type: implemented_by
+  - from: REQ-PRODUCT-019
+    to: TEST-safe-automation-policy-blocks-disallowed-command
+    type: verified_by
+  - from: REQ-PRODUCT-020
+    to: DES-PRODUCT-005
+    type: refined_by
+  - from: DES-PRODUCT-005
+    to: CODE-PolicyEvaluator
+    type: implemented_by
+  - from: REQ-PRODUCT-020
+    to: CODE-PolicyEvaluator
+    type: implemented_by
+  - from: REQ-PRODUCT-020
+    to: TEST-policy-evaluator-measures-selection-regret
+    type: verified_by
+  - from: REQ-AUTO-001
+    to: DES-AUTO-001
+    type: refined_by
+  - from: REQ-AUTO-001
+    to: CODE-ExperimentPlanContract
+    type: implemented_by
+  - from: REQ-AUTO-001
+    to: TEST-durable-research-identities-and-lineage
+    type: verified_by
+  - from: REQ-AUTO-001
+    to: TEST-experiment-plan-contract-validates-required-schema
+    type: verified_by
+  - from: REQ-AUTO-002
+    to: DES-AUTO-002
+    type: refined_by
+  - from: DES-AUTO-002
+    to: CODE-LocalExperimentRunner
+    type: implemented_by
+  - from: DES-AUTO-002
+    to: CODE-LocalBenchmarkFixtures
+    type: implemented_by
+  - from: REQ-AUTO-002
+    to: TEST-local-runner-captures-artifacts
+    type: verified_by
+  - from: REQ-AUTO-002
+    to: TEST-local-benchmark-fixture-runs-through-runner
+    type: verified_by
+  - from: REQ-AUTO-003
+    to: DES-AUTO-001
+    type: refined_by
+  - from: REQ-AUTO-003
+    to: CODE-RunIdentityLedger
+    type: implemented_by
+  - from: REQ-AUTO-003
+    to: TEST-run-identity-ledger-links-run-logs-artifacts-evidence
+    type: verified_by
+  - from: REQ-AUTO-004
+    to: DES-AUTO-001
+    type: refined_by
+  - from: REQ-AUTO-004
+    to: CODE-ConfigurationCapture
+    type: implemented_by
+  - from: REQ-AUTO-004
+    to: TEST-configuration-capture-records-reproducible-settings
+    type: verified_by
+  - from: REQ-AUTO-005
+    to: DES-AUTO-003
+    type: refined_by
+  - from: REQ-AUTO-005
+    to: CODE-ArtifactCollectionContract
+    type: implemented_by
+  - from: REQ-AUTO-005
+    to: TEST-local-runner-captures-artifacts
+    type: verified_by
+  - from: REQ-AUTO-005
+    to: TEST-local-benchmark-fixture-produces-artifacts
+    type: verified_by
+  - from: REQ-AUTO-005
+    to: TEST-artifact-collection-contract-detects-missing-required-artifacts
+    type: verified_by
+  - from: REQ-AUTO-006
+    to: DES-AUTO-004
+    type: refined_by
+  - from: REQ-AUTO-006
+    to: CODE-BenchmarkRegistry
+    type: implemented_by
+  - from: REQ-AUTO-006
+    to: CODE-MetricNormalizer
+    type: implemented_by
+  - from: REQ-AUTO-006
+    to: TEST-metric-normalizer-aligns-direction-and-scale
+    type: verified_by
+  - from: REQ-AUTO-007
+    to: DES-AUTO-006
+    type: refined_by
+  - from: DES-AUTO-006
+    to: CODE-BaselineRegistry
+    type: implemented_by
+  - from: REQ-AUTO-007
+    to: TEST-baseline-registry-selects-best
+    type: verified_by
+  - from: REQ-AUTO-008
+    to: DES-AUTO-008
+    type: refined_by
+  - from: REQ-AUTO-008
+    to: CODE-AblationGenerator
+    type: implemented_by
+  - from: REQ-AUTO-008
+    to: TEST-ablation-generator-creates-controlled-followups
+    type: verified_by
+  - from: REQ-AUTO-009
+    to: DES-SOTA-002
+    type: refined_by
+  - from: REQ-AUTO-009
+    to: CODE-BenchmarkRegistry
+    type: implemented_by
+  - from: REQ-AUTO-009
+    to: TEST-repeated-run-summary-requires-signal-over-noise
+    type: verified_by
+  - from: REQ-AUTO-010
+    to: DES-AUTO-008
+    type: refined_by
+  - from: REQ-AUTO-010
+    to: CODE-FailureClassifier
+    type: implemented_by
+  - from: REQ-AUTO-010
+    to: TEST-failure-classifier-categorizes-run-outcomes
+    type: verified_by
+  - from: REQ-AUTO-011
+    to: DES-AUTO-007
+    type: refined_by
+  - from: REQ-AUTO-011
+    to: CODE-ExperimentQueue
+    type: implemented_by
+  - from: REQ-AUTO-011
+    to: TEST-experiment-queue-orders-ready-experiments
+    type: verified_by
+  - from: REQ-AUTO-012
+    to: DES-AUTO-002
+    type: refined_by
+  - from: REQ-AUTO-012
+    to: CODE-StopCriteriaEvaluator
+    type: implemented_by
+  - from: REQ-AUTO-012
+    to: TEST-stop-criteria-evaluator-blocks-run-continuation
+    type: verified_by
+  - from: REQ-AUTO-013
+    to: DES-AUTO-004
+    type: refined_by
+  - from: DES-AUTO-004
+    to: CODE-ResultIngestor
+    type: implemented_by
+  - from: REQ-AUTO-013
+    to: TEST-result-ingestor-parses-metrics-artifact
+    type: verified_by
+  - from: REQ-AUTO-013
+    to: CODE-LocalExperimentRunner
+    type: implemented_by
+  - from: REQ-AUTO-013
+    to: TEST-local-benchmark-fixture-runs-through-runner
+    type: verified_by
+  - from: REQ-AUTO-014
+    to: DES-AUTO-008
+    type: refined_by
+  - from: DES-AUTO-008
+    to: CODE-RunAnalyst
+    type: implemented_by
+  - from: REQ-AUTO-014
+    to: TEST-run-analyst-writes-structured-note
+    type: verified_by
+  - from: REQ-AUTO-015
+    to: DES-PRODUCT-003
+    type: refined_by
+  - from: DES-PRODUCT-003
+    to: CODE-CandidateEvolutionOperators
+    type: implemented_by
+  - from: REQ-AUTO-015
+    to: CODE-CandidateEvolutionOperators
+    type: implemented_by
+  - from: REQ-AUTO-015
+    to: TEST-candidate-mutation-preserves-lineage
+    type: verified_by
+  - from: REQ-AUTO-016
+    to: DES-PRODUCT-004
+    type: refined_by
+  - from: DES-PRODUCT-004
+    to: CODE-PortfolioScheduler
+    type: implemented_by
+  - from: REQ-AUTO-016
+    to: CODE-PortfolioScheduler
+    type: implemented_by
+  - from: REQ-AUTO-016
+    to: TEST-portfolio-scheduler-balances-exploit-explore-cost
+    type: verified_by
+  - from: REQ-AUTO-016
+    to: TEST-evolution-agent-schedules-balanced-portfolio
+    type: verified_by
+  - from: REQ-PRODUCT-016
+    to: CODE-CandidateEvolutionOperators
+    type: implemented_by
+  - from: REQ-PRODUCT-016
+    to: TEST-candidate-crossover-combines-parent-mechanisms
+    type: verified_by
+  - from: REQ-AUTO-017
+    to: DES-AUTO-004
+    type: refined_by
+  - from: REQ-AUTO-017
+    to: CODE-RegressionDetector
+    type: implemented_by
+  - from: REQ-AUTO-017
+    to: TEST-regression-detector-flags-shared-benchmark-drop
+    type: verified_by
+  - from: REQ-AUTO-018
+    to: DES-AUTO-007
+    type: refined_by
+  - from: REQ-AUTO-018
+    to: CODE-ExperimentDependencyGraph
+    type: implemented_by
+  - from: REQ-AUTO-018
+    to: TEST-dependency-graph-unlocks-ready-plans
+    type: verified_by
+  - from: REQ-AUTO-019
+    to: DES-PRODUCT-001
+    type: refined_by
+  - from: REQ-AUTO-019
+    to: CODE-ResearchProgram
+    type: implemented_by
+  - from: REQ-AUTO-019
+    to: CODE-DecisionRecordValidator
+    type: implemented_by
+  - from: REQ-AUTO-019
+    to: TEST-research-program-records-runs-and-evidence
+    type: verified_by
+  - from: REQ-AUTO-020
+    to: DES-AUTO-005
+    type: refined_by
+  - from: DES-AUTO-005
+    to: CODE-BenchmarkRegistry
+    type: implemented_by
+  - from: REQ-AUTO-020
+    to: TEST-benchmark-registry-refreshes-versioned-definitions
+    type: verified_by
+  - from: REQ-AUTO-021
+    to: DES-AUTO-007
+    type: refined_by
+  - from: REQ-AUTO-021
+    to: CODE-ExperimentCampaignTracker
+    type: implemented_by
+  - from: REQ-AUTO-021
+    to: TEST-experiment-campaign-tracker-identifies-next-milestone
+    type: verified_by
+  - from: REQ-AUTO-022
+    to: DES-AUTO-007
+    type: refined_by
+  - from: REQ-AUTO-022
+    to: CODE-BudgetedExperimentBatchPlanner
+    type: implemented_by
+  - from: REQ-AUTO-022
+    to: TEST-budgeted-experiment-batch-planner-respects-cost-and-diversity
+    type: verified_by
+  - from: REQ-AUTO-023
+    to: DES-AUTO-008
+    type: refined_by
+  - from: REQ-AUTO-023
+    to: CODE-RetryEscalationPlanner
+    type: implemented_by
+  - from: REQ-AUTO-023
+    to: TEST-retry-escalation-planner-routes-failures-to-next-actions
+    type: verified_by
+  - from: REQ-AUTO-024
+    to: DES-AUTO-004
+    type: refined_by
+  - from: REQ-AUTO-024
+    to: CODE-EvidenceFreshnessAudit
+    type: implemented_by
+  - from: REQ-AUTO-024
+    to: TEST-evidence-freshness-audit-flags-stale-versioned-evidence
+    type: verified_by
+  - from: REQ-AUTO-025
+    to: DES-AUTO-008
+    type: refined_by
+  - from: REQ-AUTO-025
+    to: CODE-LearningCurveAnalyzer
+    type: implemented_by
+  - from: REQ-AUTO-025
+    to: TEST-learning-curve-analyzer-detects-plateau-and-instability
+    type: verified_by
+  - from: REQ-AUTO-026
+    to: DES-SOTA-002
+    type: refined_by
+  - from: REQ-AUTO-026
+    to: CODE-CandidatePromotionPolicy
+    type: implemented_by
+  - from: REQ-AUTO-026
+    to: TEST-candidate-promotion-policy-gates-promotion
+    type: verified_by
+  - from: REQ-SOTA-001
+    to: DES-SOTA-001
+    type: refined_by
+  - from: REQ-SOTA-001
+    to: CODE-SotaChallengeDefinition
+    type: implemented_by
+  - from: REQ-SOTA-001
+    to: TEST-sota-challenge-loads-definition-file
+    type: verified_by
+  - from: REQ-SOTA-002
+    to: DES-SOTA-002
+    type: refined_by
+  - from: REQ-SOTA-002
+    to: CODE-BaselineReproductionLedger
+    type: implemented_by
+  - from: REQ-SOTA-002
+    to: TEST-baseline-reproduction-ledger-requires-reproduced-baseline
+    type: verified_by
+  - from: REQ-SOTA-003
+    to: DES-SOTA-003
+    type: refined_by
+  - from: REQ-SOTA-003
+    to: CODE-LeakageChecker
+    type: implemented_by
+  - from: REQ-SOTA-003
+    to: TEST-leakage-checker-blocks-split-overlap
+    type: verified_by
+  - from: REQ-SOTA-004
+    to: DES-SOTA-002
+    type: refined_by
+  - from: REQ-SOTA-004
+    to: CODE-ConfidenceIntervalEstimator
+    type: implemented_by
+  - from: REQ-SOTA-004
+    to: TEST-confidence-interval-estimator-summarizes-repeated-runs
+    type: verified_by
+  - from: REQ-SOTA-005
+    to: DES-SOTA-005
+    type: refined_by
+  - from: REQ-SOTA-005
+    to: CODE-ComputeAccountant
+    type: implemented_by
+  - from: REQ-SOTA-005
+    to: TEST-compute-accountant-counts-failed-attempts
+    type: verified_by
+  - from: REQ-SOTA-006
+    to: DES-SOTA-003
+    type: refined_by
+  - from: REQ-SOTA-006
+    to: CODE-NoveltyReviewer
+    type: implemented_by
+  - from: REQ-SOTA-006
+    to: TEST-novelty-reviewer-flags-known-family-overlap
+    type: verified_by
+  - from: REQ-SOTA-007
+    to: DES-SOTA-003
+    type: refined_by
+  - from: REQ-SOTA-007
+    to: CODE-ExternalValidityEvaluator
+    type: implemented_by
+  - from: REQ-SOTA-007
+    to: TEST-external-validity-requires-transfer-across-domains
+    type: verified_by
+  - from: REQ-SOTA-008
+    to: DES-SOTA-001
+    type: refined_by
+  - from: REQ-SOTA-008
+    to: CODE-ClaimReadinessGate
+    type: implemented_by
+  - from: REQ-SOTA-008
+    to: TEST-claim-readiness-promotes-with-evidence
+    type: verified_by
+  - from: REQ-SOTA-009
+    to: DES-SOTA-003
+    type: refined_by
+  - from: REQ-SOTA-009
+    to: CODE-ReviewLedger
+    type: implemented_by
+  - from: REQ-SOTA-009
+    to: TEST-review-ledger-tracks-open-objections
+    type: verified_by
+  - from: REQ-SOTA-010
+    to: DES-SOTA-005
+    type: refined_by
+  - from: DES-SOTA-005
+    to: CODE-SotaReportBundle
+    type: implemented_by
+  - from: REQ-SOTA-010
+    to: CODE-SotaReportBundle
+    type: implemented_by
+  - from: REQ-SOTA-010
+    to: TEST-sota-report-bundle-writes-reproduction-files
+    type: verified_by
+  - from: DES-SOTA-005
+    to: TEST-living-research-report-summarizes-program
+    type: verified_by
+  - from: REQ-SOTA-011
+    to: DES-SOTA-003
+    type: refined_by
+  - from: REQ-SOTA-011
+    to: CODE-AntiOverfittingMonitor
+    type: implemented_by
+  - from: REQ-SOTA-011
+    to: TEST-anti-overfitting-monitor-limits-target-probes
+    type: verified_by
+  - from: REQ-SOTA-012
+    to: DES-SOTA-006
+    type: refined_by
+  - from: REQ-SOTA-012
+    to: CODE-LimitationSectionGenerator
+    type: implemented_by
+  - from: REQ-SOTA-012
+    to: TEST-limitation-section-includes-failures-gaps-and-objections
+    type: verified_by
+  - from: REQ-SOTA-013
+    to: DES-SOTA-003
+    type: refined_by
+  - from: REQ-SOTA-013
+    to: CODE-LeaderboardSubmissionLedger
+    type: implemented_by
+  - from: REQ-SOTA-013
+    to: TEST-leaderboard-submission-ledger-flags-excessive-probing
+    type: verified_by
+  - from: REQ-SOTA-014
+    to: DES-SOTA-003
+    type: refined_by
+  - from: REQ-SOTA-014
+    to: CODE-ContaminationSourceRegistry
+    type: implemented_by
+  - from: REQ-SOTA-014
+    to: TEST-contamination-source-registry-flags-dataset-and-artifact-overlap
+    type: verified_by
+  - from: DES-SOTA-006
+    to: CODE-ReviewLedger
+    type: implemented_by
+  - from: DES-PRODUCT-004
+    to: CODE-CandidateScoring
+    type: implemented_by
+  - from: DES-AUTO-001
+    to: CODE:src/evoagent/models.py::class:ExperimentPlan
+    type: implemented_by
+  - from: DES-SOTA-002
+    to: CODE-SotaClaimGate
+    type: implemented_by

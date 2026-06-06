@@ -1,0 +1,8 @@
+version: 1
+commit_policy:
+  require_trace_completeness: false
+verification:
+  required:
+    - id: unit-tests
+      command: "PYTHONPATH=src python3 -m unittest discover -s tests -v"
+      cwd: "."
