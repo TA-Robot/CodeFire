@@ -9,7 +9,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-pub const OBJECT_ID_DIGEST_HEX_LENGTH: usize = 12;
+pub const OBJECT_ID_DIGEST_HEX_LENGTH: usize = 24;
+const LEGACY_OBJECT_ID_DIGEST_HEX_LENGTH: usize = 12;
 
 const OBJECT_KINDS: &[ObjectKind] = &[
     ObjectKind::new("blob", "CF-BLOB", "blobs"),
@@ -122,11 +123,23 @@ pub fn object_digest(type_tag: &str, payload: &Value) -> Result<String, serde_js
 
 pub fn object_id(type_tag: &str, payload: &Value) -> Result<String, serde_json::Error> {
     let digest = object_digest(type_tag, payload)?;
-    Ok(format!(
+    Ok(object_id_from_digest(
+        type_tag,
+        &digest,
+        OBJECT_ID_DIGEST_HEX_LENGTH,
+    ))
+}
+
+fn legacy_object_id(type_tag: &str, digest: &str) -> String {
+    object_id_from_digest(type_tag, digest, LEGACY_OBJECT_ID_DIGEST_HEX_LENGTH)
+}
+
+fn object_id_from_digest(type_tag: &str, digest: &str, digest_hex_length: usize) -> String {
+    format!(
         "{}-{}",
         object_prefix(type_tag),
-        &digest[..OBJECT_ID_DIGEST_HEX_LENGTH]
-    ))
+        &digest[..digest_hex_length]
+    )
 }
 
 pub fn object_prefix(type_tag: &str) -> &'static str {
@@ -180,9 +193,14 @@ pub fn validate_object_record(
         ));
     }
 
-    let computed_id = object_id(&record.type_tag, &record.payload)?;
     let computed_hash = object_digest(&record.type_tag, &record.payload)?;
-    if record.object_id != computed_id {
+    let computed_id = object_id_from_digest(
+        &record.type_tag,
+        &computed_hash,
+        OBJECT_ID_DIGEST_HEX_LENGTH,
+    );
+    let legacy_id = legacy_object_id(&record.type_tag, &computed_hash);
+    if record.object_id != computed_id && record.object_id != legacy_id {
         return Err(StoreError::ObjectIdMismatch {
             expected: computed_id,
             actual: record.object_id.clone(),
@@ -195,10 +213,10 @@ pub fn validate_object_record(
         });
     }
     if let Some(expected) = expected_object_id {
-        if expected != computed_id {
+        if expected != record.object_id {
             return Err(StoreError::ObjectIdMismatch {
                 expected: expected.to_string(),
-                actual: computed_id,
+                actual: record.object_id.clone(),
             });
         }
     }
@@ -207,9 +225,9 @@ pub fn validate_object_record(
             .file_stem()
             .and_then(|value| value.to_str())
             .unwrap_or_default();
-        if stem != computed_id {
+        if stem != record.object_id {
             return Err(StoreError::FilenameMismatch {
-                expected: computed_id,
+                expected: record.object_id.clone(),
                 actual: stem.to_string(),
             });
         }
@@ -697,14 +715,17 @@ mod tests {
             object_digest("blob", &blob).unwrap(),
             "3b9124b51836f77522a243c6caa86d1a8773dc443246ce9860a1c0f630343514"
         );
-        assert_eq!(object_id("blob", &blob).unwrap(), "CF-BLOB-3b9124b51836");
+        assert_eq!(
+            object_id("blob", &blob).unwrap(),
+            "CF-BLOB-3b9124b51836f77522a243c6"
+        );
         assert_eq!(
             object_digest("atom_index", &atom_index).unwrap(),
             "6f78247e9b25327f61e2b86d57bca8f63a0dc781ae661ae50361d997b23ac0ea"
         );
         assert_eq!(
             object_id("atom_index", &atom_index).unwrap(),
-            "CF-ATOMINDEX-6f78247e9b25"
+            "CF-ATOMINDEX-6f78247e9b25327f61e2b86d"
         );
         assert_eq!(
             object_digest("commit", &commit).unwrap(),
@@ -712,7 +733,7 @@ mod tests {
         );
         assert_eq!(
             object_id("commit", &commit).unwrap(),
-            "CF-COMMIT-f2c6dacf47ce"
+            "CF-COMMIT-f2c6dacf47ce757c611162a7"
         );
     }
 
@@ -733,7 +754,8 @@ mod tests {
         assert!(subdirs.contains(&"evidence"));
         assert_eq!(object_subdir("commit"), Some("commits"));
         assert_eq!(object_prefix("commit"), "CF-COMMIT");
-        assert_eq!(OBJECT_ID_DIGEST_HEX_LENGTH, 12);
+        assert_eq!(OBJECT_ID_DIGEST_HEX_LENGTH, 24);
+        assert_eq!(LEGACY_OBJECT_ID_DIGEST_HEX_LENGTH, 12);
     }
 
     #[test]
@@ -748,6 +770,29 @@ mod tests {
 
         assert_eq!(object_record_path(&objects, commit_id), Some(path));
         assert_eq!(object_record_path(&objects, "CF-COMMIT-missing"), None);
+    }
+
+    #[test]
+    fn read_object_accepts_legacy_twelve_hex_object_ids() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let policies = objects.join("policies");
+        fs::create_dir_all(&policies).unwrap();
+        let payload = json!({"type": "policy", "version": 1, "policy": {"legacy": true}});
+        let hash = object_digest("policy", &payload).unwrap();
+        let object_id = legacy_object_id("policy", &hash);
+        let record = ObjectRecord {
+            object_id: object_id.clone(),
+            type_tag: "policy".to_string(),
+            hash,
+            payload: payload.clone(),
+        };
+        let path = policies.join(format!("{object_id}.json"));
+        fs::write(path, serde_json::to_string_pretty(&record).unwrap()).unwrap();
+
+        let loaded = read_object(&objects, &object_id).unwrap();
+
+        assert_eq!(loaded, payload);
     }
 
     #[test]

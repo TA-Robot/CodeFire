@@ -15,14 +15,14 @@
 - High: 15
 - Medium: 64
 - Low: 1
-- Fixed in v0.7: 31
-- Remaining open: 49
+- Fixed in v0.7: 32
+- Remaining open: 48
 
 ## v0.7 Progress
 
 - Batch 1 fixed: [CFR-005](code-review-issues/cfr-005.md), [CFR-006](code-review-issues/cfr-006.md), [CFR-010](code-review-issues/cfr-010.md), [CFR-031](code-review-issues/cfr-031.md), [CFR-032](code-review-issues/cfr-032.md), [CFR-047](code-review-issues/cfr-047.md), [CFR-058](code-review-issues/cfr-058.md), [CFR-067](code-review-issues/cfr-067.md), [CFR-077](code-review-issues/cfr-077.md)
 - Batch 2/8 partial fixed: [CFR-003](code-review-issues/cfr-003.md), [CFR-009](code-review-issues/cfr-009.md), [CFR-057](code-review-issues/cfr-057.md), [CFR-071](code-review-issues/cfr-071.md), [CFR-072](code-review-issues/cfr-072.md), [CFR-075](code-review-issues/cfr-075.md), [CFR-076](code-review-issues/cfr-076.md)
-- Batch 3 partial fixed: [CFR-011](code-review-issues/cfr-011.md), [CFR-012](code-review-issues/cfr-012.md), [CFR-013](code-review-issues/cfr-013.md), [CFR-014](code-review-issues/cfr-014.md), [CFR-015](code-review-issues/cfr-015.md), [CFR-017](code-review-issues/cfr-017.md), [CFR-018](code-review-issues/cfr-018.md)
+- Batch 3 fixed: [CFR-011](code-review-issues/cfr-011.md), [CFR-012](code-review-issues/cfr-012.md), [CFR-013](code-review-issues/cfr-013.md), [CFR-014](code-review-issues/cfr-014.md), [CFR-015](code-review-issues/cfr-015.md), [CFR-016](code-review-issues/cfr-016.md), [CFR-017](code-review-issues/cfr-017.md), [CFR-018](code-review-issues/cfr-018.md)
 - Batch 5 partial fixed: [CFR-025](code-review-issues/cfr-025.md), [CFR-026](code-review-issues/cfr-026.md); [CFR-027](code-review-issues/cfr-027.md) has bounded output partial progress but remains open for `--context <n>`.
 - Batch 6 partial fixed: [CFR-030](code-review-issues/cfr-030.md), [CFR-034](code-review-issues/cfr-034.md), [CFR-078](code-review-issues/cfr-078.md), [CFR-079](code-review-issues/cfr-079.md)
 - Batch 7 partial fixed: [CFR-041](code-review-issues/cfr-041.md), [CFR-043](code-review-issues/cfr-043.md); [CFR-042](code-review-issues/cfr-042.md) records shell mode metadata but remains open for argv mode.

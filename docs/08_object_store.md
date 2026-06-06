@@ -22,6 +22,15 @@ object\_id = sha256(type\_tag \parallel 0x00 \parallel canonical\_payload)
 - \( \parallel \)：バイト列の連結
 - \( canonical\_payload \)：順序や空白差分を排除した正規化payload
 
+保存されるobject ID文字列は、object種別prefixとSHA-256 digestの先頭24 hexを組み合わせる。
+
+```text
+CF-BLOB-<24 hex>
+CF-COMMIT-<24 hex>
+```
+
+v0.6以前に作られた先頭12 hexのobject IDは読み取り互換として残す。互換読み取りではrecord内 `object_id`、record `hash`、filenameが一致し、payloadから再計算したSHA-256 digestの先頭12 hexと一致する場合だけ有効とする。新規書き込みは常に24 hex IDを使う。
+
 ## 8.3 主要object
 
 ```text

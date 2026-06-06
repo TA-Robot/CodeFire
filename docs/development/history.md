@@ -170,6 +170,7 @@
 | 2026-06-06 | v0.7 Hardening | Batch 7の一部としてevidence command captureにtimeoutを追加し、timeout結果とshell mode metadataを保存し、未指定cwdをrepository rootへ寄せた | `crates/codefire-cli/src/evidence.rs`, `crates/codefire-cli/src/evidence/batch.rs`, `crates/codefire-cli/src/tests.rs`, docs | `cargo test -p codefire-cli --bin codefire-rs evidence -- --nocapture`; CFR-041, CFR-043 fixed; CFR-042 partial |
 | 2026-06-06 | v0.7 Hardening | Batch 6の一部としてHTTP client timeout、IPv6 authority parser、HTTP request method/path validation、upload tmp directory一意化を実装した | `crates/codefire-cli/src/http.rs`, `docs/04_cli_spec.md`, docs | `cargo test -p codefire-cli --bin codefire-rs http::tests -- --nocapture`; CFR-030, CFR-034, CFR-078, CFR-079 fixed |
 | 2026-06-06 | v0.7 Hardening | Batch 3の追加としてsealed commit root配下のmanifest/evidence/artifact参照検証をstoreへ追加し、scan生成fireのUID/display IDをSHA-256由来のstable identityへ移行した | `crates/codefire-store/src/lib.rs`, `crates/codefire-core/src/lib.rs`, `crates/codefire-cli/src/main.rs`, `crates/codefire-cli/src/tests.rs`, docs | `cargo fmt --check`; `cargo clippy --workspace --all-targets -- -D warnings`; `cargo test --workspace`; CFR-014, CFR-017, CFR-018 fixed |
+| 2026-06-06 | v0.7 Hardening | Batch 3の完了として新規object IDをSHA-256 digest 24 hexへ拡張し、legacy 12 hex object recordの読み取り互換を追加した | `crates/codefire-store/src/lib.rs`, `docs/08_object_store.md`, `docs/decisions.md`, docs | `cargo fmt --check`; `cargo test -p codefire-store --lib -- --nocapture`; CFR-016 fixed |
 
 ## Current Decisions
 
