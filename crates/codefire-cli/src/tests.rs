@@ -4096,6 +4096,30 @@ fn merge_branch_writes_binary_conflict_sides_without_lossy_markers() {
 }
 
 #[test]
+fn common_ancestor_handles_deep_generation_graph() {
+    let temp = tempdir().unwrap();
+    let objects = temp.path().join("objects");
+    let root = write_generation_commit(&objects, Vec::new(), 0);
+    let mut base = root;
+    for generation in 1..=40 {
+        base = write_generation_commit(&objects, vec![base], generation);
+    }
+    let split = base.clone();
+    let mut left = split.clone();
+    for generation in 41..=80 {
+        left = write_generation_commit_with_label(&objects, vec![left], generation, "left");
+    }
+    let mut right = split.clone();
+    for generation in 41..=70 {
+        right = write_generation_commit_with_label(&objects, vec![right], generation, "right");
+    }
+
+    let ancestor = common_ancestor(&objects, &left, &right).unwrap();
+
+    assert_eq!(ancestor.as_deref(), Some(split.as_str()));
+}
+
+#[test]
 fn merge_dry_run_reports_plan_without_writing_target() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
@@ -4484,6 +4508,26 @@ fn write_valid_commit(objects: &Path) -> String {
     let roots = write_required_roots(objects);
     let certificate = consistent_certificate();
     let commit = codefire_store::commit_payload(vec![], roots, certificate);
+    codefire_store::store_object(objects, "commit", commit).unwrap()
+}
+
+fn write_generation_commit(objects: &Path, parents: Vec<String>, generation: u64) -> String {
+    write_generation_commit_with_label(objects, parents, generation, "")
+}
+
+fn write_generation_commit_with_label(
+    objects: &Path,
+    parents: Vec<String>,
+    generation: u64,
+    label: &str,
+) -> String {
+    let mut commit = codefire_store::commit_payload(
+        parents,
+        write_required_roots(objects),
+        consistent_certificate(),
+    );
+    commit["generation"] = json!(generation);
+    commit["generation_test_label"] = json!(label);
     codefire_store::store_object(objects, "commit", commit).unwrap()
 }
 

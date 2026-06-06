@@ -1,5 +1,6 @@
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, BTreeSet};
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::env;
 use std::fmt;
 use std::fs::{self, File};
@@ -4191,49 +4192,93 @@ fn read_status(start: &Path) -> Result<Status, CliError> {
 
 fn common_ancestor(objects: &Path, left: &str, right: &str) -> Result<Option<String>, CliError> {
     let left_distances = ancestor_distances(objects, left)?;
-    let right_distances = ancestor_distances(objects, right)?;
-    Ok(left_distances
-        .keys()
-        .filter_map(|commit| {
-            let left_distance = left_distances.get(commit)?;
-            let right_distance = right_distances.get(commit)?;
-            Some((
-                *left_distance + *right_distance,
-                (*left_distance).max(*right_distance),
-                commit.clone(),
-            ))
-        })
-        .min()
-        .map(|(_, _, commit)| commit))
+    nearest_common_ancestor_from_right(objects, right, &left_distances)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct AncestorInfo {
+    distance: usize,
+    generation: Option<u64>,
 }
 
 fn ancestor_distances(
     objects: &Path,
     commit_id: &str,
-) -> Result<BTreeMap<String, usize>, CliError> {
-    let mut distances = BTreeMap::new();
-    let mut queue = vec![(commit_id.to_string(), 0usize)];
-    let mut cursor = 0usize;
-    while cursor < queue.len() {
-        let (current, distance) = queue[cursor].clone();
-        cursor += 1;
+) -> Result<HashMap<String, AncestorInfo>, CliError> {
+    let mut distances = HashMap::new();
+    let mut queue = VecDeque::from([(commit_id.to_string(), 0usize)]);
+    while let Some((current, distance)) = queue.pop_front() {
         if distances
             .get(&current)
-            .is_some_and(|known| *known <= distance)
+            .is_some_and(|known: &AncestorInfo| known.distance <= distance)
         {
             continue;
         }
-        distances.insert(current.clone(), distance);
-        for parent in commit_parents(objects, &current)? {
-            queue.push((parent, distance + 1));
+        let commit = commit_info(objects, &current)?;
+        distances.insert(
+            current,
+            AncestorInfo {
+                distance,
+                generation: commit.generation,
+            },
+        );
+        for parent in commit.parents {
+            queue.push_back((parent, distance + 1));
         }
     }
     Ok(distances)
 }
 
-fn commit_parents(objects: &Path, commit_id: &str) -> Result<Vec<String>, CliError> {
+fn nearest_common_ancestor_from_right(
+    objects: &Path,
+    right: &str,
+    left_distances: &HashMap<String, AncestorInfo>,
+) -> Result<Option<String>, CliError> {
+    let mut queue = VecDeque::from([(right.to_string(), 0usize)]);
+    let mut seen = HashMap::<String, usize>::new();
+    let mut best: Option<(usize, usize, Reverse<u64>, String)> = None;
+    while let Some((current, right_distance)) = queue.pop_front() {
+        if best
+            .as_ref()
+            .is_some_and(|(best_sum, _, _, _)| right_distance > *best_sum)
+        {
+            break;
+        }
+        if seen
+            .get(&current)
+            .is_some_and(|known| *known <= right_distance)
+        {
+            continue;
+        }
+        seen.insert(current.clone(), right_distance);
+        let commit = commit_info(objects, &current)?;
+        if let Some(left_info) = left_distances.get(&current) {
+            let candidate = (
+                left_info.distance + right_distance,
+                left_info.distance.max(right_distance),
+                Reverse(commit.generation.or(left_info.generation).unwrap_or(0)),
+                current.clone(),
+            );
+            if best.as_ref().map_or(true, |best| candidate < *best) {
+                best = Some(candidate);
+            }
+        }
+        for parent in commit.parents {
+            queue.push_back((parent, right_distance + 1));
+        }
+    }
+    Ok(best.map(|(_, _, _, commit)| commit))
+}
+
+#[derive(Debug)]
+struct CommitInfo {
+    parents: Vec<String>,
+    generation: Option<u64>,
+}
+
+fn commit_info(objects: &Path, commit_id: &str) -> Result<CommitInfo, CliError> {
     let commit = codefire_store::read_object(objects, commit_id)?;
-    Ok(commit
+    let parents = commit
         .get("parents")
         .and_then(Value::as_array)
         .map(|parents| {
@@ -4243,7 +4288,12 @@ fn commit_parents(objects: &Path, commit_id: &str) -> Result<Vec<String>, CliErr
                 .map(str::to_string)
                 .collect()
         })
-        .unwrap_or_default())
+        .unwrap_or_default();
+    let generation = commit.get("generation").and_then(Value::as_u64);
+    Ok(CommitInfo {
+        parents,
+        generation,
+    })
 }
 
 fn write_merged_file(root: &Path, rel_path: &str, data: Option<&[u8]>) -> Result<(), CliError> {
