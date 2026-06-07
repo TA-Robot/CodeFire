@@ -1146,26 +1146,18 @@ fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
     let mut index = 0usize;
     while index < args.len() {
         let value = &args[index];
-        if parse_lock_option(args, &mut index, &mut lock)? {
+        if parse_common_mutation_option(
+            args,
+            &mut index,
+            &mut dry_run,
+            &mut json_output,
+            &mut lock,
+            &mut idempotency_key,
+        )? {
             index += 1;
             continue;
         }
         match value.as_str() {
-            "--dry-run" => dry_run = true,
-            "--json" => json_output = true,
-            "--idempotency-key" => {
-                index += 1;
-                idempotency_key = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--idempotency-key requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
-            }
-            value if value.starts_with("--idempotency-key=") => {
-                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
-            }
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported open option: {option}"
@@ -1195,11 +1187,10 @@ fn parse_path_json_args(args: &[String], command: &str) -> Result<PathJsonOption
     let mut json_output = false;
     let mut metrics = false;
     for arg in args {
-        if arg == "--json" {
-            json_output = true;
-        } else if arg == "--metrics" {
-            metrics = true;
-        } else if arg.starts_with("--") {
+        if parse_path_json_metrics_option(arg, &mut json_output, &mut metrics) {
+            continue;
+        }
+        if arg.starts_with("--") {
             return Err(CliError::Usage(format!(
                 "unsupported {command} option: {arg}"
             )));
@@ -1233,7 +1224,14 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
     let mut edit_rationale = false;
     let mut index = 0usize;
     while index < args.len() {
-        if parse_lock_option(args, &mut index, &mut lock)? {
+        if parse_common_mutation_option(
+            args,
+            &mut index,
+            &mut dry_run,
+            &mut json_output,
+            &mut lock,
+            &mut idempotency_key,
+        )? {
             index += 1;
             continue;
         }
@@ -1277,22 +1275,7 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
                 );
             }
             "--refresh" => refresh = true,
-            "--dry-run" => dry_run = true,
-            "--json" => json_output = true,
             "--edit-rationale" => edit_rationale = true,
-            "--idempotency-key" => {
-                index += 1;
-                idempotency_key = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--idempotency-key requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
-            }
-            value if value.starts_with("--idempotency-key=") => {
-                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
-            }
             value if value.starts_with("--evidence-ref=") => {
                 evidence_refs.push(value.trim_start_matches("--evidence-ref=").to_string());
             }
@@ -1334,62 +1317,38 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
     let mut key_id = None;
     let mut index = 0usize;
     while index < args.len() {
-        if parse_lock_option(args, &mut index, &mut lock)? {
+        if parse_common_mutation_option(
+            args,
+            &mut index,
+            &mut dry_run,
+            &mut json_output,
+            &mut lock,
+            &mut idempotency_key,
+        )? {
             index += 1;
             continue;
         }
         match args[index].as_str() {
             "--path" => {
-                index += 1;
-                path = Some(PathBuf::from(args.get(index).ok_or_else(|| {
-                    CliError::Usage("--path requires a value".to_string())
-                })?));
+                path = Some(PathBuf::from(take_option_value(
+                    args, &mut index, "--path",
+                )?));
             }
             "-m" | "--message" => {
-                index += 1;
-                message = Some(
-                    args.get(index)
-                        .ok_or_else(|| CliError::Usage("-m requires a value".to_string()))?
-                        .to_string(),
-                );
-            }
-            "--idempotency-key" => {
-                index += 1;
-                idempotency_key = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--idempotency-key requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
-            }
-            value if value.starts_with("--idempotency-key=") => {
-                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+                message = Some(take_option_value(args, &mut index, "-m")?);
             }
             "--signer" => {
-                index += 1;
-                signer = Some(
-                    args.get(index)
-                        .ok_or_else(|| CliError::Usage("--signer requires a value".to_string()))?
-                        .to_string(),
-                );
+                signer = Some(take_option_value(args, &mut index, "--signer")?);
             }
             value if value.starts_with("--signer=") => {
                 signer = Some(value.trim_start_matches("--signer=").to_string());
             }
             "--key-id" => {
-                index += 1;
-                key_id = Some(
-                    args.get(index)
-                        .ok_or_else(|| CliError::Usage("--key-id requires a value".to_string()))?
-                        .to_string(),
-                );
+                key_id = Some(take_option_value(args, &mut index, "--key-id")?);
             }
             value if value.starts_with("--key-id=") => {
                 key_id = Some(value.trim_start_matches("--key-id=").to_string());
             }
-            "--dry-run" => dry_run = true,
-            "--json" => json_output = true,
             value if path.is_none() => path = Some(PathBuf::from(value)),
             value => {
                 return Err(CliError::Usage(format!(
@@ -1420,26 +1379,18 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
     let mut index = 0usize;
     while index < args.len() {
         let value = &args[index];
-        if parse_lock_option(args, &mut index, &mut lock)? {
+        if parse_common_mutation_option(
+            args,
+            &mut index,
+            &mut dry_run,
+            &mut json_output,
+            &mut lock,
+            &mut idempotency_key,
+        )? {
             index += 1;
             continue;
         }
         match value.as_str() {
-            "--dry-run" => dry_run = true,
-            "--json" => json_output = true,
-            "--idempotency-key" => {
-                index += 1;
-                idempotency_key = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--idempotency-key requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
-            }
-            value if value.starts_with("--idempotency-key=") => {
-                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
-            }
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported clone option: {option}"
@@ -1659,26 +1610,18 @@ fn parse_patch_import_args(args: &[String]) -> Result<PatchImportOptions, CliErr
     let mut index = 0usize;
     while index < args.len() {
         let value = &args[index];
-        if parse_lock_option(args, &mut index, &mut lock)? {
+        if parse_common_mutation_option(
+            args,
+            &mut index,
+            &mut dry_run,
+            &mut json_output,
+            &mut lock,
+            &mut idempotency_key,
+        )? {
             index += 1;
             continue;
         }
         match value.as_str() {
-            "--dry-run" => dry_run = true,
-            "--json" => json_output = true,
-            "--idempotency-key" => {
-                index += 1;
-                idempotency_key = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--idempotency-key requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
-            }
-            value if value.starts_with("--idempotency-key=") => {
-                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
-            }
             value if value.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported patch import option: {value}"
@@ -1715,35 +1658,20 @@ fn parse_upload_args(args: &[String]) -> Result<UploadOptions, CliError> {
     let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
-        if parse_lock_option(args, &mut index, &mut lock)? {
+        if parse_common_mutation_option(
+            args,
+            &mut index,
+            &mut dry_run,
+            &mut json_output,
+            &mut lock,
+            &mut idempotency_key,
+        )? {
             index += 1;
             continue;
         }
         match args[index].as_str() {
-            "--dry-run" => dry_run = true,
-            "--json" => json_output = true,
-            "--idempotency-key" => {
-                index += 1;
-                idempotency_key = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--idempotency-key requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
-            }
-            value if value.starts_with("--idempotency-key=") => {
-                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
-            }
             "--request-key-id" => {
-                index += 1;
-                request_key_id = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--request-key-id requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
+                request_key_id = Some(take_option_value(args, &mut index, "--request-key-id")?);
             }
             value if value.starts_with("--request-key-id=") => {
                 request_key_id = Some(value.trim_start_matches("--request-key-id=").to_string());
@@ -1793,35 +1721,20 @@ fn parse_request_merge_args(args: &[String]) -> Result<RequestMergeOptions, CliE
     let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
-        if parse_lock_option(args, &mut index, &mut lock)? {
+        if parse_common_mutation_option(
+            args,
+            &mut index,
+            &mut dry_run,
+            &mut json_output,
+            &mut lock,
+            &mut idempotency_key,
+        )? {
             index += 1;
             continue;
         }
         match args[index].as_str() {
-            "--dry-run" => dry_run = true,
-            "--json" => json_output = true,
-            "--idempotency-key" => {
-                index += 1;
-                idempotency_key = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--idempotency-key requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
-            }
-            value if value.starts_with("--idempotency-key=") => {
-                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
-            }
             "--request-key-id" => {
-                index += 1;
-                request_key_id = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--request-key-id requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
+                request_key_id = Some(take_option_value(args, &mut index, "--request-key-id")?);
             }
             value if value.starts_with("--request-key-id=") => {
                 request_key_id = Some(value.trim_start_matches("--request-key-id=").to_string());
@@ -1860,35 +1773,20 @@ fn parse_request_review_args(args: &[String]) -> Result<RequestReviewOptions, Cl
     let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
-        if parse_lock_option(args, &mut index, &mut lock)? {
+        if parse_common_mutation_option(
+            args,
+            &mut index,
+            &mut dry_run,
+            &mut json_output,
+            &mut lock,
+            &mut idempotency_key,
+        )? {
             index += 1;
             continue;
         }
         match args[index].as_str() {
-            "--dry-run" => dry_run = true,
-            "--json" => json_output = true,
-            "--idempotency-key" => {
-                index += 1;
-                idempotency_key = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--idempotency-key requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
-            }
-            value if value.starts_with("--idempotency-key=") => {
-                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
-            }
             "--request-key-id" => {
-                index += 1;
-                request_key_id = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--request-key-id requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
+                request_key_id = Some(take_option_value(args, &mut index, "--request-key-id")?);
             }
             value if value.starts_with("--request-key-id=") => {
                 request_key_id = Some(value.trim_start_matches("--request-key-id=").to_string());
@@ -1953,35 +1851,20 @@ fn parse_request_apply_args(args: &[String]) -> Result<RequestApplyOptions, CliE
     let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
-        if parse_lock_option(args, &mut index, &mut lock)? {
+        if parse_common_mutation_option(
+            args,
+            &mut index,
+            &mut dry_run,
+            &mut json_output,
+            &mut lock,
+            &mut idempotency_key,
+        )? {
             index += 1;
             continue;
         }
         match args[index].as_str() {
-            "--dry-run" => dry_run = true,
-            "--json" => json_output = true,
-            "--idempotency-key" => {
-                index += 1;
-                idempotency_key = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--idempotency-key requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
-            }
-            value if value.starts_with("--idempotency-key=") => {
-                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
-            }
             "--request-key-id" => {
-                index += 1;
-                request_key_id = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--request-key-id requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
+                request_key_id = Some(take_option_value(args, &mut index, "--request-key-id")?);
             }
             value if value.starts_with("--request-key-id=") => {
                 request_key_id = Some(value.trim_start_matches("--request-key-id=").to_string());
@@ -2118,6 +2001,59 @@ fn skip_ignored_option(args: &[String], index: &mut usize) -> Result<(), CliErro
     }
 }
 
+fn parse_common_mutation_option(
+    args: &[String],
+    index: &mut usize,
+    dry_run: &mut bool,
+    json_output: &mut bool,
+    lock: &mut LockOptions,
+    idempotency_key: &mut Option<String>,
+) -> Result<bool, CliError> {
+    if parse_lock_option(args, index, lock)? {
+        return Ok(true);
+    }
+    match args[*index].as_str() {
+        "--dry-run" => {
+            *dry_run = true;
+            Ok(true)
+        }
+        "--json" => {
+            *json_output = true;
+            Ok(true)
+        }
+        "--idempotency-key" => {
+            *idempotency_key = Some(take_option_value(args, index, "--idempotency-key")?);
+            Ok(true)
+        }
+        value if value.starts_with("--idempotency-key=") => {
+            *idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
+}
+
+fn parse_path_json_metrics_option(arg: &str, json_output: &mut bool, metrics: &mut bool) -> bool {
+    match arg {
+        "--json" => {
+            *json_output = true;
+            true
+        }
+        "--metrics" => {
+            *metrics = true;
+            true
+        }
+        _ => false,
+    }
+}
+
+fn take_option_value(args: &[String], index: &mut usize, option: &str) -> Result<String, CliError> {
+    *index += 1;
+    args.get(*index)
+        .cloned()
+        .ok_or_else(|| CliError::Usage(format!("{option} requires a value")))
+}
+
 fn parse_lock_option(
     args: &[String],
     index: &mut usize,
@@ -2181,32 +2117,20 @@ fn parse_merge_args(args: &[String]) -> Result<MergeOptions, CliError> {
     let mut idempotency_key = None;
     let mut index = 0usize;
     while index < args.len() {
-        if parse_lock_option(args, &mut index, &mut lock)? {
+        if parse_common_mutation_option(
+            args,
+            &mut index,
+            &mut dry_run,
+            &mut json_output,
+            &mut lock,
+            &mut idempotency_key,
+        )? {
             index += 1;
             continue;
         }
         match args[index].as_str() {
             "--into" => {
-                index += 1;
-                let value = args.get(index).ok_or_else(|| {
-                    CliError::Usage("--into requires a target branch".to_string())
-                })?;
-                target_branch = Some(value.clone());
-            }
-            "--dry-run" => dry_run = true,
-            "--json" => json_output = true,
-            "--idempotency-key" => {
-                index += 1;
-                idempotency_key = Some(
-                    args.get(index)
-                        .ok_or_else(|| {
-                            CliError::Usage("--idempotency-key requires a value".to_string())
-                        })?
-                        .to_string(),
-                );
-            }
-            value if value.starts_with("--idempotency-key=") => {
-                idempotency_key = Some(value.trim_start_matches("--idempotency-key=").to_string());
+                target_branch = Some(take_option_value(args, &mut index, "--into")?);
             }
             value if source_branch.is_none() => source_branch = Some(value.to_string()),
             value => {
