@@ -25,6 +25,12 @@ from evoagent.budgeting import BudgetAwarePlanner, BudgetPlan
 from evoagent.campaign import CampaignMilestone, CampaignProgress, ExperimentCampaignTracker
 from evoagent.challenge import ChallengeBaseline, ComputeBudget, SotaChallengeDefinition, load_challenge_definition
 from evoagent.claim_audit import ClaimAuditEvent, ClaimAuditStage, ClaimAuditTrail, ClaimAuditTrailBuilder
+from evoagent.claim_release import (
+    ClaimReleaseDecision,
+    ClaimReleaseGate,
+    ClaimReleaseGateResult,
+    ClaimReleaseInput,
+)
 from evoagent.claim_review_queue import (
     ClaimReviewDecision,
     ClaimReviewItem,
@@ -115,6 +121,10 @@ __all__ = [
     "ClaimAuditStage",
     "ClaimAuditTrail",
     "ClaimAuditTrailBuilder",
+    "ClaimReleaseDecision",
+    "ClaimReleaseGate",
+    "ClaimReleaseGateResult",
+    "ClaimReleaseInput",
     "ClaimDisciplineClassifier",
     "ClaimDisciplineResult",
     "ClaimReviewDecision",

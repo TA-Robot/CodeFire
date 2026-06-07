@@ -127,3 +127,7 @@ The system shall turn evidence packs and reviewer objections into a deterministi
 ## REQ-AUTO-032: Claim audit trail
 
 The system shall generate a deterministic audit trail for candidate claims that records evidence readiness, review decisions, external-claim eligibility, and required follow-up so that promotion decisions can be reconstructed without reading raw logs.
+
+## REQ-AUTO-033: Claim release gate
+
+The system shall evaluate whether a candidate claim may be externally released by combining evidence readiness, review decision, audit terminal status, and required release artifacts into an allow, hold, or reject gate decision.

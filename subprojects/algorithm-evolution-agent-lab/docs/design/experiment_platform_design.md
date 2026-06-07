@@ -230,3 +230,30 @@ The builder validates that every event has a claim ID, candidate ID, stage, stat
 4. `follow_up`
 
 The audit trail is intentionally compact. It stores decisions and references, not raw metrics or logs. Raw artifacts remain in evidence objects and report bundles.
+
+## DES-AUTO-015: Claim release gate
+
+The release gate consumes:
+
+- claim ID
+- candidate ID
+- evidence readiness
+- review decision
+- audit trail terminal status
+- required release artifact names
+- available artifact names
+
+It produces:
+
+- release decision: `allow`, `hold`, or `reject`
+- blocking reasons
+- release checklist
+- missing artifacts
+
+Gate rules:
+
+- evidence `blocked`, review `block`, or audit terminal status `required` produces `reject`
+- evidence `review`, review `revise`, audit terminal status other than `allowed`, or missing artifacts produces `hold`
+- only evidence `ready`, review `approve`, audit terminal status `allowed`, and all required artifacts present produces `allow`
+
+The gate is deterministic and does not inspect raw logs. Missing artifacts preserve input order from the required artifact list.

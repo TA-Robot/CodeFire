@@ -224,6 +224,7 @@
 | 2026-06-07 | Dogfood | algorithm cycle 2の `ClaimReviewQueue` 実装中に、scan next_actionsがpath contextを落とす問題とverify blocking-only next_actionsが非blocking missing linksを薦める問題をCFB-068/069として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-068.md`, `docs/development/bug-issues/cfb-069.md` | `codefire scan --path . --json --metrics`; `codefire verify --path . --details --blocking-only --json --metrics` |
 | 2026-06-07 | Dogfood | algorithm cycle 2の `ClaimAuditTrailBuilder` 実装中に、local dry-run envelope、health/storage path option、evidence dry-run cwdの課題をCFB-070..072として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-070.md`..`cfb-072.md` | `codefire extinguish ... --dry-run --json`; `codefire storage/doctor/migrate --path ... --json`; `codefire evidence add --dry-run --json` |
 | 2026-06-07 | Dogfood | algorithm cycle 2の `ClaimAuditTrailBuilder` 実装中に、context bounded outputの省略件数不足とexplain next_actions schema不統一をCFB-073/074として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-073.md`, `docs/development/bug-issues/cfb-074.md` | `codefire context --changed --limit 2 --json`; `codefire explain fire ... --json` |
+| 2026-06-07 | Dogfood | algorithm cycle 2の `ClaimReleaseGate` 実装中に、scan next_actionsの省略markerが復元不能なstatus commandを薦める問題をCFB-075として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-075.md` | `codefire scan --path . --json --metrics` |
 
 ## Current Decisions
 
