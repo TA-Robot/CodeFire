@@ -228,6 +228,7 @@
 | 2026-06-07 | Dogfood | algorithm cycle 2の `ClaimReleaseGate` 実装中に、scan next_actionsの省略markerが復元不能なstatus commandを薦める問題をCFB-075として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-075.md` | `codefire scan --path . --json --metrics` |
 | 2026-06-07 | Dogfood | clean状態でCodeFireのlink/fire/trace-graph surfaceを追加調査し、validation dry-run、manual fire identity/state recovery、trace-graph help/path/jsonの課題をCFB-076..080として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-076.md`..`cfb-080.md` | `codefire link --batch --dry-run --json`; `codefire fire ... --dry-run/--json`; `codefire trace-graph --help`; `codefire trace-graph --path . --json` |
 | 2026-06-07 | Dogfood | cycle 2 dogfood issue目標20件へ到達するため、explain/storage/branch/migrate/help surfaceの課題をCFB-081..085として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-081.md`..`cfb-085.md` | `codefire explain verify-failure --json`; `codefire storage --quick --json`; `codefire branch list --json --metrics`; `codefire migrate check --json --metrics`; `codefire migrate/context/explain --help` |
+| 2026-06-07 | Source Review | cycle 2 source reviewとしてCFR-121..160を追加し、sealed commit validation、operation locking、command capability registry、automation JSON schema drift、large repo observabilityのroot cause bucketへ整理した | `docs/development/code-review-issues/cfr-121.md`..`cfr-160.md`, `docs/development/code-review-issues-2026-06-06.md` | index updated to Total 160 / Remaining open 79 |
 
 ## Current Decisions
 

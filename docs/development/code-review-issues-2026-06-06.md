@@ -11,12 +11,76 @@
 
 ## Count
 
-- Total: 120
-- High: 26
-- Medium: 91
+- Total: 160
+- High: 36
+- Medium: 121
 - Low: 3
 - Fixed in v0.7: 80
-- Remaining open: 39
+- Remaining open: 79
+
+## Cycle 2 Source Review Expansion
+
+Cycle 2ではdogfooding CFB-066..085を20件まで増やした後、CodeFire本体sourceを再レビューしてCFR-121..160を追加した。主なroot causeは、sealed commit/root validation、JSON envelope/next_actions schema drift、parser/help capability registry不足、storage/context/migrationのlarge repo対応不足である。
+
+### Cycle 2 High Priority
+
+| ID | Type | Area | Title | Detail |
+|---|---|---|---|---|
+| CFR-121 | correctness-risk | Commit validation | sealed commit validationがresolution_ledger rootを必須化していない | [CFR-121](code-review-issues/cfr-121.md) |
+| CFR-122 | correctness-risk | Commit certificate | commit certificateがverification payloadと相互検証されていない | [CFR-122](code-review-issues/cfr-122.md) |
+| CFR-123 | correctness-risk | Object validation | root validationがatom_indexやtrace_graphなどのpayload shapeを検証しない | [CFR-123](code-review-issues/cfr-123.md) |
+| CFR-124 | correctness-risk | Fire lifecycle | manual fire作成がlock取得前の古い状態を元に実行される | [CFR-124](code-review-issues/cfr-124.md) |
+| CFR-125 | correctness-risk | Batch link | link batch dry-runのinvalid結果が成功envelopeに包まれる | [CFR-125](code-review-issues/cfr-125.md) |
+| CFR-126 | ux | Metrics | branch listが--metricsを受け付けるが出力へ反映しない | [CFR-126](code-review-issues/cfr-126.md) |
+| CFR-127 | correctness-risk | Explain | explain verify-failureがnon-blocking warningをblockerとして数える | [CFR-127](code-review-issues/cfr-127.md) |
+| CFR-128 | security | HTTP client | HTTP client response bodyに読み取り上限がない | [CFR-128](code-review-issues/cfr-128.md) |
+| CFR-129 | correctness-risk | Remote merge | HTTP request-merge dry-runがhead検証なしで空head planを返す | [CFR-129](code-review-issues/cfr-129.md) |
+| CFR-130 | correctness-risk | Commit durability | commit書き込みがmulti-object transactionとして扱われていない | [CFR-130](code-review-issues/cfr-130.md) |
+
+### Cycle 2 Medium Priority
+
+| ID | Area | Title | Detail |
+|---|---|---|---|
+| CFR-131 | CLI help | top-level help routingが主要commandを網羅していない | [CFR-131](code-review-issues/cfr-131.md) |
+| CFR-132 | Migration | migrateのtarget formatがv0.6に固定されている | [CFR-132](code-review-issues/cfr-132.md) |
+| CFR-133 | Repository layout | repo layout必須directory一覧がdoctorとmigrationで重複している | [CFR-133](code-review-issues/cfr-133.md) |
+| CFR-134 | Storage report | storage quick modeのlargest object typeがunscanned固定になる | [CFR-134](code-review-issues/cfr-134.md) |
+| CFR-135 | Storage report | storage largest object集計が全object情報を保持してからtruncateする | [CFR-135](code-review-issues/cfr-135.md) |
+| CFR-136 | Context | contextのtruncated flagが省略件数を返さない | [CFR-136](code-review-issues/cfr-136.md) |
+| CFR-137 | Context | branch context selectorが空selectionを返して実質的なbranch要約にならない | [CFR-137](code-review-issues/cfr-137.md) |
+| CFR-138 | CLI parser | context parserが--path=などのequals形式に対応していない | [CFR-138](code-review-issues/cfr-138.md) |
+| CFR-139 | CLI parser | commit/extinguish parserの--path形式が他commandと揃っていない | [CFR-139](code-review-issues/cfr-139.md) |
+| CFR-140 | Verification JSON | verification diagnostic filterがpayloadを実際には絞り込まない | [CFR-140](code-review-issues/cfr-140.md) |
+| CFR-141 | Next actions | verify成功時next_actionが変更有無を見ずcommitを勧める | [CFR-141](code-review-issues/cfr-141.md) |
+| CFR-142 | Next actions | bounded_next_actionsのfallbackが常にstatus固定で文脈を失う | [CFR-142](code-review-issues/cfr-142.md) |
+| CFR-143 | Automation JSON | next_actions schemaがmoduleごとに重複して揺れている | [CFR-143](code-review-issues/cfr-143.md) |
+| CFR-144 | Explain | explain text rendererがnext_actionのid fieldを前提にしている | [CFR-144](code-review-issues/cfr-144.md) |
+| CFR-145 | Fire dry-run | fire operation planが全item詳細を無制限に含む | [CFR-145](code-review-issues/cfr-145.md) |
+| CFR-146 | Fire dry-run | fire operation planのnext_actionがpath情報を持たない | [CFR-146](code-review-issues/cfr-146.md) |
+| CFR-147 | Evidence | evidence dry-run planが解決後cwdを返さない | [CFR-147](code-review-issues/cfr-147.md) |
+| CFR-148 | Doctor | doctorがactive state file欠損を明示診断しない | [CFR-148](code-review-issues/cfr-148.md) |
+| CFR-149 | Doctor | doctorがstate/open_firesの整合性を検証しない | [CFR-149](code-review-issues/cfr-149.md) |
+| CFR-150 | Metrics | metrics対応がcommand capabilityとして管理されていない | [CFR-150](code-review-issues/cfr-150.md) |
+| CFR-151 | Migration | migration next_actionsがautomation共通schemaを使っていない | [CFR-151](code-review-issues/cfr-151.md) |
+| CFR-152 | Storage report | storage next_actionsがautomation共通schemaを使っていない | [CFR-152](code-review-issues/cfr-152.md) |
+| CFR-153 | Doctor | doctor next_actionsがautomation共通schemaを使っていない | [CFR-153](code-review-issues/cfr-153.md) |
+| CFR-154 | JSON envelope | plan result envelopeがoperation plan内next_actionsを昇格しない | [CFR-154](code-review-issues/cfr-154.md) |
+| CFR-155 | JSON envelope | plan result envelopeがrepo_root以外のrepo fieldを読まない | [CFR-155](code-review-issues/cfr-155.md) |
+| CFR-156 | Migration | migrateのJSON object走査にlimitやquick modeがない | [CFR-156](code-review-issues/cfr-156.md) |
+| CFR-157 | Context | context atom traversalがlimitで落としたneighbor情報を説明しない | [CFR-157](code-review-issues/cfr-157.md) |
+| CFR-158 | Fire identity | manual fire UIDがbase_commitを含み同じ意味のfireがcommit後に再発行される | [CFR-158](code-review-issues/cfr-158.md) |
+| CFR-159 | Commit certificate | certificate resultの用語がverification resultとずれている | [CFR-159](code-review-issues/cfr-159.md) |
+| CFR-160 | JSON envelope | data result envelopeのrepo抽出規則がcommandごとに弱い | [CFR-160](code-review-issues/cfr-160.md) |
+
+### Cycle 2 Root Cause Buckets
+
+| Root Cause | Issues |
+|---|---|
+| Commit/root validation contract不足 | [CFR-121](code-review-issues/cfr-121.md), [CFR-122](code-review-issues/cfr-122.md), [CFR-123](code-review-issues/cfr-123.md), [CFR-130](code-review-issues/cfr-130.md), [CFR-159](code-review-issues/cfr-159.md) |
+| Operation locking/identity/dry-run検証不足 | [CFR-124](code-review-issues/cfr-124.md), [CFR-125](code-review-issues/cfr-125.md), [CFR-129](code-review-issues/cfr-129.md), [CFR-145](code-review-issues/cfr-145.md), [CFR-146](code-review-issues/cfr-146.md), [CFR-158](code-review-issues/cfr-158.md) |
+| Command capability registry不足 | [CFR-126](code-review-issues/cfr-126.md), [CFR-131](code-review-issues/cfr-131.md), [CFR-132](code-review-issues/cfr-132.md), [CFR-138](code-review-issues/cfr-138.md), [CFR-139](code-review-issues/cfr-139.md), [CFR-150](code-review-issues/cfr-150.md) |
+| Automation JSON/next_actions schema drift | [CFR-140](code-review-issues/cfr-140.md), [CFR-141](code-review-issues/cfr-141.md), [CFR-142](code-review-issues/cfr-142.md), [CFR-143](code-review-issues/cfr-143.md), [CFR-144](code-review-issues/cfr-144.md), [CFR-151](code-review-issues/cfr-151.md), [CFR-152](code-review-issues/cfr-152.md), [CFR-153](code-review-issues/cfr-153.md), [CFR-154](code-review-issues/cfr-154.md), [CFR-155](code-review-issues/cfr-155.md), [CFR-160](code-review-issues/cfr-160.md) |
+| Large repo/observability対応不足 | [CFR-128](code-review-issues/cfr-128.md), [CFR-134](code-review-issues/cfr-134.md), [CFR-135](code-review-issues/cfr-135.md), [CFR-136](code-review-issues/cfr-136.md), [CFR-137](code-review-issues/cfr-137.md), [CFR-147](code-review-issues/cfr-147.md), [CFR-148](code-review-issues/cfr-148.md), [CFR-149](code-review-issues/cfr-149.md), [CFR-156](code-review-issues/cfr-156.md), [CFR-157](code-review-issues/cfr-157.md) |
 
 ## Current Open Expansion
 
