@@ -3913,7 +3913,7 @@ fn extinguish_operation_plan(
             "resolution_type": &options.resolution,
             "refresh": options.refresh,
             "has_rationale": !options.rationale.is_empty(),
-            "has_evidence": !options.evidence.is_empty(),
+            "has_evidence": !options.evidence.is_empty() || !options.evidence_refs.is_empty(),
             "evidence_refs": &options.evidence_refs,
         },
         "operations": [

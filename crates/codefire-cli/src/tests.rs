@@ -2852,6 +2852,11 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
     assert!(!result.command_timed_out);
     assert_eq!(data["type"], "codefire_evidence_add_result");
     assert_eq!(data["dry_run"], false);
+    assert_eq!(data["created"], true);
+    assert_eq!(
+        data["evidence_id"].as_str(),
+        Some(result.evidence_id.as_str())
+    );
     assert_eq!(data["command_timed_out"], false);
     assert_eq!(data["command_stdout_summary"], "ok");
     assert_eq!(data["command_stdout_truncated"], true);
@@ -2940,6 +2945,8 @@ fn evidence_add_single_dry_run_returns_plan_without_writing_object() {
     assert!(result.dry_run);
     assert_eq!(result.evidence_id, "");
     assert_eq!(data["dry_run"], true);
+    assert_eq!(data["created"], false);
+    assert!(data["evidence_id"].is_null());
     assert_eq!(data["plan"]["command"], "evidence-add");
     assert_eq!(data["plan"]["would_apply"], false);
     assert_eq!(
@@ -3214,6 +3221,27 @@ fn extinguish_evidence_ref_links_resolution_and_verify_detects_missing_ref() {
         }]),
     )
     .unwrap();
+    let dry_run = run_extinguish(&ExtinguishOptions {
+        path: open_dir.clone(),
+        fire_id: "FIRE-001".to_string(),
+        resolution: "addressed".to_string(),
+        rationale: String::new(),
+        evidence: String::new(),
+        evidence_refs: vec![evidence.evidence_id.clone()],
+        refresh: false,
+        dry_run: true,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        edit_rationale: false,
+    })
+    .unwrap();
+    assert_eq!(dry_run.plan["resolution"]["has_evidence"], true);
+    assert_eq!(
+        dry_run.plan["resolution"]["evidence_refs"],
+        json!([evidence.evidence_id.clone()])
+    );
+
     run_extinguish(&ExtinguishOptions {
         path: open_dir.clone(),
         fire_id: "FIRE-001".to_string(),

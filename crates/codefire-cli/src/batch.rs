@@ -232,7 +232,7 @@ fn batch_extinguish_operation_plan(
                 "resolution": &fire.resolution,
                 "refresh": fire.refresh,
                 "has_rationale": !fire.rationale.is_empty(),
-                "has_evidence": !fire.evidence.is_empty(),
+                "has_evidence": !fire.evidence.is_empty() || !fire.evidence_refs.is_empty(),
                 "evidence_refs": &fire.evidence_refs,
                 "validation": &fire.validation_plan,
             })

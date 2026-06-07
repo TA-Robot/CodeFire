@@ -353,11 +353,17 @@ pub(super) fn validate_evidence_add_options(options: &EvidenceAddOptions) -> Res
 }
 
 pub(crate) fn evidence_add_data_json(result: &EvidenceAddResult) -> Value {
+    let evidence_id = if result.evidence_id.is_empty() {
+        Value::Null
+    } else {
+        Value::String(result.evidence_id.clone())
+    };
     json!({
         "type": "codefire_evidence_add_result",
         "version": 1,
         "dry_run": result.dry_run,
-        "evidence_id": &result.evidence_id,
+        "created": !result.dry_run,
+        "evidence_id": evidence_id,
         "artifact_ref_id": &result.artifact_ref_id,
         "object_path": &result.object_path,
         "command_exit_code": result.command_exit_code,
