@@ -1138,21 +1138,29 @@ pub fn extract_explicit_cf_atoms(
 ) -> Result<Vec<Atom>, CoreError> {
     let text = read_text_lossy(path)?;
     let lines = split_lines_without_terminators(&text);
-    let mut atoms = Vec::new();
+    let mut markers = Vec::new();
     for (line_index, line) in lines.iter().enumerate() {
         if let Some(atom_id) = explicit_cf_atom_id(line, artifact_path, line_index + 1)? {
-            let content = format!("{}\n", line.trim());
-            atoms.push(Atom {
-                atom_id: atom_id.clone(),
-                kind: kind_from_atom_id(&atom_id, fallback_kind).to_string(),
-                artifact_path: artifact_path.to_string(),
-                selector: Selector {
-                    selector_type: "explicit_cf_atom".to_string(),
-                    value: atom_id,
-                },
-                content_hash: hash_text(&content),
-            });
+            markers.push((line_index, atom_id));
         }
+    }
+    let mut atoms = Vec::with_capacity(markers.len());
+    for (index, (start, atom_id)) in markers.iter().enumerate() {
+        let end = markers
+            .get(index + 1)
+            .map(|(next_start, _)| *next_start)
+            .unwrap_or(lines.len());
+        let content = normalized_block_content(&lines[*start..end]);
+        atoms.push(Atom {
+            atom_id: atom_id.clone(),
+            kind: kind_from_atom_id(atom_id, fallback_kind).to_string(),
+            artifact_path: artifact_path.to_string(),
+            selector: Selector {
+                selector_type: "explicit_cf_atom".to_string(),
+                value: atom_id.clone(),
+            },
+            content_hash: hash_text(&content),
+        });
     }
     Ok(atoms)
 }
@@ -1563,8 +1571,49 @@ mod tests {
         assert_eq!(atoms[1].atom_id, "CODE:src/app.py::function:run");
         assert_eq!(
             atoms[0].content_hash,
-            "sha256:e77db9516bb440255ebb1177be2f1aa3b5fcba7f46e43dd86871783fdf97cee4"
+            "sha256:01e54e8f2a22283b0e25e51c1571921c2c51af29c5f8fc24517aecdbdaddce1f"
         );
+    }
+
+    #[test]
+    fn explicit_cf_atom_body_changes_update_content_hash_for_python_and_rust() {
+        let temp = tempdir().unwrap();
+        let python_path = temp.path().join("app.py");
+        fs::write(
+            &python_path,
+            "# cf-atom: CODE-SessionPolicy\nclass SessionPolicy:\n    timeout = 30\n",
+        )
+        .unwrap();
+        let first_python =
+            extract_explicit_cf_atoms(&python_path, "src/app.py", "code").unwrap()[0].clone();
+        fs::write(
+            &python_path,
+            "# cf-atom: CODE-SessionPolicy\nclass SessionPolicy:\n    timeout = 60\n",
+        )
+        .unwrap();
+        let second_python =
+            extract_explicit_cf_atoms(&python_path, "src/app.py", "code").unwrap()[0].clone();
+
+        let rust_path = temp.path().join("lib.rs");
+        fs::write(
+            &rust_path,
+            "// cf-atom: CODE-RustPolicy\nfn timeout() -> u32 {\n    30\n}\n",
+        )
+        .unwrap();
+        let first_rust =
+            extract_explicit_cf_atoms(&rust_path, "src/lib.rs", "code").unwrap()[0].clone();
+        fs::write(
+            &rust_path,
+            "// cf-atom: CODE-RustPolicy\nfn timeout() -> u32 {\n    60\n}\n",
+        )
+        .unwrap();
+        let second_rust =
+            extract_explicit_cf_atoms(&rust_path, "src/lib.rs", "code").unwrap()[0].clone();
+
+        assert_eq!(first_python.atom_id, second_python.atom_id);
+        assert_ne!(first_python.content_hash, second_python.content_hash);
+        assert_eq!(first_rust.atom_id, second_rust.atom_id);
+        assert_ne!(first_rust.content_hash, second_rust.content_hash);
     }
 
     #[test]

@@ -160,6 +160,8 @@ Python / JavaScript / TypeScript / Go / Java / C# / Rust / Kotlin / PHP / Ruby /
 
 Atom ID validationはMarkdown headingと明示 `cf-atom:` commentで共通である。許可される形式は、`REQ-...` / `DES-...` / `TEST-...` / `CODE-...` / `ADR-...` / `OPS-...` / `API-...` / `DB-...` のような大文字prefix + `-` + tail、またはPython reference由来の `CODE:<path>::<symbol-kind>:<symbol>` 形式である。tailにはASCII英数字、`_`、`.`、`-` を使える。`CODE:` path形式ではさらに `/` と `:` を使える。無効な明示 `cf-atom:` IDはconfig diagnosticとして報告する。
 
+明示 `cf-atom:` commentのcontent hashは、marker行だけではなく、そのmarker行から次の明示 `cf-atom:` marker直前までのblockを対象にする。1 file内に複数の明示Atomがある場合、各Atomの本文範囲は次のmarkerで区切られる。これにより、同じmarker IDのまま関数・class・test本文だけが変わった場合もAtom変更として検出される。
+
 ```python
 # cf-atom: CODE-SessionPolicy
 class SessionPolicy:
