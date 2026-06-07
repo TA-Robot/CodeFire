@@ -31,6 +31,25 @@
 9. `crates/codefire-cli/src/tests.rs` and `crates/codefire-cli/src/tests/docs.rs`
    - 既存behaviorとregression coverageを見る。
 
+## Source Tour In 20 Minutes
+
+このrepoを短時間で把握する場合は、ソースを全部読む前に次のtourを行う。
+
+| Step | Open | What to answer |
+|---|---|---|
+| 1 | `docs/01_product_definition.md` | CodeFireがGitではなく、sealed commitだけを正式履歴にする理由は何か |
+| 2 | `docs/11_internal_architecture.md` | layer境界、state model、command lifecycleはどう設計されているか |
+| 3 | `crates/codefire-cli/src/main.rs:130` | `run(args)` がcommandをどう振り分けるか |
+| 4 | `crates/codefire-cli/src/main.rs:928` | local workflow commandが共通handlerを通る理由は何か |
+| 5 | `crates/codefire-cli/src/main.rs:3197` | scanがopen directory、core、active stateをどう接続するか |
+| 6 | `crates/codefire-cli/src/main.rs:3261` | verifyがscan、policy、external checks、diagnosticsをどう束ねるか |
+| 7 | `crates/codefire-cli/src/main.rs:3546` | commitがsealed objectとbranch headをどう作るか |
+| 8 | `crates/codefire-core/src/lib.rs:266` | Atom indexからTrace Graph、Fire、Verificationへどう進むか |
+| 9 | `crates/codefire-store/src/lib.rs:173` | payloadからobject record、object ID、sealed validationへどう進むか |
+| 10 | `crates/codefire-cli/src/automation.rs:9` | AI/toolが消費するJSON envelopeはどこで作るか |
+
+このtourで答えられない箇所は、対応するsource mapまたはblueprintを増補する対象である。
+
 ## Workspace Crates
 
 | Crate | Role | Reads | Writes |
@@ -59,6 +78,53 @@ Current architecture debt:
 
 - `main.rs` still owns many parse helpers and operation implementations (`run_scan`, `run_verify`, `run_extinguish`, `run_commit`). v0.8 should extract state/contract/workflow modules without changing behavior.
 - `subcommand_help` and path option parsing currently live in `main.rs`; if more commands gain aliases, extract command metadata and shared parser helpers before the table grows further.
+
+## `main.rs` Function Band Map
+
+`main.rs` は長いが、実装意図は次の帯で読める。
+
+| Lines | Band | Read as |
+|---:|---|---|
+| 1-120 | module wiring and state labels | command moduleの入口、`scan_branch_state`、`status_state` |
+| 121-762 | top-level dispatch | `main`、`run`、command match、top-level JSON/text routing |
+| 763-927 | help/error/output helpers | `wants_help`、`subcommand_help`、`CliError`、envelope helper |
+| 928-1139 | local workflow wrappers | scan/verify/fire/extinguish/commitのparse/run/render接続 |
+| 1142-1269 | render helpers | status/scan/branch/plan/lock JSONの表示 |
+| 1272-2329 | argument parsers | init/open/path/extinguish/commit/clone/diff/remote/serve parser |
+| 2332-3194 | repo-open-merge-patch operations | init、merge、patch import、clone、open、operation plan |
+| 3197-3544 | scan/verify/extinguish | active stateを更新するlocal workflow中核 |
+| 3546-3907 | commit and verification commands | sealed commit作成、idempotency、external verification |
+| 3925-4093 | base/index/layout/io helpers | base Atom index、repo layout、atomic JSON write |
+| 4096-4286 | status/history/merge helpers | status read、ancestor探索、commit info、conflict content |
+| 4289-4598 | repo/open/materialization helpers | open context、branch record、manifest、rel files、base64、active reset |
+| 4618-4812 | locks/discovery/JSON primitives | repo/file locks、repo discovery、open marker、required JSON fields、time |
+
+Design expectation:
+
+- dispatch and render can stay near the top;
+- operation logic below parser bands should gradually move to feature modules;
+- helpers at the end should become shared repository services when two commands depend on the same invariant.
+
+## Command To Persistence Matrix
+
+This table is the fastest way to infer which source files and `.codefire` files are involved in a command.
+
+| Command | Source entry | Domain/store calls | Reads | Writes |
+|---|---|---|---|---|
+| `init` | `main.rs::parse_init_args`, `init_repo` | `codefire-store::store_object`, initial roots | target path | `.codefire/objects`, `.codefire/branches/main` |
+| `open` | `parse_open_args`, `open_branch_from` | `validate_sealed_commit`, `materialize_commit` | branch head, commit objects | working tree, `.codefire-open`, `.codefire/opened`, `.codefire/active` |
+| `status` | `parse_path_json_args`, `read_status` | sealed branch validation | `.codefire-open`, opened registry, branch head, active state | none |
+| `scan` | `run_scan_command`, `compute_scan` | `build_atom_index`, `current_trace_graph`, `build_scan_result` | working files, base commit roots, policy, links | active `scan.json`, `fires.json`, state |
+| `verify` | `run_verify_command`, `compute_verify` | `build_verification`, `parse_verification_policy` | scan inputs, resolutions, evidence refs, policy | active `verification.json`, state |
+| `fire` | `run_fire_command`, `fire.rs::run_fire` | core fire/resolution basis helpers | Atom index, active fires | active `fires.json` |
+| `extinguish` | `run_extinguish_command`, `run_extinguish` | `build_resolution`, evidence ref validation | active fires, Atom index, Trace Graph, evidence objects | active `resolutions.json`, `fires.json` |
+| `commit` | `run_commit_command`, `run_commit` | `build_verification`, `commit_payload`, `store_object` | working files, active state, branch head, objects | objects, branch head, reset active state |
+| `diff/show` | `parse_diff_args`, `view.rs` | `validate_sealed_commit`, manifest/object readers | branch/commitish objects | none |
+| `remote` | `parse_upload_args`, `remote.rs` | object graph copy/validation, signatures | local objects, remote project | remote objects, branches, merge requests |
+| `doctor` | `doctor.rs`, `doctor/checks.rs` | store record validation | repository layout and JSON | none |
+| `storage` | `storage.rs::run_storage_report` | object record parsing, remote dirs | local/remote storage trees | none |
+
+If a command adds a new write target, update this matrix, `docs/11_internal_architecture.md`, and the relevant command trace in the same change.
 
 ## Mental Model Anchors
 

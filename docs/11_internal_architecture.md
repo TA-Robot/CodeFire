@@ -114,6 +114,31 @@ Ownership rules:
 
 When a change adds a responsibility not listed here, update this document or `docs/development/module-boundaries.md` before implementation.
 
+## 11.3.1 Source Shape Contract
+
+内部設計は抽象設計だけでなく、実装の形も制約する。CodeFireのsource codeは、読む人が次の対応を推測できる構造でなければならない。
+
+| Design concept | Expected source shape |
+|---|---|
+| command contract | parser, options/result type, runner, text renderer, JSON rendererが識別できる |
+| local workflow | scan/verify/fire/extinguish/commitが同じOpenContextとactive state規則を使う |
+| repository services | repo discovery、open registry、branch head、lock、atomic writeが分散しすぎない |
+| domain semantics | Atom、Trace Graph、Fire、Resolution、Verificationは`codefire-core`に残る |
+| object identity | object ID、record validation、sealed commit validationは`codefire-store`に残る |
+| automation interface | machine-readable outputはenvelope helperとcommand-specific data helperに分かれる |
+| remote boundary | remote mutation、HTTP transport、signature/TLS/idempotencyの境界がfileで分かる |
+| recovery tooling | doctor/migrate/storageが同じlayout vocabularyを参照する |
+
+Source documentation requirements:
+
+- `docs/development/source-code-map.md` はfile/module/type/function責務の索引である。
+- `docs/development/source-code-mental-model.md` は関数内のdata flowと永続化境界を説明する。
+- `docs/development/source-code-blueprint.md` は要求、設計、source、persistence、testの対応表である。
+- `docs/development/command-source-trace.md` はCLI commandからparse/run/render/writeまでのtraceである。
+- 主要commandの実装経路を変えたcommitは、上記文書の少なくとも1つを更新する。
+
+この規則により、ドキュメントだけを読んでも「どのcrateに何があり、どの関数を起点に変更するか」を想像できる状態を維持する。
+
 ## 11.4 Data Model
 
 ### Object Store

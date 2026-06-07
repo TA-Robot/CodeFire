@@ -149,6 +149,104 @@ This pattern is visible in:
 - `evidence add` dispatch -> `parse_evidence_add_args` -> `run_evidence_add`
 - remote request commands -> parse -> plan/dry-run -> lock -> remote mutation
 
+## 4.1 In-Memory Shapes While A Command Runs
+
+CodeFireのcommandは、文字列やJSONを直接持ち回すのではなく、できるだけ次の中間構造を経由して読む。
+
+```text
+argv
+  -> *Options
+  -> OpenContext or repo_root
+  -> domain result
+  -> command result struct
+  -> human text or automation envelope
+```
+
+Typical examples:
+
+| Command | Options | Context | Domain result | Render source |
+|---|---|---|---|---|
+| `status` | `PathJsonOptions` | repo/open discovery inside `read_status` | `Status` | `print_status`, `status_data_json` |
+| `scan` | `PathJsonOptions` | `OpenContext` in `compute_scan` | `ScanExecution`, `ScanResult` | `render_scan`, `scan_data_json` |
+| `verify` | `VerifyOptions` | `OpenContext` in `compute_verify` | `VerifyExecution`, `Verification` | `render_verification`, `verification_data_json` |
+| `fire` | `FireOptions` | command module resolves open context | `FireResult` | `print_fire_result`, `fire_data_json` |
+| `extinguish` | `ExtinguishOptions` | `OpenContext` | `ExtinguishResult` | text helper in `main.rs`, automation data in `main.rs` |
+| `commit` | `CommitOptions` | `OpenContext` | `CommitResult` | text helper in `main.rs`, plan/data envelope |
+| `evidence add` | `EvidenceAddOptions` | repo root plus optional open context | `EvidenceAddResult` | `print_evidence_add_result`, `evidence_add_data_json` |
+| `storage` | `StorageReportOptions` | repo root and remote URLs | `StorageReport` | `print_storage_report`, `storage_report_data_json` |
+
+Design smell:
+
+- if a runner returns raw `serde_json::Value` before mutation has finished, the business result model is probably missing;
+- if a parser writes files or a renderer performs validation, the command lifecycle has leaked across layers;
+- if `automation.rs` needs to know internal lock or filesystem steps, the command result is not expressive enough.
+
+## 4.2 Function-Level Flow For Local Workflow
+
+Use this as a concrete call graph when reading the local workflow code.
+
+```text
+run(args)
+  -> local_workflow_handler(command)
+  -> run_scan_command / run_verify_command / run_fire_command /
+     run_extinguish_command / run_commit_command
+```
+
+Scan:
+
+```text
+run_scan_command
+  -> parse_path_json_args
+  -> run_scan
+  -> compute_scan(persist=true)
+       -> open_context
+       -> build_atom_index(open_dir)
+       -> load_base_atom_index(objects, base_commit)
+       -> current_trace_graph(open_dir)
+       -> parse_trace_policy(open_dir)
+       -> build_scan_result(...)
+       -> set_open_state(...)
+       -> write active scan/fires when persist=true
+  -> render_scan or command_result_envelope(scan_data_json)
+```
+
+Verify:
+
+```text
+run_verify_command
+  -> verification::parse_verify_args
+  -> run_verify
+  -> compute_verify(persist=true)
+       -> compute_scan(persist=true)
+       -> parse_verification_policy(open_dir)
+       -> run_verification_commands(open_dir, policy)
+       -> build_verification(...)
+       -> persist_verification_result_state
+       -> set_open_state(verification_open_state)
+  -> render_verification or command_result_envelope(verification_data_json)
+```
+
+Commit:
+
+```text
+run_commit_command
+  -> parse_commit_args
+  -> run_commit
+       -> open_context
+       -> lock repo and branch
+       -> compute_verify(persist=true)
+       -> reject blocking diagnostics
+       -> build_manifest
+       -> store blob/manifest/atom_index/trace_graph/fire_delta/verification/policy
+       -> commit_payload
+       -> store commit object
+       -> save_branch_record
+       -> reset_active
+  -> human summary or JSON result
+```
+
+When these flows change, update `docs/development/command-source-trace.md` in the same commit.
+
 ## 5. Local Workflow Data Flow
 
 The local workflow is the core loop: scan, verify, extinguish, commit.
@@ -300,6 +398,54 @@ Core structs to recognize:
 
 Core should not know about `--json`, terminal text, or command names.
 
+Main public functions:
+
+| Function | Reads | Produces | Used by |
+|---|---|---|---|
+| `build_atom_index(open_dir)` | source files plus `codefire.yaml` patterns | `AtomIndex` | scan, context, fire, verify, commit |
+| `current_trace_graph(open_dir)` | `codefire.links.yaml` | `TraceGraph` | scan, context, diff, commit |
+| `parse_trace_policy(open_dir)` | `codefire.policy.yaml` | `TracePolicy` | scan and missing-link checks |
+| `parse_verification_policy(open_dir)` | `codefire.policy.yaml` | `VerificationPolicy` | verify and commit |
+| `build_scan_result(...)` | current/base indexes, trace graph, policy, existing fires/resolutions | `ScanResult` | scan, verify, commit |
+| `build_verification(...)` | scan, resolutions, failed checks, policy | `Verification` | verify and commit |
+| `build_resolution(...)` | fire, atom index, trace graph, evidence refs | `Resolution` | extinguish |
+
+Internal shape:
+
+- extractor functions create `Atom` values with `id`, `kind`, `path`, `selector`, and content hash;
+- `changed_atoms` compares current and base `AtomIndex` maps by Atom ID and hash;
+- Trace Link IDs and fire UIDs are deterministic hashes of semantic inputs;
+- verification is a pure summary over scan/fires/resolutions/policy plus external failed checks.
+
+Core must not mutate `.codefire/` or print output. If a future core function needs to write active state, that responsibility belongs in CLI repository services instead.
+
+## 7.1 Extractor Mental Model
+
+Atom extraction follows this order:
+
+```text
+codefire.yaml / default patterns
+  -> rel_files(open_dir)
+  -> classify file kind by pattern
+  -> format-specific extractor
+  -> AtomIndex { atoms: Vec<Atom> }
+```
+
+Current extractor categories:
+
+| Category | Source shape | Atom ID style | Typical consumer |
+|---|---|---|---|
+| markdown headings | heading line and following block | documented requirement/design IDs | requirement, design, docs trace |
+| explicit `cf-atom` markers | marker metadata plus nearby content | explicit Atom ID | code and mixed files |
+| code/path fallback | configured path patterns | path-derived IDs | implementation trace and broad impact |
+
+Any extractor change must answer:
+
+- how duplicate IDs are diagnosed;
+- whether content hash reflects the intended semantic unit;
+- whether non-Atom file changes remain visible in scan;
+- which Trace Link policies should apply to the new Atom kind.
+
 ## 8. Store Domain Flow
 
 `codefire-store/src/lib.rs` owns identity and validation.
@@ -341,6 +487,19 @@ If a new object type is introduced, update:
 - doctor layout checks
 - storage grouping
 - sealed validation if commits can reference it
+
+Main public functions:
+
+| Function | Responsibility |
+|---|---|
+| `object_record(type_tag, payload)` | create deterministic record with ID and hash |
+| `store_object(objects_root, type_tag, payload)` | publish immutable object record |
+| `read_object` / `read_object_record` | load and validate object files |
+| `object_record_path` | resolve object ID to known subdir/path |
+| `validate_sealed_commit` | prove a commit object graph is structurally valid |
+| `commit_payload` | build the commit object payload from root object IDs and metadata |
+
+Store should not know open directories, branch state names, CLI flags, or remote permissions. It only knows object records and references.
 
 ## 9. Automation JSON Model
 

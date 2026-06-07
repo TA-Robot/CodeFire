@@ -89,6 +89,21 @@ Design intent:
 - keep core/store invariants delegated downward;
 - make every mutation path obvious: parse, resolve, validate, plan, lock, revalidate, write, render.
 
+Current concrete anchors:
+
+| Anchor | Meaning | Do not hide |
+|---|---|---|
+| `run(args)` | top-level command selection | command aliases, help behavior, JSON failure policy |
+| `local_workflow_handler` | common entry for scan/verify/fire/extinguish/commit | workflow command dispatch changes |
+| `compute_scan` | source tree to `ScanResult` and active scan state | Atom/base/trace/policy comparison |
+| `compute_verify` | scan plus policy plus external checks | verification blocker semantics |
+| `run_extinguish` | active fire to resolution mutation | stale basis and evidence reference validation |
+| `run_commit` | open state to sealed commit and branch head | object write ordering, branch atomicity, idempotency |
+| `open_context` | marker/registry/base validation | copied open directory and branch identity checks |
+| `write_json_atomic` | active/branch JSON publication | partial write and directory sync behavior |
+
+When a new feature touches one of these anchors, the implementation should first add a narrow test around the anchor, then refactor only enough to keep the anchor readable.
+
 ### `crates/codefire-core/src/lib.rs`
 
 This is the semantic engine. It answers:
@@ -107,6 +122,19 @@ It should not answer:
 - where active state JSON is written;
 - how a remote request is authenticated.
 
+Source zones inside the file:
+
+| Zone | Primary structs/functions | Change examples |
+|---|---|---|
+| domain structs | `Atom`, `TraceGraph`, `Fire`, `ScanResult`, `Verification`, `Resolution` | add field to persisted semantic output |
+| config and policy parsing | `parse_trace_policy`, `parse_verification_policy` | new required-link or verification policy |
+| scan semantics | `changed_atoms`, `required_link_missing`, `build_scan_result` | new fire reason, better grouping |
+| verification semantics | `build_verification`, `stale_resolutions` | new blocker or warning category |
+| resolution basis | `build_resolution` | new stale-basis input |
+| extractors | `build_atom_index`, `extract_markdown_atoms`, `extract_explicit_cf_atoms` | new Atom kind or content hash rule |
+
+The core module is allowed to read source files for indexing. It is not allowed to write repository state, decide exit codes, or format human/JSON command output.
+
 ### `crates/codefire-store/src/lib.rs`
 
 This is the identity engine. It answers:
@@ -118,6 +146,18 @@ This is the identity engine. It answers:
 
 Any feature that adds a commit root, object kind, or reference-bearing payload must update store validation, doctor visibility, and storage reporting together.
 
+Source zones inside the file:
+
+| Zone | Primary functions | Change examples |
+|---|---|---|
+| object kind registry | `object_kind_by_type`, `object_prefix`, `object_subdir` | new object type |
+| identity | `canonical_json`, `object_digest`, `object_id`, `object_record` | object identity versioning |
+| persistence | `store_object`, `read_object_record`, `object_record_path` | write durability or lookup performance |
+| sealed validation | `validate_sealed_commit`, root/reference validators | new commit root or evidence reference |
+| commit builder | `commit_payload` | certificate/root shape changes |
+
+If object identity changes, treat it as a compatibility migration, not a local refactor.
+
 ### `crates/codefire-cli/src/automation.rs`
 
 This is the machine contract. It translates domain/command results into:
@@ -128,6 +168,18 @@ This is the machine contract. It translates domain/command results into:
 - executable `next_actions`.
 
 Do not hide command-specific write logic in this file. If `automation.rs` needs to know too much about mutation internals, the command result model is probably missing a proper result struct.
+
+Source zones inside the file:
+
+| Zone | Functions | Purpose |
+|---|---|---|
+| envelope | `command_result_envelope` | stable wrapper for tool consumption |
+| command names | `cli_command` | canonical command text in next_actions |
+| status/scan data | `status_data_json`, `scan_data_json` | lifecycle state summaries |
+| verification data | `verification_data_json_with_filter`, diagnostic helpers | blocker/warning machine payload |
+| next actions | `*_next_actions`, `bounded_next_actions` | action suggestions with caps |
+
+Automation output is a public API. Changing field names requires docs and compatibility tests.
 
 ### Command Modules
 
@@ -144,6 +196,49 @@ Command modules own one vertical surface.
 | `remote/*` | file remote mutation, dry-run plans, idempotency |
 | `http*` | transport boundary and TLS |
 | `signatures.rs` | HMAC signatures, key policy, nonce replay |
+
+## 3.1 Feature Change Blueprint
+
+Use this table to understand which files should normally change together.
+
+| Feature change | Contract docs | Source files | Persistence | Tests |
+|---|---|---|---|---|
+| new CLI flag | `docs/04_cli_spec.md`, `docs/automation_interface.md` if JSON changes | parser in `main.rs` or command module, completion docs tests | none unless flag mutates state | parser/help/docs consistency plus command behavior |
+| new scan/fire rule | `docs/09_index_trace_policy.md`, `docs/06_fire_extinguish.md` | `codefire-core/src/lib.rs`, `main.rs::compute_scan`, `automation.rs` | active scan/fires, commit fire delta | core unit plus scan CLI regression |
+| new verification blocker | `docs/05_consistency_model.md`, `docs/04_cli_spec.md` | `codefire-core`, `verification.rs`, `automation.rs`, `exit_code.rs` | active verification, commit certificate | verification JSON and commit rejection tests |
+| new object kind | `docs/08_object_store.md`, `docs/11_internal_architecture.md` | `codefire-store`, writer module, `doctor`, `storage`, `remote` | `.codefire/objects/<kind>` | object tamper, doctor, storage, remote copy tests |
+| remote mutation change | `docs/10_merge_remote_server.md`, automation docs | `remote.rs`, `remote/plans.rs`, `http.rs`, `signatures.rs` | remote branches/MRs/idempotency/nonce | file remote and HTTP remote tests |
+| evidence behavior | `docs/06_fire_extinguish.md`, `docs/04_cli_spec.md` | `evidence.rs`, `evidence/batch.rs`, `storage.rs`, `automation.rs` | evidence objects, artifact refs | command capture, dry-run, batch, storage tests |
+| install/completion | README/runbook, CLI spec | `install.sh`, `completion.rs`, docs tests | install prefix only | shell/Python smoke and docs consistency |
+
+Any row that changes JSON output must update `docs/automation_interface.md` and add a test that inspects the actual JSON shape.
+
+## 3.2 Repository State Blueprint
+
+The source code should make these state transitions visible.
+
+```text
+closed branch
+  -- open --> open-clean
+  -- edit/scan/fire --> open-burning
+  -- extinguish/verify with no blockers --> open-consistent
+  -- commit --> open-clean at new base commit
+  -- close --> closed
+```
+
+State inputs:
+
+| Input | Source owner | Persistent source |
+|---|---|---|
+| branch head | `main.rs`, future repository service | `.codefire/branches/<branch>.json` |
+| open identity | `open_context`, opened registry helpers | `.codefire-open`, `.codefire/opened/<branch>.json` |
+| base commit | `OpenContext` | open marker and opened registry |
+| changed atoms | `codefire-core::build_scan_result` | active `scan.json` |
+| open fires | scan/fire/extinguish runners | active `fires.json` |
+| stale resolutions | `codefire-core::stale_resolutions` | active `resolutions.json`, current basis |
+| verification blockers | `build_verification`, external checks | active `verification.json` |
+
+The same state reducer should eventually feed status, scan, verify, commit, close, and automation next_actions.
 
 ## 4. Open Directory Lifecycle
 
@@ -278,4 +373,3 @@ These are known areas where the source shape is not yet ideal.
 | active-state next_actions can be stale | automation may perform useless commit/verify steps | next_actions generated from reducer and changed-count context |
 
 Treat these as design debt to retire during v0.8/v0.9 planning, not as reasons to add workaround code.
-
