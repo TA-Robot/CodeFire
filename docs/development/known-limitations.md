@@ -74,6 +74,13 @@
 
 Rust v0.6 is the default installed `codefire` CLI. Python v0.2 remains the reference/fallback as installed `codefire-py` or repository-local `./codefire`.
 
+Python fallback freeze policy:
+
+- New mainline features must land in Rust first.
+- Python fallback changes are limited to compatibility fixtures, critical security/bug fixes, installer fallback behavior, and narrowly-scoped Python/Rust parity tests.
+- Python fallback must not gain a new user-facing command, flag, output schema, remote behavior, or repository format unless the Rust CLI already owns that behavior and the temporary fallback delta is documented here.
+- Golden compatibility tests should cover only repository/object/remote formats that Python-created projects still need for migration or incident response.
+
 The Python fallback still owns Python-only maintenance commands that are not part of the Rust v0.6 default CLI surface yet:
 
 - `close`

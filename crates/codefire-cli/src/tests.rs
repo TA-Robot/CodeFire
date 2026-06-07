@@ -35,6 +35,20 @@ fn help_and_completion_scripts_cover_rust_default_cli() {
 
 #[test]
 fn known_limitations_python_fallback_commands_stay_out_of_rust_cli() {
+    let known_limitations = include_str!("../../../docs/development/known-limitations.md");
+    for required_policy_line in [
+        "Python fallback freeze policy:",
+        "New mainline features must land in Rust first.",
+        "Python fallback changes are limited to compatibility fixtures, critical security/bug fixes, installer fallback behavior, and narrowly-scoped Python/Rust parity tests.",
+        "Python fallback must not gain a new user-facing command, flag, output schema, remote behavior, or repository format unless the Rust CLI already owns that behavior and the temporary fallback delta is documented here.",
+        "Golden compatibility tests should cover only repository/object/remote formats that Python-created projects still need for migration or incident response.",
+    ] {
+        assert!(
+            known_limitations.contains(required_policy_line),
+            "known-limitations.md is missing Python fallback freeze policy line: {required_policy_line}"
+        );
+    }
+
     let documented_fallback = documented_python_fallback_commands();
     assert_eq!(
         documented_fallback,
