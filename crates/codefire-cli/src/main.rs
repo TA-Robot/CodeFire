@@ -776,9 +776,16 @@ fn command_help_for_args(args: &[String]) -> Option<&'static str> {
     match command {
         "status" | "scan" | "verify" | "fire" | "extinguish" | "commit" | "init" | "open"
         | "clone" | "upload" | "list" | "request-merge" | "request-list" | "request-review"
-        | "request-apply" | "review-pack" | "storage" | "doctor" | "show" | "diff" => {
+        | "request-apply" | "review-pack" | "storage" | "doctor" | "show" | "diff" | "context"
+        | "explain" | "atom-index" | "trace-graph" | "missing-links" => {
             Some(subcommand_help(command))
         }
+        "migrate" => match args.get(1).map(String::as_str) {
+            Some("check") | Some("dry-run") | Some("apply") => {
+                Some(subcommand_help("migrate check"))
+            }
+            _ => Some(subcommand_help("migrate")),
+        },
         "branch" => match args.get(1).map(String::as_str) {
             Some("list") => Some(subcommand_help("branch list")),
             _ => Some(subcommand_help("branch")),
@@ -845,6 +852,24 @@ fn subcommand_help(command: &str) -> &'static str {
         }
         "branch" | "branch list" => {
             "usage: codefire branch list [path|--path <repo-or-open>] [--json]\n\nList local branches.\n"
+        }
+        "context" => {
+            "usage: codefire context (--changed|--atom <atom-id>|--fire <fire-id>|--branch <branch>) [--path <open-dir>] [--depth <n>] [--limit <n>] [--json]\n\nBuild a bounded context pack for an open directory.\n"
+        }
+        "explain" => {
+            "usage: codefire explain (fire <fire-id>|atom <atom-id>|verify-failure|storage-warning) [--path <open-dir>] [--json]\n\nExplain CodeFire state, diagnostics, and next actions.\n"
+        }
+        "migrate" | "migrate check" => {
+            "usage: codefire migrate check [path] [--json] [--target-format v0.6]\n       codefire migrate dry-run [path] [--json] [--target-format v0.6]\n       codefire migrate apply [path] [--json] [--target-format v0.6]\n\nCheck or prepare CodeFire repository layout migration.\n"
+        }
+        "atom-index" => {
+            "usage: codefire atom-index [path]\n\nPrint the current Atom index as JSON for a repository or open directory.\n"
+        }
+        "trace-graph" => {
+            "usage: codefire trace-graph [path]\n\nPrint the current trace graph as JSON for a repository or open directory.\n"
+        }
+        "missing-links" => {
+            "usage: codefire missing-links [path]\n\nPrint required trace links that are currently missing.\n"
         }
         "storage" => {
             "usage: codefire storage [path] [--quick|--full] [--json] [--large-threshold <bytes|KB|MB|GB>] [--remote <cf://server/org/app>]\n       codefire storage report [path] [--quick|--full] [--json] [--large-threshold <bytes|KB|MB|GB>] [--remote <cf://server/org/app>]\n"

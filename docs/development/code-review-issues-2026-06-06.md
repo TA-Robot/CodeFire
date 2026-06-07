@@ -16,7 +16,7 @@
 - Medium: 121
 - Low: 3
 - Fixed in v0.7: 80
-- Remaining open: 79
+- Remaining open: 78
 
 ## Cycle 2 Source Review Expansion
 
@@ -142,6 +142,7 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | ID | Fixed in | Summary | Evidence |
 |---|---|---|---|
 | CFR-091 | v0.9 Phase A | `init --help` をparser前にread-only helpとして処理 | `command_help_routes_before_mutating_parsers` |
+| CFR-131 | v1.0 Phase 1a | `context` / `explain` / `migrate` / debug read-only commandsのhelp routingを追加 | `command_help_routes_before_mutating_parsers` |
 
 ### Open Area View
 

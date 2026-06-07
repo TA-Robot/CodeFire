@@ -30,6 +30,19 @@ fn command_help_routes_before_mutating_parsers() {
             vec!["patch", "export", "--help"],
             "usage: codefire patch export",
         ),
+        (vec!["context", "--help"], "usage: codefire context"),
+        (vec!["explain", "--help"], "usage: codefire explain"),
+        (vec!["migrate", "--help"], "usage: codefire migrate"),
+        (
+            vec!["migrate", "check", "--help"],
+            "usage: codefire migrate check",
+        ),
+        (vec!["atom-index", "--help"], "usage: codefire atom-index"),
+        (vec!["trace-graph", "--help"], "usage: codefire trace-graph"),
+        (
+            vec!["missing-links", "--help"],
+            "usage: codefire missing-links",
+        ),
     ] {
         let args = args.into_iter().map(str::to_string).collect::<Vec<_>>();
         let help = command_help_for_args(&args).expect("help should be routed");
