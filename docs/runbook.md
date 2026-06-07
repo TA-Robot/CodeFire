@@ -14,6 +14,7 @@
 ```bash
 cd /workspace/project
 ./install.sh --prefix "$HOME/.local"
+./install.sh --prefix "$HOME/.local" --completion bash --dry-run
 ./install.sh --prefix "$HOME/.local" --completion bash --completion-dir "$HOME/.local/share/bash-completion/completions"
 ./install.sh --prefix "$HOME/.local" --binary ./target/release/codefire-rs
 python3 -m pip install .
@@ -31,7 +32,7 @@ cargo build --workspace
 ./target/debug/codefire-rs --help
 ```
 
-`install.sh` はrelease Rust binaryをbuildまたは検出して `PATH/bin/codefire` に配置し、Python reference implementationを `PATH/bin/codefire-py` として残す。`python3 -m pip install .` はPython reference implementationを `codefire` entrypointとして入れるため、Rust default installとは用途を分ける。
+`install.sh` はrelease Rust binaryをbuildして `PATH/bin/codefire` に配置し、Python reference implementationを `PATH/bin/codefire-py` として残す。`--binary` 指定時はprebuilt binaryを使うが、install前後に `--help` / `--version` smokeでCodeFire identityを確認する。`--dry-run` はbuild/mkdir/installを行わず、配置予定のbinary/completion pathを表示する。prefixとcompletion dirは絶対pathを要求し、symlink prefix/bin/completion dirは拒否する。`python3 -m pip install .` はPython reference implementationを `codefire` entrypointとして入れるため、Rust default installとは用途を分ける。
 
 ## 実行
 

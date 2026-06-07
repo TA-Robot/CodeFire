@@ -3312,6 +3312,97 @@ class CodeFireCliTests(unittest.TestCase):
         self.assertEqual(help_proc.returncode, 0, help_proc.stderr)
         self.assertIn("usage: codefire", help_proc.stdout)
 
+    def test_install_script_dry_run_bad_binary_and_prefix_safety(self):
+        prefix = self.tmp / "dry-prefix"
+        completion_dir = self.tmp / "dry-completions"
+        dry = subprocess.run(
+            [
+                str(INSTALL),
+                "--prefix",
+                str(prefix),
+                "--completion",
+                "bash",
+                "--completion-dir",
+                str(completion_dir),
+                "--dry-run",
+            ],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.assertEqual(dry.returncode, 0, dry.stderr)
+        self.assertIn("dry_run: true", dry.stdout)
+        self.assertIn(f"install_codefire: {prefix / 'bin/codefire'}", dry.stdout)
+        self.assertFalse(prefix.exists())
+        self.assertFalse(completion_dir.exists())
+
+        bad_binary = self.tmp / "not-codefire"
+        bad_binary.write_text("#!/usr/bin/env sh\necho nope\n", encoding="utf-8")
+        bad_binary.chmod(0o755)
+        bad = subprocess.run(
+            [str(INSTALL), "--prefix", str(self.tmp / "bad-prefix"), "--binary", str(bad_binary)],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.assertNotEqual(bad.returncode, 0)
+        self.assertIn("does not look like CodeFire", bad.stderr)
+        self.assertFalse((self.tmp / "bad-prefix/bin/codefire").exists())
+
+        real_prefix = self.tmp / "real-prefix"
+        real_prefix.mkdir()
+        linked_prefix = self.tmp / "linked-prefix"
+        linked_prefix.symlink_to(real_prefix, target_is_directory=True)
+        symlink = subprocess.run(
+            [str(INSTALL), "--prefix", str(linked_prefix), "--dry-run"],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.assertNotEqual(symlink.returncode, 0)
+        self.assertIn("must not be a symlink", symlink.stderr)
+
+    def test_install_script_completion_failure_does_not_install_binary(self):
+        fake = self.tmp / "fake-codefire"
+        fake.write_text(
+            """#!/usr/bin/env sh
+case "$1" in
+  --help) echo "usage: codefire <command> [args]"; exit 0 ;;
+  --version) echo "codefire foundation 1"; exit 0 ;;
+  completion) echo "completion failed" >&2; exit 9 ;;
+  *) exit 0 ;;
+esac
+""",
+            encoding="utf-8",
+        )
+        fake.chmod(0o755)
+        prefix = self.tmp / "partial-prefix"
+        completion_dir = self.tmp / "partial-completions"
+        proc = subprocess.run(
+            [
+                str(INSTALL),
+                "--prefix",
+                str(prefix),
+                "--binary",
+                str(fake),
+                "--completion",
+                "bash",
+                "--completion-dir",
+                str(completion_dir),
+            ],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("completion failed", proc.stderr)
+        self.assertFalse((prefix / "bin/codefire").exists())
+        self.assertFalse((prefix / "bin/codefire-py").exists())
+
     def test_pyproject_installs_codefire_script(self):
         venv = self.tmp / "venv"
         subprocess.run(

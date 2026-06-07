@@ -200,6 +200,6 @@ semantic merge、Atom-level自動解決、AI提案は未実装。競合時はcon
 
 ### Packaging
 
-`install.sh --prefix PATH` はRust v0.6 binaryを `PATH/bin/codefire` に配置し、Python v0.2 reference implementationを `PATH/bin/codefire-py` に配置する。`codefire completion bash|zsh` でRust CLIのshell completionを生成でき、`install.sh --completion bash|zsh` で配置できる。`pyproject.toml` / `setup.py` はPython reference implementationのsetuptools script installに対応しており、`python3 -m pip install .` はPython版 `codefire` entrypointを配置するため、Rust default installとは別経路として扱う。
+`install.sh --prefix PATH` はRust v0.6 binaryを `PATH/bin/codefire` に配置し、Python v0.2 reference implementationを `PATH/bin/codefire-py` に配置する。`--dry-run` はbuild/mkdir/installを行わず配置計画だけを表示する。通常installはRust release binaryをbuildし、`--binary PATH` 指定時だけprebuilt binaryを使う。いずれも `--help` / `--version` smokeでCodeFire identityを検証し、completionは一時fileに事前生成してから配置する。prefix/completion dirは絶対pathを要求し、symlink prefix/bin/completion dirは拒否する。`codefire completion bash|zsh` でRust CLIのshell completionを生成でき、`install.sh --completion bash|zsh` で配置できる。`pyproject.toml` / `setup.py` はPython reference implementationのsetuptools script installに対応しており、`python3 -m pip install .` はPython版 `codefire` entrypointを配置するため、Rust default installとは別経路として扱う。
 
 Rust workspace自体は `Cargo.toml` / `crates/codefire-*` として作成済みで、installer defaultはRustへ切替済みである。ただしpackage indexへの公開、署名付きrelease artifact、OS packageは未実装である。

@@ -78,7 +78,13 @@ codefire --help
 codefire-py --help
 ```
 
-`install.sh` はrelease Rust binaryをbuildまたは検出して `codefire` として配置し、Python reference implementationを `codefire-py` として配置します。prebuilt binaryを使う場合:
+`install.sh` はrelease Rust binaryをbuildして `codefire` として配置し、Python reference implementationを `codefire-py` として配置します。install前後にRust binaryの `--help` / `--version` smokeを行い、completionは事前生成してから配置します。事前確認だけ行う場合:
+
+```bash
+./install.sh --prefix "$HOME/.local" --completion bash --dry-run
+```
+
+prebuilt binaryを使う場合:
 
 ```bash
 ./install.sh --prefix "$HOME/.local" --binary ./target/release/codefire-rs
