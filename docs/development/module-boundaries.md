@@ -41,6 +41,21 @@ Rust CLIでは、以下の責務分離を標準形とする。
 
 Python reference implementationは歴史的に単一ファイルだが、Rust v0.6 default化後は互換性確認用referenceとして扱う。新規の本流機能はRust側でmodule分割して実装する。
 
+## テスト配置
+
+Rust CLIの横断integration-style testsは、`crates/codefire-cli/src/tests.rs` を入口にしつつ、目的別のsubmoduleへ分割する。
+
+| Test domain | Preferred location | Notes |
+|---|---|---|
+| docs/help/completion/release-doc consistency | `crates/codefire-cli/src/tests/docs.rs` | CLI surfaceと文書の整合を固定する |
+| doctor/storage/state diagnostics | `crates/codefire-cli/src/tests/doctor.rs` or feature-local module | 破損fixtureとdiagnostic schemaをまとめる |
+| local branch/open/clone/status flows | `crates/codefire-cli/src/tests/local.rs` | repository lifecycle helpersを共有する |
+| diff/merge/review-pack | `crates/codefire-cli/src/tests/diff_merge.rs` or `view/*` module tests | golden fixturesとnormalizerを近くに置く |
+| remote/idempotency/http flows | `crates/codefire-cli/src/tests/remote.rs` or feature-local module | remote fixture setupを共有する |
+| evidence/fire/extinguish/verify | `crates/codefire-cli/src/tests/workflow.rs` | traceability workflowのE2Eをまとめる |
+
+新規Rust CLIテストを追加するときは、既存の巨大な `tests.rs` へ直接足す前に、上記domain submoduleまたはfeature-local `#[cfg(test)] mod tests` を優先する。既存テストは、関連featureを触るたびに近いdomain fileへ段階移動する。
+
 ## 実装フロー
 
 1. 変更前に、追加する責務が既存moduleに属するかを確認する。
@@ -48,7 +63,7 @@ Python reference implementationは歴史的に単一ファイルだが、Rust v0
 3. public APIは狭くする。module外へ出す型や関数は、呼び出し側の責務に必要なものだけにする。
 4. mutation前にはplan型を作り、検証とwriteを分離する。
 5. outputは最後にrenderする。domain logic内で直接printしない。
-6. testsはmodule境界に沿って置き、private helperを無理に公開しない。
+6. testsはmodule境界に沿って置き、private helperを無理に公開しない。横断CLI testsは `src/tests/<domain>.rs` へ置く。
 
 ## レビュー観点
 
