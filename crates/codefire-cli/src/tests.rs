@@ -821,6 +821,17 @@ fn legacy_plan_json_outputs_are_wrapped_in_command_result_envelope() {
 }
 
 #[test]
+fn local_workflow_commands_are_registered_through_dispatch_table() {
+    for command in ["scan", "verify", "fire", "extinguish", "commit"] {
+        assert!(
+            local_workflow_handler(command).is_some(),
+            "{command} should be routed through the local workflow dispatch table"
+        );
+    }
+    assert!(local_workflow_handler("clone").is_none());
+}
+
+#[test]
 fn remote_generation_allocation_is_locked_across_threads() {
     let temp = tempdir().unwrap();
     let project_root = temp.path().join("remote").join("org").join("app");

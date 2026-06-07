@@ -128,6 +128,11 @@ fn main() {
 }
 
 fn run(args: Vec<String>) -> Result<(), CliError> {
+    if let Some(command) = args.first().map(String::as_str) {
+        if let Some(handler) = local_workflow_handler(command) {
+            return handler(&args[1..]);
+        }
+    }
     match args.first().map(String::as_str) {
         Some("-h") | Some("--help") | Some("help") => {
             print!("{}", help_text());
@@ -188,204 +193,6 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 );
             } else {
                 print_context_summary(&pack.data);
-            }
-            Ok(())
-        }
-        Some("scan") => {
-            let options = parse_path_json_args(&args[1..], "scan")?;
-            let started = Instant::now();
-            let scan = run_scan(&options.path)?;
-            let metrics = options
-                .metrics
-                .then(|| scan_metrics(started.elapsed(), &scan));
-            if options.json_output {
-                let repo_root = open_context(&options.path).ok().map(|context| context.repo_root);
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&command_result_envelope(
-                        "scan",
-                        true,
-                        0,
-                        repo_root.as_deref(),
-                        attach_metrics(scan_data_json(&scan), metrics.as_ref()),
-                        scan_diagnostics_json(&scan),
-                        scan_next_actions(&scan),
-                    ))?
-                );
-            } else {
-                print_scan(&scan);
-                if let Some(metrics) = metrics.as_ref() {
-                    print_metrics(metrics);
-                }
-            }
-            Ok(())
-        }
-        Some("verify") => {
-            let options = parse_verify_args(&args[1..])?;
-            let started = Instant::now();
-            let verification = run_verify(&options.path)?;
-            let metrics = options
-                .metrics
-                .then(|| verification_metrics(started.elapsed(), &verification));
-            let exit_code = verification_exit_code(&verification);
-            if options.json_output {
-                let repo_root = open_context(&options.path).ok().map(|context| context.repo_root);
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&command_result_envelope(
-                        "verify",
-                        verification.result == "passed",
-                        exit_code.code(),
-                        repo_root.as_deref(),
-                        attach_metrics(
-                            verification_data_json_with_filter(
-                                &verification,
-                                options.diagnostic_filter(),
-                            ),
-                            metrics.as_ref(),
-                        ),
-                        verification_diagnostics_json_with_filter(
-                            &verification,
-                            options.blocking_only,
-                        ),
-                        verification_next_actions(&verification),
-                    ))?
-                );
-            } else {
-                print_verification(&verification, options.details, options.blocking_only);
-                if let Some(metrics) = metrics.as_ref() {
-                    print_metrics(metrics);
-                }
-            }
-            if verification.result == "passed" {
-                Ok(())
-            } else {
-                Err(CliError::VerificationFailed(exit_code))
-            }
-        }
-        Some("fire") => {
-            if args
-                .iter()
-                .skip(1)
-                .any(|arg| arg == "--batch" || arg.starts_with("--batch="))
-            {
-                let options = parse_fire_batch_args(&args[1..])?;
-                let result = run_fire_batch(&options)?;
-                if options.json_output {
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&command_result_envelope(
-                            "fire-batch",
-                            true,
-                            0,
-                            Some(&result.repo_root),
-                            fire_batch_data_json(&result),
-                            Vec::new(),
-                            Vec::new(),
-                        ))?
-                    );
-                } else {
-                    print_fire_result(&result);
-                }
-            } else {
-                let options = parse_fire_args(&args[1..])?;
-                let result = run_fire(&options)?;
-                if options.json_output {
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&command_result_envelope(
-                            "fire",
-                            true,
-                            0,
-                            Some(&result.repo_root),
-                            fire_data_json(&result),
-                            Vec::new(),
-                            Vec::new(),
-                        ))?
-                    );
-                } else {
-                    print_fire_result(&result);
-                }
-            }
-            Ok(())
-        }
-        Some("extinguish") => {
-            if has_interactive_extinguish_arg(&args[1..]) {
-                let options = parse_interactive_extinguish_args(&args[1..])?;
-                let result = run_interactive_extinguish(&options)?;
-                if options.json_output {
-                    print_plan_result_json("extinguish-interactive", &result.plan)?;
-                } else {
-                    print_interactive_extinguish_result(&result);
-                }
-            } else if has_all_matching_extinguish_arg(&args[1..]) {
-                let options = parse_all_matching_extinguish_args(&args[1..])?;
-                let result = run_all_matching_extinguish(&options)?;
-                if options.json_output {
-                    print_plan_result_json("extinguish-all", &result.plan)?;
-                } else {
-                    print_all_matching_extinguish_result(&options, &result);
-                }
-            } else if has_batch_extinguish_arg(&args[1..]) {
-                let options = parse_extinguish_batch_args(&args[1..])?;
-                let result = run_extinguish_batch(&options)?;
-                if options.json_output {
-                    print_plan_result_json("extinguish-batch", &result.plan)?;
-                } else if options.dry_run {
-                    println!(
-                        "extinguish batch dry-run: {} fires would be processed",
-                        result.item_count
-                    );
-                } else {
-                    println!("extinguished {} fires", result.item_count);
-                }
-            } else {
-                let options = prepare_extinguish_options(parse_extinguish_args(&args[1..])?)?;
-                let result = run_extinguish(&options)?;
-                if options.json_output {
-                    print_plan_result_json("extinguish", &result.plan)?;
-                } else if options.dry_run {
-                    println!(
-                        "extinguish dry-run: {} ({}) would be {}",
-                        result.display_id,
-                        result.fire_uid,
-                        if options.refresh {
-                            "refreshed"
-                        } else {
-                            "extinguished"
-                        }
-                    );
-                } else {
-                    println!(
-                        "{} {} ({})",
-                        if options.refresh {
-                            "refreshed"
-                        } else {
-                            "extinguished"
-                        },
-                        result.display_id,
-                        result.fire_uid
-                    );
-                }
-            }
-            Ok(())
-        }
-        Some("commit") => {
-            let options = parse_commit_args(&args[1..])?;
-            let result = run_commit(&options)?;
-            if options.json_output {
-                print_plan_result_json("commit", &result.plan)?;
-            } else if options.dry_run {
-                println!("commit dry-run: branch {} would be sealed", result.branch);
-                println!(
-                    "Changed atoms: {}",
-                    result.plan["changed_atoms"].as_array().map(Vec::len).unwrap_or(0)
-                );
-            } else {
-                println!("Sealed commit created.");
-                println!("Commit: {}", result.commit_id);
-                println!("Branch: {}", result.branch);
-                println!("State: open-clean");
             }
             Ok(())
         }
@@ -995,6 +802,222 @@ impl From<codefire_store::StoreError> for CliError {
     fn from(error: codefire_store::StoreError) -> Self {
         CliError::Store(error)
     }
+}
+
+type CommandHandler = fn(&[String]) -> Result<(), CliError>;
+
+fn local_workflow_handler(command: &str) -> Option<CommandHandler> {
+    match command {
+        "scan" => Some(run_scan_command),
+        "verify" => Some(run_verify_command),
+        "fire" => Some(run_fire_command),
+        "extinguish" => Some(run_extinguish_command),
+        "commit" => Some(run_commit_command),
+        _ => None,
+    }
+}
+
+fn run_scan_command(args: &[String]) -> Result<(), CliError> {
+    let options = parse_path_json_args(args, "scan")?;
+    let started = Instant::now();
+    let scan = run_scan(&options.path)?;
+    let metrics = options
+        .metrics
+        .then(|| scan_metrics(started.elapsed(), &scan));
+    if options.json_output {
+        let repo_root = open_context(&options.path)
+            .ok()
+            .map(|context| context.repo_root);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&command_result_envelope(
+                "scan",
+                true,
+                0,
+                repo_root.as_deref(),
+                attach_metrics(scan_data_json(&scan), metrics.as_ref()),
+                scan_diagnostics_json(&scan),
+                scan_next_actions(&scan),
+            ))?
+        );
+    } else {
+        print_scan(&scan);
+        if let Some(metrics) = metrics.as_ref() {
+            print_metrics(metrics);
+        }
+    }
+    Ok(())
+}
+
+fn run_verify_command(args: &[String]) -> Result<(), CliError> {
+    let options = parse_verify_args(args)?;
+    let started = Instant::now();
+    let verification = run_verify(&options.path)?;
+    let metrics = options
+        .metrics
+        .then(|| verification_metrics(started.elapsed(), &verification));
+    let exit_code = verification_exit_code(&verification);
+    if options.json_output {
+        let repo_root = open_context(&options.path)
+            .ok()
+            .map(|context| context.repo_root);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&command_result_envelope(
+                "verify",
+                verification.result == "passed",
+                exit_code.code(),
+                repo_root.as_deref(),
+                attach_metrics(
+                    verification_data_json_with_filter(&verification, options.diagnostic_filter()),
+                    metrics.as_ref(),
+                ),
+                verification_diagnostics_json_with_filter(&verification, options.blocking_only),
+                verification_next_actions(&verification),
+            ))?
+        );
+    } else {
+        print_verification(&verification, options.details, options.blocking_only);
+        if let Some(metrics) = metrics.as_ref() {
+            print_metrics(metrics);
+        }
+    }
+    if verification.result == "passed" {
+        Ok(())
+    } else {
+        Err(CliError::VerificationFailed(exit_code))
+    }
+}
+
+fn run_fire_command(args: &[String]) -> Result<(), CliError> {
+    if args
+        .iter()
+        .any(|arg| arg == "--batch" || arg.starts_with("--batch="))
+    {
+        let options = parse_fire_batch_args(args)?;
+        let result = run_fire_batch(&options)?;
+        if options.json_output {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&command_result_envelope(
+                    "fire-batch",
+                    true,
+                    0,
+                    Some(&result.repo_root),
+                    fire_batch_data_json(&result),
+                    Vec::new(),
+                    Vec::new(),
+                ))?
+            );
+        } else {
+            print_fire_result(&result);
+        }
+    } else {
+        let options = parse_fire_args(args)?;
+        let result = run_fire(&options)?;
+        if options.json_output {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&command_result_envelope(
+                    "fire",
+                    true,
+                    0,
+                    Some(&result.repo_root),
+                    fire_data_json(&result),
+                    Vec::new(),
+                    Vec::new(),
+                ))?
+            );
+        } else {
+            print_fire_result(&result);
+        }
+    }
+    Ok(())
+}
+
+fn run_extinguish_command(args: &[String]) -> Result<(), CliError> {
+    if has_interactive_extinguish_arg(args) {
+        let options = parse_interactive_extinguish_args(args)?;
+        let result = run_interactive_extinguish(&options)?;
+        if options.json_output {
+            print_plan_result_json("extinguish-interactive", &result.plan)?;
+        } else {
+            print_interactive_extinguish_result(&result);
+        }
+    } else if has_all_matching_extinguish_arg(args) {
+        let options = parse_all_matching_extinguish_args(args)?;
+        let result = run_all_matching_extinguish(&options)?;
+        if options.json_output {
+            print_plan_result_json("extinguish-all", &result.plan)?;
+        } else {
+            print_all_matching_extinguish_result(&options, &result);
+        }
+    } else if has_batch_extinguish_arg(args) {
+        let options = parse_extinguish_batch_args(args)?;
+        let result = run_extinguish_batch(&options)?;
+        if options.json_output {
+            print_plan_result_json("extinguish-batch", &result.plan)?;
+        } else if options.dry_run {
+            println!(
+                "extinguish batch dry-run: {} fires would be processed",
+                result.item_count
+            );
+        } else {
+            println!("extinguished {} fires", result.item_count);
+        }
+    } else {
+        let options = prepare_extinguish_options(parse_extinguish_args(args)?)?;
+        let result = run_extinguish(&options)?;
+        if options.json_output {
+            print_plan_result_json("extinguish", &result.plan)?;
+        } else if options.dry_run {
+            println!(
+                "extinguish dry-run: {} ({}) would be {}",
+                result.display_id,
+                result.fire_uid,
+                if options.refresh {
+                    "refreshed"
+                } else {
+                    "extinguished"
+                }
+            );
+        } else {
+            println!(
+                "{} {} ({})",
+                if options.refresh {
+                    "refreshed"
+                } else {
+                    "extinguished"
+                },
+                result.display_id,
+                result.fire_uid
+            );
+        }
+    }
+    Ok(())
+}
+
+fn run_commit_command(args: &[String]) -> Result<(), CliError> {
+    let options = parse_commit_args(args)?;
+    let result = run_commit(&options)?;
+    if options.json_output {
+        print_plan_result_json("commit", &result.plan)?;
+    } else if options.dry_run {
+        println!("commit dry-run: branch {} would be sealed", result.branch);
+        println!(
+            "Changed atoms: {}",
+            result.plan["changed_atoms"]
+                .as_array()
+                .map(Vec::len)
+                .unwrap_or(0)
+        );
+    } else {
+        println!("Sealed commit created.");
+        println!("Commit: {}", result.commit_id);
+        println!("Branch: {}", result.branch);
+        println!("State: open-clean");
+    }
+    Ok(())
 }
 
 fn print_status(status: &Status) {
