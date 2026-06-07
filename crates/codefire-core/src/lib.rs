@@ -1424,10 +1424,11 @@ pub fn extract_explicit_cf_atoms(
     }
     let mut atoms = Vec::with_capacity(markers.len());
     for (index, (start, atom_id)) in markers.iter().enumerate() {
-        let end = markers
+        let marker_end = markers
             .get(index + 1)
             .map(|(next_start, _)| *next_start)
             .unwrap_or(lines.len());
+        let end = explicit_cf_atom_span_end(&lines, *start, marker_end, artifact_path);
         let content = normalized_block_content(&lines[*start..end]);
         atoms.push(Atom {
             atom_id: atom_id.clone(),
@@ -1441,6 +1442,99 @@ pub fn extract_explicit_cf_atoms(
         });
     }
     Ok(atoms)
+}
+
+fn explicit_cf_atom_span_end(
+    lines: &[&str],
+    marker_start: usize,
+    marker_end: usize,
+    artifact_path: &str,
+) -> usize {
+    if artifact_path.ends_with(".py") {
+        python_explicit_cf_atom_span_end(lines, marker_start, marker_end).unwrap_or(marker_end)
+    } else {
+        marker_end
+    }
+}
+
+fn python_explicit_cf_atom_span_end(
+    lines: &[&str],
+    marker_start: usize,
+    marker_end: usize,
+) -> Option<usize> {
+    let mut index = marker_start + 1;
+    while index < marker_end {
+        let trimmed = lines[index].trim_start();
+        if trimmed.trim().is_empty() || trimmed.starts_with('#') {
+            index += 1;
+            continue;
+        }
+        if trimmed.starts_with('@') {
+            let decorator_indent = leading_space_count(lines[index]);
+            while index < marker_end && lines[index].trim_start().starts_with('@') {
+                index += 1;
+            }
+            if index < marker_end && is_python_symbol_line(lines[index].trim_start()) {
+                let symbol_indent = leading_space_count(lines[index]).min(decorator_indent);
+                return Some(python_block_end(lines, index, marker_end, symbol_indent));
+            }
+            return None;
+        }
+        if is_python_symbol_line(trimmed) {
+            return Some(python_block_end(
+                lines,
+                index,
+                marker_end,
+                leading_space_count(lines[index]),
+            ));
+        }
+        return None;
+    }
+    None
+}
+
+fn is_python_symbol_line(trimmed: &str) -> bool {
+    trimmed.starts_with("class ")
+        || trimmed.starts_with("def ")
+        || trimmed.starts_with("async def ")
+}
+
+fn python_block_end(
+    lines: &[&str],
+    symbol_start: usize,
+    marker_end: usize,
+    block_indent: usize,
+) -> usize {
+    let mut end = symbol_start + 1;
+    for (index, line) in lines
+        .iter()
+        .enumerate()
+        .take(marker_end)
+        .skip(symbol_start + 1)
+    {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            end = index + 1;
+            continue;
+        }
+        let indent = leading_space_count(line);
+        if indent <= block_indent {
+            return trim_trailing_blank_lines(lines, end);
+        }
+        end = index + 1;
+    }
+    trim_trailing_blank_lines(lines, end)
+}
+
+fn trim_trailing_blank_lines(lines: &[&str], mut end: usize) -> usize {
+    while end > 0 && lines[end - 1].trim().is_empty() {
+        end -= 1;
+    }
+    end
+}
+
+fn leading_space_count(line: &str) -> usize {
+    line.chars().take_while(|ch| *ch == ' ').count()
 }
 
 pub fn kind_from_atom_id(atom_id: &str, fallback: &str) -> &'static str {
@@ -1911,6 +2005,52 @@ mod tests {
         assert_ne!(first_python.content_hash, second_python.content_hash);
         assert_eq!(first_rust.atom_id, second_rust.atom_id);
         assert_ne!(first_rust.content_hash, second_rust.content_hash);
+    }
+
+    #[test]
+    fn python_explicit_cf_atom_hash_is_stable_when_later_marker_is_added() {
+        let temp = tempdir().unwrap();
+        let path = temp.path().join("app.py");
+        fs::write(
+            &path,
+            "# cf-atom: CODE-ExistingPolicy\nclass ExistingPolicy:\n    def allowed(self) -> bool:\n        return True\n\n\ndef helper() -> int:\n    return 1\n",
+        )
+        .unwrap();
+        let before = extract_explicit_cf_atoms(&path, "src/app.py", "code").unwrap();
+        fs::write(
+            &path,
+            "# cf-atom: CODE-ExistingPolicy\nclass ExistingPolicy:\n    def allowed(self) -> bool:\n        return True\n\n\n# cf-atom: CODE-Helper\ndef helper() -> int:\n    return 1\n",
+        )
+        .unwrap();
+        let after = extract_explicit_cf_atoms(&path, "src/app.py", "code").unwrap();
+
+        assert_eq!(before.len(), 1);
+        assert_eq!(after.len(), 2);
+        assert_eq!(before[0].atom_id, "CODE-ExistingPolicy");
+        assert_eq!(after[0].atom_id, "CODE-ExistingPolicy");
+        assert_eq!(before[0].content_hash, after[0].content_hash);
+        assert_eq!(after[1].atom_id, "CODE-Helper");
+    }
+
+    #[test]
+    fn python_explicit_cf_atom_hash_tracks_symbol_body_changes() {
+        let temp = tempdir().unwrap();
+        let path = temp.path().join("test_app.py");
+        fs::write(
+            &path,
+            "# cf-atom: TEST-existing-policy\ndef test_existing_policy():\n    assert True\n\n\ndef unrelated_helper():\n    return 1\n",
+        )
+        .unwrap();
+        let before = extract_explicit_cf_atoms(&path, "tests/test_app.py", "test").unwrap();
+        fs::write(
+            &path,
+            "# cf-atom: TEST-existing-policy\ndef test_existing_policy():\n    assert False\n\n\ndef unrelated_helper():\n    return 1\n",
+        )
+        .unwrap();
+        let after = extract_explicit_cf_atoms(&path, "tests/test_app.py", "test").unwrap();
+
+        assert_eq!(before[0].atom_id, after[0].atom_id);
+        assert_ne!(before[0].content_hash, after[0].content_hash);
     }
 
     #[test]

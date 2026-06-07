@@ -238,6 +238,8 @@
 | 2026-06-07 | Dogfood | algorithm cycle 3のclean-state probeで、`atom-index` と `missing-links` が `--path`/`--json` を通常optionとして扱わない課題をCFB-089として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-089.md` | `codefire atom-index --path . --json`; `codefire missing-links --path . --json` |
 | 2026-06-07 | Dogfood | algorithm cycle 3の `FrontierFeedbackIntegrator` 実装中に、bounded contextの `trace_links` が省略済みAtomを参照してもendpoint omission metadataを返さない課題をCFB-090として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-090.md` | `codefire context --changed --path . --limit 5 --json` |
 | 2026-06-07 | Dogfood | algorithm cycle 3の `FrontierDriftReporter` 実装中に、後続の明示 `cf-atom` 追加で既存末尾Atomのcontent hashが変わる課題をCFB-091として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-091.md` | `codefire scan --path . --json --metrics` |
+| 2026-06-07 | Core | CFB-091を修正し、Python明示Atomでmarker直後のclass/def/async def/decorator付きsymbolのindent blockをhash範囲にするようにした | `crates/codefire-core/src/lib.rs`, `docs/09_index_trace_policy.md`, `docs/development/bug-issues/cfb-091.md` | `cargo test -p codefire-core` |
+| 2026-06-07 | Dogfood | CFB-091修正版をinstallした直後、algorithm側でsource無変更にもかかわらず102 changed atoms / 116 firesが出るextractor migration課題をCFB-092として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-092.md` | `codefire scan --path . --json --metrics` |
 
 ## Current Decisions
 
