@@ -74,3 +74,4 @@
 | AE-070 | Planning | triage結果を次イテレーションのactive/review/deferred計画へ変換するplannerを追加する | done | `CODE-ExperimentIterationPlanner`; `TEST-experiment-iteration-planner-builds-bounded-plan` |
 | AE-071 | Governance | 実験campaignのrisk registerを追加し、open/blocking riskとmitigation checklistを優先度順に返す | done | `CODE-ExperimentRiskRegister`; `TEST-experiment-risk-register-prioritizes-open-risks` |
 | AE-072 | Evidence | promotion/review向けに改善、信頼度、replication、freshness、risk、artifact gapを束ねるevidence pack builderを追加する | done | `CODE-ExperimentEvidencePackBuilder`; `TEST-experiment-evidence-pack-builder-blocks-incomplete-claims` |
+| AE-073 | Review | evidence packとreviewer objectionからclaim review queueを生成し、block/revise/approveを優先度順に返す | done | `CODE-ClaimReviewQueue`; `TEST-claim-review-queue-prioritizes-blocked-claims` |

@@ -174,3 +174,31 @@ It produces:
 - a mitigation checklist ordered by input order
 
 The builder is intentionally conservative. Blocker risks or missing required artifacts produce `blocked`; stale evidence or low replication produce `review`; only candidates with sufficient confidence, replication, fresh evidence, and no blockers become `ready`.
+
+## DES-AUTO-013: Claim review queue
+
+The claim review queue consumes compact evidence packs and reviewer objection counts rather than raw experiment logs.
+
+Each review request includes:
+
+- claim ID
+- candidate ID
+- evidence pack readiness
+- open reviewer objection count
+- blocking reviewer objection count
+- assigned reviewer count
+
+The queue produces:
+
+- a decision: `approve`, `revise`, or `block`
+- a deterministic priority score
+- action reasons ordered from most severe to least severe
+- a checklist combining evidence-pack mitigations with reviewer follow-up
+
+Decision rules are intentionally conservative:
+
+- evidence-pack `blocked` or any blocking objection produces `block`
+- evidence-pack `review`, open non-blocking objections, or no assigned reviewer produces `revise`
+- only readiness `ready`, no open objections, and at least one reviewer produces `approve`
+
+Blocked items rank before revision items, and revision items rank before approval-ready items. Ties are broken by descending priority score and then stable claim ID.

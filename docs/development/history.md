@@ -221,6 +221,7 @@
 | 2026-06-07 | Dogfood | v0.9 Phase A install smoke中にPATH precedenceで古い `codefire` が実行される問題をCFB-066として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-066.md` | `/home/devuser/.local` へ再installしてactive binaryを更新 |
 | 2026-06-07 | Dogfood | algorithm cycle 2の `ExperimentEvidencePackBuilder` commit時に、commit success JSONのtop-level repo nullとapply済みplan next_action問題をCFB-067として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-067.md` | `codefire commit --path . -m "Add experiment evidence pack builder" --json` |
 | 2026-06-07 | Source Docs | 主要fileの内部にある型、関数群、状態、永続化境界、変更時の触り方まで読めるsource anatomyを追加し、AGENTSとsource navigation文書群から参照できるようにした | `docs/development/source-code-anatomy.md`, `docs/development/source-code-map.md`, `docs/development/source-code-mental-model.md`, `docs/development/source-code-blueprint.md`, `docs/development/command-source-trace.md`, `docs/11_internal_architecture.md`, `AGENTS.md` | docs-only source anatomy update |
+| 2026-06-07 | Dogfood | algorithm cycle 2の `ClaimReviewQueue` 実装中に、scan next_actionsがpath contextを落とす問題とverify blocking-only next_actionsが非blocking missing linksを薦める問題をCFB-068/069として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-068.md`, `docs/development/bug-issues/cfb-069.md` | `codefire scan --path . --json --metrics`; `codefire verify --path . --details --blocking-only --json --metrics` |
 
 ## Current Decisions
 

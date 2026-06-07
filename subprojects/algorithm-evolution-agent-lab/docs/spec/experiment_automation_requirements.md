@@ -119,3 +119,7 @@ The system shall maintain a risk register for experiment campaigns, prioritize o
 ## REQ-AUTO-030: Experiment evidence pack
 
 The system shall build a compact evidence pack for candidate promotion or external review, combining improvement signal, confidence, replication count, evidence freshness gaps, open blocker risks, missing artifacts, and mitigation checklist into a deterministic readiness decision.
+
+## REQ-AUTO-031: Claim review queue
+
+The system shall turn evidence packs and reviewer objections into a deterministic review queue that prioritizes blocked or revision-needed claims before approval-ready claims and explains the required next action for each claim.

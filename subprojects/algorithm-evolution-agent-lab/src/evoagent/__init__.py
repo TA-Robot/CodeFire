@@ -24,6 +24,12 @@ from evoagent.benchmarks import (
 from evoagent.budgeting import BudgetAwarePlanner, BudgetPlan
 from evoagent.campaign import CampaignMilestone, CampaignProgress, ExperimentCampaignTracker
 from evoagent.challenge import ChallengeBaseline, ComputeBudget, SotaChallengeDefinition, load_challenge_definition
+from evoagent.claim_review_queue import (
+    ClaimReviewDecision,
+    ClaimReviewItem,
+    ClaimReviewQueue,
+    ClaimReviewRequest,
+)
 from evoagent.claims import ClaimDisciplineClassifier, ClaimDisciplineResult, ClaimType
 from evoagent.compute import ComputeAccount, ComputeAccountant
 from evoagent.configuration import ConfigurationCapture, ConfigurationFinding, ExperimentConfiguration
@@ -106,6 +112,10 @@ __all__ = [
     "ClaimEvidenceSummary",
     "ClaimDisciplineClassifier",
     "ClaimDisciplineResult",
+    "ClaimReviewDecision",
+    "ClaimReviewItem",
+    "ClaimReviewQueue",
+    "ClaimReviewRequest",
     "ClaimReadiness",
     "ClaimType",
     "CodeFireTraceAudit",
