@@ -99,6 +99,8 @@ docs-only変更ではテスト不要。ただしMarkdownの表、リンク、TOD
 
 ## CodeFire dogfooding運用
 
+反復運用の全体像は `codefire-improvement-cycle.md` を正とする。
+
 CodeFire自身の不具合、バグに近いUX、改善点を見つけたら:
 
 - `bug-backlog.md` に `CFB-*` として記録する。

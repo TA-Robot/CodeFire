@@ -7,6 +7,7 @@
 - `docs/development/agent-code-quality.md`: AtCoder red レベルのコード品質、計算量、メモリ、アルゴリズム、不変条件。
 - `docs/development/module-boundaries.md`: module/file分割、責務境界、`main.rs` 肥大化防止。
 - `docs/development/agent-workflow.md`: 作業運用、Rust v0.6方針、diff/merge方針、テスト、禁止事項。
+- `docs/development/codefire-improvement-cycle.md`: CodeFire実装、install、algorithm dogfooding、issue創出、次version計画を反復するcodefire改善サイクル。
 - `docs/development/v0.6-readiness.md`: v0.6を完成と判断するための残ゲート。
 - `docs/development/todo-checklist.md`: 実装タスクと依存関係。
 - `docs/development/bug-backlog.md`: CodeFire自身のバグ、改善点、UX違和感。

@@ -205,6 +205,7 @@
 | 2026-06-07 | v0.7 Hardening | Batch 2/8の完了としてlocal workflow command dispatch tableを追加し、`run` からscan/verify/fire/extinguish/commitの巨大なparse/execute/render分岐を専用handlerへ切り出した | `crates/codefire-cli/src/main.rs`, `crates/codefire-cli/src/tests.rs`, docs | `cargo test -p codefire-cli --bin codefire-rs local_workflow_commands_are_registered_through_dispatch_table -- --nocapture`; `cargo test -p codefire-cli --bin codefire-rs scan_and_verify_text_outputs_include_empty_summaries -- --nocapture`; CFR-001 fixed |
 | 2026-06-07 | Dogfood | `algorithm-evolution-agent-lab` のrunbook機能追加中に見つけたCodeFire改善issue CFB-026..CFB-045を追加し、CFB用issue templateと1 issue 1 fileの詳細管理へ展開した | `docs/development/bug-backlog.md`, `docs/development/bug-issue-template.md`, `docs/development/bug-issues/` | docs-only update; CFB-026..CFB-045 |
 | 2026-06-07 | Planning | open CFBを全件解消するv0.8 burn-down計画を追加し、根本原因別の修正単位と対象moduleを整理した | `docs/development/v0.8-cfb-burn-down-plan.md` | docs-only plan; implementation not started |
+| 2026-06-07 | Process | CodeFire実装、install、algorithm dogfooding、issue創出、次version計画を反復するcodefire改善サイクルを定義した | `docs/development/codefire-improvement-cycle.md`, `AGENTS.md`, `docs/development/agent-workflow.md` | docs-only process definition |
 
 ## Current Decisions
 
