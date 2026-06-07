@@ -24,6 +24,8 @@ pub(super) struct LinkBatchResult {
     pub(super) links_file: PathBuf,
     pub(super) item_count: usize,
     pub(super) dry_run: bool,
+    pub(super) valid: bool,
+    pub(super) diagnostics: Vec<Value>,
     pub(super) plan: Value,
     pub(super) added_links: Vec<LinkBatchLink>,
 }
@@ -134,11 +136,21 @@ pub(super) fn run_link_batch(options: &LinkBatchOptions) -> Result<LinkBatchResu
         )?)
     };
     let resolved = resolve_links(&batch)?;
-    validate_links(&context.open_dir, &resolved)?;
+    let diagnostics = validate_links(&context.open_dir, &resolved)?;
     let links_file = context.open_dir.join("codefire.links.yaml");
-    let plan = link_batch_operation_plan(options, &context.open_dir, &links_file, &resolved);
+    let valid = diagnostics.is_empty();
+    if !valid && !options.dry_run {
+        return Err(CliError::Usage(link_batch_validation_message(&diagnostics)));
+    }
+    let plan = link_batch_operation_plan(
+        options,
+        &context.open_dir,
+        &links_file,
+        &resolved,
+        &diagnostics,
+    );
 
-    if !options.dry_run {
+    if !options.dry_run && valid {
         append_links(&links_file, &resolved)?;
     }
 
@@ -148,6 +160,8 @@ pub(super) fn run_link_batch(options: &LinkBatchOptions) -> Result<LinkBatchResu
         links_file,
         item_count: resolved.len(),
         dry_run: options.dry_run,
+        valid,
+        diagnostics,
         plan,
         added_links: if options.dry_run {
             Vec::new()
@@ -162,9 +176,11 @@ pub(super) fn link_batch_data_json(result: &LinkBatchResult) -> Value {
         "type": "codefire_link_batch_result",
         "version": 1,
         "dry_run": result.dry_run,
+        "valid": result.valid,
         "item_count": result.item_count,
         "open_dir": &result.open_dir,
         "links_file": &result.links_file,
+        "diagnostics": &result.diagnostics,
         "plan": &result.plan,
         "added_links": result.added_links.iter().map(link_json).collect::<Vec<_>>(),
     })
@@ -211,7 +227,7 @@ fn missing_link_field(index: usize, field: &str) -> CliError {
     CliError::Usage(format!("link batch item {} missing {field}", index + 1))
 }
 
-fn validate_links(open_dir: &Path, links: &[LinkBatchLink]) -> Result<(), CliError> {
+fn validate_links(open_dir: &Path, links: &[LinkBatchLink]) -> Result<Vec<Value>, CliError> {
     let atom_index = codefire_core::build_atom_index(open_dir)?;
     let atom_ids = atom_index
         .atoms
@@ -224,40 +240,87 @@ fn validate_links(open_dir: &Path, links: &[LinkBatchLink]) -> Result<(), CliErr
         .map(|link| (link.from, link.to, link.link_type))
         .collect::<BTreeSet<_>>();
     let mut seen = BTreeSet::new();
-    for link in links {
+    let mut diagnostics = Vec::new();
+    for (index, link) in links.iter().enumerate() {
         if link.from == link.to {
-            return Err(CliError::Usage(format!(
-                "link batch self-link is not allowed: {}",
-                link.from
-            )));
+            diagnostics.push(link_validation_diagnostic(
+                index,
+                "self_link",
+                format!("link batch self-link is not allowed: {}", link.from),
+                link,
+            ));
         }
         if !atom_ids.contains(link.from.as_str()) {
-            return Err(CliError::Usage(format!(
-                "link batch references unknown from atom: {}",
-                link.from
-            )));
+            diagnostics.push(link_validation_diagnostic(
+                index,
+                "unknown_from_atom",
+                format!("link batch references unknown from atom: {}", link.from),
+                link,
+            ));
         }
         if !atom_ids.contains(link.to.as_str()) {
-            return Err(CliError::Usage(format!(
-                "link batch references unknown to atom: {}",
-                link.to
-            )));
+            diagnostics.push(link_validation_diagnostic(
+                index,
+                "unknown_to_atom",
+                format!("link batch references unknown to atom: {}", link.to),
+                link,
+            ));
         }
         let key = (link.from.clone(), link.to.clone(), link.link_type.clone());
         if !seen.insert(key.clone()) {
-            return Err(CliError::Usage(format!(
-                "duplicate link batch item: {} --{}--> {}",
-                link.from, link.link_type, link.to
-            )));
+            diagnostics.push(link_validation_diagnostic(
+                index,
+                "duplicate_batch_link",
+                format!(
+                    "duplicate link batch item: {} --{}--> {}",
+                    link.from, link.link_type, link.to
+                ),
+                link,
+            ));
         }
         if existing.contains(&key) {
-            return Err(CliError::Usage(format!(
-                "link already exists: {} --{}--> {}",
-                link.from, link.link_type, link.to
-            )));
+            diagnostics.push(link_validation_diagnostic(
+                index,
+                "existing_link",
+                format!(
+                    "link already exists: {} --{}--> {}",
+                    link.from, link.link_type, link.to
+                ),
+                link,
+            ));
         }
     }
-    Ok(())
+    Ok(diagnostics)
+}
+
+fn link_validation_diagnostic(
+    index: usize,
+    kind: &str,
+    message: String,
+    link: &LinkBatchLink,
+) -> Value {
+    json!({
+        "kind": kind,
+        "severity": "error",
+        "message": message,
+        "item_index": index,
+        "item_number": index + 1,
+        "link": link_json(link),
+    })
+}
+
+fn link_batch_validation_message(diagnostics: &[Value]) -> String {
+    let mut message = format!(
+        "link batch validation failed: {} issue(s)",
+        diagnostics.len()
+    );
+    for diagnostic in diagnostics {
+        if let Some(detail) = diagnostic.get("message").and_then(Value::as_str) {
+            message.push_str("; ");
+            message.push_str(detail);
+        }
+    }
+    message
 }
 
 fn append_links(path: &Path, links: &[LinkBatchLink]) -> Result<(), CliError> {
@@ -269,20 +332,11 @@ fn append_links(path: &Path, links: &[LinkBatchLink]) -> Result<(), CliError> {
     if text.trim().is_empty() {
         text.push_str("version: 1\nlinks:\n");
     } else {
-        if !text.ends_with('\n') {
-            text.push('\n');
-        }
-        if !text.lines().any(|line| line.trim() == "links:") {
-            text.push_str("links:\n");
-        }
+        validate_existing_links_yaml(&text)?;
+        text = insert_links_into_existing_yaml(text, links)?;
     }
-    for link in links {
-        text.push_str(&format!(
-            "  - from: {}\n    to: {}\n    type: {}\n",
-            yaml_quote(&link.from),
-            yaml_quote(&link.to),
-            yaml_quote(&link.link_type)
-        ));
+    if text.ends_with("links:\n") {
+        append_link_lines(&mut text, links);
     }
     let temp_path = unique_yaml_temp_path(path);
     {
@@ -295,6 +349,84 @@ fn append_links(path: &Path, links: &[LinkBatchLink]) -> Result<(), CliError> {
     }
     fs::rename(temp_path, path)?;
     Ok(())
+}
+
+fn append_link_lines(text: &mut String, links: &[LinkBatchLink]) {
+    for link in links {
+        text.push_str(&format!(
+            "  - from: {}\n    to: {}\n    type: {}\n",
+            yaml_quote(&link.from),
+            yaml_quote(&link.to),
+            yaml_quote(&link.link_type)
+        ));
+    }
+}
+
+fn validate_existing_links_yaml(text: &str) -> Result<(), CliError> {
+    let mut root_links_count = 0usize;
+    let mut unsupported_roots = Vec::new();
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') || line.starts_with(' ') {
+            continue;
+        }
+        if trimmed == "links:" {
+            root_links_count += 1;
+        } else if trimmed != "version: 1" && !trimmed.starts_with("version:") {
+            unsupported_roots.push(trimmed.to_string());
+        }
+    }
+    if root_links_count > 1 {
+        return Err(CliError::Usage(
+            "unsupported codefire.links.yaml: duplicate root links sections".to_string(),
+        ));
+    }
+    if root_links_count == 0 && !unsupported_roots.is_empty() {
+        return Err(CliError::Usage(format!(
+            "unsupported codefire.links.yaml: missing root links section before root key {}",
+            unsupported_roots[0]
+        )));
+    }
+    Ok(())
+}
+
+fn insert_links_into_existing_yaml(
+    mut text: String,
+    links: &[LinkBatchLink],
+) -> Result<String, CliError> {
+    if !text.ends_with('\n') {
+        text.push('\n');
+    }
+    let lines = text.lines().map(str::to_string).collect::<Vec<_>>();
+    let Some(links_index) = lines.iter().position(|line| line.trim() == "links:") else {
+        let mut output = text;
+        output.push_str("links:\n");
+        append_link_lines(&mut output, links);
+        return Ok(output);
+    };
+    let mut insert_index = lines.len();
+    for (index, line) in lines.iter().enumerate().skip(links_index + 1) {
+        let trimmed = line.trim();
+        if !trimmed.is_empty()
+            && !trimmed.starts_with('#')
+            && !line.starts_with(' ')
+            && trimmed.ends_with(':')
+        {
+            insert_index = index;
+            break;
+        }
+    }
+    let mut output = String::new();
+    for line in &lines[..insert_index] {
+        output.push_str(line);
+        output.push('\n');
+    }
+    append_link_lines(&mut output, links);
+    for line in &lines[insert_index..] {
+        output.push_str(line);
+        output.push('\n');
+    }
+    Ok(output)
 }
 
 fn unique_yaml_temp_path(path: &Path) -> PathBuf {
@@ -311,6 +443,7 @@ fn link_batch_operation_plan(
     open_dir: &Path,
     links_file: &Path,
     links: &[LinkBatchLink],
+    diagnostics: &[Value],
 ) -> Value {
     json!({
         "type": "codefire_operation_plan",
@@ -322,6 +455,8 @@ fn link_batch_operation_plan(
         "batch_file": &options.batch_path,
         "links_file": links_file,
         "item_count": links.len(),
+        "valid": diagnostics.is_empty(),
+        "diagnostics": diagnostics,
         "items": links.iter().map(link_json).collect::<Vec<_>>(),
         "operations": [
             {"kind": "validate_all_batch_items", "count": links.len()},

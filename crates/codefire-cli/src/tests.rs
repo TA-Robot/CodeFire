@@ -926,6 +926,8 @@ fn link_batch_validates_all_items_before_writing_links() {
     .unwrap();
     assert_eq!(dry_run.item_count, 1);
     assert!(dry_run.dry_run);
+    assert!(dry_run.valid);
+    assert!(dry_run.diagnostics.is_empty());
     assert_eq!(dry_run.plan["type"], "codefire_operation_plan");
     assert!(!open_dir.join("codefire.links.yaml").exists());
 
@@ -944,6 +946,9 @@ fn link_batch_validates_all_items_before_writing_links() {
     assert_eq!(graph.links[0].from, "REQ-session");
     assert_eq!(graph.links[0].to, "DES-session");
     assert_eq!(graph.links[0].link_type, "refined_by");
+    assert!(fs::read_to_string(open_dir.join("codefire.links.yaml"))
+        .unwrap()
+        .contains("links:\n  - from: \"REQ-session\""));
 
     let invalid_path = temp.path().join("invalid-links.json");
     fs::write(
@@ -953,12 +958,48 @@ fn link_batch_validates_all_items_before_writing_links() {
             "defaults": {"type": "verified_by"},
             "links": [
                 {"from": "REQ-session", "to": "DES-session"},
+                {"from": "REQ-session", "to": "REQ-session"},
+                {"from": "REQ-session", "to": "TEST-missing"},
                 {"from": "REQ-session", "to": "TEST-missing"}
             ]
         }))
         .unwrap(),
     )
     .unwrap();
+    let invalid_dry_run = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
+        path: open_dir.clone(),
+        batch_path: invalid_path.clone(),
+        dry_run: true,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert!(!invalid_dry_run.valid);
+    assert!(invalid_dry_run.diagnostics.len() >= 4);
+    assert!(invalid_dry_run
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic["kind"] == "self_link" && diagnostic["item_index"] == 1));
+    assert!(
+        invalid_dry_run
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic["kind"] == "unknown_to_atom"
+                && diagnostic["item_index"] == 2)
+    );
+    assert!(invalid_dry_run
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic["kind"] == "duplicate_batch_link"
+            && diagnostic["item_index"] == 3));
+    assert_eq!(invalid_dry_run.plan["valid"], false);
+    assert_eq!(
+        invalid_dry_run.plan["diagnostics"]
+            .as_array()
+            .unwrap()
+            .len(),
+        invalid_dry_run.diagnostics.len()
+    );
     let error = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
         path: open_dir.clone(),
         batch_path: invalid_path,
@@ -968,8 +1009,98 @@ fn link_batch_validates_all_items_before_writing_links() {
     })
     .unwrap_err();
     assert!(error.to_string().contains("TEST-missing"));
+    assert!(error.to_string().contains("issue(s)"));
     let graph_after_error = codefire_core::current_trace_graph(&open_dir).unwrap();
     assert_eq!(graph_after_error.links.len(), 1);
+}
+
+#[test]
+fn link_batch_appends_inside_existing_links_section_and_rejects_unsupported_yaml() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::create_dir_all(open_dir.join("tests")).unwrap();
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design").join("session.md"),
+        "## DES-session: Design\nClock policy\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("tests").join("test_session.py"),
+        "# cf-atom: TEST-session\nassert True\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("codefire.links.yaml"),
+        "version: 1\nlinks:\n  - from: \"REQ-session\"\n    to: \"DES-session\"\n    type: \"refined_by\"\nmetadata:\n  owner: qa\n",
+    )
+    .unwrap();
+    let batch_path = temp.path().join("links.json");
+    fs::write(
+        &batch_path,
+        serde_json::to_string(&json!({
+            "version": 1,
+            "links": [{"from": "DES-session", "to": "TEST-session", "type": "verified_by"}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let applied = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
+        path: open_dir.clone(),
+        batch_path: batch_path.clone(),
+        dry_run: false,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert_eq!(applied.item_count, 1);
+    let updated = fs::read_to_string(open_dir.join("codefire.links.yaml")).unwrap();
+    let inserted = updated
+        .find("DES-session\"\n    to: \"TEST-session")
+        .unwrap();
+    let metadata = updated.find("metadata:").unwrap();
+    assert!(inserted < metadata);
+
+    fs::write(
+        open_dir.join("codefire.links.yaml"),
+        "version: 1\nmetadata:\n  owner: qa\n",
+    )
+    .unwrap();
+    let error = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
+        path: open_dir,
+        batch_path,
+        dry_run: false,
+        json_output: false,
+        lock: LockOptions::default(),
+    })
+    .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("unsupported codefire.links.yaml"));
 }
 
 #[test]

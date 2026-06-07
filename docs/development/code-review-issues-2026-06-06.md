@@ -15,8 +15,8 @@
 - High: 15
 - Medium: 64
 - Low: 1
-- Fixed in v0.7: 43
-- Remaining open: 37
+- Fixed in v0.7: 45
+- Remaining open: 35
 
 ## v0.7 Progress
 
@@ -25,7 +25,7 @@
 - Batch 3 fixed: [CFR-011](code-review-issues/cfr-011.md), [CFR-012](code-review-issues/cfr-012.md), [CFR-013](code-review-issues/cfr-013.md), [CFR-014](code-review-issues/cfr-014.md), [CFR-015](code-review-issues/cfr-015.md), [CFR-016](code-review-issues/cfr-016.md), [CFR-017](code-review-issues/cfr-017.md), [CFR-018](code-review-issues/cfr-018.md)
 - Batch 5 fixed: [CFR-025](code-review-issues/cfr-025.md), [CFR-026](code-review-issues/cfr-026.md), [CFR-027](code-review-issues/cfr-027.md), [CFR-028](code-review-issues/cfr-028.md), [CFR-029](code-review-issues/cfr-029.md)
 - Batch 6 fixed: [CFR-030](code-review-issues/cfr-030.md), [CFR-033](code-review-issues/cfr-033.md), [CFR-034](code-review-issues/cfr-034.md), [CFR-035](code-review-issues/cfr-035.md), [CFR-068](code-review-issues/cfr-068.md), [CFR-069](code-review-issues/cfr-069.md), [CFR-070](code-review-issues/cfr-070.md), [CFR-078](code-review-issues/cfr-078.md), [CFR-079](code-review-issues/cfr-079.md)
-- Batch 7 partial fixed: [CFR-041](code-review-issues/cfr-041.md), [CFR-042](code-review-issues/cfr-042.md), [CFR-043](code-review-issues/cfr-043.md), [CFR-044](code-review-issues/cfr-044.md), [CFR-045](code-review-issues/cfr-045.md).
+- Batch 7 partial fixed: [CFR-041](code-review-issues/cfr-041.md), [CFR-042](code-review-issues/cfr-042.md), [CFR-043](code-review-issues/cfr-043.md), [CFR-044](code-review-issues/cfr-044.md), [CFR-045](code-review-issues/cfr-045.md), [CFR-048](code-review-issues/cfr-048.md), [CFR-049](code-review-issues/cfr-049.md).
 - Plan: [v0.7-issue-improvement-plan.md](v0.7-issue-improvement-plan.md)
 
 ## Priority Buckets

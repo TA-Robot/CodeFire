@@ -760,7 +760,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         0,
                         Some(&result.repo_root),
                         link_batch_data_json(&result),
-                        Vec::new(),
+                        result.diagnostics.clone(),
                         Vec::new(),
                     ))?
                 );

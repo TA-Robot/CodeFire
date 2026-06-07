@@ -528,7 +528,9 @@ open directoryのcodefire.links.yamlへTrace Linkを追記する
 --batch --dry-runはcodefire.links.yamlを書き換えず、codefire_operation_planを返す
 batch defaults.typeを指定すると各linkのtype省略時に使う
 適用時はrepository lockを取得し、codefire.links.yamlへquoted scalar形式で追記する
---jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_link_batch_resultを含める
+既存codefire.links.yamlにroot `links:` sectionがある場合は、そのsection内で次のroot keyより前へ追記する。空ファイルは`version: 1`と`links:`を作成する。root `links:` がなく別root keyがある構造やroot `links:` 重複はunsupported errorにする
+validationは全itemを確認し、dry-runではdata.valid=falseとitem_index付きdiagnosticsを返す。非dry-runではdiagnosticsを集約したerrorで書き込み前に止める
+--jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_link_batch_result、data.valid、data.diagnosticsを含める
 ```
 
 ## 4.19 `evidence add`
