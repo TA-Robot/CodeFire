@@ -603,7 +603,7 @@ fn sha256_file(path: &Path) -> Result<String, CliError> {
         }
         hasher.update(&buffer[..read]);
     }
-    Ok(hex_lower(&hasher.finalize()))
+    Ok(codefire_util::hex_lower(&hasher.finalize()))
 }
 
 fn lossy_truncated(bytes: &[u8], limit: usize) -> (String, bool) {
@@ -655,14 +655,4 @@ fn required_arg<'a>(args: &'a [String], index: usize, option: &str) -> Result<&'
     args.get(index)
         .map(String::as_str)
         .ok_or_else(|| CliError::Usage(format!("{option} requires a value")))
-}
-
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        out.push(HEX[(byte >> 4) as usize] as char);
-        out.push(HEX[(byte & 0x0f) as usize] as char);
-    }
-    out
 }

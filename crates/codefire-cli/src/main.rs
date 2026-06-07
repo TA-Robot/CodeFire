@@ -8,7 +8,7 @@ use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 mod automation;
 mod batch;
@@ -4887,50 +4887,11 @@ fn required_string(value: &Value, path: &[&str]) -> Result<String, CliError> {
 }
 
 fn ref_file_name(name: &str) -> String {
-    let mut encoded = String::with_capacity(name.len());
-    for byte in name.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                encoded.push(byte as char);
-            }
-            _ => encoded.push_str(&format!("%{byte:02X}")),
-        }
-    }
-    encoded
+    codefire_util::percent_encode_path_segment(name)
 }
 
 fn now_iso_utc() -> String {
-    let seconds = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs() as i64)
-        .unwrap_or(0);
-    format_unix_seconds_utc(seconds)
-}
-
-fn format_unix_seconds_utc(seconds: i64) -> String {
-    let days = seconds.div_euclid(86_400);
-    let second_of_day = seconds.rem_euclid(86_400);
-    let (year, month, day) = civil_from_days(days);
-    let hour = second_of_day / 3_600;
-    let minute = second_of_day % 3_600 / 60;
-    let second = second_of_day % 60;
-    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
-}
-
-fn civil_from_days(days_since_unix_epoch: i64) -> (i32, u32, u32) {
-    let days = days_since_unix_epoch + 719_468;
-    let era = if days >= 0 { days } else { days - 146_096 }.div_euclid(146_097);
-    let day_of_era = days - era * 146_097;
-    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524
-        - day_of_era / 146_096)
-        .div_euclid(365);
-    let year = year_of_era + era * 400;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let month_part = (5 * day_of_year + 2).div_euclid(153);
-    let day = day_of_year - (153 * month_part + 2).div_euclid(5) + 1;
-    let month = month_part + if month_part < 10 { 3 } else { -9 };
-    let adjusted_year = year + if month <= 2 { 1 } else { 0 };
-    (adjusted_year as i32, month as u32, day as u32)
+    codefire_util::now_iso_utc()
 }
 
 #[cfg(test)]

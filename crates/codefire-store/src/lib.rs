@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
@@ -114,11 +113,11 @@ pub fn canonical_json(value: &Value) -> Result<Vec<u8>, serde_json::Error> {
 }
 
 pub fn object_digest(type_tag: &str, payload: &Value) -> Result<String, serde_json::Error> {
-    let mut hasher = Sha256::new();
-    hasher.update(type_tag.as_bytes());
-    hasher.update([0]);
-    hasher.update(canonical_json(payload)?);
-    Ok(hex_lower(&hasher.finalize()))
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(type_tag.as_bytes());
+    bytes.push(0);
+    bytes.extend_from_slice(&canonical_json(payload)?);
+    Ok(codefire_util::sha256_hex(&bytes))
 }
 
 pub fn object_id(type_tag: &str, payload: &Value) -> Result<String, serde_json::Error> {
@@ -634,16 +633,6 @@ pub fn commit_payload(
     payload.insert("roots".to_string(), Value::Object(roots));
     payload.insert("certificate".to_string(), Value::Object(certificate));
     Value::Object(payload)
-}
-
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        out.push(HEX[(byte >> 4) as usize] as char);
-        out.push(HEX[(byte & 0x0f) as usize] as char);
-    }
-    out
 }
 
 #[cfg(test)]

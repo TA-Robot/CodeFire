@@ -5,7 +5,6 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_LARGE_THRESHOLD_BYTES: u64 = 1_048_576;
 
@@ -617,7 +616,7 @@ fn scan_remote_idempotency_retention(
     idempotency_root: &Path,
     retention_seconds: u64,
 ) -> Result<RemoteIdempotencyRetentionStats, CliError> {
-    let now = unix_now_seconds();
+    let now = codefire_util::unix_now_seconds();
     let mut stats = RemoteIdempotencyRetentionStats {
         retention_seconds,
         ..RemoteIdempotencyRetentionStats::default()
@@ -638,7 +637,7 @@ fn scan_remote_idempotency_retention(
             stats.oldest_created_at = Some(created_at.to_string());
         }
         if retention_seconds > 0 {
-            if let Some(created_at_seconds) = parse_iso_utc_seconds(created_at) {
+            if let Some(created_at_seconds) = codefire_util::parse_iso_utc_seconds(created_at) {
                 if now.saturating_sub(created_at_seconds) > retention_seconds as i64 {
                     stats.expired_files += 1;
                     stats.expired_bytes += bytes;
@@ -673,57 +672,6 @@ fn scan_remote_object_generations(
             bytes: stats.bytes,
         })
         .collect())
-}
-
-fn unix_now_seconds() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs() as i64)
-        .unwrap_or(0)
-}
-
-fn parse_iso_utc_seconds(value: &str) -> Option<i64> {
-    if value.len() != 20
-        || !value.ends_with('Z')
-        || &value[4..5] != "-"
-        || &value[7..8] != "-"
-        || &value[10..11] != "T"
-        || &value[13..14] != ":"
-        || &value[16..17] != ":"
-    {
-        return None;
-    }
-    let year = value[0..4].parse::<i32>().ok()?;
-    let month = value[5..7].parse::<u32>().ok()?;
-    let day = value[8..10].parse::<u32>().ok()?;
-    let hour = value[11..13].parse::<u32>().ok()?;
-    let minute = value[14..16].parse::<u32>().ok()?;
-    let second = value[17..19].parse::<u32>().ok()?;
-    if !(1..=12).contains(&month)
-        || !(1..=31).contains(&day)
-        || hour > 23
-        || minute > 59
-        || second > 59
-    {
-        return None;
-    }
-    Some(
-        days_from_civil(year, month, day) * 86_400
-            + i64::from(hour) * 3_600
-            + i64::from(minute) * 60
-            + i64::from(second),
-    )
-}
-
-fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
-    let year = i64::from(year) - i64::from(month <= 2);
-    let era = if year >= 0 { year } else { year - 399 }.div_euclid(400);
-    let yoe = year - era * 400;
-    let month = i64::from(month);
-    let doy =
-        (153 * (month + if month > 2 { -3 } else { 9 }) + 2).div_euclid(5) + i64::from(day) - 1;
-    let doe = yoe * 365 + yoe.div_euclid(4) - yoe.div_euclid(100) + doy;
-    era * 146_097 + doe - 719_468
 }
 
 fn read_optional_json_value(path: &Path) -> Result<Option<Value>, CliError> {

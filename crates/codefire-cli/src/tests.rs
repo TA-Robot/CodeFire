@@ -5046,8 +5046,14 @@ fn ref_file_name_matches_python_quote_safe_empty() {
 
 #[test]
 fn unix_timestamp_format_uses_utc_iso_seconds() {
-    assert_eq!(format_unix_seconds_utc(0), "1970-01-01T00:00:00Z");
-    assert_eq!(format_unix_seconds_utc(951_782_400), "2000-02-29T00:00:00Z");
+    assert_eq!(
+        codefire_util::format_unix_seconds_utc(0),
+        "1970-01-01T00:00:00Z"
+    );
+    assert_eq!(
+        codefire_util::format_unix_seconds_utc(951_782_400),
+        "2000-02-29T00:00:00Z"
+    );
 }
 
 #[test]

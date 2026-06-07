@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 codefire-core = { path = "../codefire-core" }
 codefire-store = { path = "../codefire-store" }
+codefire-util = { path = "../codefire-util" }
 serde_json = "1"
 sha2 = "0.10"
 hmac = "0.12"

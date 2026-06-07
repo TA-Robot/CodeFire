@@ -3,11 +3,10 @@ use super::*;
 use getrandom::getrandom;
 use hmac::{Hmac, Mac};
 use serde_json::{json, Map, Value};
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use std::collections::BTreeSet;
 use std::env;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -538,7 +537,7 @@ fn hmac_hex(key: &str, input: &[u8]) -> Result<String, CliError> {
         CliError::AuthenticationOrSignature("signature validation failed: invalid key".to_string())
     })?;
     mac.update(input);
-    Ok(hex_lower(&mac.finalize().into_bytes()))
+    Ok(codefire_util::hex_lower(&mac.finalize().into_bytes()))
 }
 
 fn record_request_nonce(
@@ -623,9 +622,9 @@ fn request_nonce_cache_key(signature: &Value) -> Result<String, CliError> {
         "nonce": signature.get("nonce").cloned().unwrap_or(Value::Null),
         "signature": signature.get("signature").cloned().unwrap_or(Value::Null),
     });
-    let mut hasher = Sha256::new();
-    hasher.update(codefire_store::canonical_json(&payload)?);
-    Ok(hex_lower(&hasher.finalize()))
+    Ok(codefire_util::sha256_hex(&codefire_store::canonical_json(
+        &payload,
+    )?))
 }
 
 fn remote_policy(project_root: &Path) -> Result<Value, CliError> {
@@ -741,16 +740,6 @@ fn base64_url_no_pad(bytes: &[u8]) -> String {
     out
 }
 
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        out.push(HEX[(byte >> 4) as usize] as char);
-        out.push(HEX[(byte & 0x0f) as usize] as char);
-    }
-    out
-}
-
 fn number_as_i64(value: &Value) -> Option<i64> {
     value
         .as_i64()
@@ -758,14 +747,11 @@ fn number_as_i64(value: &Value) -> Option<i64> {
 }
 
 fn unix_now_seconds() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs() as i64)
-        .unwrap_or(0)
+    codefire_util::unix_now_seconds()
 }
 
 fn parse_iso_utc_seconds(value: &str) -> Result<i64, CliError> {
-    parse_iso_utc_seconds_raw(value).ok_or_else(|| {
+    codefire_util::parse_iso_utc_seconds(value).ok_or_else(|| {
         CliError::AuthenticationOrSignature(
             "request signature validation failed: timestamp is required".to_string(),
         )
@@ -773,56 +759,11 @@ fn parse_iso_utc_seconds(value: &str) -> Result<i64, CliError> {
 }
 
 fn parse_commit_signature_time(value: &str, field: &str) -> Result<i64, CliError> {
-    parse_iso_utc_seconds_raw(value).ok_or_else(|| {
+    codefire_util::parse_iso_utc_seconds(value).ok_or_else(|| {
         CliError::AuthenticationOrSignature(format!(
             "commit signature validation failed: {field} must be UTC seconds ending in Z"
         ))
     })
-}
-
-fn parse_iso_utc_seconds_raw(value: &str) -> Option<i64> {
-    if value.len() != 20 || !value.ends_with('Z') {
-        return None;
-    }
-    if &value[4..5] != "-"
-        || &value[7..8] != "-"
-        || &value[10..11] != "T"
-        || &value[13..14] != ":"
-        || &value[16..17] != ":"
-    {
-        return None;
-    }
-    let year = value[0..4].parse::<i32>().ok()?;
-    let month = value[5..7].parse::<u32>().ok()?;
-    let day = value[8..10].parse::<u32>().ok()?;
-    let hour = value[11..13].parse::<u32>().ok()?;
-    let minute = value[14..16].parse::<u32>().ok()?;
-    let second = value[17..19].parse::<u32>().ok()?;
-    if !(1..=12).contains(&month)
-        || !(1..=31).contains(&day)
-        || hour > 23
-        || minute > 59
-        || second > 59
-    {
-        return None;
-    }
-    Some(
-        days_from_civil(year, month, day) * 86_400
-            + i64::from(hour) * 3_600
-            + i64::from(minute) * 60
-            + i64::from(second),
-    )
-}
-
-fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
-    let year = i64::from(year) - i64::from(month <= 2);
-    let era = if year >= 0 { year } else { year - 399 }.div_euclid(400);
-    let yoe = year - era * 400;
-    let month = i64::from(month);
-    let doy =
-        (153 * (month + if month > 2 { -3 } else { 9 }) + 2).div_euclid(5) + i64::from(day) - 1;
-    let doe = yoe * 365 + yoe.div_euclid(4) - yoe.div_euclid(100) + doy;
-    era * 146_097 + doe - 719_468
 }
 
 #[cfg(test)]

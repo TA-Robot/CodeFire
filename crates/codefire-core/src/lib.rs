@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::fs;
@@ -1244,18 +1243,14 @@ fn hash_text(text: &str) -> String {
 }
 
 fn digest_bytes(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    format!("sha256:{}", hex_lower(&hasher.finalize()))
+    codefire_util::sha256_prefixed(bytes)
 }
 
 const FIRE_UID_HEX_LENGTH: usize = 32;
 const FIRE_DISPLAY_HEX_LENGTH: usize = 12;
 
 fn fire_digest_hex(key: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(key.as_bytes());
-    hex_lower(&hasher.finalize())
+    codefire_util::sha256_hex(key.as_bytes())
 }
 
 fn fire_uid_from_digest(digest: &str) -> String {
@@ -1474,16 +1469,6 @@ fn unquote(value: &str) -> String {
     } else {
         value.to_string()
     }
-}
-
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        out.push(HEX[(byte >> 4) as usize] as char);
-        out.push(HEX[(byte & 0x0f) as usize] as char);
-    }
-    out
 }
 
 #[cfg(test)]

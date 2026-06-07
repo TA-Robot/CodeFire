@@ -3,6 +3,7 @@ members = [
     "crates/codefire-cli",
     "crates/codefire-core",
     "crates/codefire-store",
+    "crates/codefire-util",
 ]
 resolver = "2"
 

@@ -9,7 +9,6 @@ use super::{
     stable_hash_48, write_json_atomic, CliError, LockOptions, OpenContext, RepoLock,
 };
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -407,19 +406,7 @@ fn manual_fire_key(
 }
 
 fn digest_bytes(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    format!("sha256:{}", hex_lower(&hasher.finalize()))
-}
-
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut output = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        output.push(HEX[(byte >> 4) as usize] as char);
-        output.push(HEX[(byte & 0x0f) as usize] as char);
-    }
-    output
+    codefire_util::sha256_prefixed(bytes)
 }
 
 fn fire_operation_plan(
