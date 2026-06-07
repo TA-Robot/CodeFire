@@ -5,6 +5,7 @@
 補助文書:
 
 - `docs/development/source-code-mental-model.md`: source fileを開く前に、実装の形、関数帯、データ流、永続化境界を頭に描くための詳細地図。
+- `docs/development/source-code-blueprint.md`: 要求、設計、Rust実装、永続化、テストを横断し、機能がどの層とfileに対応するかを示す統合blueprint。
 - `docs/development/command-source-trace.md`: CLI commandからparse/run/render/persistenceまでを追う関数レベルのtrace。
 
 ## Reading Order
@@ -13,19 +14,21 @@
 
 1. `crates/codefire-cli/src/main.rs`
    - command dispatch、local workflow handler、parse/run/renderの接続を見る。
-2. `docs/development/source-code-mental-model.md`
+2. `docs/development/source-code-blueprint.md`
+   - 要求、設計、source file、永続化file、テスト配置の対応を見る。
+3. `docs/development/source-code-mental-model.md`
    - workspace、`main.rs` の関数帯、local workflow data flow、object store flowを読む。
-3. `crates/codefire-cli/src/cli_model.rs`
+4. `crates/codefire-cli/src/cli_model.rs`
    - CLIで共有されるOptions/Result/OpenContext型を見る。
-4. `crates/codefire-cli/src/automation.rs`
+5. `crates/codefire-cli/src/automation.rs`
    - JSON envelope、diagnostics、next_actionsの形を見る。
-5. `crates/codefire-core/src/lib.rs`
+6. `crates/codefire-core/src/lib.rs`
    - Atom、Trace Graph、ScanResult、Verificationのdomain modelを見る。
-6. `crates/codefire-store/src/lib.rs`
+7. `crates/codefire-store/src/lib.rs`
    - canonical JSON、object store、sealed commit validationを見る。
-7. command-specific module
+8. command-specific module
    - evidence、doctor、storage、migration、view、remoteなど、触るcommandに近いmoduleを見る。
-8. `crates/codefire-cli/src/tests.rs` and `crates/codefire-cli/src/tests/docs.rs`
+9. `crates/codefire-cli/src/tests.rs` and `crates/codefire-cli/src/tests/docs.rs`
    - 既存behaviorとregression coverageを見る。
 
 ## Workspace Crates

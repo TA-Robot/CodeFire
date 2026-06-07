@@ -219,7 +219,10 @@ Current named cycle:
 
 - CodeFire next version: v0.8 CFB burn-down。
 - Current plan: `docs/development/v0.8-cfb-burn-down-plan.md`。
-- Next expected action: Phase Aとしてv0.8計画に沿ってCodeFire open CFBを実装修正する。
+- Current phase: Phase D。v0.8途中版をinstallし、`algorithm-evolution-agent-lab` をCodeFire管理へ再取り込み、docs-first実装でdogfooding中。
+- Latest algorithm work: Experiment Triage Boardを要求、設計、Trace Link、実装、テスト、CodeFire evidence、CodeFire commitまで通した。
+- Latest dogfood findings: CFB-046..CFB-053を追加。新規8件であり、目標20件には未達のため、次はPhase Cへ戻ってalgorithm側の次設計を立てる。
+- Next expected action: algorithm側で次のdocs-first開発テーマを決め、`context`、`doctor`、`migrate`、`diff`、`commit --dry-run`、large JSON surfaceを重点的に叩く。
 
 ## Cycle Invariants
 

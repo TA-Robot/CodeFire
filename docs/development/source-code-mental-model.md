@@ -2,7 +2,7 @@
 
 この文書は、CodeFireのソースコードをまだ開いていない状態でも、実装の形を頭に描けるようにするための詳細設計地図である。
 
-`docs/development/source-code-map.md` は「どのfileを見るか」の索引、この文書は「そのfileの中で何がどうつながっているか」の説明である。関数名やmodule名はRust実装に合わせる。
+`docs/development/source-code-map.md` は「どのfileを見るか」の索引、`docs/development/source-code-blueprint.md` は要求・設計・実装・テストの対応表、この文書は「そのfileの中で何がどうつながっているか」の説明である。関数名やmodule名はRust実装に合わせる。
 
 ## 1. Big Picture
 

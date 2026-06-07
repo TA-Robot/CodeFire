@@ -89,3 +89,27 @@ The analyst produces a structured analysis:
 - claim readiness update
 
 This makes results useful for future planning rather than merely storing metrics.
+
+## DES-AUTO-009: Experiment triage board
+
+The triage board consumes compact decision signals rather than raw logs:
+
+- plan ID
+- priority
+- expected information gain
+- estimated cost
+- promotion decision
+- learning trend
+- open blocker count
+- rationale
+
+It produces ranked actions:
+
+- `run` for ready high-value experiments within budget
+- `replicate` for promising but under-confirmed or unstable candidates
+- `mutate` for plateaued or insufficient-improvement candidates
+- `promote` for candidates that meet promotion gates
+- `reject` for confident regressions
+- `hold` for blocked or over-budget work
+
+The ranking score is deterministic and cost-aware so repeated planning with the same state returns the same action order.

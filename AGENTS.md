@@ -9,6 +9,8 @@
 - `docs/development/agent-workflow.md`: 作業運用、Rust v0.6方針、diff/merge方針、テスト、禁止事項。
 - `docs/development/codefire-improvement-cycle.md`: CodeFire実装、install、algorithm dogfooding、issue創出、次version計画を反復するcodefire改善サイクル。
 - `docs/development/source-code-map.md`: Rust実装のfile/module/type/function責務対応表。
+- `docs/development/source-code-blueprint.md`: 要求、設計、Rust実装、永続化file、テスト配置の対応表。
+- `docs/development/source-code-mental-model.md`: ソースを開かなくても実装形状とデータ流を想像するための詳細地図。
 - `docs/development/command-source-trace.md`: CLI commandごとのparse/run/render/persistent state実装経路。
 - `docs/development/v0.6-readiness.md`: v0.6を完成と判断するための残ゲート。
 - `docs/development/todo-checklist.md`: 実装タスクと依存関係。

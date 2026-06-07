@@ -103,3 +103,7 @@ The analyst shall summarize metric trajectories across repeated attempts and det
 ## REQ-AUTO-026: Candidate promotion policy
 
 The system shall decide whether a candidate should be promoted, replicated, mutated, rejected, or held based on improvement size, confidence, replication count, and open blockers.
+
+## REQ-AUTO-027: Experiment triage board
+
+The system shall combine queued experiment value, promotion policy, learning curve diagnosis, open blockers, and remaining budget into a ranked triage board of next research actions.

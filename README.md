@@ -18,6 +18,7 @@ CLI実装は `project/codefire` と `project/crates/` にあります。
 - `docs/development/bug-backlog.md` - 実運用で見つかった不具合/修正候補
 - `docs/development/v0.6-readiness.md` - Rust v0.6完成判定と残ゲート
 - `docs/development/source-code-map.md` - Rust実装のsource map
+- `docs/development/source-code-blueprint.md` - 要求、設計、実装、永続化、テストの対応表
 - `docs/development/source-code-mental-model.md` - ソースを開く前に実装形状を想像するための詳細地図
 - `docs/development/command-source-trace.md` - CLI commandからsource file/functionへの実装経路
 
@@ -164,7 +165,7 @@ Python v0.2はPython標準ライブラリのみを使う単一ファイルCLIで
 5. `docs/11_internal_architecture.md` - 内部アーキテクチャ設計
 6. `docs/12_mvp_implementation_plan.md` - MVP実装計画
 
-実装を読む場合は、上記に続けて `docs/development/source-code-map.md`、`docs/development/source-code-mental-model.md`、`docs/development/command-source-trace.md` を読むと、command、module、主要関数、データ流、persistent stateの対応を把握できます。
+実装を読む場合は、上記に続けて `docs/development/source-code-map.md`、`docs/development/source-code-blueprint.md`、`docs/development/source-code-mental-model.md`、`docs/development/command-source-trace.md` を読むと、要求、設計、command、module、主要関数、データ流、persistent state、テスト配置の対応を把握できます。
 
 単一ファイルで読みたい場合は、`CodeFire_Design_Document_v0.2.md` または `CodeFire_Design_Document_v0.2.docx` を参照してください。
 
@@ -224,6 +225,7 @@ docs/development/
   completion-plan.md
   known-limitations.md
   source-code-map.md
+  source-code-blueprint.md
   source-code-mental-model.md
   command-source-trace.md
   bug-backlog.md

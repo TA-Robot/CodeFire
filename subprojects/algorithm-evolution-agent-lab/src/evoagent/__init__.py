@@ -86,6 +86,7 @@ from evoagent.sota_framing import SotaPursuitFrame, SotaPursuitFramer
 from evoagent.statistics import ConfidenceInterval, ConfidenceIntervalEstimator
 from evoagent.stop_criteria import StopCriteria, StopCriteriaEvaluator, StopFinding, StopObservation
 from evoagent.traceability import CodeFireTraceAudit, TraceAuditFinding, TraceAuditReport, TraceLink
+from evoagent.triage import ExperimentTriageBoard, ExperimentTriageItem, ExperimentTriageSignal, TriageAction
 
 __all__ = [
     "CandidateAlgorithm",
@@ -150,6 +151,9 @@ __all__ = [
     "ExperimentQueue",
     "ExperimentResult",
     "ExperimentRun",
+    "ExperimentTriageBoard",
+    "ExperimentTriageItem",
+    "ExperimentTriageSignal",
     "EvidenceLedger",
     "EvidenceRecord",
     "EvidenceFreshnessAudit",
@@ -237,6 +241,7 @@ __all__ = [
     "TraceAuditFinding",
     "TraceAuditReport",
     "TraceLink",
+    "TriageAction",
     "SurfacePriorityFinding",
     "VersionedEvidenceRef",
     "RepeatedRunSummary",

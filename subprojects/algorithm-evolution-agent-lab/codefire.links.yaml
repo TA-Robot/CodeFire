@@ -642,3 +642,12 @@ links:
   - from: DES-SOTA-002
     to: CODE-SotaClaimGate
     type: implemented_by
+  - from: REQ-AUTO-027
+    to: DES-AUTO-009
+    type: refined_by
+  - from: DES-AUTO-009
+    to: CODE-ExperimentTriageBoard
+    type: implemented_by
+  - from: REQ-AUTO-027
+    to: TEST-experiment-triage-board-ranks-actions
+    type: verified_by
