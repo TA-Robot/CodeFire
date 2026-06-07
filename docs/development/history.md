@@ -14,6 +14,7 @@
 | Date | Area | Summary | Artifacts | Notes |
 |---|---|---|---|---|
 | 2026-06-07 | Documentation | sourceを開く前に実装構造を再構成できるよう、source reconstruction guideとdata model catalogを追加した | `docs/development/source-code-reconstruction-guide.md`, `docs/development/source-data-model-catalog.md`, source navigation docs | workspace tree、`main.rs` の帯、command skeleton、主要Rust型、active state JSON、object record、debug matrixを文書化 |
+| 2026-06-07 | Source Docs | ドキュメントだけでRust sourceの配置と処理形状を想像できるように、実装アトラスを追加し、crate/module、`main.rs` 関数帯、command ownership、主要型、永続化先、変更recipeを一枚化した | `docs/development/source-code-implementation-atlas.md`, `docs/development/source-code-map.md`, `docs/11_internal_architecture.md`, `README.md` | docs-only source navigation update |
 | 2026-06-03 | Bootstrap | `codefire_docs_v0.2.zip` を `project/` 直下に展開した | `README.md`, `docs/`, `adr/`, `schemas/`, `diagrams/`, design document | この基盤リポジトリのルールに合わせ、archive内の `examples/` は展開対象から除外した |
 | 2026-06-03 | Planning | 開発管理用TODO、履歴、完成計画を追加した | `docs/development/todo-checklist.md`, `docs/development/history.md`, `docs/development/completion-plan.md` | 実装は未開始。MVP計画を実行可能なタスクへ分解した |
 | 2026-06-03 | Implementation | Python標準ライブラリのみでCodeFire MVP CLIを追加した | `codefire`, `tests/test_codefire_cli.py` | init/open/scan/fire/extinguish/verify/commit/clone/merge/doctor のE2Eが通る |
@@ -234,6 +235,7 @@
 | 2026-06-07 | Dogfood | algorithm cycle 3の `ResearchFrontierMap` fire解消中に、`extinguish --evidence-ref --json` が `evidence_refs` と `has_evidence:false` を同時に返す課題をCFB-086として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-086.md` | `codefire evidence add --json`; `codefire extinguish ... --evidence-ref ... --json` |
 | 2026-06-07 | Dogfood | algorithm cycle 3の `FrontierExperimentPlanner` fire解消preflight中に、missing evidence-ref dry-runがJSON envelopeを返さない課題をCFB-087として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-087.md` | `codefire extinguish ... --evidence-ref CF-EVIDENCE-does-not-exist --dry-run --json` |
 | 2026-06-07 | Dogfood | algorithm cycle 3のclean-state probeで、evidence dry-runが空文字の `evidence_id` を返す課題をCFB-088として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-088.md` | `codefire evidence add --dry-run --json` |
+| 2026-06-07 | Dogfood | algorithm cycle 3のclean-state probeで、`atom-index` と `missing-links` が `--path`/`--json` を通常optionとして扱わない課題をCFB-089として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-089.md` | `codefire atom-index --path . --json`; `codefire missing-links --path . --json` |
 
 ## Current Decisions
 

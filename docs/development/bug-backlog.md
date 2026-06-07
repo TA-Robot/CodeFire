@@ -103,6 +103,7 @@
 | CFB-086 | open | Extinguish / Evidence JSON | `extinguish --evidence-ref ... --json` が `evidence_refs` を返す一方で `has_evidence:false` を返す | algorithm cycle 3でResearchFrontierMapのfireを証跡付き解消したとき | automationが証跡付きresolutionを証跡なしと誤判定し得る | `evidence_refs.length > 0` を優先する | `has_evidence` の定義をinline evidenceまたはevidence refsの存在へ揃える |
 | CFB-087 | open | Extinguish / JSON Failure | `extinguish --evidence-ref <missing> --dry-run --json` がplain text `object not found` を返す | algorithm cycle 3でFrontierExperimentPlannerのfire解消preflightをしたとき | dry-run automationがmissing evidenceを構造化診断できず、証跡作成へ復旧しづらい | evidence object存在を事前確認する | missing evidence-ref lookup failureを `ok:false` JSON envelopeへ包む |
 | CFB-088 | open | Evidence / Dry Run JSON | `evidence add --dry-run --json` が実体のない `evidence_id:""` を返す | FrontierExperimentPlanner commit後のclean-state probeでevidence preflightを確認したとき | automationが空文字IDを実IDとして扱う可能性がある | `dry_run:true` を優先して `evidence_id` を無視する | dry-runでは `evidence_id:null` またはfield省略と `created:false` を返す |
+| CFB-089 | open | Debug Commands / JSON Contract | `atom-index --path . --json` と `missing-links --path . --json` が `--path` をpathとして扱いplain OS errorになる | clean-state probeでdebug/read-only surfaceを確認したとき | AI toolがcore trace/debug dataを共通path/json指定で取得できない | positional pathか `context --changed --json` を使う | atom-index/missing-linksを通常command化し、shared path/json parserとenvelopeを使う |
 
 ## Triage Notes
 
