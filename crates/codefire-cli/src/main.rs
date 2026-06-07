@@ -130,6 +130,10 @@ fn main() {
 fn run(args: Vec<String>) -> Result<(), CliError> {
     if let Some(command) = args.first().map(String::as_str) {
         if let Some(handler) = local_workflow_handler(command) {
+            if wants_help(&args[1..]) {
+                print!("{}", subcommand_help(command));
+                return Ok(());
+            }
             return handler(&args[1..]);
         }
     }
@@ -332,6 +336,10 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             serve_http(&options)
         }
         Some("show") => {
+            if wants_help(&args[1..]) {
+                print!("{}", subcommand_help("show"));
+                return Ok(());
+            }
             let target = args.get(1).ok_or_else(|| {
                 CliError::Usage("usage: codefire show <branch-or-commit>".to_string())
             })?;
@@ -341,6 +349,10 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("diff") => {
+            if wants_help(&args[1..]) {
+                print!("{}", subcommand_help("diff"));
+                return Ok(());
+            }
             let options = parse_diff_args(&args[1..])?;
             let repo_root = optional_repo_root(&env::current_dir()?);
             let output = diff_commitish_with_options(
@@ -456,13 +468,39 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("branch") => match args.get(1).map(String::as_str) {
+            Some("-h") | Some("--help") => {
+                print!("{}", subcommand_help("branch"));
+                Ok(())
+            }
             Some("list") => {
-                let start = args
-                    .get(2)
-                    .map(PathBuf::from)
-                    .unwrap_or(env::current_dir()?);
+                if wants_help(&args[2..]) {
+                    print!("{}", subcommand_help("branch list"));
+                    return Ok(());
+                }
+                let options = parse_path_json_args(&args[2..], "branch list")?;
+                let start = options.path;
                 let branches = list_branches(&start)?;
-                print_branches(&branches);
+                if options.json_output {
+                    let repo_root = find_repo_root(&start).ok();
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&command_result_envelope(
+                            "branch-list",
+                            true,
+                            0,
+                            repo_root.as_deref(),
+                            json!({
+                                "type": "codefire_branch_list",
+                                "version": 1,
+                                "branches": branches.iter().map(branch_json).collect::<Vec<_>>(),
+                            }),
+                            Vec::new(),
+                            Vec::new(),
+                        ))?
+                    );
+                } else {
+                    print_branches(&branches);
+                }
                 Ok(())
             }
             Some(command) => Err(CliError::Usage(format!(
@@ -473,6 +511,10 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             )),
         },
         Some("status") => {
+            if wants_help(&args[1..]) {
+                print!("{}", subcommand_help("status"));
+                return Ok(());
+            }
             let options = parse_path_json_args(&args[1..], "status")?;
             let started = Instant::now();
             let status = read_status(&options.path)?;
@@ -502,64 +544,66 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("storage") => match args.get(1).map(String::as_str) {
+            Some("-h") | Some("--help") => {
+                print!("{}", subcommand_help("storage"));
+                Ok(())
+            }
             Some("report") => {
+                if wants_help(&args[2..]) {
+                    print!("{}", subcommand_help("storage"));
+                    return Ok(());
+                }
                 let options = parse_storage_report_args(&args[2..])?;
-                let report = run_storage_report(&options)?;
+                run_storage_report_command(options)
+            }
+            Some(value) if value.starts_with("--") => {
+                let options = parse_storage_report_args(&args[1..])?;
+                run_storage_report_command(options)
+            }
+            Some(_) => {
+                let options = parse_storage_report_args(&args[1..])?;
+                run_storage_report_command(options)
+            }
+            None => {
+                let options = parse_storage_report_args(&[])?;
+                run_storage_report_command(options)
+            }
+        },
+        Some("doctor") => {
+            if wants_help(&args[1..]) {
+                print!("{}", subcommand_help("doctor"));
+                Ok(())
+            } else {
+                let options = parse_doctor_args(&args[1..])?;
+                let report = run_doctor(&options)?;
+                let exit_code = if report.ok {
+                    ExitCode::Success
+                } else {
+                    ExitCode::RepositoryCorruption
+                };
                 if options.json_output {
                     println!(
                         "{}",
                         serde_json::to_string_pretty(&command_result_envelope(
-                            "storage-report",
-                            true,
-                            0,
+                            "doctor",
+                            report.ok,
+                            exit_code.code(),
                             Some(&report.repo_root),
-                            storage_report_data_json(&report),
-                            storage_report_diagnostics_json(&report),
-                            storage_report_next_actions(&report),
+                            doctor_report_data_json(&report),
+                            doctor_report_diagnostics_json(&report),
+                            doctor_report_next_actions(&report),
                         ))?
                     );
                 } else {
-                    print_storage_report(&report);
+                    print_doctor_report(&report);
                 }
-                Ok(())
-            }
-            Some(command) => Err(CliError::Usage(format!(
-                "unsupported storage command: {command}"
-            ))),
-            None => Err(CliError::Usage(
-                "usage: codefire storage report [path] [--quick|--full] [--json] [--large-threshold <bytes|KB|MB|GB>] [--remote <cf://server/org/app>]".to_string(),
-            )),
-        },
-        Some("doctor") => {
-            let options = parse_doctor_args(&args[1..])?;
-            let report = run_doctor(&options)?;
-            let exit_code = if report.ok {
-                ExitCode::Success
-            } else {
-                ExitCode::RepositoryCorruption
-            };
-            if options.json_output {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&command_result_envelope(
-                        "doctor",
-                        report.ok,
-                        exit_code.code(),
-                        Some(&report.repo_root),
-                        doctor_report_data_json(&report),
-                        doctor_report_diagnostics_json(&report),
-                        doctor_report_next_actions(&report),
-                    ))?
-                );
-            } else {
-                print_doctor_report(&report);
-            }
-            if report.ok {
-                Ok(())
-            } else {
-                Err(CliError::InvalidRepository(
-                    "doctor found repository problems".to_string(),
-                ))
+                if report.ok {
+                    Ok(())
+                } else {
+                    Err(CliError::InvalidRepository(
+                        "doctor found repository problems".to_string(),
+                    ))
+                }
             }
         }
         Some("link") => {
@@ -590,7 +634,15 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("evidence") => match args.get(1).map(String::as_str) {
+            Some("-h") | Some("--help") => {
+                print!("{}", subcommand_help("evidence"));
+                Ok(())
+            }
             Some("add") => {
+                if wants_help(&args[2..]) {
+                    print!("{}", subcommand_help("evidence add"));
+                    return Ok(());
+                }
                 let options = parse_evidence_add_args(&args[2..])?;
                 if options.batch_path.is_some() {
                     let result = run_evidence_batch(&options)?;
@@ -706,6 +758,73 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
     }
+}
+
+fn wants_help(args: &[String]) -> bool {
+    args.iter().any(|arg| arg == "-h" || arg == "--help")
+}
+
+fn subcommand_help(command: &str) -> &'static str {
+    match command {
+        "status" => {
+            "usage: codefire status [path|--path <path>] [--json] [--metrics]\n\nShow the current open branch state.\n"
+        }
+        "scan" => {
+            "usage: codefire scan [path|--path <path>] [--json] [--metrics]\n\nDetect changed atoms and open fires for an open directory.\n"
+        }
+        "verify" => {
+            "usage: codefire verify [path|--path <path>] [--details] [--blocking-only] [--json] [--metrics]\n\nRun CodeFire verification checks for an open directory.\n"
+        }
+        "fire" => {
+            "usage: codefire fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--dry-run] [--json]\n       codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--json]\n"
+        }
+        "extinguish" => {
+            "usage: codefire extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>) [--dry-run] [--json]\n       codefire extinguish --batch <file> [--path <open-dir>] [--dry-run] [--json]\n"
+        }
+        "commit" => {
+            "usage: codefire commit [path|--path <open-dir>] -m <message> [--dry-run] [--json] [--idempotency-key <key>]\n"
+        }
+        "branch" | "branch list" => {
+            "usage: codefire branch list [path|--path <repo-or-open>] [--json]\n\nList local branches.\n"
+        }
+        "storage" => {
+            "usage: codefire storage [path] [--quick|--full] [--json] [--large-threshold <bytes|KB|MB|GB>] [--remote <cf://server/org/app>]\n       codefire storage report [path] [--quick|--full] [--json] [--large-threshold <bytes|KB|MB|GB>] [--remote <cf://server/org/app>]\n"
+        }
+        "doctor" => {
+            "usage: codefire doctor [path] [--quick|--full] [--json]\n\nInspect repository health.\n"
+        }
+        "evidence" | "evidence add" => {
+            "usage: codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>|--from-argv <program> [--argv <arg>...]|--batch <file>) [--label <text>] [--cwd <dir>] [--timeout <duration>] [--max-output-bytes <bytes>] [--dry-run] [--json]\n"
+        }
+        "show" => {
+            "usage: codefire show <branch-or-commit> [--json]\n\nShow a sealed commitish.\n"
+        }
+        "diff" => {
+            "usage: codefire diff [--algorithm myers|patience|histogram] [--context <lines>] [--rename-detection] [--atoms] [--trace] [--impact] [--json] <left> <right>\n"
+        }
+        _ => "usage: codefire <command> [options]\n",
+    }
+}
+
+fn run_storage_report_command(options: storage::StorageReportOptions) -> Result<(), CliError> {
+    let report = run_storage_report(&options)?;
+    if options.json_output {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&command_result_envelope(
+                "storage-report",
+                true,
+                0,
+                Some(&report.repo_root),
+                storage_report_data_json(&report),
+                storage_report_diagnostics_json(&report),
+                storage_report_next_actions(&report),
+            ))?
+        );
+    } else {
+        print_storage_report(&report);
+    }
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -1033,6 +1152,14 @@ fn print_branches(branches: &[Branch]) {
     }
 }
 
+fn branch_json(branch: &Branch) -> Value {
+    json!({
+        "name": &branch.name,
+        "head": &branch.head,
+        "state": &branch.state,
+    })
+}
+
 fn print_scan(scan: &codefire_core::ScanResult) {
     print!("{}", render_scan(scan));
 }
@@ -1209,21 +1336,39 @@ fn parse_path_json_args(args: &[String], command: &str) -> Result<PathJsonOption
     let mut path = None;
     let mut json_output = false;
     let mut metrics = false;
-    for arg in args {
+    let mut index = 0usize;
+    while index < args.len() {
+        let arg = &args[index];
         if parse_path_json_metrics_option(arg, &mut json_output, &mut metrics) {
+            index += 1;
             continue;
         }
-        if arg.starts_with("--") {
-            return Err(CliError::Usage(format!(
-                "unsupported {command} option: {arg}"
-            )));
-        } else if path.is_none() {
-            path = Some(PathBuf::from(arg));
-        } else {
-            return Err(CliError::Usage(format!(
-                "unexpected {command} argument: {arg}"
-            )));
+        match arg.as_str() {
+            "--path" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--path requires a value".to_string()))?;
+                path = Some(PathBuf::from(value));
+            }
+            value if value.starts_with("--path=") => {
+                path = Some(PathBuf::from(value.trim_start_matches("--path=")));
+            }
+            option if option.starts_with("--") => {
+                return Err(CliError::Usage(format!(
+                    "unsupported {command} option: {option}"
+                )));
+            }
+            value if path.is_none() => {
+                path = Some(PathBuf::from(value));
+            }
+            value => {
+                return Err(CliError::Usage(format!(
+                    "unexpected {command} argument: {value}"
+                )));
+            }
         }
+        index += 1;
     }
     Ok(PathJsonOptions {
         path: path.unwrap_or(env::current_dir()?),

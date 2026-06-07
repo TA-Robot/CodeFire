@@ -644,6 +644,7 @@ fn parse_diff_args_accepts_algorithm_forms() {
 fn parse_state_diagnostic_json_args() {
     let status = parse_path_json_args(
         &[
+            "--path".to_string(),
             "/tmp/example".to_string(),
             "--json".to_string(),
             "--metrics".to_string(),
@@ -658,9 +659,9 @@ fn parse_state_diagnostic_json_args() {
     let verify = parse_verify_args(&[
         "--details".to_string(),
         "--blocking-only".to_string(),
+        "--path=/tmp/example".to_string(),
         "--json".to_string(),
         "--metrics".to_string(),
-        "/tmp/example".to_string(),
     ])
     .unwrap();
     assert_eq!(verify.path, PathBuf::from("/tmp/example"));
@@ -2800,7 +2801,14 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
     assert_eq!(result.command_exit_code, Some(0));
     assert!(!result.command_timed_out);
     assert_eq!(data["type"], "codefire_evidence_add_result");
+    assert_eq!(data["dry_run"], false);
     assert_eq!(data["command_timed_out"], false);
+    assert_eq!(data["command_stdout_summary"], "ok");
+    assert_eq!(data["command_stdout_truncated"], true);
+    assert!(data["object_path"]
+        .as_str()
+        .unwrap()
+        .contains("CF-EVIDENCE-"));
 
     let objects = repo_root.join(".codefire").join("objects");
     let artifact_ref = codefire_store::read_object(&objects, artifact_ref_id).unwrap();
@@ -2857,6 +2865,37 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
     assert_eq!(storage.external_artifacts.refs, 1);
     assert_eq!(storage.external_artifacts.referenced_bytes, 16);
     assert_eq!(storage.external_artifacts.payload_bytes_stored, 0);
+}
+
+#[test]
+fn evidence_add_single_dry_run_returns_plan_without_writing_object() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let before = fs::read_dir(objects.join("evidence")).unwrap().count();
+
+    let parsed = parse_evidence_add_args(&[
+        "--path".to_string(),
+        repo_root.to_string_lossy().into_owned(),
+        "--from-command".to_string(),
+        "printf dry-run".to_string(),
+        "--dry-run".to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    let result = run_evidence_add(&parsed).unwrap();
+    let data = evidence_add_data_json(&result);
+
+    assert!(result.dry_run);
+    assert_eq!(result.evidence_id, "");
+    assert_eq!(data["dry_run"], true);
+    assert_eq!(data["plan"]["command"], "evidence-add");
+    assert_eq!(data["plan"]["would_apply"], false);
+    assert_eq!(
+        fs::read_dir(objects.join("evidence")).unwrap().count(),
+        before
+    );
 }
 
 #[test]
@@ -5015,7 +5054,7 @@ fn metrics_attach_to_status_scan_and_verify_data() {
     assert_eq!(scan_data["metrics"]["phase_timings"]["scan_pipeline_ms"], 5);
     assert_eq!(
         scan_data["metrics"]["phase_timings"]["atom_extraction_ms"],
-        0
+        Value::Null
     );
     assert!(scan_data["metrics"]["phases"]
         .as_array()
@@ -5027,12 +5066,8 @@ fn metrics_attach_to_status_scan_and_verify_data() {
         .unwrap()
         .iter()
         .any(|counter| counter["name"] == "atoms" && counter["value"] == 1));
-    assert_eq!(scan_data["metrics"]["cache"]["status"], "unimplemented");
-    assert_eq!(
-        scan_data["metrics"]["cache"]["disabled_reason"],
-        "not_implemented"
-    );
-    assert_eq!(scan_data["metrics"]["cache"]["entry_count"], 0);
+    assert_eq!(scan_data["metrics"]["cache_status"], "unavailable");
+    assert!(scan_data["metrics"].get("cache").is_none());
 
     let verification = run_verify(&open_dir).unwrap();
     let verify_data = attach_metrics(

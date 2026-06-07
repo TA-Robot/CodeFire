@@ -36,11 +36,18 @@ pub(crate) struct EvidenceAddOptions {
 #[derive(Debug)]
 pub(crate) struct EvidenceAddResult {
     pub(crate) repo_root: PathBuf,
+    pub(crate) dry_run: bool,
     pub(crate) evidence_id: String,
     pub(crate) artifact_ref_id: Option<String>,
+    pub(crate) object_path: Option<PathBuf>,
     pub(crate) command_exit_code: Option<i32>,
     pub(crate) command_timed_out: bool,
+    pub(crate) command_stdout_summary: Option<String>,
+    pub(crate) command_stdout_truncated: bool,
+    pub(crate) command_stderr_summary: Option<String>,
+    pub(crate) command_stderr_truncated: bool,
     pub(crate) diagnostics: Vec<Value>,
+    pub(crate) plan: Option<Value>,
 }
 
 pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOptions, CliError> {
@@ -173,11 +180,6 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
             "evidence add --batch cannot be combined with single-item capture options".to_string(),
         ));
     }
-    if batch_path.is_none() && dry_run {
-        return Err(CliError::Usage(
-            "evidence add --dry-run requires --batch".to_string(),
-        ));
-    }
     if command.is_some() && command_argv.is_some() {
         return Err(CliError::Usage(
             "evidence add cannot combine --from-command and --from-argv".to_string(),
@@ -213,6 +215,23 @@ pub(crate) fn run_evidence_add(
 ) -> Result<EvidenceAddResult, CliError> {
     let repo_root = find_repo_root(&options.start)?;
     validate_evidence_add_options(options)?;
+    if options.dry_run {
+        return Ok(EvidenceAddResult {
+            repo_root,
+            dry_run: true,
+            evidence_id: String::new(),
+            artifact_ref_id: None,
+            object_path: None,
+            command_exit_code: None,
+            command_timed_out: false,
+            command_stdout_summary: None,
+            command_stdout_truncated: false,
+            command_stderr_summary: None,
+            command_stderr_truncated: false,
+            diagnostics: Vec::new(),
+            plan: Some(evidence_add_operation_plan(options)),
+        });
+    }
     let objects = repo_root.join(".codefire").join("objects");
     let mut diagnostics = Vec::new();
     let artifact_ref_id = match options.artifact_path.as_deref() {
@@ -233,6 +252,20 @@ pub(crate) fn run_evidence_add(
     let command_exit_code = command_capture
         .as_ref()
         .and_then(|capture| capture.exit_code);
+    let command_stdout_summary = command_capture
+        .as_ref()
+        .map(|capture| capture.stdout.clone());
+    let command_stdout_truncated = command_capture
+        .as_ref()
+        .map(|capture| capture.stdout_truncated)
+        .unwrap_or(false);
+    let command_stderr_summary = command_capture
+        .as_ref()
+        .map(|capture| capture.stderr.clone());
+    let command_stderr_truncated = command_capture
+        .as_ref()
+        .map(|capture| capture.stderr_truncated)
+        .unwrap_or(false);
     let evidence_id = codefire_store::store_object(
         &objects,
         "evidence",
@@ -245,16 +278,24 @@ pub(crate) fn run_evidence_add(
             "created_at": now_iso_utc(),
         }),
     )?;
+    let object_path = codefire_store::object_record_path(&objects, &evidence_id);
     Ok(EvidenceAddResult {
         repo_root,
+        dry_run: false,
         evidence_id,
         artifact_ref_id,
+        object_path,
         command_exit_code,
         command_timed_out: command_capture
             .as_ref()
             .map(|capture| capture.timed_out)
             .unwrap_or(false),
+        command_stdout_summary,
+        command_stdout_truncated,
+        command_stderr_summary,
+        command_stderr_truncated,
         diagnostics,
+        plan: None,
     })
 }
 
@@ -315,16 +356,30 @@ pub(crate) fn evidence_add_data_json(result: &EvidenceAddResult) -> Value {
     json!({
         "type": "codefire_evidence_add_result",
         "version": 1,
+        "dry_run": result.dry_run,
         "evidence_id": &result.evidence_id,
         "artifact_ref_id": &result.artifact_ref_id,
+        "object_path": &result.object_path,
         "command_exit_code": result.command_exit_code,
         "command_timed_out": result.command_timed_out,
+        "command_stdout_summary": &result.command_stdout_summary,
+        "command_stdout_truncated": result.command_stdout_truncated,
+        "command_stderr_summary": &result.command_stderr_summary,
+        "command_stderr_truncated": result.command_stderr_truncated,
         "diagnostics": &result.diagnostics,
+        "plan": &result.plan,
     })
 }
 
 pub(crate) fn print_evidence_add_result(result: &EvidenceAddResult) {
+    if result.dry_run {
+        println!("evidence dry-run: capture plan validated");
+        return;
+    }
     println!("recorded evidence: {}", result.evidence_id);
+    if let Some(object_path) = &result.object_path {
+        println!("object path: {}", object_path.display());
+    }
     if let Some(artifact_ref_id) = &result.artifact_ref_id {
         println!("artifact ref: {artifact_ref_id}");
     }
@@ -339,6 +394,37 @@ pub(crate) fn print_evidence_add_result(result: &EvidenceAddResult) {
             println!("warning: {message}");
         }
     }
+}
+
+fn evidence_add_operation_plan(options: &EvidenceAddOptions) -> Value {
+    json!({
+        "type": "codefire_operation_plan",
+        "version": 1,
+        "command": "evidence-add",
+        "dry_run": true,
+        "would_apply": false,
+        "label": &options.label,
+        "has_artifact": options.artifact_path.is_some(),
+        "artifact": &options.artifact_path,
+        "artifact_uri": &options.artifact_uri,
+        "has_command": options.command.is_some(),
+        "from_command": &options.command,
+        "has_command_argv": options.command_argv.is_some(),
+        "command_argv": &options.command_argv,
+        "cwd": &options.command_cwd,
+        "timeout_ms": options.command_timeout_ms,
+        "max_output_bytes": options.max_output_bytes,
+        "operations": [
+            {"kind": "validate_capture_inputs"},
+            {"kind": "store_artifact_ref", "enabled": options.artifact_path.is_some()},
+            {"kind": "run_command_capture", "enabled": options.command.is_some() || options.command_argv.is_some()},
+            {"kind": "store_evidence_object"}
+        ],
+        "next_actions": [
+            {"kind": "evidence_add", "command": "codefire evidence add ... --json"},
+            {"kind": "storage_report", "command": "codefire storage report --json"}
+        ],
+    })
 }
 
 struct StoredArtifactRef {

@@ -208,6 +208,8 @@
 | 2026-06-07 | Process | CodeFire実装、install、algorithm dogfooding、issue創出、次version計画を反復するcodefire改善サイクルを定義した | `docs/development/codefire-improvement-cycle.md`, `AGENTS.md`, `docs/development/agent-workflow.md` | docs-only process definition |
 | 2026-06-07 | Requirements / Design | 要求定義書と内部アーキテクチャ設計を全面的に強化し、機能要求、非機能要求、不変条件、command contract、state model、module ownership、recovery/test/security設計を明文化した | `docs/01_product_definition.md`, `docs/11_internal_architecture.md` | docs-only architecture update |
 | 2026-06-07 | Source Docs | Rust実装のfile/module/type/function責務対応と、CLI commandごとのparse/run/render/persistent state経路をsource navigation文書として追加した | `docs/development/source-code-map.md`, `docs/development/command-source-trace.md`, `README.md`, `AGENTS.md`, `docs/11_internal_architecture.md` | docs-only source map update |
+| 2026-06-07 | v0.8 CFB Burn-down | 1st implementation passとして共通path alias、主要subcommand help、branch list JSON、storage alias、metrics未計測/null化、evidence dry-run/result summaryを実装し、CFB-023/024/030/031/036/038/039をfixed、CFB-042をpartialに更新した | `crates/codefire-cli/src/main.rs`, `verification.rs`, `metrics.rs`, `evidence.rs`, `evidence/batch.rs`, `tests.rs`, `docs/development/bug-*`, `docs/development/v0.8-cfb-burn-down-plan.md` | `cargo fmt --check`; `cargo test -p codefire-cli --bin codefire-rs -- --nocapture` |
+| 2026-06-07 | Source Docs | ソースを開かなくても実装形状を想像できるように、workspace、`main.rs` の関数帯、local workflow、core/store、automation JSON、evidence/storage flow、command追加手順をまとめたmental model文書を追加した | `docs/development/source-code-mental-model.md`, `docs/development/source-code-map.md`, `docs/development/command-source-trace.md`, `docs/11_internal_architecture.md` | docs source navigation update |
 
 ## Current Decisions
 

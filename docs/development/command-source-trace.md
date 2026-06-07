@@ -61,10 +61,14 @@ Design risk:
 ## branch list
 
 ```text
-codefire branch list
+codefire branch list [--json] [--path <repo>]
   -> main.rs branch/list match arm
+  -> main.rs::parse_path_json_args(command="branch list")
   -> branch loading and sealed head validation
-  -> text rendering in main.rs
+  -> if --json:
+       automation.rs::command_result_envelope(data={type: codefire_branch_list, branches: [...]})
+     else:
+       text rendering in main.rs::print_branches
   -> reads .codefire/branches/*
 ```
 
@@ -73,14 +77,15 @@ Primary files:
 - `main.rs`
 - `codefire-store/src/lib.rs`
 
-v0.8 gap:
+Remaining v0.8 gap:
 
-- `branch list --json` should use `automation.rs` envelope.
+- `branch show --json` is still not implemented.
+- unsupported branch subcommands with `--json` still need a structured failure envelope.
 
 ## status
 
 ```text
-codefire status [--json] [--metrics]
+codefire status [path|--path <path>] [--json] [--metrics]
   -> main.rs::parse_path_json_args(command="status")
   -> status loading in main.rs
   -> automation.rs::status_data_json
@@ -96,15 +101,18 @@ Primary files:
 - `automation.rs`
 - `metrics.rs`
 
-v0.8 gap:
+Current behavior:
+
+- `--path <path>` and `--path=<path>` are accepted by the shared path/json parser for commands that use `parse_path_json_args`.
+
+Remaining v0.8 gap:
 
 - status state must be derived by a shared reducer.
-- `--path` handling should be consistent across local commands.
 
 ## scan
 
 ```text
-codefire scan [path] [--json] [--metrics]
+codefire scan [path|--path <path>] [--json] [--metrics]
   -> main.rs::local_workflow_handler("scan")
   -> main.rs::run_scan_command
   -> main.rs::parse_path_json_args(command="scan")
@@ -274,9 +282,11 @@ codefire evidence add ...
   -> main.rs evidence/add match arm
   -> evidence.rs::parse_evidence_add_args
   -> evidence.rs::run_evidence_add
+       -> dry-run returns evidence_add_operation_plan without writes
+       -> apply stores optional artifact_ref and evidence object
   -> evidence.rs::evidence_add_data_json
   -> evidence.rs::print_evidence_add_result
-  -> writes evidence object and optional artifact_ref object
+  -> writes evidence object and optional artifact_ref object unless dry-run
 ```
 
 Batch:
@@ -295,11 +305,14 @@ Primary files:
 - `storage.rs`
 - `remote.rs` for artifact/evidence graph copy.
 
-v0.8 gap:
+Current behavior:
+
+- single-item `--dry-run` returns a validated operation plan and does not write an evidence object.
+- JSON result includes evidence object path and bounded stdout/stderr summaries with truncation flags.
+
+Remaining v0.8 gap:
 
 - failed command capture should require explicit allowance.
-- single evidence dry-run should exist.
-- result data should include stdout/stderr summary and object path.
 
 ## commit
 
@@ -388,7 +401,10 @@ codefire migrate check|dry-run [path] [--json]
   -> migration.rs::run_migrate
   -> migration report render helpers
 
+codefire storage [path] [--json]
 codefire storage report [path] [--json]
+codefire storage --path <path> --json
+  -> main.rs::run_storage_report_command
   -> storage.rs::parse_storage_report_args
   -> storage.rs::run_storage_report
   -> storage report render helpers
@@ -406,10 +422,13 @@ Primary files:
 - `storage.rs`
 - `explain.rs`
 
-v0.8 gap:
+Current behavior:
+
+- `storage`, `storage [path]`, `storage --json`, and `storage report ...` all route to the same storage report runner.
+
+Remaining v0.8 gap:
 
 - doctor/migrate must share layout definitions and repair vocabulary.
-- top-level `storage [path] --json` help/alias must match implementation.
 
 ## remote and HTTP
 

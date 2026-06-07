@@ -2,7 +2,7 @@
 
 この文書は、Code Fireの内部設計である。実装時のmodule境界、データフロー、不変条件、エラー処理、テスト設計の正本として扱う。
 
-実際のsource file、主要関数、commandごとの実装経路は、補助文書として `docs/development/source-code-map.md` と `docs/development/command-source-trace.md` に展開する。この文書は設計の正本、補助文書はsource navigationの正本である。
+実際のsource file、主要関数、commandごとの実装経路は、補助文書として `docs/development/source-code-map.md`、`docs/development/source-code-mental-model.md`、`docs/development/command-source-trace.md` に展開する。この文書は設計の正本、補助文書はsource navigationの正本である。
 
 ## 11.1 Architecture Principles
 
@@ -680,5 +680,6 @@ Known gaps that drive v0.8 planning:
 - fire volume needs grouping and batch template generation.
 - non-Atom changed files need first-class scan visibility.
 - metrics should distinguish unmeasured from measured zero-cost phases.
+- source navigation docs must stay close enough to code that a contributor can infer module shape and data flow before opening the implementation.
 
 These are not separate product directions. They are architecture debt against the requirements in `docs/01_product_definition.md`.

@@ -144,17 +144,27 @@ pub(crate) fn print_metrics(metrics: &CommandMetrics) {
 fn metrics_json(metrics: &CommandMetrics) -> Value {
     let mut phase_timings = Map::new();
     for phase in &metrics.phases {
-        phase_timings.insert(phase_timing_key(phase.name), json!(phase.elapsed_ms));
+        let value = if phase.measured {
+            json!(phase.elapsed_ms)
+        } else {
+            Value::Null
+        };
+        phase_timings.insert(phase_timing_key(phase.name), value);
     }
-    json!({
+    let mut value = json!({
         "type": "codefire_metrics",
         "version": 1,
         "command": metrics.command,
         "phase_timings": phase_timings,
         "phases": metrics.phases.iter().map(phase_json).collect::<Vec<_>>(),
         "counters": metrics.counters.iter().map(counter_json).collect::<Vec<_>>(),
-        "cache": cache_json(&metrics.cache),
-    })
+    });
+    if metrics.cache.status == "unimplemented" {
+        value["cache_status"] = json!("unavailable");
+    } else {
+        value["cache"] = cache_json(&metrics.cache);
+    }
+    value
 }
 
 fn phase_json(phase: &MetricPhase) -> Value {

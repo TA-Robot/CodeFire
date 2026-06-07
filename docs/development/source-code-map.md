@@ -2,23 +2,30 @@
 
 この文書は、CodeFireのRust実装を読むためのsource mapである。要求定義や内部設計だけでは抽象的すぎるため、実際のfile、主要型、主要関数、責務境界をここで対応付ける。
 
+補助文書:
+
+- `docs/development/source-code-mental-model.md`: source fileを開く前に、実装の形、関数帯、データ流、永続化境界を頭に描くための詳細地図。
+- `docs/development/command-source-trace.md`: CLI commandからparse/run/render/persistenceまでを追う関数レベルのtrace。
+
 ## Reading Order
 
 初めて実装を読む場合は、次の順で読む。
 
 1. `crates/codefire-cli/src/main.rs`
    - command dispatch、local workflow handler、parse/run/renderの接続を見る。
-2. `crates/codefire-cli/src/cli_model.rs`
+2. `docs/development/source-code-mental-model.md`
+   - workspace、`main.rs` の関数帯、local workflow data flow、object store flowを読む。
+3. `crates/codefire-cli/src/cli_model.rs`
    - CLIで共有されるOptions/Result/OpenContext型を見る。
-3. `crates/codefire-cli/src/automation.rs`
+4. `crates/codefire-cli/src/automation.rs`
    - JSON envelope、diagnostics、next_actionsの形を見る。
-4. `crates/codefire-core/src/lib.rs`
+5. `crates/codefire-core/src/lib.rs`
    - Atom、Trace Graph、ScanResult、Verificationのdomain modelを見る。
-5. `crates/codefire-store/src/lib.rs`
+6. `crates/codefire-store/src/lib.rs`
    - canonical JSON、object store、sealed commit validationを見る。
-6. command-specific module
+7. command-specific module
    - evidence、doctor、storage、migration、view、remoteなど、触るcommandに近いmoduleを見る。
-7. `crates/codefire-cli/src/tests.rs` and `crates/codefire-cli/src/tests/docs.rs`
+8. `crates/codefire-cli/src/tests.rs` and `crates/codefire-cli/src/tests/docs.rs`
    - 既存behaviorとregression coverageを見る。
 
 ## Workspace Crates
@@ -48,6 +55,20 @@ Design rule:
 Current architecture debt:
 
 - `main.rs` still owns many parse helpers and operation implementations (`run_scan`, `run_verify`, `run_extinguish`, `run_commit`). v0.8 should extract state/contract/workflow modules without changing behavior.
+- `subcommand_help` and path option parsing currently live in `main.rs`; if more commands gain aliases, extract command metadata and shared parser helpers before the table grows further.
+
+## Mental Model Anchors
+
+Use these anchors when navigating a change.
+
+| Question | Source answer |
+|---|---|
+| What is the user-facing command contract? | `docs/04_cli_spec.md`, `completion.rs`, parser function |
+| What does the command do internally? | `command-source-trace.md`, `source-code-mental-model.md`, command runner |
+| What data shape should automation consume? | `automation.rs`, command module `*_data_json`, `docs/automation_interface.md` |
+| What persistent files change? | runner function, `source-code-mental-model.md` persistence sections |
+| Which domain invariant applies? | `codefire-core`, `codefire-store`, `docs/05_consistency_model.md`, `docs/11_internal_architecture.md` |
+| Which tests lock the behavior? | module-local tests first, then `crates/codefire-cli/src/tests.rs` |
 
 ## Module Responsibility Map
 

@@ -27,12 +27,23 @@ pub(crate) fn parse_verify_args(args: &[String]) -> Result<VerifyOptions, CliErr
     let mut blocking_only = false;
     let mut json_output = false;
     let mut metrics = false;
-    for arg in args {
-        match arg.as_str() {
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
             "--details" => details = true,
             "--blocking-only" => blocking_only = true,
             "--json" => json_output = true,
             "--metrics" => metrics = true,
+            "--path" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--path requires a value".to_string()))?;
+                path = Some(PathBuf::from(value));
+            }
+            value if value.starts_with("--path=") => {
+                path = Some(PathBuf::from(value.trim_start_matches("--path=")));
+            }
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported verify option: {option}"
@@ -45,6 +56,7 @@ pub(crate) fn parse_verify_args(args: &[String]) -> Result<VerifyOptions, CliErr
                 )));
             }
         }
+        index += 1;
     }
     Ok(VerifyOptions {
         path: path.unwrap_or(env::current_dir()?),

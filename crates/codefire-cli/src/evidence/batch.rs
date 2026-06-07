@@ -112,10 +112,16 @@ pub(crate) fn evidence_batch_data_json(result: &EvidenceBatchResult) -> Value {
 
 fn evidence_result_json(result: &EvidenceAddResult) -> Value {
     json!({
+        "dry_run": result.dry_run,
         "evidence_id": &result.evidence_id,
         "artifact_ref_id": &result.artifact_ref_id,
+        "object_path": &result.object_path,
         "command_exit_code": result.command_exit_code,
         "command_timed_out": result.command_timed_out,
+        "command_stdout_summary": &result.command_stdout_summary,
+        "command_stdout_truncated": result.command_stdout_truncated,
+        "command_stderr_summary": &result.command_stderr_summary,
+        "command_stderr_truncated": result.command_stderr_truncated,
         "diagnostics": &result.diagnostics,
     })
 }
