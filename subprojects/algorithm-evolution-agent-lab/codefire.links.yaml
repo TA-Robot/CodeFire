@@ -687,3 +687,12 @@ links:
   - from: REQ-AUTO-031
     to: TEST-claim-review-queue-prioritizes-blocked-claims
     type: verified_by
+  - from: REQ-AUTO-032
+    to: DES-AUTO-014
+    type: refined_by
+  - from: DES-AUTO-014
+    to: CODE-ClaimAuditTrailBuilder
+    type: implemented_by
+  - from: REQ-AUTO-032
+    to: TEST-claim-audit-trail-records-review-decision
+    type: verified_by

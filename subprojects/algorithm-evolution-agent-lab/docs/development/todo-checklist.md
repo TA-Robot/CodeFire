@@ -75,3 +75,4 @@
 | AE-071 | Governance | 実験campaignのrisk registerを追加し、open/blocking riskとmitigation checklistを優先度順に返す | done | `CODE-ExperimentRiskRegister`; `TEST-experiment-risk-register-prioritizes-open-risks` |
 | AE-072 | Evidence | promotion/review向けに改善、信頼度、replication、freshness、risk、artifact gapを束ねるevidence pack builderを追加する | done | `CODE-ExperimentEvidencePackBuilder`; `TEST-experiment-evidence-pack-builder-blocks-incomplete-claims` |
 | AE-073 | Review | evidence packとreviewer objectionからclaim review queueを生成し、block/revise/approveを優先度順に返す | done | `CODE-ClaimReviewQueue`; `TEST-claim-review-queue-prioritizes-blocked-claims` |
+| AE-074 | Audit | evidence readiness、review decision、external claim eligibility、follow-upをclaim audit trailへ記録する | done | `CODE-ClaimAuditTrailBuilder`; `TEST-claim-audit-trail-records-review-decision` |

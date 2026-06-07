@@ -202,3 +202,31 @@ Decision rules are intentionally conservative:
 - only readiness `ready`, no open objections, and at least one reviewer produces `approve`
 
 Blocked items rank before revision items, and revision items rank before approval-ready items. Ties are broken by descending priority score and then stable claim ID.
+
+## DES-AUTO-014: Claim audit trail
+
+The claim audit trail consumes compact review artifacts:
+
+- evidence pack
+- claim review item
+- optional external-claim eligibility
+- optional reviewer or governance note
+
+It produces ordered audit events with:
+
+- event ID
+- claim ID
+- candidate ID
+- stage
+- status
+- source references
+- follow-up actions
+
+The builder validates that every event has a claim ID, candidate ID, stage, status, and at least one source reference. Events are ordered by deterministic stage rank and then event ID:
+
+1. `evidence`
+2. `review`
+3. `external_claim`
+4. `follow_up`
+
+The audit trail is intentionally compact. It stores decisions and references, not raw metrics or logs. Raw artifacts remain in evidence objects and report bundles.

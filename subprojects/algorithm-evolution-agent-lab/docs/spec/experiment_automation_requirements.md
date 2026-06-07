@@ -123,3 +123,7 @@ The system shall build a compact evidence pack for candidate promotion or extern
 ## REQ-AUTO-031: Claim review queue
 
 The system shall turn evidence packs and reviewer objections into a deterministic review queue that prioritizes blocked or revision-needed claims before approval-ready claims and explains the required next action for each claim.
+
+## REQ-AUTO-032: Claim audit trail
+
+The system shall generate a deterministic audit trail for candidate claims that records evidence readiness, review decisions, external-claim eligibility, and required follow-up so that promotion decisions can be reconstructed without reading raw logs.
