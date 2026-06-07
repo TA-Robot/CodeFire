@@ -229,6 +229,7 @@
 | 2026-06-07 | Dogfood | clean状態でCodeFireのlink/fire/trace-graph surfaceを追加調査し、validation dry-run、manual fire identity/state recovery、trace-graph help/path/jsonの課題をCFB-076..080として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-076.md`..`cfb-080.md` | `codefire link --batch --dry-run --json`; `codefire fire ... --dry-run/--json`; `codefire trace-graph --help`; `codefire trace-graph --path . --json` |
 | 2026-06-07 | Dogfood | cycle 2 dogfood issue目標20件へ到達するため、explain/storage/branch/migrate/help surfaceの課題をCFB-081..085として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-081.md`..`cfb-085.md` | `codefire explain verify-failure --json`; `codefire storage --quick --json`; `codefire branch list --json --metrics`; `codefire migrate check --json --metrics`; `codefire migrate/context/explain --help` |
 | 2026-06-07 | Source Review | cycle 2 source reviewとしてCFR-121..160を追加し、sealed commit validation、operation locking、command capability registry、automation JSON schema drift、large repo observabilityのroot cause bucketへ整理した | `docs/development/code-review-issues/cfr-121.md`..`cfr-160.md`, `docs/development/code-review-issues-2026-06-06.md` | index updated to Total 160 / Remaining open 79 |
+| 2026-06-07 | Planning | cycle 2で追加したCFB-066..085/CFR-121..160を、v0.9 carryoverと重複しないroot fix groupへ束ねるv1.0 Contract Validation Planを追加した | `docs/development/v1.0-contract-validation-plan.md`, `docs/development/codefire-improvement-cycle.md` | next action is Phase A implementation from v1.0 Phase 0/1 |
 
 ## Current Decisions
 

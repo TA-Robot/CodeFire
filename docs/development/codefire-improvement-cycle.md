@@ -217,14 +217,14 @@ Common rules:
 
 Current named cycle:
 
-- CodeFire next version: v0.8 CFB burn-down。
-- Current plan: `docs/development/v0.8-cfb-burn-down-plan.md`。
-- Current phase: Phase F。Phase Dのdogfooding目標とPhase Eのsource review issue拡張を完了し、次version計画へ接続した。
-- Latest algorithm work: Experiment Triage Board、Experiment Iteration Planner、Experiment Risk Registerを要求、設計、Trace Link、実装、テスト、CodeFire evidence、CodeFire commitまで通した。
-- Latest dogfood findings: CFB-046..CFB-065を追加。新規20件に到達したため、Phase Dのdogfooding目標は満たした。
-- Latest source review findings: CFR-081..CFR-120を追加。追加40件目標を満たした。
-- Next version plan: `docs/development/v0.9-contract-scale-plan.md`。
-- Next expected action: Phase Aへ戻り、v0.9計画のPhase 0/1からCodeFire実装を開始する。実装後にinstallし、algorithm dogfoodingの次cycleへ入る。
+- CodeFire next version: v1.0 Contract Validation。
+- Current plan: `docs/development/v1.0-contract-validation-plan.md`。
+- Current phase: Phase F。Cycle 2のdogfooding目標とsource review issue拡張を完了し、次version計画へ接続した。
+- Latest algorithm work: algorithm cycle 2でExperimentEvidencePackBuilder、ClaimReviewQueue、ClaimAuditTrailBuilder、ClaimReleaseGateをdocs-firstで追加し、CodeFireを使ってscan/verify/context/evidence/commit/health surfaceをdogfoodした。
+- Latest dogfood findings: CFB-066..CFB-085を追加。新規20件に到達したため、Phase Dのdogfooding目標は満たした。
+- Latest source review findings: CFR-121..CFR-160を追加。追加40件目標を満たした。
+- Previous plan carried forward: `docs/development/v0.9-contract-scale-plan.md`。v1.0はv0.9の未完了contract/scale項目を継承し、cycle 2で見つかったroot causeを追加する。
+- Next expected action: Phase Aへ戻り、v1.0計画のPhase 0/1からCodeFire実装を開始する。実装後にinstallし、algorithm dogfoodingの次cycleへ入る。
 
 ## Cycle Invariants
 
