@@ -1,8 +1,11 @@
 use super::{parse_lock_option, run_extinguish, CliError, ExtinguishOptions, LockOptions};
+use crate::limited_yaml;
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+const YAML_CONTEXT: &str = "batch YAML";
 
 #[derive(Debug)]
 pub(super) struct BatchExtinguishOptions {
@@ -392,7 +395,7 @@ fn parse_batch_extinguish_yaml(text: &str) -> Result<BatchExtinguishFile, CliErr
                 "invalid batch YAML: tabs are not supported at line {line_number}"
             )));
         }
-        let without_comment = strip_yaml_comment(raw_line);
+        let without_comment = limited_yaml::strip_comment(raw_line);
         if without_comment.trim().is_empty() {
             continue;
         }
@@ -409,9 +412,14 @@ fn parse_batch_extinguish_yaml(text: &str) -> Result<BatchExtinguishFile, CliErr
                 section = BatchYamlSection::Fires;
             }
             (0, _, _) => {
-                let (key, value) = parse_yaml_key_value(text, line_number)?;
+                let (key, value) = limited_yaml::parse_key_value(text, line_number, YAML_CONTEXT)?;
                 if key == "version" {
-                    version = Some(parse_yaml_u64(&value, "version", line_number)?);
+                    version = Some(limited_yaml::parse_u64(
+                        &value,
+                        "version",
+                        line_number,
+                        YAML_CONTEXT,
+                    )?);
                     section = BatchYamlSection::Root;
                 } else {
                     return Err(CliError::Usage(format!(
@@ -420,7 +428,7 @@ fn parse_batch_extinguish_yaml(text: &str) -> Result<BatchExtinguishFile, CliErr
                 }
             }
             (2, _, BatchYamlSection::Defaults) => {
-                let (key, value) = parse_yaml_key_value(text, line_number)?;
+                let (key, value) = limited_yaml::parse_key_value(text, line_number, YAML_CONTEXT)?;
                 apply_yaml_default(&mut defaults, &key, value, line_number)?;
             }
             (2, _, BatchYamlSection::Fires) if text.starts_with("- ") => {
@@ -428,7 +436,8 @@ fn parse_batch_extinguish_yaml(text: &str) -> Result<BatchExtinguishFile, CliErr
                 let rest = text[2..].trim();
                 let mut fire = BatchFireSpec::default();
                 if !rest.is_empty() {
-                    let (key, value) = parse_yaml_key_value(rest, line_number)?;
+                    let (key, value) =
+                        limited_yaml::parse_key_value(rest, line_number, YAML_CONTEXT)?;
                     apply_yaml_fire_field(&mut fire, &key, value, line_number)?;
                 }
                 current_fire = Some(fire);
@@ -439,7 +448,7 @@ fn parse_batch_extinguish_yaml(text: &str) -> Result<BatchExtinguishFile, CliErr
                         "invalid batch YAML: fire field before list item at line {line_number}"
                     ))
                 })?;
-                let (key, value) = parse_yaml_key_value(text, line_number)?;
+                let (key, value) = limited_yaml::parse_key_value(text, line_number, YAML_CONTEXT)?;
                 apply_yaml_fire_field(fire, &key, value, line_number)?;
             }
             _ => {
@@ -508,43 +517,6 @@ fn apply_yaml_fire_field(
     Ok(())
 }
 
-fn parse_yaml_key_value(line: &str, line_number: usize) -> Result<(String, String), CliError> {
-    let colon = line.find(':').ok_or_else(|| {
-        CliError::Usage(format!(
-            "invalid batch YAML: expected key: value at line {line_number}"
-        ))
-    })?;
-    let key = line[..colon].trim();
-    if key.is_empty() {
-        return Err(CliError::Usage(format!(
-            "invalid batch YAML: empty key at line {line_number}"
-        )));
-    }
-    Ok((key.to_string(), parse_yaml_scalar(&line[colon + 1..])))
-}
-
-fn parse_yaml_scalar(raw: &str) -> String {
-    let value = raw.trim();
-    if value.len() >= 2 {
-        let bytes = value.as_bytes();
-        let quote = bytes[0];
-        if (quote == b'"' || quote == b'\'') && bytes[value.len() - 1] == quote {
-            return value[1..value.len() - 1]
-                .replace("\\\"", "\"")
-                .replace("\\\\", "\\");
-        }
-    }
-    value.to_string()
-}
-
-fn parse_yaml_u64(value: &str, field: &str, line_number: usize) -> Result<u64, CliError> {
-    value.parse::<u64>().map_err(|_| {
-        CliError::Usage(format!(
-            "invalid batch YAML: {field} must be an integer at line {line_number}"
-        ))
-    })
-}
-
 fn parse_yaml_bool(value: &str, field: &str, line_number: usize) -> Result<bool, CliError> {
     match value {
         "true" => Ok(true),
@@ -553,23 +525,4 @@ fn parse_yaml_bool(value: &str, field: &str, line_number: usize) -> Result<bool,
             "invalid batch YAML: {field} must be true or false at line {line_number}"
         ))),
     }
-}
-
-fn strip_yaml_comment(line: &str) -> String {
-    let mut quote = None;
-    let mut previous_escape = false;
-    for (index, byte) in line.bytes().enumerate() {
-        match (byte, quote, previous_escape) {
-            (b'\\', Some(b'"'), false) => {
-                previous_escape = true;
-                continue;
-            }
-            (b'"' | b'\'', None, _) => quote = Some(byte),
-            (b'"' | b'\'', Some(current), false) if current == byte => quote = None,
-            (b'#', None, _) => return line[..index].to_string(),
-            _ => {}
-        }
-        previous_escape = false;
-    }
-    line.to_string()
 }

@@ -207,6 +207,14 @@ branch stateを更新する
 --metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
 ```
 
+## 4.7.1 Batch Limited YAML Rules
+
+```text
+fire --batch、extinguish --batch、link --batch、evidence add --batch の限定YAMLは共通のscalar/comment/key-value parserを使う
+コメントはquote外の#から行末まで。double/single quoted scalarは外側quoteを外し、\" と \\ をunescapeする
+unsupported section/keyやschema固有validationは各commandで判定し、error messageのcontextはcommandごとのbatch YAML名を使う
+```
+
 ## 4.8 `fire`
 
 ```bash

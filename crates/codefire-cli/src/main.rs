@@ -23,6 +23,7 @@ mod fire;
 mod http;
 mod http_tls;
 mod idempotency;
+mod limited_yaml;
 mod link_batch;
 mod merge_patch_idempotency;
 mod metrics;
