@@ -5,6 +5,7 @@
 補助文書:
 
 - `docs/development/source-code-mental-model.md`: source fileを開く前に、実装の形、関数帯、データ流、永続化境界を頭に描くための詳細地図。
+- `docs/development/source-code-implementation-atlas.md`: crate、module、関数帯、主要型、永続化先、command ownershipを一枚で把握するための実装アトラス。
 - `docs/development/source-code-anatomy.md`: 主要fileの内部にある型、関数群、状態、永続化境界、変更時の触り方まで説明するsource anatomy。
 - `docs/development/source-code-blueprint.md`: 要求、設計、Rust実装、永続化、テストを横断し、機能がどの層とfileに対応するかを示す統合blueprint。
 - `docs/development/source-code-reconstruction-guide.md`: sourceを開く前に、workspace tree、command skeleton、永続化境界、変更recipeを再構成するための実装復元ガイド。
@@ -21,23 +22,25 @@
    - 要求、設計、source file、永続化file、テスト配置の対応を見る。
 3. `docs/development/source-code-mental-model.md`
    - workspace、`main.rs` の関数帯、local workflow data flow、object store flowを読む。
-4. `docs/development/source-code-reconstruction-guide.md`
+4. `docs/development/source-code-implementation-atlas.md`
+   - crate/moduleの実装配置、`main.rs` の関数帯、command ownership、主要型、保存先、変更recipeを一枚で読む。
+5. `docs/development/source-code-reconstruction-guide.md`
    - ソースを開かずに、command skeleton、`main.rs` の帯、core/store/automation境界、永続化fileを頭の中で再構成する。
-5. `docs/development/source-data-model-catalog.md`
+6. `docs/development/source-data-model-catalog.md`
    - 主要Rust型、JSON payload、active state file、object recordを確認する。
-6. `docs/development/source-code-anatomy.md`
+7. `docs/development/source-code-anatomy.md`
    - 主要fileの中にどの型・関数群・永続化境界があるかを読む。
-7. `crates/codefire-cli/src/cli_model.rs`
+8. `crates/codefire-cli/src/cli_model.rs`
    - CLIで共有されるOptions/Result/OpenContext型を見る。
-8. `crates/codefire-cli/src/automation.rs`
+9. `crates/codefire-cli/src/automation.rs`
    - JSON envelope、diagnostics、next_actionsの形を見る。
-9. `crates/codefire-core/src/lib.rs`
+10. `crates/codefire-core/src/lib.rs`
    - Atom、Trace Graph、ScanResult、Verificationのdomain modelを見る。
-10. `crates/codefire-store/src/lib.rs`
+11. `crates/codefire-store/src/lib.rs`
    - canonical JSON、object store、sealed commit validationを見る。
-11. command-specific module
+12. command-specific module
    - evidence、doctor、storage、migration、view、remoteなど、触るcommandに近いmoduleを見る。
-12. `crates/codefire-cli/src/tests.rs` and `crates/codefire-cli/src/tests/docs.rs`
+13. `crates/codefire-cli/src/tests.rs` and `crates/codefire-cli/src/tests/docs.rs`
    - 既存behaviorとregression coverageを見る。
 
 ## Source Tour In 20 Minutes
@@ -59,6 +62,7 @@
 | 11 | `docs/development/source-code-reconstruction-guide.md` | ソースを開かずにcommand skeleton、永続化file、変更recipeを説明できるか |
 | 12 | `docs/development/source-data-model-catalog.md` | 主要Rust型、JSON payload、active state、object recordを説明できるか |
 | 13 | `docs/development/source-code-anatomy.md` | 触るfileの内部にある型・関数群・状態境界を説明できるか |
+| 14 | `docs/development/source-code-implementation-atlas.md` | 実装配置、command ownership、主要型、永続化先、変更recipeをsourceなしで説明できるか |
 
 このtourで答えられない箇所は、対応するsource mapまたはblueprintを増補する対象である。
 
