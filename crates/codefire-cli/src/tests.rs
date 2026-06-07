@@ -1,5 +1,7 @@
 use super::*;
-use crate::completion::{bash_completion_script, help_text, zsh_completion_script};
+use crate::completion::{
+    bash_completion_script, help_text, zsh_completion_script, COMPLETION_COMMANDS,
+};
 use crate::doctor::DoctorOptions;
 use crate::remote::{next_remote_generation, remote_idempotency_key, RemoteGenerationLock};
 use serde_json::{json, Map};
@@ -28,6 +30,36 @@ fn help_and_completion_scripts_cover_rust_default_cli() {
     assert!(zsh.contains("--quick[skip full object store integrity scan]"));
     assert!(zsh.contains("--request-key-id[remote request signing key id]"));
     assert!(!zsh.contains("token-hash"));
+}
+
+#[test]
+fn known_limitations_python_fallback_commands_stay_out_of_rust_cli() {
+    let documented_fallback = documented_python_fallback_commands();
+    assert_eq!(
+        documented_fallback,
+        ["close", "discard", "gc", "token-hash"]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<std::collections::BTreeSet<_>>()
+    );
+
+    let rust_commands = COMPLETION_COMMANDS
+        .iter()
+        .map(|command| (*command).to_string())
+        .collect::<std::collections::BTreeSet<_>>();
+    let help_commands = help_command_set(&help_text());
+    assert_eq!(help_commands, rust_commands);
+
+    for command in documented_fallback {
+        assert!(
+            !rust_commands.contains(&command),
+            "{command} is documented as Python fallback-only but is present in Rust command list"
+        );
+        assert!(
+            !help_commands.contains(&command),
+            "{command} is documented as Python fallback-only but is present in Rust help"
+        );
+    }
 }
 
 #[test]
@@ -69,6 +101,64 @@ fn init_creates_python_compatible_repo_layout() {
     .unwrap();
     assert!(init_repo(&repo_root, false).is_err());
     init_repo(&repo_root, true).unwrap();
+}
+
+fn documented_python_fallback_commands() -> std::collections::BTreeSet<String> {
+    let docs = include_str!("../../../docs/development/known-limitations.md");
+    let mut commands = std::collections::BTreeSet::new();
+    let mut in_section = false;
+    let mut in_list = false;
+    for line in docs.lines() {
+        if line.contains("The Python fallback still owns Python-only maintenance commands") {
+            in_section = true;
+            continue;
+        }
+        if !in_section {
+            continue;
+        }
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            if in_list {
+                break;
+            }
+            continue;
+        }
+        if let Some(command) = trimmed
+            .strip_prefix("- `")
+            .and_then(|value| value.strip_suffix('`'))
+        {
+            in_list = true;
+            commands.insert(command.to_string());
+            continue;
+        }
+        if in_list {
+            break;
+        }
+    }
+    assert!(
+        in_section,
+        "known-limitations.md fallback command section is missing"
+    );
+    assert!(
+        !commands.is_empty(),
+        "known-limitations.md fallback command list is empty"
+    );
+    commands
+}
+
+fn help_command_set(help: &str) -> std::collections::BTreeSet<String> {
+    let mut lines = help.lines();
+    for line in lines.by_ref() {
+        if line.trim() == "commands:" {
+            break;
+        }
+    }
+    lines
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or_default()
+        .split_whitespace()
+        .map(str::to_string)
+        .collect()
 }
 
 #[test]

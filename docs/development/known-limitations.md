@@ -83,6 +83,13 @@ The Python fallback still owns Python-only maintenance commands that are not par
 
 Rust v0.6 covers the release-critical local workflow, file-backed/HTTP/HTTPS remote upload/list/clone/show/diff/MR operations, diagnostics, migration checks, signatures, automation JSON, storage/evidence, diff/merge intelligence, completion, and installer default behavior. Use Python fallback for remote GC and token hash generation until those maintenance commands are explicitly ported.
 
+Fallback削除条件:
+
+- Rust CLIの `COMPLETION_COMMANDS` / help / shell completionに対象commandが追加される。
+- 対象commandのRust実装、JSON出力、exit code、主要failure modeのテストが追加される。
+- Python-created repository / remote projectでの互換性テストが必要範囲で通る。
+- このfallback一覧から対象commandを削除し、`known_limitations_python_fallback_commands_stay_out_of_rust_cli` が通る。
+
 ### Config YAML subset
 
 現在は標準ライブラリのみで動かすため、`codefire.yaml`, `codefire.links.yaml`, `codefire.policy.yaml` はMVPに必要な形だけを読む限定YAML subsetとして処理している。
