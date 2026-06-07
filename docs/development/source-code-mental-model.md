@@ -2,7 +2,7 @@
 
 この文書は、CodeFireのソースコードをまだ開いていない状態でも、実装の形を頭に描けるようにするための詳細設計地図である。
 
-`docs/development/source-code-map.md` は「どのfileを見るか」の索引、`docs/development/source-code-blueprint.md` は要求・設計・実装・テストの対応表、この文書は「そのfileの中で何がどうつながっているか」の説明である。関数名やmodule名はRust実装に合わせる。
+`docs/development/source-code-map.md` は「どのfileを見るか」の索引、`docs/development/source-code-blueprint.md` は要求・設計・実装・テストの対応表、`docs/development/source-code-anatomy.md` は主要fileの内部構造、型、関数群、永続化境界の解剖図である。この文書は「そのfileの中で何がどう流れるか」の説明である。関数名やmodule名はRust実装に合わせる。
 
 ## 1. Big Picture
 
@@ -74,6 +74,9 @@ crates/
     src/fire.rs, src/fire/batch.rs, src/batch.rs, src/extinguish_ux.rs
       manual fire, batch fire, batch extinguish, interactive/all extinguish UX
 
+    src/link_batch.rs
+      Trace Link batch mutation
+
     src/evidence.rs, src/evidence/batch.rs
       evidence capture from artifact/URI/shell/argv and evidence batch
 
@@ -84,7 +87,7 @@ crates/
       health checking and migration reporting
 
     src/view.rs, src/view/file_diff.rs, src/view/semantic_diff.rs
-      show, diff, review-pack, patch export/import support
+      show, diff, review-pack, patch export support
 
     src/remote.rs, src/http.rs, src/http_tls.rs, src/signatures.rs
       file remote, HTTP/HTTPS server/client, signatures, replay protection
@@ -112,6 +115,8 @@ Current desired direction:
 - command-specific orchestration should gradually move out of `main.rs`;
 - thin wrappers in `main.rs` should parse, call module functions, and render;
 - shared behavior such as path parsing, state derivation, and command help should become common services.
+
+For a more concrete file-by-file anatomy, read `docs/development/source-code-anatomy.md` before making edits. This is especially important when touching `main.rs`, `codefire-core`, `codefire-store`, `remote.rs`, `http.rs`, `evidence.rs`, `storage.rs`, or diff modules.
 
 ## 4. Command Execution Pattern
 

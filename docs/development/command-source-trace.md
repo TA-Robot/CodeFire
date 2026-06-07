@@ -2,6 +2,8 @@
 
 この文書は、主要CLI commandがどのsource file、主要関数、domain model、persistent stateを通るかを示す。ソースコードを読む前に、commandの実装経路を頭に描くための索引である。
 
+file内部の型・関数群・永続化境界まで見たい場合は、`docs/development/source-code-anatomy.md` を併読する。
+
 ## Trace Notation
 
 ```text
@@ -313,6 +315,29 @@ Current behavior:
 Remaining v0.8 gap:
 
 - failed command capture should require explicit allowance.
+
+## link --batch
+
+```text
+codefire link --batch <file> [--path <open-dir>] [--dry-run] [--json]
+  -> link_batch.rs::parse_link_batch_args
+  -> link_batch.rs::run_link_batch
+       -> validate limited YAML/JSON-like input
+       -> validate all link mutations before write
+       -> dry-run returns plan
+       -> apply updates codefire.links.yaml
+  -> link batch JSON/text rendering through module/main routing
+```
+
+Primary files:
+
+- `link_batch.rs`
+- `limited_yaml.rs`
+- `codefire-core/src/lib.rs` for Trace Link parsing/validation semantics
+
+Design invariant:
+
+- batch Trace Link mutation must be all-or-nothing and should not silently drop unsupported fields.
 
 ## commit
 

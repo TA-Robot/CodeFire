@@ -150,3 +150,27 @@ The register exposes:
 - a mitigation checklist for the next research iteration
 
 Risk priority is computed without hidden mutable state so repeated planning produces the same ordering for the same risk set.
+
+## DES-AUTO-012: Experiment evidence pack
+
+The evidence pack builder consumes compact promotion evidence rather than raw logs:
+
+- plan ID
+- candidate ID
+- improvement over baseline
+- confidence
+- replication count
+- stale evidence count
+- blocker risk count
+- missing artifact count
+- mitigation notes
+
+It produces:
+
+- a readiness decision: `ready`, `review`, or `blocked`
+- a deterministic completeness score
+- blocking reasons that must be resolved before promotion
+- review notes for non-blocking weaknesses
+- a mitigation checklist ordered by input order
+
+The builder is intentionally conservative. Blocker risks or missing required artifacts produce `blocked`; stale evidence or low replication produce `review`; only candidates with sufficient confidence, replication, fresh evidence, and no blockers become `ready`.

@@ -47,6 +47,12 @@ from evoagent.planner import CodexPlanner, Planner, StaticPlanner
 from evoagent.policy_eval import PolicyEvaluationReport, PolicyEvaluator
 from evoagent.evidence import EvidenceLedger, EvidenceRecord
 from evoagent.evolution import AblationAxis, AblationGenerator, CandidateEvolutionOperators, MutationSpec
+from evoagent.evidence_pack import (
+    EvidenceReadiness,
+    ExperimentEvidencePack,
+    ExperimentEvidencePackBuilder,
+    ExperimentEvidenceSignal,
+)
 from evoagent.evidence_freshness import EvidenceFreshnessAudit, EvidenceFreshnessFinding, VersionedEvidenceRef
 from evoagent.external_validity import BenchmarkDomain, ExternalValidityEvaluator, ExternalValidityReport
 from evoagent.failures import FailureClassification, FailureClassifier
@@ -149,6 +155,9 @@ __all__ = [
     "ExperimentCampaignTracker",
     "ExperimentDependency",
     "ExperimentDependencyGraph",
+    "ExperimentEvidencePack",
+    "ExperimentEvidencePackBuilder",
+    "ExperimentEvidenceSignal",
     "ExperimentPlan",
     "ExperimentPlanContract",
     "ExperimentPlanContractBuilder",
@@ -162,6 +171,7 @@ __all__ = [
     "ExperimentTriageSignal",
     "EvidenceLedger",
     "EvidenceRecord",
+    "EvidenceReadiness",
     "EvidenceFreshnessAudit",
     "EvidenceFreshnessFinding",
     "ExternalValidityEvaluator",

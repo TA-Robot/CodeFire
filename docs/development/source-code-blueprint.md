@@ -2,7 +2,7 @@
 
 この文書は、CodeFireの要求定義、内部設計、Rust実装、テスト、運用ドキュメントを同じ頭で読めるようにするための実装blueprintである。
 
-`source-code-map.md` はfile索引、`source-code-mental-model.md` は処理の流れ、`command-source-trace.md` はcommand別traceである。この文書はそれらを統合し、「この機能はどの層に存在し、どのfileをどう変えるべきか」を示す。
+`source-code-map.md` はfile索引、`source-code-mental-model.md` は処理の流れ、`source-code-anatomy.md` は主要fileの内部構造、`command-source-trace.md` はcommand別traceである。この文書はそれらを統合し、「この機能はどの層に存在し、どのfileをどう変えるべきか」を示す。
 
 ## 1. Product Requirement To Source
 

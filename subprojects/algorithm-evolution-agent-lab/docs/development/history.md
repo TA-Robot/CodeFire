@@ -67,3 +67,4 @@
 | 2026-06-07 | Planning | queue/promotion/learning curve/budgetを統合する `ExperimentTriageBoard` を追加した | `REQ-AUTO-027`; `DES-AUTO-009`; `TEST-experiment-triage-board-ranks-actions` |
 | 2026-06-07 | Planning | triage signalからactive/review/deferred laneを持つ次イテレーション計画を作る `ExperimentIterationPlanner` を追加した | `REQ-AUTO-028`; `DES-AUTO-010`; `TEST-experiment-iteration-planner-builds-bounded-plan` |
 | 2026-06-07 | Governance | experiment campaignのopen risk、blocking risk、mitigation checklistを優先度順に返す `ExperimentRiskRegister` を追加した | `REQ-AUTO-029`; `DES-AUTO-011`; `TEST-experiment-risk-register-prioritizes-open-risks` |
+| 2026-06-07 | Evidence | promotion/review向けに改善、信頼度、replication、freshness、risk、artifact gapを束ねる `ExperimentEvidencePackBuilder` を追加した | `REQ-AUTO-030`; `DES-AUTO-012`; `TEST-experiment-evidence-pack-builder-blocks-incomplete-claims` |

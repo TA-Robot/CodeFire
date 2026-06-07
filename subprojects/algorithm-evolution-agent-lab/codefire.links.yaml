@@ -669,3 +669,12 @@ links:
   - from: REQ-AUTO-029
     to: TEST-experiment-risk-register-prioritizes-open-risks
     type: verified_by
+  - from: REQ-AUTO-030
+    to: DES-AUTO-012
+    type: refined_by
+  - from: DES-AUTO-012
+    to: CODE-ExperimentEvidencePackBuilder
+    type: implemented_by
+  - from: REQ-AUTO-030
+    to: TEST-experiment-evidence-pack-builder-blocks-incomplete-claims
+    type: verified_by

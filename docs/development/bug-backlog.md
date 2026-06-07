@@ -80,6 +80,8 @@
 | CFB-063 | open | Review/Patch / JSON Surface | `review-pack main --json` と `patch export main --json` がunsupported optionのplain text errorになる | review/patch automation surfaceを確認したとき | review artifact生成やpatch exportを機械制御しづらい | text/file outputだけを使う | review-pack/patch exportのJSON plan/resultまたはstructured unsupported diagnosticsを実装する |
 | CFB-064 | open | Remote / JSON Surface | `list <remote> --json` と `request-list <remote> --json` がunsupported optionのplain text errorになる | remote list失敗面を確認したとき | remote state確認をautomationで標準化できない | text outputをparseしないで別途確認する | remote read commandsのJSON envelopeを実装する |
 | CFB-065 | open | Remote / Dry Run Contract | `upload --dry-run --json` のtop-level `repo` がnullで、plan内next_actionsがtop-level next_actionsへ出ない | missing remote upload planを確認したとき | automationがrepository targetや次操作をenvelope共通fieldから読めない | `data.plan.repo` と `data.plan.next_actions` を読む | dry-run envelopeのrepo/next_actionsをplan内容と整合させる |
+| CFB-066 | open | Install / PATH precedence | `install.sh --prefix ~/.cargo` は成功したが、PATH上の有効 `codefire` は古い `~/.local/bin/codefire` のままだった | v0.9 Phase Aのhelp修正をinstallしてsmokeしたとき | 修正済みbinaryを使っているつもりで古いbinaryを実行し、`init --help` の副作用を再発させた | `which codefire` を確認し、PATH先頭のprefixへinstallし直す | install後にactive `codefire` path/version/help fingerprintを確認し、prefixがPATH先頭でない場合はwarningを出す |
+| CFB-067 | open | Commit / JSON Contract | `commit --json` 成功時のtop-level `repo` がnullで、実行済みなのにplan内next_actionsがapply commitを示す | evidence pack builderをCodeFire commitしたとき | automationがcommit後のrepo/branch/next actionを共通fieldから読めず、apply済み操作を未適用planのように扱う可能性がある | `data.plan.open_dir` と `data.plan.branch` を読む | commit successはtyped result dataを返し、top-level repoを埋め、apply済みplan next_actionを出さない |
 
 ## Triage Notes
 

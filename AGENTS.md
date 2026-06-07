@@ -11,6 +11,7 @@
 - `docs/development/source-code-map.md`: Rust実装のfile/module/type/function責務対応表。
 - `docs/development/source-code-blueprint.md`: 要求、設計、Rust実装、永続化file、テスト配置の対応表。
 - `docs/development/source-code-mental-model.md`: ソースを開かなくても実装形状とデータ流を想像するための詳細地図。
+- `docs/development/source-code-anatomy.md`: 主要fileの内部にある型、関数群、状態、永続化境界、変更時の触り方まで分かるsource anatomy。
 - `docs/development/command-source-trace.md`: CLI commandごとのparse/run/render/persistent state実装経路。
 - `docs/development/v0.6-readiness.md`: v0.6を完成と判断するための残ゲート。
 - `docs/development/todo-checklist.md`: 実装タスクと依存関係。
@@ -33,6 +34,7 @@
 - 計算オーダとメモリ利用オーダを軽く扱わない。
 - `main.rs` や単一ファイルへ機能を詰め込まない。責務単位でmodule/fileを分割する。
 - 新規機能で責務境界が増える場合は、実装前に `docs/development/module-boundaries.md` の分割判断を確認する。
+- 主要command、module、永続化境界を変える場合は、実装と同じ変更で `source-code-map.md` / `source-code-mental-model.md` / `source-code-anatomy.md` / `command-source-trace.md` の該当箇所を更新する。
 - parse、validate、plan、apply、renderを混ぜない。
 - object identity、sealed commit、branch head atomicity、remote mutation policyの不変条件を壊さない。
 - AI agent運用機能、agent marketplace、prompt orchestrationはCodeFire本体へ入れない。

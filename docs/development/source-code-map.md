@@ -5,6 +5,7 @@
 補助文書:
 
 - `docs/development/source-code-mental-model.md`: source fileを開く前に、実装の形、関数帯、データ流、永続化境界を頭に描くための詳細地図。
+- `docs/development/source-code-anatomy.md`: 主要fileの内部にある型、関数群、状態、永続化境界、変更時の触り方まで説明するsource anatomy。
 - `docs/development/source-code-blueprint.md`: 要求、設計、Rust実装、永続化、テストを横断し、機能がどの層とfileに対応するかを示す統合blueprint。
 - `docs/development/command-source-trace.md`: CLI commandからparse/run/render/persistenceまでを追う関数レベルのtrace。
 
@@ -18,17 +19,19 @@
    - 要求、設計、source file、永続化file、テスト配置の対応を見る。
 3. `docs/development/source-code-mental-model.md`
    - workspace、`main.rs` の関数帯、local workflow data flow、object store flowを読む。
-4. `crates/codefire-cli/src/cli_model.rs`
+4. `docs/development/source-code-anatomy.md`
+   - 主要fileの中にどの型・関数群・永続化境界があるかを読む。
+5. `crates/codefire-cli/src/cli_model.rs`
    - CLIで共有されるOptions/Result/OpenContext型を見る。
-5. `crates/codefire-cli/src/automation.rs`
+6. `crates/codefire-cli/src/automation.rs`
    - JSON envelope、diagnostics、next_actionsの形を見る。
-6. `crates/codefire-core/src/lib.rs`
+7. `crates/codefire-core/src/lib.rs`
    - Atom、Trace Graph、ScanResult、Verificationのdomain modelを見る。
-7. `crates/codefire-store/src/lib.rs`
+8. `crates/codefire-store/src/lib.rs`
    - canonical JSON、object store、sealed commit validationを見る。
-8. command-specific module
+9. command-specific module
    - evidence、doctor、storage、migration、view、remoteなど、触るcommandに近いmoduleを見る。
-9. `crates/codefire-cli/src/tests.rs` and `crates/codefire-cli/src/tests/docs.rs`
+10. `crates/codefire-cli/src/tests.rs` and `crates/codefire-cli/src/tests/docs.rs`
    - 既存behaviorとregression coverageを見る。
 
 ## Source Tour In 20 Minutes
@@ -47,6 +50,7 @@
 | 8 | `crates/codefire-core/src/lib.rs:266` | Atom indexからTrace Graph、Fire、Verificationへどう進むか |
 | 9 | `crates/codefire-store/src/lib.rs:173` | payloadからobject record、object ID、sealed validationへどう進むか |
 | 10 | `crates/codefire-cli/src/automation.rs:9` | AI/toolが消費するJSON envelopeはどこで作るか |
+| 11 | `docs/development/source-code-anatomy.md` | 触るfileの内部にある型・関数群・状態境界を説明できるか |
 
 このtourで答えられない箇所は、対応するsource mapまたはblueprintを増補する対象である。
 
@@ -73,6 +77,7 @@ Design rule:
 | `exit_code.rs` | `ExitCode`, error mapping helpers | stable process exit code taxonomy |
 | `completion.rs` | `help_text`, `completion_script` | top-level help and shell completion |
 | `automation.rs` | `command_result_envelope`, `*_data_json`, `*_next_actions` | machine-readable command result contract |
+| `link_batch.rs` | `parse_link_batch_args`, `run_link_batch` | Trace Link batch mutation |
 
 Current architecture debt:
 

@@ -2,7 +2,7 @@
 
 この文書は、Code Fireの内部設計である。実装時のmodule境界、データフロー、不変条件、エラー処理、テスト設計の正本として扱う。
 
-実際のsource file、主要関数、commandごとの実装経路は、補助文書として `docs/development/source-code-map.md`、`docs/development/source-code-blueprint.md`、`docs/development/source-code-mental-model.md`、`docs/development/command-source-trace.md` に展開する。この文書は設計の正本、補助文書はsource navigationの正本である。
+実際のsource file、主要関数、commandごとの実装経路は、補助文書として `docs/development/source-code-map.md`、`docs/development/source-code-blueprint.md`、`docs/development/source-code-mental-model.md`、`docs/development/source-code-anatomy.md`、`docs/development/command-source-trace.md` に展開する。この文書は設計の正本、補助文書はsource navigationの正本である。
 
 ## 11.1 Architecture Principles
 
@@ -76,6 +76,7 @@ crates/
     src/fire.rs
     src/fire/batch.rs
     src/extinguish_ux.rs
+    src/link_batch.rs
     src/evidence.rs
     src/evidence/batch.rs
     src/doctor.rs
@@ -133,6 +134,7 @@ Source documentation requirements:
 
 - `docs/development/source-code-map.md` はfile/module/type/function責務の索引である。
 - `docs/development/source-code-mental-model.md` は関数内のdata flowと永続化境界を説明する。
+- `docs/development/source-code-anatomy.md` は主要fileの内部にある型、関数群、状態、永続化境界、変更時の触り方を説明する。
 - `docs/development/source-code-blueprint.md` は要求、設計、source、persistence、testの対応表である。
 - `docs/development/command-source-trace.md` はCLI commandからparse/run/render/writeまでのtraceである。
 - 主要commandの実装経路を変えたcommitは、上記文書の少なくとも1つを更新する。

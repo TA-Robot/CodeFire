@@ -115,3 +115,7 @@ The system shall convert triage decisions into a bounded next-iteration plan tha
 ## REQ-AUTO-029: Experiment risk register
 
 The system shall maintain a risk register for experiment campaigns, prioritize open risks by likelihood, impact, and severity, and surface blocker risks that must be mitigated before promotion or external claims.
+
+## REQ-AUTO-030: Experiment evidence pack
+
+The system shall build a compact evidence pack for candidate promotion or external review, combining improvement signal, confidence, replication count, evidence freshness gaps, open blocker risks, missing artifacts, and mitigation checklist into a deterministic readiness decision.
