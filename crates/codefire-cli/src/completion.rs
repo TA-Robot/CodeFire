@@ -46,6 +46,7 @@ common:
   codefire open <branch> <path> [--dry-run] [--json]
   codefire scan [path] [--json] [--metrics]
   codefire verify [path] [--details] [--blocking-only] [--json] [--metrics]
+  codefire doctor [path] [--quick] [--json]
   codefire commit -m <message> [--signer <name>] [--key-id <id>]
   codefire completion <bash|zsh>
 ",
@@ -94,6 +95,9 @@ _codefire_complete()
       ;;
     verify)
       COMPREPLY=( $(compgen -W "--details --blocking-only --json --metrics" -- "$cur") )
+      ;;
+    doctor)
+      COMPREPLY=( $(compgen -W "--quick --full --json" -- "$cur") )
       ;;
     diff)
       COMPREPLY=( $(compgen -W "--algorithm --context --rename-detection --atoms --trace --impact --json" -- "$cur") )
@@ -176,6 +180,9 @@ _codefire()
       ;;
     verify)
       _arguments '--details[show failed verification diagnostic details]' '--blocking-only[show only blocking diagnostics]' '--json[emit JSON]' '--metrics[show metrics]'
+      ;;
+    doctor)
+      _arguments '--quick[skip full object store integrity scan]' '--full[run full object store integrity scan]' '--json[emit JSON]'
       ;;
     diff)
       _arguments '--algorithm[diff algorithm]:algorithm:(myers patience histogram)' '--context[context lines]:lines:' '--rename-detection[detect renames and copies]' '--atoms[include Atom diff]' '--trace[include TraceGraph diff]' '--impact[include policy and fire impact]' '--json[emit JSON]'

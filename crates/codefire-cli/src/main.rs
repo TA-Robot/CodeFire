@@ -4080,6 +4080,7 @@ fn ensure_repo_layout(repo_root: &Path) -> Result<(), CliError> {
         cf.join("cache"),
         cf.join("locks"),
         cf.join("remotes"),
+        cf.join("idempotency"),
     ] {
         fs::create_dir_all(path)?;
     }

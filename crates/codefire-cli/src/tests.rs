@@ -11,11 +11,13 @@ fn help_and_completion_scripts_cover_rust_default_cli() {
     let help = help_text();
     assert!(help.contains("usage: codefire <command> [args]"));
     assert!(help.contains("codefire completion <bash|zsh>"));
+    assert!(help.contains("codefire doctor [path] [--quick] [--json]"));
 
     let bash = bash_completion_script();
     assert!(bash.contains("complete -F _codefire_complete codefire"));
     assert!(bash.contains("request-apply"));
     assert!(bash.contains("--details --blocking-only --json --metrics"));
+    assert!(bash.contains("--quick --full --json"));
     assert!(bash.contains("--tls-cert --tls-key"));
     assert!(!bash.contains("token-hash"));
 
@@ -23,6 +25,7 @@ fn help_and_completion_scripts_cover_rust_default_cli() {
     assert!(zsh.contains("#compdef codefire"));
     assert!(zsh.contains("completion\\:completion"));
     assert!(zsh.contains("--details[show failed verification diagnostic details]"));
+    assert!(zsh.contains("--quick[skip full object store integrity scan]"));
     assert!(zsh.contains("--request-key-id[remote request signing key id]"));
     assert!(!zsh.contains("token-hash"));
 }
@@ -40,6 +43,18 @@ fn init_creates_python_compatible_repo_layout() {
     assert_eq!(branches[0].name, "main");
     assert_eq!(branches[0].head, result.main_commit);
     assert_eq!(branches[0].state, "closed");
+    for relative in [
+        "objects",
+        "branches",
+        "opened",
+        "active",
+        "cache",
+        "locks",
+        "remotes",
+        "idempotency",
+    ] {
+        assert!(repo_root.join(".codefire").join(relative).is_dir());
+    }
     for subdir in codefire_store::known_object_subdirs() {
         assert!(repo_root
             .join(".codefire")
@@ -65,6 +80,7 @@ fn doctor_reports_clean_repo_and_corrupted_object_record() {
     let clean = run_doctor(&DoctorOptions {
         start: repo_root.clone(),
         json_output: false,
+        quick: false,
     })
     .unwrap();
     assert!(clean.ok);
@@ -83,6 +99,7 @@ fn doctor_reports_clean_repo_and_corrupted_object_record() {
     let corrupted = run_doctor(&DoctorOptions {
         start: repo_root,
         json_output: false,
+        quick: false,
     })
     .unwrap();
     assert!(!corrupted.ok);
@@ -92,10 +109,118 @@ fn doctor_reports_clean_repo_and_corrupted_object_record() {
         .any(|issue| issue.kind == "object_integrity_error"));
     assert!(doctor_report_diagnostics_json(&corrupted)
         .iter()
-        .any(|issue| issue["kind"] == "object_integrity_error"));
+        .any(|issue| issue["kind"] == "object_integrity_error"
+            && issue["category"] == "object_store"
+            && issue["blocking"] == true
+            && issue["repairable"] == false));
+    let data = doctor_report_data_json(&corrupted);
+    assert_eq!(data["mode"], "full");
+    assert!(data["issue_counts"]["blocking"].as_u64().unwrap() >= 1);
     assert!(doctor_report_next_actions(&corrupted)
         .iter()
         .any(|action| action["id"] == "inspect_object_store_corruption"));
+}
+
+#[test]
+fn doctor_quick_mode_skips_full_object_record_scan() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let loose_invalid = repo_root
+        .join(".codefire")
+        .join("objects")
+        .join("blobs")
+        .join("CF-BLOB-invalid.json");
+    fs::write(loose_invalid, "{not json").unwrap();
+
+    let full = run_doctor(&DoctorOptions {
+        start: repo_root.clone(),
+        json_output: false,
+        quick: false,
+    })
+    .unwrap();
+    assert!(!full.ok);
+    assert!(full
+        .issues
+        .iter()
+        .any(|issue| issue.kind == "invalid_object_record"));
+
+    let quick = run_doctor(&DoctorOptions {
+        start: repo_root,
+        json_output: false,
+        quick: true,
+    })
+    .unwrap();
+    assert!(quick.ok);
+    assert_eq!(quick.checked_objects, 0);
+    assert_eq!(quick.skipped_checks, vec!["object_store_integrity"]);
+    let data = doctor_report_data_json(&quick);
+    assert_eq!(data["mode"], "quick");
+    assert_eq!(data["skipped_checks"][0], "object_store_integrity");
+    assert!(quick
+        .issues
+        .iter()
+        .all(|issue| issue.kind != "invalid_object_record"));
+}
+
+#[test]
+fn doctor_checks_layout_active_state_and_open_marker_shape() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    fs::remove_dir_all(repo_root.join(".codefire").join("locks")).unwrap();
+
+    let registry_path = opened_registry_path(&repo_root, "main");
+    let registry = read_json(&registry_path).unwrap();
+    let active_state_path = PathBuf::from(
+        registry["open"]["active_state_path"]
+            .as_str()
+            .expect("active state path"),
+    );
+    write_json_atomic(
+        &active_state_path.join("fires.json"),
+        &json!([{"display_id": "FIRE-1"}]),
+    )
+    .unwrap();
+
+    let mut marker = read_json(&open_dir.join(".codefire-open")).unwrap();
+    marker["open"]["open_instance_id"] = Value::String("open_wrong".to_string());
+    write_json_atomic(&open_dir.join(".codefire-open"), &marker).unwrap();
+
+    let report = run_doctor(&DoctorOptions {
+        start: repo_root,
+        json_output: false,
+        quick: true,
+    })
+    .unwrap();
+    assert!(!report.ok);
+    for expected in [
+        "missing_repo_directory",
+        "invalid_active_state_shape",
+        "open_marker_instance_mismatch",
+    ] {
+        assert!(
+            report.issues.iter().any(|issue| issue.kind == expected),
+            "missing doctor issue: {expected}"
+        );
+    }
+    assert!(doctor_report_next_actions(&report)
+        .iter()
+        .any(|action| action["id"] == "reopen_branch_workspace"));
 }
 
 #[test]
@@ -132,6 +257,7 @@ fn doctor_detects_invalid_branch_head_and_open_registry() {
     let report = run_doctor(&DoctorOptions {
         start: repo_root,
         json_output: false,
+        quick: false,
     })
     .unwrap();
     assert!(!report.ok);
@@ -3075,7 +3201,7 @@ fn migrate_check_and_dry_run_report_compatibility_and_blockers() {
     assert_eq!(data["type"], "codefire_migration_report");
     assert_eq!(data["compatible"], true);
     assert!(migration_report_diagnostics_json(&report).is_empty());
-    assert!(!migration_report_next_actions(&report).is_empty());
+    assert!(migration_report_next_actions(&report).is_empty());
 
     let dry_run = run_migrate(
         &parse_migrate_args(&[
@@ -3088,10 +3214,7 @@ fn migrate_check_and_dry_run_report_compatibility_and_blockers() {
     .unwrap();
     assert_eq!(dry_run.mode, migration::MigrateMode::DryRun);
     assert!(dry_run.compatible);
-    assert!(dry_run
-        .planned_actions
-        .iter()
-        .any(|action| action.kind == "create_directory"));
+    assert!(dry_run.planned_actions.is_empty());
 
     let branch = json!({
         "type": "branch",

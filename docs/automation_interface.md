@@ -194,10 +194,16 @@ migrate: review_migration_plan, inspect_migration_blockers
   "type": "codefire_doctor_report",
   "version": 1,
   "ok": false,
+  "mode": "full",
+  "skipped_checks": [],
   "checked": {"objects": 12, "branches": 1, "opened": 1, "active_files": 4},
+  "issue_counts": {"total": 1, "blocking": 1},
   "issues": [
     {
       "severity": "error",
+      "category": "object_store",
+      "repairable": false,
+      "blocking": true,
       "kind": "object_integrity_error",
       "message": "object hash mismatch: expected ..., got ...",
       "path": "/repo/.codefire/objects/commits/CF-COMMIT-....json"
@@ -205,6 +211,8 @@ migrate: review_migration_plan, inspect_migration_blockers
   ]
 }
 ```
+
+`doctor --quick --json` keeps layout, branch, opened registry, and active state shape checks, but skips full object store integrity scanning. The skipped check names are returned in `data.skipped_checks`.
 
 `storage report --json` data:
 

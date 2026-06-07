@@ -99,17 +99,22 @@ force-upload
 ## 4.3 `doctor`
 
 ```bash
-codefire doctor [path] [--json]
+codefire doctor [path] [--quick|--full] [--json]
 ```
 
 仕様:
 
 ```text
 repository layout、object record integrity、branch head sealed commit、opened registry、active state JSONをread-onlyで検査する
+repo layoutはobjects/branches/opened/active/cache/locks/remotes/idempotencyと既知object subdirを検査する
 object recordはhash/id/filename/type directoryの整合性を検査する
+--quickはobject store全件integrity走査をskipし、layout、branch head、opened registry、active state shape中心に検査する
+JSON data.modeはquick/full、data.skipped_checksはquickで省略した検査名を返す
 branch headとopened registry current_base_commitはsealed commit validationを実行する
-opened registryのactive_state_pathは存在するディレクトリであることを検査する
+opened registryのopen.path、active_state_path、.codefire-open marker、branch名、open_instance_idを相互検証する
+active state filesはJSONとして読めるだけでなく、state/fires/resolutions/scan/verificationの最低限のshapeを検証する
 --jsonはcodefire.command_result.v1 envelopeを返し、破損時はok=false、exit_code=20、diagnosticsとnext_actionsを含める
+doctor diagnosticsはseverity、category、repairable、blocking、kind、message、pathを含める
 ```
 
 ## 4.4 `open`

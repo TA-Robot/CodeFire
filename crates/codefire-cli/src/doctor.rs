@@ -13,6 +13,7 @@ pub(crate) use report::{
 pub(crate) struct DoctorOptions {
     pub(crate) start: PathBuf,
     pub(crate) json_output: bool,
+    pub(crate) quick: bool,
 }
 
 #[derive(Debug)]
@@ -23,6 +24,8 @@ pub(crate) struct DoctorReport {
     pub(crate) checked_branches: usize,
     pub(crate) checked_opened: usize,
     pub(crate) checked_active_files: usize,
+    pub(crate) quick: bool,
+    pub(crate) skipped_checks: Vec<String>,
     pub(crate) issues: Vec<DoctorIssue>,
 }
 
@@ -63,9 +66,12 @@ impl DoctorIssue {
 pub(crate) fn parse_doctor_args(args: &[String]) -> Result<DoctorOptions, CliError> {
     let mut start = None;
     let mut json_output = false;
+    let mut quick = false;
     for arg in args {
         match arg.as_str() {
             "--json" => json_output = true,
+            "--quick" => quick = true,
+            "--full" => quick = false,
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported doctor option: {option}"
@@ -82,17 +88,15 @@ pub(crate) fn parse_doctor_args(args: &[String]) -> Result<DoctorOptions, CliErr
     Ok(DoctorOptions {
         start: start.unwrap_or(std::env::current_dir()?),
         json_output,
+        quick,
     })
 }
 
 pub(crate) fn run_doctor(options: &DoctorOptions) -> Result<DoctorReport, CliError> {
     let repo_root = find_repo_root(&options.start)?;
     let cf = repo_root.join(".codefire");
-    let checked = checks::run_checks(&cf)?;
-    let ok = !checked
-        .issues
-        .iter()
-        .any(|issue| issue.severity == DoctorSeverity::Error);
+    let checked = checks::run_checks(&cf, options.quick)?;
+    let ok = !checked.issues.iter().any(report::issue_blocking);
 
     Ok(DoctorReport {
         repo_root,
@@ -101,6 +105,8 @@ pub(crate) fn run_doctor(options: &DoctorOptions) -> Result<DoctorReport, CliErr
         checked_branches: checked.branches,
         checked_opened: checked.opened,
         checked_active_files: checked.active_files,
+        quick: options.quick,
+        skipped_checks: checked.skipped_checks,
         issues: checked.issues,
     })
 }
