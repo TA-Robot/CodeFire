@@ -2,7 +2,7 @@
 
 この文書は、CodeFireのソースコードをまだ開いていない状態でも、実装の形を頭に描けるようにするための詳細設計地図である。
 
-`docs/development/source-code-map.md` は「どのfileを見るか」の索引、`docs/development/source-code-blueprint.md` は要求・設計・実装・テストの対応表、`docs/development/source-code-anatomy.md` は主要fileの内部構造、型、関数群、永続化境界の解剖図である。この文書は「そのfileの中で何がどう流れるか」の説明である。関数名やmodule名はRust実装に合わせる。
+`docs/development/source-code-map.md` は「どのfileを見るか」の索引、`docs/development/source-code-blueprint.md` は要求・設計・実装・テストの対応表、`docs/development/source-code-reconstruction-guide.md` はsourceを開く前に実装の形を再構成するガイド、`docs/development/source-data-model-catalog.md` は型とJSONの辞書、`docs/development/source-code-anatomy.md` は主要fileの内部構造、型、関数群、永続化境界の解剖図である。この文書は「そのfileの中で何がどう流れるか」の説明である。関数名やmodule名はRust実装に合わせる。
 
 ## 1. Big Picture
 

@@ -2,7 +2,7 @@
 
 この文書は、CodeFireのソースコードを開く前に、実装の中身まで具体的に想像できるようにするためのsource anatomyである。
 
-`source-code-map.md` はfile索引、`source-code-mental-model.md` は処理の流れ、`command-source-trace.md` はcommand別trace、`source-code-blueprint.md` は要求からsourceへの対応表である。この文書はさらに一段具体化し、主要fileの内部にある型、関数群、状態、永続化境界、変更時の触り方を説明する。
+`source-code-map.md` はfile索引、`source-code-mental-model.md` は処理の流れ、`source-code-reconstruction-guide.md` はsourceを開く前に実装を再構成するための読解ガイド、`source-data-model-catalog.md` は型とJSONの辞書、`command-source-trace.md` はcommand別trace、`source-code-blueprint.md` は要求からsourceへの対応表である。この文書はさらに一段具体化し、主要fileの内部にある型、関数群、状態、永続化境界、変更時の触り方を説明する。
 
 ## 1. Read This Before Opening Source
 
@@ -361,10 +361,10 @@ The `.codefire` directory has mutable and immutable zones.
 .codefire/
   objects/                         immutable object records
     commits/
-    manifests/
+    content_manifests/
     atom_indexes/
     trace_graphs/
-    fire_deltas/
+    fire_ledgers/
     verifications/
     policies/
     resolutions/

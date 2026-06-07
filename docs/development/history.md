@@ -13,6 +13,7 @@
 
 | Date | Area | Summary | Artifacts | Notes |
 |---|---|---|---|---|
+| 2026-06-07 | Documentation | sourceを開く前に実装構造を再構成できるよう、source reconstruction guideとdata model catalogを追加した | `docs/development/source-code-reconstruction-guide.md`, `docs/development/source-data-model-catalog.md`, source navigation docs | workspace tree、`main.rs` の帯、command skeleton、主要Rust型、active state JSON、object record、debug matrixを文書化 |
 | 2026-06-03 | Bootstrap | `codefire_docs_v0.2.zip` を `project/` 直下に展開した | `README.md`, `docs/`, `adr/`, `schemas/`, `diagrams/`, design document | この基盤リポジトリのルールに合わせ、archive内の `examples/` は展開対象から除外した |
 | 2026-06-03 | Planning | 開発管理用TODO、履歴、完成計画を追加した | `docs/development/todo-checklist.md`, `docs/development/history.md`, `docs/development/completion-plan.md` | 実装は未開始。MVP計画を実行可能なタスクへ分解した |
 | 2026-06-03 | Implementation | Python標準ライブラリのみでCodeFire MVP CLIを追加した | `codefire`, `tests/test_codefire_cli.py` | init/open/scan/fire/extinguish/verify/commit/clone/merge/doctor のE2Eが通る |
