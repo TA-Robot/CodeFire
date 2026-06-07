@@ -210,6 +210,7 @@ branch stateを更新する
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.changed_atoms、data.open_fires、diagnosticsを含める
 --jsonはchanged atoms、open fires、verifyに進むためのmachine-readable next_actionsを含める
 --metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
+metricsは `total_ms` / `scan_pipeline_ms` / `atom_extraction_ms` / `trace_parse_ms` / `fire_build_ms` の安定phase key、`phases[].measured`、cache status metadataを含める
 ```
 
 ## 4.7.1 Batch Limited YAML Rules
@@ -344,6 +345,7 @@ verify blockerのexit codeはopen fires=10、missing links=11、stale resolution
 next_actionsはcontext_changed、context_atom、refresh_resolution、rerun_check、commitなどの安定action kindを返す
 next_actionsは最大12件に制限され、超過時はnext_actions_omitted actionに省略件数とlimitを含める
 --metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
+metricsは `total_ms` / `verification_pipeline_ms` / `scan_pipeline_ms` / `verification_commands_ms` / `policy_evaluation_ms` の安定phase key、`phases[].measured`、cache status metadataを含める
 ```
 
 ## 4.11 `context`

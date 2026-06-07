@@ -4901,6 +4901,7 @@ fn metrics_attach_to_status_scan_and_verify_data() {
     );
     assert_eq!(status_data["metrics"]["type"], "codefire_metrics");
     assert_eq!(status_data["metrics"]["command"], "status");
+    assert_eq!(status_data["metrics"]["phase_timings"]["status_load_ms"], 3);
 
     let scan = run_scan(&open_dir).unwrap();
     let scan_data = attach_metrics(
@@ -4908,11 +4909,28 @@ fn metrics_attach_to_status_scan_and_verify_data() {
         Some(&scan_metrics(Duration::from_millis(5), &scan)),
     );
     assert_eq!(scan_data["metrics"]["command"], "scan");
+    assert_eq!(scan_data["metrics"]["phase_timings"]["total_ms"], 5);
+    assert_eq!(scan_data["metrics"]["phase_timings"]["scan_pipeline_ms"], 5);
+    assert_eq!(
+        scan_data["metrics"]["phase_timings"]["atom_extraction_ms"],
+        0
+    );
+    assert!(scan_data["metrics"]["phases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|phase| phase["name"] == "trace_parse" && phase["measured"] == false));
     assert!(scan_data["metrics"]["counters"]
         .as_array()
         .unwrap()
         .iter()
         .any(|counter| counter["name"] == "atoms" && counter["value"] == 1));
+    assert_eq!(scan_data["metrics"]["cache"]["status"], "unimplemented");
+    assert_eq!(
+        scan_data["metrics"]["cache"]["disabled_reason"],
+        "not_implemented"
+    );
+    assert_eq!(scan_data["metrics"]["cache"]["entry_count"], 0);
 
     let verification = run_verify(&open_dir).unwrap();
     let verify_data = attach_metrics(
@@ -4925,6 +4943,15 @@ fn metrics_attach_to_status_scan_and_verify_data() {
     assert_eq!(verify_data["diagnostic_filter"], "blocking_only");
     assert_eq!(verify_data["metrics"]["command"], "verify");
     assert_eq!(verify_data["metrics"]["phase_timings"]["total_ms"], 7);
+    assert_eq!(
+        verify_data["metrics"]["phase_timings"]["verification_pipeline_ms"],
+        7
+    );
+    assert!(verify_data["metrics"]["phases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|phase| phase["name"] == "verification_commands" && phase["measured"] == false));
 }
 
 #[test]

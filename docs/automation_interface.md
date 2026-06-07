@@ -151,12 +151,33 @@ When `--metrics` is present on `status`, `scan`, or `verify`, the command data i
     "type": "codefire_metrics",
     "version": 1,
     "command": "scan",
-    "phase_timings": {"total_ms": 12},
+    "phase_timings": {
+      "total_ms": 12,
+      "scan_pipeline_ms": 12,
+      "atom_extraction_ms": 0,
+      "trace_parse_ms": 0,
+      "fire_build_ms": 0
+    },
+    "phases": [
+      {"name": "total", "elapsed_ms": 12, "measured": true},
+      {"name": "scan_pipeline", "elapsed_ms": 12, "measured": true},
+      {"name": "atom_extraction", "elapsed_ms": 0, "measured": false}
+    ],
     "counters": [{"name": "atoms", "value": 24}],
-    "cache": {"enabled": false}
+    "cache": {
+      "status": "unimplemented",
+      "enabled": false,
+      "implementation": "none",
+      "disabled_reason": "not_implemented",
+      "entry_count": 0,
+      "hit_count": 0,
+      "miss_count": 0
+    }
   }
 }
 ```
+
+`phase_timings` keeps stable `<phase>_ms` keys for scripts. `phases` carries the same values with `measured` metadata so uninstrumented subphases are not confused with measured zero-cost work. Cache fields are present even while cache is unimplemented to keep the future cache-enabled schema compatible.
 
 `verify --json` data:
 
