@@ -997,6 +997,91 @@ fn context_pack_returns_atom_changed_and_fire_views() {
 }
 
 #[test]
+fn verify_diagnostics_filter_nonblocking_missing_required_links() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit_with_atoms(
+        &objects,
+        &[
+            (
+                "docs/requirements/session.md",
+                "## REQ-session: Requirement\nTTL 30\n",
+            ),
+            (
+                "docs/design/session.md",
+                "## DES-session: Design\nClock policy\n",
+            ),
+            (
+                "codefire.policy.yaml",
+                "commit_policy:\n  require_trace_completeness: false\n",
+            ),
+        ],
+        &[
+            (
+                "REQ-session",
+                "requirement",
+                "docs/requirements/session.md",
+                "sha256:req",
+            ),
+            (
+                "DES-session",
+                "design",
+                "docs/design/session.md",
+                "sha256:des",
+            ),
+        ],
+        Vec::new(),
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": base_commit,
+            "state": "closed",
+            "created_at": "2026-06-05T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let verification = run_verify(&open_dir).unwrap();
+    assert_eq!(verification.result, "passed");
+    assert!(!verification.trace_completeness_required);
+    assert!(!verification.missing_required_links.is_empty());
+    assert_eq!(verification_exit_code(&verification), ExitCode::Success);
+
+    let all = crate::automation::verification_diagnostics_json(&verification);
+    assert!(!all.is_empty());
+    assert!(all.iter().all(|diagnostic| {
+        diagnostic["kind"] == "missing_required_link"
+            && diagnostic["severity"] == "warning"
+            && diagnostic["blocking"] == false
+    }));
+    assert!(
+        crate::automation::verification_diagnostics_json_with_filter(&verification, true)
+            .is_empty()
+    );
+    assert!(verification::render_verification(&verification, true, true)
+        .contains("Blocking checks: none"));
+}
+
+#[test]
 fn link_batch_validates_all_items_before_writing_links() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
@@ -1672,6 +1757,7 @@ fn scan_and_verify_text_outputs_include_empty_summaries() {
         type_tag: "verification".to_string(),
         version: 1,
         result: "passed".to_string(),
+        trace_completeness_required: true,
         open_required_fires: 0,
         failed_checks: Vec::new(),
         missing_required_links: Vec::new(),

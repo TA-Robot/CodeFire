@@ -15,13 +15,13 @@
 - High: 15
 - Medium: 64
 - Low: 1
-- Fixed in v0.7: 53
-- Remaining open: 27
+- Fixed in v0.7: 54
+- Remaining open: 26
 
 ## v0.7 Progress
 
 - Batch 1 fixed: [CFR-005](code-review-issues/cfr-005.md), [CFR-006](code-review-issues/cfr-006.md), [CFR-010](code-review-issues/cfr-010.md), [CFR-031](code-review-issues/cfr-031.md), [CFR-032](code-review-issues/cfr-032.md), [CFR-047](code-review-issues/cfr-047.md), [CFR-058](code-review-issues/cfr-058.md), [CFR-067](code-review-issues/cfr-067.md), [CFR-077](code-review-issues/cfr-077.md)
-- Batch 2/8 partial fixed: [CFR-003](code-review-issues/cfr-003.md), [CFR-009](code-review-issues/cfr-009.md), [CFR-057](code-review-issues/cfr-057.md), [CFR-071](code-review-issues/cfr-071.md), [CFR-072](code-review-issues/cfr-072.md), [CFR-075](code-review-issues/cfr-075.md), [CFR-076](code-review-issues/cfr-076.md)
+- Batch 2/8 partial fixed: [CFR-003](code-review-issues/cfr-003.md), [CFR-009](code-review-issues/cfr-009.md), [CFR-057](code-review-issues/cfr-057.md), [CFR-071](code-review-issues/cfr-071.md), [CFR-072](code-review-issues/cfr-072.md), [CFR-073](code-review-issues/cfr-073.md), [CFR-075](code-review-issues/cfr-075.md), [CFR-076](code-review-issues/cfr-076.md)
 - Batch 3 fixed: [CFR-011](code-review-issues/cfr-011.md), [CFR-012](code-review-issues/cfr-012.md), [CFR-013](code-review-issues/cfr-013.md), [CFR-014](code-review-issues/cfr-014.md), [CFR-015](code-review-issues/cfr-015.md), [CFR-016](code-review-issues/cfr-016.md), [CFR-017](code-review-issues/cfr-017.md), [CFR-018](code-review-issues/cfr-018.md)
 - Batch 5 fixed: [CFR-025](code-review-issues/cfr-025.md), [CFR-026](code-review-issues/cfr-026.md), [CFR-027](code-review-issues/cfr-027.md), [CFR-028](code-review-issues/cfr-028.md), [CFR-029](code-review-issues/cfr-029.md)
 - Batch 6 fixed: [CFR-030](code-review-issues/cfr-030.md), [CFR-033](code-review-issues/cfr-033.md), [CFR-034](code-review-issues/cfr-034.md), [CFR-035](code-review-issues/cfr-035.md), [CFR-068](code-review-issues/cfr-068.md), [CFR-069](code-review-issues/cfr-069.md), [CFR-070](code-review-issues/cfr-070.md), [CFR-078](code-review-issues/cfr-078.md), [CFR-079](code-review-issues/cfr-079.md)

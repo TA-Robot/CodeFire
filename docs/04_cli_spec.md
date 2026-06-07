@@ -336,8 +336,9 @@ required verification commandを実行する
 verification objectをactive stateに保存する
 resolution.evidence_refsが存在しないevidence objectを指す場合はmissing evidence refsとして失敗する
 `--details` 指定時は、失敗したdiagnosticsの代表例を最大5件ずつ出力する
---blocking-onlyはblocking diagnosticsだけを表示/返すことを明示する。現行のverify diagnosticsはすべてblockingで、JSON data.diagnostic_filterはblocking_onlyになる
---jsonはcodefire.command_result.v1 envelopeを出力し、verification data、blocking diagnostics、next_actionsを含める
+--blocking-onlyはblocking diagnosticsだけを表示/返すことを明示する。JSON data.diagnostic_filterはblocking_onlyになる
+require_trace_completeness=falseのmissing_required_linkはseverity=warning/blocking=falseになり、--blocking-only diagnosticsから除外される
+--jsonはcodefire.command_result.v1 envelopeを出力し、verification data、policy-aware diagnostics、next_actionsを含める
 --jsonのexit_codeはprocess exit codeと一致する
 verify blockerのexit codeはopen fires=10、missing links=11、stale resolutions=12、missing evidence refs=21、duplicate Atom IDs=13、failed checks=14の優先順で決まる
 next_actionsはcontext_changed、context_atom、refresh_resolution、rerun_check、commitなどの安定action kindを返す

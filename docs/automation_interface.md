@@ -163,6 +163,7 @@ When `--metrics` is present on `status`, `scan`, or `verify`, the command data i
 ```json
 {
   "result": "failed",
+  "trace_completeness_required": true,
   "open_required_fires": 1,
   "missing_required_links": [],
   "stale_resolutions": [],
@@ -174,7 +175,7 @@ When `--metrics` is present on `status`, `scan`, or `verify`, the command data i
 ```
 
 `verify --json` sets `exit_code` to the matching blocker code from the exit code taxonomy. For example, missing required links produce code `11`, missing evidence refs produce code `21`, and failed configured verification commands produce code `14`.
-`diagnostic_filter` is `all` by default and `blocking_only` when `--blocking-only` is present.
+`diagnostic_filter` is `all` by default and `blocking_only` when `--blocking-only` is present. Verification diagnostics include `blocking`; `missing_required_link` is `severity=warning` and `blocking=false` when `trace_completeness_required` is false.
 
 `status --json`, `scan --json`, `verify --json`, `doctor --json`, `storage report --json`, and `migrate ... --json` include remediation-oriented `next_actions`:
 
@@ -391,5 +392,7 @@ stale_resolution
 duplicate_atom_id
 failed_check
 ```
+
+Each verification diagnostic has a stable `severity` and `blocking` flag. Automation should use `blocking=true` for commit-blocker filtering instead of assuming every verification diagnostic is an error.
 
 `next_actions` is present in every envelope. Empty arrays mean no action is currently suggested for that command result.

@@ -44,7 +44,7 @@ pub(crate) fn verification_exit_code(verification: &codefire_core::Verification)
     if verification.open_required_fires > 0 {
         return ExitCode::OpenFires;
     }
-    if !verification.missing_required_links.is_empty() {
+    if verification.trace_completeness_required && !verification.missing_required_links.is_empty() {
         return ExitCode::MissingRequiredLinks;
     }
     if !verification.stale_resolutions.is_empty() {
@@ -102,6 +102,7 @@ mod tests {
             type_tag: "verification".to_string(),
             version: 1,
             result: "failed".to_string(),
+            trace_completeness_required: true,
             open_required_fires: 0,
             failed_checks: vec![codefire_core::FailedCheck {
                 id: "unit".to_string(),
@@ -136,6 +137,7 @@ mod tests {
             type_tag: "verification".to_string(),
             version: 1,
             result: "failed".to_string(),
+            trace_completeness_required: true,
             open_required_fires: 0,
             failed_checks: Vec::new(),
             missing_required_links: Vec::new(),

@@ -37,7 +37,7 @@ mod view;
 use automation::{
     cli_command, command_result_envelope, scan_data_json, scan_diagnostics_json, scan_next_actions,
     status_data_json, status_next_actions, verification_data_json_with_filter,
-    verification_diagnostics_json, verification_next_actions,
+    verification_diagnostics_json_with_filter, verification_next_actions,
 };
 use batch::{has_batch_extinguish_arg, parse_extinguish_batch_args, run_extinguish_batch};
 use completion::{completion_script, help_text};
@@ -242,7 +242,10 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                             ),
                             metrics.as_ref(),
                         ),
-                        verification_diagnostics_json(&verification),
+                        verification_diagnostics_json_with_filter(
+                            &verification,
+                            options.blocking_only,
+                        ),
                         verification_next_actions(&verification),
                     ))?
                 );

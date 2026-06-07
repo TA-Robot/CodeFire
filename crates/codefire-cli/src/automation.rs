@@ -173,6 +173,7 @@ pub(crate) fn scan_next_actions(scan: &codefire_core::ScanResult) -> Vec<Value> 
 pub(crate) fn verification_data_json(verification: &codefire_core::Verification) -> Value {
     json!({
         "result": &verification.result,
+        "trace_completeness_required": verification.trace_completeness_required,
         "open_required_fires": verification.open_required_fires,
         "missing_required_links": &verification.missing_required_links,
         "stale_resolutions": &verification.stale_resolutions,
@@ -194,58 +195,107 @@ pub(crate) fn verification_data_json_with_filter(
 pub(crate) fn verification_diagnostics_json(
     verification: &codefire_core::Verification,
 ) -> Vec<Value> {
+    verification_diagnostics_json_with_filter(verification, false)
+}
+
+pub(crate) fn verification_diagnostics_json_with_filter(
+    verification: &codefire_core::Verification,
+    blocking_only: bool,
+) -> Vec<Value> {
     let mut diagnostics = Vec::new();
     if verification.open_required_fires > 0 {
-        diagnostics.push(json!({
+        push_diagnostic(
+            &mut diagnostics,
+            blocking_only,
+            json!({
             "kind": "open_required_fires",
             "severity": "error",
+            "blocking": true,
             "count": verification.open_required_fires,
-        }));
+            }),
+        );
     }
     for item in &verification.missing_required_links {
-        diagnostics.push(json!({
+        let blocking = verification.trace_completeness_required;
+        push_diagnostic(
+            &mut diagnostics,
+            blocking_only,
+            json!({
             "kind": "missing_required_link",
-            "severity": "error",
+            "severity": if blocking { "error" } else { "warning" },
+            "blocking": blocking,
             "atom_id": &item.atom_id,
             "required_type": &item.required_type,
             "target_kind": &item.target_kind,
             "min": item.min,
             "found": item.found,
-        }));
+            }),
+        );
     }
     for item in &verification.stale_resolutions {
-        diagnostics.push(json!({
+        push_diagnostic(
+            &mut diagnostics,
+            blocking_only,
+            json!({
             "kind": "stale_resolution",
             "severity": "error",
+            "blocking": true,
             "resolution_uid": &item.resolution_uid,
             "reason": &item.reason,
-        }));
+            }),
+        );
     }
     for item in &verification.missing_evidence_refs {
-        diagnostics.push(json!({
+        push_diagnostic(
+            &mut diagnostics,
+            blocking_only,
+            json!({
             "kind": "missing_evidence_ref",
             "severity": "error",
+            "blocking": true,
             "resolution_uid": &item.resolution_uid,
             "evidence_id": &item.evidence_id,
-        }));
+            }),
+        );
     }
     for atom_id in &verification.duplicate_atom_ids {
-        diagnostics.push(json!({
+        push_diagnostic(
+            &mut diagnostics,
+            blocking_only,
+            json!({
             "kind": "duplicate_atom_id",
             "severity": "error",
+            "blocking": true,
             "atom_id": atom_id,
-        }));
+            }),
+        );
     }
     for check in &verification.failed_checks {
-        diagnostics.push(json!({
+        push_diagnostic(
+            &mut diagnostics,
+            blocking_only,
+            json!({
             "kind": "failed_check",
             "severity": "error",
+            "blocking": true,
             "id": &check.id,
             "command": &check.command,
             "output": &check.output,
-        }));
+            }),
+        );
     }
     diagnostics
+}
+
+fn push_diagnostic(diagnostics: &mut Vec<Value>, blocking_only: bool, diagnostic: Value) {
+    if !blocking_only
+        || diagnostic
+            .get("blocking")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        diagnostics.push(diagnostic);
+    }
 }
 
 pub(crate) fn verification_next_actions(verification: &codefire_core::Verification) -> Vec<Value> {
@@ -428,6 +478,7 @@ mod tests {
             type_tag: "verification".to_string(),
             version: 1,
             result: "failed".to_string(),
+            trace_completeness_required: true,
             open_required_fires: 1,
             failed_checks: vec![codefire_core::FailedCheck {
                 id: "unit".to_string(),
@@ -467,11 +518,42 @@ mod tests {
     }
 
     #[test]
+    fn verification_diagnostics_use_policy_aware_missing_link_severity() {
+        let verification = codefire_core::Verification {
+            type_tag: "verification".to_string(),
+            version: 1,
+            result: "passed".to_string(),
+            trace_completeness_required: false,
+            open_required_fires: 0,
+            failed_checks: Vec::new(),
+            missing_required_links: vec![codefire_core::MissingRequiredLink {
+                atom_id: "REQ-session".to_string(),
+                required_type: "refined_by".to_string(),
+                target_kind: "design".to_string(),
+                min: 1,
+                found: 0,
+            }],
+            stale_resolutions: Vec::new(),
+            missing_evidence_refs: Vec::new(),
+            duplicate_atom_ids: Vec::new(),
+            verified_at: "2026-06-04T00:00:00Z".to_string(),
+        };
+
+        let diagnostics = verification_diagnostics_json(&verification);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0]["kind"], "missing_required_link");
+        assert_eq!(diagnostics[0]["severity"], "warning");
+        assert_eq!(diagnostics[0]["blocking"], false);
+        assert!(verification_diagnostics_json_with_filter(&verification, true).is_empty());
+    }
+
+    #[test]
     fn verification_next_actions_cover_blocker_classes() {
         let verification = codefire_core::Verification {
             type_tag: "verification".to_string(),
             version: 1,
             result: "failed".to_string(),
+            trace_completeness_required: true,
             open_required_fires: 1,
             failed_checks: vec![codefire_core::FailedCheck {
                 id: "unit".to_string(),

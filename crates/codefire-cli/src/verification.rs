@@ -119,7 +119,7 @@ pub(crate) fn render_verification(
         if blocking_only {
             output.push_str("Detail filter: blocking-only\n");
         }
-        render_blocking_verification_details(verification, &mut output);
+        render_blocking_verification_details(verification, blocking_only, &mut output);
     }
     output
 }
@@ -129,7 +129,7 @@ fn blocking_check_names(verification: &codefire_core::Verification) -> Vec<&'sta
     if verification.open_required_fires > 0 {
         blocking.push("open fires");
     }
-    if !verification.missing_required_links.is_empty() {
+    if verification.trace_completeness_required && !verification.missing_required_links.is_empty() {
         blocking.push("missing required links");
     }
     if !verification.stale_resolutions.is_empty() {
@@ -149,9 +149,12 @@ fn blocking_check_names(verification: &codefire_core::Verification) -> Vec<&'sta
 
 fn render_blocking_verification_details(
     verification: &codefire_core::Verification,
+    blocking_only: bool,
     output: &mut String,
 ) {
-    if !verification.missing_required_links.is_empty() {
+    if (!blocking_only || verification.trace_completeness_required)
+        && !verification.missing_required_links.is_empty()
+    {
         output.push_str("Missing required link details:\n");
         for item in verification.missing_required_links.iter().take(5) {
             output.push_str(&format!(

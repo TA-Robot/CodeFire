@@ -7,6 +7,10 @@ use std::path::{Path, PathBuf};
 
 pub const VERSION: u32 = 1;
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObjectId(String);
 
@@ -201,6 +205,8 @@ pub struct Verification {
     pub type_tag: String,
     pub version: u32,
     pub result: String,
+    #[serde(default = "default_true")]
+    pub trace_completeness_required: bool,
     pub open_required_fires: usize,
     pub failed_checks: Vec<FailedCheck>,
     pub missing_required_links: Vec<MissingRequiredLink>,
@@ -617,6 +623,7 @@ pub fn build_verification(
         type_tag: "verification".to_string(),
         version: VERSION,
         result: if passed { "passed" } else { "failed" }.to_string(),
+        trace_completeness_required: policy.require_trace_completeness,
         open_required_fires: scan.open_fires.len(),
         failed_checks,
         missing_required_links,
