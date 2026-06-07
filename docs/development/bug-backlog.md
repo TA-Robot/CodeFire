@@ -105,6 +105,7 @@
 | CFB-088 | open | Evidence / Dry Run JSON | `evidence add --dry-run --json` が実体のない `evidence_id:""` を返す | FrontierExperimentPlanner commit後のclean-state probeでevidence preflightを確認したとき | automationが空文字IDを実IDとして扱う可能性がある | `dry_run:true` を優先して `evidence_id` を無視する | dry-runでは `evidence_id:null` またはfield省略と `created:false` を返す |
 | CFB-089 | open | Debug Commands / JSON Contract | `atom-index --path . --json` と `missing-links --path . --json` が `--path` をpathとして扱いplain OS errorになる | clean-state probeでdebug/read-only surfaceを確認したとき | AI toolがcore trace/debug dataを共通path/json指定で取得できない | positional pathか `context --changed --json` を使う | atom-index/missing-linksを通常command化し、shared path/json parserとenvelopeを使う |
 | CFB-090 | open | Context / Bounded Graph | `context --changed --limit 5 --json` が省略されたAtomへ向かう `trace_links` を返し、dangling参照か省略済み参照かを区別できない | FrontierFeedbackIntegrator dogfoodingでchanged contextをbounded取得したとき | graph consumerが返却済みAtom集合だけでTrace Graphを構築すると欠落node参照になり、追加fetch判断もできない | `truncated` flagを見て高limitで再取得する | bounded contextはlink endpointのreturned/omitted状態、omitted endpoint count、再取得commandを返す |
+| CFB-091 | open | Atom Extraction / Explicit Atom Span | 末尾側の明示 `cf-atom` の後ろに新しい明示Atomを追加すると、既存Atomのcontent hashが変わり余分なfireが出る | FrontierDriftReporter追加時に既存FrontierFeedbackIntegrator Atomと既存feedback test Atomにもfireが出たとき | 新機能追加だけで隣接する既存Atomの再証跡が必要になり、docs-first開発のfire数が膨らむ | 影響範囲を手で確認して同じ証跡で消火する | 明示Atomのspanをsymbol/indent/close marker等で安定化し、後続Atom追加で前Atomが縮む挙動を避ける |
 
 ## Triage Notes
 
