@@ -1101,7 +1101,21 @@ pub fn extract_markdown_atoms(
     let text = read_text_lossy(path)?;
     let lines = split_lines_without_terminators(&text);
     let mut headings = Vec::new();
+    let mut open_fence = None::<(char, usize)>;
     for (line_index, line) in lines.iter().enumerate() {
+        if let Some((fence_char, fence_len)) = markdown_fence_marker(line) {
+            if let Some((open_char, open_len)) = open_fence {
+                if fence_char == open_char && fence_len >= open_len {
+                    open_fence = None;
+                }
+            } else {
+                open_fence = Some((fence_char, fence_len));
+            }
+            continue;
+        }
+        if open_fence.is_some() {
+            continue;
+        }
         if let Some((level, atom_id)) = markdown_atom_heading(line) {
             headings.push((line_index, level, atom_id));
         }
@@ -1129,6 +1143,20 @@ pub fn extract_markdown_atoms(
         });
     }
     Ok(atoms)
+}
+
+fn markdown_fence_marker(line: &str) -> Option<(char, usize)> {
+    let indent = line.chars().take_while(|ch| *ch == ' ').count();
+    if indent > 3 {
+        return None;
+    }
+    let trimmed = &line[indent..];
+    let fence_char = trimmed.chars().next()?;
+    if !matches!(fence_char, '`' | '~') {
+        return None;
+    }
+    let fence_len = trimmed.chars().take_while(|ch| *ch == fence_char).count();
+    (fence_len >= 3).then_some((fence_char, fence_len))
 }
 
 pub fn extract_explicit_cf_atoms(
@@ -1550,6 +1578,25 @@ mod tests {
         assert_eq!(atoms[1].atom_id, "DES-NESTED-IGNORED");
         assert_eq!(atoms[1].kind, "design");
         assert_eq!(atoms[2].atom_id, "REQ-AUTH-002");
+    }
+
+    #[test]
+    fn markdown_atoms_ignore_headings_inside_fenced_code_blocks() {
+        let temp = tempdir().unwrap();
+        let path = temp.path().join("spec.md");
+        fs::write(
+            &path,
+            "## REQ-REAL-001: Real requirement\n\n```markdown\n## REQ-FAKE-001: sample only\n```\n\n   ~~~text\n### DES-FAKE-001: sample only\n   ~~~\n\n## REQ-REAL-002: Another requirement\n",
+        )
+        .unwrap();
+
+        let atoms = extract_markdown_atoms(&path, "docs/spec/fenced.md", "requirement").unwrap();
+        let ids = atoms
+            .iter()
+            .map(|atom| atom.atom_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(ids, vec!["REQ-REAL-001", "REQ-REAL-002"]);
     }
 
     #[test]

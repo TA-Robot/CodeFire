@@ -80,6 +80,7 @@ Markdownでは、見出し先頭のIDをAtom IDとする。
 ```
 
 同階層以上の次の見出しまでをAtom本文とし、content hashを計算する。
+Backtick fenceまたはtilde fenceで囲まれたコードブロック内の見出し風テキストはAtomとして抽出しない。fence開始/終了は最大3つのleading spaceを許容し、通常の見出し抽出と本文scope計算はfence外の見出しだけを対象にする。
 
 ## 9.5 OpenAPI Atom抽出
 
