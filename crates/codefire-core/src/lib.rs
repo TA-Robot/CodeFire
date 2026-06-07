@@ -1130,8 +1130,8 @@ pub fn extract_explicit_cf_atoms(
     let text = read_text_lossy(path)?;
     let lines = split_lines_without_terminators(&text);
     let mut atoms = Vec::new();
-    for line in &lines {
-        if let Some(atom_id) = explicit_cf_atom_id(line) {
+    for (line_index, line) in lines.iter().enumerate() {
+        if let Some(atom_id) = explicit_cf_atom_id(line, artifact_path, line_index + 1)? {
             let content = format!("{}\n", line.trim());
             atoms.push(Atom {
                 atom_id: atom_id.clone(),
@@ -1193,9 +1193,9 @@ fn markdown_atom_heading(line: &str) -> Option<(usize, String)> {
     let rest: String = chars.collect();
     let atom_id: String = rest
         .chars()
-        .take_while(|ch| ch.is_ascii_uppercase() || is_atom_tail_char(*ch))
+        .take_while(|ch| ch.is_ascii_uppercase() || is_dash_atom_tail_char(*ch))
         .collect();
-    if !is_valid_heading_atom_id(&atom_id) {
+    if !is_valid_atom_id(&atom_id) {
         return None;
     }
     let next = rest.chars().nth(atom_id.len());
@@ -1206,30 +1206,63 @@ fn markdown_atom_heading(line: &str) -> Option<(usize, String)> {
     }
 }
 
-fn is_atom_tail_char(ch: char) -> bool {
-    ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '-')
+fn is_atom_id_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '-' | ':' | '/')
 }
 
-fn is_valid_heading_atom_id(atom_id: &str) -> bool {
+pub fn is_valid_atom_id(atom_id: &str) -> bool {
+    is_valid_dash_atom_id(atom_id) || is_valid_code_path_atom_id(atom_id)
+}
+
+fn is_valid_dash_atom_id(atom_id: &str) -> bool {
     let Some((prefix, rest)) = atom_id.split_once('-') else {
         return false;
     };
     !prefix.is_empty()
         && prefix.chars().all(|ch| ch.is_ascii_uppercase())
         && !rest.is_empty()
-        && rest
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '-'))
+        && rest.chars().all(is_dash_atom_tail_char)
 }
 
-fn explicit_cf_atom_id(line: &str) -> Option<String> {
-    let (_, after) = line.split_once("cf-atom:")?;
+fn is_valid_code_path_atom_id(atom_id: &str) -> bool {
+    let Some(rest) = atom_id.strip_prefix("CODE:") else {
+        return false;
+    };
+    !rest.is_empty() && rest.chars().all(is_code_path_atom_tail_char)
+}
+
+fn is_dash_atom_tail_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '-')
+}
+
+fn is_code_path_atom_tail_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '-' | ':' | '/')
+}
+
+fn explicit_cf_atom_id(
+    line: &str,
+    artifact_path: &str,
+    line_number: usize,
+) -> Result<Option<String>, CoreError> {
+    let Some((_, after)) = line.split_once("cf-atom:") else {
+        return Ok(None);
+    };
     let atom_id: String = after
         .trim_start()
         .chars()
-        .take_while(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | ':' | '-'))
+        .take_while(|ch| is_atom_id_char(*ch))
         .collect();
-    (!atom_id.is_empty()).then_some(atom_id)
+    if atom_id.is_empty() {
+        return Err(CoreError::Config(format!(
+            "invalid Atom ID in {artifact_path}:{line_number}: cf-atom marker has no Atom ID"
+        )));
+    }
+    if !is_valid_atom_id(&atom_id) {
+        return Err(CoreError::Config(format!(
+            "invalid Atom ID in {artifact_path}:{line_number}: {atom_id}"
+        )));
+    }
+    Ok(Some(atom_id))
 }
 
 fn normalized_block_content(lines: &[&str]) -> String {
@@ -1508,20 +1541,45 @@ mod tests {
         let path = temp.path().join("app.py");
         fs::write(
             &path,
-            "# cf-atom: CODE-SessionPolicy\nclass SessionPolicy:\n    pass\n",
+            "# cf-atom: CODE-SessionPolicy\nclass SessionPolicy:\n    pass\n# cf-atom: CODE:src/app.py::function:run\n",
         )
         .unwrap();
 
         let atoms = extract_explicit_cf_atoms(&path, "src/app.py", "code").unwrap();
 
-        assert_eq!(atoms.len(), 1);
+        assert_eq!(atoms.len(), 2);
         assert_eq!(atoms[0].atom_id, "CODE-SessionPolicy");
         assert_eq!(atoms[0].kind, "code");
         assert_eq!(atoms[0].selector.selector_type, "explicit_cf_atom");
+        assert_eq!(atoms[1].atom_id, "CODE:src/app.py::function:run");
         assert_eq!(
             atoms[0].content_hash,
             "sha256:e77db9516bb440255ebb1177be2f1aa3b5fcba7f46e43dd86871783fdf97cee4"
         );
+    }
+
+    #[test]
+    fn invalid_explicit_cf_atom_id_is_reported_with_location() {
+        let temp = tempdir().unwrap();
+        let path = temp.path().join("app.py");
+        fs::write(&path, "# cf-atom: code-lowercase\n").unwrap();
+
+        let error = extract_explicit_cf_atoms(&path, "src/app.py", "code").unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "invalid Atom ID in src/app.py:1: code-lowercase"
+        );
+    }
+
+    #[test]
+    fn atom_id_validator_is_shared_by_heading_and_explicit_forms() {
+        assert!(is_valid_atom_id("REQ-AUTH-001"));
+        assert!(is_valid_atom_id("CODE-SessionPolicy"));
+        assert!(is_valid_atom_id("CODE:src/app.py::method:Store.find"));
+        assert!(!is_valid_atom_id("code-lowercase"));
+        assert!(!is_valid_atom_id("REQ-"));
+        assert!(!is_valid_atom_id("CODE:src/app.py::method:bad name"));
     }
 
     #[test]

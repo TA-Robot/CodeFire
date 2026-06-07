@@ -158,6 +158,8 @@ sequence/materialized view/type名からも `DB-<name>` を生成し、対象DDL
 
 Python / JavaScript / TypeScript / Go / Java / C# / Rust / Kotlin / PHP / Ruby / Swift / C/C++では、明示IDコメントを推奨する。
 
+Atom ID validationはMarkdown headingと明示 `cf-atom:` commentで共通である。許可される形式は、`REQ-...` / `DES-...` / `TEST-...` / `CODE-...` / `ADR-...` / `OPS-...` / `API-...` / `DB-...` のような大文字prefix + `-` + tail、またはPython reference由来の `CODE:<path>::<symbol-kind>:<symbol>` 形式である。tailにはASCII英数字、`_`、`.`、`-` を使える。`CODE:` path形式ではさらに `/` と `:` を使える。無効な明示 `cf-atom:` IDはconfig diagnosticとして報告する。
+
 ```python
 # cf-atom: CODE-SessionPolicy
 class SessionPolicy:
