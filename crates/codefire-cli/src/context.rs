@@ -35,7 +35,10 @@ pub(crate) struct ContextPack {
 struct ContextSnapshot {
     open: OpenContext,
     scan: codefire_core::ScanResult,
+    active_scan_path: PathBuf,
+    scan_snapshot_source: &'static str,
     scan_fire_source: &'static str,
+    preview_recomputed: bool,
 }
 
 struct Selection {
@@ -179,6 +182,19 @@ fn context_snapshot(start: &Path) -> Result<ContextSnapshot, CliError> {
         &open.registry,
         &["open", "active_state_path"],
     )?);
+    let active_scan_path = active_state_path.join("scan.json");
+    if active_scan_path.exists() {
+        let scan = serde_json::from_value(read_json(&active_scan_path)?)?;
+        return Ok(ContextSnapshot {
+            open,
+            scan,
+            active_scan_path,
+            scan_snapshot_source: "active_scan",
+            scan_fire_source: "active",
+            preview_recomputed: false,
+        });
+    }
+
     let current = codefire_core::build_atom_index(&open.open_dir)?;
     let base_index = load_base_atom_index(&objects, &base_commit)?;
     let trace_graph = codefire_core::current_trace_graph(&open.open_dir)?;
@@ -211,7 +227,10 @@ fn context_snapshot(start: &Path) -> Result<ContextSnapshot, CliError> {
     Ok(ContextSnapshot {
         open,
         scan,
+        active_scan_path,
+        scan_snapshot_source: "preview_recomputed",
         scan_fire_source: "preview",
+        preview_recomputed: true,
     })
 }
 
@@ -312,6 +331,9 @@ fn context_data_json(
         },
         "scan": {
             "branch_state": scan_branch_state(snapshot.scan.changed_atoms.len(), snapshot.scan.open_fires.len()),
+            "snapshot_source": snapshot.scan_snapshot_source,
+            "active_scan_path": snapshot.active_scan_path,
+            "preview_recomputed": snapshot.preview_recomputed,
             "fire_source": snapshot.scan_fire_source,
             "changed_atoms": scan_changed_atoms,
             "open_fires": scan_open_fires,

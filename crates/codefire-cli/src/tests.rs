@@ -956,6 +956,11 @@ fn context_pack_returns_atom_changed_and_fire_views() {
     assert_eq!(atom_pack.data["selector"]["kind"], "atom");
     assert_eq!(atom_pack.data["limits"]["limit"], 100);
     assert_eq!(atom_pack.data["truncated"]["atoms"], false);
+    assert_eq!(
+        atom_pack.data["scan"]["snapshot_source"],
+        "preview_recomputed"
+    );
+    assert_eq!(atom_pack.data["scan"]["preview_recomputed"], true);
     assert_eq!(atom_pack.data["scan"]["fire_source"], "preview");
     assert_eq!(atom_pack.data["atoms"].as_array().unwrap().len(), 2);
     assert_eq!(atom_pack.data["trace_links"].as_array().unwrap().len(), 1);
@@ -976,9 +981,8 @@ fn context_pack_returns_atom_changed_and_fire_views() {
         2
     );
 
-    let fire_id = compute_scan(&open_dir, false)
-        .unwrap()
-        .scan
+    let persisted_scan = run_scan(&open_dir).unwrap();
+    let fire_id = persisted_scan
         .open_fires
         .first()
         .unwrap()
@@ -986,13 +990,20 @@ fn context_pack_returns_atom_changed_and_fire_views() {
         .clone();
     let fire_pack = context::build_context_pack(&context::ContextOptions {
         path: open_dir,
-        selector: context::ContextSelector::Fire(fire_id),
+        selector: context::ContextSelector::Fire(fire_id.clone()),
         depth: 1,
         limit: 100,
         json_output: true,
     })
     .unwrap();
     assert_eq!(fire_pack.data["selector"]["kind"], "fire");
+    assert_eq!(fire_pack.data["scan"]["snapshot_source"], "active_scan");
+    assert_eq!(fire_pack.data["scan"]["preview_recomputed"], false);
+    assert_eq!(fire_pack.data["scan"]["fire_source"], "active");
+    assert_eq!(
+        fire_pack.data["scan"]["open_fires"][0]["display_id"],
+        fire_id
+    );
     assert_eq!(fire_pack.data["fires"].as_array().unwrap().len(), 1);
 }
 

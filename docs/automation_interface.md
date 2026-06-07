@@ -346,6 +346,10 @@ When compatibility blockers exist, `migrate check --json` sets `ok=false` and `e
   },
   "scan": {
     "branch_state": "open-burning",
+    "snapshot_source": "active_scan",
+    "active_scan_path": "/workspace/repo/.codefire/active/main/scan.json",
+    "preview_recomputed": false,
+    "fire_source": "active",
     "changed_atoms": ["REQ-session"],
     "open_fires": []
   },
@@ -363,6 +367,8 @@ Context selectors:
 --atom <atom-id> [--depth <n>]: selected Atom neighborhood through TraceGraph links
 --fire <fire-id>: selected fire, source/target atoms, trace path, and matching links
 ```
+
+`scan.snapshot_source` is `active_scan` when an active `scan.json` was read. If no active scan exists, it is `preview_recomputed`, `preview_recomputed` is true, and `fire_source` is `preview`; context remains read-only in both cases.
 
 Mutating command dry-runs use `codefire_operation_plan` data when available:
 

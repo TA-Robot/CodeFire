@@ -361,13 +361,13 @@ codefire context --fire FIRE-001 --json
 仕様：
 
 ```text
-open directoryから現在のAtomIndex、TraceGraph、baseとの差分、open firesを読み取りcontext packを返す
+active scanが存在する場合はactive stateのscan.jsonを読み取り、存在しない場合だけopen directoryからread-only preview scanを再構築してcontext packを返す
 contextはactive stateを書き換えない
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_context_packを含める
 selectorは--branch、--changed、--atom、--fireのいずれか1つ
 --atomの--depthはTraceGraph上の近傍探索深さを指定する
 --depthは最大8に制限され、--limitはatoms/trace_links/firesの出力上限を指定する
-context packはlimitsとtruncatedを含め、preview scan由来のfire metadataはscan.fire_sourceで区別する
+context packはlimitsとtruncatedを含め、scan.snapshot_source、scan.active_scan_path、scan.preview_recomputed、scan.fire_sourceでactive scan/preview scanの由来を区別する
 ```
 
 ## 4.12 `commit`
