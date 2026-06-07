@@ -280,7 +280,14 @@ pub(crate) fn verify_remote_request_signature(
         if ttl <= 0 {
             return signature_error("nonce_ttl_seconds must be positive");
         }
-        record_request_nonce(project_root, signature, ttl)?;
+        let max_entries = request_policy
+            .get("max_nonce_cache_entries")
+            .and_then(number_as_i64)
+            .unwrap_or(10_000);
+        if max_entries <= 0 {
+            return signature_error("max_nonce_cache_entries must be positive");
+        }
+        record_request_nonce(project_root, signature, ttl, max_entries as usize)?;
     }
     Ok(())
 }
@@ -389,12 +396,14 @@ fn commit_signature_key_secret(
                 "commit signature validation failed: signed_at is required".to_string(),
             )
         })?;
+    let signed_at_seconds = parse_commit_signature_time(signed_at, "signed_at")?;
     if let Some(not_before) = key
         .get("not_before")
         .or_else(|| key.get("valid_from"))
         .and_then(Value::as_str)
     {
-        if signed_at < not_before {
+        let not_before = parse_commit_signature_time(not_before, "not_before")?;
+        if signed_at_seconds < not_before {
             return commit_error("key is not valid yet");
         }
     }
@@ -403,7 +412,8 @@ fn commit_signature_key_secret(
         .or_else(|| key.get("valid_until"))
         .and_then(Value::as_str)
     {
-        if signed_at > not_after {
+        let not_after = parse_commit_signature_time(not_after, "not_after")?;
+        if signed_at_seconds > not_after {
             return commit_error("key is expired");
         }
     }
@@ -535,6 +545,7 @@ fn record_request_nonce(
     project_root: &Path,
     signature: &Value,
     ttl_seconds: i64,
+    max_entries: usize,
 ) -> Result<(), CliError> {
     ensure_remote_layout(project_root)?;
     let dirs = remote_dirs(project_root);
@@ -551,6 +562,7 @@ fn record_request_nonce(
         .and_then(Value::as_object)
         .cloned()
         .unwrap_or_default();
+    let before_prune = entries.len();
     let cutoff = now - ttl_seconds;
     entries.retain(|_, value| {
         value
@@ -559,6 +571,7 @@ fn record_request_nonce(
             .unwrap_or_default()
             >= cutoff
     });
+    let mut pruned_count = before_prune.saturating_sub(entries.len());
     let cache_key = request_nonce_cache_key(signature)?;
     if entries.contains_key(&cache_key) {
         return signature_error("nonce has already been used");
@@ -574,8 +587,30 @@ fn record_request_nonce(
             "seen_at": now,
         }),
     );
+    while entries.len() > max_entries {
+        let oldest_key = entries
+            .iter()
+            .min_by_key(|(_, value)| {
+                value
+                    .get("seen_at")
+                    .and_then(Value::as_i64)
+                    .unwrap_or_default()
+            })
+            .map(|(key, _)| key.clone());
+        if let Some(oldest_key) = oldest_key {
+            entries.remove(&oldest_key);
+            pruned_count += 1;
+        } else {
+            break;
+        }
+    }
+    let entry_count = entries.len();
     cache["entries"] = Value::Object(entries);
     cache["updated_at"] = Value::String(now_iso_utc());
+    cache["ttl_seconds"] = Value::Number(ttl_seconds.into());
+    cache["max_entries"] = Value::Number((max_entries as u64).into());
+    cache["entry_count"] = Value::Number((entry_count as u64).into());
+    cache["last_pruned_count"] = Value::Number((pruned_count as u64).into());
     write_json_atomic(&cache_path, &cache)
 }
 
@@ -730,51 +765,53 @@ fn unix_now_seconds() -> i64 {
 }
 
 fn parse_iso_utc_seconds(value: &str) -> Result<i64, CliError> {
+    parse_iso_utc_seconds_raw(value).ok_or_else(|| {
+        CliError::AuthenticationOrSignature(
+            "request signature validation failed: timestamp is required".to_string(),
+        )
+    })
+}
+
+fn parse_commit_signature_time(value: &str, field: &str) -> Result<i64, CliError> {
+    parse_iso_utc_seconds_raw(value).ok_or_else(|| {
+        CliError::AuthenticationOrSignature(format!(
+            "commit signature validation failed: {field} must be UTC seconds ending in Z"
+        ))
+    })
+}
+
+fn parse_iso_utc_seconds_raw(value: &str) -> Option<i64> {
     if value.len() != 20 || !value.ends_with('Z') {
-        return signature_error("timestamp is required");
+        return None;
     }
-    let year = parse_i32(&value[0..4])?;
-    let month = parse_u32(&value[5..7])?;
-    let day = parse_u32(&value[8..10])?;
-    let hour = parse_u32(&value[11..13])?;
-    let minute = parse_u32(&value[14..16])?;
-    let second = parse_u32(&value[17..19])?;
     if &value[4..5] != "-"
         || &value[7..8] != "-"
         || &value[10..11] != "T"
         || &value[13..14] != ":"
         || &value[16..17] != ":"
     {
-        return signature_error("timestamp is required");
+        return None;
     }
+    let year = value[0..4].parse::<i32>().ok()?;
+    let month = value[5..7].parse::<u32>().ok()?;
+    let day = value[8..10].parse::<u32>().ok()?;
+    let hour = value[11..13].parse::<u32>().ok()?;
+    let minute = value[14..16].parse::<u32>().ok()?;
+    let second = value[17..19].parse::<u32>().ok()?;
     if !(1..=12).contains(&month)
         || !(1..=31).contains(&day)
         || hour > 23
         || minute > 59
         || second > 59
     {
-        return signature_error("timestamp is required");
+        return None;
     }
-    Ok(days_from_civil(year, month, day) * 86_400
-        + i64::from(hour) * 3_600
-        + i64::from(minute) * 60
-        + i64::from(second))
-}
-
-fn parse_i32(value: &str) -> Result<i32, CliError> {
-    value.parse::<i32>().map_err(|_| {
-        CliError::AuthenticationOrSignature(
-            "request signature validation failed: timestamp is required".to_string(),
-        )
-    })
-}
-
-fn parse_u32(value: &str) -> Result<u32, CliError> {
-    value.parse::<u32>().map_err(|_| {
-        CliError::AuthenticationOrSignature(
-            "request signature validation failed: timestamp is required".to_string(),
-        )
-    })
+    Some(
+        days_from_civil(year, month, day) * 86_400
+            + i64::from(hour) * 3_600
+            + i64::from(minute) * 60
+            + i64::from(second),
+    )
 }
 
 fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
@@ -806,6 +843,7 @@ mod tests {
             parse_iso_utc_seconds("1970-01-02T00:00:01Z").unwrap(),
             86_401
         );
+        assert!(parse_iso_utc_seconds("1970-01-01T00:00:00+00:00").is_err());
     }
 
     #[test]
@@ -847,6 +885,20 @@ mod tests {
             ExitCode::AuthenticationOrSignatureFailure.code()
         );
         assert!(error.to_string().contains("key is revoked"));
+
+        let invalid_window = json!({
+            "alice-2026-06": {
+                "secret": "alice-signing-key",
+                "signers": ["alice"],
+                "not_before": "2026-06-01T00:00:00+00:00"
+            }
+        });
+        let invalid_window_error =
+            verify_commit_signature(&signed, invalid_window.as_object().unwrap(), true)
+                .unwrap_err();
+        assert!(invalid_window_error
+            .to_string()
+            .contains("not_before must be UTC seconds ending in Z"));
     }
 
     #[test]
@@ -908,5 +960,56 @@ mod tests {
         assert!(error
             .to_string()
             .contains("timestamp is outside allowed skew"));
+    }
+
+    #[test]
+    fn request_nonce_cache_prunes_to_policy_limit_and_reports_metadata() {
+        let temp = tempdir().unwrap();
+        let project_root = temp.path().join("remote");
+        ensure_remote_layout(&project_root).unwrap();
+        write_json_atomic(
+            &project_root.join("server_policy.json"),
+            &json!({
+                "request_signatures": {
+                    "required": true,
+                    "max_skew_seconds": 300,
+                    "nonce_ttl_seconds": 300,
+                    "max_nonce_cache_entries": 1,
+                    "keys": {
+                        "alice-request": {
+                            "secret": "alice-request-key",
+                            "signers": ["alice"]
+                        }
+                    }
+                }
+            }),
+        )
+        .unwrap();
+        let target = remote_request_target("org", "app", "upload", Some("main"), None);
+        for _ in 0..2 {
+            let signature = sign_remote_request_with_key(
+                "upload",
+                "alice",
+                &target,
+                "alice-request",
+                "alice-request-key",
+            )
+            .unwrap();
+            verify_remote_request_signature(
+                &project_root,
+                "upload",
+                "alice",
+                &target,
+                Some(&signature),
+            )
+            .unwrap();
+        }
+
+        let cache = read_json(&project_root.join("request_nonce_cache.json")).unwrap();
+        assert_eq!(cache["entry_count"], 1);
+        assert_eq!(cache["max_entries"], 1);
+        assert_eq!(cache["ttl_seconds"], 300);
+        assert_eq!(cache["last_pruned_count"], 1);
+        assert_eq!(cache["entries"].as_object().unwrap().len(), 1);
     }
 }

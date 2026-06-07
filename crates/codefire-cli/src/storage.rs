@@ -70,6 +70,7 @@ pub(crate) struct RemoteStorageStats {
     pub(crate) merge_requests: AreaStats,
     pub(crate) idempotency: AreaStats,
     pub(crate) idempotency_retention: RemoteIdempotencyRetentionStats,
+    pub(crate) nonce_cache: RemoteNonceCacheStats,
     pub(crate) retention: RemoteRetentionStats,
     pub(crate) objects_by_generation: Vec<RemoteGenerationStats>,
 }
@@ -80,6 +81,16 @@ pub(crate) struct RemoteIdempotencyRetentionStats {
     pub(crate) oldest_created_at: Option<String>,
     pub(crate) expired_files: u64,
     pub(crate) expired_bytes: u64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct RemoteNonceCacheStats {
+    pub(crate) present: bool,
+    pub(crate) bytes: u64,
+    pub(crate) entry_count: u64,
+    pub(crate) max_entries: u64,
+    pub(crate) ttl_seconds: u64,
+    pub(crate) updated_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -288,6 +299,13 @@ pub(crate) fn print_storage_report(report: &StorageReport) {
                 remote.retention.current_generation,
                 remote.idempotency_retention.retention_seconds,
                 remote.idempotency_retention.expired_files
+            );
+            println!(
+                "    nonce cache: {} entries, max {}, ttl {}s, {}",
+                remote.nonce_cache.entry_count,
+                remote.nonce_cache.max_entries,
+                remote.nonce_cache.ttl_seconds,
+                format_bytes(remote.nonce_cache.bytes)
             );
         }
     }
@@ -528,6 +546,7 @@ fn scan_remote_storage(remote_urls: &[String]) -> Result<RemoteStorageScan, CliE
             merge_requests: scan_area(&dirs.merge_requests)?,
             idempotency,
             idempotency_retention,
+            nonce_cache: scan_remote_nonce_cache(&project_root)?,
             retention,
             objects_by_generation: scan_remote_object_generations(&dirs.objects)?,
         });
@@ -562,6 +581,35 @@ fn scan_remote_retention(project_root: &Path) -> Result<RemoteRetentionStats, Cl
             .and_then(|state| state.get("current_generation"))
             .and_then(Value::as_u64)
             .unwrap_or(0),
+    })
+}
+
+fn scan_remote_nonce_cache(project_root: &Path) -> Result<RemoteNonceCacheStats, CliError> {
+    let path = project_root.join("request_nonce_cache.json");
+    if !path.exists() {
+        return Ok(RemoteNonceCacheStats::default());
+    }
+    let bytes = fs::metadata(&path)?.len();
+    let data = read_json(&path)?;
+    let entry_count = data
+        .get("entry_count")
+        .and_then(Value::as_u64)
+        .or_else(|| {
+            data.get("entries")
+                .and_then(Value::as_object)
+                .map(|entries| entries.len() as u64)
+        })
+        .unwrap_or(0);
+    Ok(RemoteNonceCacheStats {
+        present: true,
+        bytes,
+        entry_count,
+        max_entries: data.get("max_entries").and_then(Value::as_u64).unwrap_or(0),
+        ttl_seconds: data.get("ttl_seconds").and_then(Value::as_u64).unwrap_or(0),
+        updated_at: data
+            .get("updated_at")
+            .and_then(Value::as_str)
+            .map(str::to_string),
     })
 }
 
@@ -747,6 +795,14 @@ fn remote_storage_json(stats: &RemoteStorageStats) -> Value {
             "oldest_created_at": stats.idempotency_retention.oldest_created_at,
             "expired_files": stats.idempotency_retention.expired_files,
             "expired_bytes": stats.idempotency_retention.expired_bytes,
+        },
+        "nonce_cache": {
+            "present": stats.nonce_cache.present,
+            "bytes": stats.nonce_cache.bytes,
+            "entry_count": stats.nonce_cache.entry_count,
+            "max_entries": stats.nonce_cache.max_entries,
+            "ttl_seconds": stats.nonce_cache.ttl_seconds,
+            "updated_at": stats.nonce_cache.updated_at,
         },
         "retention": {
             "retention_seconds": stats.retention.retention_seconds,

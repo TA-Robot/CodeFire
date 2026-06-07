@@ -2767,6 +2767,20 @@ fn storage_report_counts_file_remote_project_storage() {
     .unwrap();
     fs::write(dirs.branches.join("main.json"), "{}\n").unwrap();
     fs::write(dirs.merge_requests.join("mr_1.json"), "{}\n").unwrap();
+    write_json_atomic(
+        &remote_project_root.join("request_nonce_cache.json"),
+        &json!({
+            "version": 1,
+            "entries": {
+                "nonce-a": {"seen_at": 1}
+            },
+            "entry_count": 1,
+            "max_entries": 10000,
+            "ttl_seconds": 300,
+            "updated_at": "2026-06-07T00:00:00Z"
+        }),
+    )
+    .unwrap();
     fs::create_dir_all(dirs.idempotency.join("remote_upload")).unwrap();
     fs::write(
         dirs.idempotency
@@ -2811,6 +2825,10 @@ fn storage_report_counts_file_remote_project_storage() {
     assert_eq!(remote.retention.retention_generations, 2);
     assert_eq!(remote.retention.idempotency_retention_seconds, 1);
     assert_eq!(remote.retention.current_generation, 7);
+    assert!(remote.nonce_cache.present);
+    assert_eq!(remote.nonce_cache.entry_count, 1);
+    assert_eq!(remote.nonce_cache.max_entries, 10000);
+    assert_eq!(remote.nonce_cache.ttl_seconds, 300);
     assert_eq!(remote.idempotency_retention.expired_files, 1);
     assert_eq!(
         remote.idempotency_retention.oldest_created_at.as_deref(),
@@ -2827,6 +2845,8 @@ fn storage_report_counts_file_remote_project_storage() {
     assert_eq!(data["remotes"].as_array().unwrap().len(), 2);
     assert_eq!(data["remotes"][0]["retention"]["current_generation"], 7);
     assert_eq!(data["remotes"][0]["idempotency"]["expired_files"], 1);
+    assert_eq!(data["remotes"][0]["nonce_cache"]["entry_count"], 1);
+    assert_eq!(data["remotes"][0]["nonce_cache"]["max_entries"], 10000);
     assert_eq!(
         data["remotes"][0]["objects_by_generation"][0]["generation"],
         7
