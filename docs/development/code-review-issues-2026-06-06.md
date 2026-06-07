@@ -16,7 +16,7 @@
 - Medium: 91
 - Low: 3
 - Fixed in v0.7: 80
-- Remaining open: 40
+- Remaining open: 39
 
 ## Current Open Expansion
 
@@ -32,7 +32,6 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | CFR-085 | bug | View CLI | `show --json` がhelp上の契約と実装で一致していない | [CFR-085](code-review-issues/cfr-085.md) |
 | CFR-088 | performance | Patch export | patch exportがfile contentを無制限にbase64化し得る | [CFR-088](code-review-issues/cfr-088.md) |
 | CFR-089 | performance | View/Diff | manifest diffが全file blobをメモリへ展開する | [CFR-089](code-review-issues/cfr-089.md) |
-| CFR-091 | bug | CLI init | `init` がparse-before-helpで副作用なしhelpを保証できない | [CFR-091](code-review-issues/cfr-091.md) |
 | CFR-095 | maintainability | Error model | CliErrorにstructured diagnosticへの変換責務がない | [CFR-095](code-review-issues/cfr-095.md) |
 | CFR-100 | correctness-risk | Batch extinguish | batch extinguishが検証と適用を単一transactionで守れていない | [CFR-100](code-review-issues/cfr-100.md) |
 | CFR-103 | correctness-risk | Storage remote | storage reportが存在しないremote rootを空remoteとして扱い得る | [CFR-103](code-review-issues/cfr-103.md) |
@@ -73,6 +72,12 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | CFR-118 | medium | performance | Object lookup | unknown object ID lookupがsubdir全走査へ落ちる | [CFR-118](code-review-issues/cfr-118.md) |
 | CFR-119 | medium | correctness-risk | Durability helpers | object store writeのfsync/rename方針がactive metadata writeと別々に進化しやすい | [CFR-119](code-review-issues/cfr-119.md) |
 | CFR-120 | medium | maintainability | Development process | source reviewで見つかったissue群をroot cause計画へ自動接続できない | [CFR-120](code-review-issues/cfr-120.md) |
+
+### Fixed After v0.7
+
+| ID | Fixed in | Summary | Evidence |
+|---|---|---|---|
+| CFR-091 | v0.9 Phase A | `init --help` をparser前にread-only helpとして処理 | `command_help_routes_before_mutating_parsers` |
 
 ### Open Area View
 

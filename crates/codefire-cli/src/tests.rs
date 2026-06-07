@@ -8,6 +8,43 @@ use tempfile::tempdir;
 mod docs;
 
 #[test]
+fn command_help_routes_before_mutating_parsers() {
+    for (args, expected) in [
+        (vec!["init", "--help"], "usage: codefire init"),
+        (vec!["open", "--help"], "usage: codefire open"),
+        (vec!["clone", "--help"], "usage: codefire clone"),
+        (vec!["upload", "--help"], "usage: codefire upload"),
+        (
+            vec!["request-merge", "--help"],
+            "usage: codefire request-merge",
+        ),
+        (
+            vec!["branch", "list", "--help"],
+            "usage: codefire branch list",
+        ),
+        (
+            vec!["evidence", "add", "--help"],
+            "usage: codefire evidence add",
+        ),
+        (
+            vec!["patch", "export", "--help"],
+            "usage: codefire patch export",
+        ),
+    ] {
+        let args = args.into_iter().map(str::to_string).collect::<Vec<_>>();
+        let help = command_help_for_args(&args).expect("help should be routed");
+        assert!(
+            help.contains(expected),
+            "help for {:?} did not contain {expected}: {help}",
+            args
+        );
+    }
+
+    let init_options = parse_init_args(&["--help".to_string()]).unwrap();
+    assert_eq!(init_options.path, PathBuf::from("--help"));
+}
+
+#[test]
 fn init_creates_python_compatible_repo_layout() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");

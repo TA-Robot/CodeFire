@@ -128,6 +128,10 @@ fn main() {
 }
 
 fn run(args: Vec<String>) -> Result<(), CliError> {
+    if let Some(help) = command_help_for_args(&args) {
+        print!("{help}");
+        return Ok(());
+    }
     if let Some(command) = args.first().map(String::as_str) {
         if let Some(handler) = local_workflow_handler(command) {
             if wants_help(&args[1..]) {
@@ -764,8 +768,63 @@ fn wants_help(args: &[String]) -> bool {
     args.iter().any(|arg| arg == "-h" || arg == "--help")
 }
 
+fn command_help_for_args(args: &[String]) -> Option<&'static str> {
+    let command = args.first()?.as_str();
+    if !wants_help(&args[1..]) {
+        return None;
+    }
+    match command {
+        "status" | "scan" | "verify" | "fire" | "extinguish" | "commit" | "init" | "open"
+        | "clone" | "upload" | "list" | "request-merge" | "request-list" | "request-review"
+        | "request-apply" | "review-pack" | "storage" | "doctor" | "show" | "diff" => {
+            Some(subcommand_help(command))
+        }
+        "branch" => match args.get(1).map(String::as_str) {
+            Some("list") => Some(subcommand_help("branch list")),
+            _ => Some(subcommand_help("branch")),
+        },
+        "evidence" => match args.get(1).map(String::as_str) {
+            Some("add") => Some(subcommand_help("evidence add")),
+            _ => Some(subcommand_help("evidence")),
+        },
+        "patch" => match args.get(1).map(String::as_str) {
+            Some("export") => Some(subcommand_help("patch export")),
+            Some("import") => Some(subcommand_help("patch import")),
+            _ => Some(subcommand_help("patch")),
+        },
+        _ => None,
+    }
+}
+
 fn subcommand_help(command: &str) -> &'static str {
     match command {
+        "init" => {
+            "usage: codefire init [path] [--force]\n\nCreate a CodeFire repository without opening a branch.\n"
+        }
+        "open" => {
+            "usage: codefire open <branch> <path> [--dry-run] [--json] [--idempotency-key <key>]\n\nOpen a sealed branch into a working directory.\n"
+        }
+        "clone" => {
+            "usage: codefire clone <source-branch> <new-branch> [--dry-run] [--json] [--idempotency-key <key>]\n\nCreate a new sealed branch from an existing branch.\n"
+        }
+        "upload" => {
+            "usage: codefire upload <branch> <remote-url> [--dry-run] [--json] [--idempotency-key <key>] [--request-key-id <key>]\n\nUpload a sealed branch to a remote project.\n"
+        }
+        "list" => {
+            "usage: codefire list <remote-project-url>\n\nList branches in a remote project.\n"
+        }
+        "request-merge" => {
+            "usage: codefire request-merge <source-url> <target-url> [--dry-run] [--json] [--idempotency-key <key>]\n\nCreate a remote merge request.\n"
+        }
+        "request-list" => {
+            "usage: codefire request-list <remote-project-url>\n\nList remote merge requests.\n"
+        }
+        "request-review" => {
+            "usage: codefire request-review <remote-project-url> <mr-id> --decision approve|reject [--reviewer <name>] [--dry-run] [--json] [--idempotency-key <key>]\n"
+        }
+        "request-apply" => {
+            "usage: codefire request-apply <remote-project-url> <mr-id> [--dry-run] [--json] [--idempotency-key <key>]\n"
+        }
         "status" => {
             "usage: codefire status [path|--path <path>] [--json] [--metrics]\n\nShow the current open branch state.\n"
         }
@@ -801,6 +860,18 @@ fn subcommand_help(command: &str) -> &'static str {
         }
         "diff" => {
             "usage: codefire diff [--algorithm myers|patience|histogram] [--context <lines>] [--rename-detection] [--atoms] [--trace] [--impact] [--json] <left> <right>\n"
+        }
+        "review-pack" => {
+            "usage: codefire review-pack <source> [--base <base>] [--output <path>] [--algorithm myers|patience|histogram] [--no-rename-detection]\n"
+        }
+        "patch" => {
+            "usage: codefire patch export <source> [--base <base>] [--output <path>]\n       codefire patch import <patch-file> [--dry-run] [--json] [--idempotency-key <key>]\n"
+        }
+        "patch export" => {
+            "usage: codefire patch export <source> [--base <base>] [--output <path>]\n"
+        }
+        "patch import" => {
+            "usage: codefire patch import <patch-file> [--dry-run] [--json] [--idempotency-key <key>]\n"
         }
         _ => "usage: codefire <command> [options]\n",
     }
