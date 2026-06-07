@@ -139,3 +139,7 @@ The system shall synthesize a ranked research frontier map from baseline gaps, n
 ## REQ-AUTO-035: Frontier experiment plan drafting
 
 The system shall convert executable research frontier items into bounded experiment plan drafts with a hypothesis, benchmark target, baseline, metric, runner command, artifact contract, and analysis criteria. Deferred, risk-mitigation, or redesign frontier items shall not become executable plans until their blocking reason is resolved.
+
+## REQ-AUTO-036: Frontier feedback integration
+
+The system shall integrate completed run outcomes back into research frontier signals. Feedback shall update baseline gap, expected information gain, novelty pressure, negative-result overlap, blocker risks, and rationale without mutating the original signal. The update shall be deterministic, bounded, and conservative so failed, regressed, over-budget, or blocked runs reduce executable opportunity while replicated improvements increase priority for follow-up frontier planning.

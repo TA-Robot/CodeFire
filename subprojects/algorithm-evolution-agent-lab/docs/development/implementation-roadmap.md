@@ -79,5 +79,5 @@
 
 - Add research frontier map from baseline gaps, negative results, novelty, risks, budget, and challenge objectives. (done)
 - Add frontier-to-experiment-plan conversion. (done)
-- Add frontier feedback after run outcomes. (planned)
+- Add frontier feedback after run outcomes. (done)
 - Add frontier drift report for long campaigns. (planned)

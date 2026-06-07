@@ -13,6 +13,15 @@ class FrontierAction(str, Enum):
     DEFER = "defer"
 
 
+class FrontierFeedbackOutcome(str, Enum):
+    IMPROVED = "improved"
+    REPLICATED = "replicated"
+    REGRESSED = "regressed"
+    FAILED = "failed"
+    BLOCKED = "blocked"
+    INCONCLUSIVE = "inconclusive"
+
+
 @dataclass(frozen=True)
 class ResearchFrontierSignal:
     frontier_id: str
@@ -26,6 +35,26 @@ class ResearchFrontierSignal:
     negative_result_overlap: float = 0.0
     blocker_risks: int = 0
     rationale: str = ""
+
+
+@dataclass(frozen=True)
+class FrontierFeedback:
+    frontier_id: str
+    outcome: FrontierFeedbackOutcome
+    metric_delta: float = 0.0
+    confidence: float = 0.0
+    observed_cost: float = 0.0
+    blocker_count: int = 0
+    notes: str = ""
+
+
+@dataclass(frozen=True)
+class FrontierFeedbackUpdate:
+    frontier_id: str
+    prior_signal: ResearchFrontierSignal | None
+    updated_signal: ResearchFrontierSignal | None
+    applied_outcome_count: int
+    reasons: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -123,6 +152,51 @@ class FrontierExperimentPlanner:
         return tuple(drafts)
 
 
+# cf-atom: CODE-FrontierFeedbackIntegrator
+class FrontierFeedbackIntegrator:
+    def integrate(
+        self,
+        signals: tuple[ResearchFrontierSignal, ...],
+        feedback: tuple[FrontierFeedback, ...],
+    ) -> tuple[FrontierFeedbackUpdate, ...]:
+        by_frontier: dict[str, list[FrontierFeedback]] = {}
+        for item in feedback:
+            validate_feedback(item)
+            by_frontier.setdefault(item.frontier_id, []).append(item)
+
+        updates: list[FrontierFeedbackUpdate] = []
+        known_ids = {signal.frontier_id for signal in signals}
+        for signal in signals:
+            updated = signal
+            reasons: list[str] = []
+            applied = 0
+            for item in by_frontier.get(signal.frontier_id, ()):
+                updated = apply_frontier_feedback(updated, item, reasons)
+                applied += 1
+            updates.append(
+                FrontierFeedbackUpdate(
+                    frontier_id=signal.frontier_id,
+                    prior_signal=signal,
+                    updated_signal=updated,
+                    applied_outcome_count=applied,
+                    reasons=tuple(reasons) if reasons else ("no_feedback",),
+                )
+            )
+
+        for item in feedback:
+            if item.frontier_id not in known_ids:
+                updates.append(
+                    FrontierFeedbackUpdate(
+                        frontier_id=item.frontier_id,
+                        prior_signal=None,
+                        updated_signal=None,
+                        applied_outcome_count=0,
+                        reasons=("unknown_frontier", item.outcome.value),
+                    )
+                )
+        return tuple(updates)
+
+
 def frontier_item(
     signal: ResearchFrontierSignal,
     *,
@@ -164,6 +238,88 @@ def validate_signal(signal: ResearchFrontierSignal) -> None:
             raise ValueError(f"{field_name} must be non-negative")
     if signal.blocker_risks < 0:
         raise ValueError("blocker_risks must be non-negative")
+
+
+def validate_feedback(feedback: FrontierFeedback) -> None:
+    if not feedback.frontier_id:
+        raise ValueError("frontier_id is required")
+    if feedback.confidence < 0:
+        raise ValueError("confidence must be non-negative")
+    if feedback.observed_cost < 0:
+        raise ValueError("observed_cost must be non-negative")
+    if feedback.blocker_count < 0:
+        raise ValueError("blocker_count must be non-negative")
+
+
+def apply_frontier_feedback(
+    signal: ResearchFrontierSignal,
+    feedback: FrontierFeedback,
+    reasons: list[str],
+) -> ResearchFrontierSignal:
+    confidence = clamp01(feedback.confidence)
+    baseline_gap = signal.baseline_gap
+    expected_information_gain = signal.expected_information_gain
+    novelty_score = signal.novelty_score
+    challenge_alignment = signal.challenge_alignment
+    negative_result_overlap = signal.negative_result_overlap
+    blocker_risks = signal.blocker_risks
+
+    if feedback.outcome == FrontierFeedbackOutcome.IMPROVED:
+        improvement = max(feedback.metric_delta, 0.0) * max(confidence, 0.25)
+        baseline_gap += improvement
+        expected_information_gain += 0.12 * confidence
+        challenge_alignment += 0.05 * confidence
+        negative_result_overlap -= 0.08 * confidence
+        reasons.append("improved")
+    elif feedback.outcome == FrontierFeedbackOutcome.REPLICATED:
+        expected_information_gain += 0.08 * confidence
+        challenge_alignment += 0.08 * confidence
+        negative_result_overlap -= 0.05 * confidence
+        reasons.append("replicated")
+    elif feedback.outcome == FrontierFeedbackOutcome.REGRESSED:
+        regression = abs(min(feedback.metric_delta, 0.0))
+        baseline_gap -= 0.5 * regression
+        expected_information_gain -= 0.18 * max(confidence, 0.5)
+        negative_result_overlap += 0.15 + 0.5 * regression
+        reasons.append("regressed")
+    elif feedback.outcome == FrontierFeedbackOutcome.FAILED:
+        expected_information_gain -= 0.14 * max(confidence, 0.5)
+        negative_result_overlap += 0.2
+        reasons.append("failed")
+    elif feedback.outcome == FrontierFeedbackOutcome.BLOCKED:
+        blocker_risks += max(feedback.blocker_count, 1)
+        expected_information_gain -= 0.1
+        reasons.append("blocked")
+    elif feedback.outcome == FrontierFeedbackOutcome.INCONCLUSIVE:
+        expected_information_gain -= 0.05
+        reasons.append("inconclusive")
+
+    if feedback.observed_cost > signal.estimated_cost:
+        overrun_penalty = (feedback.observed_cost - signal.estimated_cost) / max(feedback.observed_cost, 1.0)
+        expected_information_gain -= min(0.25, overrun_penalty)
+        reasons.append("over_budget")
+
+    rationale = signal.rationale
+    if feedback.notes:
+        rationale = f"{rationale}; {feedback.notes}" if rationale else feedback.notes
+
+    return ResearchFrontierSignal(
+        frontier_id=signal.frontier_id,
+        mechanism_family=signal.mechanism_family,
+        target=signal.target,
+        baseline_gap=clamp01(baseline_gap),
+        expected_information_gain=clamp01(expected_information_gain),
+        novelty_score=clamp01(novelty_score),
+        estimated_cost=max(signal.estimated_cost, 0.0),
+        challenge_alignment=clamp01(challenge_alignment),
+        negative_result_overlap=clamp01(negative_result_overlap),
+        blocker_risks=blocker_risks,
+        rationale=rationale,
+    )
+
+
+def clamp01(value: float) -> float:
+    return min(max(value, 0.0), 1.0)
 
 
 def choose_frontier_action(

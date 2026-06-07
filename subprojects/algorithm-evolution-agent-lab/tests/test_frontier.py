@@ -1,6 +1,9 @@
 import unittest
 
 from evoagent.frontier import (
+    FrontierFeedback,
+    FrontierFeedbackIntegrator,
+    FrontierFeedbackOutcome,
     FrontierAction,
     FrontierExperimentPlanner,
     ResearchFrontierItem,
@@ -164,6 +167,128 @@ class FrontierExperimentPlannerTests(unittest.TestCase):
 
         self.assertEqual(len(drafts), 1)
         self.assertLessEqual(drafts[0].plan.estimated_cost, 0.6)
+
+
+# cf-atom: TEST-frontier-feedback-integrator-updates-frontier-signals
+class FrontierFeedbackIntegratorTests(unittest.TestCase):
+    def test_frontier_feedback_integrator_updates_frontier_signals(self):
+        integrator = FrontierFeedbackIntegrator()
+        base = ResearchFrontierSignal(
+            frontier_id="adaptive-selector",
+            mechanism_family="adaptive selector",
+            target="toy-tabular",
+            baseline_gap=0.2,
+            expected_information_gain=0.4,
+            novelty_score=0.7,
+            estimated_cost=0.5,
+            challenge_alignment=0.6,
+            negative_result_overlap=0.2,
+        )
+
+        updates = integrator.integrate(
+            (base,),
+            (
+                FrontierFeedback(
+                    frontier_id="adaptive-selector",
+                    outcome=FrontierFeedbackOutcome.IMPROVED,
+                    metric_delta=0.12,
+                    confidence=0.8,
+                    observed_cost=0.4,
+                    notes="stable local gain",
+                ),
+                FrontierFeedback(
+                    frontier_id="adaptive-selector",
+                    outcome=FrontierFeedbackOutcome.REPLICATED,
+                    metric_delta=0.08,
+                    confidence=0.7,
+                    observed_cost=0.5,
+                ),
+            ),
+        )
+
+        self.assertEqual(len(updates), 1)
+        update = updates[0]
+        self.assertEqual(update.applied_outcome_count, 2)
+        self.assertIn("improved", update.reasons)
+        self.assertIn("replicated", update.reasons)
+        self.assertIsNotNone(update.updated_signal)
+        assert update.updated_signal is not None
+        self.assertGreater(update.updated_signal.baseline_gap, base.baseline_gap)
+        self.assertGreater(
+            update.updated_signal.expected_information_gain,
+            base.expected_information_gain,
+        )
+        self.assertLess(
+            update.updated_signal.negative_result_overlap,
+            base.negative_result_overlap,
+        )
+        self.assertIn("stable local gain", update.updated_signal.rationale)
+
+    def test_frontier_feedback_integrator_penalizes_failed_and_blocked_feedback(self):
+        integrator = FrontierFeedbackIntegrator()
+        base = ResearchFrontierSignal(
+            frontier_id="expensive-meta",
+            mechanism_family="meta learner",
+            target="toy-tabular",
+            baseline_gap=0.5,
+            expected_information_gain=0.8,
+            novelty_score=0.8,
+            estimated_cost=0.5,
+        )
+
+        update = integrator.integrate(
+            (base,),
+            (
+                FrontierFeedback(
+                    frontier_id="expensive-meta",
+                    outcome=FrontierFeedbackOutcome.FAILED,
+                    confidence=0.9,
+                    observed_cost=0.9,
+                ),
+                FrontierFeedback(
+                    frontier_id="expensive-meta",
+                    outcome=FrontierFeedbackOutcome.BLOCKED,
+                    blocker_count=2,
+                ),
+            ),
+        )[0]
+
+        self.assertIn("failed", update.reasons)
+        self.assertIn("blocked", update.reasons)
+        self.assertIn("over_budget", update.reasons)
+        self.assertIsNotNone(update.updated_signal)
+        assert update.updated_signal is not None
+        self.assertGreater(
+            update.updated_signal.negative_result_overlap,
+            base.negative_result_overlap,
+        )
+        self.assertLess(
+            update.updated_signal.expected_information_gain,
+            base.expected_information_gain,
+        )
+        self.assertEqual(update.updated_signal.blocker_risks, 2)
+
+        ranked = ResearchFrontierMap().rank((update.updated_signal,), remaining_budget=1.0)
+        self.assertEqual(ranked[0].action, FrontierAction.MITIGATE_RISK)
+
+    def test_frontier_feedback_integrator_reports_unknown_frontier(self):
+        updates = FrontierFeedbackIntegrator().integrate(
+            (),
+            (
+                FrontierFeedback(
+                    frontier_id="missing-frontier",
+                    outcome=FrontierFeedbackOutcome.INCONCLUSIVE,
+                    notes="no matching frontier",
+                ),
+            ),
+        )
+
+        self.assertEqual(len(updates), 1)
+        self.assertEqual(updates[0].frontier_id, "missing-frontier")
+        self.assertIsNone(updates[0].prior_signal)
+        self.assertIsNone(updates[0].updated_signal)
+        self.assertEqual(updates[0].applied_outcome_count, 0)
+        self.assertEqual(updates[0].reasons, ("unknown_frontier", "inconclusive"))
 
 
 if __name__ == "__main__":

@@ -79,3 +79,4 @@
 | AE-075 | Release | evidence readiness、review decision、audit status、release artifactsを統合してexternal claim release gateを判定する | done | `CODE-ClaimReleaseGate`; `TEST-claim-release-gate-allows-complete-claims` |
 | AE-076 | Planning | baseline gap、negative results、novelty、risk、budget、challenge objectiveから次に攻めるresearch frontierを順位付けする | done | `CODE-ResearchFrontierMap`; `TEST-research-frontier-map-ranks-opportunities` |
 | AE-077 | Planning | runnable research frontierをbounded experiment plan draftへ変換し、blocked/deferred frontierを実行対象から外す | done | `CODE-FrontierExperimentPlanner`; `TEST-frontier-experiment-planner-builds-runnable-plans` |
+| AE-078 | Planning | 完了runのoutcomeをresearch frontier signalへ戻し、次iterationのfrontier rankingを保守的に更新する | done | `CODE-FrontierFeedbackIntegrator`; `TEST-frontier-feedback-integrator-updates-frontier-signals`; 139 tests pass |

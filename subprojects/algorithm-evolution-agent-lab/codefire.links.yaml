@@ -240,6 +240,15 @@ links:
   - from: REQ-AUTO-035
     to: TEST-frontier-experiment-planner-builds-runnable-plans
     type: verified_by
+  - from: REQ-AUTO-036
+    to: DES-AUTO-018
+    type: refined_by
+  - from: DES-AUTO-018
+    to: CODE-FrontierFeedbackIntegrator
+    type: implemented_by
+  - from: REQ-AUTO-036
+    to: TEST-frontier-feedback-integrator-updates-frontier-signals
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

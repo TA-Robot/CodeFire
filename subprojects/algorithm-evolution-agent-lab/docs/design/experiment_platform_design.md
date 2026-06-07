@@ -300,3 +300,35 @@ For each runnable frontier item it creates:
 - analysis criteria suitable for a first probe
 
 The planner skips frontier items whose action is `defer`, `mitigate_risk`, or `redesign`. This keeps the runner from executing work that the frontier map has already identified as blocked or unsafe. Output is bounded by `max_plans`, and ordering follows frontier ranking order.
+
+## DES-AUTO-018: Frontier feedback integration
+
+The frontier feedback integrator consumes existing `ResearchFrontierSignal` values and compact run feedback records.
+
+Each feedback record contains:
+
+- frontier ID
+- outcome: `improved`, `replicated`, `regressed`, `failed`, `blocked`, or `inconclusive`
+- metric delta against the tracked baseline
+- confidence
+- observed cost
+- blocker count
+- notes
+
+The integrator returns update records rather than mutating signals in place. Each update includes:
+
+- frontier ID
+- prior signal
+- updated signal
+- applied outcome count
+- deterministic reasons
+
+Update rules are conservative:
+
+- improved or replicated feedback increases baseline gap and challenge alignment only when confidence is positive
+- regressed or failed feedback increases negative-result overlap and reduces expected information gain
+- blocked feedback increases blocker risk and requires mitigation before execution
+- over-budget feedback reduces expected information gain so cheap probes remain favored
+- unknown frontier feedback is reported as an update with no signal rather than silently changing another frontier
+
+All numeric fields are clamped to bounded non-negative ranges. This keeps the next `ResearchFrontierMap` ranking stable and prevents a single noisy result from producing unbounded priority swings.
