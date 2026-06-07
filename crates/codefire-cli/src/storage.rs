@@ -15,6 +15,7 @@ pub(crate) struct StorageReportOptions {
     pub(crate) json_output: bool,
     pub(crate) large_threshold_bytes: u64,
     pub(crate) remotes: Vec<String>,
+    pub(crate) quick: bool,
 }
 
 #[derive(Debug)]
@@ -28,6 +29,8 @@ pub(crate) struct StorageReport {
     pub(crate) external_artifacts: ExternalArtifactStats,
     pub(crate) remotes: Vec<RemoteStorageStats>,
     pub(crate) warnings: Vec<StorageWarning>,
+    pub(crate) quick: bool,
+    pub(crate) skipped_checks: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -107,10 +110,13 @@ pub(crate) fn parse_storage_report_args(args: &[String]) -> Result<StorageReport
     let mut json_output = false;
     let mut large_threshold_bytes = DEFAULT_LARGE_THRESHOLD_BYTES;
     let mut remotes = Vec::new();
+    let mut quick = false;
     let mut index = 0usize;
     while index < args.len() {
         match args[index].as_str() {
             "--json" => json_output = true,
+            "--quick" => quick = true,
+            "--full" => quick = false,
             "--remote" => {
                 index += 1;
                 let value = args
@@ -151,6 +157,7 @@ pub(crate) fn parse_storage_report_args(args: &[String]) -> Result<StorageReport
         json_output,
         large_threshold_bytes,
         remotes,
+        quick,
     })
 }
 
@@ -159,7 +166,11 @@ pub(crate) fn run_storage_report(
 ) -> Result<StorageReport, CliError> {
     let repo_root = find_repo_root(&options.start)?;
     let cf = repo_root.join(".codefire");
-    let object_scan = scan_objects(&cf.join("objects"), options.large_threshold_bytes)?;
+    let object_scan = scan_objects(
+        &cf.join("objects"),
+        options.large_threshold_bytes,
+        options.quick,
+    )?;
     let remote_scan = scan_remote_storage(&options.remotes)?;
     let mut warnings = object_scan.warnings;
     warnings.extend(remote_scan.warnings);
@@ -173,6 +184,8 @@ pub(crate) fn run_storage_report(
         external_artifacts: object_scan.external_artifacts,
         remotes: remote_scan.remotes,
         warnings,
+        quick: options.quick,
+        skipped_checks: object_scan.skipped_checks,
     })
 }
 
@@ -181,6 +194,8 @@ pub(crate) fn storage_report_data_json(report: &StorageReport) -> Value {
         "type": "codefire_storage_report",
         "version": 1,
         "repo_root": &report.repo_root,
+        "mode": if report.quick { "quick" } else { "full" },
+        "skipped_checks": &report.skipped_checks,
         "objects": {
             "files": report.objects.files,
             "bytes": report.objects.bytes,
@@ -228,6 +243,10 @@ pub(crate) fn storage_report_next_actions(report: &StorageReport) -> Vec<Value> 
 pub(crate) fn print_storage_report(report: &StorageReport) {
     println!("CodeFire storage report");
     println!("repo: {}", report.repo_root.display());
+    println!("mode: {}", if report.quick { "quick" } else { "full" });
+    if !report.skipped_checks.is_empty() {
+        println!("skipped checks: {}", report.skipped_checks.join(", "));
+    }
     println!(
         "objects: {} files, {}",
         report.objects.files,
@@ -320,18 +339,54 @@ struct ObjectScan {
     largest_objects: Vec<ObjectFileStats>,
     external_artifacts: ExternalArtifactStats,
     warnings: Vec<StorageWarning>,
+    skipped_checks: Vec<String>,
 }
 
-fn scan_objects(objects_root: &Path, large_threshold_bytes: u64) -> Result<ObjectScan, CliError> {
+fn scan_objects(
+    objects_root: &Path,
+    large_threshold_bytes: u64,
+    quick: bool,
+) -> Result<ObjectScan, CliError> {
     let mut area = AreaStats::default();
     let mut by_type = BTreeMap::<String, AreaStats>::new();
     let mut largest_objects = Vec::new();
     let mut external_artifacts = ExternalArtifactStats::default();
     let mut warnings = Vec::new();
+    let skipped_checks = if quick {
+        vec![
+            "object_json_validation".to_string(),
+            "object_type_breakdown".to_string(),
+            "external_artifact_refs".to_string(),
+        ]
+    } else {
+        Vec::new()
+    };
     for path in collect_files(objects_root)? {
         let bytes = fs::metadata(&path)?.len();
         area.files += 1;
         area.bytes += bytes;
+        if quick {
+            let object_id = path
+                .file_stem()
+                .and_then(|name| name.to_str())
+                .map(str::to_string)
+                .unwrap_or_else(|| "(unknown)".to_string());
+            if bytes >= large_threshold_bytes {
+                warnings.push(StorageWarning {
+                    kind: "large_object".to_string(),
+                    message: "object file exceeds large threshold".to_string(),
+                    path: Some(path.clone()),
+                    bytes: Some(bytes),
+                });
+            }
+            largest_objects.push(ObjectFileStats {
+                object_id,
+                type_tag: "unscanned".to_string(),
+                path,
+                bytes,
+            });
+            continue;
+        }
         let value = match read_json(&path) {
             Ok(value) => value,
             Err(error) => {
@@ -344,30 +399,40 @@ fn scan_objects(objects_root: &Path, large_threshold_bytes: u64) -> Result<Objec
                 continue;
             }
         };
-        let type_tag = value
-            .get("type")
-            .and_then(Value::as_str)
-            .unwrap_or("unknown")
-            .to_string();
-        let object_id = value
-            .get("object_id")
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .or_else(|| {
-                path.file_stem()
-                    .and_then(|name| name.to_str())
-                    .map(str::to_string)
-            })
-            .unwrap_or_else(|| "(unknown)".to_string());
+        let record = match serde_json::from_value::<codefire_store::ObjectRecord>(value) {
+            Ok(record) => record,
+            Err(error) => {
+                warnings.push(StorageWarning {
+                    kind: "invalid_object_record".to_string(),
+                    message: error.to_string(),
+                    path: Some(path),
+                    bytes: Some(bytes),
+                });
+                continue;
+            }
+        };
+        let type_tag = record.type_tag.clone();
+        let object_id = record.object_id.clone();
         let stats = by_type.entry(type_tag.clone()).or_default();
         stats.files += 1;
         stats.bytes += bytes;
+        if let Some(payload_type) = record.payload.get("type").and_then(Value::as_str) {
+            if payload_type != type_tag {
+                warnings.push(StorageWarning {
+                    kind: "payload_type_mismatch".to_string(),
+                    message: format!(
+                        "object record type '{type_tag}' differs from payload type '{payload_type}'"
+                    ),
+                    path: Some(path.clone()),
+                    bytes: Some(bytes),
+                });
+            }
+        }
         if type_tag == "artifact_ref" {
             external_artifacts.refs += 1;
-            external_artifacts.referenced_bytes += value
-                .get("payload")
-                .and_then(|payload| payload.get("size_bytes"))
-                .or_else(|| value.get("size_bytes"))
+            external_artifacts.referenced_bytes += record
+                .payload
+                .get("size_bytes")
                 .and_then(Value::as_u64)
                 .unwrap_or(0);
         }
@@ -413,6 +478,7 @@ fn scan_objects(objects_root: &Path, large_threshold_bytes: u64) -> Result<Objec
         largest_objects,
         external_artifacts,
         warnings,
+        skipped_checks,
     })
 }
 

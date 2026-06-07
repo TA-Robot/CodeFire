@@ -254,6 +254,7 @@ fn explain_storage_warning(options: &ExplainOptions) -> Result<ExplainResult, Cl
         json_output: true,
         large_threshold_bytes: options.large_threshold_bytes,
         remotes: Vec::new(),
+        quick: false,
     })?;
     let data = json!({
         "type": "codefire_explain",

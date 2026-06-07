@@ -2443,6 +2443,12 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
         json!({"path": "large.bin", "content": "x".repeat(512)}),
     )
     .unwrap();
+    let blob_path =
+        codefire_store::object_record_path(&repo_root.join(".codefire").join("objects"), &blob_id)
+            .unwrap();
+    let mut blob_record = read_json(&blob_path).unwrap();
+    blob_record["payload"]["type"] = Value::String("payload_blob".to_string());
+    write_json_atomic(&blob_path, &blob_record).unwrap();
 
     let parsed = parse_storage_report_args(&[
         repo_root.to_string_lossy().into_owned(),
@@ -2455,6 +2461,8 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
 
     assert!(parsed.json_output);
     assert_eq!(parsed.large_threshold_bytes, 128);
+    assert!(!parsed.quick);
+    assert_eq!(data["mode"], "full");
     assert!(report.objects.files >= 10);
     assert!(report.active_state.files > 0);
     assert!(report
@@ -2469,6 +2477,10 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
         .warnings
         .iter()
         .any(|warning| warning.kind == "large_object"));
+    assert!(report
+        .warnings
+        .iter()
+        .any(|warning| warning.kind == "payload_type_mismatch"));
     assert_eq!(data["type"], "codefire_storage_report");
     assert!(data["objects"]["by_type"]
         .as_array()
@@ -2477,6 +2489,30 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
         .any(|stats| stats["type"] == "blob"));
     assert!(!storage_report_diagnostics_json(&report).is_empty());
     assert!(!storage_report_next_actions(&report).is_empty());
+
+    let quick = run_storage_report(
+        &parse_storage_report_args(&[
+            repo_root.to_string_lossy().into_owned(),
+            "--quick".to_string(),
+            "--json".to_string(),
+            "--large-threshold=128".to_string(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    let quick_data = storage_report_data_json(&quick);
+    assert!(quick.quick);
+    assert_eq!(quick_data["mode"], "quick");
+    assert!(quick.object_types.is_empty());
+    assert_eq!(quick_data["skipped_checks"][0], "object_json_validation");
+    assert!(quick
+        .largest_objects
+        .iter()
+        .all(|object| object.type_tag == "unscanned"));
+    assert!(quick
+        .warnings
+        .iter()
+        .all(|warning| warning.kind != "payload_type_mismatch"));
 }
 
 #[test]
@@ -2665,6 +2701,7 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
         json_output: false,
         large_threshold_bytes: 1024,
         remotes: Vec::new(),
+        quick: false,
     })
     .unwrap();
     assert_eq!(storage.external_artifacts.refs, 1);

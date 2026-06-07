@@ -109,7 +109,7 @@ _codefire_complete()
       if [[ $COMP_CWORD -eq 2 ]]; then
         COMPREPLY=( $(compgen -W "report" -- "$cur") )
       else
-        COMPREPLY=( $(compgen -W "--json --large-threshold --remote" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--quick --full --json --large-threshold --remote" -- "$cur") )
       fi
       ;;
     evidence)
@@ -191,7 +191,7 @@ _codefire()
       _arguments '--base[base commitish]' '--output[output file]' '--algorithm[diff algorithm]:algorithm:(myers patience histogram)' '--no-rename-detection[disable rename detection]'
       ;;
     storage)
-      _arguments '1:storage command:(report)' '--json[emit JSON]' '--large-threshold[large object threshold]' '--remote[remote project URL]'
+      _arguments '1:storage command:(report)' '--quick[skip object JSON parsing]' '--full[include object type and artifact analysis]' '--json[emit JSON]' '--large-threshold[large object threshold]' '--remote[remote project URL]'
       ;;
     evidence)
       _arguments '1:evidence command:(add)' '--path[repo or open path]' '--artifact[artifact path]' '--from-command[shell command]' '--from-argv[program]' '--argv[argv argument]' '--batch[batch file]' '--label[label]' '--dry-run[dry run]' '--json[emit JSON]'

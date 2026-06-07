@@ -220,6 +220,8 @@ migrate: review_migration_plan, inspect_migration_blockers
 {
   "type": "codefire_storage_report",
   "version": 1,
+  "mode": "full",
+  "skipped_checks": [],
   "objects": {
     "files": 12,
     "bytes": 4096,

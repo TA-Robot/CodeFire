@@ -507,6 +507,7 @@ review-packはsealed commitから再現可能な情報だけで構成し、生�
 ```bash
 codefire storage report
 codefire storage report /path/to/repo --json
+codefire storage report --quick --json
 codefire storage report --large-threshold 16MB
 codefire storage report --remote cf:///srv/codefire/org/app --json
 ```
@@ -515,9 +516,11 @@ codefire storage report --remote cf:///srv/codefire/org/app --json
 
 ```text
 repository rootを探索し、.codefire/objects、.codefire/active、.codefire/idempotencyのfile数とbytesを集計する
-object storeはobject type別のfile数/bytesとlargest object上位を返す
+full modeではobject storeをObjectRecord wrapperとしてparseし、record type別のfile数/bytesとlargest object上位を返す
+--quickはobject JSON parseを省略し、file数/bytes/largest/large_object warningだけをmetadataから返す。data.mode=quick、data.skipped_checksに省略した解析名を含める
 --large-threshold以上のobjectはlarge_object warningとしてdiagnosticsに出す
 object JSONが読めない場合はinvalid_object_json warningとしてdiagnosticsに出し、report自体は継続する
+ObjectRecordのrecord typeとpayload.typeが異なる場合はpayload_type_mismatch warningとしてdiagnosticsに出す
 --remoteはfile-backed remote project URLを追加で集計し、remote側objects/branches/merge_requests/idempotencyのfile数とbytes、gc retention policy、current generation、object generation別容量を返す
 remote `server_policy.json` の `gc.idempotency_retention_seconds` が正なら、storage reportはremote idempotency recordのexpired_files/expired_bytes/oldest_created_atを返し、期限超過recordをremote_idempotency_retention warningとして出す
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_storage_reportを含める

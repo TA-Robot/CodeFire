@@ -714,7 +714,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 "unsupported storage command: {command}"
             ))),
             None => Err(CliError::Usage(
-                "usage: codefire storage report [path] [--json] [--large-threshold <bytes|KB|MB|GB>] [--remote <cf://server/org/app>]".to_string(),
+                "usage: codefire storage report [path] [--quick|--full] [--json] [--large-threshold <bytes|KB|MB|GB>] [--remote <cf://server/org/app>]".to_string(),
             )),
         },
         Some("doctor") => {
