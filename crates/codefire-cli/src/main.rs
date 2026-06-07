@@ -812,7 +812,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                                 0,
                                 Some(&result.repo_root),
                                 evidence_add_data_json(&result),
-                                Vec::new(),
+                                result.diagnostics.clone(),
                                 Vec::new(),
                             ))?
                         );

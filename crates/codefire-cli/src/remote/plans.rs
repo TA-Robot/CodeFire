@@ -9,6 +9,7 @@ pub(super) fn upload_operation_plan(
     transport: &str,
     remote_branch: &str,
     object_count: Option<usize>,
+    diagnostics: Vec<Value>,
 ) -> Value {
     json!({
         "type": "codefire_operation_plan",
@@ -23,6 +24,7 @@ pub(super) fn upload_operation_plan(
         "remote_branch": remote_branch,
         "transport": transport,
         "object_count": object_count,
+        "diagnostics": diagnostics,
         "operations": [
             {"kind": "validate_local_branch", "branch": &options.branch, "head": head},
             {"kind": "copy_object_graph", "commit": head},

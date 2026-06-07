@@ -46,6 +46,32 @@ CommitObject
 BranchObject
 ```
 
+## 8.3.1 ArtifactRefObject
+
+外部artifactのmetadataだけを保存し、payload本体はobject storeへコピーしない。新規artifact_refはdefaultで絶対local pathを保存しない。
+
+```json
+{
+  "type": "artifact_ref",
+  "version": 1,
+  "label": "training-smoke",
+  "path": "artifacts/model.bin",
+  "path_kind": "repo_relative",
+  "local_path_redacted": false,
+  "uri": "repo://artifacts/model.bin",
+  "hash_algorithm": "sha256",
+  "content_hash": "sha256:aaa111",
+  "hash_streaming": true,
+  "hash_chunk_bytes": 65536,
+  "large_artifact": false,
+  "large_artifact_threshold_bytes": 1048576,
+  "size_bytes": 1234,
+  "captured_at": "2026-06-06T00:00:00Z"
+}
+```
+
+repo外artifactはdefaultで `path: "<redacted>"` / `path_kind: "redacted"` / `local_path_redacted: true` として保存する。
+
 ## 8.4 ContentManifestObject
 
 commit時点の全ファイル一覧を表す。

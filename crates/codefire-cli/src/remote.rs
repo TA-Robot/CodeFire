@@ -176,14 +176,16 @@ pub(crate) fn upload_branch(
     if is_cf_http_url(&options.remote_url) {
         let remote = parse_cf_http_url(&options.remote_url)?;
         let transport = remote.endpoint_scheme();
-        let object_count = collect_object_records(&local_objects, &head)?.len();
+        let object_records = collect_object_records(&local_objects, &head)?;
+        let diagnostics = upload_object_graph_diagnostics(&object_records);
         let plan = upload_operation_plan(
             options,
             &repo_root,
             &head,
             transport,
             remote.branch.as_str(),
-            Some(object_count),
+            Some(object_records.len()),
+            diagnostics,
         );
         if options.dry_run {
             return Ok(UploadResult { head, plan });
@@ -199,7 +201,7 @@ pub(crate) fn upload_branch(
         let mut payload = json!({
             "branch": options.branch,
             "head": head,
-            "objects": collect_object_records(&local_objects, &required_string(&branch, &["head"])?)?,
+            "objects": object_records,
             "actor": actor,
             "idempotency_key": &options.idempotency_key,
             "lock": lock_options_json(&options.lock),
@@ -286,13 +288,16 @@ pub(crate) fn upload_branch(
             ));
         }
     }
+    let object_records = collect_object_records(&local_objects, &head)?;
+    let diagnostics = upload_object_graph_diagnostics(&object_records);
     let plan = upload_operation_plan(
         options,
         &repo_root,
         &head,
         "file",
         remote_branch.as_str(),
-        None,
+        Some(object_records.len()),
+        diagnostics,
     );
     if options.dry_run {
         return Ok(UploadResult { head, plan });
@@ -1236,6 +1241,36 @@ pub(crate) fn collect_object_records(
             .to_string()
     });
     Ok(records)
+}
+
+pub(crate) fn upload_object_graph_diagnostics(records: &[Value]) -> Vec<Value> {
+    records
+        .iter()
+        .filter_map(|record| {
+            let payload = record.get("payload")?;
+            if payload.get("type").and_then(Value::as_str) != Some("artifact_ref") {
+                return None;
+            }
+            let path = payload.get("path").and_then(Value::as_str)?;
+            let path_kind = payload.get("path_kind").and_then(Value::as_str);
+            if path_kind == Some("repo_relative") || path_kind == Some("redacted") {
+                return None;
+            }
+            if !looks_like_absolute_path(path) {
+                return None;
+            }
+            Some(json!({
+                "kind": "artifact_path_sensitive",
+                "severity": "warning",
+                "message": "artifact_ref contains an absolute local path; recreate the evidence to store a repo-relative or redacted artifact path before remote upload",
+                "object_id": record.get("object_id").and_then(Value::as_str),
+            }))
+        })
+        .collect()
+}
+
+fn looks_like_absolute_path(path: &str) -> bool {
+    path.starts_with('/') || path.starts_with('\\') || path.as_bytes().get(1) == Some(&b':')
 }
 
 pub(crate) fn write_object_records<I>(objects: &Path, records: I) -> Result<(), CliError>

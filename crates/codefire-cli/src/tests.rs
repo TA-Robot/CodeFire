@@ -2364,6 +2364,19 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
     assert_eq!(artifact_ref["type"], "artifact_ref");
     assert_eq!(artifact_ref["label"], "training-smoke");
     assert_eq!(artifact_ref["size_bytes"], 16);
+    assert_eq!(artifact_ref["path_kind"], "redacted");
+    assert_eq!(artifact_ref["path"], "<redacted>");
+    assert_eq!(artifact_ref["local_path_redacted"], true);
+    assert!(artifact_ref["uri"]
+        .as_str()
+        .unwrap()
+        .starts_with("artifact://redacted/"));
+    assert_eq!(artifact_ref["hash_streaming"], true);
+    assert_eq!(artifact_ref["hash_chunk_bytes"], 65536);
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic["kind"] == "artifact_path_redacted"));
     assert_eq!(
         artifact_ref["content_hash"],
         "sha256:5c6fd60a6ad0ce3fffdf2f2c61fbf1e9677f780c64a1ee33563bb2a40f29ef80"
@@ -2400,6 +2413,52 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
     assert_eq!(storage.external_artifacts.refs, 1);
     assert_eq!(storage.external_artifacts.referenced_bytes, 16);
     assert_eq!(storage.external_artifacts.payload_bytes_stored, 0);
+}
+
+#[test]
+fn evidence_artifact_ref_uses_repo_relative_path_and_warns_for_large_artifact() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let artifact_dir = repo_root.join("artifacts");
+    let artifact_path = artifact_dir.join("large.bin");
+    init_repo(&repo_root, false).unwrap();
+    fs::create_dir_all(&artifact_dir).unwrap();
+    fs::write(&artifact_path, vec![b'x'; 1_048_576]).unwrap();
+
+    let parsed = parse_evidence_add_args(&[
+        "--path".to_string(),
+        repo_root.to_string_lossy().into_owned(),
+        "--artifact".to_string(),
+        artifact_path.to_string_lossy().into_owned(),
+    ])
+    .unwrap();
+    let result = run_evidence_add(&parsed).unwrap();
+
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic["kind"] == "large_artifact"));
+    let data = evidence_add_data_json(&result);
+    assert!(data["diagnostics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|diagnostic| diagnostic["kind"] == "large_artifact"));
+    let artifact_ref_id = result.artifact_ref_id.as_ref().unwrap();
+    let artifact_ref = codefire_store::read_object(
+        &repo_root.join(".codefire").join("objects"),
+        artifact_ref_id,
+    )
+    .unwrap();
+    assert_eq!(artifact_ref["path_kind"], "repo_relative");
+    assert_eq!(artifact_ref["path"], "artifacts/large.bin");
+    assert_eq!(artifact_ref["uri"], "repo://artifacts/large.bin");
+    assert_eq!(artifact_ref["local_path_redacted"], false);
+    assert_eq!(artifact_ref["large_artifact"], true);
+    assert_eq!(artifact_ref["large_artifact_threshold_bytes"], 1_048_576);
+    assert_eq!(artifact_ref["hash_streaming"], true);
+    assert_eq!(artifact_ref["hash_chunk_bytes"], 65536);
+    assert_eq!(artifact_ref["size_bytes"], 1_048_576);
 }
 
 #[test]
@@ -2738,6 +2797,11 @@ fn remote_object_graph_copies_resolution_evidence_refs() {
         codefire_store::commit_payload(Vec::new(), roots, consistent_certificate()),
     )
     .unwrap();
+    let records = crate::remote::collect_object_records(&source_objects, &commit).unwrap();
+    let diagnostics = crate::remote::upload_object_graph_diagnostics(&records);
+    assert!(diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic["kind"] == "artifact_path_sensitive"));
 
     copy_object_graph(&source_objects, &target_objects, &commit).unwrap();
 

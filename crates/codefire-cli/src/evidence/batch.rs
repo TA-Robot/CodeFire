@@ -114,6 +114,7 @@ fn evidence_result_json(result: &EvidenceAddResult) -> Value {
         "artifact_ref_id": &result.artifact_ref_id,
         "command_exit_code": result.command_exit_code,
         "command_timed_out": result.command_timed_out,
+        "diagnostics": &result.diagnostics,
     })
 }
 

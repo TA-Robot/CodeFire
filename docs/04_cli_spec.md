@@ -510,7 +510,7 @@ remote `server_policy.json` の `gc.idempotency_retention_seconds` が正なら�
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_storage_reportを含める
 warningがある場合、next_actionsにinspect_storage_warningsを含める
 external_artifactsはartifact_ref objectのrefs、referenced_bytes、payload_bytes_stored=0を返す
-artifact_refは外部artifact本体を.codefire/objectsへコピーせず、URI/path/hash/size metadataだけを保存する
+artifact_refは外部artifact本体を.codefire/objectsへコピーせず、URI/path/hash/size metadataだけを保存する。defaultでは絶対local pathを保存しない
 ```
 
 ## 4.18 `link --batch`
@@ -547,8 +547,9 @@ codefire evidence add --batch evidence-batch.json --json
 ```text
 repository rootを探索し、evidence objectを.codefire/objects/evidenceへ保存する
 --artifactはartifact_ref objectを.codefire/objects/artifact_refsへ保存する
-artifact_refはpath/uri/hash_algorithm/content_hash/size_bytes/captured_atを持ち、payload本体は保存しない
---artifact-uri指定時はartifact_ref.uriへ保存し、未指定時はcanonical path文字列を保存する
+artifact_refはpath/path_kind/local_path_redacted/uri/hash_algorithm/content_hash/hash_streaming/hash_chunk_bytes/large_artifact/large_artifact_threshold_bytes/size_bytes/captured_atを持ち、payload本体は保存しない
+--artifact-uri指定時はartifact_ref.uriへ保存する。未指定時、repo内artifactはrepo相対pathと`repo://<relative-path>`を保存し、repo外artifactはpathを`<redacted>`、uriを`artifact://redacted/<hash-prefix>`にする
+1MiB以上のartifactはlarge_artifact warningをdiagnosticsへ出し、SHA-256は64KiB chunkのstreaming hashとして計算する
 --from-commandはshell commandのstdout/stderr/exit_code/success/timed_out/timeout_ms/duration_ms/cwd/mode/shellを保存する
 --from-argvはshellを使わずprogramと--argvで指定した引数配列を直接実行し、stdout/stderr/exit_code/success/timed_out/timeout_ms/duration_ms/cwd/mode/shell/argvを保存する
 --from-commandと--from-argvは同時指定できない。--from-commandは`mode: "shell"` / `shell: true`、--from-argvは`mode: "argv"` / `shell: false`として保存する
@@ -561,6 +562,7 @@ commandがnon-zeroまたはtimeoutでもevidence capture自体は成功し、com
 --batch --dry-runはartifact_ref/evidence objectを書き込まず、codefire_operation_planを返す
 batch itemはartifact、artifact_uri、from_command、from_argv、cwd、timeout_ms、label、max_output_bytesを持てる。JSON batchのfrom_argvは文字列配列、YAML batchのfrom_argvはinline JSON string arrayで指定する
 resolutionから参照されたevidence objectと、そのevidenceが参照するartifact_refはremote object graphに含めてupload/clone/request workflowで搬送する
+legacy artifact_refが絶対local pathを含む場合、remote upload planはartifact_path_sensitive warningを返す
 ```
 
 ## 4.20 `explain`

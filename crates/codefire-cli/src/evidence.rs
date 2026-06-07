@@ -14,6 +14,8 @@ use std::time::{Duration, Instant};
 
 pub(super) const DEFAULT_MAX_OUTPUT_BYTES: usize = 64 * 1024;
 pub(super) const DEFAULT_COMMAND_TIMEOUT_MS: u64 = 300_000;
+pub(super) const LARGE_ARTIFACT_WARNING_BYTES: u64 = 1_048_576;
+const ARTIFACT_HASH_BUFFER_BYTES: usize = 64 * 1024;
 
 #[derive(Debug)]
 pub(crate) struct EvidenceAddOptions {
@@ -38,6 +40,7 @@ pub(crate) struct EvidenceAddResult {
     pub(crate) artifact_ref_id: Option<String>,
     pub(crate) command_exit_code: Option<i32>,
     pub(crate) command_timed_out: bool,
+    pub(crate) diagnostics: Vec<Value>,
 }
 
 pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOptions, CliError> {
@@ -211,8 +214,13 @@ pub(crate) fn run_evidence_add(
     let repo_root = find_repo_root(&options.start)?;
     validate_evidence_add_options(options)?;
     let objects = repo_root.join(".codefire").join("objects");
+    let mut diagnostics = Vec::new();
     let artifact_ref_id = match options.artifact_path.as_deref() {
-        Some(path) => Some(store_artifact_ref(&objects, options, path)?),
+        Some(path) => {
+            let artifact = store_artifact_ref(&objects, options, path, &repo_root)?;
+            diagnostics.extend(artifact.diagnostics);
+            Some(artifact.id)
+        }
         None => None,
     };
     let command_capture = if let Some(command) = options.command.as_deref() {
@@ -246,6 +254,7 @@ pub(crate) fn run_evidence_add(
             .as_ref()
             .map(|capture| capture.timed_out)
             .unwrap_or(false),
+        diagnostics,
     })
 }
 
@@ -310,6 +319,7 @@ pub(crate) fn evidence_add_data_json(result: &EvidenceAddResult) -> Value {
         "artifact_ref_id": &result.artifact_ref_id,
         "command_exit_code": result.command_exit_code,
         "command_timed_out": result.command_timed_out,
+        "diagnostics": &result.diagnostics,
     })
 }
 
@@ -324,13 +334,65 @@ pub(crate) fn print_evidence_add_result(result: &EvidenceAddResult) {
     if result.command_timed_out {
         println!("command timed out: true");
     }
+    for diagnostic in &result.diagnostics {
+        if let Some(message) = diagnostic.get("message").and_then(Value::as_str) {
+            println!("warning: {message}");
+        }
+    }
+}
+
+struct StoredArtifactRef {
+    id: String,
+    diagnostics: Vec<Value>,
+}
+
+struct ArtifactLocation {
+    uri: String,
+    path: String,
+    path_kind: &'static str,
+    local_path_redacted: bool,
+}
+
+fn artifact_location(
+    absolute: &Path,
+    repo_root: &Path,
+    explicit_uri: Option<&str>,
+    content_hash: &str,
+) -> ArtifactLocation {
+    if let Ok(relative) = absolute.strip_prefix(repo_root) {
+        let relative = path_slash_string(relative);
+        return ArtifactLocation {
+            uri: explicit_uri
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("repo://{relative}")),
+            path: relative,
+            path_kind: "repo_relative",
+            local_path_redacted: false,
+        };
+    }
+    ArtifactLocation {
+        uri: explicit_uri
+            .map(str::to_string)
+            .unwrap_or_else(|| format!("artifact://redacted/{}", &content_hash[..16])),
+        path: "<redacted>".to_string(),
+        path_kind: "redacted",
+        local_path_redacted: true,
+    }
+}
+
+fn path_slash_string(path: &Path) -> String {
+    path.components()
+        .map(|component| component.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 fn store_artifact_ref(
     objects: &Path,
     options: &EvidenceAddOptions,
     path: &Path,
-) -> Result<String, CliError> {
+    repo_root: &Path,
+) -> Result<StoredArtifactRef, CliError> {
     let absolute = absolute_existing_path(path)?;
     let metadata = fs::metadata(&absolute)?;
     if !metadata.is_file() {
@@ -340,26 +402,53 @@ fn store_artifact_ref(
         )));
     }
     let content_hash = sha256_file(&absolute)?;
-    let uri = options
-        .artifact_uri
-        .clone()
-        .unwrap_or_else(|| absolute.to_string_lossy().into_owned());
-    codefire_store::store_object(
+    let location = artifact_location(
+        &absolute,
+        repo_root,
+        options.artifact_uri.as_deref(),
+        &content_hash,
+    );
+    let large_artifact = metadata.len() >= LARGE_ARTIFACT_WARNING_BYTES;
+    let mut diagnostics = Vec::new();
+    if location.local_path_redacted {
+        diagnostics.push(json!({
+            "kind": "artifact_path_redacted",
+            "severity": "warning",
+            "message": "artifact path was outside the repository and was redacted before storing evidence",
+        }));
+    }
+    if large_artifact {
+        diagnostics.push(json!({
+            "kind": "large_artifact",
+            "severity": "warning",
+            "message": format!("artifact is {} bytes; hash was computed with streaming SHA-256", metadata.len()),
+            "bytes": metadata.len(),
+            "threshold_bytes": LARGE_ARTIFACT_WARNING_BYTES,
+        }));
+    }
+    let id = codefire_store::store_object(
         objects,
         "artifact_ref",
         json!({
             "type": "artifact_ref",
             "version": 1,
             "label": &options.label,
-            "uri": uri,
-            "path": absolute,
+            "uri": location.uri,
+            "path": location.path,
+            "path_kind": location.path_kind,
+            "local_path_redacted": location.local_path_redacted,
             "hash_algorithm": "sha256",
             "content_hash": format!("sha256:{content_hash}"),
+            "hash_streaming": true,
+            "hash_chunk_bytes": ARTIFACT_HASH_BUFFER_BYTES,
+            "large_artifact": large_artifact,
+            "large_artifact_threshold_bytes": LARGE_ARTIFACT_WARNING_BYTES,
             "size_bytes": metadata.len(),
             "captured_at": now_iso_utc(),
         }),
     )
-    .map_err(CliError::from)
+    .map_err(CliError::from)?;
+    Ok(StoredArtifactRef { id, diagnostics })
 }
 
 #[derive(Debug)]
@@ -506,7 +595,7 @@ fn finish_command_capture(
 fn sha256_file(path: &Path) -> Result<String, CliError> {
     let mut file = fs::File::open(path)?;
     let mut hasher = Sha256::new();
-    let mut buffer = [0u8; 64 * 1024];
+    let mut buffer = [0u8; ARTIFACT_HASH_BUFFER_BYTES];
     loop {
         let read = file.read(&mut buffer)?;
         if read == 0 {
