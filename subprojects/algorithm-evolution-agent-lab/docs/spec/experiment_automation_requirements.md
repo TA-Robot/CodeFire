@@ -131,3 +131,7 @@ The system shall generate a deterministic audit trail for candidate claims that 
 ## REQ-AUTO-033: Claim release gate
 
 The system shall evaluate whether a candidate claim may be externally released by combining evidence readiness, review decision, audit terminal status, and required release artifacts into an allow, hold, or reject gate decision.
+
+## REQ-AUTO-034: Research frontier map
+
+The system shall synthesize a ranked research frontier map from baseline gaps, negative results, novelty reviews, open risks, budget pressure, and challenge objectives. Each frontier item shall identify the mechanism family to explore, the expected evidence gain, the primary risk, the next experiment action, and the reason it is worth pursuing before lower-ranked alternatives.

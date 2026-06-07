@@ -257,3 +257,29 @@ Gate rules:
 - only evidence `ready`, review `approve`, audit terminal status `allowed`, and all required artifacts present produces `allow`
 
 The gate is deterministic and does not inspect raw logs. Missing artifacts preserve input order from the required artifact list.
+
+## DES-AUTO-016: Research frontier map
+
+The research frontier map is the entry point for the next exploration cycle. It consumes compact research signals rather than raw logs:
+
+- baseline gap by benchmark and metric
+- known negative result avoid conditions
+- novelty overlap against known algorithm families
+- open campaign risks
+- remaining budget
+- challenge objective and target metric
+
+It produces ranked frontier items with:
+
+- frontier ID
+- mechanism family
+- target benchmark or domain
+- opportunity score
+- expected evidence gain
+- primary risk
+- next experiment action
+- rationale
+
+Scoring is deterministic and conservative. A large baseline gap increases opportunity. Novel mechanism families increase opportunity. Repeated negative-result overlap, blocker risks, and severe budget pressure reduce opportunity. The map does not claim SOTA readiness; it only decides where the agent should spend the next research iteration.
+
+Tie-breaking is stable by frontier ID. This keeps repeated planning runs reproducible and makes CodeFire diffs meaningful.

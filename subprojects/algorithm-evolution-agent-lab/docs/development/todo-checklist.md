@@ -77,3 +77,4 @@
 | AE-073 | Review | evidence packとreviewer objectionからclaim review queueを生成し、block/revise/approveを優先度順に返す | done | `CODE-ClaimReviewQueue`; `TEST-claim-review-queue-prioritizes-blocked-claims` |
 | AE-074 | Audit | evidence readiness、review decision、external claim eligibility、follow-upをclaim audit trailへ記録する | done | `CODE-ClaimAuditTrailBuilder`; `TEST-claim-audit-trail-records-review-decision` |
 | AE-075 | Release | evidence readiness、review decision、audit status、release artifactsを統合してexternal claim release gateを判定する | done | `CODE-ClaimReleaseGate`; `TEST-claim-release-gate-allows-complete-claims` |
+| AE-076 | Planning | baseline gap、negative results、novelty、risk、budget、challenge objectiveから次に攻めるresearch frontierを順位付けする | done | `CODE-ResearchFrontierMap`; `TEST-research-frontier-map-ranks-opportunities` |

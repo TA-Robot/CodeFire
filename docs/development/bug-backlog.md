@@ -100,6 +100,7 @@
 | CFB-083 | open | Branch / Metrics | `branch list --json --metrics` が成功するがmetrics blockを返さずdiagnosticも出ない | branch stateをmetrics付きで確認したとき | common flagを投げるautomationが、metrics未対応と空metricsを区別できない | `branch list` へ `--metrics` を渡さない | metricsを実装するか、JSON envelopeでunsupported flagを返しhelpと一致させる |
 | CFB-084 | open | Migrate / JSON Failure | `migrate check <path> --json --metrics` がplain text `unsupported migrate option` を返す | migrate compatibilityを共通observability flag付きで確認したとき | health/recovery commandの失敗をautomationが構造化処理できない | migrateでは `--metrics` を外す | parser errorをJSON failure envelopeへ包み、metrics対応可否をhelpに明示する |
 | CFB-085 | fixed | CLI Help / Recovery | `migrate --help`、`context --help`、`explain --help` がusageではなくunsupported errorになる | command discovery surfaceを確認したとき | AI agentが失敗後にhelpで自己修正できない | fixed in v1.0 Phase 1a | shared help routingをmigrate/context/explainへ拡張した |
+| CFB-086 | open | Extinguish / Evidence JSON | `extinguish --evidence-ref ... --json` が `evidence_refs` を返す一方で `has_evidence:false` を返す | algorithm cycle 3でResearchFrontierMapのfireを証跡付き解消したとき | automationが証跡付きresolutionを証跡なしと誤判定し得る | `evidence_refs.length > 0` を優先する | `has_evidence` の定義をinline evidenceまたはevidence refsの存在へ揃える |
 
 ## Triage Notes
 
@@ -128,3 +129,4 @@
 - CFB-057からCFB-065は、`ExperimentRiskRegister` を追加する前後にshow、branch、batch失敗、context/explain失敗、storage remote、diff失敗、review/patch、remote list/upload dry-runを叩いて見つけた。これで現在cycleのdogfood issueはCFB-046..CFB-065の20件に到達した。
 - CFB-066からCFB-080は、cycle 2のalgorithm dogfoodingとclean-state probeで見つけた。主な傾向はinstall PATH、commit/dry-run envelope、next_actions path/filter/schema、health/storage path contract、context bounded output、manual fire identity/state recovery、trace-graph help/path/jsonである。
 - CFB-081からCFB-085は、cycle 2 dogfood issue目標20件へ到達するため、clean状態でexplain/storage/branch/migrate/context help surfaceを調査して追加した。主な傾向は、passed状態の要約不整合、quick reportの情報欠落、metrics flagの扱い、JSON failure envelope、help routingである。
+- CFB-086以降は、cycle 3のalgorithm dogfoodingで見つかったissueとして追加する。主な傾向は、v1.0で入れたhelp改善後に残るoperation JSON/evidence/next_actions/state freshnessである。
