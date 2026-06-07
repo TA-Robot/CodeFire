@@ -102,6 +102,7 @@
 | CFB-085 | fixed | CLI Help / Recovery | `migrate --help`、`context --help`、`explain --help` がusageではなくunsupported errorになる | command discovery surfaceを確認したとき | AI agentが失敗後にhelpで自己修正できない | fixed in v1.0 Phase 1a | shared help routingをmigrate/context/explainへ拡張した |
 | CFB-086 | open | Extinguish / Evidence JSON | `extinguish --evidence-ref ... --json` が `evidence_refs` を返す一方で `has_evidence:false` を返す | algorithm cycle 3でResearchFrontierMapのfireを証跡付き解消したとき | automationが証跡付きresolutionを証跡なしと誤判定し得る | `evidence_refs.length > 0` を優先する | `has_evidence` の定義をinline evidenceまたはevidence refsの存在へ揃える |
 | CFB-087 | open | Extinguish / JSON Failure | `extinguish --evidence-ref <missing> --dry-run --json` がplain text `object not found` を返す | algorithm cycle 3でFrontierExperimentPlannerのfire解消preflightをしたとき | dry-run automationがmissing evidenceを構造化診断できず、証跡作成へ復旧しづらい | evidence object存在を事前確認する | missing evidence-ref lookup failureを `ok:false` JSON envelopeへ包む |
+| CFB-088 | open | Evidence / Dry Run JSON | `evidence add --dry-run --json` が実体のない `evidence_id:""` を返す | FrontierExperimentPlanner commit後のclean-state probeでevidence preflightを確認したとき | automationが空文字IDを実IDとして扱う可能性がある | `dry_run:true` を優先して `evidence_id` を無視する | dry-runでは `evidence_id:null` またはfield省略と `created:false` を返す |
 
 ## Triage Notes
 
