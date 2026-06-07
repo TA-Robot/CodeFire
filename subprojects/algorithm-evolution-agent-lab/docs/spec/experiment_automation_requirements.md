@@ -147,3 +147,7 @@ The system shall integrate completed run outcomes back into research frontier si
 ## REQ-AUTO-037: Frontier drift report
 
 The system shall summarize how research frontier priorities drift across long campaigns. A drift report shall compare previous and current ranked frontier items, identify new, removed, rising, falling, and stable frontiers, expose score and action changes, and recommend follow-up actions for high-impact drift without inspecting raw experiment logs.
+
+## REQ-AUTO-038: Research cycle retrospective
+
+The system shall summarize completed research cycles into policy adjustment recommendations. A retrospective shall combine completed run counts, improvements, regressions, failures, blockers, budget pressure, frontier drift, and evidence-ready claims into deterministic recommendations for the next planning cycle. The retrospective shall distinguish whether the next cycle should increase exploration, consolidate promising candidates, reduce cost, mitigate risks, archive stale paths, or keep the current policy.

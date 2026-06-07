@@ -81,3 +81,4 @@
 | AE-077 | Planning | runnable research frontierをbounded experiment plan draftへ変換し、blocked/deferred frontierを実行対象から外す | done | `CODE-FrontierExperimentPlanner`; `TEST-frontier-experiment-planner-builds-runnable-plans` |
 | AE-078 | Planning | 完了runのoutcomeをresearch frontier signalへ戻し、次iterationのfrontier rankingを保守的に更新する | done | `CODE-FrontierFeedbackIntegrator`; `TEST-frontier-feedback-integrator-updates-frontier-signals`; 139 tests pass |
 | AE-079 | Planning | 長期campaignでfrontier順位・score・actionがどう変化したかをdrift reportとして要約する | done | `CODE-FrontierDriftReporter`; `TEST-frontier-drift-reporter-summarizes-priority-shifts`; 141 tests pass |
+| AE-080 | Planning | 複数research cycleの結果から次cycleの探索方針調整recommendationを生成する | done | `CODE-ResearchCycleRetrospective`; `TEST-research-cycle-retrospective-recommends-policy-adjustments`; 143 tests pass |

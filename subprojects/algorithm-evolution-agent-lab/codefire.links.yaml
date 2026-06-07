@@ -258,6 +258,15 @@ links:
   - from: REQ-AUTO-037
     to: TEST-frontier-drift-reporter-summarizes-priority-shifts
     type: verified_by
+  - from: REQ-AUTO-038
+    to: DES-AUTO-020
+    type: refined_by
+  - from: DES-AUTO-020
+    to: CODE-ResearchCycleRetrospective
+    type: implemented_by
+  - from: REQ-AUTO-038
+    to: TEST-research-cycle-retrospective-recommends-policy-adjustments
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

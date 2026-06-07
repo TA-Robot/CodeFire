@@ -360,3 +360,41 @@ Severity rules are conservative:
 - small rank movement without action change is low severity
 
 Report ordering is deterministic: high severity first, then absolute rank delta, then absolute score delta, then frontier ID. This lets the next planning cycle focus on drift that changes what the agent should do, rather than on cosmetic score noise.
+
+## DES-AUTO-020: Research cycle retrospective
+
+The research cycle retrospective consumes compact per-cycle signals:
+
+- cycle ID
+- completed run count
+- improved candidate count
+- regressed candidate count
+- failed run count
+- blocked item count
+- mean run cost
+- remaining budget
+- high-severity frontier drift count
+- evidence-ready claim count
+- optional notes
+
+It produces a deterministic report with:
+
+- aggregate completed run count
+- improvement, failure, and regression rates
+- average cost
+- budget pressure
+- risk pressure
+- ordered policy adjustment recommendations
+- priority: `high`, `medium`, or `low`
+- rationale strings suitable for the next planning document
+
+Recommendation rules are conservative:
+
+- high blocker or high drift pressure recommends risk mitigation
+- high cost with low remaining budget recommends reducing experiment cost
+- strong improvements with evidence-ready claims recommends consolidation
+- low improvement and low failure signal recommends increased exploration
+- repeated regressions or failures recommends archiving stale paths
+- if no clear pressure exists, the current policy is kept
+
+The retrospective does not mutate frontier, queue, or campaign state. It is a read-only synthesis step used to seed the next docs-first planning cycle.

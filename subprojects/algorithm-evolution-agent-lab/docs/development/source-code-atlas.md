@@ -35,6 +35,7 @@ src/evoagent/
   triage.py              action-ranked experiment triage board
   iteration.py           active/review/deferred iteration planner
   frontier.py            frontier ranking, plan draft, feedback, drift report
+  retrospective.py       cycle-level policy adjustment recommendations
 
   evidence.py
   evidence_pack.py
@@ -103,6 +104,7 @@ CandidateAlgorithm
 | execute | `runner.py`, `fixtures.py` | plan command and artifact contract | `ExperimentRun` |
 | ingest | `ingestion.py`, `metrics.py`, `statistics.py` | artifacts/results | normalized result summaries |
 | judge | `analysis.py`, `promotion.py`, `triage.py`, `iteration.py`, `risk.py` | runs, results, evidence, blockers | decisions and next actions |
+| learn | `frontier.py`, `policy_eval.py`, `retrospective.py` | ranked frontiers, policy outcomes, cycle summaries | policy adjustment recommendations |
 | govern | `claims.py`, `safety.py`, `review.py`, `claim_*`, `reproduction.py` | claim/evidence/review inputs | claim readiness and release gates |
 | remember | `memory.py`, `negative_results.py`, `evidence.py`, `run_identity.py`, `program.py` | events and records | searchable durable context |
 | explain | `reporting.py`, `report_bundle.py`, `limitations.py`, `progress.py` | program state | markdown/report artifacts |

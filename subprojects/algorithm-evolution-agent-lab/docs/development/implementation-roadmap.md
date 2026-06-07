@@ -82,6 +82,10 @@
 - Add frontier feedback after run outcomes. (done)
 - Add frontier drift report for long campaigns. (done)
 
+## Phase 10: Cycle-level policy learning
+
+- Add research cycle retrospective that converts completed cycle signals into next-cycle policy adjustment recommendations. (done)
+
 ## Documentation hardening
 
 - Keep `docs/development/source-code-atlas.md` current enough that a reader can infer module layout, major dataclasses, control flow, test mapping, and CodeFire trace responsibilities without opening source first. (done)
