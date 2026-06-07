@@ -398,3 +398,22 @@ Recommendation rules are conservative:
 - if no clear pressure exists, the current policy is kept
 
 The retrospective does not mutate frontier, queue, or campaign state. It is a read-only synthesis step used to seed the next docs-first planning cycle.
+
+## DES-AUTO-021: Retrospective planning summary
+
+The retrospective planning summary renderer consumes a `ResearchCycleRetrospectiveReport` and produces Markdown.
+
+The summary includes:
+
+- title
+- cycle ID list
+- priority
+- completed run count
+- improvement, regression, and failure rates
+- average cost
+- budget pressure
+- risk pressure
+- ordered recommendation list
+- ordered rationale list
+
+Formatting is deterministic and intentionally compact. It does not include raw run logs, raw artifacts, or per-experiment debug output. This keeps the planning document focused on policy adjustment rather than rerunning the analysis step.

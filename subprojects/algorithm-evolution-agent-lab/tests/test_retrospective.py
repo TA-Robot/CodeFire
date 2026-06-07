@@ -3,6 +3,7 @@ import unittest
 from evoagent.retrospective import (
     ResearchCycleRetrospective,
     ResearchCycleSignal,
+    RetrospectivePlanningSummary,
     RetrospectivePriority,
     RetrospectiveRecommendation,
 )
@@ -65,6 +66,34 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
                     )
                 ]
             )
+
+    # cf-atom: TEST-retrospective-planning-summary-renders-markdown
+    def test_retrospective_planning_summary_renders_markdown(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-3",
+                    completed_runs=5,
+                    improved_candidates=0,
+                    regressed_candidates=1,
+                    failed_runs=1,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=6.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=0,
+                )
+            ]
+        )
+
+        markdown = RetrospectivePlanningSummary().render_markdown(report, title="Next Cycle Policy")
+
+        self.assertIn("# Next Cycle Policy", markdown)
+        self.assertIn("- Cycles: cycle-3", markdown)
+        self.assertIn("- Priority: low", markdown)
+        self.assertIn("## Recommendations", markdown)
+        self.assertIn("- increase_exploration", markdown)
+        self.assertIn("## Rationale", markdown)
 
 
 if __name__ == "__main__":

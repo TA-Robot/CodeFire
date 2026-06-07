@@ -35,7 +35,7 @@ src/evoagent/
   triage.py              action-ranked experiment triage board
   iteration.py           active/review/deferred iteration planner
   frontier.py            frontier ranking, plan draft, feedback, drift report
-  retrospective.py       cycle-level policy adjustment recommendations
+  retrospective.py       cycle-level policy adjustment recommendations and Markdown planning summary
 
   evidence.py
   evidence_pack.py

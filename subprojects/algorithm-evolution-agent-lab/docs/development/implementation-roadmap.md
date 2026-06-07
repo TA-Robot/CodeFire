@@ -85,6 +85,7 @@
 ## Phase 10: Cycle-level policy learning
 
 - Add research cycle retrospective that converts completed cycle signals into next-cycle policy adjustment recommendations. (done)
+- Add retrospective planning summary renderer for docs-first next-cycle planning. (done)
 
 ## Documentation hardening
 

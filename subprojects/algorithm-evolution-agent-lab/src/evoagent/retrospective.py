@@ -223,3 +223,33 @@ def rationale_for(
 
 def clamp01(value: float) -> float:
     return min(1.0, max(0.0, value))
+
+
+# cf-atom: CODE-RetrospectivePlanningSummary
+class RetrospectivePlanningSummary:
+    def render_markdown(
+        self,
+        report: ResearchCycleRetrospectiveReport,
+        *,
+        title: str = "Research Cycle Retrospective",
+    ) -> str:
+        lines = [
+            f"# {title}",
+            "",
+            f"- Cycles: {', '.join(report.cycle_ids)}",
+            f"- Priority: {report.priority.value}",
+            f"- Completed runs: {report.completed_runs}",
+            f"- Improvement rate: {report.improvement_rate:.2f}",
+            f"- Regression rate: {report.regression_rate:.2f}",
+            f"- Failure rate: {report.failure_rate:.2f}",
+            f"- Average cost: {report.average_cost:.2f}",
+            f"- Budget pressure: {report.budget_pressure:.2f}",
+            f"- Risk pressure: {report.risk_pressure:.2f}",
+            "",
+            "## Recommendations",
+            "",
+        ]
+        lines.extend(f"- {recommendation.value}" for recommendation in report.recommendations)
+        lines.extend(["", "## Rationale", ""])
+        lines.extend(f"- {reason}" for reason in report.rationale)
+        return "\n".join(lines).rstrip() + "\n"

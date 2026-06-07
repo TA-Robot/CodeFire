@@ -151,3 +151,7 @@ The system shall summarize how research frontier priorities drift across long ca
 ## REQ-AUTO-038: Research cycle retrospective
 
 The system shall summarize completed research cycles into policy adjustment recommendations. A retrospective shall combine completed run counts, improvements, regressions, failures, blockers, budget pressure, frontier drift, and evidence-ready claims into deterministic recommendations for the next planning cycle. The retrospective shall distinguish whether the next cycle should increase exploration, consolidate promising candidates, reduce cost, mitigate risks, archive stale paths, or keep the current policy.
+
+## REQ-AUTO-039: Retrospective planning summary
+
+The system shall render a research cycle retrospective into a compact planning summary suitable for the next docs-first development cycle. The summary shall include cycle IDs, priority, key rates, recommendations, and rationale in deterministic order so the next planning document can be generated without rereading raw run logs.
