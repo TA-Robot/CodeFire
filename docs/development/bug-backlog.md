@@ -104,6 +104,7 @@
 | CFB-087 | open | Extinguish / JSON Failure | `extinguish --evidence-ref <missing> --dry-run --json` がplain text `object not found` を返す | algorithm cycle 3でFrontierExperimentPlannerのfire解消preflightをしたとき | dry-run automationがmissing evidenceを構造化診断できず、証跡作成へ復旧しづらい | evidence object存在を事前確認する | missing evidence-ref lookup failureを `ok:false` JSON envelopeへ包む |
 | CFB-088 | open | Evidence / Dry Run JSON | `evidence add --dry-run --json` が実体のない `evidence_id:""` を返す | FrontierExperimentPlanner commit後のclean-state probeでevidence preflightを確認したとき | automationが空文字IDを実IDとして扱う可能性がある | `dry_run:true` を優先して `evidence_id` を無視する | dry-runでは `evidence_id:null` またはfield省略と `created:false` を返す |
 | CFB-089 | open | Debug Commands / JSON Contract | `atom-index --path . --json` と `missing-links --path . --json` が `--path` をpathとして扱いplain OS errorになる | clean-state probeでdebug/read-only surfaceを確認したとき | AI toolがcore trace/debug dataを共通path/json指定で取得できない | positional pathか `context --changed --json` を使う | atom-index/missing-linksを通常command化し、shared path/json parserとenvelopeを使う |
+| CFB-090 | open | Context / Bounded Graph | `context --changed --limit 5 --json` が省略されたAtomへ向かう `trace_links` を返し、dangling参照か省略済み参照かを区別できない | FrontierFeedbackIntegrator dogfoodingでchanged contextをbounded取得したとき | graph consumerが返却済みAtom集合だけでTrace Graphを構築すると欠落node参照になり、追加fetch判断もできない | `truncated` flagを見て高limitで再取得する | bounded contextはlink endpointのreturned/omitted状態、omitted endpoint count、再取得commandを返す |
 
 ## Triage Notes
 

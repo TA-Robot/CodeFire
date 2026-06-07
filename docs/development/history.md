@@ -236,6 +236,7 @@
 | 2026-06-07 | Dogfood | algorithm cycle 3の `FrontierExperimentPlanner` fire解消preflight中に、missing evidence-ref dry-runがJSON envelopeを返さない課題をCFB-087として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-087.md` | `codefire extinguish ... --evidence-ref CF-EVIDENCE-does-not-exist --dry-run --json` |
 | 2026-06-07 | Dogfood | algorithm cycle 3のclean-state probeで、evidence dry-runが空文字の `evidence_id` を返す課題をCFB-088として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-088.md` | `codefire evidence add --dry-run --json` |
 | 2026-06-07 | Dogfood | algorithm cycle 3のclean-state probeで、`atom-index` と `missing-links` が `--path`/`--json` を通常optionとして扱わない課題をCFB-089として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-089.md` | `codefire atom-index --path . --json`; `codefire missing-links --path . --json` |
+| 2026-06-07 | Dogfood | algorithm cycle 3の `FrontierFeedbackIntegrator` 実装中に、bounded contextの `trace_links` が省略済みAtomを参照してもendpoint omission metadataを返さない課題をCFB-090として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-090.md` | `codefire context --changed --path . --limit 5 --json` |
 
 ## Current Decisions
 
