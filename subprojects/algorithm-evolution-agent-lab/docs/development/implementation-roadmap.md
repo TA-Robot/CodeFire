@@ -80,4 +80,9 @@
 - Add research frontier map from baseline gaps, negative results, novelty, risks, budget, and challenge objectives. (done)
 - Add frontier-to-experiment-plan conversion. (done)
 - Add frontier feedback after run outcomes. (done)
-- Add frontier drift report for long campaigns. (planned)
+- Add frontier drift report for long campaigns. (done)
+
+## Documentation hardening
+
+- Keep `docs/development/source-code-atlas.md` current enough that a reader can infer module layout, major dataclasses, control flow, test mapping, and CodeFire trace responsibilities without opening source first. (done)
+- When a new module is added, update the atlas in the same change if the module introduces a new layer, data lifetime, external I/O boundary, or planning/governance decision path.

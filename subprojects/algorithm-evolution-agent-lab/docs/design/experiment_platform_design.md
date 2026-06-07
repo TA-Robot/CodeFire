@@ -332,3 +332,31 @@ Update rules are conservative:
 - unknown frontier feedback is reported as an update with no signal rather than silently changing another frontier
 
 All numeric fields are clamped to bounded non-negative ranges. This keeps the next `ResearchFrontierMap` ranking stable and prevents a single noisy result from producing unbounded priority swings.
+
+## DES-AUTO-019: Frontier drift report
+
+The frontier drift reporter consumes two ranked frontier snapshots:
+
+- previous frontier items
+- current frontier items after feedback, new evidence, or changed budget
+
+It produces a compact report with:
+
+- per-frontier drift records
+- rank delta
+- score delta
+- action transition
+- drift category: `new`, `removed`, `rising`, `falling`, `stable`, or `action_changed`
+- severity: `high`, `medium`, or `low`
+- deterministic recommendation
+
+The reporter does not inspect raw logs. It compares stable frontier IDs and the already-ranked `ResearchFrontierItem` records. This keeps long-campaign review cheap and reproducible.
+
+Severity rules are conservative:
+
+- new or removed executable frontiers are high severity
+- action changes into mitigation, redesign, or defer are high severity
+- large rank or score movement is medium or high depending on magnitude
+- small rank movement without action change is low severity
+
+Report ordering is deterministic: high severity first, then absolute rank delta, then absolute score delta, then frontier ID. This lets the next planning cycle focus on drift that changes what the agent should do, rather than on cosmetic score noise.

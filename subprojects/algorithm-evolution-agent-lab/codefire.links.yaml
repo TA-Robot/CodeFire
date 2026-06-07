@@ -249,6 +249,15 @@ links:
   - from: REQ-AUTO-036
     to: TEST-frontier-feedback-integrator-updates-frontier-signals
     type: verified_by
+  - from: REQ-AUTO-037
+    to: DES-AUTO-019
+    type: refined_by
+  - from: DES-AUTO-019
+    to: CODE-FrontierDriftReporter
+    type: implemented_by
+  - from: REQ-AUTO-037
+    to: TEST-frontier-drift-reporter-summarizes-priority-shifts
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

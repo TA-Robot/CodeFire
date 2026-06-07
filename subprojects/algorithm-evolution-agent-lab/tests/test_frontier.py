@@ -1,6 +1,9 @@
 import unittest
 
 from evoagent.frontier import (
+    FrontierDriftCategory,
+    FrontierDriftReporter,
+    FrontierDriftSeverity,
     FrontierFeedback,
     FrontierFeedbackIntegrator,
     FrontierFeedbackOutcome,
@@ -289,6 +292,75 @@ class FrontierFeedbackIntegratorTests(unittest.TestCase):
         self.assertIsNone(updates[0].updated_signal)
         self.assertEqual(updates[0].applied_outcome_count, 0)
         self.assertEqual(updates[0].reasons, ("unknown_frontier", "inconclusive"))
+
+
+# cf-atom: TEST-frontier-drift-reporter-summarizes-priority-shifts
+class FrontierDriftReporterTests(unittest.TestCase):
+    def test_frontier_drift_reporter_summarizes_priority_shifts(self):
+        previous = (
+            frontier_item_fixture("stable", score=8.0, action=FrontierAction.RUN_PROBE),
+            frontier_item_fixture("falling", score=7.0, action=FrontierAction.RUN_PROBE),
+            frontier_item_fixture("blocked", score=6.0, action=FrontierAction.RUN_PROBE),
+            frontier_item_fixture("removed", score=5.0, action=FrontierAction.RUN_PROBE),
+        )
+        current = (
+            frontier_item_fixture("new", score=9.0, action=FrontierAction.RUN_PROBE),
+            frontier_item_fixture("blocked", score=5.5, action=FrontierAction.MITIGATE_RISK),
+            frontier_item_fixture("stable", score=8.1, action=FrontierAction.RUN_PROBE),
+            frontier_item_fixture("falling", score=5.5, action=FrontierAction.RUN_PROBE),
+        )
+
+        report = FrontierDriftReporter().report(
+            previous,
+            current,
+            significant_rank_delta=3,
+            significant_score_delta=1.0,
+        )
+
+        by_id = {record.frontier_id: record for record in report.records}
+        self.assertEqual(by_id["new"].category, FrontierDriftCategory.NEW)
+        self.assertEqual(by_id["new"].severity, FrontierDriftSeverity.HIGH)
+        self.assertEqual(by_id["new"].recommendation, "triage_new_frontier")
+        self.assertEqual(by_id["removed"].category, FrontierDriftCategory.REMOVED)
+        self.assertEqual(by_id["removed"].severity, FrontierDriftSeverity.HIGH)
+        self.assertEqual(by_id["blocked"].category, FrontierDriftCategory.ACTION_CHANGED)
+        self.assertEqual(by_id["blocked"].severity, FrontierDriftSeverity.HIGH)
+        self.assertEqual(by_id["blocked"].recommendation, "mitigate_before_next_run")
+        self.assertEqual(by_id["falling"].category, FrontierDriftCategory.FALLING)
+        self.assertEqual(by_id["falling"].severity, FrontierDriftSeverity.MEDIUM)
+        self.assertIn("score_down:1.500", by_id["falling"].reasons)
+        self.assertEqual(by_id["stable"].category, FrontierDriftCategory.STABLE)
+        self.assertEqual(by_id["stable"].severity, FrontierDriftSeverity.LOW)
+        self.assertEqual(report.high_severity_count, 3)
+        self.assertIn("high severity", report.summary)
+        self.assertEqual(report.records[0].severity, FrontierDriftSeverity.HIGH)
+
+    def test_frontier_drift_reporter_validates_thresholds(self):
+        reporter = FrontierDriftReporter()
+
+        with self.assertRaises(ValueError):
+            reporter.report((), (), significant_rank_delta=-1)
+        with self.assertRaises(ValueError):
+            reporter.report((), (), significant_score_delta=-0.1)
+
+
+def frontier_item_fixture(
+    frontier_id: str,
+    *,
+    score: float,
+    action: FrontierAction,
+) -> ResearchFrontierItem:
+    return ResearchFrontierItem(
+        frontier_id=frontier_id,
+        mechanism_family=f"{frontier_id} mechanism",
+        target="toy-tabular",
+        action=action,
+        score=score,
+        expected_evidence_gain="medium",
+        primary_risk="execution_uncertainty",
+        reasons=("fixture",),
+        rationale="fixture frontier",
+    )
 
 
 if __name__ == "__main__":

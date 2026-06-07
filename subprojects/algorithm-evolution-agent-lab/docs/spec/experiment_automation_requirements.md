@@ -143,3 +143,7 @@ The system shall convert executable research frontier items into bounded experim
 ## REQ-AUTO-036: Frontier feedback integration
 
 The system shall integrate completed run outcomes back into research frontier signals. Feedback shall update baseline gap, expected information gain, novelty pressure, negative-result overlap, blocker risks, and rationale without mutating the original signal. The update shall be deterministic, bounded, and conservative so failed, regressed, over-budget, or blocked runs reduce executable opportunity while replicated improvements increase priority for follow-up frontier planning.
+
+## REQ-AUTO-037: Frontier drift report
+
+The system shall summarize how research frontier priorities drift across long campaigns. A drift report shall compare previous and current ranked frontier items, identify new, removed, rising, falling, and stable frontiers, expose score and action changes, and recommend follow-up actions for high-impact drift without inspecting raw experiment logs.

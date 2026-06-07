@@ -22,6 +22,21 @@ class FrontierFeedbackOutcome(str, Enum):
     INCONCLUSIVE = "inconclusive"
 
 
+class FrontierDriftCategory(str, Enum):
+    NEW = "new"
+    REMOVED = "removed"
+    RISING = "rising"
+    FALLING = "falling"
+    STABLE = "stable"
+    ACTION_CHANGED = "action_changed"
+
+
+class FrontierDriftSeverity(str, Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 @dataclass(frozen=True)
 class ResearchFrontierSignal:
     frontier_id: str
@@ -76,6 +91,32 @@ class FrontierPlanDraft:
     plan: ExperimentPlan
     analysis_criteria: tuple[str, ...]
     reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class FrontierDriftRecord:
+    frontier_id: str
+    category: FrontierDriftCategory
+    severity: FrontierDriftSeverity
+    previous_rank: int | None
+    current_rank: int | None
+    rank_delta: int | None
+    previous_score: float | None
+    current_score: float | None
+    score_delta: float | None
+    previous_action: FrontierAction | None
+    current_action: FrontierAction | None
+    recommendation: str
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class FrontierDriftReport:
+    records: tuple[FrontierDriftRecord, ...]
+    high_severity_count: int
+    medium_severity_count: int
+    low_severity_count: int
+    summary: str
 
 
 # cf-atom: CODE-ResearchFrontierMap
@@ -195,6 +236,51 @@ class FrontierFeedbackIntegrator:
                     )
                 )
         return tuple(updates)
+
+
+# cf-atom: CODE-FrontierDriftReporter
+class FrontierDriftReporter:
+    def report(
+        self,
+        previous: tuple[ResearchFrontierItem, ...],
+        current: tuple[ResearchFrontierItem, ...],
+        *,
+        significant_rank_delta: int = 2,
+        significant_score_delta: float = 1.0,
+    ) -> FrontierDriftReport:
+        if significant_rank_delta < 0:
+            raise ValueError("significant_rank_delta must be non-negative")
+        if significant_score_delta < 0:
+            raise ValueError("significant_score_delta must be non-negative")
+
+        previous_by_id = {item.frontier_id: item for item in previous}
+        current_by_id = {item.frontier_id: item for item in current}
+        previous_rank = {item.frontier_id: index + 1 for index, item in enumerate(previous)}
+        current_rank = {item.frontier_id: index + 1 for index, item in enumerate(current)}
+
+        records = tuple(
+            drift_record(
+                frontier_id,
+                previous_by_id.get(frontier_id),
+                current_by_id.get(frontier_id),
+                previous_rank.get(frontier_id),
+                current_rank.get(frontier_id),
+                significant_rank_delta=significant_rank_delta,
+                significant_score_delta=significant_score_delta,
+            )
+            for frontier_id in sorted(set(previous_by_id) | set(current_by_id))
+        )
+        ordered = tuple(sorted(records, key=drift_sort_key))
+        high = sum(1 for record in ordered if record.severity == FrontierDriftSeverity.HIGH)
+        medium = sum(1 for record in ordered if record.severity == FrontierDriftSeverity.MEDIUM)
+        low = sum(1 for record in ordered if record.severity == FrontierDriftSeverity.LOW)
+        return FrontierDriftReport(
+            records=ordered,
+            high_severity_count=high,
+            medium_severity_count=medium,
+            low_severity_count=low,
+            summary=drift_summary(high, medium, low),
+        )
 
 
 def frontier_item(
@@ -320,6 +406,194 @@ def apply_frontier_feedback(
 
 def clamp01(value: float) -> float:
     return min(max(value, 0.0), 1.0)
+
+
+def drift_record(
+    frontier_id: str,
+    previous: ResearchFrontierItem | None,
+    current: ResearchFrontierItem | None,
+    previous_rank: int | None,
+    current_rank: int | None,
+    *,
+    significant_rank_delta: int,
+    significant_score_delta: float,
+) -> FrontierDriftRecord:
+    previous_score = previous.score if previous is not None else None
+    current_score = current.score if current is not None else None
+    score_delta = None
+    if previous_score is not None and current_score is not None:
+        score_delta = current_score - previous_score
+    rank_delta = None
+    if previous_rank is not None and current_rank is not None:
+        rank_delta = previous_rank - current_rank
+
+    previous_action = previous.action if previous is not None else None
+    current_action = current.action if current is not None else None
+    category = drift_category(
+        previous,
+        current,
+        rank_delta=rank_delta,
+        score_delta=score_delta,
+        significant_rank_delta=significant_rank_delta,
+        significant_score_delta=significant_score_delta,
+    )
+    severity = drift_severity(
+        category,
+        previous_action=previous_action,
+        current_action=current_action,
+        rank_delta=rank_delta,
+        score_delta=score_delta,
+        significant_rank_delta=significant_rank_delta,
+        significant_score_delta=significant_score_delta,
+    )
+    reasons = drift_reasons(
+        category,
+        previous_action=previous_action,
+        current_action=current_action,
+        rank_delta=rank_delta,
+        score_delta=score_delta,
+    )
+    return FrontierDriftRecord(
+        frontier_id=frontier_id,
+        category=category,
+        severity=severity,
+        previous_rank=previous_rank,
+        current_rank=current_rank,
+        rank_delta=rank_delta,
+        previous_score=previous_score,
+        current_score=current_score,
+        score_delta=score_delta,
+        previous_action=previous_action,
+        current_action=current_action,
+        recommendation=drift_recommendation(category, severity, current_action),
+        reasons=reasons,
+    )
+
+
+def drift_category(
+    previous: ResearchFrontierItem | None,
+    current: ResearchFrontierItem | None,
+    *,
+    rank_delta: int | None,
+    score_delta: float | None,
+    significant_rank_delta: int,
+    significant_score_delta: float,
+) -> FrontierDriftCategory:
+    if previous is None:
+        return FrontierDriftCategory.NEW
+    if current is None:
+        return FrontierDriftCategory.REMOVED
+    if previous.action != current.action:
+        return FrontierDriftCategory.ACTION_CHANGED
+    if rank_delta is not None and rank_delta >= significant_rank_delta and significant_rank_delta > 0:
+        return FrontierDriftCategory.RISING
+    if rank_delta is not None and -rank_delta >= significant_rank_delta and significant_rank_delta > 0:
+        return FrontierDriftCategory.FALLING
+    if score_delta is not None and score_delta >= significant_score_delta and significant_score_delta > 0:
+        return FrontierDriftCategory.RISING
+    if score_delta is not None and -score_delta >= significant_score_delta and significant_score_delta > 0:
+        return FrontierDriftCategory.FALLING
+    return FrontierDriftCategory.STABLE
+
+
+def drift_severity(
+    category: FrontierDriftCategory,
+    *,
+    previous_action: FrontierAction | None,
+    current_action: FrontierAction | None,
+    rank_delta: int | None,
+    score_delta: float | None,
+    significant_rank_delta: int,
+    significant_score_delta: float,
+) -> FrontierDriftSeverity:
+    if category in (FrontierDriftCategory.NEW, FrontierDriftCategory.REMOVED):
+        action = current_action or previous_action
+        if action == FrontierAction.RUN_PROBE:
+            return FrontierDriftSeverity.HIGH
+        return FrontierDriftSeverity.MEDIUM
+    if category == FrontierDriftCategory.ACTION_CHANGED:
+        if current_action in (FrontierAction.MITIGATE_RISK, FrontierAction.REDESIGN, FrontierAction.DEFER):
+            return FrontierDriftSeverity.HIGH
+        return FrontierDriftSeverity.MEDIUM
+    rank_magnitude = abs(rank_delta or 0)
+    score_magnitude = abs(score_delta or 0.0)
+    if rank_magnitude >= max(significant_rank_delta * 2, 1):
+        return FrontierDriftSeverity.HIGH
+    if score_magnitude >= max(significant_score_delta * 2.0, 0.01):
+        return FrontierDriftSeverity.HIGH
+    if category in (FrontierDriftCategory.RISING, FrontierDriftCategory.FALLING):
+        return FrontierDriftSeverity.MEDIUM
+    return FrontierDriftSeverity.LOW
+
+
+def drift_reasons(
+    category: FrontierDriftCategory,
+    *,
+    previous_action: FrontierAction | None,
+    current_action: FrontierAction | None,
+    rank_delta: int | None,
+    score_delta: float | None,
+) -> tuple[str, ...]:
+    reasons = [category.value]
+    if previous_action != current_action:
+        reasons.append(f"action:{action_value(previous_action)}->{action_value(current_action)}")
+    if rank_delta:
+        direction = "rank_up" if rank_delta > 0 else "rank_down"
+        reasons.append(f"{direction}:{abs(rank_delta)}")
+    if score_delta:
+        direction = "score_up" if score_delta > 0 else "score_down"
+        reasons.append(f"{direction}:{abs(score_delta):.3f}")
+    return tuple(reasons)
+
+
+def drift_recommendation(
+    category: FrontierDriftCategory,
+    severity: FrontierDriftSeverity,
+    current_action: FrontierAction | None,
+) -> str:
+    if category == FrontierDriftCategory.NEW:
+        return "triage_new_frontier"
+    if category == FrontierDriftCategory.REMOVED:
+        return "archive_or_explain_removed_frontier"
+    if current_action == FrontierAction.MITIGATE_RISK:
+        return "mitigate_before_next_run"
+    if current_action == FrontierAction.REDESIGN:
+        return "redesign_hypothesis"
+    if current_action == FrontierAction.DEFER:
+        return "defer_until_budget_or_blocker_changes"
+    if severity == FrontierDriftSeverity.HIGH:
+        return "review_priority_shift"
+    if category == FrontierDriftCategory.RISING:
+        return "consider_next_iteration"
+    if category == FrontierDriftCategory.FALLING:
+        return "reduce_priority_or_recheck_evidence"
+    return "monitor"
+
+
+def drift_sort_key(record: FrontierDriftRecord) -> tuple[int, int, float, str]:
+    severity_rank = {
+        FrontierDriftSeverity.HIGH: 0,
+        FrontierDriftSeverity.MEDIUM: 1,
+        FrontierDriftSeverity.LOW: 2,
+    }[record.severity]
+    return (
+        severity_rank,
+        -abs(record.rank_delta or 0),
+        -abs(record.score_delta or 0.0),
+        record.frontier_id,
+    )
+
+
+def drift_summary(high: int, medium: int, low: int) -> str:
+    if high:
+        return f"{high} high severity frontier drift item(s) need review"
+    if medium:
+        return f"{medium} medium severity frontier drift item(s) should be checked"
+    return f"{low} low severity frontier drift item(s) observed"
+
+
+def action_value(action: FrontierAction | None) -> str:
+    return action.value if action is not None else "none"
 
 
 def choose_frontier_action(
