@@ -58,3 +58,4 @@
 - CFB-005の具体例として、同一evidenceで多数fireを解消する場合は `verify` からbatch templateを生成できると操作量が大きく減る。
 - CFB-006の具体例として、`require_trace_completeness: false` でもmissing link件数が表示されるため、`--blocking-only` とnon-blocking診断の優先度分離は引き続き重要である。
 - CFB-023からCFB-025は、v0.7をinstallしてalgorithm projectへ戻した直後の再開手順で踏んだ。共通path option、subcommand help、policy migrationの3つはAI agentが自力復旧するうえで優先度が高い。
+- CFB-017は、`algorithm-evolution-agent-lab` のドキュメント中心開発への再整備でも再現した。`REQ-PROCESS-*` / `DES-PROCESS-*` は `scan` のchanged atomsへ出るが、同時に更新した `AGENTS.md`、`README.md`、`docs/development/implementation-roadmap.md`、`docs/development/todo-checklist.md`、`docs/development/history.md` はscan要約に出ないため、ドキュメント中心運用ほどnon-atom changed filesの明示が重要になる。
