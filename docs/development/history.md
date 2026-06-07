@@ -241,6 +241,7 @@
 | 2026-06-07 | Core | CFB-091を修正し、Python明示Atomでmarker直後のclass/def/async def/decorator付きsymbolのindent blockをhash範囲にするようにした | `crates/codefire-core/src/lib.rs`, `docs/09_index_trace_policy.md`, `docs/development/bug-issues/cfb-091.md` | `cargo test -p codefire-core` |
 | 2026-06-07 | Dogfood | CFB-091修正版をinstallした直後、algorithm側でsource無変更にもかかわらず102 changed atoms / 116 firesが出るextractor migration課題をCFB-092として追加した | `docs/development/bug-backlog.md`, `docs/development/bug-issues/cfb-092.md` | `codefire scan --path . --json --metrics` |
 | 2026-06-07 | Automation JSON | CFB-086とCFB-088を修正し、証跡参照付きextinguishの `has_evidence` とevidence dry-runの `evidence_id:null` / `created:false` 契約を揃えた | `crates/codefire-cli/src/evidence.rs`, `crates/codefire-cli/src/evidence/batch.rs`, `crates/codefire-cli/src/main.rs`, `crates/codefire-cli/src/batch.rs`, `crates/codefire-cli/src/extinguish_ux.rs` | `cargo test -p codefire-cli --bin codefire-rs evidence_add -- --nocapture`; `cargo test -p codefire-cli --bin codefire-rs extinguish_evidence_ref_links_resolution_and_verify_detects_missing_ref -- --nocapture` |
+| 2026-06-07 | Cycle Status | codefire改善サイクル2周完了後の現在地を文書化し、installed binary、latest pushed Git commits、algorithm CodeFire state、fixed/open CFB、次actionを整理した | `docs/development/codefire-improvement-cycle.md` | latest pushed commits: `6d8361d`, `8978dfc`; algorithm state: `open-clean`, open fires 0 |
 
 ## Current Decisions
 

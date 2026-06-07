@@ -217,14 +217,100 @@ Common rules:
 
 Current named cycle:
 
-- CodeFire next version: v1.0 Contract Validation。
+- CodeFire次version系統: v1.0 Contract ValidationのPhase 1a以降を継続する。
 - Current plan: `docs/development/v1.0-contract-validation-plan.md`。
-- Current phase: Phase F。Cycle 2のdogfooding目標とsource review issue拡張を完了し、次version計画へ接続した。
-- Latest algorithm work: algorithm cycle 2でExperimentEvidencePackBuilder、ClaimReviewQueue、ClaimAuditTrailBuilder、ClaimReleaseGateをdocs-firstで追加し、CodeFireを使ってscan/verify/context/evidence/commit/health surfaceをdogfoodした。
-- Latest dogfood findings: CFB-066..CFB-085を追加。新規20件に到達したため、Phase Dのdogfooding目標は満たした。
-- Latest source review findings: CFR-121..CFR-160を追加。追加40件目標を満たした。
-- Previous plan carried forward: `docs/development/v0.9-contract-scale-plan.md`。v1.0はv0.9の未完了contract/scale項目を継承し、cycle 2で見つかったroot causeを追加する。
-- Next expected action: Phase Aへ戻り、v1.0計画のPhase 0/1からCodeFire実装を開始する。実装後にinstallし、algorithm dogfoodingの次cycleへ入る。
+- Current phase: 2周分のcodefire改善サイクルを完了し、次は残open CFB/CFRのburn-down設計へ戻る状態。
+- Installed CodeFire: `/home/devuser/.local/bin/codefire`。
+- Installed version output: `codefire foundation 1`。
+- Git remote: `git@github.com:TA-Robot/CodeFire.git`。
+- Latest pushed Git commits: `6d8361d Fix evidence JSON contracts`, `8978dfc Add retrospective planning summary`。
+- Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` は `open-clean`、open fires 0。
+- Latest algorithm CodeFire base: `CF-COMMIT-6558c5b7de3769164e36172a`。
+
+## Completed Two-Cycle Snapshot
+
+直近の2周分の実行は、2026-06-07時点で完了している。
+
+### Cycle 1
+
+CodeFire側:
+
+- Fixed CFB-091 by making Python explicit `cf-atom` spans stop at the marker-owned class/def/async def/decorated symbol block.
+- Verified with `cargo test -p codefire-core`.
+- Installed the updated CodeFire before dogfooding.
+
+Algorithm dogfood側:
+
+- Added `ResearchCycleRetrospective` docs-first.
+- Covered trace from `REQ-AUTO-038` to `DES-AUTO-020`, `CODE-ResearchCycleRetrospective`, and `TEST-research-cycle-retrospective-recommends-policy-adjustments`.
+- Verified algorithm test suite: 143 tests pass.
+- Sealed algorithm work with CodeFire evidence `CF-EVIDENCE-d751bcd96366e2d8ac72c61f` and CodeFire commit `CF-COMMIT-c4e4c9adea4d17be6ddbaabd`.
+
+Dogfoodで見つかったこと:
+
+- CFB-092 was added after the extractor fix caused source-unchanged projects to produce many hash-change fires.
+- This is not treated as a functional regression in the algorithm source. It is a CodeFire migration/rebaseline workflow gap.
+
+Git結果:
+
+- Pushed as `9b6dd07 Stabilize Python explicit atom spans` and `1d181bc Add research cycle retrospective`.
+
+### Cycle 2
+
+CodeFire側:
+
+- Fixed CFB-086 by making extinguish JSON compute `has_evidence` from inline evidence or `evidence_refs`.
+- Fixed CFB-088 by making evidence dry-run JSON return `created:false` and `evidence_id:null` instead of an empty-string ID.
+- Added targeted tests for evidence JSON and evidence-ref extinguish behavior.
+- Verified with:
+  - `cargo fmt --check`
+  - `cargo test --workspace`
+  - `cargo clippy --workspace --all-targets -- -D warnings`
+  - targeted `evidence_add` tests
+  - targeted `extinguish_evidence_ref_links_resolution_and_verify_detects_missing_ref` test
+- Reinstalled CodeFire to `/home/devuser/.local/bin/codefire`.
+
+Algorithm dogfood側:
+
+- Added `RetrospectivePlanningSummary` docs-first.
+- Covered trace from `REQ-AUTO-039` to `DES-AUTO-021`, `CODE-RetrospectivePlanningSummary`, and `TEST-retrospective-planning-summary-renders-markdown`.
+- Verified algorithm test suite: 144 tests pass.
+- Registered evidence `CF-EVIDENCE-4b6b2a0e93268addbc3371f9`.
+- Sealed algorithm work through CodeFire commits:
+  - `CF-COMMIT-4d8776fc22ae2f173890165e`
+  - `CF-COMMIT-6558c5b7de3769164e36172a`
+
+Dogfoodで確認したこと:
+
+- `codefire evidence add --dry-run --json` now shows `created:false` and `evidence_id:null`.
+- `codefire extinguish --evidence-ref ... --dry-run --json` now shows `has_evidence:true`.
+- `codefire scan --path . --json --metrics` changed only the four intended new atoms for the planning summary work.
+- Algorithm project ended at `open-clean` with open fires 0.
+
+Git結果:
+
+- Pushed as `6d8361d Fix evidence JSON contracts` and `8978dfc Add retrospective planning summary`.
+
+## Current Open Work
+
+Open CodeFire dogfood issues still visible in the current backlog:
+
+- CFB-087: missing evidence-ref dry-run failures are not JSON enveloped.
+- CFB-089: `atom-index` and `missing-links` do not handle shared `--path` / `--json` like normal commands.
+- CFB-090: bounded context can return trace links to omitted endpoints without endpoint omission metadata.
+- CFB-092: extractor/hash schema changes need migration-aware rebaseline workflow.
+
+Important already-fixed issues from the latest two-cycle run:
+
+- CFB-086: evidence-ref extinguish `has_evidence` contract.
+- CFB-088: evidence dry-run `created` / nullable `evidence_id` contract.
+- CFB-091: Python explicit atom span stability.
+
+Next expected action:
+
+- Choose the next CodeFire root-fix bundle from the remaining CFB/CFR backlog.
+- Prefer automation-contract fixes that unblock reliable dogfooding: JSON failure envelopes, shared path/json parsing for debug commands, bounded context metadata, and extractor migration/rebaseline support.
+- After CodeFire implementation, reinstall and dogfood again in `subprojects/algorithm-evolution-agent-lab/`.
 
 ## Cycle Invariants
 
