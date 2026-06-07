@@ -312,7 +312,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 let options = parse_interactive_extinguish_args(&args[1..])?;
                 let result = run_interactive_extinguish(&options)?;
                 if options.json_output {
-                    println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                    print_plan_result_json("extinguish-interactive", &result.plan)?;
                 } else {
                     print_interactive_extinguish_result(&result);
                 }
@@ -320,7 +320,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 let options = parse_all_matching_extinguish_args(&args[1..])?;
                 let result = run_all_matching_extinguish(&options)?;
                 if options.json_output {
-                    println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                    print_plan_result_json("extinguish-all", &result.plan)?;
                 } else {
                     print_all_matching_extinguish_result(&options, &result);
                 }
@@ -328,7 +328,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 let options = parse_extinguish_batch_args(&args[1..])?;
                 let result = run_extinguish_batch(&options)?;
                 if options.json_output {
-                    println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                    print_plan_result_json("extinguish-batch", &result.plan)?;
                 } else if options.dry_run {
                     println!(
                         "extinguish batch dry-run: {} fires would be processed",
@@ -341,7 +341,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 let options = prepare_extinguish_options(parse_extinguish_args(&args[1..])?)?;
                 let result = run_extinguish(&options)?;
                 if options.json_output {
-                    println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                    print_plan_result_json("extinguish", &result.plan)?;
                 } else if options.dry_run {
                     println!(
                         "extinguish dry-run: {} ({}) would be {}",
@@ -372,7 +372,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             let options = parse_commit_args(&args[1..])?;
             let result = run_commit(&options)?;
             if options.json_output {
-                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                print_plan_result_json("commit", &result.plan)?;
             } else if options.dry_run {
                 println!("commit dry-run: branch {} would be sealed", result.branch);
                 println!(
@@ -391,7 +391,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             let options = parse_clone_args(&args[1..])?;
             let result = clone_branch(&env::current_dir()?, &options)?;
             if options.json_output {
-                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                print_plan_result_json("clone", &result.plan)?;
             } else if options.dry_run {
                 println!(
                     "clone dry-run: {} would create {}",
@@ -413,7 +413,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 Err(error) => return Err(error),
             };
             if options.json_output {
-                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                print_plan_result_json("upload", &result.plan)?;
             } else if options.dry_run {
                 println!(
                     "upload dry-run: {}@{} would update {}",
@@ -446,7 +446,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 Err(error) => return Err(error),
             };
             if options.json_output {
-                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                print_plan_result_json("request-merge", &result.plan)?;
             } else if options.dry_run {
                 println!(
                     "request-merge dry-run: {} would request {}",
@@ -481,7 +481,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 Err(error) => return Err(error),
             };
             if options.json_output {
-                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                print_plan_result_json("request-review", &result.plan)?;
             } else if options.dry_run {
                 println!(
                     "request-review dry-run: {} would be {}d by {}",
@@ -506,7 +506,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 Err(error) => return Err(error),
             };
             if options.json_output {
-                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                print_plan_result_json("request-apply", &result.plan)?;
             } else if options.dry_run {
                 println!(
                     "request-apply dry-run: {} would update {}@{}",
@@ -576,7 +576,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 let options = parse_patch_import_args(&args[2..])?;
                 let result = import_patch(&env::current_dir()?, &options)?;
                 if options.json_output {
-                    println!("{}", serde_json::to_string_pretty(&result)?);
+                    print_data_result_json("patch-import", result)?;
                 } else if options.dry_run {
                     println!(
                         "patch dry-run: {} entries would apply to {}",
@@ -600,7 +600,8 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             let options = parse_merge_args(&args[1..])?;
             let result = merge_branch(&env::current_dir()?, &options)?;
             if options.json_output {
-                println!("{}", render_merge_result_json(&result)?);
+                let plan = merge_result_json_value(&result);
+                print_plan_result_json("merge", &plan)?;
             } else if options.dry_run {
                 print!("{}", render_merge_dry_run(&result));
             } else if result.conflicts.is_empty() {
@@ -633,7 +634,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             let options = parse_open_args(&args[1..])?;
             let result = open_branch(&options)?;
             if options.json_output {
-                println!("{}", serde_json::to_string_pretty(&result.plan)?);
+                print_plan_result_json("open", &result.plan)?;
             } else if options.dry_run {
                 println!(
                     "open dry-run: {} would open at {}",
@@ -1286,6 +1287,52 @@ fn print_lock_contention_json(command: &str, error: &CliError) -> Result<(), Cli
         serde_json::to_string_pretty(&lock_contention_envelope(command, error))?
     );
     Ok(())
+}
+
+fn print_plan_result_json(command: &str, plan: &Value) -> Result<(), CliError> {
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&plan_result_envelope(command, plan))?
+    );
+    Ok(())
+}
+
+fn print_data_result_json(command: &str, data: Value) -> Result<(), CliError> {
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&command_result_envelope(
+            command,
+            true,
+            0,
+            None,
+            data,
+            Vec::new(),
+            Vec::new(),
+        ))?
+    );
+    Ok(())
+}
+
+fn plan_result_envelope(command: &str, plan: &Value) -> Value {
+    let repo_root = plan_repo_root(plan);
+    command_result_envelope(
+        command,
+        true,
+        0,
+        repo_root.as_deref(),
+        json!({
+            "type": "codefire_plan_result",
+            "plan": plan,
+        }),
+        Vec::new(),
+        Vec::new(),
+    )
+}
+
+fn plan_repo_root(plan: &Value) -> Option<PathBuf> {
+    plan.get("repo_root")
+        .and_then(Value::as_str)
+        .map(PathBuf::from)
 }
 
 fn lock_contention_envelope(command: &str, error: &CliError) -> Value {
@@ -2776,8 +2823,15 @@ fn render_merge_dry_run(result: &MergeResult) -> String {
     output
 }
 
+#[cfg(test)]
 fn render_merge_result_json(result: &MergeResult) -> Result<String, CliError> {
-    let value = json!({
+    Ok(serde_json::to_string_pretty(&merge_result_json_value(
+        result,
+    ))?)
+}
+
+fn merge_result_json_value(result: &MergeResult) -> Value {
+    json!({
         "type": "codefire_merge_plan",
         "version": 1,
         "dry_run": result.dry_run,
@@ -2797,8 +2851,7 @@ fn render_merge_result_json(result: &MergeResult) -> Result<String, CliError> {
         "binary_conflicts": result.binary_conflicts.iter().map(binary_merge_conflict_json).collect::<Vec<_>>(),
         "semantic_conflicts": result.semantic_conflicts.iter().map(semantic_conflict_json).collect::<Vec<_>>(),
         "next_actions": merge_next_actions(result),
-    });
-    Ok(serde_json::to_string_pretty(&value)?)
+    })
 }
 
 fn merge_file_action_json(action: &MergeFileAction) -> Value {

@@ -75,6 +75,7 @@ timeout時はexit code 30で失敗し、lock fileにpid/created_atがあれば�
 remote mutatorのupload/request-merge/request-review/request-applyも同じoptionを受け付け、remote project resource lockに適用する
 remote branch head更新はbranch resource lockで直列化し、remote generation採番はproject単位の`generation.lock`で直列化する。generation採番APIはlock guard経由でのみ呼び出す
 remote mutatorで--json併用時にlock contentionが発生した場合はcodefire.command_result.v1 envelopeをstdoutに出し、diagnosticsにlock_contention、next_actionsにretry_with_wait_lockを含める
+--jsonを持つ主要commandはcodefire.command_result.v1 envelopeを返す。旧来のoperation/merge plan payloadを返していたmutating commandは同じpayloadをdata.planへ入れ、data.type=codefire_plan_resultを付ける
 HTTP clientはconnect/read/write timeoutを持ち、defaultは30000ms。`CODEFIRE_HTTP_TIMEOUT_MS` に正の整数を指定すると調整できる
 HTTP serverはbounded per-connection handlerでrequestを処理し、server-side read/write timeoutを同じ値で設定する。cleartext HTTPで同時接続上限を超えた場合は503を返す
 HTTP authorityはIPv4/hostnameとbracketed IPv6 (`[::1]:8080`) を受け付け、bracketなしIPv6 literalは拒否する

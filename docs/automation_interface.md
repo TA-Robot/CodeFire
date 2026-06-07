@@ -284,6 +284,8 @@ migrate: review_migration_plan, inspect_migration_blockers
 
 `link --batch <file> --json` data uses `type=codefire_link_batch_result`, includes `dry_run`, `item_count`, `links_file`, a `codefire_operation_plan`, and applied `added_links`. `--dry-run` validates Atom references and duplicate links without modifying `codefire.links.yaml`.
 
+Mutating commands that still expose legacy operation/merge plan payloads return the same plan under `data.plan` in a `codefire.command_result.v1` envelope with `data.type=codefire_plan_result`. This applies to `open`, `clone`, `commit`, `extinguish` variants, `upload`, `request-merge`, `request-review`, `request-apply`, and `merge`. `patch import --json` returns its patch import result directly as envelope `data`.
+
 `fire --json` data uses `type=codefire_fire_result`, includes `dry_run`, `item_count`, `branch`, `open_dir`, a `codefire_operation_plan`, and applied manual fires. `fire --batch <file> --json` uses `type=codefire_fire_batch_result` with the same shape and all-item validation. `--dry-run` validates Atom references and duplicate fire keys without modifying `fires.json` or branch state.
 
 `evidence add --batch <file> --json` data uses `type=codefire_evidence_batch_result`, includes `dry_run`, `item_count`, a `codefire_operation_plan`, and per-item evidence results when applied.

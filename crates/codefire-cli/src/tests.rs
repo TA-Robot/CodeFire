@@ -801,6 +801,26 @@ fn remote_resource_lock_wait_timeout_returns_owner_metadata_and_json_diagnostics
 }
 
 #[test]
+fn legacy_plan_json_outputs_are_wrapped_in_command_result_envelope() {
+    let plan = json!({
+        "type": "codefire_operation_plan",
+        "version": 1,
+        "repo_root": "/tmp/codefire-repo",
+        "dry_run": true,
+    });
+
+    let envelope = plan_result_envelope("commit", &plan);
+
+    assert_eq!(envelope["schema"], "codefire.command_result.v1");
+    assert_eq!(envelope["command"], "commit");
+    assert_eq!(envelope["ok"], true);
+    assert_eq!(envelope["exit_code"], 0);
+    assert_eq!(envelope["repo"], "/tmp/codefire-repo");
+    assert_eq!(envelope["data"]["type"], "codefire_plan_result");
+    assert_eq!(envelope["data"]["plan"], plan);
+}
+
+#[test]
 fn remote_generation_allocation_is_locked_across_threads() {
     let temp = tempdir().unwrap();
     let project_root = temp.path().join("remote").join("org").join("app");
