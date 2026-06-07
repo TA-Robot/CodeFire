@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 mod automation;
 mod batch;
+mod cli_model;
 mod completion;
 mod context;
 mod doctor;
@@ -40,6 +41,7 @@ use automation::{
     verification_diagnostics_json_with_filter, verification_next_actions,
 };
 use batch::{has_batch_extinguish_arg, parse_extinguish_batch_args, run_extinguish_batch};
+pub(crate) use cli_model::*;
 use completion::{completion_script, help_text};
 use context::{build_context_pack, parse_context_args, print_context_summary};
 use doctor::{
@@ -993,244 +995,6 @@ impl From<codefire_store::StoreError> for CliError {
     fn from(error: codefire_store::StoreError) -> Self {
         CliError::Store(error)
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct Status {
-    branch: String,
-    state: String,
-    base: String,
-    open_fires: usize,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct Branch {
-    name: String,
-    head: String,
-    state: String,
-}
-
-#[derive(Debug)]
-struct InitOptions {
-    path: PathBuf,
-    force: bool,
-}
-
-#[derive(Debug)]
-struct InitResult {
-    repo_root: PathBuf,
-    main_commit: String,
-}
-
-#[derive(Debug)]
-struct OpenOptions {
-    branch: String,
-    path: PathBuf,
-    dry_run: bool,
-    json_output: bool,
-    lock: LockOptions,
-    idempotency_key: Option<String>,
-}
-
-#[derive(Debug)]
-struct OpenResult {
-    branch: String,
-    open_dir: PathBuf,
-    plan: Value,
-}
-
-#[derive(Debug)]
-struct PathJsonOptions {
-    path: PathBuf,
-    json_output: bool,
-    metrics: bool,
-}
-
-#[derive(Debug)]
-struct ExtinguishOptions {
-    path: PathBuf,
-    fire_id: String,
-    resolution: String,
-    rationale: String,
-    evidence: String,
-    evidence_refs: Vec<String>,
-    refresh: bool,
-    dry_run: bool,
-    json_output: bool,
-    lock: LockOptions,
-    idempotency_key: Option<String>,
-    edit_rationale: bool,
-}
-
-#[derive(Debug)]
-struct ExtinguishResult {
-    display_id: String,
-    fire_uid: String,
-    plan: Value,
-}
-
-#[derive(Debug)]
-struct CommitOptions {
-    path: PathBuf,
-    message: String,
-    dry_run: bool,
-    json_output: bool,
-    lock: LockOptions,
-    idempotency_key: Option<String>,
-    signer: Option<String>,
-    key_id: Option<String>,
-}
-
-#[derive(Debug)]
-struct CommitResult {
-    commit_id: String,
-    branch: String,
-    plan: Value,
-}
-
-#[derive(Debug)]
-struct CloneOptions {
-    source: String,
-    new_branch: String,
-    dry_run: bool,
-    json_output: bool,
-    lock: LockOptions,
-    idempotency_key: Option<String>,
-}
-
-#[derive(Debug)]
-struct CloneResult {
-    plan: Value,
-}
-
-#[derive(Debug)]
-struct DiffArgs {
-    left: String,
-    right: String,
-    diff: DiffOptions,
-}
-
-#[derive(Debug)]
-struct ReviewPackArgs {
-    review: ReviewPackOptions,
-    output: Option<PathBuf>,
-}
-
-#[derive(Debug)]
-struct PatchExportArgs {
-    patch: PatchExportOptions,
-    output: Option<PathBuf>,
-}
-
-#[derive(Debug)]
-struct PatchImportOptions {
-    path: PathBuf,
-    dry_run: bool,
-    json_output: bool,
-    lock: LockOptions,
-    idempotency_key: Option<String>,
-}
-
-#[derive(Debug)]
-struct ServeOptions {
-    storage_root: PathBuf,
-    host: String,
-    port: u16,
-    tls_cert: Option<PathBuf>,
-    tls_key: Option<PathBuf>,
-    tls_client_ca: Option<PathBuf>,
-}
-
-#[derive(Debug)]
-struct MergeOptions {
-    source_branch: String,
-    target_branch: String,
-    dry_run: bool,
-    json_output: bool,
-    lock: LockOptions,
-    idempotency_key: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-struct LockOptions {
-    wait: bool,
-    timeout_ms: Option<u64>,
-}
-
-#[derive(Debug)]
-struct MergeResult {
-    source_branch: String,
-    target_branch: String,
-    source_head: String,
-    target_head: String,
-    base: String,
-    target_dir: PathBuf,
-    file_actions: Vec<MergeFileAction>,
-    conflicts: Vec<String>,
-    binary_conflicts: Vec<BinaryMergeConflict>,
-    semantic_conflicts: Vec<SemanticConflictCandidate>,
-    dry_run: bool,
-    applied: bool,
-}
-
-#[derive(Debug)]
-struct MergeFileAction {
-    path: String,
-    action: MergeAction,
-    content: Option<Vec<u8>>,
-}
-
-#[derive(Debug, Clone)]
-struct BinaryMergeConflict {
-    path: String,
-    target_path: Option<String>,
-    source_path: Option<String>,
-    target_bytes: Option<usize>,
-    source_bytes: Option<usize>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MergeAction {
-    WriteSource,
-    DeleteTarget,
-    WriteConflictMarkers,
-    WriteConflictSide,
-}
-
-impl MergeAction {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::WriteSource => "write_source",
-            Self::DeleteTarget => "delete_target",
-            Self::WriteConflictMarkers => "write_conflict_markers",
-            Self::WriteConflictSide => "write_conflict_side",
-        }
-    }
-}
-
-#[derive(Debug)]
-struct SemanticConflictCandidate {
-    atom_id: String,
-    base_hash: Option<String>,
-    source_hash: Option<String>,
-    target_hash: Option<String>,
-    source_path: Option<String>,
-    target_path: Option<String>,
-}
-
-struct OpenContext {
-    repo_root: PathBuf,
-    open_dir: PathBuf,
-    branch: String,
-    registry_path: PathBuf,
-    registry: Value,
-}
-
-struct ScanExecution {
-    context: OpenContext,
-    active_state_path: PathBuf,
-    scan: codefire_core::ScanResult,
-    fires: Vec<codefire_core::Fire>,
 }
 
 fn print_status(status: &Status) {
@@ -3400,11 +3164,6 @@ fn compute_scan(start: &Path, persist: bool) -> Result<ScanExecution, CliError> 
 
 fn run_verify(start: &Path) -> Result<codefire_core::Verification, CliError> {
     Ok(compute_verify(start, true)?.verification)
-}
-
-struct VerifyExecution {
-    scan: codefire_core::ScanResult,
-    verification: codefire_core::Verification,
 }
 
 fn compute_verify(start: &Path, persist: bool) -> Result<VerifyExecution, CliError> {

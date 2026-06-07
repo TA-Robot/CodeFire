@@ -31,6 +31,7 @@ Rust CLIでは、以下の責務分離を標準形とする。
 | Responsibility | Preferred location | Notes |
 |---|---|---|
 | CLI dispatch / argument routing | `main.rs` | 薄く保つ。command固有ロジックを置かない |
+| CLI option/result/context model | `crates/codefire-cli/src/cli_model.rs` | command modulesが共有する型を集約し、fieldsは`pub(crate)`に限定する |
 | command-specific planning | `crates/codefire-cli/src/<command>.rs` | parse済み入力からplanを作る |
 | repository/object invariants | `codefire-core` or dedicated CLI module | object ID、canonical JSON、sealed commitを集中管理する |
 | remote mutation policy | `remote/` | file-backed/HTTPで共通policyを共有する |
