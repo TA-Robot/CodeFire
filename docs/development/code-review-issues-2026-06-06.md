@@ -11,12 +11,86 @@
 
 ## Count
 
-- Total: 80
-- High: 15
-- Medium: 64
-- Low: 1
+- Total: 120
+- High: 26
+- Medium: 91
+- Low: 3
 - Fixed in v0.7: 80
-- Remaining open: 0
+- Remaining open: 40
+
+## Current Open Expansion
+
+Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCFR-081..120を追加した。これらは次version計画でroot causeごとに束ねて解消する。
+
+### Open Priority Buckets
+
+#### High
+
+| ID | Type | Area | Title | Detail |
+|---|---|---|---|---|
+| CFR-081 | maintainability | CLI JSON output | JSON失敗経路が共通envelopeを通らない | [CFR-081](code-review-issues/cfr-081.md) |
+| CFR-085 | bug | View CLI | `show --json` がhelp上の契約と実装で一致していない | [CFR-085](code-review-issues/cfr-085.md) |
+| CFR-088 | performance | Patch export | patch exportがfile contentを無制限にbase64化し得る | [CFR-088](code-review-issues/cfr-088.md) |
+| CFR-089 | performance | View/Diff | manifest diffが全file blobをメモリへ展開する | [CFR-089](code-review-issues/cfr-089.md) |
+| CFR-091 | bug | CLI init | `init` がparse-before-helpで副作用なしhelpを保証できない | [CFR-091](code-review-issues/cfr-091.md) |
+| CFR-095 | maintainability | Error model | CliErrorにstructured diagnosticへの変換責務がない | [CFR-095](code-review-issues/cfr-095.md) |
+| CFR-100 | correctness-risk | Batch extinguish | batch extinguishが検証と適用を単一transactionで守れていない | [CFR-100](code-review-issues/cfr-100.md) |
+| CFR-103 | correctness-risk | Storage remote | storage reportが存在しないremote rootを空remoteとして扱い得る | [CFR-103](code-review-issues/cfr-103.md) |
+| CFR-109 | correctness-risk | Evidence capture | evidence commandの非ゼロ終了が成功証跡のように見える | [CFR-109](code-review-issues/cfr-109.md) |
+| CFR-112 | correctness-risk | Remote upload dry-run | file remote upload dry-runがremote layout/policy検証を省略する | [CFR-112](code-review-issues/cfr-112.md) |
+| CFR-114 | correctness-risk | Context | contextがactive scan freshnessを検証しない | [CFR-114](code-review-issues/cfr-114.md) |
+
+#### Medium / Low
+
+| ID | Severity | Type | Area | Title | Detail |
+|---|---|---|---|---|---|
+| CFR-082 | medium | ux | CLI help | command help metadataがdispatchと分離して不完全になっている | [CFR-082](code-review-issues/cfr-082.md) |
+| CFR-083 | medium | maintainability | Automation JSON | debug系commandがautomation envelopeを迂回している | [CFR-083](code-review-issues/cfr-083.md) |
+| CFR-084 | medium | ux | Remote CLI | remote read commandがJSON出力に対応していない | [CFR-084](code-review-issues/cfr-084.md) |
+| CFR-086 | medium | maintainability | Diff CLI | `diff --json` がcommand_result envelopeではなくraw JSONを返す | [CFR-086](code-review-issues/cfr-086.md) |
+| CFR-087 | medium | ux | Review/Patch CLI | review-packとpatch exportにautomation向けJSON envelopeがない | [CFR-087](code-review-issues/cfr-087.md) |
+| CFR-090 | medium | correctness-risk | HTTP remote view | HTTP remote commitish解決の一時directory名が競合し得る | [CFR-090](code-review-issues/cfr-090.md) |
+| CFR-092 | medium | ux | Branch CLI | branch subcommandのunsupported pathがstructured errorにならない | [CFR-092](code-review-issues/cfr-092.md) |
+| CFR-093 | medium | correctness-risk | Status JSON | status JSONがrepo root取得失敗を握りつぶす | [CFR-093](code-review-issues/cfr-093.md) |
+| CFR-094 | medium | ux | Link CLI | link commandのhelp routingとJSON error contractが弱い | [CFR-094](code-review-issues/cfr-094.md) |
+| CFR-096 | medium | ux | Automation next_actions | status next_actionsがchanged countやfreshnessを見ずにverifyを勧める | [CFR-096](code-review-issues/cfr-096.md) |
+| CFR-097 | medium | ux | Scan JSON | scan JSONの`changed_atoms`がID配列だけで詳細不足 | [CFR-097](code-review-issues/cfr-097.md) |
+| CFR-098 | medium | ux | Scan next_actions | clean scanのnext_actionsがverify誘導に寄りすぎる | [CFR-098](code-review-issues/cfr-098.md) |
+| CFR-099 | medium | compatibility | Batch parser | batch JSON parserがtop-level arrayをJSONとして扱わない | [CFR-099](code-review-issues/cfr-099.md) |
+| CFR-101 | medium | performance | Batch operation plan | batch extinguish dry-run planがitem詳細を無制限に含む | [CFR-101](code-review-issues/cfr-101.md) |
+| CFR-102 | medium | ux | Batch result JSON | batch extinguish成功JSONが適用結果の直接summaryを持たない | [CFR-102](code-review-issues/cfr-102.md) |
+| CFR-104 | medium | correctness-risk | Filesystem scan helper | `collect_files` がmissing rootとempty directoryを区別しない | [CFR-104](code-review-issues/cfr-104.md) |
+| CFR-105 | medium | performance | Storage report | storage full scanがobject JSONを毎回全件parseする | [CFR-105](code-review-issues/cfr-105.md) |
+| CFR-106 | low | ux | Storage report | storage quick/full modeの保証範囲がJSONに明示されない | [CFR-106](code-review-issues/cfr-106.md) |
+| CFR-107 | medium | ux | Evidence capture | evidence JSONが解決後のcommand cwdを返さない | [CFR-107](code-review-issues/cfr-107.md) |
+| CFR-108 | medium | ux | Evidence dry-run | evidence dry-runが空のevidence_idを返して実体と紛らわしい | [CFR-108](code-review-issues/cfr-108.md) |
+| CFR-110 | medium | maintainability | HTTP client | HTTP error responseがCliError文字列へ潰される | [CFR-110](code-review-issues/cfr-110.md) |
+| CFR-111 | low | ux | HTTP client config | `CODEFIRE_HTTP_TIMEOUT_MS` の不正値が診断されない | [CFR-111](code-review-issues/cfr-111.md) |
+| CFR-113 | medium | ux | Remote upload JSON | upload dry-run envelopeのrepo/next_actionsがtop-levelで弱い | [CFR-113](code-review-issues/cfr-113.md) |
+| CFR-115 | medium | ux | Context/Explain | context/explainのunknown target errorがJSON contractへ乗らない | [CFR-115](code-review-issues/cfr-115.md) |
+| CFR-116 | medium | correctness-risk | Verification policy | VerificationCommandがenv/max_output/timeoutの契約をcore型で十分表現しない | [CFR-116](code-review-issues/cfr-116.md) |
+| CFR-117 | medium | maintainability | Core scan model | ScanResultがchanged atom詳細とnon-Atom変更を同じ粒度で表現しない | [CFR-117](code-review-issues/cfr-117.md) |
+| CFR-118 | medium | performance | Object lookup | unknown object ID lookupがsubdir全走査へ落ちる | [CFR-118](code-review-issues/cfr-118.md) |
+| CFR-119 | medium | correctness-risk | Durability helpers | object store writeのfsync/rename方針がactive metadata writeと別々に進化しやすい | [CFR-119](code-review-issues/cfr-119.md) |
+| CFR-120 | medium | maintainability | Development process | source reviewで見つかったissue群をroot cause計画へ自動接続できない | [CFR-120](code-review-issues/cfr-120.md) |
+
+### Open Area View
+
+| Area | Issues |
+|---|---|
+| Automation JSON / errors | [CFR-081](code-review-issues/cfr-081.md), [CFR-083](code-review-issues/cfr-083.md), [CFR-095](code-review-issues/cfr-095.md), [CFR-110](code-review-issues/cfr-110.md) |
+| CLI help and parser consistency | [CFR-082](code-review-issues/cfr-082.md), [CFR-091](code-review-issues/cfr-091.md), [CFR-092](code-review-issues/cfr-092.md), [CFR-094](code-review-issues/cfr-094.md), [CFR-099](code-review-issues/cfr-099.md) |
+| View, diff, patch | [CFR-085](code-review-issues/cfr-085.md), [CFR-086](code-review-issues/cfr-086.md), [CFR-087](code-review-issues/cfr-087.md), [CFR-088](code-review-issues/cfr-088.md), [CFR-089](code-review-issues/cfr-089.md), [CFR-090](code-review-issues/cfr-090.md) |
+| Remote | [CFR-084](code-review-issues/cfr-084.md), [CFR-112](code-review-issues/cfr-112.md), [CFR-113](code-review-issues/cfr-113.md) |
+| Next actions and scan model | [CFR-096](code-review-issues/cfr-096.md), [CFR-097](code-review-issues/cfr-097.md), [CFR-098](code-review-issues/cfr-098.md), [CFR-117](code-review-issues/cfr-117.md) |
+| Batch | [CFR-100](code-review-issues/cfr-100.md), [CFR-101](code-review-issues/cfr-101.md), [CFR-102](code-review-issues/cfr-102.md) |
+| Storage and filesystem scan | [CFR-103](code-review-issues/cfr-103.md), [CFR-104](code-review-issues/cfr-104.md), [CFR-105](code-review-issues/cfr-105.md), [CFR-106](code-review-issues/cfr-106.md) |
+| Evidence | [CFR-107](code-review-issues/cfr-107.md), [CFR-108](code-review-issues/cfr-108.md), [CFR-109](code-review-issues/cfr-109.md) |
+| Context and explain | [CFR-114](code-review-issues/cfr-114.md), [CFR-115](code-review-issues/cfr-115.md) |
+| HTTP config | [CFR-111](code-review-issues/cfr-111.md) |
+| Verification policy | [CFR-116](code-review-issues/cfr-116.md) |
+| Object store and durability | [CFR-118](code-review-issues/cfr-118.md), [CFR-119](code-review-issues/cfr-119.md) |
+| Development process | [CFR-120](code-review-issues/cfr-120.md) |
 
 ## v0.7 Progress
 

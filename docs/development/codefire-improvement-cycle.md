@@ -219,11 +219,12 @@ Current named cycle:
 
 - CodeFire next version: v0.8 CFB burn-down。
 - Current plan: `docs/development/v0.8-cfb-burn-down-plan.md`。
-- Current phase: Phase D。v0.8途中版をinstallし、`algorithm-evolution-agent-lab` をCodeFire管理へ再取り込み、docs-first実装でdogfooding中。
+- Current phase: Phase F。Phase Dのdogfooding目標とPhase Eのsource review issue拡張を完了し、次version計画へ接続した。
 - Latest algorithm work: Experiment Triage Board、Experiment Iteration Planner、Experiment Risk Registerを要求、設計、Trace Link、実装、テスト、CodeFire evidence、CodeFire commitまで通した。
 - Latest dogfood findings: CFB-046..CFB-065を追加。新規20件に到達したため、Phase Dのdogfooding目標は満たした。
-- Current phase: Phase Eへ移行。CodeFire source reviewで追加40件を目標にissueを洗い出す。
-- Next expected action: CodeFire sourceをreviewし、既存CFBと重複しないCFR/CFBを整理し、Phase Fの次version計画へつなげる。
+- Latest source review findings: CFR-081..CFR-120を追加。追加40件目標を満たした。
+- Next version plan: `docs/development/v0.9-contract-scale-plan.md`。
+- Next expected action: Phase Aへ戻り、v0.9計画のPhase 0/1からCodeFire実装を開始する。実装後にinstallし、algorithm dogfoodingの次cycleへ入る。
 
 ## Cycle Invariants
 
