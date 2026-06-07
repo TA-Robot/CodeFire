@@ -206,6 +206,7 @@
 | 2026-06-07 | Dogfood | `algorithm-evolution-agent-lab` のrunbook機能追加中に見つけたCodeFire改善issue CFB-026..CFB-045を追加し、CFB用issue templateと1 issue 1 fileの詳細管理へ展開した | `docs/development/bug-backlog.md`, `docs/development/bug-issue-template.md`, `docs/development/bug-issues/` | docs-only update; CFB-026..CFB-045 |
 | 2026-06-07 | Planning | open CFBを全件解消するv0.8 burn-down計画を追加し、根本原因別の修正単位と対象moduleを整理した | `docs/development/v0.8-cfb-burn-down-plan.md` | docs-only plan; implementation not started |
 | 2026-06-07 | Process | CodeFire実装、install、algorithm dogfooding、issue創出、次version計画を反復するcodefire改善サイクルを定義した | `docs/development/codefire-improvement-cycle.md`, `AGENTS.md`, `docs/development/agent-workflow.md` | docs-only process definition |
+| 2026-06-07 | Requirements / Design | 要求定義書と内部アーキテクチャ設計を全面的に強化し、機能要求、非機能要求、不変条件、command contract、state model、module ownership、recovery/test/security設計を明文化した | `docs/01_product_definition.md`, `docs/11_internal_architecture.md` | docs-only architecture update |
 
 ## Current Decisions
 

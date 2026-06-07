@@ -155,10 +155,10 @@ Python v0.2はPython標準ライブラリのみを使う単一ファイルCLIで
 最初に以下を読むと全体像がつかめます。
 
 1. `docs/00_philosophy.md` - 思想背景
-2. `docs/01_product_definition.md` - プロダクト定義
+2. `docs/01_product_definition.md` - 要求定義
 3. `docs/02_core_concepts.md` - 中核概念
 4. `docs/03_workflow_spec.md` - 開発フロー仕様
-5. `docs/11_internal_architecture.md` - 内部実装設計
+5. `docs/11_internal_architecture.md` - 内部アーキテクチャ設計
 6. `docs/12_mvp_implementation_plan.md` - MVP実装計画
 
 単一ファイルで読みたい場合は、`CodeFire_Design_Document_v0.2.md` または `CodeFire_Design_Document_v0.2.docx` を参照してください。
