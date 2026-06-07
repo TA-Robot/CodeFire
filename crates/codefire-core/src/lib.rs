@@ -752,28 +752,37 @@ pub fn required_link_missing(
     trace_graph: &TraceGraph,
     policy: &TracePolicy,
 ) -> Vec<MissingRequiredLink> {
-    let atoms = atom_index
+    let atom_kinds = atom_index
         .atoms
         .iter()
-        .map(|atom| (atom.atom_id.as_str(), atom))
+        .map(|atom| (atom.atom_id.as_str(), atom.kind.as_str()))
         .collect::<BTreeMap<_, _>>();
+    let mut link_counts = BTreeMap::<(String, String, String), usize>::new();
+    for link in &trace_graph.links {
+        if let Some(target_kind) = atom_kinds.get(link.to.as_str()) {
+            *link_counts
+                .entry((
+                    link.from.clone(),
+                    link.link_type.clone(),
+                    (*target_kind).to_string(),
+                ))
+                .or_insert(0) += 1;
+        }
+    }
     let mut missing = Vec::new();
     for atom in &atom_index.atoms {
         let Some(rules) = policy.required_links.get(&atom.kind) else {
             continue;
         };
         for rule in rules {
-            let found = trace_graph
-                .links
-                .iter()
-                .filter(|link| {
-                    link.from == atom.atom_id
-                        && link.link_type == rule.link_type
-                        && atoms
-                            .get(link.to.as_str())
-                            .is_some_and(|target| target.kind == rule.target_kind)
-                })
-                .count();
+            let found = link_counts
+                .get(&(
+                    atom.atom_id.clone(),
+                    rule.link_type.clone(),
+                    rule.target_kind.clone(),
+                ))
+                .copied()
+                .unwrap_or_default();
             if found < rule.min {
                 missing.push(MissingRequiredLink {
                     atom_id: atom.atom_id.clone(),
@@ -1759,6 +1768,52 @@ mod tests {
                 found: 0,
             }]
         );
+    }
+
+    #[test]
+    fn required_link_missing_counts_large_fixture_with_link_index() {
+        let mut atoms = Vec::new();
+        let mut links = Vec::new();
+        for index in 0..256 {
+            let requirement = format!("REQ-LARGE-{index:03}");
+            let design = format!("DES-LARGE-{index:03}");
+            atoms.push(atom(&requirement, "requirement", "sha256:req"));
+            atoms.push(atom(&design, "design", "sha256:des"));
+            links.push(
+                TraceLinkInput {
+                    from: requirement,
+                    to: Some(design),
+                    link_type: Some("refined_by".to_string()),
+                }
+                .into_trace_link()
+                .unwrap(),
+            );
+        }
+        let atom_index = AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: VERSION,
+            atoms,
+            duplicate_atom_ids: Vec::new(),
+        };
+        let trace_graph = TraceGraph {
+            type_tag: "trace_graph".to_string(),
+            version: VERSION,
+            links,
+        };
+        let policy = TracePolicy {
+            required_links: BTreeMap::from([(
+                "requirement".to_string(),
+                vec![RequiredLinkRule {
+                    link_type: "refined_by".to_string(),
+                    target_kind: "design".to_string(),
+                    min: 1,
+                }],
+            )]),
+        };
+
+        let missing = required_link_missing(&atom_index, &trace_graph, &policy);
+
+        assert!(missing.is_empty());
     }
 
     #[test]
