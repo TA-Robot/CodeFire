@@ -188,6 +188,8 @@ CODEFIRE_TLS_INSECURE=1 \
   /workspace/project/target/debug/codefire-rs list "cf+https://127.0.0.1:8443/org/app"
 ```
 
+Rust HTTPS serve can require client certificates with `--tls-client-ca <ca-pem>` alongside `--tls-cert` and `--tls-key`. The server private key PEM may be PKCS#8, RSA, or SEC1 EC. Unsupported key files fail with a format-specific error before the listener accepts TLS connections.
+
 server-side verification policy の例:
 
 ```bash

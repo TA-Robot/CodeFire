@@ -139,7 +139,7 @@ Python v0.2とRust v0.6のHTTP/HTTPS transportで実装済み:
 - `doctor`
 - `gc`
 
-HTTPS transportは `codefire serve --tls-cert --tls-key` / `codefire-rs serve --tls-cert --tls-key` で有効化できる。通常のTLS証明書検証を使い、自署名証明書のローカル検証時のみ `CODEFIRE_TLS_INSECURE=1` で検証を無効化できる。
+HTTPS transportは `codefire serve --tls-cert --tls-key` / `codefire-rs serve --tls-cert --tls-key` で有効化できる。Rust版は `--tls-client-ca <ca-pem>` を指定するとclient certificateを必須にする。server private key PEMはPKCS#8、RSA、SEC1 ECに対応する。通常のTLS証明書検証を使い、自署名証明書のローカル検証時のみ `CODEFIRE_TLS_INSECURE=1` で検証を無効化できる。
 
 server-side verificationは `server_policy.json` に書いたcommandをremote project root配下で実行する。checkごとに `cwd`、`env`、`timeout_seconds` を指定でき、`cwd` はremote project root配下に制限される。親プロセス環境は丸ごと渡さず、最小環境、CodeFire remote metadata、checkごとの `env` だけを渡す。OS-level sandboxやコンテナ隔離はまだ持たない。
 

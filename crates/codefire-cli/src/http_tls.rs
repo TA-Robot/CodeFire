@@ -1,5 +1,6 @@
 use super::CliError;
 use rustls::client::{ServerCertVerified, ServerCertVerifier};
+use rustls::server::AllowAnyAuthenticatedClient;
 use rustls::{
     Certificate, ClientConfig, ClientConnection, Error as TlsError, OwnedTrustAnchor, PrivateKey,
     RootCertStore, ServerConfig, ServerConnection, ServerName, StreamOwned,
@@ -45,14 +46,20 @@ pub(crate) fn insecure_env_value_enabled(value: Option<&OsStr>) -> bool {
 pub(crate) fn server_config(
     cert_path: &Path,
     key_path: &Path,
+    client_ca_path: Option<&Path>,
 ) -> Result<Arc<ServerConfig>, CliError> {
     let certs = load_certs(cert_path)?;
     let key = load_private_key(key_path)?;
-    let config = ServerConfig::builder()
-        .with_safe_defaults()
-        .with_no_client_auth()
-        .with_single_cert(certs, key)
-        .map_err(|error| CliError::Usage(format!("invalid TLS certificate/key: {error}")))?;
+    let builder = ServerConfig::builder().with_safe_defaults();
+    let config = if let Some(client_ca_path) = client_ca_path {
+        let verifier = AllowAnyAuthenticatedClient::new(load_client_ca_roots(client_ca_path)?);
+        builder
+            .with_client_cert_verifier(Arc::new(verifier))
+            .with_single_cert(certs, key)
+    } else {
+        builder.with_no_client_auth().with_single_cert(certs, key)
+    }
+    .map_err(|error| CliError::Usage(format!("invalid TLS certificate/key: {error}")))?;
     Ok(Arc::new(config))
 }
 
@@ -91,11 +98,29 @@ fn load_certs(path: &Path) -> Result<Vec<Certificate>, CliError> {
     Ok(certs.into_iter().map(Certificate).collect())
 }
 
-fn load_private_key(path: &Path) -> Result<PrivateKey, CliError> {
+fn load_client_ca_roots(path: &Path) -> Result<RootCertStore, CliError> {
+    let certs = load_certs(path)?;
+    let mut roots = RootCertStore::empty();
+    for cert in certs {
+        roots.add(&cert).map_err(|error| {
+            CliError::Usage(format!(
+                "invalid TLS client CA certificate {}: {error}",
+                path.display()
+            ))
+        })?;
+    }
+    Ok(roots)
+}
+
+pub(crate) fn load_private_key(path: &Path) -> Result<PrivateKey, CliError> {
     let file = fs::File::open(path)?;
     let mut reader = BufReader::new(file);
-    let pkcs8_keys = rustls_pemfile::pkcs8_private_keys(&mut reader)
-        .map_err(|_| CliError::Usage(format!("invalid private key PEM: {}", path.display())))?;
+    let pkcs8_keys = rustls_pemfile::pkcs8_private_keys(&mut reader).map_err(|_| {
+        CliError::Usage(format!(
+            "invalid PKCS#8 private key PEM: {}",
+            path.display()
+        ))
+    })?;
     if let Some(key) = pkcs8_keys.into_iter().next() {
         return Ok(PrivateKey(key));
     }
@@ -103,12 +128,25 @@ fn load_private_key(path: &Path) -> Result<PrivateKey, CliError> {
     let file = fs::File::open(path)?;
     let mut reader = BufReader::new(file);
     let rsa_keys = rustls_pemfile::rsa_private_keys(&mut reader)
-        .map_err(|_| CliError::Usage(format!("invalid private key PEM: {}", path.display())))?;
-    rsa_keys
-        .into_iter()
-        .next()
-        .map(PrivateKey)
-        .ok_or_else(|| CliError::Usage(format!("private key PEM has no keys: {}", path.display())))
+        .map_err(|_| CliError::Usage(format!("invalid RSA private key PEM: {}", path.display())))?;
+    if let Some(key) = rsa_keys.into_iter().next() {
+        return Ok(PrivateKey(key));
+    }
+
+    let file = fs::File::open(path)?;
+    let mut reader = BufReader::new(file);
+    let ec_keys = rustls_pemfile::ec_private_keys(&mut reader).map_err(|_| {
+        CliError::Usage(format!(
+            "invalid SEC1 EC private key PEM: {}",
+            path.display()
+        ))
+    })?;
+    ec_keys.into_iter().next().map(PrivateKey).ok_or_else(|| {
+        CliError::Usage(format!(
+            "private key PEM has no supported keys (PKCS#8, RSA, SEC1 EC): {}",
+            path.display()
+        ))
+    })
 }
 
 struct InsecureVerifier;

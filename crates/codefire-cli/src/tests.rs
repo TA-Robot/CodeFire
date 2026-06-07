@@ -20,7 +20,7 @@ fn help_and_completion_scripts_cover_rust_default_cli() {
     assert!(bash.contains("request-apply"));
     assert!(bash.contains("--details --blocking-only --json --metrics"));
     assert!(bash.contains("--quick --full --json"));
-    assert!(bash.contains("--tls-cert --tls-key"));
+    assert!(bash.contains("--tls-cert --tls-key --tls-client-ca"));
     assert!(!bash.contains("token-hash"));
 
     let zsh = zsh_completion_script();
@@ -28,6 +28,7 @@ fn help_and_completion_scripts_cover_rust_default_cli() {
     assert!(zsh.contains("completion\\:completion"));
     assert!(zsh.contains("--details[show failed verification diagnostic details]"));
     assert!(zsh.contains("--quick[skip full object store integrity scan]"));
+    assert!(zsh.contains("--tls-client-ca[required client CA PEM]"));
     assert!(zsh.contains("--request-key-id[remote request signing key id]"));
     assert!(!zsh.contains("token-hash"));
 }
@@ -1758,6 +1759,8 @@ fn parse_https_remote_urls_and_tls_serve_args() {
         "/tmp/server.crt".to_string(),
         "--tls-key".to_string(),
         "/tmp/server.key".to_string(),
+        "--tls-client-ca".to_string(),
+        "/tmp/client-ca.crt".to_string(),
     ])
     .unwrap();
     assert_eq!(serve.storage_root, PathBuf::from("/tmp/server"));
@@ -1765,6 +1768,10 @@ fn parse_https_remote_urls_and_tls_serve_args() {
     assert_eq!(serve.port, 8443);
     assert_eq!(serve.tls_cert, Some(PathBuf::from("/tmp/server.crt")));
     assert_eq!(serve.tls_key, Some(PathBuf::from("/tmp/server.key")));
+    assert_eq!(
+        serve.tls_client_ca,
+        Some(PathBuf::from("/tmp/client-ca.crt"))
+    );
 
     let missing_key = parse_serve_args(&[
         "/tmp/server".to_string(),
@@ -1775,6 +1782,16 @@ fn parse_https_remote_urls_and_tls_serve_args() {
     assert!(missing_key
         .to_string()
         .contains("--tls-cert and --tls-key must be provided together"));
+
+    let client_ca_without_server_tls = parse_serve_args(&[
+        "/tmp/server".to_string(),
+        "--tls-client-ca".to_string(),
+        "/tmp/client-ca.crt".to_string(),
+    ])
+    .unwrap_err();
+    assert!(client_ca_without_server_tls
+        .to_string()
+        .contains("--tls-client-ca requires --tls-cert and --tls-key"));
 }
 
 #[test]
@@ -1805,6 +1822,15 @@ fn tls_insecure_env_requires_explicit_truthy_value() {
     assert!(http_tls::insecure_env_value_enabled(Some(
         std::ffi::OsStr::new("true")
     )));
+}
+
+#[test]
+fn tls_private_key_errors_name_supported_formats() {
+    let temp = tempdir().unwrap();
+    let key_path = temp.path().join("unsupported.key");
+    fs::write(&key_path, "not a supported PEM private key\n").unwrap();
+    let error = http_tls::load_private_key(&key_path).unwrap_err();
+    assert!(error.to_string().contains("PKCS#8, RSA, SEC1 EC"));
 }
 
 #[test]

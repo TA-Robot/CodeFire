@@ -45,14 +45,14 @@ codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command 
 codefire explain (fire <id>|atom <id>|verify-failure|storage-warning) [--path <path>] [--json]
 codefire migrate check [path] [--json]
 codefire migrate dry-run [path] [--target-format v0.6] [--json]
-codefire serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>] [--tls-key <key>]
+codefire serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>] [--tls-key <key>] [--tls-client-ca <ca-pem>]
 codefire completion <bash|zsh>
 ```
 
 Implementation status note:
 
 - Python v0.2 `codefire` supports the full HTTPS serve surface shown above.
-- Rust v0.6 `codefire` supports `serve <storage-root> [--host] [--port] [--tls-cert] [--tls-key]` for `cf+http://` and `cf+https://`.
+- Rust v0.6 `codefire` supports `serve <storage-root> [--host] [--port] [--tls-cert] [--tls-key] [--tls-client-ca]` for `cf+http://` and `cf+https://`.
 - Rust v0.6 supports `--signer`, `--key-id`, `--request-key-id`, commit signature verification, key rotation/revocation policy, request timestamp skew checks, and request nonce replay cache for file-backed and HTTP remote mutators.
 - `install.sh` installs Rust v0.6 as the default `codefire` command and keeps Python v0.2 as `codefire-py`.
 - Python-only maintenance commands such as remote `gc` and token hash generation remain available through `codefire-py` / `./codefire` while Rust v0.6 is the default install CLI.

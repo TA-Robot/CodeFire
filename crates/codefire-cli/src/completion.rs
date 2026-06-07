@@ -133,7 +133,7 @@ _codefire_complete()
       fi
       ;;
     serve)
-      COMPREPLY=( $(compgen -W "--host --port --tls-cert --tls-key" -- "$cur") )
+      COMPREPLY=( $(compgen -W "--host --port --tls-cert --tls-key --tls-client-ca" -- "$cur") )
       ;;
     completion)
       COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") )
@@ -206,7 +206,7 @@ _codefire()
       _arguments '1:migrate command:(check dry-run)' '--json[emit JSON]' '--target-format[target format]'
       ;;
     serve)
-      _arguments '--host[host]' '--port[port]' '--tls-cert[TLS certificate]' '--tls-key[TLS private key]'
+      _arguments '--host[host]' '--port[port]' '--tls-cert[TLS certificate]' '--tls-key[TLS private key]' '--tls-client-ca[required client CA PEM]'
       ;;
     completion)
       _arguments '1:shell:(bash zsh)'

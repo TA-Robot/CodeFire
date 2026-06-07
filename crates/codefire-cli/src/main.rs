@@ -1137,6 +1137,7 @@ struct ServeOptions {
     port: u16,
     tls_cert: Option<PathBuf>,
     tls_key: Option<PathBuf>,
+    tls_client_ca: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -2202,6 +2203,7 @@ fn parse_serve_args(args: &[String]) -> Result<ServeOptions, CliError> {
     let mut port = 8080u16;
     let mut tls_cert = None;
     let mut tls_key = None;
+    let mut tls_client_ca = None;
     let mut index = 0usize;
     while index < args.len() {
         match args[index].as_str() {
@@ -2233,6 +2235,12 @@ fn parse_serve_args(args: &[String]) -> Result<ServeOptions, CliError> {
                     CliError::Usage("--tls-key requires a value".to_string())
                 })?));
             }
+            "--tls-client-ca" => {
+                index += 1;
+                tls_client_ca = Some(PathBuf::from(args.get(index).ok_or_else(|| {
+                    CliError::Usage("--tls-client-ca requires a value".to_string())
+                })?));
+            }
             value if storage_root.is_none() => storage_root = Some(PathBuf::from(value)),
             value => {
                 return Err(CliError::Usage(format!(
@@ -2247,10 +2255,15 @@ fn parse_serve_args(args: &[String]) -> Result<ServeOptions, CliError> {
             "--tls-cert and --tls-key must be provided together".to_string(),
         ));
     }
+    if tls_client_ca.is_some() && tls_cert.is_none() {
+        return Err(CliError::Usage(
+            "--tls-client-ca requires --tls-cert and --tls-key".to_string(),
+        ));
+    }
     Ok(ServeOptions {
         storage_root: storage_root.ok_or_else(|| {
             CliError::Usage(
-                "usage: codefire serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>] [--tls-key <key>]"
+                "usage: codefire serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>] [--tls-key <key>] [--tls-client-ca <ca-pem>]"
                     .to_string(),
             )
         })?,
@@ -2258,6 +2271,7 @@ fn parse_serve_args(args: &[String]) -> Result<ServeOptions, CliError> {
         port,
         tls_cert,
         tls_key,
+        tls_client_ca,
     })
 }
 

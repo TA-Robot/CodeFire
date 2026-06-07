@@ -345,7 +345,11 @@ pub(crate) fn serve_http(options: &ServeOptions) -> Result<(), CliError> {
     let listener = TcpListener::bind((options.host.as_str(), options.port))?;
     let address = listener.local_addr()?;
     let tls_config = match (&options.tls_cert, &options.tls_key) {
-        (Some(cert), Some(key)) => Some(http_tls::server_config(cert, key)?),
+        (Some(cert), Some(key)) => Some(http_tls::server_config(
+            cert,
+            key,
+            options.tls_client_ca.as_deref(),
+        )?),
         _ => None,
     };
     let scheme = if tls_config.is_some() {
