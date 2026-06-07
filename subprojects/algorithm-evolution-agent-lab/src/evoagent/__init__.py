@@ -75,6 +75,7 @@ from evoagent.report_bundle import SotaReportBundleGenerator, SotaReportBundleMa
 from evoagent.reporting import LivingResearchReport, ReportOptions
 from evoagent.reproduction import ReproductionChecklist, ReproductionChecklistBuilder, ReproductionChecklistItem
 from evoagent.regression import RegressionDetector, RegressionFinding
+from evoagent.risk import ExperimentRisk, ExperimentRiskRegister, RiskPriority, RiskSeverity, RiskStatus
 from evoagent.review import ReviewLedger, ReviewObjection
 from evoagent.roles import RoleComponent, RoleRegistry
 from evoagent.run_identity import RunIdentityLedger, RunIdentityRecord
@@ -152,6 +153,8 @@ __all__ = [
     "ExperimentPlanContract",
     "ExperimentPlanContractBuilder",
     "ExperimentQueue",
+    "ExperimentRisk",
+    "ExperimentRiskRegister",
     "ExperimentResult",
     "ExperimentRun",
     "ExperimentTriageBoard",
@@ -219,6 +222,9 @@ __all__ = [
     "RegressionDetector",
     "RegressionFinding",
     "ResultIngestor",
+    "RiskPriority",
+    "RiskSeverity",
+    "RiskStatus",
     "ReviewLedger",
     "ReviewObjection",
     "RetryDecision",

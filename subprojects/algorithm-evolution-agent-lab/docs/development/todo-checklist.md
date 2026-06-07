@@ -72,3 +72,4 @@
 | AE-068 | SOTA Governance | contamination sourceとdataset/artifact overlapを検出するregistryを追加する | done | `CODE-ContaminationSourceRegistry`; `test_contamination_source_registry_flags_dataset_and_artifact_overlap` |
 | AE-069 | Planning | queue/promotion/learning curve/budgetを統合して次研究actionを順位付けするtriage boardを追加する | done | `CODE-ExperimentTriageBoard`; `TEST-experiment-triage-board-ranks-actions` |
 | AE-070 | Planning | triage結果を次イテレーションのactive/review/deferred計画へ変換するplannerを追加する | done | `CODE-ExperimentIterationPlanner`; `TEST-experiment-iteration-planner-builds-bounded-plan` |
+| AE-071 | Governance | 実験campaignのrisk registerを追加し、open/blocking riskとmitigation checklistを優先度順に返す | done | `CODE-ExperimentRiskRegister`; `TEST-experiment-risk-register-prioritizes-open-risks` |

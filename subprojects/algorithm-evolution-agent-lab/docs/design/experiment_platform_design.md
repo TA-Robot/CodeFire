@@ -129,3 +129,24 @@ The planner enforces:
 - deterministic ordering from the triage score
 - budget accounting based on estimated experiment cost
 - review capacity so promotion/rejection work cannot crowd out execution planning
+
+## DES-AUTO-011: Experiment risk register
+
+The risk register stores compact risk records:
+
+- risk ID
+- related plan ID
+- category
+- severity
+- probability
+- impact
+- status
+- mitigation
+
+The register exposes:
+
+- a deterministic priority order for open risks
+- a blocker view for critical or high-risk open items
+- a mitigation checklist for the next research iteration
+
+Risk priority is computed without hidden mutable state so repeated planning produces the same ordering for the same risk set.

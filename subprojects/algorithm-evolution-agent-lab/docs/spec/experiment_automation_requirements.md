@@ -111,3 +111,7 @@ The system shall combine queued experiment value, promotion policy, learning cur
 ## REQ-AUTO-028: Experiment iteration plan
 
 The system shall convert triage decisions into a bounded next-iteration plan that separates executable experiments, promotion or rejection review items, and deferred work while respecting remaining budget and active-run capacity.
+
+## REQ-AUTO-029: Experiment risk register
+
+The system shall maintain a risk register for experiment campaigns, prioritize open risks by likelihood, impact, and severity, and surface blocker risks that must be mitigated before promotion or external claims.
