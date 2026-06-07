@@ -336,6 +336,9 @@ scanを実行する
 policy checkを実行する
 required verification commandを実行する
 verification objectをactive stateに保存する
+verifyがpersistするopen directory stateは `.codefire/active/<open_instance_id>/scan.json`, `fires.json`, `verification.json`, `state.json` である
+verification passed時のopen stateは`open-consistent`、failed時のopen stateは`open-burning`になる
+clean状態でverifyしてもopen fireは増えず、statusは`open-consistent`へ進む
 resolution.evidence_refsが存在しないevidence objectを指す場合はmissing evidence refsとして失敗する
 `--details` 指定時は、失敗したdiagnosticsの代表例を最大5件ずつ出力する
 --blocking-onlyはblocking diagnosticsだけを表示/返すことを明示する。JSON data.diagnostic_filterはblocking_onlyになる

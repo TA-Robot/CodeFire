@@ -3442,18 +3442,33 @@ fn compute_verify(start: &Path, persist: bool) -> Result<VerifyExecution, CliErr
         &now_iso_utc(),
     );
     if persist {
-        write_json_atomic(
-            &active_state_path.join("verification.json"),
-            &serde_json::to_value(&verification)?,
-        )?;
-        let state = if verification.result == "passed" {
-            "open-consistent"
-        } else {
-            "open-burning"
-        };
-        set_open_state(&context, &active_state_path, state)?;
+        persist_verification_result_state(&context, &active_state_path, &verification)?;
     }
     Ok(VerifyExecution { scan, verification })
+}
+
+fn persist_verification_result_state(
+    context: &OpenContext,
+    active_state_path: &Path,
+    verification: &codefire_core::Verification,
+) -> Result<(), CliError> {
+    write_json_atomic(
+        &active_state_path.join("verification.json"),
+        &serde_json::to_value(verification)?,
+    )?;
+    set_open_state(
+        context,
+        active_state_path,
+        verification_open_state(verification),
+    )
+}
+
+fn verification_open_state(verification: &codefire_core::Verification) -> &'static str {
+    if verification.result == "passed" {
+        "open-consistent"
+    } else {
+        "open-burning"
+    }
 }
 
 fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliError> {
