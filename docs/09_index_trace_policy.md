@@ -309,6 +309,10 @@ links:
     type: verified_by
 ```
 
+`codefire.links.yaml` はCodeFire schema向けの限定YAML subsetとして読む。`links` 配下は `from` / `to` / `type` のkey-value itemだけをTrace Linkとして受け付ける。`links` section後の別root sectionはTrace Graph入力外metadataとして読み飛ばすが、`links` sectionが無いまま別root sectionだけがある構造、unsupported link field、root外のnested entry、tab indentation、対応外list形式は黙って無視せず、line number付きconfig errorにする。quoted scalarとquoted string内ではないinline commentは処理できる。
+
+新規Trace Linkの内部IDは `LINK-sha256-<32hex>` 形式で、`from` / `to` / `type` のcanonical JSON digestから生成する。旧形式 `LINK-{from}-{type}-{to}` は新規生成には使わないが、既存resolutionのstale判定では旧ID/hashも互換照合する。
+
 Trace Graphを以下の有向グラフとして扱う。
 
 \[
@@ -339,6 +343,8 @@ required_links:
       target_kind: code
       min: 1
 ```
+
+`codefire.policy.yaml` もCodeFire schema向けの限定YAML subsetとして読む。対応root sectionは `version`、`required_links`、`commit_policy`、`extinguish_policy`、`verification` で、各section内のunsupported fieldやunsupported indentationはline number付きconfig errorにする。
 
 必須linkが欠落している場合、commit不可である。
 

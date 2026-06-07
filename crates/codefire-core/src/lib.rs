@@ -323,14 +323,61 @@ pub fn parse_links(path: &Path) -> Result<Vec<TraceLinkInput>, CoreError> {
     let mut links = Vec::new();
     let mut current = None;
     let mut current_line = 0usize;
+    let mut in_links = false;
+    let mut seen_links = false;
+    let mut skipping_extra_root = false;
 
     for (line_index, raw_line) in read_text_lossy(path)?.lines().enumerate() {
         let line_no = line_index + 1;
-        let stripped = raw_line.split('#').next().unwrap_or_default().trim();
-        if stripped.is_empty() {
+        let Some(line) = limited_yaml_line(raw_line, line_no, "codefire.links.yaml")? else {
+            continue;
+        };
+        if line.indent == 0 {
+            flush_link(&mut links, current.take(), current_line)?;
+            current_line = 0;
+            current = None;
+            match limited_yaml_key(line.text) {
+                Some(("version", _)) => {
+                    in_links = false;
+                    skipping_extra_root = false;
+                }
+                Some(("links", "")) => {
+                    in_links = true;
+                    seen_links = true;
+                    skipping_extra_root = false;
+                }
+                Some((key, _)) => {
+                    if seen_links {
+                        in_links = false;
+                        skipping_extra_root = true;
+                        continue;
+                    }
+                    return Err(CoreError::Config(format!(
+                        "unsupported codefire.links.yaml: root key {key} at line {line_no}"
+                    )));
+                }
+                None => {
+                    return Err(CoreError::Config(format!(
+                        "unsupported codefire.links.yaml: line {line_no} must be key: value"
+                    )));
+                }
+            }
             continue;
         }
-        if let Some(value) = stripped.strip_prefix("- from:") {
+        if !in_links {
+            if skipping_extra_root {
+                continue;
+            }
+            return Err(CoreError::Config(format!(
+                "unsupported codefire.links.yaml: nested entry outside links at line {line_no}"
+            )));
+        }
+        if line.indent == 2 {
+            let Some(value) = line.text.strip_prefix("- from:") else {
+                return Err(CoreError::Config(format!(
+                    "unsupported codefire.links.yaml: link item at line {line_no} must start with '- from:'"
+                )));
+            };
             flush_link(&mut links, current.take(), current_line)?;
             current = Some(TraceLinkInput {
                 from: unquote(value.trim()),
@@ -340,13 +387,30 @@ pub fn parse_links(path: &Path) -> Result<Vec<TraceLinkInput>, CoreError> {
             current_line = line_no;
             continue;
         }
+        if line.indent != 4 {
+            return Err(CoreError::Config(format!(
+                "unsupported codefire.links.yaml: unsupported indentation at line {line_no}"
+            )));
+        }
         let Some(link) = current.as_mut() else {
-            continue;
+            return Err(CoreError::Config(format!(
+                "invalid codefire.links.yaml: link field before link item at line {line_no}"
+            )));
         };
-        if let Some(value) = stripped.strip_prefix("to:") {
-            link.to = Some(unquote(value.trim()));
-        } else if let Some(value) = stripped.strip_prefix("type:") {
-            link.link_type = Some(unquote(value.trim()));
+        match limited_yaml_key(line.text) {
+            Some(("from", value)) => link.from = unquote(value),
+            Some(("to", value)) => link.to = Some(unquote(value)),
+            Some(("type", value)) => link.link_type = Some(unquote(value)),
+            Some((key, _)) => {
+                return Err(CoreError::Config(format!(
+                    "unsupported codefire.links.yaml: link field {key} at line {line_no}"
+                )));
+            }
+            None => {
+                return Err(CoreError::Config(format!(
+                    "unsupported codefire.links.yaml: line {line_no} must be key: value"
+                )));
+            }
         }
     }
     flush_link(&mut links, current, current_line)?;
@@ -357,6 +421,68 @@ pub fn parse_trace_policy(open_dir: &Path) -> Result<TracePolicy, CoreError> {
     Ok(TracePolicy {
         required_links: parse_verification_policy(open_dir)?.required_links,
     })
+}
+
+#[derive(Clone, Copy)]
+struct LimitedYamlLine<'a> {
+    indent: usize,
+    text: &'a str,
+}
+
+fn limited_yaml_line<'a>(
+    raw_line: &'a str,
+    line_no: usize,
+    file_name: &str,
+) -> Result<Option<LimitedYamlLine<'a>>, CoreError> {
+    let indent = raw_line
+        .as_bytes()
+        .iter()
+        .take_while(|byte| **byte == b' ')
+        .count();
+    if raw_line[indent..].starts_with('\t') {
+        return Err(CoreError::Config(format!(
+            "unsupported {file_name}: tab indentation at line {line_no}"
+        )));
+    }
+    let without_comment = strip_limited_yaml_comment(raw_line);
+    let text = without_comment.trim_end();
+    let stripped = text.trim_start_matches(' ');
+    if stripped.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(LimitedYamlLine {
+        indent: text.len() - stripped.len(),
+        text: stripped,
+    }))
+}
+
+fn strip_limited_yaml_comment(line: &str) -> &str {
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut escaped = false;
+    for (index, ch) in line.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' if in_double => escaped = true,
+            '"' if !in_single => in_double = !in_double,
+            '\'' if !in_double => in_single = !in_single,
+            '#' if !in_single && !in_double => return &line[..index],
+            _ => {}
+        }
+    }
+    line
+}
+
+fn limited_yaml_key(text: &str) -> Option<(&str, &str)> {
+    let (key, value) = text.split_once(':')?;
+    let key = key.trim();
+    if key.is_empty() || key.starts_with('-') {
+        return None;
+    }
+    Some((key, value.trim()))
 }
 
 pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, CoreError> {
@@ -377,18 +503,29 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
     let mut current_check = None::<VerificationCommandDraft>;
     let mut checks = Vec::new();
 
-    for raw_line in read_text_lossy(&path)?.lines() {
-        let line = raw_line.split('#').next().unwrap_or_default().trim_end();
-        let stripped = line.trim();
-        if stripped.is_empty() {
+    for (line_index, raw_line) in read_text_lossy(&path)?.lines().enumerate() {
+        let line_no = line_index + 1;
+        let Some(line) = limited_yaml_line(raw_line, line_no, "codefire.policy.yaml")? else {
             continue;
-        }
-        if !raw_line.starts_with([' ', '\t']) {
-            if stripped == "required_links:" {
+        };
+        let stripped = line.text;
+        if line.indent == 0 {
+            if stripped == "version:" || stripped.starts_with("version:") {
+                flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
+                flush_verification_check(&mut checks, current_check.take())?;
+                in_required_links = false;
+                in_commit_policy = false;
+                in_extinguish_policy = false;
+                in_no_change_required_policy = false;
+                in_verification = false;
+                current_kind = None;
+            } else if stripped == "required_links:" {
                 flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
                 flush_verification_check(&mut checks, current_check.take())?;
                 in_required_links = true;
                 in_commit_policy = false;
+                in_extinguish_policy = false;
+                in_no_change_required_policy = false;
                 in_verification = false;
                 current_kind = None;
             } else if stripped == "commit_policy:" {
@@ -421,93 +558,132 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
             } else {
                 flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
                 flush_verification_check(&mut checks, current_check.take())?;
-                in_required_links = false;
-                in_commit_policy = false;
-                in_extinguish_policy = false;
-                in_no_change_required_policy = false;
-                in_verification = false;
-                current_kind = None;
+                return Err(CoreError::Config(format!(
+                    "unsupported codefire.policy.yaml: root key at line {line_no}"
+                )));
             }
             continue;
         }
         if in_commit_policy {
-            if let Some((key, value)) = stripped.split_once(':') {
-                set_commit_policy_bool(&mut policy, key.trim(), value.trim())?;
+            if line.indent != 2 {
+                return Err(CoreError::Config(format!(
+                    "unsupported codefire.policy.yaml: unsupported commit_policy indentation at line {line_no}"
+                )));
             }
+            let Some((key, value)) = limited_yaml_key(stripped) else {
+                return Err(CoreError::Config(format!(
+                    "unsupported codefire.policy.yaml: commit_policy entry at line {line_no} must be key: value"
+                )));
+            };
+            set_commit_policy_bool(&mut policy, key, value, line_no)?;
             continue;
         }
         if in_extinguish_policy {
-            if line.starts_with("  ") && stripped == "no-change-required:" {
+            if line.indent == 2 && stripped == "no-change-required:" {
                 in_no_change_required_policy = true;
                 continue;
             }
             if in_no_change_required_policy {
-                if let Some(value) = stripped.strip_prefix("requires_rationale:") {
+                if line.indent != 4 {
+                    return Err(CoreError::Config(format!(
+                        "unsupported codefire.policy.yaml: unsupported no-change-required indentation at line {line_no}"
+                    )));
+                }
+                let Some((key, value)) = limited_yaml_key(stripped) else {
+                    return Err(CoreError::Config(format!(
+                        "unsupported codefire.policy.yaml: no-change-required entry at line {line_no} must be key: value"
+                    )));
+                };
+                if key == "requires_rationale" {
                     policy.no_change_required_requires_rationale = parse_bool_field(value.trim())?;
                     continue;
                 }
             }
+            return Err(CoreError::Config(format!(
+                "unsupported codefire.policy.yaml: extinguish_policy entry at line {line_no}"
+            )));
         }
         if in_verification {
-            if let Some(value) = stripped.strip_prefix("- id:") {
+            if line.indent == 2 && stripped.starts_with("- ") {
+                let item = stripped.trim_start_matches("- ").trim();
+                let Some((key, value)) = limited_yaml_key(item) else {
+                    return Err(CoreError::Config(format!(
+                        "unsupported codefire.policy.yaml: verification item at line {line_no} must be '- key: value'"
+                    )));
+                };
                 flush_verification_check(&mut checks, current_check.take())?;
-                current_check = Some(VerificationCommandDraft {
-                    id: Some(unquote(value.trim())),
+                let mut check = VerificationCommandDraft {
+                    id: None,
                     command: None,
                     cwd: Some(".".to_string()),
-                });
+                };
+                set_verification_check_field(&mut check, key, value, line_no)?;
+                current_check = Some(check);
                 continue;
             }
-            if let Some(value) = stripped.strip_prefix("- command:") {
-                flush_verification_check(&mut checks, current_check.take())?;
-                current_check = Some(VerificationCommandDraft {
-                    id: None,
-                    command: Some(unquote(value.trim())),
-                    cwd: Some(".".to_string()),
-                });
-                continue;
+            if line.indent != 4 {
+                return Err(CoreError::Config(format!(
+                    "unsupported codefire.policy.yaml: unsupported verification indentation at line {line_no}"
+                )));
             }
             let Some(check) = current_check.as_mut() else {
-                continue;
+                return Err(CoreError::Config(format!(
+                    "invalid codefire.policy.yaml: verification field before item at line {line_no}"
+                )));
             };
-            if let Some(value) = stripped.strip_prefix("id:") {
-                check.id = Some(unquote(value.trim()));
-            } else if let Some(value) = stripped.strip_prefix("command:") {
-                check.command = Some(unquote(value.trim()));
-            } else if let Some(value) = stripped.strip_prefix("cwd:") {
-                check.cwd = Some(unquote(value.trim()));
-            }
+            let Some((key, value)) = limited_yaml_key(stripped) else {
+                return Err(CoreError::Config(format!(
+                    "unsupported codefire.policy.yaml: verification entry at line {line_no} must be key: value"
+                )));
+            };
+            set_verification_check_field(check, key, value, line_no)?;
             continue;
         }
         if !in_required_links {
-            continue;
+            return Err(CoreError::Config(format!(
+                "unsupported codefire.policy.yaml: nested entry outside supported section at line {line_no}"
+            )));
         }
-        if line.starts_with("  ") && !line.starts_with("    ") && stripped.ends_with(':') {
+        if line.indent == 2 && stripped.ends_with(':') {
             flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
             let kind = stripped.trim_end_matches(':').to_string();
             required_links.entry(kind.clone()).or_default();
             current_kind = Some(kind);
             continue;
         }
-        if let Some(value) = stripped.strip_prefix("- type:") {
+        if line.indent == 4 && stripped.starts_with("- ") {
+            let item = stripped.trim_start_matches("- ").trim();
+            let Some((key, value)) = limited_yaml_key(item) else {
+                return Err(CoreError::Config(format!(
+                    "unsupported codefire.policy.yaml: required link rule at line {line_no} must be '- key: value'"
+                )));
+            };
             flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
-            current_rule = Some(RequiredLinkRuleDraft {
-                link_type: Some(unquote(value.trim())),
+            let mut rule = RequiredLinkRuleDraft {
+                link_type: None,
                 target_kind: None,
                 min: None,
-            });
+            };
+            set_required_rule_field(&mut rule, key, value, line_no)?;
+            current_rule = Some(rule);
             continue;
+        }
+        if line.indent != 6 {
+            return Err(CoreError::Config(format!(
+                "unsupported codefire.policy.yaml: unsupported required_links indentation at line {line_no}"
+            )));
         }
         let Some(rule) = current_rule.as_mut() else {
-            continue;
+            return Err(CoreError::Config(format!(
+                "invalid codefire.policy.yaml: required link field before rule at line {line_no}"
+            )));
         };
-        if let Some(value) = stripped.strip_prefix("type:") {
-            rule.link_type = Some(unquote(value.trim()));
-        } else if let Some(value) = stripped.strip_prefix("target_kind:") {
-            rule.target_kind = Some(unquote(value.trim()));
-        } else if let Some(value) = stripped.strip_prefix("min:") {
-            rule.min = Some(parse_usize_field("required_links min", value.trim())?);
-        }
+        let Some((key, value)) = limited_yaml_key(stripped) else {
+            return Err(CoreError::Config(format!(
+                "unsupported codefire.policy.yaml: required link entry at line {line_no} must be key: value"
+            )));
+        };
+        set_required_rule_field(rule, key, value, line_no)?;
     }
     flush_required_rule(&mut required_links, &current_kind, current_rule)?;
     flush_verification_check(&mut checks, current_check)?;
@@ -523,6 +699,7 @@ fn set_commit_policy_bool(
     policy: &mut VerificationPolicy,
     key: &str,
     value: &str,
+    line_no: usize,
 ) -> Result<(), CoreError> {
     let parsed = parse_bool_field(value)?;
     match key {
@@ -531,7 +708,11 @@ fn set_commit_policy_bool(
         "require_trace_completeness" => policy.require_trace_completeness = parsed,
         "require_verification_success" => policy.require_verification_success = parsed,
         "reject_duplicate_atom_ids" => policy.reject_duplicate_atom_ids = parsed,
-        _ => {}
+        _ => {
+            return Err(CoreError::Config(format!(
+                "unsupported codefire.policy.yaml: commit_policy field {key} at line {line_no}"
+            )));
+        }
     }
     Ok(())
 }
@@ -586,6 +767,25 @@ fn flush_verification_check(
         command,
         cwd: draft.cwd.unwrap_or_else(|| ".".to_string()),
     });
+    Ok(())
+}
+
+fn set_verification_check_field(
+    check: &mut VerificationCommandDraft,
+    key: &str,
+    value: &str,
+    line_no: usize,
+) -> Result<(), CoreError> {
+    match key {
+        "id" => check.id = Some(unquote(value)),
+        "command" => check.command = Some(unquote(value)),
+        "cwd" => check.cwd = Some(unquote(value)),
+        _ => {
+            return Err(CoreError::Config(format!(
+                "unsupported codefire.policy.yaml: verification field {key} at line {line_no}"
+            )));
+        }
+    }
     Ok(())
 }
 
@@ -644,11 +844,7 @@ pub fn stale_resolutions(
         .iter()
         .map(|atom| (atom.atom_id.as_str(), atom.content_hash.clone()))
         .collect::<BTreeMap<_, _>>();
-    let link_hashes = trace_graph
-        .links
-        .iter()
-        .map(|link| (link.link_id.as_str(), link.link_hash.as_str()))
-        .collect::<BTreeMap<_, _>>();
+    let link_hashes = trace_link_hash_index(trace_graph)?;
     let current_policy_hash = policy_hash(policy)?;
     let mut stale = Vec::new();
 
@@ -680,7 +876,8 @@ pub fn stale_resolutions(
             continue;
         }
         if resolution.basis.trace_links.iter().any(|link| {
-            link_hashes.get(link.link_id.as_str()).copied() != Some(link.link_hash.as_str())
+            link_hashes.get(link.link_id.as_str()).map(String::as_str)
+                != Some(link.link_hash.as_str())
         }) {
             stale.push(StaleResolution {
                 resolution_uid: resolution.resolution_uid.clone(),
@@ -936,7 +1133,7 @@ impl TraceLinkInput {
         let link_type = self.link_type.ok_or_else(|| {
             CoreError::Config("invalid codefire.links.yaml: link missing type".to_string())
         })?;
-        let link_id = format!("LINK-{}-{}-{}", self.from, link_type, to);
+        let link_id = trace_link_id(&self.from, &to, &link_type)?;
         let link_hash = trace_link_hash(&self.from, &to, &link_type, &link_id)?;
         Ok(TraceLink {
             from: self.from,
@@ -973,6 +1170,25 @@ fn flush_link(
         )));
     }
     links.push(link);
+    Ok(())
+}
+
+fn set_required_rule_field(
+    rule: &mut RequiredLinkRuleDraft,
+    key: &str,
+    value: &str,
+    line_no: usize,
+) -> Result<(), CoreError> {
+    match key {
+        "type" => rule.link_type = Some(unquote(value)),
+        "target_kind" => rule.target_kind = Some(unquote(value)),
+        "min" => rule.min = Some(parse_usize_field("required_links min", value.trim())?),
+        _ => {
+            return Err(CoreError::Config(format!(
+                "unsupported codefire.policy.yaml: required link field {key} at line {line_no}"
+            )));
+        }
+    }
     Ok(())
 }
 
@@ -1061,6 +1277,40 @@ fn trace_link_hash(
         "type": link_type,
     });
     Ok(digest_bytes(&serde_json::to_vec(&value)?))
+}
+
+const TRACE_LINK_ID_HEX_LENGTH: usize = 32;
+
+fn trace_link_id(from: &str, to: &str, link_type: &str) -> Result<String, CoreError> {
+    let value = serde_json::json!({
+        "from": from,
+        "to": to,
+        "type": link_type,
+    });
+    let digest = codefire_util::sha256_hex(&serde_json::to_vec(&value)?);
+    Ok(format!(
+        "LINK-sha256-{}",
+        &digest[..TRACE_LINK_ID_HEX_LENGTH]
+    ))
+}
+
+fn legacy_trace_link_id(from: &str, to: &str, link_type: &str) -> String {
+    format!("LINK-{from}-{link_type}-{to}")
+}
+
+fn trace_link_hash_index(trace_graph: &TraceGraph) -> Result<BTreeMap<String, String>, CoreError> {
+    let mut link_hashes = BTreeMap::new();
+    for link in &trace_graph.links {
+        link_hashes.insert(link.link_id.clone(), link.link_hash.clone());
+        let legacy_id = legacy_trace_link_id(&link.from, &link.to, &link.link_type);
+        if legacy_id != link.link_id {
+            link_hashes.insert(
+                legacy_id.clone(),
+                trace_link_hash(&link.from, &link.to, &link.link_type, &legacy_id)?,
+            );
+        }
+    }
+    Ok(link_hashes)
 }
 
 fn adjacent_atoms(atom_id: &str, trace_graph: &TraceGraph) -> Vec<(String, Vec<String>)> {
@@ -1759,11 +2009,11 @@ mod tests {
     }
 
     #[test]
-    fn trace_graph_parses_links_and_matches_python_hash() {
+    fn trace_graph_parses_links_and_uses_bounded_digest_ids() {
         let temp = tempdir().unwrap();
         write_file(
             &temp.path().join("codefire.links.yaml"),
-            "version: 1\nlinks:\n  - from: REQ-AUTH-001\n    to: DES-AUTH-001\n    type: refined_by\n",
+            "version: 1\nlinks:\n  - from: 'REQ-AUTH-001' # comment\n    to: \"DES-AUTH-001\"\n    type: refined_by\n",
         );
 
         let graph = current_trace_graph(temp.path()).unwrap();
@@ -1773,13 +2023,17 @@ mod tests {
         assert_eq!(graph.links[0].from, "REQ-AUTH-001");
         assert_eq!(graph.links[0].to, "DES-AUTH-001");
         assert_eq!(graph.links[0].link_type, "refined_by");
-        assert_eq!(
-            graph.links[0].link_id,
-            "LINK-REQ-AUTH-001-refined_by-DES-AUTH-001"
-        );
+        assert!(graph.links[0].link_id.starts_with("LINK-sha256-"));
+        assert_eq!(graph.links[0].link_id.len(), "LINK-sha256-".len() + 32);
         assert_eq!(
             graph.links[0].link_hash,
-            "sha256:54748236f430e7b4e61322f644932c04e96e75a7d174a1a993aeacd98f08bb89"
+            trace_link_hash(
+                "REQ-AUTH-001",
+                "DES-AUTH-001",
+                "refined_by",
+                &graph.links[0].link_id,
+            )
+            .unwrap()
         );
     }
 
@@ -1794,6 +2048,21 @@ mod tests {
         let error = current_trace_graph(temp.path()).unwrap_err();
 
         assert!(matches!(error, CoreError::Config(message) if message.contains("missing type")));
+    }
+
+    #[test]
+    fn trace_graph_rejects_unsupported_links_yaml() {
+        let temp = tempdir().unwrap();
+        write_file(
+            &temp.path().join("codefire.links.yaml"),
+            "version: 1\nmetadata:\n  owner: docs\nlinks:\n  - from: REQ-AUTH-001\n",
+        );
+
+        let error = current_trace_graph(temp.path()).unwrap_err();
+
+        assert!(
+            matches!(error, CoreError::Config(message) if message.contains("unsupported codefire.links.yaml: root key metadata at line 2"))
+        );
     }
 
     #[test]
@@ -1933,6 +2202,80 @@ mod tests {
                 cwd: "crates/app".to_string(),
             }]
         );
+    }
+
+    #[test]
+    fn verification_policy_rejects_unsupported_yaml_fields() {
+        let temp = tempdir().unwrap();
+        write_file(
+            &temp.path().join("codefire.policy.yaml"),
+            "commit_policy:\n  require_no_required_fires: false\n  typo_field: true\n",
+        );
+
+        let error = parse_verification_policy(temp.path()).unwrap_err();
+
+        assert!(
+            matches!(error, CoreError::Config(message) if message.contains("unsupported codefire.policy.yaml: commit_policy field typo_field at line 3"))
+        );
+    }
+
+    #[test]
+    fn stale_resolutions_accept_legacy_trace_link_basis() {
+        let policy = default_verification_policy();
+        let atom_index = AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: VERSION,
+            atoms: vec![
+                atom("REQ-AUTH-001", "requirement", "sha256:req1"),
+                atom("DES-AUTH-001", "design", "sha256:des1"),
+            ],
+            duplicate_atom_ids: Vec::new(),
+        };
+        let trace_graph = TraceGraph {
+            type_tag: "trace_graph".to_string(),
+            version: VERSION,
+            links: vec![TraceLinkInput {
+                from: "REQ-AUTH-001".to_string(),
+                to: Some("DES-AUTH-001".to_string()),
+                link_type: Some("refined_by".to_string()),
+            }
+            .into_trace_link()
+            .unwrap()],
+        };
+        let legacy_id = legacy_trace_link_id("REQ-AUTH-001", "DES-AUTH-001", "refined_by");
+        let legacy_hash =
+            trace_link_hash("REQ-AUTH-001", "DES-AUTH-001", "refined_by", &legacy_id).unwrap();
+        let resolution = Resolution {
+            type_tag: "resolution".to_string(),
+            version: VERSION,
+            resolution_uid: "res_legacy".to_string(),
+            fire_uid: "fire_legacy".to_string(),
+            resolution_type: "addressed".to_string(),
+            rationale: "checked".to_string(),
+            evidence: String::new(),
+            evidence_refs: Vec::new(),
+            basis: ResolutionBasis {
+                source_atom: ResolutionAtomBasis {
+                    atom_id: "REQ-AUTH-001".to_string(),
+                    content_hash: Some("sha256:req1".to_string()),
+                },
+                target_atom: ResolutionAtomBasis {
+                    atom_id: "DES-AUTH-001".to_string(),
+                    content_hash: Some("sha256:des1".to_string()),
+                },
+                trace_links: vec![ResolutionTraceLinkBasis {
+                    link_id: legacy_id,
+                    link_hash: legacy_hash,
+                }],
+                policy_hash: policy_hash(&policy).unwrap(),
+            },
+            resolved_at: "2026-06-07T00:00:00Z".to_string(),
+            status: "active".to_string(),
+        };
+
+        let stale = stale_resolutions(&atom_index, &trace_graph, &policy, &[resolution]).unwrap();
+
+        assert!(stale.is_empty());
     }
 
     #[test]
