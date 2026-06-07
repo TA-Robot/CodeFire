@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from evoagent.models import ExperimentPlan, Hypothesis
+
 
 class FrontierAction(str, Enum):
     RUN_PROBE = "run_probe"
@@ -39,6 +41,14 @@ class ResearchFrontierItem:
     rationale: str
 
 
+@dataclass(frozen=True)
+class FrontierPlanDraft:
+    frontier_id: str
+    plan: ExperimentPlan
+    analysis_criteria: tuple[str, ...]
+    reasons: tuple[str, ...]
+
+
 # cf-atom: CODE-ResearchFrontierMap
 class ResearchFrontierMap:
     def rank(
@@ -51,6 +61,66 @@ class ResearchFrontierMap:
             raise ValueError("remaining_budget must be non-negative")
         items = tuple(frontier_item(signal, remaining_budget=remaining_budget) for signal in signals)
         return tuple(sorted(items, key=lambda item: (-item.score, item.frontier_id)))
+
+
+# cf-atom: CODE-FrontierExperimentPlanner
+class FrontierExperimentPlanner:
+    def build_plans(
+        self,
+        frontiers: tuple[ResearchFrontierItem, ...],
+        *,
+        baseline: str,
+        metric: str,
+        remaining_budget: float,
+        max_plans: int,
+    ) -> tuple[FrontierPlanDraft, ...]:
+        if not baseline:
+            raise ValueError("baseline is required")
+        if not metric:
+            raise ValueError("metric is required")
+        if remaining_budget < 0:
+            raise ValueError("remaining_budget must be non-negative")
+        if max_plans < 0:
+            raise ValueError("max_plans must be non-negative")
+
+        drafts: list[FrontierPlanDraft] = []
+        spent = 0.0
+        for frontier in frontiers:
+            if len(drafts) >= max_plans:
+                break
+            if frontier.action != FrontierAction.RUN_PROBE:
+                continue
+            estimated_cost = min(max(frontier.score / 10.0, 0.1), max(remaining_budget - spent, 0.0))
+            if estimated_cost <= 0:
+                break
+            plan = ExperimentPlan(
+                hypothesis=Hypothesis(
+                    title=f"Probe {frontier.mechanism_family} for {frontier.target}",
+                    rationale=frontier.rationale or "; ".join(frontier.reasons),
+                    expected_gain=max(frontier.score / 100.0, 0.0),
+                    novelty=1.0 if "novel_mechanism" in frontier.reasons else 0.3,
+                ),
+                benchmark=frontier.target,
+                baseline=baseline,
+                metric=metric,
+                estimated_cost=estimated_cost,
+                command=frontier_command(frontier),
+                artifact_paths=(f"artifacts/{frontier.frontier_id}/metrics.json",),
+            )
+            drafts.append(
+                FrontierPlanDraft(
+                    frontier_id=frontier.frontier_id,
+                    plan=plan,
+                    analysis_criteria=(
+                        "compare against baseline",
+                        "record confidence and caveats",
+                        f"inspect primary risk: {frontier.primary_risk}",
+                    ),
+                    reasons=frontier.reasons,
+                )
+            )
+            spent += estimated_cost
+        return tuple(drafts)
 
 
 def frontier_item(
@@ -162,3 +232,14 @@ def primary_risk(signal: ResearchFrontierSignal) -> str:
     if signal.estimated_cost > 0 and signal.expected_information_gain / signal.estimated_cost < 0.25:
         return "weak_information_gain_per_cost"
     return "execution_uncertainty"
+
+
+def frontier_command(frontier: ResearchFrontierItem) -> str:
+    mechanism = frontier.mechanism_family.replace(" ", "_")
+    target = frontier.target.replace(" ", "_")
+    return (
+        "python -m evoagent.fixture_runner "
+        f"--mechanism {mechanism} "
+        f"--benchmark {target} "
+        f"--output artifacts/{frontier.frontier_id}/metrics.json"
+    )

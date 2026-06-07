@@ -231,6 +231,15 @@ links:
   - from: REQ-AUTO-034
     to: TEST-research-frontier-map-ranks-opportunities
     type: verified_by
+  - from: REQ-AUTO-035
+    to: DES-AUTO-017
+    type: refined_by
+  - from: DES-AUTO-017
+    to: CODE-FrontierExperimentPlanner
+    type: implemented_by
+  - from: REQ-AUTO-035
+    to: TEST-frontier-experiment-planner-builds-runnable-plans
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

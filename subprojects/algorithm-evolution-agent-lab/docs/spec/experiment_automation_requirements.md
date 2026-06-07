@@ -135,3 +135,7 @@ The system shall evaluate whether a candidate claim may be externally released b
 ## REQ-AUTO-034: Research frontier map
 
 The system shall synthesize a ranked research frontier map from baseline gaps, negative results, novelty reviews, open risks, budget pressure, and challenge objectives. Each frontier item shall identify the mechanism family to explore, the expected evidence gain, the primary risk, the next experiment action, and the reason it is worth pursuing before lower-ranked alternatives.
+
+## REQ-AUTO-035: Frontier experiment plan drafting
+
+The system shall convert executable research frontier items into bounded experiment plan drafts with a hypothesis, benchmark target, baseline, metric, runner command, artifact contract, and analysis criteria. Deferred, risk-mitigation, or redesign frontier items shall not become executable plans until their blocking reason is resolved.

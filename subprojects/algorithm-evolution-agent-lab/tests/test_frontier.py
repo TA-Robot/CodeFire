@@ -1,6 +1,12 @@
 import unittest
 
-from evoagent.frontier import FrontierAction, ResearchFrontierMap, ResearchFrontierSignal
+from evoagent.frontier import (
+    FrontierAction,
+    FrontierExperimentPlanner,
+    ResearchFrontierItem,
+    ResearchFrontierMap,
+    ResearchFrontierSignal,
+)
 
 
 # cf-atom: TEST-research-frontier-map-ranks-opportunities
@@ -83,6 +89,81 @@ class ResearchFrontierMapTests(unittest.TestCase):
         self.assertIn("over_budget", by_id["over-budget"].reasons)
         self.assertEqual(by_id["known-bad"].action, FrontierAction.REDESIGN)
         self.assertEqual(by_id["known-bad"].primary_risk, "repeated_negative_result")
+
+
+# cf-atom: TEST-frontier-experiment-planner-builds-runnable-plans
+class FrontierExperimentPlannerTests(unittest.TestCase):
+    def test_frontier_experiment_planner_builds_runnable_plans(self):
+        planner = FrontierExperimentPlanner()
+        frontiers = (
+            ResearchFrontierItem(
+                frontier_id="frontier-a",
+                mechanism_family="adaptive selector",
+                target="toy-tabular",
+                action=FrontierAction.RUN_PROBE,
+                score=8.0,
+                expected_evidence_gain="high",
+                primary_risk="execution_uncertainty",
+                reasons=("baseline_gap", "novel_mechanism"),
+                rationale="probe a compact adaptive selector",
+            ),
+            ResearchFrontierItem(
+                frontier_id="blocked",
+                mechanism_family="unsafe shortcut",
+                target="toy-tabular",
+                action=FrontierAction.REDESIGN,
+                score=6.0,
+                expected_evidence_gain="medium",
+                primary_risk="repeated_negative_result",
+                reasons=("negative_result_overlap",),
+                rationale="known bad path",
+            ),
+        )
+
+        drafts = planner.build_plans(
+            frontiers,
+            baseline="baseline-v1",
+            metric="validation_score",
+            remaining_budget=1.0,
+            max_plans=2,
+        )
+
+        self.assertEqual(len(drafts), 1)
+        self.assertEqual(drafts[0].frontier_id, "frontier-a")
+        self.assertEqual(drafts[0].plan.benchmark, "toy-tabular")
+        self.assertEqual(drafts[0].plan.baseline, "baseline-v1")
+        self.assertEqual(drafts[0].plan.metric, "validation_score")
+        self.assertIn("--mechanism adaptive_selector", drafts[0].plan.command)
+        self.assertEqual(drafts[0].plan.artifact_paths, ("artifacts/frontier-a/metrics.json",))
+        self.assertIn("inspect primary risk: execution_uncertainty", drafts[0].analysis_criteria)
+
+    def test_frontier_experiment_planner_respects_budget_and_limit(self):
+        planner = FrontierExperimentPlanner()
+        frontiers = tuple(
+            ResearchFrontierItem(
+                frontier_id=f"frontier-{index}",
+                mechanism_family="cheap probe",
+                target="toy-tabular",
+                action=FrontierAction.RUN_PROBE,
+                score=5.0,
+                expected_evidence_gain="medium",
+                primary_risk="execution_uncertainty",
+                reasons=("baseline_gap",),
+                rationale="cheap",
+            )
+            for index in range(3)
+        )
+
+        drafts = planner.build_plans(
+            frontiers,
+            baseline="baseline-v1",
+            metric="validation_score",
+            remaining_budget=0.6,
+            max_plans=1,
+        )
+
+        self.assertEqual(len(drafts), 1)
+        self.assertLessEqual(drafts[0].plan.estimated_cost, 0.6)
 
 
 if __name__ == "__main__":

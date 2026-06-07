@@ -78,6 +78,6 @@
 ## Phase 9: Frontier-driven research iteration
 
 - Add research frontier map from baseline gaps, negative results, novelty, risks, budget, and challenge objectives. (done)
-- Add frontier-to-experiment-plan conversion. (planned)
+- Add frontier-to-experiment-plan conversion. (done)
 - Add frontier feedback after run outcomes. (planned)
 - Add frontier drift report for long campaigns. (planned)

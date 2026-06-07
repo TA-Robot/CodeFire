@@ -283,3 +283,20 @@ It produces ranked frontier items with:
 Scoring is deterministic and conservative. A large baseline gap increases opportunity. Novel mechanism families increase opportunity. Repeated negative-result overlap, blocker risks, and severe budget pressure reduce opportunity. The map does not claim SOTA readiness; it only decides where the agent should spend the next research iteration.
 
 Tie-breaking is stable by frontier ID. This keeps repeated planning runs reproducible and makes CodeFire diffs meaningful.
+
+## DES-AUTO-017: Frontier experiment plan drafting
+
+The frontier experiment planner consumes ranked `ResearchFrontierItem` values and emits bounded `ExperimentPlan` drafts.
+
+For each runnable frontier item it creates:
+
+- a hypothesis title based on the mechanism family
+- a hypothesis rationale from the frontier rationale and reasons
+- benchmark and baseline references
+- the target metric
+- an estimated cost capped by remaining budget
+- a deterministic runner command
+- required artifact paths
+- analysis criteria suitable for a first probe
+
+The planner skips frontier items whose action is `defer`, `mitigate_risk`, or `redesign`. This keeps the runner from executing work that the frontier map has already identified as blocked or unsafe. Output is bounded by `max_plans`, and ordering follows frontier ranking order.
