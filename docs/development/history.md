@@ -212,6 +212,7 @@
 | 2026-06-07 | Source Docs | ソースを開かなくても実装形状を想像できるように、workspace、`main.rs` の関数帯、local workflow、core/store、automation JSON、evidence/storage flow、command追加手順をまとめたmental model文書を追加した | `docs/development/source-code-mental-model.md`, `docs/development/source-code-map.md`, `docs/development/command-source-trace.md`, `docs/11_internal_architecture.md` | docs source navigation update |
 | 2026-06-07 | Source Docs | 要求定義、内部設計、Rust実装、永続化file、テスト配置を一枚で対応付けるsource blueprintを追加し、source navigation文書群を相互参照化した | `docs/development/source-code-blueprint.md`, `docs/development/source-code-map.md`, `docs/development/source-code-mental-model.md`, `docs/11_internal_architecture.md` | docs source navigation update |
 | 2026-06-07 | Dogfood | v0.8途中版をinstallし、`algorithm-evolution-agent-lab` をCodeFire管理へ再取り込み、Experiment Triage Boardをdocs-firstで実装・検証・CodeFire commitした | `subprojects/algorithm-evolution-agent-lab/`, `docs/development/bug-issues/cfb-046.md`..`cfb-053.md`, `docs/development/codefire-improvement-cycle.md` | algorithm tests 116 pass; CodeFire commit `CF-COMMIT-66304c4e78c3c56536fbe6af`; new dogfood CFB count 8 |
+| 2026-06-07 | Dogfood | 追加dogfoodとしてExperiment Iteration Plannerをdocs-firstで実装し、context freshness、scan JSON shape、batch schema helpの課題をCFB化した | `subprojects/algorithm-evolution-agent-lab/`, `docs/development/bug-issues/cfb-054.md`..`cfb-056.md`, `docs/development/codefire-improvement-cycle.md` | algorithm tests 118 pass; CodeFire commit `CF-COMMIT-aa2a3a7d14579ff8b361374d`; new dogfood CFB count 11 total for current cycle |
 
 ## Current Decisions
 

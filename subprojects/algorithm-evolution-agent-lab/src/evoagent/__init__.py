@@ -52,6 +52,7 @@ from evoagent.external_validity import BenchmarkDomain, ExternalValidityEvaluato
 from evoagent.failures import FailureClassification, FailureClassifier
 from evoagent.fixtures import FixtureResult, ToyTabularFixture
 from evoagent.ingestion import ResultIngestor
+from evoagent.iteration import ExperimentIterationPlan, ExperimentIterationPlanner, IterationLaneItem
 from evoagent.leakage import DatasetSplitAudit, LeakageChecker, LeakageFinding
 from evoagent.learning_curve import LearningCurveAnalyzer, LearningCurveReport
 from evoagent.leaderboard import LeaderboardSubmission, LeaderboardSubmissionFinding, LeaderboardSubmissionLedger
@@ -139,6 +140,8 @@ __all__ = [
     "AutomationPolicyFinding",
     "EvolutionAgent",
     "ExperimentGoal",
+    "ExperimentIterationPlan",
+    "ExperimentIterationPlanner",
     "ExperimentConfiguration",
     "ExperimentAutomationSurfaceGuard",
     "ExperimentBatch",
@@ -165,6 +168,7 @@ __all__ = [
     "FixtureResult",
     "Hypothesis",
     "HypothesisLink",
+    "IterationLaneItem",
     "HumanOverride",
     "HumanOverrideLedger",
     "LocalExperimentRunner",

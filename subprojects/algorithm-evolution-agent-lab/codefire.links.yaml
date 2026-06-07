@@ -651,3 +651,12 @@ links:
   - from: REQ-AUTO-027
     to: TEST-experiment-triage-board-ranks-actions
     type: verified_by
+  - from: REQ-AUTO-028
+    to: DES-AUTO-010
+    type: refined_by
+  - from: DES-AUTO-010
+    to: CODE-ExperimentIterationPlanner
+    type: implemented_by
+  - from: REQ-AUTO-028
+    to: TEST-experiment-iteration-planner-builds-bounded-plan
+    type: verified_by

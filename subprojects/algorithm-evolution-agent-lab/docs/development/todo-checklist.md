@@ -71,3 +71,4 @@
 | AE-067 | SOTA Governance | hidden leaderboard submissionの過剰probe、cooldown違反、local evidence不足を検出するledgerを追加する | done | `CODE-LeaderboardSubmissionLedger`; `test_leaderboard_submission_ledger_flags_excessive_probing` |
 | AE-068 | SOTA Governance | contamination sourceとdataset/artifact overlapを検出するregistryを追加する | done | `CODE-ContaminationSourceRegistry`; `test_contamination_source_registry_flags_dataset_and_artifact_overlap` |
 | AE-069 | Planning | queue/promotion/learning curve/budgetを統合して次研究actionを順位付けするtriage boardを追加する | done | `CODE-ExperimentTriageBoard`; `TEST-experiment-triage-board-ranks-actions` |
+| AE-070 | Planning | triage結果を次イテレーションのactive/review/deferred計画へ変換するplannerを追加する | done | `CODE-ExperimentIterationPlanner`; `TEST-experiment-iteration-planner-builds-bounded-plan` |

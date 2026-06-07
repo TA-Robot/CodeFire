@@ -113,3 +113,19 @@ It produces ranked actions:
 - `hold` for blocked or over-budget work
 
 The ranking score is deterministic and cost-aware so repeated planning with the same state returns the same action order.
+
+## DES-AUTO-010: Experiment iteration planner
+
+The iteration planner consumes the same compact signals as the triage board and produces a plan with three lanes:
+
+- `active` for experiments that should run, replicate, or mutate in the next iteration
+- `review` for promotion or rejection decisions that need claim, evidence, or human review before changing campaign state
+- `deferred` for blocked, over-budget, or lower-ranked work that should remain visible but not consume the next iteration
+
+The planner enforces:
+
+- non-negative remaining budget
+- positive active capacity
+- deterministic ordering from the triage score
+- budget accounting based on estimated experiment cost
+- review capacity so promotion/rejection work cannot crowd out execution planning

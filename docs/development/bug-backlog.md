@@ -68,6 +68,9 @@
 | CFB-051 | open | Automation JSON / Commit Dry Run | `commit --dry-run --json` がchanged Atom 219件を全量で返す | algorithm初回import commit dry-run | dry-run planが大きくなり、意思決定に必要な要約が埋もれる | `jq` で要約する | changed count、sample、omitted metadataをdefaultにする |
 | CFB-052 | open | UX / Verify Next Actions | clean branchの `verify --json` が変更なしでもcommitをnext_actionに出す | 初回import commit後のclean確認 | AI agentが不要なno-op commitへ進みやすい | `scan --json` のchanged_countを確認する | verify next_actionsをpending changes awareにする |
 | CFB-053 | open | Automation JSON / Scan Size | 初回importの `scan --json` が219 changed atoms / 427 firesを全量で返し巨大になる | algorithm projectを空baseから初回scanしたとき | 大規模repoや初回importでJSONがagent/log上扱いづらい | `jq` でcountsだけ抽出する | scan JSONをbounded defaultにし、full outputは明示optionにする |
+| CFB-054 | open | Context / Staleness | `context --changed --json` がfile編集直後でも既存active scanを優先し、古いclean状態を返しうる | iteration planner実装直後、scan前にcontextを確認したとき | agentが変更なしと誤認し、必要なscan/fire対応を飛ばす可能性がある | 必ず `scan --json` を先に実行する | contextがactive scan freshnessを検証し、staleならpreview再計算またはdiagnosticを返す |
+| CFB-055 | open | Automation JSON / Scan Shape | `scan --json` の `changed_atoms` がID文字列配列で、詳細objectと思って読むと壊れる | iteration planner実装後にjqでchanged atom sampleを抽出したとき | automationがfield shapeを誤解しやすく、詳細取得導線も分かりづらい | string配列として扱い、詳細はcontext/explainで別取得する | scan JSONに `changed_atom_ids` と `changed_atoms_sample` 等を分ける、またはschema/docsで明確化する |
+| CFB-056 | open | CLI Help / Batch Schema | `extinguish --help` がbatch schemaを示さず、一般的なtop-level array JSON/YAMLが使えるか判断できない | iteration plannerのfireをbatch extinguishするとき | agentが自然な配列形式を生成して失敗し、正しいwrapper形式をsource/docs検索なしで発見しづらい | `{"version":1,"fires":[...]}` wrapperを手で作る | batch help/diagnosticにrequired wrapper schemaとexampleを出す |
 
 ## Triage Notes
 
@@ -91,3 +94,5 @@
 - CFB-017は、`algorithm-evolution-agent-lab` のドキュメント中心開発への再整備でも再現した。`REQ-PROCESS-*` / `DES-PROCESS-*` は `scan` のchanged atomsへ出るが、同時に更新した `AGENTS.md`、`README.md`、`docs/development/implementation-roadmap.md`、`docs/development/todo-checklist.md`、`docs/development/history.md` はscan要約に出ないため、ドキュメント中心運用ほどnon-atom changed filesの明示が重要になる。
 - CFB-026からCFB-045は、`algorithm-evolution-agent-lab` で `ExperimentRunbookGenerator` をdocs-firstで追加しながら、context、verify metrics、doctor/migrate、storage、evidence、show/list/branch、commit dry-run、diffを実際に叩いて登録した。主な傾向はJSON envelope不統一、next_actionsのpath/batch不足、doctor/migrateの健康状態不一致、evidence command failureの扱いである。
 - CFB-046からCFB-053は、v0.8 first implementation passをinstallし直し、`algorithm-evolution-agent-lab` をCodeFire管理へ戻して初回import commitを作る過程で見つけた。主な傾向はhelpの副作用、既存project import導線不足、大量JSONのboundedness不足、evidence command cwd、clean state next_actionsである。
+- CFB-054からCFB-055は、`ExperimentIterationPlanner` をdocs-firstで追加し、scan前後のcontextとscan JSONを叩いたときに見つけた。主な傾向はactive scan freshnessとJSON field shapeの読み取りやすさである。
+- CFB-056は同じiteration planner変更のfire消火時に見つけた。既存batch schemaは使えるが、helpとerrorだけでは正しいwrapper構造へ到達しづらい。

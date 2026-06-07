@@ -107,3 +107,7 @@ The system shall decide whether a candidate should be promoted, replicated, muta
 ## REQ-AUTO-027: Experiment triage board
 
 The system shall combine queued experiment value, promotion policy, learning curve diagnosis, open blockers, and remaining budget into a ranked triage board of next research actions.
+
+## REQ-AUTO-028: Experiment iteration plan
+
+The system shall convert triage decisions into a bounded next-iteration plan that separates executable experiments, promotion or rejection review items, and deferred work while respecting remaining budget and active-run capacity.

@@ -65,3 +65,4 @@
 | 2026-06-05 | SOTA Governance | contamination sourceとdataset/artifact overlapを検出する `ContaminationSourceRegistry` を追加した | `TEST-contamination-source-registry-flags-dataset-and-artifact-overlap` |
 | 2026-06-07 | CodeFire | v0.8途中版をinstallし、`algorithm-evolution-agent-lab` をCodeFire管理へ戻して初回importを封印した | `CF-COMMIT-176865705a2e2a5f63e88d2f`; 114 tests pass |
 | 2026-06-07 | Planning | queue/promotion/learning curve/budgetを統合する `ExperimentTriageBoard` を追加した | `REQ-AUTO-027`; `DES-AUTO-009`; `TEST-experiment-triage-board-ranks-actions` |
+| 2026-06-07 | Planning | triage signalからactive/review/deferred laneを持つ次イテレーション計画を作る `ExperimentIterationPlanner` を追加した | `REQ-AUTO-028`; `DES-AUTO-010`; `TEST-experiment-iteration-planner-builds-bounded-plan` |
