@@ -17,6 +17,8 @@ CLI実装は `project/codefire` と `project/crates/` にあります。
 - `docs/development/known-limitations.md` - 既知制約、Rust v0.6差分、将来課題
 - `docs/development/bug-backlog.md` - 実運用で見つかった不具合/修正候補
 - `docs/development/v0.6-readiness.md` - Rust v0.6完成判定と残ゲート
+- `docs/development/source-code-map.md` - Rust実装のsource map
+- `docs/development/command-source-trace.md` - CLI commandからsource file/functionへの実装経路
 
 ## 現在の実装
 
@@ -160,6 +162,8 @@ Python v0.2はPython標準ライブラリのみを使う単一ファイルCLIで
 4. `docs/03_workflow_spec.md` - 開発フロー仕様
 5. `docs/11_internal_architecture.md` - 内部アーキテクチャ設計
 6. `docs/12_mvp_implementation_plan.md` - MVP実装計画
+
+実装を読む場合は、上記に続けて `docs/development/source-code-map.md` と `docs/development/command-source-trace.md` を読むと、command、module、主要関数、persistent stateの対応を把握できます。
 
 単一ファイルで読みたい場合は、`CodeFire_Design_Document_v0.2.md` または `CodeFire_Design_Document_v0.2.docx` を参照してください。
 
