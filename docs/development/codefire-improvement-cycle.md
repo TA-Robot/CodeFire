@@ -229,13 +229,13 @@ Current named cycle:
 - CodeFire次version系統: v1.0 Contract ValidationのPhase 1a以降を継続する。
 - Current plan: `docs/development/v1.0-contract-validation-plan.md`。
 - Current burn-down plan: `docs/development/current-cycle-burn-down-plan.md`。
-- Current phase: `BATCH-2026-06-cycle3-dogfood` のBurn-down planning完了。次はCFB-087/089/090/092を全部修正する。
+- Current phase: `BATCH-2026-06-cycle3-dogfood` のBurn-down完了。次は次cycle discoveryを開始できる。
 - Installed CodeFire: `/home/devuser/.local/bin/codefire`。
 - Installed version output: `codefire foundation 1`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
 - Latest pushed Git commits: `6d8361d Fix evidence JSON contracts`, `8978dfc Add retrospective planning summary`。
 - Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` は `open-clean`、open fires 0。
-- Latest algorithm CodeFire base: `CF-COMMIT-6558c5b7de3769164e36172a`。
+- Latest algorithm CodeFire base: `CF-COMMIT-568328cd5a5ad7db30e3b9b9`。
 
 ## Completed Two-Cycle Snapshot
 
@@ -307,11 +307,11 @@ Open CodeFire issues are larger than the active batch.
 
 Global inventory as of 2026-06-09:
 
-- CFB dogfood issues: 92 total, 19 fixed, 73 open.
+- CFB dogfood issues: 92 total, 23 fixed, 69 open.
 - CFR code review issues: 160 total, 82 fixed/closed, 78 open.
-- Combined tracked backlog: 252 total, 101 fixed/closed, 151 open.
+- Combined tracked backlog: 252 total, 105 fixed/closed, 147 open.
 
-Active batch now being burned down:
+Active batch closed in this burn-down:
 
 - CFB-087: missing evidence-ref dry-run failures are not JSON enveloped.
 - CFB-089: `atom-index` and `missing-links` do not handle shared `--path` / `--json` like normal commands.
@@ -326,9 +326,8 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- `docs/development/current-cycle-burn-down-plan.md` に従い、CFB-087、CFB-089、CFB-090、CFB-092を全部修正する。
-- このbatchが全部fixedになるまで、次のissue discoveryや追加40件レビューには進まない。
-- 修正後にinstallし、`subprojects/algorithm-evolution-agent-lab/` でdogfood confirmationを行う。
+- 次cycle discoveryを開始し、algorithm dogfoodまたはsource reviewで新しいbatchを作る。
+- 新batchをfreezeしたら、再びそのbatchを全部消すまで次のissue discoveryへ進まない。
 
 ## Cycle Invariants
 

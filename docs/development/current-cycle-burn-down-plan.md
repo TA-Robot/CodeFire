@@ -46,16 +46,16 @@ Completion rule:
 | Issue | Status | Root fix group | Current decision |
 |---|---|---|---|
 | CFB-086 | fixed | Evidence/extinguish JSON | fixed済み。close auditで再確認する |
-| CFB-087 | open | Evidence/extinguish JSON failure envelope | このbatchで修正する |
+| CFB-087 | fixed | Evidence/extinguish JSON failure envelope | fixed済み。missing evidence-ref JSON envelopeを確認した |
 | CFB-088 | fixed | Evidence dry-run JSON | fixed済み。close auditで再確認する |
-| CFB-089 | open | Debug/read-only command path/json contract | このbatchで修正する |
-| CFB-090 | open | Bounded context graph metadata | このbatchで修正する |
+| CFB-089 | fixed | Debug/read-only command path/json contract | fixed済み。atom-index/missing-links path/jsonを確認した |
+| CFB-090 | fixed | Bounded context graph metadata | fixed済み。trace endpoint omission metadataを確認した |
 | CFB-091 | fixed | Explicit atom span stability | fixed済み。close auditで再確認する |
-| CFB-092 | open | Extractor/hash schema migration | このbatchで修正する |
+| CFB-092 | fixed | Extractor/hash schema migration | fixed済み。schema migration detectionとrebaseline commitを確認した |
 
 Remaining open count for this batch:
 
-- 4 issues: CFB-087, CFB-089, CFB-090, CFB-092.
+- 0 issues.
 
 ## Global Issue Inventory
 
@@ -65,19 +65,19 @@ Current tracked issue inventory as of 2026-06-09:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 92 | 19 | 73 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFB dogfood issues | 92 | 23 | 69 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
 | CFR code review issues | 160 | 82 | 78 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. |
-| Total | 252 | 101 | 151 | This is the whole known issue backlog, not the current burn-down batch. |
+| Total | 252 | 105 | 147 | This is the whole known issue backlog, not the current burn-down batch. |
 
 Current active batch size:
 
 - 7 CFB issues total: CFB-086..CFB-092.
-- 3 already fixed: CFB-086, CFB-088, CFB-091.
-- 4 remaining open: CFB-087, CFB-089, CFB-090, CFB-092.
+- 7 fixed: CFB-086, CFB-087, CFB-088, CFB-089, CFB-090, CFB-091, CFB-092.
+- 0 remaining open.
 
 Burn-down interpretation:
 
-- The current cycle is responsible for closing the active batch first.
+- The current cycle closed the active batch first.
 - Older CFB/CFR remain tracked backlog and must be assigned to later burn-down batches.
 - A future release-quality cycle should create larger batches from the global backlog root-cause groups, but still obey the same rule: freeze a batch, fix all issues in that batch, then start the next discovery/batch.
 

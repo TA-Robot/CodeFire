@@ -5,6 +5,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub const VERSION: u32 = 1;
+pub const ATOM_HASH_SCHEMA_VERSION: u32 = 2;
+
+fn legacy_atom_hash_schema_version() -> u32 {
+    1
+}
 
 fn default_true() -> bool {
     true
@@ -75,6 +80,8 @@ pub struct AtomIndex {
     #[serde(rename = "type")]
     pub type_tag: String,
     pub version: u32,
+    #[serde(default = "legacy_atom_hash_schema_version")]
+    pub hash_schema_version: u32,
     pub atoms: Vec<Atom>,
     pub duplicate_atom_ids: Vec<String>,
 }
@@ -177,6 +184,24 @@ pub struct ScanResult {
     pub trace_graph: TraceGraph,
     pub changed_atoms: Vec<String>,
     pub open_fires: Vec<Fire>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_migration: Option<ToolMigration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ToolMigration {
+    pub kind: String,
+    pub from_hash_schema_version: u32,
+    pub to_hash_schema_version: u32,
+    pub source_unchanged: bool,
+    pub affected_atoms: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScanBuildOptions<'a> {
+    pub reason: &'a str,
+    pub now: &'a str,
+    pub source_unchanged: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -299,6 +324,7 @@ pub fn build_atom_index(open_dir: &Path) -> Result<AtomIndex, CoreError> {
     Ok(AtomIndex {
         type_tag: "atom_index".to_string(),
         version: VERSION,
+        hash_schema_version: ATOM_HASH_SCHEMA_VERSION,
         atoms,
         duplicate_atom_ids,
     })
@@ -1025,12 +1051,48 @@ pub fn build_scan_result(
     current: AtomIndex,
     base_index: AtomIndex,
     trace_graph: TraceGraph,
-    mut fires: Vec<Fire>,
+    fires: Vec<Fire>,
     base_commit: String,
     reason: &str,
     now: &str,
 ) -> Result<(ScanResult, Vec<Fire>), CoreError> {
-    let changed = changed_atoms(&current, &base_index);
+    build_scan_result_with_options(
+        current,
+        base_index,
+        trace_graph,
+        fires,
+        base_commit,
+        ScanBuildOptions {
+            reason,
+            now,
+            source_unchanged: false,
+        },
+    )
+}
+
+pub fn build_scan_result_with_options(
+    current: AtomIndex,
+    base_index: AtomIndex,
+    trace_graph: TraceGraph,
+    mut fires: Vec<Fire>,
+    base_commit: String,
+    options: ScanBuildOptions<'_>,
+) -> Result<(ScanResult, Vec<Fire>), CoreError> {
+    let raw_changed = changed_atoms(&current, &base_index);
+    let tool_schema_changed =
+        current.hash_schema_version != base_index.hash_schema_version && options.source_unchanged;
+    let changed = if tool_schema_changed {
+        Vec::new()
+    } else {
+        raw_changed.clone()
+    };
+    let tool_migration = tool_schema_changed.then(|| ToolMigration {
+        kind: "atom_hash_schema_changed".to_string(),
+        from_hash_schema_version: base_index.hash_schema_version,
+        to_hash_schema_version: current.hash_schema_version,
+        source_unchanged: options.source_unchanged,
+        affected_atoms: raw_changed.clone(),
+    });
     let current_atoms = current
         .atoms
         .iter()
@@ -1046,7 +1108,7 @@ pub fn build_scan_result(
             if target == *source {
                 continue;
             }
-            let key = fire_key(source, &target, reason, &trace_path, &base_commit)?;
+            let key = fire_key(source, &target, options.reason, &trace_path, &base_commit)?;
             if !existing_keys.insert(key.clone()) {
                 continue;
             }
@@ -1072,10 +1134,10 @@ pub fn build_scan_result(
                     atom_id: target,
                     content_hash_at_fire: target_hash,
                 },
-                reason: reason.to_string(),
+                reason: options.reason.to_string(),
                 trace_path,
                 created_by: "scan".to_string(),
-                created_at: now.to_string(),
+                created_at: options.now.to_string(),
                 key,
                 obsolete_at: None,
                 resolution_uid: None,
@@ -1090,7 +1152,7 @@ pub fn build_scan_result(
             && !changed_set.contains(fire.source.atom_id.as_str())
         {
             fire.status = "obsolete".to_string();
-            fire.obsolete_at = Some(now.to_string());
+            fire.obsolete_at = Some(options.now.to_string());
         }
     }
 
@@ -1107,6 +1169,7 @@ pub fn build_scan_result(
         trace_graph,
         changed_atoms: changed,
         open_fires,
+        tool_migration,
     };
     Ok((scan, fires))
 }
@@ -2297,6 +2360,7 @@ mod tests {
         let atom_index = AtomIndex {
             type_tag: "atom_index".to_string(),
             version: VERSION,
+            hash_schema_version: ATOM_HASH_SCHEMA_VERSION,
             atoms,
             duplicate_atom_ids: Vec::new(),
         };
@@ -2365,6 +2429,7 @@ mod tests {
         let atom_index = AtomIndex {
             type_tag: "atom_index".to_string(),
             version: VERSION,
+            hash_schema_version: ATOM_HASH_SCHEMA_VERSION,
             atoms: vec![
                 atom("REQ-AUTH-001", "requirement", "sha256:req1"),
                 atom("DES-AUTH-001", "design", "sha256:des1"),
@@ -2427,6 +2492,7 @@ mod tests {
             atom_index: AtomIndex {
                 type_tag: "atom_index".to_string(),
                 version: VERSION,
+                hash_schema_version: ATOM_HASH_SCHEMA_VERSION,
                 atoms: vec![atom("REQ-AUTH-001", "requirement", "sha256:req")],
                 duplicate_atom_ids: vec!["REQ-AUTH-001".to_string()],
             },
@@ -2437,6 +2503,7 @@ mod tests {
             },
             changed_atoms: Vec::new(),
             open_fires: Vec::new(),
+            tool_migration: None,
         };
         let policy = VerificationPolicy {
             reject_duplicate_atom_ids: false,
@@ -2470,6 +2537,7 @@ mod tests {
         let atom_index = AtomIndex {
             type_tag: "atom_index".to_string(),
             version: VERSION,
+            hash_schema_version: ATOM_HASH_SCHEMA_VERSION,
             atoms: vec![
                 atom("REQ-AUTH-001", "requirement", "sha256:req1"),
                 atom("DES-AUTH-001", "design", "sha256:des1"),
@@ -2563,6 +2631,7 @@ mod tests {
         let current = AtomIndex {
             type_tag: "atom_index".to_string(),
             version: VERSION,
+            hash_schema_version: ATOM_HASH_SCHEMA_VERSION,
             atoms: vec![
                 atom("DES-AUTH-001", "design", "sha256:design2"),
                 atom("REQ-AUTH-001", "requirement", "sha256:req2"),
@@ -2572,6 +2641,7 @@ mod tests {
         let base = AtomIndex {
             type_tag: "atom_index".to_string(),
             version: VERSION,
+            hash_schema_version: ATOM_HASH_SCHEMA_VERSION,
             atoms: vec![atom("REQ-AUTH-001", "requirement", "sha256:req1")],
             duplicate_atom_ids: Vec::new(),
         };
@@ -2614,6 +2684,7 @@ mod tests {
         let current = AtomIndex {
             type_tag: "atom_index".to_string(),
             version: VERSION,
+            hash_schema_version: ATOM_HASH_SCHEMA_VERSION,
             atoms: vec![
                 atom("REQ-AUTH-001", "requirement", "sha256:req2"),
                 atom("DES-AUTH-001", "design", "sha256:design2"),
@@ -2623,6 +2694,7 @@ mod tests {
         let base = AtomIndex {
             type_tag: "atom_index".to_string(),
             version: VERSION,
+            hash_schema_version: ATOM_HASH_SCHEMA_VERSION,
             atoms: vec![atom("REQ-AUTH-001", "requirement", "sha256:req1")],
             duplicate_atom_ids: Vec::new(),
         };
@@ -2672,10 +2744,90 @@ mod tests {
     }
 
     #[test]
+    fn scan_result_classifies_source_unchanged_hash_schema_drift_as_tool_migration() {
+        let current = AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: VERSION,
+            hash_schema_version: ATOM_HASH_SCHEMA_VERSION,
+            atoms: vec![
+                atom("REQ-AUTH-001", "requirement", "sha256:req2"),
+                atom("DES-AUTH-001", "design", "sha256:design2"),
+            ],
+            duplicate_atom_ids: Vec::new(),
+        };
+        let base = AtomIndex {
+            type_tag: "atom_index".to_string(),
+            version: VERSION,
+            hash_schema_version: 1,
+            atoms: vec![
+                atom("REQ-AUTH-001", "requirement", "sha256:req1"),
+                atom("DES-AUTH-001", "design", "sha256:design1"),
+            ],
+            duplicate_atom_ids: Vec::new(),
+        };
+        let trace_graph = TraceGraph {
+            type_tag: "trace_graph".to_string(),
+            version: VERSION,
+            links: vec![TraceLinkInput {
+                from: "REQ-AUTH-001".to_string(),
+                to: Some("DES-AUTH-001".to_string()),
+                link_type: Some("refined_by".to_string()),
+            }
+            .into_trace_link()
+            .unwrap()],
+        };
+
+        let (scan, fires) = build_scan_result_with_options(
+            current.clone(),
+            base.clone(),
+            trace_graph.clone(),
+            Vec::new(),
+            "CF-COMMIT-base".to_string(),
+            ScanBuildOptions {
+                reason: "atom_changed",
+                now: "2026-06-04T00:00:00Z",
+                source_unchanged: true,
+            },
+        )
+        .unwrap();
+
+        assert!(scan.changed_atoms.is_empty());
+        assert!(scan.open_fires.is_empty());
+        assert!(fires.is_empty());
+        let migration = scan.tool_migration.unwrap();
+        assert_eq!(migration.kind, "atom_hash_schema_changed");
+        assert_eq!(migration.from_hash_schema_version, 1);
+        assert_eq!(migration.to_hash_schema_version, ATOM_HASH_SCHEMA_VERSION);
+        assert_eq!(
+            migration.affected_atoms,
+            vec!["DES-AUTH-001", "REQ-AUTH-001"]
+        );
+
+        let (scan, fires) = build_scan_result_with_options(
+            current,
+            base,
+            trace_graph,
+            Vec::new(),
+            "CF-COMMIT-base".to_string(),
+            ScanBuildOptions {
+                reason: "atom_changed",
+                now: "2026-06-04T00:00:00Z",
+                source_unchanged: false,
+            },
+        )
+        .unwrap();
+        assert_eq!(scan.changed_atoms, vec!["DES-AUTH-001", "REQ-AUTH-001"]);
+        assert_eq!(scan.open_fires.len(), 2);
+        assert_eq!(fires.len(), 2);
+        assert!(scan.tool_migration.is_none());
+    }
+
+    #[test]
     fn scan_result_obsoletes_scan_fires_when_source_is_no_longer_changed() {
         let current = AtomIndex {
             type_tag: "atom_index".to_string(),
             version: VERSION,
+            hash_schema_version: ATOM_HASH_SCHEMA_VERSION,
             atoms: vec![atom("REQ-AUTH-001", "requirement", "sha256:req1")],
             duplicate_atom_ids: Vec::new(),
         };

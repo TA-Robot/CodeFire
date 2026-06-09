@@ -58,6 +58,62 @@ fn command_help_routes_before_mutating_parsers() {
 }
 
 #[test]
+fn read_only_debug_args_accept_path_and_json() {
+    let options = parse_read_only_debug_args(
+        &[
+            "--path".to_string(),
+            "/tmp/open".to_string(),
+            "--json".to_string(),
+        ],
+        "atom-index",
+    )
+    .unwrap();
+    assert_eq!(options.path, PathBuf::from("/tmp/open"));
+    assert!(options.json_output);
+
+    let options = parse_read_only_debug_args(
+        &["--path=/tmp/open".to_string(), "--json".to_string()],
+        "missing-links",
+    )
+    .unwrap();
+    assert_eq!(options.path, PathBuf::from("/tmp/open"));
+    assert!(options.json_output);
+
+    assert!(parse_read_only_debug_args(
+        &["--path".to_string(), "/a".to_string(), "/b".to_string()],
+        "atom-index",
+    )
+    .is_err());
+}
+
+#[test]
+fn missing_evidence_ref_error_uses_json_envelope() {
+    let repo_root = PathBuf::from("/repo");
+    let envelope = cli_error_envelope(
+        "extinguish",
+        &CliError::MissingEvidenceRef {
+            evidence_id: "CF-EVIDENCE-missing".to_string(),
+            repo_root: repo_root.clone(),
+        },
+    );
+
+    assert_eq!(envelope["schema"], "codefire.command_result.v1");
+    assert_eq!(envelope["command"], "extinguish");
+    assert_eq!(envelope["ok"], false);
+    assert_eq!(
+        envelope["exit_code"],
+        ExitCode::ObjectReferenceInvalid.code()
+    );
+    assert_eq!(envelope["repo"], repo_root.to_string_lossy().as_ref());
+    assert_eq!(envelope["diagnostics"][0]["kind"], "missing_evidence_ref");
+    assert_eq!(
+        envelope["diagnostics"][0]["evidence_id"],
+        "CF-EVIDENCE-missing"
+    );
+    assert_eq!(envelope["next_actions"][0]["kind"], "create_evidence");
+}
+
+#[test]
 fn init_creates_python_compatible_repo_layout() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
@@ -1039,6 +1095,27 @@ fn context_pack_returns_atom_changed_and_fire_views() {
             .len(),
         2
     );
+    let bounded_changed_pack = context::build_context_pack(&context::ContextOptions {
+        path: open_dir.clone(),
+        selector: context::ContextSelector::Changed,
+        depth: 1,
+        limit: 1,
+        json_output: true,
+    })
+    .unwrap();
+    assert_eq!(bounded_changed_pack.data["summary"]["atoms"]["total"], 1);
+    assert_eq!(bounded_changed_pack.data["summary"]["atoms"]["returned"], 1);
+    assert_eq!(bounded_changed_pack.data["summary"]["atoms"]["omitted"], 0);
+    assert_eq!(
+        bounded_changed_pack.data["summary"]["trace_links"]["with_omitted_endpoints"],
+        1
+    );
+    assert!(bounded_changed_pack.data["trace_link_endpoints"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|endpoint| endpoint["from"]["presence"] == "omitted"
+            || endpoint["to"]["presence"] == "omitted"));
 
     let persisted_scan = run_scan(&open_dir).unwrap();
     let fire_id = persisted_scan
@@ -1833,6 +1910,7 @@ fn scan_and_verify_text_outputs_include_empty_summaries() {
         atom_index: codefire_core::AtomIndex {
             type_tag: "atom_index".to_string(),
             version: 1,
+            hash_schema_version: codefire_core::ATOM_HASH_SCHEMA_VERSION,
             atoms: Vec::new(),
             duplicate_atom_ids: Vec::new(),
         },
@@ -1843,6 +1921,7 @@ fn scan_and_verify_text_outputs_include_empty_summaries() {
         },
         changed_atoms: Vec::new(),
         open_fires: Vec::new(),
+        tool_migration: None,
     };
     let scan_text = render_scan(&scan);
     assert!(scan_text.contains("Changed atoms: none"));

@@ -97,6 +97,7 @@ pub(crate) fn scan_data_json(scan: &codefire_core::ScanResult) -> Value {
     json!({
         "branch_state": scan_branch_state(scan.changed_atoms.len(), scan.open_fires.len()),
         "base_commit": &scan.base_commit,
+        "tool_migration": &scan.tool_migration,
         "changed_atoms": &scan.changed_atoms,
         "open_fires": &scan.open_fires,
     })

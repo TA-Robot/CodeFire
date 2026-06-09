@@ -279,11 +279,41 @@ fn context_data_json(
         .take(limit)
         .map(atom_json)
         .collect::<Vec<_>>();
+    let returned_atom_ids = selected_atoms
+        .iter()
+        .filter_map(|atom| atom.get("atom_id").and_then(Value::as_str))
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
+    let known_atom_ids = atom_by_id(&snapshot.scan.atom_index)
+        .keys()
+        .map(|atom_id| atom_id.to_string())
+        .collect::<BTreeSet<_>>();
     let trace_links = all_trace_links
         .iter()
         .take(limit)
         .map(|link| trace_link_json(link))
         .collect::<Vec<_>>();
+    let trace_link_endpoint_metadata = all_trace_links
+        .iter()
+        .take(limit)
+        .map(|link| trace_link_endpoint_metadata_json(link, &returned_atom_ids, &known_atom_ids))
+        .collect::<Vec<_>>();
+    let trace_links_with_omitted_endpoints = all_trace_links
+        .iter()
+        .take(limit)
+        .filter(|link| {
+            endpoint_presence(&link.from, &returned_atom_ids, &known_atom_ids) == "omitted"
+                || endpoint_presence(&link.to, &returned_atom_ids, &known_atom_ids) == "omitted"
+        })
+        .count();
+    let trace_links_with_missing_endpoints = all_trace_links
+        .iter()
+        .take(limit)
+        .filter(|link| {
+            endpoint_presence(&link.from, &returned_atom_ids, &known_atom_ids) == "missing"
+                || endpoint_presence(&link.to, &returned_atom_ids, &known_atom_ids) == "missing"
+        })
+        .count();
     let fires = all_fires
         .iter()
         .take(limit)
@@ -324,6 +354,35 @@ fn context_data_json(
             "scan_changed_atoms": scan_changed_atoms_truncated,
             "scan_open_fires": scan_open_fires_truncated,
         },
+        "summary": {
+            "atoms": {
+                "total": atom_count_before_limit,
+                "returned": selected_atoms.len(),
+                "omitted": atom_count_before_limit.saturating_sub(selected_atoms.len()),
+            },
+            "trace_links": {
+                "total": all_trace_links.len(),
+                "returned": trace_links.len(),
+                "omitted": all_trace_links.len().saturating_sub(trace_links.len()),
+                "with_omitted_endpoints": trace_links_with_omitted_endpoints,
+                "with_missing_endpoints": trace_links_with_missing_endpoints,
+            },
+            "fires": {
+                "total": all_fires.len(),
+                "returned": fires.len(),
+                "omitted": all_fires.len().saturating_sub(fires.len()),
+            },
+            "scan_changed_atoms": {
+                "total": snapshot.scan.changed_atoms.len(),
+                "returned": scan_changed_atoms.len(),
+                "omitted": snapshot.scan.changed_atoms.len().saturating_sub(scan_changed_atoms.len()),
+            },
+            "scan_open_fires": {
+                "total": snapshot.scan.open_fires.len(),
+                "returned": scan_open_fires.len(),
+                "omitted": snapshot.scan.open_fires.len().saturating_sub(scan_open_fires.len()),
+            },
+        },
         "branch": {
             "name": &snapshot.open.branch,
             "open_dir": snapshot.open.open_dir,
@@ -340,6 +399,7 @@ fn context_data_json(
         },
         "atoms": selected_atoms,
         "trace_links": trace_links,
+        "trace_link_endpoints": trace_link_endpoint_metadata,
         "fires": fires,
     }))
 }
@@ -479,6 +539,38 @@ fn trace_link_json(link: &codefire_core::TraceLink) -> Value {
         "link_id": &link.link_id,
         "link_hash": &link.link_hash,
     })
+}
+
+fn trace_link_endpoint_metadata_json(
+    link: &codefire_core::TraceLink,
+    returned_atom_ids: &BTreeSet<String>,
+    known_atom_ids: &BTreeSet<String>,
+) -> Value {
+    json!({
+        "link_id": &link.link_id,
+        "from": {
+            "atom_id": &link.from,
+            "presence": endpoint_presence(&link.from, returned_atom_ids, known_atom_ids),
+        },
+        "to": {
+            "atom_id": &link.to,
+            "presence": endpoint_presence(&link.to, returned_atom_ids, known_atom_ids),
+        },
+    })
+}
+
+fn endpoint_presence(
+    atom_id: &str,
+    returned_atom_ids: &BTreeSet<String>,
+    known_atom_ids: &BTreeSet<String>,
+) -> &'static str {
+    if returned_atom_ids.contains(atom_id) {
+        "returned"
+    } else if known_atom_ids.contains(atom_id) {
+        "omitted"
+    } else {
+        "missing"
+    }
 }
 
 fn fire_json(fire: &codefire_core::Fire) -> Value {

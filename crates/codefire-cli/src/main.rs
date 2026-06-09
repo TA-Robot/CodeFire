@@ -157,12 +157,31 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("atom-index") => {
-            let start = args
-                .get(1)
-                .map(PathBuf::from)
-                .unwrap_or(env::current_dir()?);
-            let index = codefire_core::build_atom_index(&start)?;
-            println!("{}", serde_json::to_string_pretty(&index)?);
+            let options = parse_read_only_debug_args(&args[1..], "atom-index")?;
+            let index = codefire_core::build_atom_index(&options.path)?;
+            let repo_root = open_context(&options.path)
+                .ok()
+                .map(|context| context.repo_root);
+            if options.json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "atom-index",
+                        true,
+                        0,
+                        repo_root.as_deref(),
+                        json!({
+                            "type": "codefire_atom_index",
+                            "version": 1,
+                            "atom_index": index,
+                        }),
+                        Vec::new(),
+                        Vec::new(),
+                    ))?
+                );
+            } else {
+                println!("{}", serde_json::to_string_pretty(&index)?);
+            }
             Ok(())
         }
         Some("trace-graph") => {
@@ -175,12 +194,31 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("missing-links") => {
-            let start = args
-                .get(1)
-                .map(PathBuf::from)
-                .unwrap_or(env::current_dir()?);
-            let missing = codefire_core::current_required_link_missing(&start)?;
-            println!("{}", serde_json::to_string_pretty(&missing)?);
+            let options = parse_read_only_debug_args(&args[1..], "missing-links")?;
+            let missing = codefire_core::current_required_link_missing(&options.path)?;
+            let repo_root = open_context(&options.path)
+                .ok()
+                .map(|context| context.repo_root);
+            if options.json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "missing-links",
+                        true,
+                        0,
+                        repo_root.as_deref(),
+                        json!({
+                            "type": "codefire_missing_required_links",
+                            "version": 1,
+                            "missing_required_links": missing,
+                        }),
+                        Vec::new(),
+                        Vec::new(),
+                    ))?
+                );
+            } else {
+                println!("{}", serde_json::to_string_pretty(&missing)?);
+            }
             Ok(())
         }
         Some("context") => {
@@ -939,6 +977,10 @@ enum CliError {
     InvalidMarker(String),
     InvalidRepository(String),
     LockContention(String),
+    MissingEvidenceRef {
+        evidence_id: String,
+        repo_root: PathBuf,
+    },
 }
 
 impl CliError {
@@ -959,6 +1001,7 @@ impl CliError {
                 ExitCode::RepositoryCorruption
             }
             CliError::LockContention(_) => ExitCode::LockContention,
+            CliError::MissingEvidenceRef { .. } => ExitCode::ObjectReferenceInvalid,
         }
         .code()
     }
@@ -989,6 +1032,9 @@ impl fmt::Display for CliError {
                 write!(f, "invalid CodeFire repository: {message}")
             }
             CliError::LockContention(message) => write!(f, "{message}"),
+            CliError::MissingEvidenceRef { evidence_id, .. } => {
+                write!(f, "missing evidence object: {evidence_id}")
+            }
         }
     }
 }
@@ -1153,7 +1199,14 @@ fn run_fire_command(args: &[String]) -> Result<(), CliError> {
 fn run_extinguish_command(args: &[String]) -> Result<(), CliError> {
     if has_interactive_extinguish_arg(args) {
         let options = parse_interactive_extinguish_args(args)?;
-        let result = run_interactive_extinguish(&options)?;
+        let result = match run_interactive_extinguish(&options) {
+            Ok(result) => result,
+            Err(error) if options.json_output => {
+                print_cli_error_json("extinguish-interactive", &error)?;
+                return Err(error);
+            }
+            Err(error) => return Err(error),
+        };
         if options.json_output {
             print_plan_result_json("extinguish-interactive", &result.plan)?;
         } else {
@@ -1161,7 +1214,14 @@ fn run_extinguish_command(args: &[String]) -> Result<(), CliError> {
         }
     } else if has_all_matching_extinguish_arg(args) {
         let options = parse_all_matching_extinguish_args(args)?;
-        let result = run_all_matching_extinguish(&options)?;
+        let result = match run_all_matching_extinguish(&options) {
+            Ok(result) => result,
+            Err(error) if options.json_output => {
+                print_cli_error_json("extinguish-all", &error)?;
+                return Err(error);
+            }
+            Err(error) => return Err(error),
+        };
         if options.json_output {
             print_plan_result_json("extinguish-all", &result.plan)?;
         } else {
@@ -1169,7 +1229,14 @@ fn run_extinguish_command(args: &[String]) -> Result<(), CliError> {
         }
     } else if has_batch_extinguish_arg(args) {
         let options = parse_extinguish_batch_args(args)?;
-        let result = run_extinguish_batch(&options)?;
+        let result = match run_extinguish_batch(&options) {
+            Ok(result) => result,
+            Err(error) if options.json_output => {
+                print_cli_error_json("extinguish-batch", &error)?;
+                return Err(error);
+            }
+            Err(error) => return Err(error),
+        };
         if options.json_output {
             print_plan_result_json("extinguish-batch", &result.plan)?;
         } else if options.dry_run {
@@ -1182,7 +1249,14 @@ fn run_extinguish_command(args: &[String]) -> Result<(), CliError> {
         }
     } else {
         let options = prepare_extinguish_options(parse_extinguish_args(args)?)?;
-        let result = run_extinguish(&options)?;
+        let result = match run_extinguish(&options) {
+            Ok(result) => result,
+            Err(error) if options.json_output => {
+                print_cli_error_json("extinguish", &error)?;
+                return Err(error);
+            }
+            Err(error) => return Err(error),
+        };
         if options.json_output {
             print_plan_result_json("extinguish", &result.plan)?;
         } else if options.dry_run {
@@ -1272,6 +1346,15 @@ fn render_scan(scan: &codefire_core::ScanResult) -> String {
             output.push_str(&format!("  {atom_id}\n"));
         }
     }
+    if let Some(migration) = &scan.tool_migration {
+        output.push_str(&format!(
+            "Tool migration: {} hash schema {} -> {} affected_atoms={}\n",
+            migration.kind,
+            migration.from_hash_schema_version,
+            migration.to_hash_schema_version,
+            migration.affected_atoms.len()
+        ));
+    }
     if scan.open_fires.is_empty() {
         output.push_str("Open fires: none\n");
     } else {
@@ -1323,6 +1406,70 @@ fn print_data_result_json(command: &str, data: Value) -> Result<(), CliError> {
     Ok(())
 }
 
+fn print_cli_error_json(command: &str, error: &CliError) -> Result<(), CliError> {
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&cli_error_envelope(command, error))?
+    );
+    Ok(())
+}
+
+fn cli_error_envelope(command: &str, error: &CliError) -> Value {
+    let repo_root = match error {
+        CliError::MissingEvidenceRef { repo_root, .. } => Some(repo_root.as_path()),
+        _ => None,
+    };
+    command_result_envelope(
+        command,
+        false,
+        error.exit_code(),
+        repo_root,
+        json!({ "type": "codefire_command_error" }),
+        vec![cli_error_diagnostic(error)],
+        cli_error_next_actions(error),
+    )
+}
+
+fn cli_error_diagnostic(error: &CliError) -> Value {
+    match error {
+        CliError::MissingEvidenceRef {
+            evidence_id,
+            repo_root,
+        } => json!({
+            "kind": "missing_evidence_ref",
+            "severity": "blocking",
+            "evidence_id": evidence_id,
+            "repo": repo_root,
+            "message": error.to_string(),
+        }),
+        _ => json!({
+            "kind": "command_error",
+            "severity": "blocking",
+            "message": error.to_string(),
+        }),
+    }
+}
+
+fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
+    match error {
+        CliError::MissingEvidenceRef { evidence_id, .. } => vec![
+            json!({
+                "kind": "create_evidence",
+                "command": cli_command("evidence add --path <open-dir> --from-command <cmd> --json"),
+                "reason": "create an evidence object before referencing it from a resolution",
+                "target": {"missing_evidence_id": evidence_id},
+            }),
+            json!({
+                "kind": "remove_evidence_ref",
+                "command": cli_command("extinguish <fire> --resolution <type> --rationale <text> --json"),
+                "reason": "retry without the missing evidence reference if the resolution should not cite it",
+                "target": {"missing_evidence_id": evidence_id},
+            }),
+        ],
+        _ => Vec::new(),
+    }
+}
+
 fn plan_result_envelope(command: &str, plan: &Value) -> Value {
     let repo_root = plan_repo_root(plan);
     command_result_envelope(
@@ -1363,6 +1510,63 @@ fn lock_contention_envelope(command: &str, error: &CliError) -> Value {
             "description": "retry after the remote resource lock is released or wait up to a bounded timeout",
         })],
     )
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ReadOnlyDebugOptions {
+    path: PathBuf,
+    json_output: bool,
+}
+
+fn parse_read_only_debug_args(
+    args: &[String],
+    command: &str,
+) -> Result<ReadOnlyDebugOptions, CliError> {
+    let mut path = None;
+    let mut json_output = false;
+    let mut index = 0usize;
+    while index < args.len() {
+        let value = &args[index];
+        match value.as_str() {
+            "--json" => json_output = true,
+            "--path" => {
+                index += 1;
+                let path_value = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--path requires a value".to_string()))?;
+                set_single_path(&mut path, path_value)?;
+            }
+            "--metrics" => {
+                return Err(CliError::Usage(format!(
+                    "{command} does not support --metrics"
+                )));
+            }
+            value if value.starts_with("--path=") => {
+                set_single_path(&mut path, value.trim_start_matches("--path="))?;
+            }
+            value if value.starts_with("--") => {
+                return Err(CliError::Usage(format!(
+                    "unsupported {command} option: {value}"
+                )));
+            }
+            value => set_single_path(&mut path, value)?,
+        }
+        index += 1;
+    }
+    Ok(ReadOnlyDebugOptions {
+        path: path.unwrap_or(env::current_dir()?),
+        json_output,
+    })
+}
+
+fn set_single_path(path: &mut Option<PathBuf>, value: &str) -> Result<(), CliError> {
+    if path.is_some() {
+        return Err(CliError::Usage(
+            "path may only be specified once".to_string(),
+        ));
+    }
+    *path = Some(PathBuf::from(value));
+    Ok(())
 }
 
 fn parse_init_args(args: &[String]) -> Result<InitOptions, CliError> {
@@ -3323,14 +3527,19 @@ fn compute_scan(start: &Path, persist: bool) -> Result<ScanExecution, CliError> 
         "atom_changed"
     };
     let now = now_iso_utc();
-    let (scan, fires) = codefire_core::build_scan_result(
+    let source_unchanged =
+        source_manifest_unchanged(&objects, &base_commit, &context.open_dir).unwrap_or(false);
+    let (scan, fires) = codefire_core::build_scan_result_with_options(
         current,
         base_index,
         trace_graph,
         fires,
         base_commit,
-        reason,
-        &now,
+        codefire_core::ScanBuildOptions {
+            reason,
+            now: &now,
+            source_unchanged,
+        },
     )?;
     if persist {
         fs::create_dir_all(&active_state_path)?;
@@ -3556,7 +3765,16 @@ fn validate_evidence_refs(repo_root: &Path, refs: &[String]) -> Result<(), CliEr
                 "--evidence-ref requires a non-empty evidence id".to_string(),
             ));
         }
-        let payload = codefire_store::read_object(&objects, evidence_id)?;
+        let payload = codefire_store::read_object(&objects, evidence_id).map_err(|error| {
+            if matches!(error, codefire_store::StoreError::ObjectNotFound(_)) {
+                CliError::MissingEvidenceRef {
+                    evidence_id: evidence_id.clone(),
+                    repo_root: repo_root.to_path_buf(),
+                }
+            } else {
+                CliError::Store(error)
+            }
+        })?;
         if payload.get("type").and_then(Value::as_str) != Some("evidence") {
             return Err(CliError::Usage(format!(
                 "--evidence-ref must point to an evidence object: {evidence_id}"
@@ -4533,6 +4751,39 @@ fn build_manifest(objects: &Path, open_dir: &Path) -> Result<Value, CliError> {
                 "content": encode_base64(&data),
             }),
         )?;
+        entries.push(json!({
+            "path": to_posix(&rel),
+            "kind": "file",
+            "mode": "100644",
+            "blob": blob_id,
+        }));
+    }
+    Ok(json!({"type": "content_manifest", "version": 1, "entries": entries}))
+}
+
+fn source_manifest_unchanged(
+    objects: &Path,
+    base_commit: &str,
+    open_dir: &Path,
+) -> Result<bool, CliError> {
+    let commit = codefire_store::read_object(objects, base_commit)?;
+    let manifest_id = required_string(&commit, &["roots", "content_manifest"])?;
+    let base_manifest = codefire_store::read_object(objects, &manifest_id)?;
+    let current_manifest = build_manifest_fingerprint(open_dir)?;
+    Ok(base_manifest == current_manifest)
+}
+
+fn build_manifest_fingerprint(open_dir: &Path) -> Result<Value, CliError> {
+    let mut entries = Vec::new();
+    for rel in rel_files(open_dir)? {
+        let data = fs::read(open_dir.join(&rel))?;
+        let blob_payload = json!({
+            "type": "blob",
+            "version": 1,
+            "encoding": "base64",
+            "content": encode_base64(&data),
+        });
+        let blob_id = codefire_store::object_id("blob", &blob_payload)?;
         entries.push(json!({
             "path": to_posix(&rel),
             "kind": "file",

@@ -487,6 +487,7 @@ mod tests {
         let left = codefire_core::AtomIndex {
             type_tag: "atom_index".to_string(),
             version: 1,
+            hash_schema_version: codefire_core::ATOM_HASH_SCHEMA_VERSION,
             atoms: vec![
                 atom("REQ-OLD", "requirement", "docs/old.md", "old-hash"),
                 atom("REQ-SAME", "requirement", "docs/same.md", "hash-a"),
@@ -497,6 +498,7 @@ mod tests {
         let right = codefire_core::AtomIndex {
             type_tag: "atom_index".to_string(),
             version: 1,
+            hash_schema_version: codefire_core::ATOM_HASH_SCHEMA_VERSION,
             atoms: vec![
                 atom("REQ-NEW", "requirement", "docs/new.md", "new-hash"),
                 atom("REQ-SAME", "requirement", "docs/same.md", "hash-a"),
