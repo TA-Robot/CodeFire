@@ -303,7 +303,15 @@ Git結果:
 
 ## Current Open Work
 
-Open CodeFire dogfood issues still visible in the current backlog:
+Open CodeFire issues are larger than the active batch.
+
+Global inventory as of 2026-06-09:
+
+- CFB dogfood issues: 92 total, 19 fixed, 73 open.
+- CFR code review issues: 160 total, 82 fixed/closed, 78 open.
+- Combined tracked backlog: 252 total, 101 fixed/closed, 151 open.
+
+Active batch now being burned down:
 
 - CFB-087: missing evidence-ref dry-run failures are not JSON enveloped.
 - CFB-089: `atom-index` and `missing-links` do not handle shared `--path` / `--json` like normal commands.

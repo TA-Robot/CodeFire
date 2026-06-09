@@ -57,6 +57,30 @@ Remaining open count for this batch:
 
 - 4 issues: CFB-087, CFB-089, CFB-090, CFB-092.
 
+## Global Issue Inventory
+
+This active batch is not the whole backlog.
+
+Current tracked issue inventory as of 2026-06-09:
+
+| Series | Total tracked | Fixed / closed | Open | Notes |
+|---|---:|---:|---:|---|
+| CFB dogfood issues | 92 | 19 | 73 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFR code review issues | 160 | 82 | 78 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. |
+| Total | 252 | 101 | 151 | This is the whole known issue backlog, not the current burn-down batch. |
+
+Current active batch size:
+
+- 7 CFB issues total: CFB-086..CFB-092.
+- 3 already fixed: CFB-086, CFB-088, CFB-091.
+- 4 remaining open: CFB-087, CFB-089, CFB-090, CFB-092.
+
+Burn-down interpretation:
+
+- The current cycle is responsible for closing the active batch first.
+- Older CFB/CFR remain tracked backlog and must be assigned to later burn-down batches.
+- A future release-quality cycle should create larger batches from the global backlog root-cause groups, but still obey the same rule: freeze a batch, fix all issues in that batch, then start the next discovery/batch.
+
 ## Root Fix Groups
 
 ### Group 1: Evidence/extinguish JSON failure envelope
@@ -243,4 +267,3 @@ The batch is done only when all are true:
 - Full Rust checks pass.
 - Installed CodeFire passes algorithm dogfood confirmation.
 - Git is clean and pushed.
-

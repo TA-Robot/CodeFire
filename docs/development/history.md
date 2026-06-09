@@ -243,6 +243,7 @@
 | 2026-06-07 | Automation JSON | CFB-086とCFB-088を修正し、証跡参照付きextinguishの `has_evidence` とevidence dry-runの `evidence_id:null` / `created:false` 契約を揃えた | `crates/codefire-cli/src/evidence.rs`, `crates/codefire-cli/src/evidence/batch.rs`, `crates/codefire-cli/src/main.rs`, `crates/codefire-cli/src/batch.rs`, `crates/codefire-cli/src/extinguish_ux.rs` | `cargo test -p codefire-cli --bin codefire-rs evidence_add -- --nocapture`; `cargo test -p codefire-cli --bin codefire-rs extinguish_evidence_ref_links_resolution_and_verify_detects_missing_ref -- --nocapture` |
 | 2026-06-07 | Cycle Status | codefire改善サイクル2周完了後の現在地を文書化し、installed binary、latest pushed Git commits、algorithm CodeFire state、fixed/open CFB、次actionを整理した | `docs/development/codefire-improvement-cycle.md` | latest pushed commits: `6d8361d`, `8978dfc`; algorithm state: `open-clean`, open fires 0 |
 | 2026-06-09 | Cycle Policy | codefire改善サイクルを「issueを出す -> batchを全部消す -> 次のissueを出す」運用へ明確化し、直近batch `CFB-086..CFB-092` の全修正計画を作成した | `docs/development/codefire-improvement-cycle.md`, `docs/development/current-cycle-burn-down-plan.md` | remaining active batch issues: `CFB-087`, `CFB-089`, `CFB-090`, `CFB-092` |
+| 2026-06-09 | Issue Inventory | active batchと全backlogの混同を避けるため、全issue数を明記した。全体はCFB 92件中73件open、CFR 160件中78件open、合計252件中151件openである | `docs/development/codefire-improvement-cycle.md`, `docs/development/current-cycle-burn-down-plan.md` | active batch remains 4 open issues: `CFB-087`, `CFB-089`, `CFB-090`, `CFB-092` |
 
 ## Current Decisions
 
