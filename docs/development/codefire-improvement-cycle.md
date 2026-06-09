@@ -307,9 +307,9 @@ Open CodeFire issues are larger than the active batch.
 
 Global inventory as of 2026-06-09:
 
-- CFB dogfood issues: 92 total, 23 fixed, 69 open.
+- CFB dogfood issues: 92 total, 24 fixed, 68 open.
 - CFR code review issues: 160 total, 82 fixed/closed, 78 open.
-- Combined tracked backlog: 252 total, 105 fixed/closed, 147 open.
+- Combined tracked backlog: 252 total, 106 fixed/closed, 146 open.
 
 Active batch closed in this burn-down:
 

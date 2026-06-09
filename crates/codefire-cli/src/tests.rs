@@ -79,6 +79,14 @@ fn read_only_debug_args_accept_path_and_json() {
     assert_eq!(options.path, PathBuf::from("/tmp/open"));
     assert!(options.json_output);
 
+    let options = parse_read_only_debug_args(
+        &["/tmp/open".to_string(), "--json".to_string()],
+        "trace-graph",
+    )
+    .unwrap();
+    assert_eq!(options.path, PathBuf::from("/tmp/open"));
+    assert!(options.json_output);
+
     assert!(parse_read_only_debug_args(
         &["--path".to_string(), "/a".to_string(), "/b".to_string()],
         "atom-index",

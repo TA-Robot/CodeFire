@@ -185,12 +185,31 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("trace-graph") => {
-            let start = args
-                .get(1)
-                .map(PathBuf::from)
-                .unwrap_or(env::current_dir()?);
-            let trace_graph = codefire_core::current_trace_graph(&start)?;
-            println!("{}", serde_json::to_string_pretty(&trace_graph)?);
+            let options = parse_read_only_debug_args(&args[1..], "trace-graph")?;
+            let trace_graph = codefire_core::current_trace_graph(&options.path)?;
+            let repo_root = open_context(&options.path)
+                .ok()
+                .map(|context| context.repo_root);
+            if options.json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "trace-graph",
+                        true,
+                        0,
+                        repo_root.as_deref(),
+                        json!({
+                            "type": "codefire_trace_graph",
+                            "version": 1,
+                            "trace_graph": trace_graph,
+                        }),
+                        Vec::new(),
+                        Vec::new(),
+                    ))?
+                );
+            } else {
+                println!("{}", serde_json::to_string_pretty(&trace_graph)?);
+            }
             Ok(())
         }
         Some("missing-links") => {

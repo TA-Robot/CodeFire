@@ -65,9 +65,9 @@ Current tracked issue inventory as of 2026-06-09:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 92 | 23 | 69 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFB dogfood issues | 92 | 24 | 68 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
 | CFR code review issues | 160 | 82 | 78 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. |
-| Total | 252 | 105 | 147 | This is the whole known issue backlog, not the current burn-down batch. |
+| Total | 252 | 106 | 146 | This is the whole known issue backlog, not the current burn-down batch. |
 
 Current active batch size:
 
