@@ -22,16 +22,23 @@ CodeFire本体にAI agent運用機能は入れない。ただし、外部自動�
 
 ## Cycle Overview
 
-1. CodeFireの次versionを設計に沿って開発する。
-2. 開発したCodeFireをinstallし、実際の `codefire` commandとして使える状態にする。
-3. Algorithm dogfood projectの次の開発計画と設計を作る。
-4. その設計に基づいてalgorithm開発を進める。
-5. algorithm開発中にCodeFireを使い、バグ、UX違和感、JSON contract不整合、速度、記憶領域、diagnostic不足を `CFB-*` として記録する。
-6. algorithm開発終了時に、dogfoodingで十分なissueが見つかったか確認する。目標は新規20件。
-7. 20件に届かない場合は、algorithmの次の開発計画と設計からもう一度進める。
-8. dogfooding issueが十分集まったら、CodeFireソースコードレビューを行い、追加で40件を目標にissueを洗い出す。
-9. dogfooding issueとcode review issueを重複排除し、全issueを解決する次versionの開発計画と設計を作る。
-10. 次versionのCodeFire開発へ戻る。
+1. Discovery: Algorithm dogfood projectでCodeFireを使い、バグ、UX違和感、JSON contract不整合、速度、記憶領域、diagnostic不足を `CFB-*` として記録する。
+2. Expansion: 必要ならCodeFireソースコードレビューを行い、同じbatchの `CFR-*` を追加する。
+3. Freeze: そのcycleで修正するissue batchを確定する。この時点で次のissue探索を止める。
+4. Burn-down planning: batch内issueをroot cause単位に束ね、全部消すための修正計画を作る。
+5. CodeFire development: 計画に沿ってbatch内issueを全部fixedまたは明示wontfixにする。
+6. Install: 開発したCodeFireをinstallし、実際の `codefire` commandとして使える状態にする。
+7. Confirmation dogfood: Algorithm projectでbatch内issueの再現コマンドを再実行し、修正を確認する。
+8. Close audit: backlog、detail issue、history、version plan、cycle planが一致していることを確認する。
+9. Next discovery: batch内issueが全部消えてから、次のalgorithm計画と次のissue出しへ進む。
+
+今後の基本形は **issueを出す -> 全部消す -> issueを出す** である。issueを出したまま次のissue discoveryへ進まない。
+
+Burn-down中に新しい問題を見つけた場合:
+
+- batch内issueの修正を妨げるblockerは、同じbatchへ追加してそのcycle内で消す。
+- blockerでない周辺改善は、正式issue採番を次のDiscoveryまで待つ。必要なら `next discovery candidate` として短くメモする。
+- 「issue数を増やすための追加探索」はBurn-down完了まで行わない。
 
 ## Phase A: CodeFire Development
 
@@ -137,7 +144,8 @@ Exit criteria:
 - algorithm側の設計対象が実装済み。
 - algorithm側テストが通る。
 - CodeFire commitまたはCodeFire管理上のclean stateまで到達している。
-- dogfoodingで新規CFBが20件以上見つかった、または20件未満ならPhase Cへ戻る判断が明記されている。
+- dogfoodingで見つけたCFBをbatchとして確定している。
+- batch確定後は、Burn-down完了まで追加探索へ進まない。
 
 ## Phase E: Code Review Issue Expansion
 
@@ -171,6 +179,7 @@ Exit criteria:
 - 追加40件目標を達成しているか、重複排除の結果として達成しない理由が明記されている。
 - summary backlogとdetail filesが一致している。
 - issue templateが使われている。
+- 追加したCFRは現在batchに入れるか、次batch候補として明示的に分けている。
 
 ## Phase F: Next Version Planning and Design
 
@@ -189,7 +198,7 @@ Work:
 Exit criteria:
 
 - 次version planが `docs/development/v*-*.md` にある。
-- 全open issueが次version plan内のどこかにmappingされている。
+- 現在batch内の全issueが次version planまたはcycle burn-down plan内のどこかにmappingされている。
 - 実装順序が、共通基盤、state/contract、command個別修正、docs/issue closeの順に整理されている。
 
 ## Issue Recording Rules
@@ -219,7 +228,8 @@ Current named cycle:
 
 - CodeFire次version系統: v1.0 Contract ValidationのPhase 1a以降を継続する。
 - Current plan: `docs/development/v1.0-contract-validation-plan.md`。
-- Current phase: 2周分のcodefire改善サイクルを完了し、次は残open CFB/CFRのburn-down設計へ戻る状態。
+- Current burn-down plan: `docs/development/current-cycle-burn-down-plan.md`。
+- Current phase: `BATCH-2026-06-cycle3-dogfood` のBurn-down planning完了。次はCFB-087/089/090/092を全部修正する。
 - Installed CodeFire: `/home/devuser/.local/bin/codefire`。
 - Installed version output: `codefire foundation 1`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
@@ -308,9 +318,9 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- Choose the next CodeFire root-fix bundle from the remaining CFB/CFR backlog.
-- Prefer automation-contract fixes that unblock reliable dogfooding: JSON failure envelopes, shared path/json parsing for debug commands, bounded context metadata, and extractor migration/rebaseline support.
-- After CodeFire implementation, reinstall and dogfood again in `subprojects/algorithm-evolution-agent-lab/`.
+- `docs/development/current-cycle-burn-down-plan.md` に従い、CFB-087、CFB-089、CFB-090、CFB-092を全部修正する。
+- このbatchが全部fixedになるまで、次のissue discoveryや追加40件レビューには進まない。
+- 修正後にinstallし、`subprojects/algorithm-evolution-agent-lab/` でdogfood confirmationを行う。
 
 ## Cycle Invariants
 
