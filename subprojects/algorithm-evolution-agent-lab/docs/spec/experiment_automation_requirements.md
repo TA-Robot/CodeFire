@@ -231,3 +231,7 @@ The system shall package a planning handoff review packet into deterministic han
 ## REQ-AUTO-058: Research cycle planning handoff review packet artifact manifest
 
 The system shall build a deterministic manifest for planning handoff review packet artifacts. The manifest shall preserve source cycles from the review packet summary and record each packaged artifact path, SHA-256 digest, and byte count so storage adapters can verify the persisted final review surface without reparsing Markdown.
+
+## REQ-AUTO-059: Research cycle planning handoff review packet artifact manifest Markdown
+
+The system shall render planning handoff review packet artifact manifests into deterministic Markdown. The rendered document shall include source cycles, manifest status, artifact count, and a path, SHA-256 digest, and byte count table so reviewers can audit the persisted final review artifact set without opening each artifact.

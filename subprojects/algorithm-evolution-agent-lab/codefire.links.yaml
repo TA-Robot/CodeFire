@@ -447,6 +447,15 @@ links:
   - from: REQ-AUTO-058
     to: TEST-research-cycle-planning-handoff-review-packet-artifact-manifest-records-artifacts
     type: verified_by
+  - from: REQ-AUTO-059
+    to: DES-AUTO-041
+    type: refined_by
+  - from: DES-AUTO-041
+    to: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown
+    type: implemented_by
+  - from: REQ-AUTO-059
+    to: TEST-research-cycle-planning-handoff-review-packet-artifact-manifest-markdown-renders-table
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

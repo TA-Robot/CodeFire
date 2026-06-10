@@ -268,6 +268,11 @@ ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder.build(packet, ar
   -> build a storage verification manifest for packaged review packet artifacts
   -> preserve source cycles from the packet summary
   -> reuse shared manifest entry hashing and path validation without reading or writing files
+
+ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown.render(manifest)
+  -> render packaged review packet artifact manifests as reviewer-facing Markdown tables
+  -> include source cycles, manifest status, artifact count, path, hash, and byte count
+  -> reuse the shared manifest Markdown renderer without reading artifact contents
 ```
 
 Important implementation details:
