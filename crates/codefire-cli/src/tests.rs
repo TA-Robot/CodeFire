@@ -165,6 +165,105 @@ fn unknown_target_errors_use_json_failure_envelope() {
 }
 
 #[test]
+fn batch_file_read_errors_use_json_failure_envelope() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let missing = temp.path().join("missing-batch.json");
+    init_repo(&repo_root, false).unwrap();
+
+    let evidence_error = run_evidence_batch(&evidence::EvidenceAddOptions {
+        start: repo_root,
+        json_output: true,
+        dry_run: true,
+        batch_path: Some(missing.clone()),
+        label: None,
+        artifact_path: None,
+        artifact_uri: None,
+        command: None,
+        command_argv: None,
+        command_cwd: None,
+        command_timeout_ms: 300_000,
+        max_output_bytes: 64 * 1024,
+    })
+    .unwrap_err();
+    assert_batch_missing_envelope("evidence-add-batch", &evidence_error);
+
+    let link_error = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
+        path: temp.path().to_path_buf(),
+        batch_path: missing.clone(),
+        dry_run: true,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap_err();
+    assert_batch_missing_envelope("link-batch", &link_error);
+
+    let fire_error = fire::run_fire_batch(&fire::FireBatchOptions {
+        path: temp.path().to_path_buf(),
+        batch_path: missing.clone(),
+        dry_run: true,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap_err();
+    assert_batch_missing_envelope("fire-batch", &fire_error);
+
+    let extinguish_error = run_extinguish_batch(&batch::BatchExtinguishOptions {
+        path: temp.path().to_path_buf(),
+        batch_path: missing,
+        dry_run: true,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap_err();
+    assert_batch_missing_envelope("extinguish-batch", &extinguish_error);
+}
+
+#[test]
+fn batch_json_arrays_report_schema_errors_not_yaml_errors() {
+    let temp = tempdir().unwrap();
+    let batch_path = temp.path().join("fires.json");
+    fs::write(&batch_path, "[]").unwrap();
+
+    let error = run_extinguish_batch(&batch::BatchExtinguishOptions {
+        path: temp.path().to_path_buf(),
+        batch_path,
+        dry_run: true,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap_err();
+    let envelope = cli_error_envelope("extinguish-batch", &error);
+
+    assert_eq!(envelope["diagnostics"][0]["kind"], "batch_schema_error");
+    assert!(error
+        .to_string()
+        .contains("batch extinguish JSON must be an object"));
+    assert!(!error.to_string().contains("YAML"));
+    assert_eq!(envelope["next_actions"][0]["kind"], "show_batch_schema");
+}
+
+#[test]
+fn extinguish_help_documents_batch_wrapper_schema() {
+    let help = subcommand_help("extinguish");
+
+    assert!(help.contains("Batch JSON example"));
+    assert!(help.contains("{\"version\":1,\"fires\""));
+}
+
+fn assert_batch_missing_envelope(command: &str, error: &CliError) {
+    let envelope = cli_error_envelope(command, error);
+
+    assert_eq!(envelope["schema"], "codefire.command_result.v1");
+    assert_eq!(envelope["command"], command);
+    assert_eq!(envelope["ok"], false);
+    assert_eq!(envelope["exit_code"], ExitCode::InvalidUsageOrConfig.code());
+    assert_eq!(envelope["diagnostics"][0]["kind"], "batch_file_missing");
+    assert_eq!(envelope["next_actions"][0]["kind"], "check_batch_path");
+    assert_eq!(envelope["next_actions"][1]["kind"], "show_batch_schema");
+}
+
+#[test]
 fn init_creates_python_compatible_repo_layout() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");

@@ -2,9 +2,8 @@ use super::{
     default_manual_fire_severity, required_arg, run_manual_fire_specs, validate_manual_fire_spec,
     FireResult, ManualFireSpec,
 };
-use crate::{limited_yaml, parse_lock_option, CliError, LockOptions};
+use crate::{limited_yaml, parse_lock_option, read_batch_file, CliError, LockOptions};
 use serde_json::{json, Value};
-use std::fs;
 use std::path::{Path, PathBuf};
 
 const YAML_CONTEXT: &str = "fire batch YAML";
@@ -184,8 +183,8 @@ fn missing_fire_field(index: usize, field: &str) -> CliError {
 }
 
 fn parse_fire_batch_file(path: &Path) -> Result<FireBatchFile, CliError> {
-    let text = fs::read_to_string(path)?;
-    if text.trim_start().starts_with('{') {
+    let text = read_batch_file(path, "fire batch")?;
+    if starts_json_document(&text) {
         parse_fire_batch_json(&text)
     } else {
         parse_fire_batch_yaml(&text)
@@ -193,10 +192,16 @@ fn parse_fire_batch_file(path: &Path) -> Result<FireBatchFile, CliError> {
 }
 
 fn parse_fire_batch_json(text: &str) -> Result<FireBatchFile, CliError> {
-    let value: Value = serde_json::from_str(text)?;
-    let version = value.get("version").and_then(Value::as_u64).unwrap_or(0);
-    let defaults = parse_json_defaults(value.get("defaults"))?;
-    let fires = value
+    let value: Value = serde_json::from_str(text)
+        .map_err(|error| CliError::Usage(format!("invalid fire batch JSON: {error}")))?;
+    let object = value.as_object().ok_or_else(|| {
+        CliError::Usage(
+            "fire batch JSON must be an object with version and fires array; top-level arrays are not supported. Use {\"version\":1,\"fires\":[...]} wrapper".to_string(),
+        )
+    })?;
+    let version = object.get("version").and_then(Value::as_u64).unwrap_or(0);
+    let defaults = parse_json_defaults(object.get("defaults"))?;
+    let fires = object
         .get("fires")
         .and_then(Value::as_array)
         .ok_or_else(|| CliError::Usage("fire batch JSON missing fires array".to_string()))?
@@ -208,6 +213,11 @@ fn parse_fire_batch_json(text: &str) -> Result<FireBatchFile, CliError> {
         defaults,
         fires,
     })
+}
+
+fn starts_json_document(text: &str) -> bool {
+    let trimmed = text.trim_start();
+    trimmed.starts_with('{') || trimmed.starts_with('[')
 }
 
 fn parse_json_defaults(value: Option<&Value>) -> Result<FireBatchDefaults, CliError> {

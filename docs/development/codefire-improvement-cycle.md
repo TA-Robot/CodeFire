@@ -303,13 +303,13 @@ Git結果:
 
 ## Current Open Work
 
-Open CodeFire issues are larger than the active batch.
+The active CodeFire improvement cycle is a global burn-down. The initial frozen batch was 146 open issues as of 2026-06-09; the current remaining count is tracked in `current-cycle-burn-down-plan.md`.
 
-Global inventory as of 2026-06-09:
+Global inventory as of 2026-06-10:
 
-- CFB dogfood issues: 92 total, 24 fixed, 68 open.
-- CFR code review issues: 160 total, 82 fixed/closed, 78 open.
-- Combined tracked backlog: 252 total, 106 fixed/closed, 146 open.
+- CFB dogfood issues: 92 total, 57 fixed, 35 open.
+- CFR code review issues: 160 total, 105 fixed/closed, 55 open.
+- Combined tracked backlog: 252 total, 162 fixed/closed, 90 open.
 
 Active batch closed in this burn-down:
 

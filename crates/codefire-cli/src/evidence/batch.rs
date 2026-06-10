@@ -2,9 +2,8 @@ use super::{
     parse_duration_ms, run_evidence_add, validate_evidence_add_options, EvidenceAddOptions,
     EvidenceAddResult, DEFAULT_MAX_OUTPUT_BYTES,
 };
-use crate::{find_repo_root, limited_yaml, CliError};
+use crate::{find_repo_root, limited_yaml, read_batch_file, CliError};
 use serde_json::{json, Value};
-use std::fs;
 use std::path::{Path, PathBuf};
 
 const YAML_CONTEXT: &str = "evidence batch YAML";
@@ -205,8 +204,8 @@ fn evidence_batch_item_plan(item: &EvidenceAddOptions) -> Value {
 }
 
 fn parse_evidence_batch_file(path: &Path) -> Result<EvidenceBatchFile, CliError> {
-    let text = fs::read_to_string(path)?;
-    if text.trim_start().starts_with('{') {
+    let text = read_batch_file(path, "evidence batch")?;
+    if starts_json_document(&text) {
         parse_evidence_batch_json(&text)
     } else {
         parse_evidence_batch_yaml(&text)
@@ -214,10 +213,16 @@ fn parse_evidence_batch_file(path: &Path) -> Result<EvidenceBatchFile, CliError>
 }
 
 fn parse_evidence_batch_json(text: &str) -> Result<EvidenceBatchFile, CliError> {
-    let value: Value = serde_json::from_str(text)?;
-    let version = value.get("version").and_then(Value::as_u64).unwrap_or(0);
-    let defaults = parse_json_defaults(value.get("defaults"))?;
-    let items = value
+    let value: Value = serde_json::from_str(text)
+        .map_err(|error| CliError::Usage(format!("invalid evidence batch JSON: {error}")))?;
+    let object = value.as_object().ok_or_else(|| {
+        CliError::Usage(
+            "evidence batch JSON must be an object with version and items array; top-level arrays are not supported. Use {\"version\":1,\"items\":[...]} wrapper".to_string(),
+        )
+    })?;
+    let version = object.get("version").and_then(Value::as_u64).unwrap_or(0);
+    let defaults = parse_json_defaults(object.get("defaults"))?;
+    let items = object
         .get("items")
         .and_then(Value::as_array)
         .ok_or_else(|| CliError::Usage("evidence batch JSON missing items array".to_string()))?
@@ -229,6 +234,11 @@ fn parse_evidence_batch_json(text: &str) -> Result<EvidenceBatchFile, CliError> 
         defaults,
         items,
     })
+}
+
+fn starts_json_document(text: &str) -> bool {
+    let trimmed = text.trim_start();
+    trimmed.starts_with('{') || trimmed.starts_with('[')
 }
 
 fn parse_json_defaults(value: Option<&Value>) -> Result<EvidenceBatchDefaults, CliError> {

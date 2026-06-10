@@ -1,5 +1,5 @@
 use super::{open_context, parse_lock_option, CliError, LockOptions, RepoLock};
-use crate::limited_yaml;
+use crate::{limited_yaml, read_batch_file};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::fs;
@@ -481,8 +481,8 @@ fn link_json(link: &LinkBatchLink) -> Value {
 }
 
 fn parse_link_batch_file(path: &Path) -> Result<LinkBatchFile, CliError> {
-    let text = fs::read_to_string(path)?;
-    if text.trim_start().starts_with('{') {
+    let text = read_batch_file(path, "link batch")?;
+    if starts_json_document(&text) {
         parse_link_batch_json(&text)
     } else {
         parse_link_batch_yaml(&text)
@@ -490,10 +490,16 @@ fn parse_link_batch_file(path: &Path) -> Result<LinkBatchFile, CliError> {
 }
 
 fn parse_link_batch_json(text: &str) -> Result<LinkBatchFile, CliError> {
-    let value: Value = serde_json::from_str(text)?;
-    let version = value.get("version").and_then(Value::as_u64).unwrap_or(0);
-    let defaults = parse_json_defaults(value.get("defaults"))?;
-    let links = value
+    let value: Value = serde_json::from_str(text)
+        .map_err(|error| CliError::Usage(format!("invalid link batch JSON: {error}")))?;
+    let object = value.as_object().ok_or_else(|| {
+        CliError::Usage(
+            "link batch JSON must be an object with version and links array; top-level arrays are not supported. Use {\"version\":1,\"links\":[...]} wrapper".to_string(),
+        )
+    })?;
+    let version = object.get("version").and_then(Value::as_u64).unwrap_or(0);
+    let defaults = parse_json_defaults(object.get("defaults"))?;
+    let links = object
         .get("links")
         .and_then(Value::as_array)
         .ok_or_else(|| CliError::Usage("link batch JSON missing links array".to_string()))?
@@ -505,6 +511,11 @@ fn parse_link_batch_json(text: &str) -> Result<LinkBatchFile, CliError> {
         defaults,
         links,
     })
+}
+
+fn starts_json_document(text: &str) -> bool {
+    let trimmed = text.trim_start();
+    trimmed.starts_with('{') || trimmed.starts_with('[')
 }
 
 fn parse_json_defaults(value: Option<&Value>) -> Result<LinkBatchDefaults, CliError> {

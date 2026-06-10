@@ -31,9 +31,9 @@ Active batch ID:
 Scope:
 
 - 2026-06-09時点でopenだった全既知issue。
-- CFB dogfood issue: 68 open。
-- CFR code review issue: 78 open。
-- 合計146件を同一burn-down対象としてfreezeする。
+- Initial frozen CFB dogfood issue count: 68。
+- Initial frozen CFR code review issue count: 78。
+- Initial frozen total: 146件を同一burn-down対象としてfreezeする。
 - 新規issue探索は、このglobal batchを0件にするまで行わない。作業中に見つけた周辺問題は、修正blockerでない限り採番せず、次回discovery候補として短くメモする。
 
 Completion rule:
@@ -111,7 +111,7 @@ Completion rule:
 
 Remaining open count for this batch:
 
-- 103 issues.
+- 90 issues.
 
 ## Global Issue Inventory
 
@@ -121,15 +121,15 @@ Current tracked issue inventory as of 2026-06-10:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 92 | 55 | 37 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
-| CFR code review issues | 160 | 94 | 66 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. |
-| Total | 252 | 149 | 103 | This global batch is the whole known issue backlog. |
+| CFB dogfood issues | 92 | 57 | 35 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFR code review issues | 160 | 105 | 55 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
+| Total | 252 | 162 | 90 | This global batch is the whole known issue backlog. |
 
 Current active batch progress:
 
-- Frozen open issue count: 146.
-- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-029, CFB-040, CFB-041, CFB-042, CFB-044, CFB-052, CFB-057, CFB-058, CFB-060, CFB-062, CFB-064, CFB-065, CFB-068, CFB-069, CFB-070, CFB-071, CFB-073, CFB-074, CFB-075, CFB-076, CFB-081, CFB-083, CFB-084, CFR-085, CFR-086, CFR-096, CFR-098, CFR-115, CFR-125, CFR-126, CFR-127, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-142, CFR-143, CFR-144, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-157.
-- Remaining open: 103.
+- Initial frozen open issue count: 146.
+- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-029, CFB-040, CFB-041, CFB-042, CFB-044, CFB-052, CFB-056, CFB-057, CFB-058, CFB-059, CFB-060, CFB-062, CFB-064, CFB-065, CFB-068, CFB-069, CFB-070, CFB-071, CFB-073, CFB-074, CFB-075, CFB-076, CFB-081, CFB-083, CFB-084, CFR-085, CFR-086, CFR-096, CFR-098, CFR-099, CFR-115, CFR-125, CFR-126, CFR-127, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-142, CFR-143, CFR-144, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-157.
+- Remaining open now: 90.
 
 Burn-down interpretation:
 
@@ -316,7 +316,7 @@ The exact fire ID for the CFB-087 missing evidence test can be replaced with a r
 
 The batch is done only when all are true:
 
-- CFB-086..CFB-092 have no `open` status.
+- All tracked CFB/CFR issues in the active global batch have no `open` status.
 - Fixed issue detail files include `Fix` and `Verification` sections.
 - `bug-backlog.md` summary rows match detail files.
 - `current-cycle-burn-down-plan.md` marks remaining open count as 0.

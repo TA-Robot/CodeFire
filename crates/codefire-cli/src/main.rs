@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::env;
 use std::fmt;
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -860,8 +860,22 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             }
         }
         Some("link") => {
-            let options = parse_link_batch_args(&args[1..])?;
-            let result = run_link_batch(&options)?;
+            let options = match parse_link_batch_args(&args[1..]) {
+                Ok(options) => options,
+                Err(error) if args_want_json(&args[1..]) => {
+                    print_cli_error_json("link-batch", &error)?;
+                    return Err(CliError::CommandFailed(error.exit_status()));
+                }
+                Err(error) => return Err(error),
+            };
+            let result = match run_link_batch(&options) {
+                Ok(result) => result,
+                Err(error) if options.json_output => {
+                    print_cli_error_json("link-batch", &error)?;
+                    return Err(CliError::CommandFailed(error.exit_status()));
+                }
+                Err(error) => return Err(error),
+            };
             let valid_result = result.valid;
             let exit_code = if valid_result {
                 ExitCode::Success
@@ -913,9 +927,23 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     print!("{}", subcommand_help("evidence add"));
                     return Ok(());
                 }
-                let options = parse_evidence_add_args(&args[2..])?;
+                let options = match parse_evidence_add_args(&args[2..]) {
+                    Ok(options) => options,
+                    Err(error) if args_want_json(&args[2..]) => {
+                        print_cli_error_json("evidence-add", &error)?;
+                        return Err(CliError::CommandFailed(error.exit_status()));
+                    }
+                    Err(error) => return Err(error),
+                };
                 if options.batch_path.is_some() {
-                    let result = run_evidence_batch(&options)?;
+                    let result = match run_evidence_batch(&options) {
+                        Ok(result) => result,
+                        Err(error) if options.json_output => {
+                            print_cli_error_json("evidence-add-batch", &error)?;
+                            return Err(CliError::CommandFailed(error.exit_status()));
+                        }
+                        Err(error) => return Err(error),
+                    };
                     if options.json_output {
                         println!(
                             "{}",
@@ -1065,7 +1093,7 @@ fn command_help_for_args(args: &[String]) -> Option<&'static str> {
         "status" | "scan" | "verify" | "fire" | "extinguish" | "commit" | "init" | "open"
         | "clone" | "upload" | "list" | "request-merge" | "request-list" | "request-review"
         | "request-apply" | "review-pack" | "storage" | "doctor" | "show" | "diff" | "context"
-        | "explain" | "atom-index" | "trace-graph" | "missing-links" => {
+        | "explain" | "atom-index" | "trace-graph" | "missing-links" | "link" => {
             Some(subcommand_help(command))
         }
         "migrate" => match args.get(1).map(String::as_str) {
@@ -1131,10 +1159,10 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire verify [path|--path <path>] [--details] [--blocking-only] [--json] [--metrics]\n\nRun CodeFire verification checks for an open directory.\n"
         }
         "fire" => {
-            "usage: codefire fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--dry-run] [--json]\n       codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--json]\n"
+            "usage: codefire fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--dry-run] [--json]\n       codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"from\":\"REQ-id\",\"to\":\"DES-id\",\"reason\":\"manual review\"}]}\n"
         }
         "extinguish" => {
-            "usage: codefire extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>) [--dry-run] [--json]\n       codefire extinguish --batch <file> [--path <open-dir>] [--dry-run] [--json]\n"
+            "usage: codefire extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>) [--dry-run] [--json]\n       codefire extinguish --batch <file> [--path <open-dir>] [--dry-run] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"id\":\"FIRE-1\",\"resolution\":\"addressed\",\"rationale\":\"fixed\"}]}\n"
         }
         "commit" => {
             "usage: codefire commit [path|--path <open-dir>] -m <message> [--dry-run] [--json] [--idempotency-key <key>]\n"
@@ -1166,6 +1194,9 @@ fn subcommand_help(command: &str) -> &'static str {
         "missing-links" => {
             "usage: codefire missing-links [path]\n\nPrint required trace links that are currently missing.\n"
         }
+        "link" => {
+            "usage: codefire link --batch <file> [--path <open-dir>] [--dry-run] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"links\":[{\"from\":\"REQ-id\",\"to\":\"DES-id\",\"type\":\"refined_by\"}]}\n"
+        }
         "storage" => {
             "usage: codefire storage [path] [--quick|--full] [--json] [--large-threshold <bytes|KB|MB|GB>] [--remote <cf://server/org/app>]\n       codefire storage report [path] [--quick|--full] [--json] [--large-threshold <bytes|KB|MB|GB>] [--remote <cf://server/org/app>]\n"
         }
@@ -1173,7 +1204,7 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire doctor [path] [--quick|--full] [--json]\n\nInspect repository health.\n"
         }
         "evidence" | "evidence add" => {
-            "usage: codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>|--from-argv <program> [--argv <arg>...]|--batch <file>) [--label <text>] [--cwd <dir>] [--timeout <duration>] [--max-output-bytes <bytes>] [--dry-run] [--json]\n"
+            "usage: codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>|--from-argv <program> [--argv <arg>...]|--batch <file>) [--label <text>] [--cwd <dir>] [--timeout <duration>] [--max-output-bytes <bytes>] [--dry-run] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"items\":[{\"from_command\":\"cargo test --workspace\",\"label\":\"tests\"}]}\n"
         }
         "show" => {
             "usage: codefire show <branch-or-commit> [--json]\n\nShow a sealed commitish.\n"
@@ -1235,6 +1266,12 @@ enum CliError {
     InvalidMarker(String),
     InvalidRepository(String),
     LockContention(String),
+    BatchFileRead {
+        operation: &'static str,
+        path: PathBuf,
+        kind: ErrorKind,
+        message: String,
+    },
     MissingEvidenceRef {
         evidence_id: String,
         repo_root: PathBuf,
@@ -1260,6 +1297,7 @@ impl CliError {
                 ExitCode::RepositoryCorruption
             }
             CliError::LockContention(_) => ExitCode::LockContention,
+            CliError::BatchFileRead { .. } => ExitCode::InvalidUsageOrConfig,
             CliError::MissingEvidenceRef { .. } => ExitCode::ObjectReferenceInvalid,
         }
     }
@@ -1295,6 +1333,16 @@ impl fmt::Display for CliError {
                 write!(f, "invalid CodeFire repository: {message}")
             }
             CliError::LockContention(message) => write!(f, "{message}"),
+            CliError::BatchFileRead {
+                operation,
+                path,
+                message,
+                ..
+            } => write!(
+                f,
+                "{operation} file read failed: {}: {message}",
+                path.display()
+            ),
             CliError::MissingEvidenceRef { evidence_id, .. } => {
                 write!(f, "missing evidence object: {evidence_id}")
             }
@@ -1326,6 +1374,15 @@ impl From<codefire_store::StoreError> for CliError {
     fn from(error: codefire_store::StoreError) -> Self {
         CliError::Store(error)
     }
+}
+
+pub(crate) fn read_batch_file(path: &Path, operation: &'static str) -> Result<String, CliError> {
+    fs::read_to_string(path).map_err(|error| CliError::BatchFileRead {
+        operation,
+        path: path.to_path_buf(),
+        kind: error.kind(),
+        message: error.to_string(),
+    })
 }
 
 type CommandHandler = fn(&[String]) -> Result<(), CliError>;
@@ -1425,8 +1482,22 @@ fn run_fire_command(args: &[String]) -> Result<(), CliError> {
         .iter()
         .any(|arg| arg == "--batch" || arg.starts_with("--batch="))
     {
-        let options = parse_fire_batch_args(args)?;
-        let result = run_fire_batch(&options)?;
+        let options = match parse_fire_batch_args(args) {
+            Ok(options) => options,
+            Err(error) if args_want_json(args) => {
+                print_cli_error_json("fire-batch", &error)?;
+                return Err(CliError::CommandFailed(error.exit_status()));
+            }
+            Err(error) => return Err(error),
+        };
+        let result = match run_fire_batch(&options) {
+            Ok(result) => result,
+            Err(error) if options.json_output => {
+                print_cli_error_json("fire-batch", &error)?;
+                return Err(CliError::CommandFailed(error.exit_status()));
+            }
+            Err(error) => return Err(error),
+        };
         if options.json_output {
             println!(
                 "{}",
@@ -1444,8 +1515,22 @@ fn run_fire_command(args: &[String]) -> Result<(), CliError> {
             print_fire_result(&result);
         }
     } else {
-        let options = parse_fire_args(args)?;
-        let result = run_fire(&options)?;
+        let options = match parse_fire_args(args) {
+            Ok(options) => options,
+            Err(error) if args_want_json(args) => {
+                print_cli_error_json("fire", &error)?;
+                return Err(CliError::CommandFailed(error.exit_status()));
+            }
+            Err(error) => return Err(error),
+        };
+        let result = match run_fire(&options) {
+            Ok(result) => result,
+            Err(error) if options.json_output => {
+                print_cli_error_json("fire", &error)?;
+                return Err(CliError::CommandFailed(error.exit_status()));
+            }
+            Err(error) => return Err(error),
+        };
         if options.json_output {
             println!(
                 "{}",
@@ -1498,12 +1583,19 @@ fn run_extinguish_command(args: &[String]) -> Result<(), CliError> {
             print_all_matching_extinguish_result(&options, &result);
         }
     } else if has_batch_extinguish_arg(args) {
-        let options = parse_extinguish_batch_args(args)?;
+        let options = match parse_extinguish_batch_args(args) {
+            Ok(options) => options,
+            Err(error) if args_want_json(args) => {
+                print_cli_error_json("extinguish-batch", &error)?;
+                return Err(CliError::CommandFailed(error.exit_status()));
+            }
+            Err(error) => return Err(error),
+        };
         let result = match run_extinguish_batch(&options) {
             Ok(result) => result,
             Err(error) if options.json_output => {
                 print_cli_error_json("extinguish-batch", &error)?;
-                return Err(error);
+                return Err(CliError::CommandFailed(error.exit_status()));
             }
             Err(error) => return Err(error),
         };
@@ -1933,6 +2025,28 @@ fn cli_error_diagnostic(error: &CliError) -> Value {
                 "message": error.to_string(),
             })
         }
+        CliError::Usage(message) if batch_schema_command(message).is_some() => json!({
+            "kind": "batch_schema_error",
+            "severity": "blocking",
+            "blocking": true,
+            "repairable": true,
+            "command": batch_schema_command(message).expect("checked above"),
+            "message": error.to_string(),
+        }),
+        CliError::BatchFileRead {
+            operation,
+            path,
+            kind,
+            ..
+        } => json!({
+            "kind": batch_file_diagnostic_kind(*kind),
+            "severity": "blocking",
+            "blocking": true,
+            "repairable": true,
+            "operation": operation,
+            "path": path,
+            "message": error.to_string(),
+        }),
         _ => json!({
             "kind": "command_error",
             "severity": "blocking",
@@ -1969,6 +2083,43 @@ fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
                 },
             })]
         }
+        CliError::Usage(message) if batch_schema_command(message).is_some() => {
+            let command = batch_schema_command(message).expect("checked above");
+            vec![json!({
+                "kind": "show_batch_schema",
+                "command": cli_command(format!("{command} --help")),
+                "reason": "inspect the required batch wrapper schema before retrying",
+                "target": {
+                    "command": command,
+                    "error": message,
+                },
+            })]
+        }
+        CliError::BatchFileRead {
+            operation, path, ..
+        } => vec![
+            json!({
+                "kind": "check_batch_path",
+                "command": cli_command(format!(
+                    "{} --batch {} --json",
+                    batch_operation_help_command(operation),
+                    command_arg(&path.to_string_lossy())
+                )),
+                "reason": "verify that the batch file path exists and is readable",
+                "target": {
+                    "operation": operation,
+                    "path": path,
+                },
+            }),
+            json!({
+                "kind": "show_batch_schema",
+                "command": cli_command(format!("{} --help", batch_operation_help_command(operation))),
+                "reason": "generate a batch file that matches the command schema before retrying",
+                "target": {
+                    "operation": operation,
+                },
+            }),
+        ],
         CliError::NotOpen(path) => vec![json!({
             "kind": "inspect_repository",
             "command": cli_command(format!("doctor --path {} --json", command_arg(&path.to_string_lossy()))),
@@ -2004,6 +2155,57 @@ fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
             }),
         ],
         _ => Vec::new(),
+    }
+}
+
+fn batch_file_diagnostic_kind(kind: ErrorKind) -> &'static str {
+    match kind {
+        ErrorKind::NotFound => "batch_file_missing",
+        ErrorKind::PermissionDenied => "batch_file_permission_denied",
+        _ => "batch_file_read_failed",
+    }
+}
+
+fn batch_schema_command(message: &str) -> Option<&'static str> {
+    if message.contains("batch extinguish JSON")
+        || message.contains("batch extinguish YAML")
+        || message.contains("invalid batch YAML")
+        || message.contains("batch fire entry")
+        || message.contains("batch defaults")
+    {
+        Some("extinguish")
+    } else if message.contains("fire batch JSON")
+        || message.contains("fire batch YAML")
+        || message.contains("invalid fire batch YAML")
+        || message.contains("fire batch item")
+    {
+        Some("fire")
+    } else if message.contains("evidence batch JSON")
+        || message.contains("evidence batch YAML")
+        || message.contains("invalid evidence batch YAML")
+        || message.contains("evidence batch item")
+        || message.contains("evidence batch defaults")
+    {
+        Some("evidence add")
+    } else if message.contains("link batch JSON")
+        || message.contains("link batch YAML")
+        || message.contains("invalid link batch YAML")
+        || message.contains("link batch item")
+        || message.contains("link batch defaults")
+    {
+        Some("link")
+    } else {
+        None
+    }
+}
+
+fn batch_operation_help_command(operation: &str) -> &'static str {
+    match operation {
+        "evidence batch" => "evidence add",
+        "fire batch" => "fire",
+        "link batch" => "link",
+        "extinguish batch" => "extinguish",
+        _ => "help",
     }
 }
 
