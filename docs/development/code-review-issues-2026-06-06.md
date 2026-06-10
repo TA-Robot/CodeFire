@@ -15,8 +15,8 @@
 - High: 36
 - Medium: 121
 - Low: 3
-- Fixed / closed: 149
-- Remaining open: 11
+- Fixed / closed: 150
+- Remaining open: 10
 
 ## Cycle 2 Source Review Expansion
 
@@ -153,12 +153,13 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | CFR-113 | global burn-down | upload dry-run envelopeがtop-level repo/next_actionsを返す既存実装をclose auditで確認 | `file_remote_upload_clone_show_diff_and_merge_request_flow` |
 | CFR-093 | global burn-down | status JSONのrepo context取得失敗を握りつぶさずstructured diagnosticにした | `status_context_mismatch_returns_structured_diagnostic` |
 | CFR-090 | global burn-down | HTTP remote view bundle temp directoryを呼び出しごとの一意pathとDrop cleanupへ変更 | `view::tests::http_bundle_temp_dirs_are_unique_and_cleaned_on_drop` |
+| CFR-110 | global burn-down | HTTP error responseを`RemoteDiagnostic`として保持しremote diagnostic kind/statusをJSONへ伝播 | `http::tests::http_remote_error_preserves_structured_diagnostic` |
 
 ### Open Area View
 
 | Area | Issues |
 |---|---|
-| Automation JSON / errors | [CFR-110](code-review-issues/cfr-110.md) |
+| Automation JSON / errors | none |
 | CLI help and parser consistency | none |
 | View, diff, patch | [CFR-085](code-review-issues/cfr-085.md), [CFR-086](code-review-issues/cfr-086.md), [CFR-087](code-review-issues/cfr-087.md), [CFR-088](code-review-issues/cfr-088.md), [CFR-089](code-review-issues/cfr-089.md), [CFR-090](code-review-issues/cfr-090.md) |
 | Remote | [CFR-112](code-review-issues/cfr-112.md) |

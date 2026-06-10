@@ -285,6 +285,7 @@
 | 2026-06-10 | Global Burn-down | close auditで既存実装済みのperformance metrics、storage artifact policy、upload dry-run envelopeを確認し、CFB-007、CFB-008、CFR-113をfixedにした | `docs/development/bug-backlog.md`, `docs/development/code-review-issues/cfr-113.md`, docs | `cargo test --workspace`; `codefire branch list --path subprojects/algorithm-evolution-agent-lab --json --metrics`; remaining global open: 15 |
 | 2026-06-10 | Global Burn-down | status JSONのrepo context取得を必須化し、open marker/registry mismatchをpartial successではなくstructured diagnosticへ返すようにして CFR-093 をfixedにした | `crates/codefire-cli/src/main.rs`, `crates/codefire-cli/src/tests.rs`, docs | `cargo test -p codefire-cli status_context_mismatch_returns_structured_diagnostic`; remaining global open: 14 |
 | 2026-06-10 | Global Burn-down | HTTP remote view bundleのtemp object directoryを呼び出しごとの一意pathにし、`ResolvedCommitish` のDrop guardで掃除するようにして CFR-090 をfixedにした | `crates/codefire-cli/src/view.rs`, docs | `cargo test -p codefire-cli view::tests::http_bundle_temp_dirs_are_unique_and_cleaned_on_drop`; remaining global open: 13 |
+| 2026-06-10 | Global Burn-down | HTTP error responseをplain usage stringへ潰さず `RemoteDiagnostic` として保持し、remote diagnostic kind/status/exit codeをclient JSONへ伝播して CFR-110 をfixedにした | `crates/codefire-cli/src/http.rs`, `crates/codefire-cli/src/main.rs`, docs | `cargo test -p codefire-cli http_remote_error_preserves_structured_diagnostic`; remaining global open: 12 |
 
 ## Current Decisions
 

@@ -1392,6 +1392,12 @@ enum CliError {
     AuthenticationOrSignature(String),
     IdempotencyConflict(String),
     HttpPayloadTooLarge(String),
+    RemoteDiagnostic {
+        status: u16,
+        exit_code: ExitCode,
+        kind: String,
+        message: String,
+    },
     MigrationIncompatibility(String),
     VerificationFailed(ExitCode),
     CommandFailed(ExitCode),
@@ -1428,6 +1434,7 @@ impl CliError {
             CliError::AuthenticationOrSignature(_) => ExitCode::AuthenticationOrSignatureFailure,
             CliError::IdempotencyConflict(_) => ExitCode::IdempotencyConflict,
             CliError::HttpPayloadTooLarge(_) => ExitCode::InvalidUsageOrConfig,
+            CliError::RemoteDiagnostic { exit_code, .. } => *exit_code,
             CliError::MigrationIncompatibility(_) => ExitCode::MigrationIncompatibility,
             CliError::VerificationFailed(exit_code) => *exit_code,
             CliError::CommandFailed(exit_code) => *exit_code,
@@ -1537,6 +1544,20 @@ impl CliError {
             CliError::HttpPayloadTooLarge(_) => {
                 self.simple_diagnostic("http_payload_too_large", true)
             }
+            CliError::RemoteDiagnostic {
+                status,
+                exit_code,
+                kind,
+                ..
+            } => json!({
+                "kind": kind,
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "http_status": status,
+                "exit_code": exit_code.code(),
+                "message": self.to_string(),
+            }),
             CliError::MigrationIncompatibility(_) => {
                 self.simple_diagnostic("migration_incompatibility", true)
             }
@@ -1580,6 +1601,7 @@ impl fmt::Display for CliError {
             CliError::AuthenticationOrSignature(message) => write!(f, "{message}"),
             CliError::IdempotencyConflict(message) => write!(f, "{message}"),
             CliError::HttpPayloadTooLarge(message) => write!(f, "{message}"),
+            CliError::RemoteDiagnostic { message, .. } => write!(f, "{message}"),
             CliError::MigrationIncompatibility(message) => write!(f, "{message}"),
             CliError::VerificationFailed(_) => write!(f, "verification failed"),
             CliError::CommandFailed(_) => write!(f, "command failed"),

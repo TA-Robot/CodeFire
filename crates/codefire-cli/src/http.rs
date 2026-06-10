@@ -172,27 +172,68 @@ fn http_json_stream<S: Read + Write>(
         serde_json::from_slice(&response_body)?
     };
     if status >= 400 {
-        let detail = value
-            .get("error")
-            .and_then(Value::as_str)
-            .unwrap_or("HTTP remote error");
-        if value.get("exit_code").and_then(Value::as_i64)
-            == Some(ExitCode::IdempotencyConflict.code() as i64)
-        {
-            return Err(CliError::IdempotencyConflict(format!(
-                "HTTP remote error: {detail}"
-            )));
-        }
-        if value.get("exit_code").and_then(Value::as_i64)
-            == Some(ExitCode::AuthenticationOrSignatureFailure.code() as i64)
-        {
-            return Err(CliError::AuthenticationOrSignature(format!(
-                "HTTP remote error: {detail}"
-            )));
-        }
-        return Err(CliError::Usage(format!("HTTP remote error: {detail}")));
+        return Err(http_remote_error(status, &value));
     }
     Ok(value)
+}
+
+fn http_remote_error(status: u16, value: &Value) -> CliError {
+    let detail = value
+        .get("error")
+        .and_then(Value::as_str)
+        .or_else(|| value.get("message").and_then(Value::as_str))
+        .unwrap_or("HTTP remote error");
+    let exit_code = value
+        .get("exit_code")
+        .and_then(Value::as_i64)
+        .and_then(exit_code_from_i64)
+        .unwrap_or(ExitCode::RemoteRejected);
+    let kind = value
+        .get("diagnostics")
+        .and_then(Value::as_array)
+        .and_then(|items| items.first())
+        .and_then(|item| item.get("kind"))
+        .and_then(Value::as_str)
+        .or_else(|| value.get("kind").and_then(Value::as_str))
+        .map(str::to_string)
+        .unwrap_or_else(|| match exit_code {
+            ExitCode::AuthenticationOrSignatureFailure => {
+                "remote_authentication_or_signature_error".to_string()
+            }
+            ExitCode::IdempotencyConflict => "remote_idempotency_conflict".to_string(),
+            _ => "remote_rejected".to_string(),
+        });
+    CliError::RemoteDiagnostic {
+        status,
+        exit_code,
+        kind,
+        message: format!("HTTP remote error: {detail}"),
+    }
+}
+
+fn exit_code_from_i64(value: i64) -> Option<ExitCode> {
+    match value {
+        value if value == ExitCode::InvalidUsageOrConfig.code() as i64 => {
+            Some(ExitCode::InvalidUsageOrConfig)
+        }
+        value if value == ExitCode::RepositoryCorruption.code() as i64 => {
+            Some(ExitCode::RepositoryCorruption)
+        }
+        value if value == ExitCode::ObjectReferenceInvalid.code() as i64 => {
+            Some(ExitCode::ObjectReferenceInvalid)
+        }
+        value if value == ExitCode::SealedCommitInvalid.code() as i64 => {
+            Some(ExitCode::SealedCommitInvalid)
+        }
+        value if value == ExitCode::RemoteRejected.code() as i64 => Some(ExitCode::RemoteRejected),
+        value if value == ExitCode::AuthenticationOrSignatureFailure.code() as i64 => {
+            Some(ExitCode::AuthenticationOrSignatureFailure)
+        }
+        value if value == ExitCode::IdempotencyConflict.code() as i64 => {
+            Some(ExitCode::IdempotencyConflict)
+        }
+        _ => None,
+    }
 }
 
 fn read_http_response<S: Read + Write>(stream: &mut S) -> Result<(String, Vec<u8>), CliError> {
@@ -1339,6 +1380,31 @@ mod tests {
         let error = read_http_response(&mut Cursor::new(response.into_bytes())).unwrap_err();
         assert!(matches!(error, CliError::HttpPayloadTooLarge(_)));
         assert!(error.to_string().contains("HTTP response body too large"));
+    }
+
+    #[test]
+    fn http_remote_error_preserves_structured_diagnostic() {
+        let error = http_remote_error(
+            403,
+            &json!({
+                "error": "signature rejected",
+                "exit_code": ExitCode::AuthenticationOrSignatureFailure.code(),
+                "diagnostics": [
+                    {"kind": "remote_signature_rejected", "message": "bad signature"}
+                ]
+            }),
+        );
+        assert_eq!(
+            error.exit_code(),
+            ExitCode::AuthenticationOrSignatureFailure.code()
+        );
+        let diagnostic = error.diagnostic();
+        assert_eq!(diagnostic["kind"], "remote_signature_rejected");
+        assert_eq!(diagnostic["http_status"], 403);
+        assert_eq!(
+            diagnostic["exit_code"],
+            ExitCode::AuthenticationOrSignatureFailure.code()
+        );
     }
 
     #[test]
