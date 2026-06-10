@@ -192,7 +192,24 @@ codefire clone cf+http://127.0.0.1:8080/org/app/main main-latest
 
 remote tracking branchは作らない。
 
-## 4.7 `scan`
+## 4.7 `status`
+
+```bash
+codefire status [path|--path <open-dir>] [--json] [--metrics]
+```
+
+仕様：
+
+```text
+open registryとactive fires ledgerから現在のbranch/state/open fire countを返す
+branch head current_base_commitはsealed commit validationを実行する
+open fire数が正の場合、raw stateがopen-clean/open-consistentでもstatus.stateはopen-burningとして返す
+--jsonはcodefire.command_result.v1 envelopeを返す
+--json data.scan_predictionはactive stateを書き換えずに現在worktreeをpreview scanし、branch_state、changed_count、open_fire_count、tool_migration、base_commitを返す
+--metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
+```
+
+## 4.8 `scan`
 
 ```bash
 codefire scan
@@ -229,7 +246,7 @@ fire --batch、extinguish --batch、link --batch、evidence add --batch の限�
 unsupported section/keyやschema固有validationは各commandで判定し、error messageのcontextはcommandごとのbatch YAML名を使う
 ```
 
-## 4.8 `fire`
+## 4.9 `fire`
 
 ```bash
 codefire fire REQ-AUTH-001 --to DES-AUTH-001 --reason "仕様と設計が一致していない可能性がある"
@@ -254,7 +271,7 @@ fire planのnext_actionsは--path <open_dir>付きcommandとbranch/open_dir/repo
 --jsonはcodefire.command_result.v1 envelopeを出力し、単発はdata.type=codefire_fire_result、batchはdata.type=codefire_fire_batch_resultを含める
 ```
 
-## 4.9 `extinguish`
+## 4.10 `extinguish`
 
 ```bash
 codefire extinguish FIRE-001 \
@@ -336,7 +353,7 @@ fires:
     rationale: "REQ/DES linkを確認した"
 ```
 
-## 4.10 `verify`
+## 4.11 `verify`
 
 ```bash
 codefire verify
@@ -371,7 +388,7 @@ next_actionsは最大12件に制限され、超過時はnext_actions_omitted act
 metricsは `total_ms` / `verification_pipeline_ms` / `scan_pipeline_ms` / `verification_commands_ms` / `policy_evaluation_ms` の安定phase key、`phases[].measured`、cache status metadataを含める
 ```
 
-## 4.11 `context`
+## 4.12 `context`
 
 ```bash
 codefire context --branch --json
@@ -384,16 +401,19 @@ codefire context --fire FIRE-001 --json
 仕様：
 
 ```text
-active scanが存在する場合はactive stateのscan.jsonを読み取り、存在しない場合だけopen directoryからread-only preview scanを再構築してcontext packを返す
+contextはactive scanが存在する場合も現在worktreeのread-only preview scanを作り、active scan fingerprintと比較する
+active scanがfreshならactive stateのscan.jsonを使い、staleならactive stateを書き換えずpreview scanをcontext packに使う
 contextはactive stateを書き換えない
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_context_packを含める
 selectorは--branch、--changed、--atom、--fireのいずれか1つ
+--branchはchanged atomsとopen fire endpointsをbranch context selectionとして返す
 --atomの--depthはTraceGraph上の近傍探索深さを指定する
 --depthは最大8に制限され、--limitはatoms/trace_links/firesの出力上限を指定する
-context packはlimitsとtruncatedを含め、scan.snapshot_source、scan.active_scan_path、scan.preview_recomputed、scan.fire_sourceでactive scan/preview scanの由来を区別する
+context packはtop-level changed_atoms、open_fires、changed_count、open_fire_countを返し、scan --jsonと同じ主要summaryを読める
+context packはlimitsとtruncatedを含め、scan.snapshot_source、scan.active_scan_path、scan.preview_recomputed、scan.active_scan_fresh、scan.active_scan_stale_reason、scan.fire_sourceでactive scan/preview scanの由来を区別する
 ```
 
-## 4.12 `commit`
+## 4.13 `commit`
 
 ```bash
 codefire commit -m "Implement login handler"
@@ -420,7 +440,7 @@ certificate.resultはverification.resultと同じ語彙を使い、現行成功c
 同じ--idempotency-keyでmessage/open_dir/branchが異なるpayloadはexit code 33で拒否する
 ```
 
-## 4.13 `merge`
+## 4.14 `merge`
 
 ```bash
 codefire merge feature-login --into main
@@ -447,7 +467,7 @@ text conflictはtarget fileへconflict markerを書き込む
 binaryまたは非UTF-8 conflictはtarget fileへlossy markerを書かず、`.codefire-conflicts/<path>/target` と `.codefire-conflicts/<path>/source` に復元用bytesを保存し、binary_conflicts metadataへ記録する
 ```
 
-## 4.14 `upload`
+## 4.15 `upload`
 
 ```bash
 codefire upload feature-login cf://server/alice/app/feature-login
@@ -475,7 +495,7 @@ cf+http uploadはserver側remote projectのidempotency recordで同じ規則を�
 cf+http uploadのserver側tmp object directoryはrequestごとに一意化され、cleanupは自分のrequest directoryだけを対象にする
 ```
 
-## 4.15 `show` / `diff`
+## 4.16 `show` / `diff`
 
 ```bash
 codefire show feature-login
@@ -513,7 +533,7 @@ text diff payloadはunified hunk headerを持ち、file単位の最大出力byte
 --rename-detectionはexact hash renameを先に検出し、candidate pair数が上限を超えるinexact similarity計算はwarning付きでskipする
 ```
 
-## 4.16 `review-pack`
+## 4.17 `review-pack`
 
 ```bash
 codefire review-pack feature-login
@@ -537,7 +557,7 @@ verificationにbase/sourceそれぞれのverification summaryを含める
 review-packはsealed commitから再現可能な情報だけで構成し、生成時刻などの非決定的値は含めない
 ```
 
-## 4.17 `storage report`
+## 4.18 `storage report`
 
 ```bash
 codefire storage report
@@ -566,7 +586,7 @@ external_artifactsはartifact_ref objectのrefs、referenced_bytes、payload_byt
 artifact_refは外部artifact本体を.codefire/objectsへコピーせず、URI/path/hash/size metadataだけを保存する。defaultでは絶対local pathを保存しない
 ```
 
-## 4.18 `link --batch`
+## 4.19 `link --batch`
 
 ```bash
 codefire link --batch links-batch.yaml --dry-run --json
@@ -586,7 +606,7 @@ validationは全itemを確認し、dry-runではdata.valid=falseとitem_index付
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_link_batch_result、data.valid、data.diagnosticsを含める
 ```
 
-## 4.19 `evidence add`
+## 4.20 `evidence add`
 
 ```bash
 codefire evidence add --artifact runs/model.bin --label "best checkpoint" --json
@@ -623,7 +643,7 @@ resolutionから参照されたevidence objectと、そのevidenceが参照す�
 legacy artifact_refが絶対local pathを含む場合、remote upload planはartifact_path_sensitive warningを返す
 ```
 
-## 4.20 `explain`
+## 4.21 `explain`
 
 ```bash
 codefire explain fire FIRE-001 --path ./main-open --json
@@ -643,7 +663,7 @@ storage-warningはstorage reportを実行し、large object/invalid JSON warning
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_explainを含める
 ```
 
-## 4.21 `migrate`
+## 4.22 `migrate`
 
 ```bash
 codefire migrate check
@@ -666,7 +686,7 @@ shared layout registry上のmissing auto-create directoryとobject subdirはplan
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_migration_report、current_format、supported_target_formats、scan_mode、skipped_checksを含める
 ```
 
-## 4.22 `patch`
+## 4.23 `patch`
 
 ```bash
 codefire patch export feature-login --base main --output feature-login.cfpatch.json
@@ -699,7 +719,7 @@ patch import --idempotency-keyは成功したimport resultを.codefire/idempoten
 patch pathはmanifest pathと同じく相対pathだけを許可し、open directory外へescapeするpathを拒否する
 ```
 
-## 4.23 `request-merge`
+## 4.24 `request-merge`
 
 ```bash
 codefire request-merge \

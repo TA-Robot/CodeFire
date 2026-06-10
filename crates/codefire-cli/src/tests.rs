@@ -1500,6 +1500,30 @@ fn context_pack_returns_atom_changed_and_fire_views() {
             .len(),
         2
     );
+    assert_eq!(changed_pack.data["changed_count"], 2);
+    assert_eq!(changed_pack.data["open_fire_count"], 2);
+    assert_eq!(
+        changed_pack.data["changed_atoms"],
+        changed_pack.data["scan"]["changed_atoms"]
+    );
+    assert_eq!(
+        changed_pack.data["open_fires"],
+        changed_pack.data["scan"]["open_fires"]
+    );
+    let branch_pack = context::build_context_pack(&context::ContextOptions {
+        path: open_dir.clone(),
+        selector: context::ContextSelector::Branch,
+        depth: 1,
+        limit: 100,
+        json_output: true,
+    })
+    .unwrap();
+    assert_eq!(branch_pack.data["selector"]["kind"], "branch");
+    assert!(branch_pack.data["atoms"].as_array().unwrap().len() >= 2);
+    let status = read_status(&open_dir).unwrap();
+    let status_json = status_data_json_with_prediction(&status, &open_dir);
+    assert_eq!(status_json["scan_prediction"]["changed_count"], 2);
+    assert_eq!(status_json["scan_prediction"]["open_fire_count"], 2);
     let bounded_changed_pack = context::build_context_pack(&context::ContextOptions {
         path: open_dir.clone(),
         selector: context::ContextSelector::Changed,
@@ -1540,7 +1564,7 @@ fn context_pack_returns_atom_changed_and_fire_views() {
         .display_id
         .clone();
     let fire_pack = context::build_context_pack(&context::ContextOptions {
-        path: open_dir,
+        path: open_dir.clone(),
         selector: context::ContextSelector::Fire(fire_id.clone()),
         depth: 1,
         limit: 100,
@@ -1556,6 +1580,29 @@ fn context_pack_returns_atom_changed_and_fire_views() {
         fire_id
     );
     assert_eq!(fire_pack.data["fires"].as_array().unwrap().len(), 1);
+
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 45\n",
+    )
+    .unwrap();
+    let stale_pack = context::build_context_pack(&context::ContextOptions {
+        path: open_dir,
+        selector: context::ContextSelector::Changed,
+        depth: 1,
+        limit: 100,
+        json_output: true,
+    })
+    .unwrap();
+    assert_eq!(
+        stale_pack.data["scan"]["snapshot_source"],
+        "stale_active_scan_preview"
+    );
+    assert_eq!(stale_pack.data["scan"]["active_scan_fresh"], false);
+    assert_eq!(stale_pack.data["scan"]["preview_recomputed"], true);
 }
 
 #[test]

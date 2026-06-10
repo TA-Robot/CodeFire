@@ -40,6 +40,8 @@ struct ContextSnapshot {
     scan_snapshot_source: &'static str,
     scan_fire_source: &'static str,
     preview_recomputed: bool,
+    active_scan_fresh: bool,
+    active_scan_stale_reason: Option<&'static str>,
 }
 
 struct Selection {
@@ -243,18 +245,6 @@ fn context_snapshot(start: &Path) -> Result<ContextSnapshot, CliError> {
         &["open", "active_state_path"],
     )?);
     let active_scan_path = active_state_path.join("scan.json");
-    if active_scan_path.exists() {
-        let scan = serde_json::from_value(read_json(&active_scan_path)?)?;
-        return Ok(ContextSnapshot {
-            open,
-            scan,
-            active_scan_path,
-            scan_snapshot_source: "active_scan",
-            scan_fire_source: "active",
-            preview_recomputed: false,
-        });
-    }
-
     let current = codefire_core::build_atom_index(&open.open_dir)?;
     let base_index = load_base_atom_index(&objects, &base_commit)?;
     let trace_graph = codefire_core::current_trace_graph(&open.open_dir)?;
@@ -275,7 +265,7 @@ fn context_snapshot(start: &Path) -> Result<ContextSnapshot, CliError> {
     } else {
         "atom_changed"
     };
-    let (scan, _) = codefire_core::build_scan_result(
+    let (preview_scan, _) = codefire_core::build_scan_result(
         current,
         base_index,
         trace_graph,
@@ -284,14 +274,53 @@ fn context_snapshot(start: &Path) -> Result<ContextSnapshot, CliError> {
         reason,
         "preview-context",
     )?;
+    if active_scan_path.exists() {
+        let active_scan: codefire_core::ScanResult =
+            serde_json::from_value(read_json(&active_scan_path)?)?;
+        if scan_fingerprint(&active_scan)? == scan_fingerprint(&preview_scan)? {
+            return Ok(ContextSnapshot {
+                open,
+                scan: active_scan,
+                active_scan_path,
+                scan_snapshot_source: "active_scan",
+                scan_fire_source: "active",
+                preview_recomputed: false,
+                active_scan_fresh: true,
+                active_scan_stale_reason: None,
+            });
+        }
+        return Ok(ContextSnapshot {
+            open,
+            scan: preview_scan,
+            active_scan_path,
+            scan_snapshot_source: "stale_active_scan_preview",
+            scan_fire_source: "preview",
+            preview_recomputed: true,
+            active_scan_fresh: false,
+            active_scan_stale_reason: Some("active scan differs from current worktree preview"),
+        });
+    }
     Ok(ContextSnapshot {
         open,
-        scan,
+        scan: preview_scan,
         active_scan_path,
         scan_snapshot_source: "preview_recomputed",
         scan_fire_source: "preview",
         preview_recomputed: true,
+        active_scan_fresh: false,
+        active_scan_stale_reason: Some("active scan missing"),
     })
+}
+
+fn scan_fingerprint(scan: &codefire_core::ScanResult) -> Result<Value, CliError> {
+    Ok(json!({
+        "base_commit": &scan.base_commit,
+        "tool_migration": &scan.tool_migration,
+        "changed_atoms": &scan.changed_atoms,
+        "open_fires": &scan.open_fires,
+        "atom_index": serde_json::to_value(&scan.atom_index)?,
+        "trace_graph": serde_json::to_value(&scan.trace_graph)?,
+    }))
 }
 
 fn context_data_json(
@@ -415,6 +444,8 @@ fn context_data_json(
             "scan_open_fires": scan_open_fires_truncated,
         },
         "summary": {
+            "changed_count": snapshot.scan.changed_atoms.len(),
+            "open_fire_count": snapshot.scan.open_fires.len(),
             "atoms": {
                 "total": atom_count_before_limit,
                 "returned": selected_atoms.len(),
@@ -456,10 +487,16 @@ fn context_data_json(
             "snapshot_source": snapshot.scan_snapshot_source,
             "active_scan_path": snapshot.active_scan_path,
             "preview_recomputed": snapshot.preview_recomputed,
+            "active_scan_fresh": snapshot.active_scan_fresh,
+            "active_scan_stale_reason": snapshot.active_scan_stale_reason,
             "fire_source": snapshot.scan_fire_source,
-            "changed_atoms": scan_changed_atoms,
-            "open_fires": scan_open_fires,
+            "changed_atoms": &scan_changed_atoms,
+            "open_fires": &scan_open_fires,
         },
+        "changed_count": snapshot.scan.changed_atoms.len(),
+        "open_fire_count": snapshot.scan.open_fires.len(),
+        "changed_atoms": &scan_changed_atoms,
+        "open_fires": &scan_open_fires,
         "atoms": selected_atoms,
         "trace_links": trace_links,
         "trace_link_endpoints": trace_link_endpoint_metadata,
@@ -474,7 +511,21 @@ fn selected_atom_ids(
     limit: usize,
 ) -> Result<Selection, CliError> {
     match selector {
-        ContextSelector::Branch => Ok(selection(BTreeSet::new(), false)),
+        ContextSelector::Branch => {
+            let mut ids = BTreeSet::new();
+            for atom_id in &scan.changed_atoms {
+                ids.insert(atom_id.clone());
+            }
+            for fire in &scan.open_fires {
+                ids.insert(fire.source.atom_id.clone());
+                ids.insert(fire.target.atom_id.clone());
+            }
+            let total = ids.len();
+            if total > limit {
+                ids = ids.into_iter().take(limit).collect();
+            }
+            Ok(selection_with_omitted_neighbors(ids, total > limit, 0))
+        }
         ContextSelector::Changed => {
             let total = scan.changed_atoms.len();
             Ok(selection_with_omitted_neighbors(
@@ -508,10 +559,6 @@ fn selected_atom_ids(
             Ok(selection_with_omitted_neighbors(ids, total > limit, 0))
         }
     }
-}
-
-fn selection(atom_ids: BTreeSet<String>, truncated_atoms: bool) -> Selection {
-    selection_with_omitted_neighbors(atom_ids, truncated_atoms, 0)
 }
 
 fn selection_with_omitted_neighbors(

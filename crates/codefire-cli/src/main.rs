@@ -804,6 +804,10 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 .then(|| status_metrics(started.elapsed(), &status));
             if options.json_output {
                 let repo_root = open_context(&options.path).ok().map(|context| context.repo_root);
+                let data = attach_metrics(
+                    status_data_json_with_prediction(&status, &options.path),
+                    metrics.as_ref(),
+                );
                 println!(
                     "{}",
                     serde_json::to_string_pretty(&command_result_envelope(
@@ -811,7 +815,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         true,
                         0,
                         repo_root.as_deref(),
-                        attach_metrics(status_data_json(&status), metrics.as_ref()),
+                        data,
                         Vec::new(),
                         status_next_actions(&status),
                     ))?
@@ -1859,6 +1863,22 @@ fn print_status(status: &Status) {
     println!("State: {}", status.state);
     println!("Base: {}", status.base);
     println!("Open fires: {}", status.open_fires);
+}
+
+fn status_data_json_with_prediction(status: &Status, path: &Path) -> Value {
+    let mut data = status_data_json(status);
+    if let Ok(scan_execution) = compute_scan(path, false) {
+        let scan = scan_execution.scan;
+        data["scan_prediction"] = json!({
+            "source": "preview_recomputed",
+            "branch_state": scan_branch_state(scan.changed_atoms.len(), scan.open_fires.len()),
+            "changed_count": scan.changed_atoms.len(),
+            "open_fire_count": scan.open_fires.len(),
+            "tool_migration": &scan.tool_migration,
+            "base_commit": &scan.base_commit,
+        });
+    }
+    data
 }
 
 fn print_branches(branches: &[Branch]) {
