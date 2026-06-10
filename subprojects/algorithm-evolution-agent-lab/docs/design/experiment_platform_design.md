@@ -561,3 +561,17 @@ The manifest includes:
 - lint Markdown artifact entry
 
 Each entry stores a relative POSIX path, `sha256:<hex>` digest, and UTF-8 byte count. Absolute paths, Windows separators, empty segments, current-directory segments, and parent-directory segments are rejected before any manifest entry is returned. This keeps the handoff contract deterministic and safe to pass to a future writer or storage adapter.
+
+## DES-AUTO-029: Research cycle planning packet manifest Markdown
+
+The manifest Markdown renderer consumes `ResearchCyclePlanningPacketManifest` and emits a compact audit document.
+
+The document includes:
+
+- title
+- source cycle IDs
+- status
+- artifact count
+- artifact table with path, SHA-256 digest, and byte count
+
+The renderer does not recompute hashes and does not inspect packet contents. It formats the manifest that automation already validated, preserving entry order so reviewer-facing logs and machine handoff metadata stay aligned.

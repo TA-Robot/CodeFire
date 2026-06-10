@@ -183,3 +183,7 @@ The system shall render a complete research cycle planning packet into one deter
 ## REQ-AUTO-046: Research cycle planning packet manifest
 
 The system shall build a deterministic manifest for planning packet handoff artifacts. The manifest shall record source cycles, lint status, relative artifact paths, content SHA-256 digests, and byte counts for the combined packet Markdown, plan Markdown, and lint Markdown so downstream automation can verify that persisted handoff files still match the reviewed planning packet.
+
+## REQ-AUTO-047: Research cycle planning packet manifest Markdown
+
+The system shall render a planning packet manifest into deterministic Markdown for audit logs. The rendered document shall include source cycles, status, artifact count, and a stable table of artifact path, SHA-256 digest, and byte count so human reviewers can inspect the same handoff integrity metadata that automation validates.

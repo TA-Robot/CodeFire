@@ -7,6 +7,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanItem,
     ResearchCyclePlanningPacketBuilder,
     ResearchCyclePlanningPacketManifestBuilder,
+    ResearchCyclePlanningPacketManifestMarkdown,
     ResearchCyclePlanningPacketMarkdown,
     ResearchCyclePlanLint,
     ResearchCyclePlanLintMarkdown,
@@ -388,6 +389,52 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
                 packet,
                 packet_path="/tmp/planning-packet.md",
             )
+
+    # cf-atom: TEST-research-cycle-planning-packet-manifest-markdown-renders-audit-table
+    def test_research_cycle_planning_packet_manifest_markdown_renders_audit_table(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-11",
+                    completed_runs=3,
+                    improved_candidates=0,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=4.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=0,
+                )
+            ]
+        )
+        packet = ResearchCyclePlanningPacketBuilder().build(
+            report,
+            active_capacity=1,
+            remaining_budget=2.0,
+            plan_title="Cycle 11 Plan",
+            lint_title="Cycle 11 Lint",
+        )
+        manifest = ResearchCyclePlanningPacketManifestBuilder().build(
+            packet,
+            packet_path="cycle-11/planning-packet.md",
+            plan_path="cycle-11/plan.md",
+            lint_path="cycle-11/lint.md",
+            packet_title="Cycle 11 Packet",
+        )
+
+        markdown = ResearchCyclePlanningPacketManifestMarkdown().render(
+            manifest,
+            title="Cycle 11 Manifest",
+        )
+
+        self.assertIn("# Cycle 11 Manifest", markdown)
+        self.assertIn("- Source cycles: cycle-11", markdown)
+        self.assertIn("- Status: ok", markdown)
+        self.assertIn("- Artifact count: 3", markdown)
+        self.assertIn("| Path | SHA-256 | Bytes |", markdown)
+        self.assertIn("| `cycle-11/planning-packet.md` | `sha256:", markdown)
+        self.assertIn("| `cycle-11/lint.md` | `sha256:", markdown)
 
 
 if __name__ == "__main__":

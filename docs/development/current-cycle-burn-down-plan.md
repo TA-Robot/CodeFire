@@ -24,6 +24,12 @@ Burn-down中に別の問題を見つけた場合の扱い:
 
 ## Active Batch
 
+Current known open issue count:
+
+- CFB/CFR product/review issues: 0.
+- Algorithm CodeFire open fires after the latest dogfood seal: 0.
+- The historical 146-item global batch below is complete; it is not a remaining-open count.
+
 Active batch ID:
 
 - `BATCH-2026-06-global-open-backlog`
@@ -33,7 +39,7 @@ Scope:
 - 2026-06-09時点でopenだった全既知issue。
 - Initial frozen CFB dogfood issue count: 68。
 - Initial frozen CFR code review issue count: 78。
-- Initial frozen total: 146件を同一burn-down対象としてfreezeする。
+- Historical initial frozen total: 146件を同一burn-down対象としてfreezeした。
 - 新規issue探索は、このglobal batchを0件にするまで行わない。作業中に見つけた周辺問題は、修正blockerでない限り採番せず、次回discovery候補として短くメモする。
 
 Completion rule:
@@ -209,11 +215,11 @@ Current tracked issue inventory as of 2026-06-10:
 |---|---:|---:|---:|---|
 | CFB dogfood issues | 95 | 95 | 0 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-005/009/010/011/017/018/020/021/025, CFB-023 and later, plus later generated issues; CFB-001..004/006..008/012..016/019/022 are summary-only legacy entries. |
 | CFR code review issues | 160 | 160 | 0 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
-| Total | 255 | 255 | 0 | This global batch plus cycle 4/5/6/7/8/9/10 dogfood passes are the whole known issue backlog. |
+| Total | 255 | 255 | 0 | This global batch plus cycle 4/5/6/7/8/9/10/11 dogfood passes are the whole known issue backlog. |
 
-Current active batch progress:
+Completed global batch progress:
 
-- Initial frozen open issue count: 146. This is the historical starting count for this completed batch, not the current open count.
+- Historical starting count for the closed global batch: 146. This is not the current open count.
 - Fixed during global burn-down so far: CFB-005, CFB-006, CFB-007, CFB-008, CFB-009, CFB-010, CFB-011, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-017, CFB-018, CFB-020, CFB-021, CFB-022, CFB-025, CFB-026, CFB-027, CFB-028, CFB-029, CFB-032, CFB-033, CFB-034, CFB-035, CFB-037, CFB-040, CFB-041, CFB-042, CFB-043, CFB-044, CFB-045, CFB-048, CFB-049, CFB-050, CFB-051, CFB-052, CFB-053, CFB-054, CFB-055, CFB-056, CFB-057, CFB-058, CFB-059, CFB-060, CFB-061, CFB-062, CFB-063, CFB-064, CFB-065, CFB-066, CFB-067, CFB-068, CFB-069, CFB-070, CFB-071, CFB-072, CFB-073, CFB-074, CFB-075, CFB-076, CFB-077, CFB-078, CFB-081, CFB-082, CFB-083, CFB-084, CFR-081, CFR-082, CFR-083, CFR-084, CFR-085, CFR-086, CFR-087, CFR-088, CFR-089, CFR-092, CFR-094, CFR-095, CFR-096, CFR-097, CFR-098, CFR-099, CFR-100, CFR-101, CFR-102, CFR-103, CFR-104, CFR-105, CFR-106, CFR-107, CFR-108, CFR-109, CFR-111, CFR-112, CFR-113, CFR-114, CFR-115, CFR-116, CFR-117, CFR-118, CFR-119, CFR-120, CFR-121, CFR-122, CFR-123, CFR-124, CFR-125, CFR-126, CFR-127, CFR-128, CFR-129, CFR-130, CFR-132, CFR-133, CFR-134, CFR-135, CFR-136, CFR-137, CFR-138, CFR-139, CFR-140, CFR-141, CFR-142, CFR-143, CFR-144, CFR-145, CFR-146, CFR-147, CFR-148, CFR-149, CFR-150, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-156, CFR-157, CFR-158, CFR-159, CFR-160.
 - Remaining open now: 0.
 
@@ -355,6 +361,24 @@ Cycle 10 burn-down:
 | Issue | Status | Root fix group | Current decision |
 |---|---|---|---|
 | CFB-095 | fixed | Status prediction next_actions | `status --json` uses scan prediction changed/open-fire counts to recommend `scan` and `verify` when prediction-only open fires exist |
+
+## Cycle 11 Dogfood Pass
+
+After cycle 10 reached zero open issues, cycle 11 resumed algorithm development with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `ResearchCyclePlanningPacketManifestMarkdown` to render planning packet manifests as reviewer-readable audit tables.
+- Added `REQ-AUTO-047`, `DES-AUTO-029`, `CODE-ResearchCyclePlanningPacketManifestMarkdown`, and `TEST-research-cycle-planning-packet-manifest-markdown-renders-audit-table`.
+- Algorithm unittest result: 153 tests pass.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-85c55142b38b449258674506`.
+
+Cycle 11 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
 
 Burn-down interpretation:
 

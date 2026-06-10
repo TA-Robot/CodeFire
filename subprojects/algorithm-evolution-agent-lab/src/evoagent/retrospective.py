@@ -582,6 +582,29 @@ class ResearchCyclePlanningPacketManifestBuilder:
         )
 
 
+# cf-atom: CODE-ResearchCyclePlanningPacketManifestMarkdown
+class ResearchCyclePlanningPacketManifestMarkdown:
+    def render(
+        self,
+        manifest: ResearchCyclePlanningPacketManifest,
+        *,
+        title: str = "Research Cycle Planning Packet Manifest",
+    ) -> str:
+        lines = [
+            f"# {title}",
+            "",
+            f"- Source cycles: {', '.join(manifest.source_cycles)}",
+            f"- Status: {manifest.status}",
+            f"- Artifact count: {len(manifest.entries)}",
+            "",
+            "| Path | SHA-256 | Bytes |",
+            "|---|---|---:|",
+        ]
+        for entry in manifest.entries:
+            lines.append(f"| `{entry.path}` | `{entry.content_sha256}` | {entry.byte_count} |")
+        return "\n".join(lines).rstrip() + "\n"
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

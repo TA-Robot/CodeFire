@@ -90,3 +90,4 @@
 | AE-086 | Planning QA | retrospectiveからplan/lint/Markdown一式をplanning packetとして生成する | done | `CODE-ResearchCyclePlanningPacketBuilder`; `TEST-research-cycle-planning-packet-builds-plan-lint-and-markdown`; 150 tests pass |
 | AE-087 | Reporting | planning packetを単一のcycle handoff Markdown文書へ整形する | done | `CODE-ResearchCyclePlanningPacketMarkdown`; `TEST-research-cycle-planning-packet-markdown-renders-review-document`; 151 tests pass |
 | AE-088 | Reporting | planning packet handoff artifactのpath/hash/byte manifestを生成する | done | `CODE-ResearchCyclePlanningPacketManifestBuilder`; `TEST-research-cycle-planning-packet-manifest-records-artifact-hashes`; 152 tests pass |
+| AE-089 | Reporting | planning packet manifestを監査用Markdown tableへ整形する | done | `CODE-ResearchCyclePlanningPacketManifestMarkdown`; `TEST-research-cycle-planning-packet-manifest-markdown-renders-audit-table`; 153 tests pass |
