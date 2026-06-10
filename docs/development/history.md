@@ -278,6 +278,7 @@
 | 2026-06-10 | Global Burn-down | ScanResultへnon-Atom changed file metadataを追加し、scan/context/status/commitでREADME等のAtom外変更を表示するようにして CFB-017 と CFR-117 をfixedにした | `crates/codefire-core/src/lib.rs`, `crates/codefire-cli/src/main.rs`, `crates/codefire-cli/src/automation.rs`, `crates/codefire-cli/src/context.rs`, `crates/codefire-cli/src/tests.rs`, docs | `cargo test -p codefire-cli non_atom_file_changes_are_reported_in_scan_context_and_commit`; `cargo test -p codefire-cli`; remaining global open: 30 |
 | 2026-06-10 | Global Burn-down | branch unsupported subcommandのJSON errorを専用envelopeへ寄せ、supported subcommandsと有効なnext_actionsを返すようにして CFR-092 をfixedにした | `crates/codefire-cli/src/main.rs`, `crates/codefire-cli/src/tests.rs`, docs | `cargo test -p codefire-cli branch_list_reads_repo_from_open_marker_and_validates_heads`; `cargo clippy -p codefire-cli --all-targets -- -D warnings`; remaining global open: 29 |
 | 2026-06-10 | Global Burn-down | `CODEFIRE_HTTP_TIMEOUT_MS` の不正値/0を明示的な設定エラーにして、silent fallbackをなくし CFR-111 をfixedにした | `crates/codefire-cli/src/http.rs`, docs | `cargo test -p codefire-cli http_timeout`; `cargo clippy -p codefire-cli --all-targets -- -D warnings`; remaining global open: 28 |
+| 2026-06-10 | Global Burn-down | HTTP client responseの巨大 `Content-Length` をbody読み取り前に拒否する上限を追加して CFR-128 をfixedにした | `crates/codefire-cli/src/http.rs`, docs | `cargo test -p codefire-cli oversized_body`; `cargo clippy -p codefire-cli --all-targets -- -D warnings`; remaining global open: 27 |
 
 ## Current Decisions
 

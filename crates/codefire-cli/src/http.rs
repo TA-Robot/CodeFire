@@ -225,6 +225,11 @@ fn read_http_response<S: Read + Write>(stream: &mut S) -> Result<(String, Vec<u8
                 .flatten()
         })
         .unwrap_or(0);
+    if content_length > MAX_HTTP_BODY_BYTES {
+        return Err(CliError::HttpPayloadTooLarge(format!(
+            "HTTP response body too large: {content_length} bytes exceeds {MAX_HTTP_BODY_BYTES} bytes"
+        )));
+    }
     let body_start = header_end + 4;
     while buffer.len() < body_start + content_length {
         let read = stream.read(&mut temp)?;
@@ -1323,6 +1328,17 @@ mod tests {
         );
         let error = read_http_request(&mut Cursor::new(request.into_bytes())).unwrap_err();
         assert!(matches!(error, CliError::HttpPayloadTooLarge(_)));
+    }
+
+    #[test]
+    fn http_response_rejects_oversized_body_before_reading_body() {
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+            MAX_HTTP_BODY_BYTES + 1
+        );
+        let error = read_http_response(&mut Cursor::new(response.into_bytes())).unwrap_err();
+        assert!(matches!(error, CliError::HttpPayloadTooLarge(_)));
+        assert!(error.to_string().contains("HTTP response body too large"));
     }
 
     #[test]
