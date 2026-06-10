@@ -30,6 +30,7 @@ Current known open issue count:
 - Algorithm CodeFire open fires after the latest dogfood seal: 0.
 - Active frozen issue batch: none.
 - The historical 146-item global batch below is already closed. The number 146 is the old starting count, not a remaining-open count.
+- Closed issue detail files remain in `docs/development/bug-issues/` and `docs/development/code-review-issues/` as audit history. Counting files in those directories is not the open issue count; `Status: fixed` / `Status: fixed in v0.7` means closed.
 
 ## Closed Historical Batch
 
@@ -828,6 +829,25 @@ Algorithm work:
 - All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-03b681f9ef9c5844c3a1c639`.
 
 Cycle 36 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+
+## Cycle 37 Dogfood Pass
+
+After cycle 36 reached zero open issues, cycle 37 resumed algorithm development with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary` to summarize final archive summary artifact archives into a deterministic machine-readable index.
+- Added `REQ-AUTO-073`, `DES-AUTO-055`, `CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary`, and `TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-reports-index`.
+- Algorithm unittest result: 179 tests pass.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-8e531b39a917b74f6e89fec2`.
+- Clarified that the historical 146 count is the closed global batch starting count, not current open work.
+
+Cycle 37 issue status:
 
 - Newly discovered CodeFire product issues: 0.
 - Newly frozen CFB/CFR batch size: 0.

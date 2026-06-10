@@ -10,6 +10,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown,
@@ -1781,6 +1782,73 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Status: ok", summary_archive.verification_markdown)
         self.assertIn("- Finding count: 0", summary_archive.verification_markdown)
         self.assertIn("- none", summary_archive.verification_markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-reports-index
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_reports_index(
+        self,
+    ) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-37",
+                    completed_runs=17,
+                    improved_candidates=13,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.4,
+                    remaining_budget=17.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=13,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=13.0,
+            packet_path="cycle-37/planning-packet.md",
+            plan_path="cycle-37/plan.md",
+            lint_path="cycle-37/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-37/review-packet.md",
+            readiness_path="cycle-37/readiness.md",
+            manifest_path="cycle-37/manifest.md",
+            verification_path="cycle-37/verification.md",
+        )
+        handoff = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder().build(
+            archive,
+            summary_path="cycle-37/archive-summary.md",
+            gate_path="cycle-37/archive-summary-gate.md",
+        )
+        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+            handoff,
+        )
+
+        summary = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary().summarize(
+            summary_archive,
+        )
+
+        self.assertEqual(["cycle-37"], summary["source_cycles"])
+        self.assertEqual("ok", summary["parent_archive_status"])
+        self.assertEqual("ok", summary["archive_status"])
+        self.assertEqual("ok", summary["manifest_status"])
+        self.assertEqual("ok", summary["verification_status"])
+        self.assertEqual(2, summary["artifact_count"])
+        self.assertEqual(0, summary["finding_count"])
+        self.assertEqual(
+            {"manifest_markdown": True, "verification_markdown": True},
+            summary["audits"],
+        )
+        artifacts = summary["artifacts"]
+        self.assertIsInstance(artifacts, list)
+        self.assertEqual("cycle-37/archive-summary.md", artifacts[0]["path"])
+        self.assertEqual(len(handoff.summary_markdown.encode("utf-8")), artifacts[0]["byte_count"])
+        self.assertTrue(artifacts[0]["content_sha256"].startswith("sha256:"))
+        self.assertEqual("cycle-37/archive-summary-gate.md", artifacts[1]["path"])
 
 
 if __name__ == "__main__":

@@ -929,3 +929,19 @@ The builder returns one deterministic in-memory archive with:
 - manifest verification Markdown
 
 The builder composes the existing summary artifact manifest builder, manifest Markdown renderer, manifest verifier, and verification Markdown renderer. It does not rebuild the final review archive, rerender summary or gate Markdown, read files, write files, or mutate inputs.
+
+## DES-AUTO-055: Research cycle planning handoff review packet artifact archive summary artifact archive summary
+
+The review packet artifact archive summary artifact archive summary consumes `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchive`.
+
+The summary dictionary contains:
+
+- source cycles copied from the summary artifact manifest
+- parent archive status copied from the source archive summary payload
+- summary artifact archive status derived from manifest status and verification result
+- manifest and verification status
+- artifact count and per-artifact path, byte count, and SHA-256 digest
+- audit availability for manifest Markdown and verification Markdown
+- verification finding count
+
+The summarizer treats the in-memory archive as the single source of truth. It does not rerun verification, recompute the manifest, read files, write files, or mutate inputs.

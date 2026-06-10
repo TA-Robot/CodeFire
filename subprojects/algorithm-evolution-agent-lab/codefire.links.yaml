@@ -573,6 +573,15 @@ links:
   - from: REQ-AUTO-072
     to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-builder-builds-audits
     type: verified_by
+  - from: REQ-AUTO-073
+    to: DES-AUTO-055
+    type: refined_by
+  - from: DES-AUTO-055
+    to: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary
+    type: implemented_by
+  - from: REQ-AUTO-073
+    to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-reports-index
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by
