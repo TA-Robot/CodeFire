@@ -10,6 +10,7 @@ pub(crate) struct CommandCapability {
 
 pub(crate) const COMMAND_CAPABILITIES: &[CommandCapability] = &[
     capability("init", false, false),
+    capability("import", true, false),
     capability("open", true, false),
     capability("branch", true, true),
     capability("status", true, true),
@@ -44,6 +45,7 @@ pub(crate) const COMMAND_CAPABILITIES: &[CommandCapability] = &[
 
 pub(crate) const COMMAND_NAMES: &[&str] = &[
     "init",
+    "import",
     "open",
     "branch",
     "status",

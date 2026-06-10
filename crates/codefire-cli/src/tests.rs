@@ -13,6 +13,7 @@ mod docs;
 fn command_help_routes_before_mutating_parsers() {
     for (args, expected) in [
         (vec!["init", "--help"], "usage: codefire init"),
+        (vec!["import", "--help"], "usage: codefire import"),
         (vec!["open", "--help"], "usage: codefire open"),
         (vec!["clone", "--help"], "usage: codefire clone"),
         (vec!["upload", "--help"], "usage: codefire upload"),
@@ -79,6 +80,64 @@ fn command_help_routes_before_mutating_parsers() {
     ])
     .expect("branch show help should be routed");
     assert!(branch_show_help.contains("usage: codefire branch show"));
+}
+
+#[test]
+fn import_existing_project_dry_run_and_apply_adopt_non_empty_directory() {
+    let temp = tempdir().unwrap();
+    let project = temp.path().join("existing");
+    fs::create_dir_all(&project).unwrap();
+    fs::write(project.join("README.md"), "# Existing\n\ncontent\n").unwrap();
+
+    let dry_run = import_existing_project(&ImportOptions {
+        path: project.clone(),
+        branch: "main".to_string(),
+        dry_run: true,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+    })
+    .unwrap();
+    assert_eq!(dry_run.initial_files, 1);
+    assert_eq!(dry_run.initial_state, "planned");
+    assert_eq!(dry_run.plan["command"], "import");
+    assert_eq!(dry_run.plan["initial_files"], 1);
+    assert!(!project.join(".codefire").exists());
+    assert!(!project.join(".codefire-open").exists());
+
+    let applied = import_existing_project(&ImportOptions {
+        path: project.clone(),
+        branch: "main".to_string(),
+        dry_run: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: Some("import-once".to_string()),
+    })
+    .unwrap();
+    assert_eq!(applied.repo_root, project);
+    assert_eq!(applied.open_dir, applied.repo_root);
+    assert_eq!(applied.branch, "main");
+    assert_eq!(applied.initial_files, 1);
+    assert_eq!(applied.initial_state, "open-burning");
+    assert!(applied.repo_root.join(".codefire").is_dir());
+    assert!(applied.repo_root.join(".codefire-open").is_file());
+
+    let status = read_status(&applied.open_dir).unwrap();
+    assert_eq!(status.branch, "main");
+    assert_eq!(status.state, "open-burning");
+    assert_eq!(status.base, applied.base_commit);
+
+    let replay = import_existing_project(&ImportOptions {
+        path: applied.open_dir.clone(),
+        branch: "main".to_string(),
+        dry_run: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: Some("import-once".to_string()),
+    })
+    .unwrap();
+    assert_eq!(replay.base_commit, applied.base_commit);
+    assert_eq!(replay.plan["replayed"], true);
 }
 
 #[test]

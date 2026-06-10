@@ -31,6 +31,27 @@ pub(crate) struct InitResult {
 }
 
 #[derive(Debug)]
+pub(crate) struct ImportOptions {
+    pub(crate) path: PathBuf,
+    pub(crate) branch: String,
+    pub(crate) dry_run: bool,
+    pub(crate) json_output: bool,
+    pub(crate) lock: LockOptions,
+    pub(crate) idempotency_key: Option<String>,
+}
+
+#[derive(Debug)]
+pub(crate) struct ImportResult {
+    pub(crate) repo_root: PathBuf,
+    pub(crate) open_dir: PathBuf,
+    pub(crate) branch: String,
+    pub(crate) base_commit: String,
+    pub(crate) initial_files: usize,
+    pub(crate) initial_state: String,
+    pub(crate) plan: Value,
+}
+
+#[derive(Debug)]
 pub(crate) struct OpenOptions {
     pub(crate) branch: String,
     pub(crate) path: PathBuf,

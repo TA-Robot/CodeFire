@@ -26,6 +26,7 @@ mod fire;
 mod http;
 mod http_tls;
 mod idempotency;
+mod import_workflow;
 mod limited_yaml;
 mod link_batch;
 mod merge_patch_idempotency;
@@ -79,6 +80,7 @@ use idempotency::{
     idempotency_payload_hash, idempotency_record_path, idempotency_result_plan,
     require_idempotency_key, verify_idempotency_record,
 };
+use import_workflow::{import_existing_project, import_result_data_json, parse_import_args};
 use link_batch::{link_batch_data_json, parse_link_batch_args, run_link_batch};
 use merge_patch_idempotency::{
     load_merge_idempotency, load_patch_import_idempotency, merge_idempotency_payload,
@@ -742,6 +744,44 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             println!("main: {}", result.main_commit);
             Ok(())
         }
+        Some("import") => {
+            let options = parse_import_args(&args[1..])?;
+            let result = import_existing_project(&options)?;
+            if options.json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "import",
+                        true,
+                        0,
+                        Some(&result.repo_root),
+                        import_result_data_json(&result),
+                        Vec::new(),
+                        result
+                            .plan
+                            .get("next_actions")
+                            .and_then(Value::as_array)
+                            .cloned()
+                            .unwrap_or_default(),
+                    ))?
+                );
+            } else if options.dry_run {
+                println!(
+                    "import dry-run: {} files would be adopted at {} on branch {}",
+                    result.initial_files,
+                    result.open_dir.display(),
+                    result.branch
+                );
+            } else {
+                println!(
+                    "imported {} as branch {} ({})",
+                    result.open_dir.display(),
+                    result.branch,
+                    result.initial_state
+                );
+            }
+            Ok(())
+        }
         Some("open") => {
             let options = parse_open_args(&args[1..])?;
             let result = open_branch(&options)?;
@@ -1221,12 +1261,11 @@ fn command_help_for_args(args: &[String]) -> Option<&'static str> {
         return None;
     }
     match command {
-        "status" | "scan" | "verify" | "fire" | "extinguish" | "commit" | "init" | "open"
-        | "clone" | "upload" | "list" | "request-merge" | "request-list" | "request-review"
-        | "request-apply" | "review-pack" | "storage" | "doctor" | "show" | "diff" | "context"
-        | "explain" | "atom-index" | "trace-graph" | "missing-links" | "link" | "capabilities" => {
-            Some(subcommand_help(command))
-        }
+        "status" | "scan" | "verify" | "fire" | "extinguish" | "commit" | "init" | "import"
+        | "open" | "clone" | "upload" | "list" | "request-merge" | "request-list"
+        | "request-review" | "request-apply" | "review-pack" | "storage" | "doctor" | "show"
+        | "diff" | "context" | "explain" | "atom-index" | "trace-graph" | "missing-links"
+        | "link" | "capabilities" => Some(subcommand_help(command)),
         "migrate" => match args.get(1).map(String::as_str) {
             Some("check") | Some("dry-run") | Some("apply") => {
                 Some(subcommand_help("migrate check"))
@@ -1255,6 +1294,9 @@ fn subcommand_help(command: &str) -> &'static str {
     match command {
         "init" => {
             "usage: codefire init [path] [--force]\n\nCreate a CodeFire repository without opening a branch.\n"
+        }
+        "import" => {
+            "usage: codefire import [path] [--branch <name>] [--dry-run] [--json] [--idempotency-key <key>]\n\nAdopt an existing non-empty directory as a CodeFire open directory.\n"
         }
         "open" => {
             "usage: codefire open <branch> <path> [--dry-run] [--json] [--idempotency-key <key>]\n\nOpen a sealed branch into a working directory.\n"

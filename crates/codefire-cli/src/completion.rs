@@ -12,6 +12,7 @@ commands:
 
 common:
   codefire init [path]
+  codefire import [path] [--branch main] [--dry-run] [--json]
   codefire open <branch> <path> [--dry-run] [--json]
   codefire scan [path] [--json] [--metrics]
   codefire verify [path] [--details] [--blocking-only] [--json] [--metrics]
@@ -53,8 +54,8 @@ _codefire_complete()
     branch)
       if [[ $COMP_CWORD -eq 2 ]]; then COMPREPLY=( $(compgen -W "list" -- "$cur") ); fi
       ;;
-    open|clone|merge|commit|extinguish|patch)
-      COMPREPLY=( $(compgen -W "--dry-run --json --idempotency-key --wait-lock --lock-timeout --into --message -m --signer --key-id --resolution --rationale --evidence --evidence-ref --interactive --all-matching --batch --batch-template --full --output" -- "$cur") )
+    import|open|clone|merge|commit|extinguish|patch)
+      COMPREPLY=( $(compgen -W "--branch --dry-run --json --idempotency-key --wait-lock --lock-timeout --into --message -m --signer --key-id --resolution --rationale --evidence --evidence-ref --interactive --all-matching --batch --batch-template --full --output" -- "$cur") )
       ;;
     upload|request-merge|request-review|request-apply)
       COMPREPLY=( $(compgen -W "--dry-run --json --idempotency-key --wait-lock --lock-timeout --actor --token --request-key-id --reviewer --decision --comment" -- "$cur") )
@@ -138,8 +139,8 @@ _codefire()
     branch)
       _arguments '1:branch command:(list)'
       ;;
-    open|clone|merge|commit|extinguish|patch)
-      _arguments '--dry-run[dry run]' '--json[emit JSON]' '--idempotency-key[idempotency key]' '--wait-lock[wait for locks]' '--lock-timeout[lock timeout]' '--into[target branch]' '--message[commit message]' '-m[commit message]' '--signer[commit signer]' '--key-id[commit signing key id]' '--resolution[resolution]' '--rationale[rationale]' '--evidence[evidence text]' '--evidence-ref[evidence object id]' '--interactive[interactive resolution]' '--all-matching[extinguish matching source-target fires]' '--batch[batch file]' '--batch-template[generate extinguish batch template]' '--full[include full output]' '--output[output file]'
+    import|open|clone|merge|commit|extinguish|patch)
+      _arguments '--branch[branch name]' '--dry-run[dry run]' '--json[emit JSON]' '--idempotency-key[idempotency key]' '--wait-lock[wait for locks]' '--lock-timeout[lock timeout]' '--into[target branch]' '--message[commit message]' '-m[commit message]' '--signer[commit signer]' '--key-id[commit signing key id]' '--resolution[resolution]' '--rationale[rationale]' '--evidence[evidence text]' '--evidence-ref[evidence object id]' '--interactive[interactive resolution]' '--all-matching[extinguish matching source-target fires]' '--batch[batch file]' '--batch-template[generate extinguish batch template]' '--full[include full output]' '--output[output file]'
       ;;
     upload|request-merge|request-review|request-apply)
       _arguments '--dry-run[dry run]' '--json[emit JSON]' '--idempotency-key[idempotency key]' '--wait-lock[wait for locks]' '--lock-timeout[lock timeout]' '--actor[remote actor]' '--token[remote token]' '--request-key-id[remote request signing key id]' '--reviewer[reviewer]' '--decision[decision]:decision:(approve reject)' '--comment[comment]'

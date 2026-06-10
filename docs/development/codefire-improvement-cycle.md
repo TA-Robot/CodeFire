@@ -307,9 +307,9 @@ The active CodeFire improvement cycle is a global burn-down. The initial frozen 
 
 Global inventory as of 2026-06-10:
 
-- CFB dogfood issues: 92 total, 90 fixed, 2 open.
+- CFB dogfood issues: 92 total, 92 fixed, 0 open.
 - CFR code review issues: 160 total, 155 fixed/closed, 5 open.
-- Combined tracked backlog: 252 total, 245 fixed/closed, 7 open.
+- Combined tracked backlog: 252 total, 247 fixed/closed, 5 open.
 
 Active batch closed in this burn-down:
 
@@ -342,6 +342,8 @@ Active batch closed in this burn-down:
 - CFR-123: required roots now have payload shape validators and validator coverage tests.
 - CFR-112: file remote upload dry-run validates existing remote layout and reports validation checks.
 - CFR-129: HTTP request-merge dry-run resolves branch heads and fails missing branches instead of returning empty heads.
+- CFB-009: new import workflow code lives in `import_workflow.rs`, keeping command-specific parsing/planning/apply logic out of `main.rs`.
+- CFB-048: `codefire import` adopts existing non-empty directories with dry-run/apply/idempotency support.
 - CFB-025: core policy parser accepts legacy `verification.required` command lists.
 - CFB-026: context data exposes scan-compatible changed/open fire summary fields.
 - CFB-045: diff JSON distinguishes requested options from actually included sections.

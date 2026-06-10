@@ -4,6 +4,7 @@
 
 ```bash
 codefire init
+codefire import [path] [--branch main] [--dry-run] [--json]
 
 codefire branch list [--json] [--metrics]
 codefire branch show [branch] [--json]
@@ -146,6 +147,22 @@ open registryを更新する
 同じ--idempotency-keyかつ同じopen request payloadは保存済みopen resultを返し、多重open/target既存checkより先にreplayする
 同じ--idempotency-keyでbranch/path/branch_head/repoが異なるpayloadはexit code 33で拒否する
 ```
+
+## 4.4.1 `import`
+
+```bash
+codefire import .
+codefire import ./existing-project --branch main --dry-run --json
+codefire import ./existing-project --idempotency-key initial-adopt
+```
+
+既存の非空directoryをCodeFire repositoryかつopen directoryとして採用する。`init` + `open` と異なり、targetが既存fileを含んでいても拒否しない。採用後は初期empty commitをbaseとして `.codefire-open`、opened registry、active stateを作成し、既存fileを現在のworktree変更として扱う。
+
+- targetが存在しない、directoryではない、既に `.codefire` または `.codefire-open` を持つ場合は拒否する。
+- `--dry-run --json` はrepo metadata、open marker、opened registry、active state、初回scanのplanと `initial_files` を返し、filesystemへ書かない。
+- 適用時はrepository lockを取得し、初期repositoryを作成してからopen metadataを生成し、最後にscanをpersistしてbranch stateを実際のworktree差分に合わせる。
+- `--branch` は初期branch名を指定する。省略時は `main`。
+- 初期import後の通常導線は `codefire scan --json`、`codefire verify --json`、`codefire commit -m "Initial import"`。
 
 ## 4.5 `close`
 
