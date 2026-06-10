@@ -1,4 +1,4 @@
-use crate::{scan_branch_state, Status};
+use crate::{scan_branch_state, scan_change_count, Status};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -96,10 +96,17 @@ pub(crate) fn status_next_actions(status: &Status) -> Vec<Value> {
 }
 
 pub(crate) fn scan_data_json_with_full(scan: &codefire_core::ScanResult, full: bool) -> Value {
-    let changed_count = scan.changed_atoms.len();
+    let changed_atom_count = scan.changed_atoms.len();
+    let non_atom_changed_file_count = scan.non_atom_changed_files.len();
+    let changed_count = scan_change_count(scan);
     let open_fire_count = scan.open_fires.len();
     let changed_limit = if full {
-        changed_count
+        changed_atom_count
+    } else {
+        MAX_SCAN_JSON_SAMPLE
+    };
+    let non_atom_file_limit = if full {
+        non_atom_changed_file_count
     } else {
         MAX_SCAN_JSON_SAMPLE
     };
@@ -112,6 +119,12 @@ pub(crate) fn scan_data_json_with_full(scan: &codefire_core::ScanResult, full: b
         .changed_atoms
         .iter()
         .take(changed_limit)
+        .cloned()
+        .collect::<Vec<_>>();
+    let non_atom_changed_files = scan
+        .non_atom_changed_files
+        .iter()
+        .take(non_atom_file_limit)
         .cloned()
         .collect::<Vec<_>>();
     let open_fires = scan
@@ -140,18 +153,22 @@ pub(crate) fn scan_data_json_with_full(scan: &codefire_core::ScanResult, full: b
         })
         .collect::<Vec<_>>();
     json!({
-        "branch_state": scan_branch_state(scan.changed_atoms.len(), scan.open_fires.len()),
+        "branch_state": scan_branch_state(scan_change_count(scan), scan.open_fires.len()),
         "base_commit": &scan.base_commit,
         "tool_migration": &scan.tool_migration,
         "full": full,
         "sample_limit": MAX_SCAN_JSON_SAMPLE,
         "changed_count": changed_count,
+        "changed_atom_count": changed_atom_count,
+        "non_atom_changed_file_count": non_atom_changed_file_count,
         "open_fire_count": open_fire_count,
-        "changed_atoms_omitted": changed_count.saturating_sub(changed_atom_ids.len()),
+        "changed_atoms_omitted": changed_atom_count.saturating_sub(changed_atom_ids.len()),
+        "non_atom_changed_files_omitted": non_atom_changed_file_count.saturating_sub(non_atom_changed_files.len()),
         "open_fires_omitted": open_fire_count.saturating_sub(open_fires.len()),
         "changed_atom_ids": &changed_atom_ids,
         "changed_atoms": &changed_atom_ids,
         "changed_atoms_sample": changed_atoms_sample,
+        "non_atom_changed_files": non_atom_changed_files,
         "open_fires": &open_fires,
     })
 }
@@ -189,6 +206,16 @@ pub(crate) fn scan_next_actions(
             cli_command(path_command("verify --details --json", action_path)),
             "run policy checks against the changed branch",
             action_target(json!({"base_commit": &scan.base_commit}), action_path),
+        ));
+    } else if !scan.non_atom_changed_files.is_empty() {
+        actions.push(next_action(
+            "verify",
+            cli_command(path_command("verify --details --json", action_path)),
+            "run policy checks before sealing non-atom file changes",
+            action_target(
+                json!({"base_commit": &scan.base_commit, "non_atom_changed_files": scan.non_atom_changed_files.len()}),
+                action_path,
+            ),
         ));
     }
     if scan.open_fires.len() > 1 {
@@ -576,7 +603,10 @@ fn verification_diagnostic_summary(
 }
 
 fn has_pending_scan_changes(scan: &codefire_core::ScanResult) -> bool {
-    !scan.changed_atoms.is_empty() || !scan.open_fires.is_empty() || scan.tool_migration.is_some()
+    !scan.changed_atoms.is_empty()
+        || !scan.non_atom_changed_files.is_empty()
+        || !scan.open_fires.is_empty()
+        || scan.tool_migration.is_some()
 }
 
 fn pending_changes_target(scan: &codefire_core::ScanResult) -> Value {
@@ -1232,6 +1262,7 @@ mod tests {
                 links: Vec::new(),
             },
             changed_atoms: Vec::new(),
+            non_atom_changed_files: Vec::new(),
             open_fires: Vec::new(),
             tool_migration: None,
         }

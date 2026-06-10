@@ -15,8 +15,8 @@
 - High: 36
 - Medium: 121
 - Low: 3
-- Fixed / closed: 131
-- Remaining open: 29
+- Fixed / closed: 134
+- Remaining open: 26
 
 ## Cycle 2 Source Review Expansion
 

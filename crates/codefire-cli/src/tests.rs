@@ -2619,6 +2619,7 @@ fn scan_and_verify_text_outputs_include_empty_summaries() {
             links: Vec::new(),
         },
         changed_atoms: Vec::new(),
+        non_atom_changed_files: Vec::new(),
         open_fires: Vec::new(),
         tool_migration: None,
     };
@@ -2644,6 +2645,83 @@ fn scan_and_verify_text_outputs_include_empty_summaries() {
     assert!(verify_text.contains("Blocking checks: none"));
     assert!(verify_text.contains("Open fires: 0"));
     assert!(verify_text.contains("Failed checks: 0"));
+}
+
+#[test]
+fn non_atom_file_changes_are_reported_in_scan_context_and_commit() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    fs::write(open_dir.join("README.md"), "plain project notes\n").unwrap();
+    let scan = compute_scan(&open_dir, true).unwrap().scan;
+    assert!(scan.changed_atoms.is_empty());
+    assert_eq!(scan.non_atom_changed_files.len(), 1);
+    assert_eq!(scan.non_atom_changed_files[0].path, "README.md");
+    assert_eq!(scan.non_atom_changed_files[0].status, "added");
+
+    let scan_text = render_scan(&scan);
+    assert!(scan_text.contains("Changed atoms: none"));
+    assert!(scan_text.contains("Non-atom changed files:\n  added README.md"));
+    let scan_json = scan_data_json_with_full(&scan, false);
+    assert_eq!(scan_json["branch_state"], "open-burning");
+    assert_eq!(scan_json["changed_count"], 1);
+    assert_eq!(scan_json["changed_atom_count"], 0);
+    assert_eq!(scan_json["non_atom_changed_file_count"], 1);
+    assert_eq!(scan_json["non_atom_changed_files"][0]["path"], "README.md");
+
+    let context = build_context_pack(&context::ContextOptions {
+        path: open_dir.clone(),
+        selector: context::ContextSelector::Changed,
+        depth: 1,
+        limit: 10,
+        json_output: true,
+    })
+    .unwrap();
+    assert_eq!(context.data["changed_count"], 1);
+    assert_eq!(context.data["changed_atom_count"], 0);
+    assert_eq!(context.data["non_atom_changed_file_count"], 1);
+    assert_eq!(
+        context.data["non_atom_changed_files"][0]["path"],
+        "README.md"
+    );
+
+    let verification = compute_verify(&open_dir, true).unwrap();
+    assert_eq!(verification.verification.result, "passed");
+    assert_eq!(read_status(&open_dir).unwrap().state, "open-consistent");
+
+    let commit = run_commit(&CommitOptions {
+        path: open_dir,
+        message: "Seal non-atom docs".to_string(),
+        dry_run: true,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap();
+    let commit_data = commit_result_data_json(&commit);
+    assert_eq!(commit_data["changed_atom_count"], 0);
+    assert_eq!(commit_data["non_atom_changed_file_count"], 1);
+    assert_eq!(
+        commit_data["non_atom_changed_files"][0]["path"],
+        "README.md"
+    );
 }
 
 #[test]

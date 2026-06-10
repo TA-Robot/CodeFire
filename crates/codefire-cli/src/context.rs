@@ -1,6 +1,6 @@
 use crate::{
-    load_base_atom_index, open_context, read_json, required_string, scan_branch_state, CliError,
-    OpenContext,
+    load_base_atom_index, non_atom_changed_files_since_base, open_context, read_json,
+    required_string, scan_branch_state, scan_change_count, CliError, OpenContext,
 };
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -196,6 +196,13 @@ pub(crate) fn print_context_summary(data: &Value) {
             .unwrap_or(0)
     );
     println!(
+        "Non-atom changed files: {}",
+        data["scan"]["non_atom_changed_files"]
+            .as_array()
+            .map(Vec::len)
+            .unwrap_or(0)
+    );
+    println!(
         "Open fires: {}",
         data["scan"]["open_fires"]
             .as_array()
@@ -265,7 +272,14 @@ fn context_snapshot(start: &Path) -> Result<ContextSnapshot, CliError> {
     } else {
         "atom_changed"
     };
-    let (preview_scan, _) = codefire_core::build_scan_result(
+    let non_atom_changed_files = non_atom_changed_files_since_base(
+        &objects,
+        &base_commit,
+        &open.open_dir,
+        &current,
+        &base_index,
+    )?;
+    let (mut preview_scan, _) = codefire_core::build_scan_result(
         current,
         base_index,
         trace_graph,
@@ -274,6 +288,7 @@ fn context_snapshot(start: &Path) -> Result<ContextSnapshot, CliError> {
         reason,
         "preview-context",
     )?;
+    preview_scan.non_atom_changed_files = non_atom_changed_files;
     if active_scan_path.exists() {
         let active_scan: codefire_core::ScanResult =
             serde_json::from_value(read_json(&active_scan_path)?)?;
@@ -317,6 +332,7 @@ fn scan_fingerprint(scan: &codefire_core::ScanResult) -> Result<Value, CliError>
         "base_commit": &scan.base_commit,
         "tool_migration": &scan.tool_migration,
         "changed_atoms": &scan.changed_atoms,
+        "non_atom_changed_files": &scan.non_atom_changed_files,
         "open_fires": &scan.open_fires,
         "atom_index": serde_json::to_value(&scan.atom_index)?,
         "trace_graph": serde_json::to_value(&scan.trace_graph)?,
@@ -422,11 +438,20 @@ fn context_data_json(
         .take(limit)
         .map(fire_json)
         .collect::<Vec<_>>();
+    let scan_non_atom_changed_files = snapshot
+        .scan
+        .non_atom_changed_files
+        .iter()
+        .take(limit)
+        .cloned()
+        .collect::<Vec<_>>();
     let atoms_truncated =
         selection.truncated_atoms || atom_count_before_limit > selected_atoms.len();
     let trace_links_truncated = all_trace_links.len() > trace_links.len();
     let fires_truncated = all_fires.len() > fires.len();
     let scan_changed_atoms_truncated = snapshot.scan.changed_atoms.len() > scan_changed_atoms.len();
+    let scan_non_atom_changed_files_truncated =
+        snapshot.scan.non_atom_changed_files.len() > scan_non_atom_changed_files.len();
     let scan_open_fires_truncated = snapshot.scan.open_fires.len() > scan_open_fires.len();
     Ok(json!({
         "type": "codefire_context_pack",
@@ -441,10 +466,13 @@ fn context_data_json(
             "trace_links": trace_links_truncated,
             "fires": fires_truncated,
             "scan_changed_atoms": scan_changed_atoms_truncated,
+            "scan_non_atom_changed_files": scan_non_atom_changed_files_truncated,
             "scan_open_fires": scan_open_fires_truncated,
         },
         "summary": {
-            "changed_count": snapshot.scan.changed_atoms.len(),
+            "changed_count": scan_change_count(&snapshot.scan),
+            "changed_atom_count": snapshot.scan.changed_atoms.len(),
+            "non_atom_changed_file_count": snapshot.scan.non_atom_changed_files.len(),
             "open_fire_count": snapshot.scan.open_fires.len(),
             "atoms": {
                 "total": atom_count_before_limit,
@@ -468,6 +496,11 @@ fn context_data_json(
                 "returned": scan_changed_atoms.len(),
                 "omitted": snapshot.scan.changed_atoms.len().saturating_sub(scan_changed_atoms.len()),
             },
+            "scan_non_atom_changed_files": {
+                "total": snapshot.scan.non_atom_changed_files.len(),
+                "returned": scan_non_atom_changed_files.len(),
+                "omitted": snapshot.scan.non_atom_changed_files.len().saturating_sub(scan_non_atom_changed_files.len()),
+            },
             "scan_open_fires": {
                 "total": snapshot.scan.open_fires.len(),
                 "returned": scan_open_fires.len(),
@@ -483,7 +516,7 @@ fn context_data_json(
             "base_commit": &snapshot.scan.base_commit,
         },
         "scan": {
-            "branch_state": scan_branch_state(snapshot.scan.changed_atoms.len(), snapshot.scan.open_fires.len()),
+            "branch_state": scan_branch_state(scan_change_count(&snapshot.scan), snapshot.scan.open_fires.len()),
             "snapshot_source": snapshot.scan_snapshot_source,
             "active_scan_path": snapshot.active_scan_path,
             "preview_recomputed": snapshot.preview_recomputed,
@@ -491,11 +524,15 @@ fn context_data_json(
             "active_scan_stale_reason": snapshot.active_scan_stale_reason,
             "fire_source": snapshot.scan_fire_source,
             "changed_atoms": &scan_changed_atoms,
+            "non_atom_changed_files": &scan_non_atom_changed_files,
             "open_fires": &scan_open_fires,
         },
-        "changed_count": snapshot.scan.changed_atoms.len(),
+        "changed_count": scan_change_count(&snapshot.scan),
+        "changed_atom_count": snapshot.scan.changed_atoms.len(),
+        "non_atom_changed_file_count": snapshot.scan.non_atom_changed_files.len(),
         "open_fire_count": snapshot.scan.open_fires.len(),
         "changed_atoms": &scan_changed_atoms,
+        "non_atom_changed_files": &scan_non_atom_changed_files,
         "open_fires": &scan_open_fires,
         "atoms": selected_atoms,
         "trace_links": trace_links,

@@ -183,9 +183,21 @@ pub struct ScanResult {
     pub atom_index: AtomIndex,
     pub trace_graph: TraceGraph,
     pub changed_atoms: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub non_atom_changed_files: Vec<NonAtomFileChange>,
     pub open_fires: Vec<Fire>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_migration: Option<ToolMigration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NonAtomFileChange {
+    pub path: String,
+    pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_blob: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_blob: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1189,6 +1201,7 @@ pub fn build_scan_result_with_options(
         atom_index: current,
         trace_graph,
         changed_atoms: changed,
+        non_atom_changed_files: Vec::new(),
         open_fires,
         tool_migration,
     };
@@ -2543,6 +2556,7 @@ mod tests {
                 links: Vec::new(),
             },
             changed_atoms: Vec::new(),
+            non_atom_changed_files: Vec::new(),
             open_fires: Vec::new(),
             tool_migration: None,
         };

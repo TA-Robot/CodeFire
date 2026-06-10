@@ -307,9 +307,9 @@ The active CodeFire improvement cycle is a global burn-down. The initial frozen 
 
 Global inventory as of 2026-06-10:
 
-- CFB dogfood issues: 92 total, 86 fixed, 6 open.
-- CFR code review issues: 160 total, 133 fixed/closed, 27 open.
-- Combined tracked backlog: 252 total, 219 fixed/closed, 33 open.
+- CFB dogfood issues: 92 total, 88 fixed, 4 open.
+- CFR code review issues: 160 total, 134 fixed/closed, 26 open.
+- Combined tracked backlog: 252 total, 222 fixed/closed, 30 open.
 
 Active batch closed in this burn-down:
 
@@ -318,6 +318,7 @@ Active batch closed in this burn-down:
 - CFB-011: `extinguish --batch-template` generates a strict JSON batch wrapper from current open fires.
 - CFB-018: batch-template and all-matching extinguish reduce repeated evidence entry across many related fires.
 - CFB-020: extinguish text output includes source/target context and remaining open fire count.
+- CFB-017/CFR-117: scan model and CLI outputs include non-Atom changed file metadata.
 - CFB-025: core policy parser accepts legacy `verification.required` command lists.
 - CFB-026: context data exposes scan-compatible changed/open fire summary fields.
 - CFB-045: diff JSON distinguishes requested options from actually included sections.
@@ -366,7 +367,7 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- Remaining 32 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
+- Remaining 30 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
 - このglobal batchが0 openになるまで、新しいissue discovery batchへ進まない。
 
 ## Cycle Invariants

@@ -224,14 +224,16 @@ codefire scan --json --full
 ```text
 open directoryをindexする
 Atom単位で変更を検出する
+Atomを含まないファイルの追加・変更・削除をnon-Atom changed filesとして検出する
 Trace Graphに基づきfireを生成する
 scan生成fireのfire_uidはSHA-256由来のstable IDで、display_idもfire key由来のstable短縮IDになる
 text出力のopen fire行はdisplay_idとfire_uidを併記する
 obsolete fireを整理する
 branch stateを更新する
 --jsonはcodefire.command_result.v1 envelopeを出力し、既定ではchanged atoms/open firesをbounded sampleとして返す
-data.changed_count、data.open_fire_count、data.changed_atoms_omitted、data.open_fires_omittedで全体件数と省略件数を返す
+data.changed_count、data.changed_atom_count、data.non_atom_changed_file_count、data.open_fire_count、data.changed_atoms_omitted、data.non_atom_changed_files_omitted、data.open_fires_omittedで全体件数と省略件数を返す
 data.changed_atom_idsとdata.changed_atomsは後方互換のID sample配列、data.changed_atoms_sampleはpath/kind/selector/content_hashを含むobject sample
+data.non_atom_changed_filesはpath/status/base_blob/current_blobを含むbounded sampleを返す
 --full --jsonはchanged atom IDとopen fireを全量返す
 --jsonはchanged atoms、open fires、verifyに進むためのmachine-readable next_actionsを含める
 --metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
@@ -433,8 +435,9 @@ open stateをopen-cleanにする
 --dry-runはsealed object、branch head、open registry、active stateを書き換えず、codefire_operation_planを返す
 --dry-run --jsonはcodefire_commit_resultを返し、blockedの場合もok=falseのcommand_result envelopeでverification summaryとnext_actionsを返す
 commit JSONはtop-level repo、data.open_dir、data.branch、data.changed_atom_countを返す
-commit text/JSONはmessage、changed atom count、extinguished fire count、active resolution count、evidence ref countを要約として返す
+commit text/JSONはmessage、changed atom count、non-Atom changed file count、extinguished fire count、active resolution count、evidence ref countを要約として返す
 changed_atomsはdefaultで50件sampleに制限し、changed_atoms_omittedとchanged_atoms_truncatedを返す。--fullで全件を返す
+non_atom_changed_filesもdefaultで50件sampleに制限し、non_atom_changed_files_omittedとnon_atom_changed_files_truncatedを返す。--fullで全件を返す
 certificate.resultはverification.resultと同じ語彙を使い、現行成功commitはpassedを返す
 --idempotency-keyは成功したcommit resultを.codefire/idempotency/commit/へ記録する
 同じ--idempotency-keyかつ同じcommit request payloadは保存済みcommit resultを返し、新しいcommitを作らない

@@ -119,6 +119,10 @@ pub(crate) fn scan_branch_state(changed_atoms: usize, open_fires: usize) -> &'st
     }
 }
 
+pub(crate) fn scan_change_count(scan: &codefire_core::ScanResult) -> usize {
+    scan.changed_atoms.len() + scan.non_atom_changed_files.len()
+}
+
 fn status_state(raw_state: &str, open_fires: usize) -> String {
     if open_fires > 0 {
         "open-burning".to_string()
@@ -1850,6 +1854,12 @@ fn run_commit_command(args: &[String]) -> Result<(), CliError> {
             result.plan["changed_atom_count"].as_u64().unwrap_or(0)
         );
         println!(
+            "Non-atom changed files: {}",
+            result.plan["non_atom_changed_file_count"]
+                .as_u64()
+                .unwrap_or(0)
+        );
+        println!(
             "Extinguished fires: {}",
             result.plan["extinguished_fire_count"].as_u64().unwrap_or(0)
         );
@@ -1869,6 +1879,12 @@ fn run_commit_command(args: &[String]) -> Result<(), CliError> {
         println!(
             "Changed atoms: {}",
             result.plan["changed_atom_count"].as_u64().unwrap_or(0)
+        );
+        println!(
+            "Non-atom changed files: {}",
+            result.plan["non_atom_changed_file_count"]
+                .as_u64()
+                .unwrap_or(0)
         );
         println!(
             "Extinguished fires: {}",
@@ -1900,8 +1916,10 @@ fn status_data_json_with_prediction(status: &Status, path: &Path) -> Value {
         let scan = scan_execution.scan;
         data["scan_prediction"] = json!({
             "source": "preview_recomputed",
-            "branch_state": scan_branch_state(scan.changed_atoms.len(), scan.open_fires.len()),
-            "changed_count": scan.changed_atoms.len(),
+            "branch_state": scan_branch_state(scan_change_count(&scan), scan.open_fires.len()),
+            "changed_count": scan_change_count(&scan),
+            "changed_atom_count": scan.changed_atoms.len(),
+            "non_atom_changed_file_count": scan.non_atom_changed_files.len(),
             "open_fire_count": scan.open_fires.len(),
             "tool_migration": &scan.tool_migration,
             "base_commit": &scan.base_commit,
@@ -2114,7 +2132,7 @@ fn print_scan(scan: &codefire_core::ScanResult) {
 }
 
 fn render_scan(scan: &codefire_core::ScanResult) -> String {
-    let state = scan_branch_state(scan.changed_atoms.len(), scan.open_fires.len());
+    let state = scan_branch_state(scan_change_count(scan), scan.open_fires.len());
     let mut output = String::new();
     output.push_str(&format!("Branch state: {state}\n"));
     if scan.changed_atoms.is_empty() {
@@ -2123,6 +2141,14 @@ fn render_scan(scan: &codefire_core::ScanResult) -> String {
         output.push_str("Changed atoms:\n");
         for atom_id in &scan.changed_atoms {
             output.push_str(&format!("  {atom_id}\n"));
+        }
+    }
+    if scan.non_atom_changed_files.is_empty() {
+        output.push_str("Non-atom changed files: none\n");
+    } else {
+        output.push_str("Non-atom changed files:\n");
+        for file in &scan.non_atom_changed_files {
+            output.push_str(&format!("  {} {}\n", file.status, file.path));
         }
     }
     if let Some(migration) = &scan.tool_migration {
@@ -2226,6 +2252,9 @@ fn commit_result_data_json(result: &CommitResult) -> Value {
         "changed_atom_count": &result.plan["changed_atom_count"],
         "changed_atoms": &result.plan["changed_atoms"],
         "changed_atoms_omitted": &result.plan["changed_atoms_omitted"],
+        "non_atom_changed_file_count": &result.plan["non_atom_changed_file_count"],
+        "non_atom_changed_files": &result.plan["non_atom_changed_files"],
+        "non_atom_changed_files_omitted": &result.plan["non_atom_changed_files_omitted"],
         "extinguished_fire_count": &result.plan["extinguished_fire_count"],
         "active_resolution_count": &result.plan["active_resolution_count"],
         "evidence_ref_count": &result.plan["evidence_ref_count"],
@@ -4855,7 +4884,14 @@ fn compute_scan(start: &Path, persist: bool) -> Result<ScanExecution, CliError> 
     let now = now_iso_utc();
     let source_unchanged =
         source_manifest_unchanged(&objects, &base_commit, &context.open_dir).unwrap_or(false);
-    let (scan, fires) = codefire_core::build_scan_result_with_options(
+    let non_atom_changed_files = non_atom_changed_files_since_base(
+        &objects,
+        &base_commit,
+        &context.open_dir,
+        &current,
+        &base_index,
+    )?;
+    let (mut scan, fires) = codefire_core::build_scan_result_with_options(
         current,
         base_index,
         trace_graph,
@@ -4867,6 +4903,7 @@ fn compute_scan(start: &Path, persist: bool) -> Result<ScanExecution, CliError> 
             source_unchanged,
         },
     )?;
+    scan.non_atom_changed_files = non_atom_changed_files;
     if persist {
         fs::create_dir_all(&active_state_path)?;
         write_json_atomic(&fires_path, &serde_json::to_value(&fires)?)?;
@@ -4874,7 +4911,7 @@ fn compute_scan(start: &Path, persist: bool) -> Result<ScanExecution, CliError> 
             &active_state_path.join("scan.json"),
             &serde_json::to_value(&scan)?,
         )?;
-        let state = scan_branch_state(scan.changed_atoms.len(), scan.open_fires.len());
+        let state = scan_branch_state(scan_change_count(&scan), scan.open_fires.len());
         set_open_state(&context, &active_state_path, state)?;
     }
     Ok(ScanExecution {
@@ -4954,7 +4991,7 @@ fn verification_open_state(
     if verification.result != "passed" {
         return "open-burning";
     }
-    if scan.changed_atoms.is_empty() && scan.open_fires.is_empty() {
+    if scan_change_count(scan) == 0 && scan.open_fires.is_empty() {
         "open-clean"
     } else {
         "open-consistent"
@@ -5601,6 +5638,21 @@ fn commit_operation_plan(
         .collect::<Vec<_>>();
     let changed_atoms_sample = changed_atoms.clone();
     let changed_atoms_omitted = scan.changed_atoms.len().saturating_sub(changed_atoms.len());
+    let non_atom_changed_file_limit = if options.full_output {
+        scan.non_atom_changed_files.len()
+    } else {
+        DEFAULT_COMMIT_CHANGED_ATOM_LIMIT
+    };
+    let non_atom_changed_files = scan
+        .non_atom_changed_files
+        .iter()
+        .take(non_atom_changed_file_limit)
+        .cloned()
+        .collect::<Vec<_>>();
+    let non_atom_changed_files_omitted = scan
+        .non_atom_changed_files
+        .len()
+        .saturating_sub(non_atom_changed_files.len());
     let next_actions = if verification.result != "passed" {
         vec![json!({
             "kind": "verify",
@@ -5632,6 +5684,10 @@ fn commit_operation_plan(
         "changed_atoms_sample_limit": changed_atom_limit,
         "changed_atoms_omitted": changed_atoms_omitted,
         "changed_atoms_truncated": changed_atoms_omitted > 0,
+        "non_atom_changed_file_count": scan.non_atom_changed_files.len(),
+        "non_atom_changed_files": non_atom_changed_files,
+        "non_atom_changed_files_omitted": non_atom_changed_files_omitted,
+        "non_atom_changed_files_truncated": non_atom_changed_files_omitted > 0,
         "extinguished_fire_count": summary.extinguished_fire_count,
         "active_resolution_count": summary.active_resolution_count,
         "evidence_ref_count": summary.evidence_ref_count,
@@ -6241,6 +6297,75 @@ fn source_manifest_unchanged(
     let base_manifest = codefire_store::read_object(objects, &manifest_id)?;
     let current_manifest = build_manifest_fingerprint(open_dir)?;
     Ok(base_manifest == current_manifest)
+}
+
+fn non_atom_changed_files_since_base(
+    objects: &Path,
+    base_commit: &str,
+    open_dir: &Path,
+    current: &codefire_core::AtomIndex,
+    base_index: &codefire_core::AtomIndex,
+) -> Result<Vec<codefire_core::NonAtomFileChange>, CliError> {
+    let commit = codefire_store::read_object(objects, base_commit)?;
+    let manifest_id = required_string(&commit, &["roots", "content_manifest"])?;
+    let base_manifest = codefire_store::read_object(objects, &manifest_id)?;
+    let current_manifest = build_manifest_fingerprint(open_dir)?;
+    let base_files = manifest_blob_map(&base_manifest)?;
+    let current_files = manifest_blob_map(&current_manifest)?;
+    let atom_paths = current
+        .atoms
+        .iter()
+        .chain(base_index.atoms.iter())
+        .map(|atom| atom.artifact_path.clone())
+        .collect::<BTreeSet<_>>();
+    let paths = base_files
+        .keys()
+        .chain(current_files.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut changes = Vec::new();
+    for path in paths {
+        if atom_paths.contains(&path) {
+            continue;
+        }
+        let base_blob = base_files.get(&path).cloned();
+        let current_blob = current_files.get(&path).cloned();
+        if base_blob == current_blob {
+            continue;
+        }
+        let status = match (base_blob.as_ref(), current_blob.as_ref()) {
+            (None, Some(_)) => "added",
+            (Some(_), None) => "deleted",
+            (Some(_), Some(_)) => "modified",
+            (None, None) => continue,
+        };
+        changes.push(codefire_core::NonAtomFileChange {
+            path,
+            status: status.to_string(),
+            base_blob,
+            current_blob,
+        });
+    }
+    Ok(changes)
+}
+
+fn manifest_blob_map(manifest: &Value) -> Result<BTreeMap<String, String>, CliError> {
+    let entries = manifest
+        .get("entries")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            CliError::InvalidRepository("content manifest entries must be a list".to_string())
+        })?;
+    let mut files = BTreeMap::new();
+    for entry in entries {
+        if entry.get("kind").and_then(Value::as_str) != Some("file") {
+            continue;
+        }
+        let path = required_string(entry, &["path"])?;
+        let blob = required_string(entry, &["blob"])?;
+        files.insert(path, blob);
+    }
+    Ok(files)
 }
 
 fn build_manifest_fingerprint(open_dir: &Path) -> Result<Value, CliError> {

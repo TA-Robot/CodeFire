@@ -141,8 +141,11 @@ codefire context --fire FIRE-001 --json
   "full": false,
   "sample_limit": 50,
   "changed_count": 1,
+  "changed_atom_count": 1,
+  "non_atom_changed_file_count": 0,
   "open_fire_count": 0,
   "changed_atoms_omitted": 0,
+  "non_atom_changed_files_omitted": 0,
   "open_fires_omitted": 0,
   "changed_atom_ids": ["REQ-session"],
   "changed_atoms": ["REQ-session"],
@@ -155,6 +158,7 @@ codefire context --fire FIRE-001 --json
       "content_hash": "sha256:..."
     }
   ],
+  "non_atom_changed_files": [],
   "open_fires": []
 }
 ```
