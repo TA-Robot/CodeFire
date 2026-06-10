@@ -120,7 +120,10 @@ fn status_state(raw_state: &str, open_fires: usize) -> String {
 
 fn main() {
     if let Err(error) = run(env::args().skip(1).collect()) {
-        if !matches!(error, CliError::VerificationFailed(_)) {
+        if !matches!(
+            error,
+            CliError::VerificationFailed(_) | CliError::CommandFailed(_)
+        ) {
             eprintln!("error: {error}");
         }
         std::process::exit(error.exit_code());
@@ -670,13 +673,19 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         Some("link") => {
             let options = parse_link_batch_args(&args[1..])?;
             let result = run_link_batch(&options)?;
+            let valid_result = result.valid;
+            let exit_code = if valid_result {
+                ExitCode::Success
+            } else {
+                ExitCode::InvalidUsageOrConfig
+            };
             if options.json_output {
                 println!(
                     "{}",
                     serde_json::to_string_pretty(&command_result_envelope(
                         "link-batch",
-                        true,
-                        0,
+                        valid_result,
+                        exit_code.code(),
                         Some(&result.repo_root),
                         link_batch_data_json(&result),
                         result.diagnostics.clone(),
@@ -684,7 +693,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     ))?
                 );
             } else if options.dry_run {
-                println!("link batch dry-run: {} links validated", result.item_count);
+                if valid_result {
+                    println!("link batch dry-run: {} links validated", result.item_count);
+                } else {
+                    println!(
+                        "link batch dry-run validation failed: {} issue(s)",
+                        result.diagnostics.len()
+                    );
+                }
             } else {
                 println!(
                     "recorded link batch: {} links in {}",
@@ -692,7 +708,11 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     result.links_file.display()
                 );
             }
-            Ok(())
+            if valid_result {
+                Ok(())
+            } else {
+                Err(CliError::CommandFailed(exit_code))
+            }
         }
         Some("evidence") => match args.get(1).map(String::as_str) {
             Some("-h") | Some("--help") => {
@@ -992,6 +1012,7 @@ enum CliError {
     HttpPayloadTooLarge(String),
     MigrationIncompatibility(String),
     VerificationFailed(ExitCode),
+    CommandFailed(ExitCode),
     NotOpen(PathBuf),
     InvalidMarker(String),
     InvalidRepository(String),
@@ -1015,6 +1036,7 @@ impl CliError {
             CliError::HttpPayloadTooLarge(_) => ExitCode::InvalidUsageOrConfig,
             CliError::MigrationIncompatibility(_) => ExitCode::MigrationIncompatibility,
             CliError::VerificationFailed(exit_code) => *exit_code,
+            CliError::CommandFailed(exit_code) => *exit_code,
             CliError::NotOpen(_) => ExitCode::InvalidUsageOrConfig,
             CliError::InvalidMarker(_) | CliError::InvalidRepository(_) => {
                 ExitCode::RepositoryCorruption
@@ -1039,6 +1061,7 @@ impl fmt::Display for CliError {
             CliError::HttpPayloadTooLarge(message) => write!(f, "{message}"),
             CliError::MigrationIncompatibility(message) => write!(f, "{message}"),
             CliError::VerificationFailed(_) => write!(f, "verification failed"),
+            CliError::CommandFailed(_) => write!(f, "command failed"),
             CliError::NotOpen(path) => write!(
                 f,
                 "not inside an open CodeFire branch directory: {}",

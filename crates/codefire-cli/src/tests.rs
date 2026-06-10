@@ -1417,6 +1417,22 @@ fn link_batch_validates_all_items_before_writing_links() {
             .len(),
         invalid_dry_run.diagnostics.len()
     );
+    let invalid_envelope = command_result_envelope(
+        "link-batch",
+        invalid_dry_run.valid,
+        ExitCode::InvalidUsageOrConfig.code(),
+        Some(&invalid_dry_run.repo_root),
+        link_batch::link_batch_data_json(&invalid_dry_run),
+        invalid_dry_run.diagnostics.clone(),
+        Vec::new(),
+    );
+    assert_eq!(invalid_envelope["ok"], false);
+    assert_eq!(
+        invalid_envelope["exit_code"],
+        ExitCode::InvalidUsageOrConfig.code()
+    );
+    assert_eq!(invalid_envelope["data"]["valid"], false);
+    assert!(invalid_envelope["diagnostics"].as_array().unwrap().len() >= 4);
     let error = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
         path: open_dir.clone(),
         batch_path: invalid_path,
