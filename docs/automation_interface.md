@@ -350,6 +350,10 @@ Mutating commands that still expose legacy operation/merge plan payloads return 
 
 `fire --json` data uses `type=codefire_fire_result`, includes `dry_run`, `item_count`, `branch`, `open_dir`, a `codefire_operation_plan`, and applied manual fires. `fire --batch <file> --json` uses `type=codefire_fire_batch_result` with the same shape and all-item validation. `--dry-run` validates Atom references and duplicate fire keys without modifying `fires.json` or branch state.
 
+Manual fire identity uses the same digest family as scan fires: `display_id` is `FIRE-<12 uppercase hex>` and `fire_uid` is `fire_sha256_<32 lowercase hex>`. The semantic key excludes the base commit; the current base commit is reported separately in `plan.current_base_commit`.
+
+Fire operation plans are bounded by default. `plan.item_count` is the full count, `plan.items` and `plan.sample_items` contain up to `plan.sample_limit` entries, `plan.items_omitted` reports omitted entries, and `plan.truncated` is true when the default sample is incomplete. Use `--full` when complete item detail is required. Plan `next_actions` include `--path <open_dir>` commands and targets with `branch`, `open_dir`, and `repo_root`.
+
 `evidence add --batch <file> --json` data uses `type=codefire_evidence_batch_result`, includes `dry_run`, `item_count`, a `codefire_operation_plan`, and per-item evidence results when applied.
 
 Evidence capture stores command output as a sealed `evidence` object and external artifact metadata as an `artifact_ref` object. Artifact payload bytes are not copied into `.codefire/objects`; storage report exposes their referenced bytes separately from stored payload bytes.

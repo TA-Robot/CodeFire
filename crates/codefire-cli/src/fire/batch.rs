@@ -13,6 +13,7 @@ pub(crate) struct FireBatchOptions {
     pub(crate) path: PathBuf,
     pub(crate) batch_path: PathBuf,
     pub(crate) dry_run: bool,
+    pub(crate) full_output: bool,
     pub(crate) json_output: bool,
     pub(crate) lock: LockOptions,
 }
@@ -42,6 +43,7 @@ pub(crate) fn parse_fire_batch_args(args: &[String]) -> Result<FireBatchOptions,
     let mut path = None;
     let mut batch_path = None;
     let mut dry_run = false;
+    let mut full_output = false;
     let mut json_output = false;
     let mut lock = LockOptions::default();
     let mut index = 0usize;
@@ -60,6 +62,7 @@ pub(crate) fn parse_fire_batch_args(args: &[String]) -> Result<FireBatchOptions,
                 batch_path = Some(PathBuf::from(required_arg(args, index, "--batch")?));
             }
             "--dry-run" => dry_run = true,
+            "--full" => full_output = true,
             "--json" => json_output = true,
             value if value.starts_with("--path=") => {
                 path = Some(PathBuf::from(value.trim_start_matches("--path=")));
@@ -89,6 +92,7 @@ pub(crate) fn parse_fire_batch_args(args: &[String]) -> Result<FireBatchOptions,
             )
         })?,
         dry_run,
+        full_output,
         json_output,
         lock,
     })
@@ -112,6 +116,7 @@ pub(crate) fn run_fire_batch(options: &FireBatchOptions) -> Result<FireResult, C
         &options.path,
         &specs,
         options.dry_run,
+        options.full_output,
         &options.lock,
         "fire-batch",
     )

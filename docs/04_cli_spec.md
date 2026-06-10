@@ -18,8 +18,8 @@ codefire status
 codefire status --json [--metrics]
 codefire scan
 codefire scan --json [--metrics]
-codefire fire <source-atom> --to <target-atom> --reason <text> [--dry-run] [--json]
-codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--json]
+codefire fire <source-atom> --to <target-atom> --reason <text> [--dry-run] [--full] [--json]
+codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--full] [--json]
 codefire extinguish <fire-id> --resolution <type> [--rationale <text>] [--evidence <ref>]
 codefire verify
 codefire verify --json [--metrics]
@@ -233,19 +233,23 @@ unsupported section/keyやschema固有validationは各commandで判定し、erro
 ```bash
 codefire fire REQ-AUTH-001 --to DES-AUTH-001 --reason "仕様と設計が一致していない可能性がある"
 codefire fire --batch fires-batch.yaml --dry-run --json
-codefire fire --batch fires-batch.json --path ./main-open --json
+codefire fire --batch fires-batch.json --path ./main-open --full --json
 ```
 
 仕様：
 
 ```text
 manual fireを立てる。source/target Atomはどちらも現在のopen directoryに存在する必要がある
+manual fireのdisplay_idはFIRE-<12 uppercase hex>、fire_uidはfire_sha256_<32 lowercase hex>で、scan fireと同じdigest-derived familyを使う
+manual fireのsemantic keyはsource atom、target atom、reason、severity、trace path hashから作り、base commitはUIDに含めずplan.current_base_commitに記録する
 manual fireはrevertで自動消滅しない
 extinguishが必要
---dry-runはfires.jsonやbranch stateを書き換えず、codefire_operation_planを返す
+--dry-runはfires.jsonやbranch stateを書き換えず、codefire_operation_planを返す。planはitem_count、sample_items、sample_limit、items_omitted、truncatedを含み、defaultでは20件sampleに制限する
+--fullはfire operation planへ全item詳細を含める
 --batchはJSONまたは限定YAMLのversion/fires形式を読み、全fireのfrom/to/reason/severity、Atom存在、batch内重複、既存fire重複を事前検証してから書き込む
 batch defaults.reason/defaults.severityを指定すると各fireの省略fieldへ適用する
-適用時はrepository lockを取得し、.codefire/active/<branch>/fires.jsonへmanual fireを追記し、open stateをopen-burningへ更新する
+適用時はrepository lockを取得後にactive stateを再読込してmanual fireを再計算し、.codefire/active/<branch>/fires.jsonへmanual fireを追記し、open stateをopen-burningへ更新する
+fire planのnext_actionsは--path <open_dir>付きcommandとbranch/open_dir/repo_root targetを含める
 --jsonはcodefire.command_result.v1 envelopeを出力し、単発はdata.type=codefire_fire_result、batchはdata.type=codefire_fire_batch_resultを含める
 ```
 

@@ -203,6 +203,7 @@ fn batch_file_read_errors_use_json_failure_envelope() {
         path: temp.path().to_path_buf(),
         batch_path: missing.clone(),
         dry_run: true,
+        full_output: false,
         json_output: true,
         lock: LockOptions::default(),
     })
@@ -1979,6 +1980,7 @@ fn manual_fire_and_batch_validate_before_writing_fires() {
         reason: "manual concern".to_string(),
         severity: "required".to_string(),
         dry_run: true,
+        full_output: false,
         json_output: true,
         lock: LockOptions::default(),
     })
@@ -1986,6 +1988,13 @@ fn manual_fire_and_batch_validate_before_writing_fires() {
     assert_eq!(dry_run.item_count, 1);
     assert!(dry_run.dry_run);
     assert_eq!(dry_run.plan["type"], "codefire_operation_plan");
+    assert_eq!(dry_run.plan["item_count"], 1);
+    assert_eq!(dry_run.plan["items_omitted"], 0);
+    assert_eq!(dry_run.plan["truncated"], false);
+    assert!(dry_run.plan["next_actions"][0]["command"]
+        .as_str()
+        .unwrap()
+        .contains("--path"));
     let active_path = active_state_path(&open_dir);
     assert!(!active_path.join("fires.json").exists());
 
@@ -1996,12 +2005,18 @@ fn manual_fire_and_batch_validate_before_writing_fires() {
         reason: "manual concern".to_string(),
         severity: "required".to_string(),
         dry_run: false,
+        full_output: false,
         json_output: true,
         lock: LockOptions::default(),
     })
     .unwrap();
     assert_eq!(applied.fires.len(), 1);
     assert_eq!(applied.fires[0].created_by, "manual");
+    assert!(applied.fires[0].display_id.starts_with("FIRE-"));
+    assert_eq!(applied.fires[0].display_id.len(), "FIRE-".len() + 12);
+    assert_ne!(applied.fires[0].display_id, "FIRE-001");
+    assert!(applied.fires[0].fire_uid.starts_with("fire_sha256_"));
+    assert_eq!(applied.fires[0].fire_uid.len(), "fire_sha256_".len() + 32);
     assert_eq!(read_status(&open_dir).unwrap().state, "open-burning");
     let fires_after_single = read_active_fires(&open_dir);
     assert_eq!(fires_after_single.len(), 1);
@@ -2023,6 +2038,7 @@ fn manual_fire_and_batch_validate_before_writing_fires() {
         path: open_dir.clone(),
         batch_path: batch_path.clone(),
         dry_run: true,
+        full_output: false,
         json_output: true,
         lock: LockOptions::default(),
     })
@@ -2034,6 +2050,7 @@ fn manual_fire_and_batch_validate_before_writing_fires() {
         path: open_dir.clone(),
         batch_path: batch_path.clone(),
         dry_run: false,
+        full_output: false,
         json_output: true,
         lock: LockOptions::default(),
     })
@@ -2059,12 +2076,173 @@ fn manual_fire_and_batch_validate_before_writing_fires() {
         path: open_dir.clone(),
         batch_path: invalid_path,
         dry_run: false,
+        full_output: false,
         json_output: false,
         lock: LockOptions::default(),
     })
     .unwrap_err();
     assert!(error.to_string().contains("TEST-missing"));
     assert_eq!(read_active_fires(&open_dir).len(), 2);
+}
+
+#[test]
+fn manual_fire_cleanup_without_source_changes_returns_open_clean() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir.join("docs").join("requirements").join("clean.md"),
+        "## REQ-clean-manual: Requirement\nManual cleanup fixture\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design").join("clean.md"),
+        "## DES-clean-manual: Design\nManual cleanup fixture\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("codefire.policy.yaml"),
+        "commit_policy:\n  require_trace_completeness: false\n",
+    )
+    .unwrap();
+    run_commit(&CommitOptions {
+        path: open_dir.clone(),
+        message: "Seed manual fire atoms".to_string(),
+        dry_run: false,
+        json_output: false,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap();
+    assert_eq!(read_status(&open_dir).unwrap().state, "open-clean");
+
+    let opened = fire::run_fire(&fire::FireOptions {
+        path: open_dir.clone(),
+        source_atom: "REQ-clean-manual".to_string(),
+        target_atom: "DES-clean-manual".to_string(),
+        reason: "manual cleanup probe".to_string(),
+        severity: "required".to_string(),
+        dry_run: false,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert_eq!(read_status(&open_dir).unwrap().state, "open-burning");
+
+    run_extinguish(&ExtinguishOptions {
+        path: open_dir.clone(),
+        fire_id: opened.fires[0].display_id.clone(),
+        resolution: "obsolete".to_string(),
+        rationale: "probe cleanup".to_string(),
+        evidence: String::new(),
+        evidence_refs: Vec::new(),
+        refresh: false,
+        dry_run: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        edit_rationale: false,
+    })
+    .unwrap();
+    let status = read_status(&open_dir).unwrap();
+    assert_eq!(status.open_fires, 0);
+    assert_eq!(status.state, "open-clean");
+}
+
+#[test]
+fn fire_batch_dry_run_plan_is_bounded_by_default() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    let batch_path = temp.path().join("manual-fires.json");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir.join("docs").join("requirements").join("base.md"),
+        "## REQ-manual-batch: Requirement\nManual batch fixture\n",
+    )
+    .unwrap();
+    let mut fires = Vec::new();
+    for index in 0..25 {
+        fs::write(
+            open_dir
+                .join("docs")
+                .join("design")
+                .join(format!("manual-{index}.md")),
+            format!("## DES-manual-batch-{index}: Design\nManual batch fixture {index}\n"),
+        )
+        .unwrap();
+        fires.push(json!({
+            "from": "REQ-manual-batch",
+            "to": format!("DES-manual-batch-{index}"),
+            "reason": "manual batch dry-run bounded",
+        }));
+    }
+    fs::write(
+        &batch_path,
+        serde_json::to_string(&json!({"version": 1, "fires": fires})).unwrap(),
+    )
+    .unwrap();
+
+    let bounded = fire::run_fire_batch(&fire::FireBatchOptions {
+        path: open_dir.clone(),
+        batch_path: batch_path.clone(),
+        dry_run: true,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert_eq!(bounded.item_count, 25);
+    assert_eq!(bounded.plan["item_count"], 25);
+    assert_eq!(bounded.plan["items"].as_array().unwrap().len(), 20);
+    assert_eq!(bounded.plan["sample_items"].as_array().unwrap().len(), 20);
+    assert_eq!(bounded.plan["items_omitted"], 5);
+    assert_eq!(bounded.plan["truncated"], true);
+
+    let full = fire::run_fire_batch(&fire::FireBatchOptions {
+        path: open_dir,
+        batch_path,
+        dry_run: true,
+        full_output: true,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert_eq!(full.plan["items"].as_array().unwrap().len(), 25);
+    assert_eq!(full.plan["items_omitted"], 0);
+    assert_eq!(full.plan["truncated"], false);
 }
 
 #[test]
@@ -3018,6 +3196,7 @@ fn extinguish_batch_dry_run_json_is_bounded_by_default() {
             reason: "large batch dry-run fixture".to_string(),
             severity: "required".to_string(),
             dry_run: false,
+            full_output: false,
             json_output: false,
             lock: LockOptions::default(),
         })

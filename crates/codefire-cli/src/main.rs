@@ -1221,7 +1221,7 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire verify [path|--path <path>] [--details] [--blocking-only] [--json] [--metrics]\n\nRun CodeFire verification checks for an open directory.\n"
         }
         "fire" => {
-            "usage: codefire fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--dry-run] [--json]\n       codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"from\":\"REQ-id\",\"to\":\"DES-id\",\"reason\":\"manual review\"}]}\n"
+            "usage: codefire fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--dry-run] [--full] [--json]\n       codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--full] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"from\":\"REQ-id\",\"to\":\"DES-id\",\"reason\":\"manual review\"}]}\n"
         }
         "extinguish" => {
             "usage: codefire extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>) [--dry-run] [--json]\n       codefire extinguish --batch <file> [--path <open-dir>] [--dry-run] [--full] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"id\":\"FIRE-1\",\"resolution\":\"addressed\",\"rationale\":\"fixed\"}]}\n"
@@ -4868,8 +4868,14 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
         }
     }
     resolutions.push(resolution);
+    let remaining_open_fires = fires.iter().filter(|fire| fire.status == "open").count();
     write_json_atomic(&fires_path, &serde_json::to_value(fires)?)?;
     write_json_atomic(&resolutions_path, &serde_json::to_value(resolutions)?)?;
+    set_open_state(
+        &context,
+        &active_state_path,
+        scan_branch_state(scan.changed_atoms.len(), remaining_open_fires),
+    )?;
     let result = ExtinguishResult {
         display_id,
         fire_uid,

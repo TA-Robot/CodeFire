@@ -137,10 +137,16 @@ Completion rule:
 | CFR-148 | fixed | Doctor active state diagnostics | missing active `state.json` is explicitly diagnosed |
 | CFR-149 | fixed | Doctor active state invariants | clean/consistent state with open fires is diagnosed |
 | CFR-156 | fixed | Migration quick/full scan mode | quick mode skips object integrity and reports skipped checks |
+| CFB-077 | fixed | Manual fire identity | manual fire IDs use scan-compatible digest format |
+| CFB-078 | fixed | Manual fire state recovery | no-source-change manual fire cleanup returns to open-clean |
+| CFR-124 | fixed | Manual fire lock lifecycle | apply reloads active state after acquiring repo lock |
+| CFR-145 | fixed | Fire operation plan boundedness | dry-run plan returns bounded sample metadata by default |
+| CFR-146 | fixed | Fire operation next_actions | fire plan next_actions include open_dir path context |
+| CFR-158 | fixed | Manual fire semantic identity | base commit removed from manual fire semantic key |
 
 Remaining open count for this batch:
 
-- 57 issues.
+- 51 issues.
 
 ## Global Issue Inventory
 
@@ -150,15 +156,15 @@ Current tracked issue inventory as of 2026-06-10:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 92 | 70 | 22 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
-| CFR code review issues | 160 | 125 | 35 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
-| Total | 252 | 195 | 57 | This global batch is the whole known issue backlog. |
+| CFB dogfood issues | 92 | 72 | 20 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFR code review issues | 160 | 129 | 31 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
+| Total | 252 | 201 | 51 | This global batch is the whole known issue backlog. |
 
 Current active batch progress:
 
 - Initial frozen open issue count: 146.
-- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-029, CFB-032, CFB-033, CFB-034, CFB-035, CFB-037, CFB-040, CFB-041, CFB-042, CFB-044, CFB-049, CFB-050, CFB-052, CFB-053, CFB-055, CFB-056, CFB-057, CFB-058, CFB-059, CFB-060, CFB-061, CFB-062, CFB-063, CFB-064, CFB-065, CFB-068, CFB-069, CFB-070, CFB-071, CFB-072, CFB-073, CFB-074, CFB-075, CFB-076, CFB-081, CFB-082, CFB-083, CFB-084, CFR-085, CFR-086, CFR-087, CFR-088, CFR-096, CFR-097, CFR-098, CFR-099, CFR-100, CFR-101, CFR-102, CFR-103, CFR-104, CFR-106, CFR-107, CFR-108, CFR-109, CFR-115, CFR-125, CFR-126, CFR-127, CFR-132, CFR-133, CFR-134, CFR-135, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-142, CFR-143, CFR-144, CFR-147, CFR-148, CFR-149, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-156, CFR-157.
-- Remaining open now: 57.
+- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-029, CFB-032, CFB-033, CFB-034, CFB-035, CFB-037, CFB-040, CFB-041, CFB-042, CFB-044, CFB-049, CFB-050, CFB-052, CFB-053, CFB-055, CFB-056, CFB-057, CFB-058, CFB-059, CFB-060, CFB-061, CFB-062, CFB-063, CFB-064, CFB-065, CFB-068, CFB-069, CFB-070, CFB-071, CFB-072, CFB-073, CFB-074, CFB-075, CFB-076, CFB-077, CFB-078, CFB-081, CFB-082, CFB-083, CFB-084, CFR-085, CFR-086, CFR-087, CFR-088, CFR-096, CFR-097, CFR-098, CFR-099, CFR-100, CFR-101, CFR-102, CFR-103, CFR-104, CFR-106, CFR-107, CFR-108, CFR-109, CFR-115, CFR-124, CFR-125, CFR-126, CFR-127, CFR-132, CFR-133, CFR-134, CFR-135, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-142, CFR-143, CFR-144, CFR-145, CFR-146, CFR-147, CFR-148, CFR-149, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-156, CFR-157, CFR-158.
+- Remaining open now: 51.
 
 Burn-down interpretation:
 

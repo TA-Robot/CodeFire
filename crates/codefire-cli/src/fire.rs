@@ -6,13 +6,16 @@ pub(crate) use batch::{fire_batch_data_json, parse_fire_batch_args, run_fire_bat
 
 use super::{
     now_iso_utc, open_context, parse_lock_option, read_json, required_string, set_open_state,
-    stable_hash_48, write_json_atomic, CliError, LockOptions, OpenContext, RepoLock,
+    write_json_atomic, CliError, LockOptions, OpenContext, RepoLock,
 };
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 const DEFAULT_MANUAL_FIRE_SEVERITY: &str = "required";
+const MAX_FIRE_PLAN_ITEMS: usize = 20;
+const FIRE_UID_HEX_LENGTH: usize = 32;
+const FIRE_DISPLAY_HEX_LENGTH: usize = 12;
 
 #[derive(Debug)]
 pub(crate) struct FireOptions {
@@ -22,6 +25,7 @@ pub(crate) struct FireOptions {
     pub(crate) reason: String,
     pub(crate) severity: String,
     pub(crate) dry_run: bool,
+    pub(crate) full_output: bool,
     pub(crate) json_output: bool,
     pub(crate) lock: LockOptions,
 }
@@ -62,6 +66,7 @@ pub(crate) fn parse_fire_args(args: &[String]) -> Result<FireOptions, CliError> 
     let mut reason = None;
     let mut severity = DEFAULT_MANUAL_FIRE_SEVERITY.to_string();
     let mut dry_run = false;
+    let mut full_output = false;
     let mut json_output = false;
     let mut lock = LockOptions::default();
     let mut index = 0usize;
@@ -88,6 +93,7 @@ pub(crate) fn parse_fire_args(args: &[String]) -> Result<FireOptions, CliError> 
                 severity = required_arg(args, index, "--severity")?.to_string();
             }
             "--dry-run" => dry_run = true,
+            "--full" => full_output = true,
             "--json" => json_output = true,
             value if value.starts_with("--path=") => {
                 path = Some(PathBuf::from(value.trim_start_matches("--path=")));
@@ -125,6 +131,7 @@ pub(crate) fn parse_fire_args(args: &[String]) -> Result<FireOptions, CliError> 
         reason: reason.ok_or_else(single_fire_usage)?,
         severity,
         dry_run,
+        full_output,
         json_output,
         lock,
     })
@@ -141,6 +148,7 @@ pub(crate) fn run_fire(options: &FireOptions) -> Result<FireResult, CliError> {
         &options.path,
         &[spec],
         options.dry_run,
+        options.full_output,
         &options.lock,
         "fire",
     )
@@ -150,6 +158,7 @@ pub(crate) fn run_manual_fire_specs(
     path: &Path,
     specs: &[ManualFireSpec],
     dry_run: bool,
+    full_output: bool,
     lock: &LockOptions,
     command: &str,
 ) -> Result<FireResult, CliError> {
@@ -158,17 +167,21 @@ pub(crate) fn run_manual_fire_specs(
             "fire batch requires at least one fire".to_string(),
         ));
     }
-    let context = load_manual_fire_context(path)?;
-    let _lock = if dry_run {
-        None
+    let _lock;
+    let context;
+    if dry_run {
+        _lock = None;
+        context = load_manual_fire_context(path)?;
     } else {
-        Some(RepoLock::acquire_with_options(
-            &context.context.repo_root,
+        let lock_context = open_context(path)?;
+        _lock = Some(RepoLock::acquire_with_options(
+            &lock_context.repo_root,
             lock,
-        )?)
-    };
+        )?);
+        context = load_manual_fire_context(path)?;
+    }
     let new_fires = build_manual_fires(&context, specs)?;
-    let plan = fire_operation_plan(command, dry_run, &context, specs, &new_fires);
+    let plan = fire_operation_plan(command, dry_run, full_output, &context, specs, &new_fires);
     if !dry_run {
         let mut fires = context.existing_fires.clone();
         fires.extend(new_fires.iter().cloned());
@@ -244,7 +257,7 @@ pub(crate) fn default_manual_fire_severity() -> String {
 
 fn single_fire_usage() -> CliError {
     CliError::Usage(
-        "usage: codefire fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--severity required] [--dry-run] [--json]"
+        "usage: codefire fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--severity required] [--dry-run] [--full] [--json]"
             .to_string(),
     )
 }
@@ -292,7 +305,6 @@ fn build_manual_fires(
         .map(|fire| fire.key.clone())
         .collect::<BTreeSet<_>>();
     let mut batch_keys = BTreeSet::new();
-    let mut display_number = next_fire_display_number(&context.existing_fires);
     let now = now_iso_utc();
     let mut fires = Vec::with_capacity(specs.len());
     for spec in specs {
@@ -321,8 +333,8 @@ fn build_manual_fires(
             &spec.source_atom,
             &spec.target_atom,
             &spec.reason,
+            &spec.severity,
             &trace_path,
-            &context.base_commit,
         )?;
         if !batch_keys.insert(key.clone()) {
             return Err(CliError::Usage(format!(
@@ -336,11 +348,12 @@ fn build_manual_fires(
                 spec.source_atom, spec.target_atom, spec.reason
             )));
         }
+        let fire_digest = fire_digest_hex(&key);
         fires.push(codefire_core::Fire {
             type_tag: "fire".to_string(),
             version: codefire_core::VERSION,
-            fire_uid: format!("fire_{:012x}", stable_hash_48(key.as_bytes())),
-            display_id: format!("FIRE-{display_number:03}"),
+            fire_uid: fire_uid_from_digest(&fire_digest),
+            display_id: fire_display_id_from_digest(&fire_digest),
             status: "open".to_string(),
             severity: spec.severity,
             source: codefire_core::FireAtomRef {
@@ -359,18 +372,8 @@ fn build_manual_fires(
             obsolete_at: None,
             resolution_uid: None,
         });
-        display_number += 1;
     }
     Ok(fires)
-}
-
-fn next_fire_display_number(fires: &[codefire_core::Fire]) -> usize {
-    fires
-        .iter()
-        .filter_map(|fire| fire.display_id.strip_prefix("FIRE-"))
-        .filter_map(|number| number.parse::<usize>().ok())
-        .max()
-        .map_or(1, |number| number + 1)
 }
 
 fn manual_trace_path(
@@ -391,16 +394,16 @@ fn manual_fire_key(
     source: &str,
     target: &str,
     reason: &str,
+    severity: &str,
     trace_path: &[String],
-    base_commit: &str,
 ) -> Result<String, CliError> {
     let trace_path_hash = digest_bytes(&serde_json::to_vec(trace_path)?);
     let value = json!({
         "source_atom_id": source,
         "target_atom_id": target,
         "reason": reason,
+        "severity": severity,
         "trace_path_hash": trace_path_hash,
-        "base_commit": base_commit,
     });
     Ok(digest_bytes(&serde_json::to_vec(&value)?))
 }
@@ -409,31 +412,74 @@ fn digest_bytes(bytes: &[u8]) -> String {
     codefire_util::sha256_prefixed(bytes)
 }
 
+fn fire_digest_hex(key: &str) -> String {
+    codefire_util::sha256_hex(key.as_bytes())
+}
+
+fn fire_uid_from_digest(digest: &str) -> String {
+    format!("fire_sha256_{}", &digest[..FIRE_UID_HEX_LENGTH])
+}
+
+fn fire_display_id_from_digest(digest: &str) -> String {
+    format!(
+        "FIRE-{}",
+        digest[..FIRE_DISPLAY_HEX_LENGTH].to_ascii_uppercase()
+    )
+}
+
 fn fire_operation_plan(
     command: &str,
     dry_run: bool,
+    full_output: bool,
     context: &ManualFireContext,
     specs: &[ManualFireSpec],
     fires: &[codefire_core::Fire],
 ) -> Value {
+    let item_limit = if full_output {
+        fires.len()
+    } else {
+        MAX_FIRE_PLAN_ITEMS
+    };
+    let items = fires
+        .iter()
+        .take(item_limit)
+        .map(fire_json)
+        .collect::<Vec<_>>();
+    let items_omitted = fires.len().saturating_sub(items.len());
+    let open_dir = context.context.open_dir.to_string_lossy();
     json!({
         "type": "codefire_operation_plan",
         "version": 1,
         "command": command,
         "dry_run": dry_run,
         "would_apply": !dry_run,
+        "requires_lock_revalidation": !dry_run,
+        "repo_root": &context.context.repo_root,
         "branch": &context.context.branch,
         "open_dir": &context.context.open_dir,
+        "current_base_commit": &context.base_commit,
         "item_count": fires.len(),
-        "items": fires.iter().map(fire_json).collect::<Vec<_>>(),
+        "items": items,
+        "sample_items": fires.iter().take(item_limit).map(fire_json).collect::<Vec<_>>(),
+        "sample_limit": item_limit,
+        "items_omitted": items_omitted,
+        "truncated": items_omitted > 0,
         "operations": [
             {"kind": "validate_all_fire_items", "count": specs.len()},
             {"kind": "append_manual_fires", "path": &context.fires_path, "count": fires.len()},
             {"kind": "set_open_state", "state": "open-burning"},
         ],
         "next_actions": [
-            {"kind": "verify", "command": "codefire verify --details --json", "target": {"branch": &context.context.branch}},
-            {"kind": "extinguish", "command": "codefire extinguish <fire-id> --resolution addressed --rationale <text>", "target": {"branch": &context.context.branch}},
+            {
+                "kind": "verify",
+                "command": format!("codefire verify --path {} --details --json", open_dir),
+                "target": {"branch": &context.context.branch, "open_dir": &context.context.open_dir, "repo_root": &context.context.repo_root}
+            },
+            {
+                "kind": "extinguish",
+                "command": format!("codefire extinguish <fire-id> --path {} --resolution addressed --rationale <text>", open_dir),
+                "target": {"branch": &context.context.branch, "open_dir": &context.context.open_dir, "repo_root": &context.context.repo_root}
+            },
         ],
     })
 }

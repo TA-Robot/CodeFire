@@ -307,9 +307,9 @@ The active CodeFire improvement cycle is a global burn-down. The initial frozen 
 
 Global inventory as of 2026-06-10:
 
-- CFB dogfood issues: 92 total, 70 fixed, 22 open.
-- CFR code review issues: 160 total, 125 fixed/closed, 35 open.
-- Combined tracked backlog: 252 total, 195 fixed/closed, 57 open.
+- CFB dogfood issues: 92 total, 72 fixed, 20 open.
+- CFR code review issues: 160 total, 129 fixed/closed, 31 open.
+- Combined tracked backlog: 252 total, 201 fixed/closed, 51 open.
 
 Active batch closed in this burn-down:
 
@@ -323,6 +323,8 @@ Active batch closed in this burn-down:
 - CFB-061: missing remote storage target is reported as invalid layout instead of silently disappearing.
 - CFB-063: review-pack and patch export have JSON metadata automation surfaces.
 - CFB-072: evidence dry-run plan reports resolved cwd and cwd source.
+- CFB-077: manual fire identity uses scan-compatible digest IDs.
+- CFB-078: manual fire cleanup without source changes returns to open-clean.
 - CFB-082: storage quick mode reports inferred largest object types and type confidence.
 - CFB-087: missing evidence-ref dry-run failures are returned as JSON envelopes.
 - CFB-089: `atom-index` and `missing-links` handle shared `--path` / `--json` like normal commands.
@@ -330,9 +332,13 @@ Active batch closed in this burn-down:
 - CFB-092: extractor/hash schema changes are migration-aware and can be rebaselined.
 - CFR-132: migrate target format defaults to `current` and reports supported targets.
 - CFR-133: repository layout is defined by a shared doctor/migrate registry.
+- CFR-124: manual fire apply reloads state after lock acquisition.
+- CFR-145: fire dry-run plans are bounded by default.
+- CFR-146: fire operation plan next_actions carry open_dir/repo path context.
 - CFR-148: doctor reports missing active `state.json`.
 - CFR-149: doctor reports active state/open fire invariant violations.
 - CFR-156: migrate supports quick/full scan modes with skipped check metadata.
+- CFR-158: manual fire semantic identity is independent of base commit.
 
 Important already-fixed issues from the latest two-cycle run:
 
@@ -342,7 +348,7 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- Remaining 57 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
+- Remaining 51 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
 - このglobal batchが0 openになるまで、新しいissue discovery batchへ進まない。
 
 ## Cycle Invariants
