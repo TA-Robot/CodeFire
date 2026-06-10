@@ -275,3 +275,7 @@ The system shall build a deterministic manifest for final planning handoff revie
 ## REQ-AUTO-069: Research cycle planning handoff review packet artifact archive summary artifact manifest Markdown
 
 The system shall render final planning handoff review packet artifact archive summary artifact manifests into deterministic Markdown. The rendered document shall include source cycles, manifest status, artifact count, and a path, SHA-256 digest, and byte count table so reviewers can audit persisted archive summary and gate audit artifact integrity metadata without opening each artifact.
+
+## REQ-AUTO-070: Research cycle planning handoff review packet artifact archive summary artifact manifest verification
+
+The system shall verify final planning handoff review packet artifact archive summary artifact manifests against artifact contents. The verification shall detect missing artifacts, SHA-256 digest drift, and byte count drift using the shared planning packet manifest verification shape so storage adapters can reject corrupted archive summary and gate audit documents before reviewer handoff.

@@ -440,6 +440,16 @@ When adding a module, add its test in the same naming pattern. When adding a Cod
 5. Add CodeFire links for requirement/design/code/test atoms.
 6. Run the full unittest suite and commit through CodeFire.
 
+Current archive summary artifact flow:
+
+```text
+ResearchCyclePlanningHandoffReviewPacketArtifactArchive
+  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder.build(...)
+  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder.build(...)
+  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown.render(...)
+  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerifier.verify(...)
+```
+
 ### Add a new governance gate
 
 1. Define the exact blocker/review/approve states in spec.

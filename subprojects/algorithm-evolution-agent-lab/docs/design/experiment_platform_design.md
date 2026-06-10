@@ -890,3 +890,15 @@ The rendered document contains:
 - artifact table with path, SHA-256 digest, and byte count
 
 The renderer delegates table semantics to the existing manifest Markdown shape while providing an archive-summary-specific title and trace atom. It does not inspect artifact contents, recompute hashes, or write files.
+
+## DES-AUTO-052: Research cycle planning handoff review packet artifact archive summary artifact manifest verification
+
+The review packet artifact archive summary artifact manifest verifier consumes the manifest produced for archive summary artifacts and a path-to-content map for the persisted summary artifacts.
+
+The verifier emits `ResearchCyclePlanningPacketManifestVerification` with one finding per detected integrity issue:
+
+- missing artifact content
+- SHA-256 digest mismatch
+- byte count mismatch
+
+The verifier delegates integrity semantics to the shared manifest verifier while providing an archive-summary-specific trace atom. It does not rebuild summary artifacts, rerender Markdown, read files, write files, or mutate the archive.
