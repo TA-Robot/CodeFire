@@ -1080,3 +1080,19 @@ The gate returns a deterministic dictionary containing:
 - blocker messages
 
 The gate verifies that the Markdown contains the expected status line, finding count line, and one path-specific finding row for every verification finding. When the verification is clean, it verifies the clean `none` line instead. The gate is pure and deterministic. It does not rerun verification, read files, write files, parse manifests, recompute hashes, or mutate inputs.
+
+## DES-AUTO-065: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown gate Markdown
+
+The review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown gate Markdown renderer consumes the dictionary emitted by `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate`.
+
+The rendered document contains:
+
+- title
+- ready state
+- gate status
+- verification status
+- finding count
+- checked finding count
+- blocker messages, or `none` when clean
+
+The renderer is pure and deterministic. It does not rerun the gate, inspect manifests, parse files, write files, or mutate inputs.

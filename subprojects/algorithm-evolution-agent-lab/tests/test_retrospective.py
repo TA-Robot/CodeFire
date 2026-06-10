@@ -16,6 +16,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate,
@@ -2489,6 +2490,51 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertTrue(empty_clean["ready"])
         self.assertEqual("ok", empty_clean["verification_status"])
         self.assertEqual(0, empty_clean["finding_count"])
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-gate-markdown-renders-blockers
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_gate_markdown_renders_blockers(
+        self,
+    ) -> None:
+        gate_result = {
+            "ready": False,
+            "status": "blocked",
+            "verification_status": "blocked",
+            "finding_count": 2,
+            "checked_finding_count": 2,
+            "blockers": [
+                "finding count line is missing",
+                "finding line is missing for manifest.md",
+            ],
+        }
+
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown().render(
+            gate_result,
+            title="Cycle 47 Verification Markdown Gate",
+        )
+        clean = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown().render(
+            {
+                "ready": True,
+                "status": "ready",
+                "verification_status": "ok",
+                "finding_count": 0,
+                "checked_finding_count": 0,
+                "blockers": [],
+            },
+            title="Cycle 47 Verification Markdown Gate",
+        )
+
+        self.assertIn("# Cycle 47 Verification Markdown Gate", markdown)
+        self.assertIn("- Ready: no", markdown)
+        self.assertIn("- Status: blocked", markdown)
+        self.assertIn("- Verification status: blocked", markdown)
+        self.assertIn("- Finding count: 2", markdown)
+        self.assertIn("- Checked finding count: 2", markdown)
+        self.assertIn("- finding count line is missing", markdown)
+        self.assertIn("- finding line is missing for manifest.md", markdown)
+        self.assertIn("- Ready: yes", clean)
+        self.assertIn("- Status: ready", clean)
+        self.assertIn("- Verification status: ok", clean)
+        self.assertIn("- none", clean)
 
 
 if __name__ == "__main__":
