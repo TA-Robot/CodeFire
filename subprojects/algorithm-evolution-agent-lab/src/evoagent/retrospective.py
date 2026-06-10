@@ -1496,6 +1496,72 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
         return "\n".join(lines).rstrip() + "\n"
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate:
+    def evaluate(self, summary: dict[str, object], markdown: str) -> dict[str, object]:
+        blockers: list[str] = []
+        source_cycles = ", ".join(str(cycle) for cycle in summary.get("source_cycles", []))
+        artifact_count = summary.get("artifact_count", 0)
+        finding_count = summary.get("finding_count", 0)
+        artifacts = summary.get("artifacts", [])
+        audits = summary.get("audits", {})
+        manifest_markdown = bool(isinstance(audits, dict) and audits.get("manifest_markdown"))
+        verification_markdown = bool(isinstance(audits, dict) and audits.get("verification_markdown"))
+
+        required_lines = [
+            (f"- Source cycles: {source_cycles}", "source cycle line is missing"),
+            (
+                f"- Parent archive status: {summary.get('parent_archive_status', 'unknown')}",
+                "parent archive status line is missing",
+            ),
+            (f"- Archive status: {summary.get('archive_status', 'unknown')}", "archive status line is missing"),
+            (f"- Manifest status: {summary.get('manifest_status', 'unknown')}", "manifest status line is missing"),
+            (
+                f"- Verification status: {summary.get('verification_status', 'unknown')}",
+                "verification status line is missing",
+            ),
+            (f"- Artifact count: {artifact_count}", "artifact count line is missing"),
+            (f"- Finding count: {finding_count}", "finding count line is missing"),
+            (
+                f"- Manifest Markdown: {'included' if manifest_markdown else 'missing'}",
+                "manifest Markdown audit line is missing",
+            ),
+            (
+                f"- Verification Markdown: {'included' if verification_markdown else 'missing'}",
+                "verification Markdown audit line is missing",
+            ),
+        ]
+        for required_line, message in required_lines:
+            if required_line not in markdown:
+                blockers.append(message)
+
+        if not isinstance(artifacts, list):
+            blockers.append("summary artifacts must be a list")
+            artifacts = []
+        if artifact_count != len(artifacts):
+            blockers.append(f"artifact count {artifact_count} does not match {len(artifacts)} artifact record(s)")
+
+        for index, artifact in enumerate(artifacts):
+            if not isinstance(artifact, dict):
+                blockers.append(f"artifact {index} is not an object")
+                continue
+            path = artifact.get("path", "")
+            byte_count = artifact.get("byte_count", 0)
+            digest = artifact.get("content_sha256", "")
+            row = f"| `{path}` | {byte_count} | `{digest}` |"
+            if row not in markdown:
+                blockers.append(f"artifact row is missing for {path}")
+
+        return {
+            "ready": not blockers,
+            "status": "ready" if not blockers else "blocked",
+            "blockers": blockers,
+            "artifact_count": artifact_count,
+            "finding_count": finding_count,
+            "checked_artifact_count": len(artifacts),
+        }
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

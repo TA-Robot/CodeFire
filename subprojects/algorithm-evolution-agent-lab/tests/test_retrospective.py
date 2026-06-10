@@ -12,6 +12,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown,
@@ -1916,6 +1917,86 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("| `cycle-38/archive-summary-gate.md` |", markdown)
         self.assertIn("- Manifest Markdown: included", markdown)
         self.assertIn("- Verification Markdown: included", markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-markdown-gate-blocks-drift
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_markdown_gate_blocks_drift(
+        self,
+    ) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-39",
+                    completed_runs=19,
+                    improved_candidates=15,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.4,
+                    remaining_budget=19.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=15,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=15.0,
+            packet_path="cycle-39/planning-packet.md",
+            plan_path="cycle-39/plan.md",
+            lint_path="cycle-39/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-39/review-packet.md",
+            readiness_path="cycle-39/readiness.md",
+            manifest_path="cycle-39/manifest.md",
+            verification_path="cycle-39/verification.md",
+        )
+        handoff = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder().build(
+            archive,
+            summary_path="cycle-39/archive-summary.md",
+            gate_path="cycle-39/archive-summary-gate.md",
+        )
+        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+            handoff,
+        )
+        summary = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary().summarize(
+            summary_archive,
+        )
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown().render(
+            summary,
+        )
+        gate = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate()
+
+        clean = gate.evaluate(summary, markdown)
+        self.assertTrue(clean["ready"])
+        self.assertEqual("ready", clean["status"])
+        self.assertEqual([], clean["blockers"])
+        self.assertEqual(2, clean["artifact_count"])
+        self.assertEqual(2, clean["checked_artifact_count"])
+        self.assertEqual(0, clean["finding_count"])
+
+        drifted_summary = dict(summary)
+        drifted_summary["artifact_count"] = 3
+        drifted_markdown = markdown.replace("- Parent archive status: ok\n", "").replace(
+            "| `cycle-39/archive-summary-gate.md` |",
+            "| `cycle-39/missing-gate.md` |",
+        )
+        result = gate.evaluate(drifted_summary, drifted_markdown)
+
+        self.assertFalse(result["ready"])
+        self.assertEqual("blocked", result["status"])
+        self.assertEqual(
+            [
+                "parent archive status line is missing",
+                "artifact count line is missing",
+                "artifact count 3 does not match 2 artifact record(s)",
+                "artifact row is missing for cycle-39/archive-summary-gate.md",
+            ],
+            result["blockers"],
+        )
 
 
 if __name__ == "__main__":

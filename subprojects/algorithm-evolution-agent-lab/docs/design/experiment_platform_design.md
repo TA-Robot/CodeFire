@@ -961,3 +961,21 @@ The rendered document contains:
 - artifact table with path, byte count, and SHA-256 digest
 
 The renderer is pure and deterministic. It does not inspect the archive object, rerun verification, recompute hashes, read files, write files, or mutate the summary payload.
+
+## DES-AUTO-057: Research cycle planning handoff review packet artifact archive summary artifact archive summary Markdown gate
+
+The review packet artifact archive summary artifact archive summary Markdown gate consumes:
+
+- the machine-readable summary dictionary emitted by `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary`
+- the Markdown emitted by `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown`
+
+The gate returns a deterministic dictionary containing ready status, blocker messages, artifact count, checked artifact count, and finding count.
+
+The gate blocks when:
+
+- required source cycle, status, count, or audit lines are missing
+- artifact count does not match the number of artifact records
+- artifact records are not dictionaries
+- any artifact row with path, byte count, and SHA-256 digest is missing
+
+The gate does not inspect archive objects, rerun verification, recompute hashes, parse files, write files, or mutate inputs.
