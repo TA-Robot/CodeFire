@@ -1026,6 +1026,16 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown:
         return ResearchCyclePlanningPacketManifestMarkdown().render(manifest, title=title)
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier
+class ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier:
+    def verify(
+        self,
+        manifest: ResearchCyclePlanningPacketManifest,
+        artifact_contents: dict[str, str],
+    ) -> ResearchCyclePlanningPacketManifestVerification:
+        return ResearchCyclePlanningPacketManifestVerifier().verify(manifest, artifact_contents)
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

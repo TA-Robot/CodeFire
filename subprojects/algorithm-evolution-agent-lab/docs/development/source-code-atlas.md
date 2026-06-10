@@ -273,6 +273,11 @@ ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown.render(manifest
   -> render packaged review packet artifact manifests as reviewer-facing Markdown tables
   -> include source cycles, manifest status, artifact count, path, hash, and byte count
   -> reuse the shared manifest Markdown renderer without reading artifact contents
+
+ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier.verify(manifest, artifact_contents)
+  -> verify packaged review packet artifacts against manifest path, hash, and byte count records
+  -> return the shared manifest verification result and finding shape
+  -> detect missing artifacts, digest drift, and byte-count drift without filesystem access
 ```
 
 Important implementation details:

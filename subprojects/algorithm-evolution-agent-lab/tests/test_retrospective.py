@@ -10,6 +10,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier,
     ResearchCyclePlanningHandoffReviewPacketBuilder,
     ResearchCyclePlanningHandoffReviewPacketMarkdown,
     ResearchCyclePlanningHandoffBundleSummary,
@@ -1055,6 +1056,64 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Artifact count: 4", markdown)
         self.assertIn("| `cycle-23/review-packet.md` |", markdown)
         self.assertIn("sha256:", markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-manifest-verifier-detects-drift
+    def test_research_cycle_planning_handoff_review_packet_artifact_manifest_verifier_detects_drift(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-24",
+                    completed_runs=7,
+                    improved_candidates=4,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=7.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=4,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=4.0,
+            packet_path="cycle-24/planning-packet.md",
+            plan_path="cycle-24/plan.md",
+            lint_path="cycle-24/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        artifacts = ResearchCyclePlanningHandoffReviewPacketArtifactBuilder().build(
+            packet,
+            review_path="cycle-24/review-packet.md",
+            readiness_path="cycle-24/readiness.md",
+            manifest_path="cycle-24/manifest.md",
+            verification_path="cycle-24/verification.md",
+        )
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder().build(
+            packet,
+            artifacts,
+        )
+        artifact_contents = {artifact.path: artifact.content for artifact in artifacts}
+        clean = ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier().verify(
+            manifest,
+            artifact_contents,
+        )
+        drifted_contents = dict(artifact_contents)
+        drifted_contents["cycle-24/review-packet.md"] += "\nchanged\n"
+        drifted_contents.pop("cycle-24/readiness.md")
+
+        drifted = ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier().verify(
+            manifest,
+            drifted_contents,
+        )
+
+        self.assertTrue(clean.ok)
+        self.assertFalse(drifted.ok)
+        self.assertIn("sha256 digest mismatch", [finding.message for finding in drifted.findings])
+        self.assertIn("byte count mismatch", [finding.message for finding in drifted.findings])
+        self.assertIn("artifact is missing", [finding.message for finding in drifted.findings])
 
 
 if __name__ == "__main__":

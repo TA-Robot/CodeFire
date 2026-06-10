@@ -755,3 +755,16 @@ The rendered document contains:
 - artifact table with path, SHA-256 digest, and byte count
 
 The renderer delegates table semantics to the existing manifest Markdown shape while providing a review-packet-specific title and trace atom. It does not inspect artifact contents, recompute hashes, or write files.
+
+## DES-AUTO-042: Research cycle planning handoff review packet artifact manifest verification
+
+The review packet artifact manifest verifier consumes a `ResearchCyclePlanningPacketManifest` and a mapping of artifact path to content.
+
+The verifier returns `ResearchCyclePlanningPacketManifestVerification` with:
+
+- missing artifact findings
+- SHA-256 digest mismatch findings
+- byte count mismatch findings
+- `ok` true only when no findings exist
+
+The verifier delegates checksum and byte-count semantics to the existing planning packet manifest verifier. It does not read or write files and keeps review packet storage validation aligned with the rest of the planning handoff audit pipeline.

@@ -456,6 +456,15 @@ links:
   - from: REQ-AUTO-059
     to: TEST-research-cycle-planning-handoff-review-packet-artifact-manifest-markdown-renders-table
     type: verified_by
+  - from: REQ-AUTO-060
+    to: DES-AUTO-042
+    type: refined_by
+  - from: DES-AUTO-042
+    to: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier
+    type: implemented_by
+  - from: REQ-AUTO-060
+    to: TEST-research-cycle-planning-handoff-review-packet-artifact-manifest-verifier-detects-drift
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

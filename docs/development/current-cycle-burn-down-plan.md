@@ -22,15 +22,18 @@ Burn-down中に別の問題を見つけた場合の扱い:
 
 この運用により、「issueを出す -> 全部消す -> issueを出す」を崩さない。
 
-## Active Batch
+## Current Open State
 
 Current known open issue count:
 
 - CFB/CFR product/review issues: 0.
 - Algorithm CodeFire open fires after the latest dogfood seal: 0.
-- The historical 146-item global batch below is complete; it is not a remaining-open count.
+- Active frozen issue batch: none.
+- The historical 146-item global batch below is already closed. The number 146 is the old starting count, not a remaining-open count.
 
-Active batch ID:
+## Closed Historical Batch
+
+Closed batch ID:
 
 - `BATCH-2026-06-global-open-backlog`
 
@@ -40,7 +43,7 @@ Scope:
 - Initial frozen CFB dogfood issue count: 68。
 - Initial frozen CFR code review issue count: 78。
 - Historical initial frozen total: 146件を同一burn-down対象としてfreezeした。
-- 新規issue探索は、このglobal batchを0件にするまで行わない。作業中に見つけた周辺問題は、修正blockerでない限り採番せず、次回discovery候補として短くメモする。
+- This batch is complete. 新規issue探索は、このglobal batchを0件にした後に再開した。
 
 Completion rule:
 
@@ -215,7 +218,7 @@ Current tracked issue inventory as of 2026-06-10:
 |---|---:|---:|---:|---|
 | CFB dogfood issues | 95 | 95 | 0 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for every `CFB-001..CFB-095` issue. |
 | CFR code review issues | 160 | 160 | 0 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
-| Total | 255 | 255 | 0 | This global batch plus cycle 4/5/6/7/8/9/10/11/12/13/14/15/16/17/18/19/20/21/22/23 dogfood passes are the whole known issue backlog. |
+| Total | 255 | 255 | 0 | This global batch plus cycle 4/5/6/7/8/9/10/11/12/13/14/15/16/17/18/19/20/21/22/23/24 dogfood passes are the whole known issue backlog. |
 
 Completed global batch progress:
 
@@ -591,6 +594,24 @@ Algorithm work:
 - All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-bdf99515ee6fa2576e7b0acc`.
 
 Cycle 23 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+
+## Cycle 24 Dogfood Pass
+
+After cycle 23 reached zero open issues, cycle 24 resumed algorithm development with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier` to detect missing artifacts, SHA-256 drift, and byte-count drift for review packet artifact manifests.
+- Added `REQ-AUTO-060`, `DES-AUTO-042`, `CODE-ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier`, and `TEST-research-cycle-planning-handoff-review-packet-artifact-manifest-verifier-detects-drift`.
+- Algorithm unittest result: 166 tests pass.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-efcc72220a4aec9228629367`.
+
+Cycle 24 issue status:
 
 - Newly discovered CodeFire product issues: 0.
 - Newly frozen CFB/CFR batch size: 0.

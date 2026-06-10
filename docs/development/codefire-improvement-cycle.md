@@ -229,13 +229,13 @@ Current named cycle:
 - CodeFire次version系統: v1.0 Contract ValidationのPhase 1a以降を継続する。
 - Current plan: `docs/development/v1.0-contract-validation-plan.md`。
 - Current burn-down plan: `docs/development/current-cycle-burn-down-plan.md`。
-- Current phase: cycle 23 dogfood pass完了。今回のalgorithm開発ではCodeFire本体の新規CFBは発見されず、既知CFB/CFR open issueは0件。
+- Current phase: cycle 24 dogfood pass完了。今回のalgorithm開発ではCodeFire本体の新規CFBは発見されず、既知CFB/CFR open issueは0件。
 - Installed CodeFire: `/home/devuser/.local/bin/codefire`。
 - Installed version output: `codefire foundation 1`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
-- Latest pushed Git commits: current global burn-down commits through cycle 23 dogfood pass。
+- Latest pushed Git commits: current global burn-down commits through cycle 24 dogfood pass。
 - Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` は `open-clean`、open fires 0。
-- Latest algorithm CodeFire base: `CF-COMMIT-bdf99515ee6fa2576e7b0acc`。
+- Latest algorithm CodeFire base: `CF-COMMIT-efcc72220a4aec9228629367`。
 
 Current global issue inventory:
 
@@ -248,6 +248,7 @@ Current global issue inventory:
 Close audit note:
 
 - 2026-06-10時点で残っていた146件は、過去の `BATCH-2026-06-global-open-backlog` の初期open数であり、現在のopen数ではない。同batchは同cycle内で全件fixedにした。
+- 現在のCFB/CFR open issueは0件。`146` は履歴ログに出る開始件数であって、現残数ではない。
 - 最後に残っていた `CFR-120` は、`docs/development/issue-root-cause-map.json` と `issue_root_cause_map_covers_open_issues` で、今後のopen issueをroot cause計画へ機械的に接続する形でcloseした。
 - Cycle 4 dogfoodingでは `ResearchCyclePlanSynthesizer` を追加し、`CFB-093` を発見、同cycle内でfixedにした。
 - Cycle 5 dogfoodingでは `ResearchCyclePlanMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-476c73ed58ac5e64be166e38` でsealした。CodeFire本体issueは新規発見なし。
@@ -269,6 +270,7 @@ Close audit note:
 - Cycle 21 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactBuilder` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-5dd928c08fe5c0eeb673bb04` でsealした。CodeFire本体issueは新規発見なし。
 - Cycle 22 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-a301c378a9e91020c26669e1` でsealした。CodeFire本体issueは新規発見なし。
 - Cycle 23 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-bdf99515ee6fa2576e7b0acc` でsealした。CodeFire本体issueは新規発見なし。
+- Cycle 24 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-efcc72220a4aec9228629367` でsealした。CodeFire本体issueは新規発見なし。
 - 次のcycleでも、issue discovery後にこのmapまたは後継schemaへ全open issueを登録し、batchを全部消してから次のissue出しへ進む。
 
 ## Completed Two-Cycle Snapshot
