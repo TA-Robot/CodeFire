@@ -453,6 +453,7 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchive
   -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary.summarize(...)
   -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown.render(...)
   -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate.evaluate(...)
+  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown.render(...)
 ```
 
 ### Add a new governance gate

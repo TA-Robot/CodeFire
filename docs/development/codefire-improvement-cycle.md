@@ -229,13 +229,13 @@ Current named cycle:
 - CodeFire次version系統: v1.0 Contract ValidationのPhase 1a以降を継続する。
 - Current plan: `docs/development/v1.0-contract-validation-plan.md`。
 - Current burn-down plan: `docs/development/current-cycle-burn-down-plan.md`。
-- Current phase: cycle 39 dogfood pass完了。今回のalgorithm開発ではCodeFire本体の新規CFBは発見されず、既知CFB/CFR open issueは0件。
+- Current phase: cycle 40 dogfood pass完了。今回のalgorithm開発ではCodeFire本体の新規CFBは発見されず、既知CFB/CFR open issueは0件。
 - Installed CodeFire: `/home/devuser/.local/bin/codefire`。
 - Installed version output: `codefire foundation 1`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
-- Latest pushed Git commits: current global burn-down commits through cycle 39 dogfood pass。
+- Latest pushed Git commits: current global burn-down commits through cycle 40 dogfood pass。
 - Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` は `open-clean`、open fires 0。
-- Latest algorithm CodeFire base: `CF-COMMIT-9385332c9198de84896635b1`。
+- Latest algorithm CodeFire base: `CF-COMMIT-20252fcb8779d550e7740a57`。
 
 Current global issue inventory:
 
@@ -287,6 +287,7 @@ Close audit note:
 - Cycle 37 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-8e531b39a917b74f6e89fec2` でsealした。CodeFire本体issueは新規発見なし。146件は閉じた履歴batchの開始数であり現open数ではないことをissueディレクトリREADMEにも明記した。
 - Cycle 38 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-450cc175834950cb4741f574` でsealした。CodeFire本体issueは新規発見なし。
 - Cycle 39 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-9385332c9198de84896635b1` でsealした。CodeFire本体issueは新規発見なし。
+- Cycle 40 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-20252fcb8779d550e7740a57` でsealした。CodeFire本体issueは新規発見なし。
 - 次のcycleでも、issue discovery後にこのmapまたは後継schemaへ全open issueを登録し、batchを全部消してから次のissue出しへ進む。
 
 ## Completed Two-Cycle Snapshot

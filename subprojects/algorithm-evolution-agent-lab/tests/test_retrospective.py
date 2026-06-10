@@ -13,6 +13,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown,
@@ -1997,6 +1998,42 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             ],
             result["blockers"],
         )
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-markdown-gate-markdown-renders-blockers
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_markdown_gate_markdown_renders_blockers(
+        self,
+    ) -> None:
+        result = {
+            "ready": False,
+            "status": "blocked",
+            "artifact_count": 3,
+            "checked_artifact_count": 2,
+            "finding_count": 1,
+            "blockers": [
+                "parent archive status line is missing",
+                "artifact row is missing for cycle-40/archive-summary-gate.md",
+            ],
+        }
+
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown().render(
+            result,
+            title="Cycle 40 Archive Summary Artifact Archive Summary Markdown Gate",
+        )
+
+        self.assertIn("# Cycle 40 Archive Summary Artifact Archive Summary Markdown Gate", markdown)
+        self.assertIn("- Ready: no", markdown)
+        self.assertIn("- Status: blocked", markdown)
+        self.assertIn("- Artifact count: 3", markdown)
+        self.assertIn("- Checked artifact count: 2", markdown)
+        self.assertIn("- Finding count: 1", markdown)
+        self.assertIn("- parent archive status line is missing", markdown)
+        self.assertIn("- artifact row is missing for cycle-40/archive-summary-gate.md", markdown)
+
+        clean = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown().render(
+            {"ready": True, "status": "ready", "artifact_count": 2, "checked_artifact_count": 2, "finding_count": 0},
+        )
+        self.assertIn("- Ready: yes", clean)
+        self.assertIn("- none", clean)
 
 
 if __name__ == "__main__":

@@ -979,3 +979,18 @@ The gate blocks when:
 - any artifact row with path, byte count, and SHA-256 digest is missing
 
 The gate does not inspect archive objects, rerun verification, recompute hashes, parse files, write files, or mutate inputs.
+
+## DES-AUTO-058: Research cycle planning handoff review packet artifact archive summary artifact archive summary Markdown gate Markdown
+
+The review packet artifact archive summary artifact archive summary Markdown gate Markdown renderer consumes the dictionary emitted by `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate`.
+
+The rendered document contains:
+
+- ready state
+- status
+- artifact count
+- checked artifact count
+- finding count
+- blocker messages, or `none` when clean
+
+The renderer is pure and deterministic. It does not rerun the gate, inspect summary artifacts, parse files, write files, or mutate inputs.
