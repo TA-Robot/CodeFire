@@ -291,3 +291,7 @@ The system shall build a final archive summary artifact archive. The archive sha
 ## REQ-AUTO-073: Research cycle planning handoff review packet artifact archive summary artifact archive summary
 
 The system shall summarize final archive summary artifact archives into a deterministic machine-readable index. The summary shall include source cycles, parent archive status, summary artifact archive status, artifact count, artifact path, byte count, SHA-256 digest, manifest status, verification status, finding count, and audit document availability so storage adapters and reviewers can inspect persisted archive summary audit surfaces without opening every artifact.
+
+## REQ-AUTO-074: Research cycle planning handoff review packet artifact archive summary artifact archive summary Markdown
+
+The system shall render final archive summary artifact archive summaries into deterministic Markdown. The rendered document shall include source cycles, parent archive status, summary artifact archive status, manifest status, verification status, artifact count, finding count, audit availability, and an artifact path, byte count, and SHA-256 digest table so reviewers can inspect persisted archive summary audit indexes without reading machine-only summary payloads.

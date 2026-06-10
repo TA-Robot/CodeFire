@@ -945,3 +945,19 @@ The summary dictionary contains:
 - verification finding count
 
 The summarizer treats the in-memory archive as the single source of truth. It does not rerun verification, recompute the manifest, read files, write files, or mutate inputs.
+
+## DES-AUTO-056: Research cycle planning handoff review packet artifact archive summary artifact archive summary Markdown
+
+The review packet artifact archive summary artifact archive summary Markdown renderer consumes the dictionary emitted by `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary`.
+
+The rendered document contains:
+
+- source cycles
+- parent archive status
+- summary artifact archive status
+- manifest and verification status
+- artifact count and finding count
+- audit availability for manifest Markdown and verification Markdown
+- artifact table with path, byte count, and SHA-256 digest
+
+The renderer is pure and deterministic. It does not inspect the archive object, rerun verification, recompute hashes, read files, write files, or mutate the summary payload.

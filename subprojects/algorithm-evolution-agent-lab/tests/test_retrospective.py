@@ -11,6 +11,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown,
@@ -1849,6 +1850,72 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertEqual(len(handoff.summary_markdown.encode("utf-8")), artifacts[0]["byte_count"])
         self.assertTrue(artifacts[0]["content_sha256"].startswith("sha256:"))
         self.assertEqual("cycle-37/archive-summary-gate.md", artifacts[1]["path"])
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-markdown-renders-index
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_markdown_renders_index(
+        self,
+    ) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-38",
+                    completed_runs=18,
+                    improved_candidates=14,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.4,
+                    remaining_budget=18.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=14,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=14.0,
+            packet_path="cycle-38/planning-packet.md",
+            plan_path="cycle-38/plan.md",
+            lint_path="cycle-38/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-38/review-packet.md",
+            readiness_path="cycle-38/readiness.md",
+            manifest_path="cycle-38/manifest.md",
+            verification_path="cycle-38/verification.md",
+        )
+        handoff = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder().build(
+            archive,
+            summary_path="cycle-38/archive-summary.md",
+            gate_path="cycle-38/archive-summary-gate.md",
+        )
+        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+            handoff,
+        )
+        summary = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary().summarize(
+            summary_archive,
+        )
+
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown().render(
+            summary,
+            title="Cycle 38 Archive Summary Artifact Archive Summary",
+        )
+
+        self.assertIn("# Cycle 38 Archive Summary Artifact Archive Summary", markdown)
+        self.assertIn("- Source cycles: cycle-38", markdown)
+        self.assertIn("- Parent archive status: ok", markdown)
+        self.assertIn("- Archive status: ok", markdown)
+        self.assertIn("- Manifest status: ok", markdown)
+        self.assertIn("- Verification status: ok", markdown)
+        self.assertIn("- Artifact count: 2", markdown)
+        self.assertIn("- Finding count: 0", markdown)
+        self.assertIn("| `cycle-38/archive-summary.md` |", markdown)
+        self.assertIn("| `cycle-38/archive-summary-gate.md` |", markdown)
+        self.assertIn("- Manifest Markdown: included", markdown)
+        self.assertIn("- Verification Markdown: included", markdown)
 
 
 if __name__ == "__main__":

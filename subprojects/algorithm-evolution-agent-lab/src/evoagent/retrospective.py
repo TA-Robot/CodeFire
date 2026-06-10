@@ -1448,6 +1448,54 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
         }
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown:
+    def render(
+        self,
+        summary: dict[str, object],
+        *,
+        title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary",
+    ) -> str:
+        source_cycles = ", ".join(str(cycle) for cycle in summary.get("source_cycles", []))
+        audits = summary.get("audits", {})
+        manifest_markdown = bool(isinstance(audits, dict) and audits.get("manifest_markdown"))
+        verification_markdown = bool(isinstance(audits, dict) and audits.get("verification_markdown"))
+        artifacts = summary.get("artifacts", [])
+        lines = [
+            f"# {title}",
+            "",
+            f"- Source cycles: {source_cycles}",
+            f"- Parent archive status: {summary.get('parent_archive_status', 'unknown')}",
+            f"- Archive status: {summary.get('archive_status', 'unknown')}",
+            f"- Manifest status: {summary.get('manifest_status', 'unknown')}",
+            f"- Verification status: {summary.get('verification_status', 'unknown')}",
+            f"- Artifact count: {summary.get('artifact_count', 0)}",
+            f"- Finding count: {summary.get('finding_count', 0)}",
+            "",
+            "## Artifacts",
+            "",
+            "| Path | Bytes | SHA-256 |",
+            "|---|---:|---|",
+        ]
+        if isinstance(artifacts, list):
+            for artifact in artifacts:
+                if isinstance(artifact, dict):
+                    path = artifact.get("path", "")
+                    byte_count = artifact.get("byte_count", 0)
+                    digest = artifact.get("content_sha256", "")
+                    lines.append(f"| `{path}` | {byte_count} | `{digest}` |")
+        lines.extend(
+            [
+                "",
+                "## Audits",
+                "",
+                f"- Manifest Markdown: {'included' if manifest_markdown else 'missing'}",
+                f"- Verification Markdown: {'included' if verification_markdown else 'missing'}",
+            ]
+        )
+        return "\n".join(lines).rstrip() + "\n"
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")
