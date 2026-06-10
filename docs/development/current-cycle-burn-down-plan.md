@@ -57,10 +57,12 @@ Completion rule:
 | CFB-022 | fixed | Scan/verify text summaries | passed verifyもblocking summary/countersを表示する |
 | CFB-028 | fixed | Verification diagnostic filtering | blocking-only JSON dataをfiltered viewにした |
 | CFB-040 | fixed | Show JSON envelope | `show --json` をtyped command_resultへ統一した |
+| CFB-041 | fixed | List JSON surface | local/remote `list --json` をcommand_result envelopeへ統一した |
 | CFB-042 | fixed | Branch JSON surface | `branch show --json` とunsupported branch JSON failureを実装した |
 | CFB-052 | fixed | Verify next_actions state awareness | clean passed verifyはcommitではなくstatusを返す |
 | CFB-057 | fixed | Show JSON envelope | exit 0でhuman textを返すshow JSON契約違反を解消した |
 | CFB-058 | fixed | Branch JSON surface | branch detailをmachine-readable envelopeで取得できるようにした |
+| CFB-064 | fixed | Remote read JSON surface | `list <remote> --json` と `request-list <remote> --json` を実装した |
 | CFB-069 | fixed | Verification diagnostic filtering | blocking-only next_actionsをblocking diagnosticsに限定した |
 | CFB-073 | fixed | Context bounded output metadata | context summary countsとcontext_expand next_actionを追加した |
 | CFB-076 | fixed | Batch dry-run validation | invalid link batch dry-runはtop-level ok:false/exit 2にした |
@@ -86,7 +88,7 @@ Completion rule:
 
 Remaining open count for this batch:
 
-- 118 issues.
+- 116 issues.
 
 ## Global Issue Inventory
 
@@ -96,15 +98,15 @@ Current tracked issue inventory as of 2026-06-10:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 92 | 42 | 50 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFB dogfood issues | 92 | 44 | 48 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
 | CFR code review issues | 160 | 92 | 68 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. |
-| Total | 252 | 134 | 118 | This global batch is the whole known issue backlog. |
+| Total | 252 | 136 | 116 | This global batch is the whole known issue backlog. |
 
 Current active batch progress:
 
 - Frozen open issue count: 146.
-- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-040, CFB-042, CFB-052, CFB-057, CFB-058, CFB-069, CFB-073, CFB-076, CFB-081, CFB-083, CFR-085, CFR-096, CFR-098, CFR-125, CFR-126, CFR-127, CFR-136, CFR-140, CFR-141, CFR-157.
-- Remaining open: 118.
+- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-040, CFB-041, CFB-042, CFB-052, CFB-057, CFB-058, CFB-064, CFB-069, CFB-073, CFB-076, CFB-081, CFB-083, CFR-085, CFR-096, CFR-098, CFR-125, CFR-126, CFR-127, CFR-136, CFR-140, CFR-141, CFR-157.
+- Remaining open: 116.
 
 Burn-down interpretation:
 

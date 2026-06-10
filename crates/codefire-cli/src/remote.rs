@@ -48,6 +48,7 @@ pub(crate) struct RemoteBranch {
 #[derive(Debug)]
 pub(crate) struct RemoteProjectOptions {
     pub(crate) project_url: String,
+    pub(crate) json_output: bool,
 }
 
 #[derive(Debug)]

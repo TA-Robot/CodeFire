@@ -308,10 +308,58 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("list") => {
-            let options = parse_remote_project_args(&args[1..], "list")?;
-            let branches = list_remote_branches(&options.project_url)?;
-            for branch in branches {
-                println!("{}\t{}", branch.name, branch.head);
+            let options = parse_list_args(&args[1..])?;
+            match options.target {
+                ListTarget::Local(path) => {
+                    let repo_root = find_repo_root(&path)?;
+                    let branches = list_branches(&path)?;
+                    let opened = list_opened_registries(&repo_root)?;
+                    let data = local_list_data_json(&branches, opened);
+                    if options.json_output {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&command_result_envelope(
+                                "list",
+                                true,
+                                0,
+                                Some(&repo_root),
+                                data,
+                                Vec::new(),
+                                Vec::new(),
+                            ))?
+                        );
+                    } else {
+                        print_local_list(&branches, &data);
+                    }
+                }
+                ListTarget::Remote(project_url) => {
+                    let branches = match list_remote_branches(&project_url) {
+                        Ok(branches) => branches,
+                        Err(error) if options.json_output => {
+                            print_cli_error_json("list", &error)?;
+                            return Err(CliError::CommandFailed(error.exit_status()));
+                        }
+                        Err(error) => return Err(error),
+                    };
+                    if options.json_output {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&command_result_envelope(
+                                "list",
+                                true,
+                                0,
+                                None,
+                                remote_branch_list_data_json(&project_url, &branches),
+                                Vec::new(),
+                                Vec::new(),
+                            ))?
+                        );
+                    } else {
+                        for branch in branches {
+                            println!("{}\t{}", branch.name, branch.head);
+                        }
+                    }
+                }
             }
             Ok(())
         }
@@ -341,12 +389,34 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         }
         Some("request-list") => {
             let options = parse_remote_project_args(&args[1..], "request-list")?;
-            let requests = list_merge_requests(&options.project_url)?;
-            for request in requests {
+            let requests = match list_merge_requests(&options.project_url) {
+                Ok(requests) => requests,
+                Err(error) if options.json_output => {
+                    print_cli_error_json("request-list", &error)?;
+                    return Err(CliError::CommandFailed(error.exit_status()));
+                }
+                Err(error) => return Err(error),
+            };
+            if options.json_output {
                 println!(
-                    "{}\t{}\t{}\t{}",
-                    request.id, request.status, request.source_url, request.target_url
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "request-list",
+                        true,
+                        0,
+                        None,
+                        merge_request_list_data_json(&options.project_url, &requests),
+                        Vec::new(),
+                        Vec::new(),
+                    ))?
                 );
+            } else {
+                for request in requests {
+                    println!(
+                        "{}\t{}\t{}\t{}",
+                        request.id, request.status, request.source_url, request.target_url
+                    );
+                }
             }
             Ok(())
         }
@@ -955,13 +1025,13 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire upload <branch> <remote-url> [--dry-run] [--json] [--idempotency-key <key>] [--request-key-id <key>]\n\nUpload a sealed branch to a remote project.\n"
         }
         "list" => {
-            "usage: codefire list <remote-project-url>\n\nList branches in a remote project.\n"
+            "usage: codefire list [path|<remote-project-url>] [--json]\n\nList local repository branches/open worktrees or remote project branches.\n"
         }
         "request-merge" => {
             "usage: codefire request-merge <source-url> <target-url> [--dry-run] [--json] [--idempotency-key <key>]\n\nCreate a remote merge request.\n"
         }
         "request-list" => {
-            "usage: codefire request-list <remote-project-url>\n\nList remote merge requests.\n"
+            "usage: codefire request-list <remote-project-url> [--json]\n\nList remote merge requests.\n"
         }
         "request-review" => {
             "usage: codefire request-review <remote-project-url> <mr-id> --decision approve|reject [--reviewer <name>] [--dry-run] [--json] [--idempotency-key <key>]\n"
@@ -1479,6 +1549,107 @@ fn branch_json(branch: &Branch) -> Value {
     })
 }
 
+fn is_remote_project_url(value: &str) -> bool {
+    value.starts_with("cf://") || is_cf_http_url(value)
+}
+
+fn print_local_list(branches: &[Branch], data: &Value) {
+    println!("Branches:");
+    print_branches(branches);
+    println!("Opened:");
+    let opened = data
+        .get("opened")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    if opened.is_empty() {
+        println!("none");
+        return;
+    }
+    for item in opened {
+        println!(
+            "{}\t{}",
+            item.get("branch")
+                .and_then(Value::as_str)
+                .unwrap_or("(unknown)"),
+            item.get("path").and_then(Value::as_str).unwrap_or("")
+        );
+    }
+}
+
+fn local_list_data_json(branches: &[Branch], opened: Vec<Value>) -> Value {
+    json!({
+        "type": "codefire_local_list",
+        "version": 1,
+        "branches": branches.iter().map(branch_json).collect::<Vec<_>>(),
+        "opened": opened,
+    })
+}
+
+fn remote_branch_list_data_json(project_url: &str, branches: &[remote::RemoteBranch]) -> Value {
+    json!({
+        "type": "codefire_remote_branch_list",
+        "version": 1,
+        "project_url": project_url,
+        "branches": branches.iter().map(|branch| json!({
+            "name": &branch.name,
+            "head": &branch.head,
+        })).collect::<Vec<_>>(),
+    })
+}
+
+fn merge_request_list_data_json(
+    project_url: &str,
+    requests: &[remote::MergeRequestListItem],
+) -> Value {
+    json!({
+        "type": "codefire_merge_request_list",
+        "version": 1,
+        "project_url": project_url,
+        "merge_requests": requests.iter().map(|request| json!({
+            "id": &request.id,
+            "status": &request.status,
+            "source_url": &request.source_url,
+            "target_url": &request.target_url,
+        })).collect::<Vec<_>>(),
+    })
+}
+
+fn list_opened_registries(repo_root: &Path) -> Result<Vec<Value>, CliError> {
+    let opened_root = repo_root.join(".codefire").join("opened");
+    if !opened_root.exists() {
+        return Ok(Vec::new());
+    }
+    let mut paths = Vec::new();
+    for entry in fs::read_dir(opened_root)? {
+        let path = entry?.path();
+        if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
+            paths.push(path);
+        }
+    }
+    paths.sort();
+    let mut opened = Vec::with_capacity(paths.len());
+    for path in paths {
+        let registry = read_json(&path)?;
+        let branch = required_string(&registry, &["branch", "name"])?;
+        let open = registry.get("open").cloned().unwrap_or_else(|| json!({}));
+        let open_path = open
+            .get("path")
+            .or_else(|| open.get("opened_path"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        opened.push(json!({
+            "branch": branch,
+            "path": open_path,
+            "open_instance_id": open.get("open_instance_id").cloned().unwrap_or(Value::Null),
+            "current_base_commit": open.get("current_base_commit").cloned().unwrap_or(Value::Null),
+            "opened_from_commit": open.get("opened_from_commit").cloned().unwrap_or(Value::Null),
+            "registry_path": path,
+        }));
+    }
+    Ok(opened)
+}
+
 fn branch_show_data(start: &Path, branch: Option<&str>) -> Result<(PathBuf, Value), CliError> {
     let repo_root = find_repo_root(start)?;
     let branch_name = match branch {
@@ -1728,6 +1899,18 @@ struct BranchShowOptions {
     json_output: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ListTarget {
+    Local(PathBuf),
+    Remote(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ListOptions {
+    target: ListTarget,
+    json_output: bool,
+}
+
 fn parse_show_args(args: &[String]) -> Result<ShowOptions, CliError> {
     let mut target = None;
     let mut json_output = false;
@@ -1751,6 +1934,36 @@ fn parse_show_args(args: &[String]) -> Result<ShowOptions, CliError> {
         target: target.ok_or_else(|| {
             CliError::Usage("usage: codefire show <branch-or-commit> [--json]".to_string())
         })?,
+        json_output,
+    })
+}
+
+fn parse_list_args(args: &[String]) -> Result<ListOptions, CliError> {
+    let mut positional = Vec::new();
+    let mut json_output = false;
+    for value in args {
+        match value.as_str() {
+            "--json" => json_output = true,
+            option if option.starts_with("--") => {
+                return Err(CliError::Usage(format!(
+                    "unsupported list option: {option}"
+                )));
+            }
+            value => positional.push(value.to_string()),
+        }
+    }
+    let target = match positional.as_slice() {
+        [] => ListTarget::Local(env::current_dir()?),
+        [value] if is_remote_project_url(value) => ListTarget::Remote(value.clone()),
+        [value] => ListTarget::Local(PathBuf::from(value)),
+        _ => {
+            return Err(CliError::Usage(
+                "usage: codefire list [path|<remote-project-url>] [--json]".to_string(),
+            ));
+        }
+    };
+    Ok(ListOptions {
+        target,
         json_output,
     })
 }
@@ -2451,13 +2664,26 @@ fn parse_remote_project_args(
     args: &[String],
     command: &str,
 ) -> Result<RemoteProjectOptions, CliError> {
-    let positional = positional_args(args)?;
+    let mut positional = Vec::new();
+    let mut json_output = false;
+    for value in args {
+        match value.as_str() {
+            "--json" => json_output = true,
+            option if option.starts_with("--") => {
+                return Err(CliError::Usage(format!(
+                    "unsupported {command} option: {option}"
+                )));
+            }
+            value => positional.push(value.to_string()),
+        }
+    }
     match positional.as_slice() {
         [project_url] => Ok(RemoteProjectOptions {
             project_url: project_url.clone(),
+            json_output,
         }),
         _ => Err(CliError::Usage(format!(
-            "usage: codefire {command} <cf-project-url>"
+            "usage: codefire {command} <cf-project-url> [--json]"
         ))),
     }
 }
@@ -2717,21 +2943,6 @@ fn parse_serve_args(args: &[String]) -> Result<ServeOptions, CliError> {
         tls_key,
         tls_client_ca,
     })
-}
-
-fn positional_args(args: &[String]) -> Result<Vec<String>, CliError> {
-    let mut positional = Vec::new();
-    let mut index = 0usize;
-    while index < args.len() {
-        let value = &args[index];
-        if value.starts_with("--") {
-            skip_ignored_option(args, &mut index)?;
-        } else {
-            positional.push(value.clone());
-        }
-        index += 1;
-    }
-    Ok(positional)
 }
 
 fn skip_ignored_option(args: &[String], index: &mut usize) -> Result<(), CliError> {

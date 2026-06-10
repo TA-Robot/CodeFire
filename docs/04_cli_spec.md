@@ -34,10 +34,10 @@ codefire merge <source-branch> --into <target-branch>
 codefire upload <branch> <server-url> [--dry-run] [--json]
 codefire request-merge <source-url> <target-url> [--dry-run] [--json]
 
-codefire list <server-url>
+codefire list [path|<server-url>] [--json]
 codefire show <branch-or-url>
 codefire diff [--algorithm myers|patience|histogram] [--context <lines>] [--rename-detection] [--atoms] [--trace] [--impact] [--json] <branch-or-url> <branch-or-url>
-codefire request-list <server-url>
+codefire request-list <server-url> [--json]
 
 codefire discard <branch>
 codefire doctor

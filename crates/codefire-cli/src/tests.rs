@@ -758,6 +758,23 @@ fn parse_diff_args_accepts_algorithm_forms() {
     assert_eq!(branch_show.branch.as_deref(), Some("main"));
     assert!(branch_show.json_output);
     assert!(parse_branch_show_args(&["--metrics".to_string()]).is_err());
+    let local_list = parse_list_args(&["--json".to_string()]).unwrap();
+    assert!(matches!(local_list.target, ListTarget::Local(_)));
+    assert!(local_list.json_output);
+    let remote_list =
+        parse_list_args(&["cf:///tmp/server/org/app".to_string(), "--json".to_string()]).unwrap();
+    assert_eq!(
+        remote_list.target,
+        ListTarget::Remote("cf:///tmp/server/org/app".to_string())
+    );
+    assert!(remote_list.json_output);
+    let request_list = parse_remote_project_args(
+        &["cf:///tmp/server/org/app".to_string(), "--json".to_string()],
+        "request-list",
+    )
+    .unwrap();
+    assert_eq!(request_list.project_url, "cf:///tmp/server/org/app");
+    assert!(request_list.json_output);
 
     let args = vec![
         "--algorithm".to_string(),
@@ -4217,6 +4234,10 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         branches[0].head,
         load_branch_record(&repo_root, "main").unwrap()["head"]
     );
+    let remote_list = remote_branch_list_data_json(&project_url, &branches);
+    assert_eq!(remote_list["type"], "codefire_remote_branch_list");
+    assert_eq!(remote_list["project_url"], project_url);
+    assert_eq!(remote_list["branches"][0]["name"], "main");
 
     clone_branch(
         &clone_repo,
@@ -4287,6 +4308,10 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
     assert!(mr.id.starts_with("MR-"));
     let listed = list_merge_requests(&project_url).unwrap();
     assert_eq!(listed[0].status, "open");
+    let request_list = merge_request_list_data_json(&project_url, &listed);
+    assert_eq!(request_list["type"], "codefire_merge_request_list");
+    assert_eq!(request_list["project_url"], project_url);
+    assert_eq!(request_list["merge_requests"][0]["status"], "open");
     let mr_path = request_dir.join(format!("{}.json", mr.id));
     let open_mr_before_review = read_json(&mr_path).unwrap();
     let review_dry_run = review_merge_request(&RequestReviewOptions {
@@ -5475,6 +5500,16 @@ fn branch_list_reads_repo_from_open_marker_and_validates_heads() {
             head: commit_id.clone(),
             state: "open-clean".to_string()
         }]
+    );
+
+    let opened = list_opened_registries(&repo_root).unwrap();
+    let local_list = local_list_data_json(&branches, opened);
+    assert_eq!(local_list["type"], "codefire_local_list");
+    assert_eq!(local_list["branches"][0]["name"], branch_name);
+    assert_eq!(local_list["opened"][0]["branch"], branch_name);
+    assert_eq!(
+        local_list["opened"][0]["path"],
+        open_dir.to_string_lossy().as_ref()
     );
 
     let (detail_repo, detail) = branch_show_data(&open_dir, None).unwrap();
