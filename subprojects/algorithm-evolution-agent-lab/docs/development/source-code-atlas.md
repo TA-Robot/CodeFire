@@ -313,6 +313,11 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder.bu
   -> summarize final review archives, render summary Markdown, evaluate the summary Markdown gate, and render the gate audit
   -> package summary Markdown and gate Markdown as storage-ready handoff artifacts
   -> avoid archive rebuilds, archive manifest verification reruns, filesystem reads, and storage adapter coupling
+
+ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder.build(handoff)
+  -> build a manifest for archive summary and gate Markdown artifacts
+  -> preserve source cycles from the machine-readable summary and record path/hash/byte metadata
+  -> avoid summary artifact rebuilds, Markdown rendering, archive inspection, filesystem reads, and storage adapter coupling
 ```
 
 Important implementation details:

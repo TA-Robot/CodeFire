@@ -864,3 +864,16 @@ The builder returns one deterministic handoff object with:
 - two packaged artifacts: summary Markdown and gate Markdown
 
 The builder composes the existing archive summary, summary Markdown renderer, summary Markdown gate, and gate Markdown renderer. It validates output paths with the shared manifest path rule. It does not rebuild the archive, rerun archive manifest verification, read files, write files, or mutate the archive.
+
+## DES-AUTO-050: Research cycle planning handoff review packet artifact archive summary artifact manifest
+
+The review packet artifact archive summary artifact manifest builder consumes `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifacts`.
+
+The builder emits `ResearchCyclePlanningPacketManifest` with:
+
+- source cycles copied from the summary payload
+- status `ok`
+- one entry per packaged summary artifact
+- each entry containing artifact path, SHA-256 digest, and byte count
+
+The builder reuses the shared manifest entry path validation and hashing helper. It does not rebuild summary artifacts, render Markdown, inspect the archive, read files, or write files.

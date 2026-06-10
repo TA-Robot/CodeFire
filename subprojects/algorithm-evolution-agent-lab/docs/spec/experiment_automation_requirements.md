@@ -267,3 +267,7 @@ The system shall render final planning handoff review packet artifact archive su
 ## REQ-AUTO-067: Research cycle planning handoff review packet artifact archive summary artifacts
 
 The system shall package final planning handoff review packet artifact archive summary review surfaces into deterministic handoff artifacts. The artifact set shall include archive summary Markdown and archive summary Markdown gate Markdown at caller-controlled relative POSIX paths, plus the machine-readable summary and gate result, so storage adapters can persist the final archive index and its handoff readiness audit without recomputing archive summaries or revalidating Markdown later.
+
+## REQ-AUTO-068: Research cycle planning handoff review packet artifact archive summary artifact manifest
+
+The system shall build a deterministic manifest for final planning handoff review packet artifact archive summary artifacts. The manifest shall preserve source cycles from the archive summary payload and record each packaged summary artifact path, SHA-256 digest, and byte count so storage adapters can verify persisted archive summary and gate audit documents without reparsing Markdown.

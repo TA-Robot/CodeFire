@@ -10,6 +10,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown,
@@ -1469,6 +1470,66 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         )
         self.assertEqual(handoff.summary_markdown, handoff.artifacts[0].content)
         self.assertEqual(handoff.gate_markdown, handoff.artifacts[1].content)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-manifest-records-summary-artifacts
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_manifest_records_summary_artifacts(
+        self,
+    ) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-32",
+                    completed_runs=11,
+                    improved_candidates=8,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.6,
+                    remaining_budget=11.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=8,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=8.0,
+            packet_path="cycle-32/planning-packet.md",
+            plan_path="cycle-32/plan.md",
+            lint_path="cycle-32/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-32/review-packet.md",
+            readiness_path="cycle-32/readiness.md",
+            manifest_path="cycle-32/manifest.md",
+            verification_path="cycle-32/verification.md",
+        )
+        handoff = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder().build(
+            archive,
+            summary_path="cycle-32/archive-summary.md",
+            gate_path="cycle-32/archive-summary-gate.md",
+        )
+
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder().build(
+            handoff,
+        )
+
+        self.assertEqual(("cycle-32",), manifest.source_cycles)
+        self.assertEqual("ok", manifest.status)
+        self.assertEqual(
+            [
+                "cycle-32/archive-summary.md",
+                "cycle-32/archive-summary-gate.md",
+            ],
+            [entry.path for entry in manifest.entries],
+        )
+        self.assertEqual(len(handoff.summary_markdown.encode("utf-8")), manifest.entries[0].byte_count)
+        self.assertTrue(manifest.entries[0].content_sha256.startswith("sha256:"))
+        self.assertEqual(len(handoff.gate_markdown.encode("utf-8")), manifest.entries[1].byte_count)
+        self.assertTrue(manifest.entries[1].content_sha256.startswith("sha256:"))
 
 
 if __name__ == "__main__":
