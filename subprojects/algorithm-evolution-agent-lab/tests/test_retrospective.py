@@ -6,6 +6,7 @@ from evoagent.retrospective import (
     ResearchCyclePlan,
     ResearchCyclePlanItem,
     ResearchCyclePlanLint,
+    ResearchCyclePlanLintMarkdown,
     ResearchCyclePlanLintSeverity,
     ResearchCyclePlanMarkdown,
     ResearchCyclePlanSynthesizer,
@@ -232,6 +233,37 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
 
         self.assertTrue(lint.ok)
         self.assertEqual(lint.findings, ())
+
+    # cf-atom: TEST-research-cycle-plan-lint-markdown-renders-findings
+    def test_research_cycle_plan_lint_markdown_renders_findings(self) -> None:
+        plan = ResearchCyclePlan(
+            source_cycles=("cycle-7",),
+            priority=RetrospectivePriority.LOW,
+            active_capacity=1,
+            remaining_budget=0.5,
+            items=(
+                ResearchCyclePlanItem(
+                    lane=ResearchCyclePlanLane.ACTIVE,
+                    recommendation=RetrospectiveRecommendation.INCREASE_EXPLORATION,
+                    title="Increase exploration diversity",
+                    action="sample an alternate frontier",
+                    rationale="",
+                    budget_hint=1.0,
+                ),
+            ),
+        )
+        lint = ResearchCyclePlanLint().lint(plan)
+
+        markdown = ResearchCyclePlanLintMarkdown().render(lint, title="Cycle 7 Plan Lint")
+
+        self.assertIn("# Cycle 7 Plan Lint", markdown)
+        self.assertIn("- Status: blocked", markdown)
+        self.assertIn("- Blockers: 1", markdown)
+        self.assertIn("- Warnings: 1", markdown)
+        self.assertIn("## Blockers", markdown)
+        self.assertIn("`items.budget_hint`: active budget hints exceed remaining budget", markdown)
+        self.assertIn("## Warnings", markdown)
+        self.assertIn("`items[0].rationale`: rationale is empty", markdown)
 
 
 if __name__ == "__main__":

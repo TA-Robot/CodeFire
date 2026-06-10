@@ -229,13 +229,13 @@ Current named cycle:
 - CodeFire次version系統: v1.0 Contract ValidationのPhase 1a以降を継続する。
 - Current plan: `docs/development/v1.0-contract-validation-plan.md`。
 - Current burn-down plan: `docs/development/current-cycle-burn-down-plan.md`。
-- Current phase: cycle 6 dogfood pass完了。今回のalgorithm開発ではCodeFire本体の新規CFBは発見されず、既知CFB/CFR open issueは0件。
+- Current phase: cycle 7 dogfood pass完了。今回のalgorithm開発ではCodeFire本体の新規CFBは発見されず、既知CFB/CFR open issueは0件。
 - Installed CodeFire: `/home/devuser/.local/bin/codefire`。
 - Installed version output: `codefire foundation 1`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
 - Latest pushed Git commits: current global burn-down commits through cycle 5 dogfood pass。
 - Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` は `open-clean`、open fires 0。
-- Latest algorithm CodeFire base: `CF-COMMIT-2de6ff5b70a1591e55786035`。
+- Latest algorithm CodeFire base: `CF-COMMIT-a1d8e9e852adbb15c0e1e532`。
 
 Current global issue inventory:
 
@@ -252,6 +252,7 @@ Close audit note:
 - Cycle 4 dogfoodingでは `ResearchCyclePlanSynthesizer` を追加し、`CFB-093` を発見、同cycle内でfixedにした。
 - Cycle 5 dogfoodingでは `ResearchCyclePlanMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-476c73ed58ac5e64be166e38` でsealした。CodeFire本体issueは新規発見なし。
 - Cycle 6 dogfoodingでは `ResearchCyclePlanLint` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-e9809fabb758032363e80407` でsealした。その後、非Atomのみ変更のstatus next_actions欠落として `CFB-094` を発見し、同cycle内でfixedにした。最終algorithm baseは履歴追記seal後の `CF-COMMIT-2de6ff5b70a1591e55786035`。
+- Cycle 7 dogfoodingでは `ResearchCyclePlanLintMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-a1d8e9e852adbb15c0e1e532` でsealした。CodeFire本体issueは新規発見なし。
 - 次のcycleでも、issue discovery後にこのmapまたは後継schemaへ全open issueを登録し、batchを全部消してから次のissue出しへ進む。
 
 ## Completed Two-Cycle Snapshot

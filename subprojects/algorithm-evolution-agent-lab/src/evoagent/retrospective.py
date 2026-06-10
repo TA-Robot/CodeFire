@@ -452,6 +452,34 @@ class ResearchCyclePlanLint:
         return ResearchCyclePlanLintReport(findings=tuple(sorted(findings, key=lint_finding_sort_key)))
 
 
+# cf-atom: CODE-ResearchCyclePlanLintMarkdown
+class ResearchCyclePlanLintMarkdown:
+    def render(
+        self,
+        report: ResearchCyclePlanLintReport,
+        *,
+        title: str = "Research Cycle Plan Lint",
+    ) -> str:
+        lines = [
+            f"# {title}",
+            "",
+            f"- Status: {'ok' if report.ok else 'blocked'}",
+            f"- Blockers: {report.blocker_count}",
+            f"- Warnings: {report.warning_count}",
+            "",
+        ]
+        for severity in ResearchCyclePlanLintSeverity:
+            severity_findings = tuple(finding for finding in report.findings if finding.severity == severity)
+            if not severity_findings:
+                continue
+            lines.extend([f"## {severity.value.title()}s", ""])
+            lines.extend(f"- `{finding.field}`: {finding.message}" for finding in severity_findings)
+            lines.append("")
+        if not report.findings:
+            lines.extend(["## Findings", "", "- none", ""])
+        return "\n".join(lines).rstrip() + "\n"
+
+
 def add_if(
     findings: list[ResearchCyclePlanLintFinding],
     condition: bool,

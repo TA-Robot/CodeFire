@@ -185,6 +185,11 @@ ResearchCyclePlanLint.lint(plan)
   -> validate source cycle, capacity, budget, and item fields
   -> detect active lane and budget overcommitment
   -> return deterministic blocker/warning findings without mutating the plan
+
+ResearchCyclePlanLintMarkdown.render(report)
+  -> summarize status, blocker count, and warning count
+  -> group findings into severity sections
+  -> emit field path and message lines for review logs
 ```
 
 Important implementation details:

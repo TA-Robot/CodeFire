@@ -303,6 +303,15 @@ links:
   - from: REQ-AUTO-042
     to: TEST-research-cycle-plan-lint-flags-invalid-plan
     type: verified_by
+  - from: REQ-AUTO-043
+    to: DES-AUTO-025
+    type: refined_by
+  - from: DES-AUTO-025
+    to: CODE-ResearchCyclePlanLintMarkdown
+    type: implemented_by
+  - from: REQ-AUTO-043
+    to: TEST-research-cycle-plan-lint-markdown-renders-findings
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

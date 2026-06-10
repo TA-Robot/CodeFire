@@ -493,3 +493,20 @@ Warnings are used for reviewer attention without blocking plan storage:
 - duplicated recommendation
 
 The linter does not mutate the plan, rerun retrospective analysis, or infer hidden state from logs. It only validates the bounded plan object that will be rendered, reviewed, and executed in the next docs-first cycle.
+
+## DES-AUTO-025: Research cycle plan lint Markdown rendering
+
+The lint Markdown renderer consumes `ResearchCyclePlanLintReport` and produces a compact deterministic review document.
+
+The document includes:
+
+- title
+- overall status: `ok` or `blocked`
+- blocker count
+- warning count
+- blocker section when blocker findings exist
+- warning section when warning findings exist
+- field path and message for each finding
+- explicit `none` finding line when the report has no findings
+
+Findings are rendered in the already-sorted report order and grouped by severity. The renderer does not rerun linting, inspect the original plan, or hide warnings behind a passing status. This keeps automated planning logs stable and lets reviewers see why a plan is blocked or merely needs attention.

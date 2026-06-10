@@ -167,3 +167,7 @@ The system shall render a synthesized research cycle plan into deterministic Mar
 ## REQ-AUTO-042: Research cycle plan linting
 
 The system shall lint a synthesized or hand-authored research cycle plan before it is used as the next execution plan. The lint report shall detect missing source cycle IDs, invalid capacity or budget values, empty lane items, active-lane overcommitment, budget overcommitment, missing item titles or actions, empty rationales, negative budget hints, and duplicated recommendations. Findings shall be deterministic, severity-labeled, and machine-readable so docs-first planning can block unsafe execution while preserving non-blocking warnings for reviewer attention.
+
+## REQ-AUTO-043: Research cycle plan lint Markdown rendering
+
+The system shall render a research cycle plan lint report into deterministic Markdown for reviewer-facing planning logs. The rendered report shall include overall status, blocker count, warning count, severity sections, field paths, and finding messages so plan safety decisions can be reviewed without inspecting Python objects or raw lint tuples.
