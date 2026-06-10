@@ -7044,6 +7044,12 @@ fn write_required_roots(objects: &Path) -> Map<String, Value> {
         json!({"type": "fire_ledger", "version": 1, "fires": []}),
     )
     .unwrap();
+    let resolution_ledger = codefire_store::store_object(
+        objects,
+        "resolution_ledger",
+        json!({"type": "resolution_ledger", "version": 1, "resolutions": []}),
+    )
+    .unwrap();
     let verification = codefire_store::store_object(
         objects,
         "verification",
@@ -7065,6 +7071,10 @@ fn write_required_roots(objects: &Path) -> Map<String, Value> {
     roots.insert("atom_index".to_string(), Value::String(atom_index));
     roots.insert("trace_graph".to_string(), Value::String(trace_graph));
     roots.insert("fire_delta".to_string(), Value::String(fire_delta));
+    roots.insert(
+        "resolution_ledger".to_string(),
+        Value::String(resolution_ledger),
+    );
     roots.insert("verification".to_string(), Value::String(verification));
     roots.insert("policy".to_string(), Value::String(policy));
     roots

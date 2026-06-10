@@ -4082,6 +4082,7 @@ fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
     let commit_payload = json!({
         "type": "commit",
         "version": 1,
+        "root_schema_version": 2,
         "parents": [],
         "message": "Initial empty CodeFire repository",
         "roots": roots,
@@ -5480,6 +5481,7 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
     let commit = json!({
         "type": "commit",
         "version": 1,
+        "root_schema_version": 2,
         "parents": parents,
         "message": options.message,
         "roots": {
@@ -5890,6 +5892,11 @@ fn initial_roots(objects: &Path, now: &str) -> Result<Value, CliError> {
         "fire_ledger",
         json!({"type": "fire_ledger", "version": 1, "fires": []}),
     )?;
+    let resolution_ledger = codefire_store::store_object(
+        objects,
+        "resolution_ledger",
+        json!({"type": "resolution_ledger", "version": 1, "resolutions": []}),
+    )?;
     let verification = codefire_store::store_object(
         objects,
         "verification",
@@ -5915,6 +5922,7 @@ fn initial_roots(objects: &Path, now: &str) -> Result<Value, CliError> {
         "atom_index": atom_index,
         "trace_graph": trace_graph,
         "fire_delta": fire_delta,
+        "resolution_ledger": resolution_ledger,
         "verification": verification,
         "policy": policy,
     }))

@@ -280,6 +280,7 @@
 | 2026-06-10 | Global Burn-down | `CODEFIRE_HTTP_TIMEOUT_MS` の不正値/0を明示的な設定エラーにして、silent fallbackをなくし CFR-111 をfixedにした | `crates/codefire-cli/src/http.rs`, docs | `cargo test -p codefire-cli http_timeout`; `cargo clippy -p codefire-cli --all-targets -- -D warnings`; remaining global open: 28 |
 | 2026-06-10 | Global Burn-down | HTTP client responseの巨大 `Content-Length` をbody読み取り前に拒否する上限を追加して CFR-128 をfixedにした | `crates/codefire-cli/src/http.rs`, docs | `cargo test -p codefire-cli oversized_body`; `cargo clippy -p codefire-cli --all-targets -- -D warnings`; remaining global open: 27 |
 | 2026-06-10 | Global Burn-down | object ID lookupで未知 `CF-*` prefixをfallback subdir scanせず即not foundにして CFR-118 をfixedにした | `crates/codefire-store/src/lib.rs`, docs | `cargo test -p codefire-store object_record_path`; `cargo clippy -p codefire-store --all-targets -- -D warnings`; remaining global open: 26 |
+| 2026-06-10 | Global Burn-down | sealed commit validationのrequired rootに `resolution_ledger` を追加し、欠損commitを拒否して CFR-121 をfixedにした | `crates/codefire-store/src/lib.rs`, docs | `cargo test -p codefire-store validate_sealed_commit`; `cargo clippy -p codefire-store --all-targets -- -D warnings`; remaining global open: 25 |
 
 ## Current Decisions
 

@@ -404,7 +404,11 @@ fn validate_sealed_commit_inner(
         .get("roots")
         .and_then(Value::as_object)
         .ok_or_else(|| StoreError::InvalidSealedCommit("roots must be an object".to_string()))?;
-    for root in REQUIRED_COMMIT_ROOTS {
+    let root_schema_version = commit
+        .get("root_schema_version")
+        .and_then(Value::as_u64)
+        .unwrap_or(1);
+    for root in required_commit_roots(root_schema_version) {
         if !roots.contains_key(*root) {
             return Err(StoreError::InvalidSealedCommit(format!(
                 "missing root {root}"
@@ -452,7 +456,7 @@ fn validate_sealed_commit_inner(
     Ok(())
 }
 
-const REQUIRED_COMMIT_ROOTS: &[&str] = &[
+const LEGACY_REQUIRED_COMMIT_ROOTS: &[&str] = &[
     "content_manifest",
     "atom_index",
     "trace_graph",
@@ -460,6 +464,24 @@ const REQUIRED_COMMIT_ROOTS: &[&str] = &[
     "verification",
     "policy",
 ];
+
+const CURRENT_REQUIRED_COMMIT_ROOTS: &[&str] = &[
+    "content_manifest",
+    "atom_index",
+    "trace_graph",
+    "fire_delta",
+    "resolution_ledger",
+    "verification",
+    "policy",
+];
+
+fn required_commit_roots(root_schema_version: u64) -> &'static [&'static str] {
+    if root_schema_version >= 2 {
+        CURRENT_REQUIRED_COMMIT_ROOTS
+    } else {
+        LEGACY_REQUIRED_COMMIT_ROOTS
+    }
+}
 
 fn expected_root_type(root: &str) -> Option<&'static str> {
     match root {
@@ -632,6 +654,7 @@ pub fn commit_payload(
     let mut payload = Map::new();
     payload.insert("type".to_string(), Value::String("commit".to_string()));
     payload.insert("version".to_string(), Value::Number(1.into()));
+    payload.insert("root_schema_version".to_string(), Value::Number(2.into()));
     payload.insert(
         "parents".to_string(),
         Value::Array(parents.into_iter().map(Value::String).collect()),
@@ -925,6 +948,38 @@ mod tests {
     }
 
     #[test]
+    fn validate_sealed_commit_rejects_missing_resolution_ledger_root() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let mut roots = write_required_roots(&objects);
+        roots.remove("resolution_ledger");
+        let commit = commit_payload(vec![], roots, consistent_certificate());
+        let commit_id = store_object(&objects, "commit", commit).unwrap();
+
+        let error = validate_sealed_commit(&objects, &commit_id).unwrap_err();
+
+        assert!(
+            matches!(error, StoreError::InvalidSealedCommit(message) if message.contains("missing root resolution_ledger"))
+        );
+    }
+
+    #[test]
+    fn validate_sealed_commit_accepts_legacy_missing_resolution_ledger_root() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let mut roots = write_required_roots(&objects);
+        roots.remove("resolution_ledger");
+        let mut commit = commit_payload(vec![], roots, consistent_certificate());
+        commit
+            .as_object_mut()
+            .unwrap()
+            .remove("root_schema_version");
+        let commit_id = store_object(&objects, "commit", commit).unwrap();
+
+        validate_sealed_commit(&objects, &commit_id).unwrap();
+    }
+
+    #[test]
     fn validate_sealed_commit_rejects_wrong_root_type() {
         let temp = tempdir().unwrap();
         let objects = temp.path().join("objects");
@@ -1115,6 +1170,12 @@ mod tests {
             json!({"type": "fire_ledger", "version": 1, "fires": []}),
         )
         .unwrap();
+        let resolution_ledger = store_object(
+            objects,
+            "resolution_ledger",
+            json!({"type": "resolution_ledger", "version": 1, "resolutions": []}),
+        )
+        .unwrap();
         let verification = store_object(
             objects,
             "verification",
@@ -1136,6 +1197,10 @@ mod tests {
         roots.insert("atom_index".to_string(), Value::String(atom_index));
         roots.insert("trace_graph".to_string(), Value::String(trace_graph));
         roots.insert("fire_delta".to_string(), Value::String(fire_delta));
+        roots.insert(
+            "resolution_ledger".to_string(),
+            Value::String(resolution_ledger),
+        );
         roots.insert("verification".to_string(), Value::String(verification));
         roots.insert("policy".to_string(), Value::String(policy));
         roots
