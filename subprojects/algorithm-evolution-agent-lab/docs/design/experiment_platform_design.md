@@ -877,3 +877,16 @@ The builder emits `ResearchCyclePlanningPacketManifest` with:
 - each entry containing artifact path, SHA-256 digest, and byte count
 
 The builder reuses the shared manifest entry path validation and hashing helper. It does not rebuild summary artifacts, render Markdown, inspect the archive, read files, or write files.
+
+## DES-AUTO-051: Research cycle planning handoff review packet artifact archive summary artifact manifest Markdown
+
+The review packet artifact archive summary artifact manifest Markdown renderer consumes a `ResearchCyclePlanningPacketManifest` produced for archive summary artifacts.
+
+The rendered document contains:
+
+- source cycles
+- manifest status
+- artifact count
+- artifact table with path, SHA-256 digest, and byte count
+
+The renderer delegates table semantics to the existing manifest Markdown shape while providing an archive-summary-specific title and trace atom. It does not inspect artifact contents, recompute hashes, or write files.

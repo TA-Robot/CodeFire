@@ -11,6 +11,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown,
@@ -1530,6 +1531,64 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertTrue(manifest.entries[0].content_sha256.startswith("sha256:"))
         self.assertEqual(len(handoff.gate_markdown.encode("utf-8")), manifest.entries[1].byte_count)
         self.assertTrue(manifest.entries[1].content_sha256.startswith("sha256:"))
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-manifest-markdown-renders-table
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_manifest_markdown_renders_table(
+        self,
+    ) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-33",
+                    completed_runs=12,
+                    improved_candidates=9,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.5,
+                    remaining_budget=12.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=9,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=9.0,
+            packet_path="cycle-33/planning-packet.md",
+            plan_path="cycle-33/plan.md",
+            lint_path="cycle-33/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-33/review-packet.md",
+            readiness_path="cycle-33/readiness.md",
+            manifest_path="cycle-33/manifest.md",
+            verification_path="cycle-33/verification.md",
+        )
+        handoff = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder().build(
+            archive,
+            summary_path="cycle-33/archive-summary.md",
+            gate_path="cycle-33/archive-summary-gate.md",
+        )
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder().build(
+            handoff,
+        )
+
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown().render(
+            manifest,
+            title="Cycle 33 Archive Summary Artifact Manifest",
+        )
+
+        self.assertIn("# Cycle 33 Archive Summary Artifact Manifest", markdown)
+        self.assertIn("- Source cycles: cycle-33", markdown)
+        self.assertIn("- Status: ok", markdown)
+        self.assertIn("- Artifact count: 2", markdown)
+        self.assertIn("| Path | SHA-256 | Bytes |", markdown)
+        self.assertIn("| `cycle-33/archive-summary.md` |", markdown)
+        self.assertIn("| `cycle-33/archive-summary-gate.md` |", markdown)
 
 
 if __name__ == "__main__":

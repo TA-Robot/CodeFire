@@ -318,6 +318,11 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBu
   -> build a manifest for archive summary and gate Markdown artifacts
   -> preserve source cycles from the machine-readable summary and record path/hash/byte metadata
   -> avoid summary artifact rebuilds, Markdown rendering, archive inspection, filesystem reads, and storage adapter coupling
+
+ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown.render(manifest)
+  -> render archive summary artifact manifests as reviewer-facing Markdown tables
+  -> include source cycles, manifest status, artifact count, path, hash, and byte count
+  -> reuse the shared manifest Markdown renderer without reading artifact contents
 ```
 
 Important implementation details:
