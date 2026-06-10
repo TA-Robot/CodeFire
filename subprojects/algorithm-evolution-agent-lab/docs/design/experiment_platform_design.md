@@ -781,3 +781,17 @@ The document includes:
 - one bullet per path-scoped finding, or `none` when clean
 
 The renderer delegates formatting semantics to the existing planning packet manifest verification Markdown renderer while providing a dedicated trace atom and default title for final review artifact audits. It does not recompute verification, inspect artifacts, or write files.
+
+## DES-AUTO-044: Research cycle planning handoff review packet artifact archive
+
+The review packet artifact archive builder consumes a `ResearchCyclePlanningHandoffReviewPacket` and deterministic output paths.
+
+The builder returns a single archive object with:
+
+- packaged review packet artifacts
+- artifact manifest
+- artifact manifest Markdown
+- artifact manifest verification result
+- artifact manifest verification Markdown
+
+The builder composes the existing artifact builder, manifest builder, manifest Markdown renderer, manifest verifier, and verification Markdown renderer. It builds verification from the in-memory artifact contents it just packaged, so clean archives have `verification.ok == true` unless the constituent builders disagree. It does not write files, read storage, or mutate the review packet.

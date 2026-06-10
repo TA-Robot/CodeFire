@@ -283,6 +283,11 @@ ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerificationMarkdown.ren
   -> render packaged review packet artifact manifest verification results as reviewer-facing Markdown
   -> include status, finding count, and path-scoped finding messages
   -> reuse the shared manifest verification Markdown renderer without recomputing verification
+
+ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder.build(packet)
+  -> package review packet artifacts, manifest, manifest Markdown, verification, and verification Markdown
+  -> verify the in-memory artifact contents that were just packaged
+  -> return a complete final review archive without filesystem access or hand-assembled audit state
 ```
 
 Important implementation details:

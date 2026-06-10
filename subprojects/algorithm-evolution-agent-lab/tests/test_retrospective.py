@@ -7,6 +7,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffBundleMarkdown,
     ResearchCyclePlanningHandoffReadinessGate,
     ResearchCyclePlanningHandoffReadinessMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown,
@@ -1151,6 +1152,62 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Finding count: 2", drifted_markdown)
         self.assertIn("`cycle-25/review-packet.md`: sha256 digest mismatch", drifted_markdown)
         self.assertIn("`cycle-25/readiness.md`: artifact is missing", drifted_markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-builder-builds-final-audits
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_builder_builds_final_audits(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-26",
+                    completed_runs=8,
+                    improved_candidates=5,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.9,
+                    remaining_budget=8.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=5,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=5.0,
+            packet_path="cycle-26/planning-packet.md",
+            plan_path="cycle-26/plan.md",
+            lint_path="cycle-26/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-26/review-packet.md",
+            readiness_path="cycle-26/readiness.md",
+            manifest_path="cycle-26/manifest.md",
+            verification_path="cycle-26/verification.md",
+            manifest_title="Cycle 26 Artifact Manifest",
+            verification_title="Cycle 26 Artifact Manifest Verification",
+        )
+
+        self.assertEqual(packet, archive.packet)
+        self.assertEqual(4, len(archive.artifacts))
+        self.assertEqual(4, len(archive.manifest.entries))
+        self.assertTrue(archive.verification.ok)
+        self.assertIn("# Cycle 26 Artifact Manifest", archive.manifest_markdown)
+        self.assertIn("# Cycle 26 Artifact Manifest Verification", archive.verification_markdown)
+        self.assertIn("- Status: ok", archive.verification_markdown)
+        self.assertIn("- Finding count: 0", archive.verification_markdown)
+        self.assertEqual(
+            [
+                "cycle-26/review-packet.md",
+                "cycle-26/readiness.md",
+                "cycle-26/manifest.md",
+                "cycle-26/verification.md",
+            ],
+            [artifact.path for artifact in archive.artifacts],
+        )
 
 
 if __name__ == "__main__":

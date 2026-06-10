@@ -170,6 +170,16 @@ class ResearchCyclePlanningHandoffReviewPacket:
     readiness_markdown: str
 
 
+@dataclass(frozen=True)
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchive:
+    packet: ResearchCyclePlanningHandoffReviewPacket
+    artifacts: tuple[ResearchCyclePlanningHandoffArtifact, ...]
+    manifest: ResearchCyclePlanningPacketManifest
+    manifest_markdown: str
+    verification: ResearchCyclePlanningPacketManifestVerification
+    verification_markdown: str
+
+
 # cf-atom: CODE-ResearchCycleRetrospective
 class ResearchCycleRetrospective:
     def summarize(self, signals: list[ResearchCycleSignal]) -> ResearchCycleRetrospectiveReport:
@@ -1047,6 +1057,48 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerificationMarkdo
         return ResearchCyclePlanningPacketManifestVerificationMarkdown().render(
             verification,
             title=title,
+        )
+
+
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder:
+    def build(
+        self,
+        packet: ResearchCyclePlanningHandoffReviewPacket,
+        *,
+        review_path: str = "review-packet.md",
+        readiness_path: str = "readiness.md",
+        manifest_path: str = "manifest.md",
+        verification_path: str = "verification.md",
+        manifest_title: str = "Research Cycle Planning Handoff Review Packet Artifact Manifest",
+        verification_title: str = "Research Cycle Planning Handoff Review Packet Artifact Manifest Verification",
+    ) -> ResearchCyclePlanningHandoffReviewPacketArtifactArchive:
+        artifacts = ResearchCyclePlanningHandoffReviewPacketArtifactBuilder().build(
+            packet,
+            review_path=review_path,
+            readiness_path=readiness_path,
+            manifest_path=manifest_path,
+            verification_path=verification_path,
+        )
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder().build(packet, artifacts)
+        artifact_contents = {artifact.path: artifact.content for artifact in artifacts}
+        verification = ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier().verify(
+            manifest,
+            artifact_contents,
+        )
+        return ResearchCyclePlanningHandoffReviewPacketArtifactArchive(
+            packet=packet,
+            artifacts=artifacts,
+            manifest=manifest,
+            manifest_markdown=ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown().render(
+                manifest,
+                title=manifest_title,
+            ),
+            verification=verification,
+            verification_markdown=ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerificationMarkdown().render(
+                verification,
+                title=verification_title,
+            ),
         )
 
 

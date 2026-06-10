@@ -243,3 +243,7 @@ The system shall verify planning handoff review packet artifact manifests agains
 ## REQ-AUTO-061: Research cycle planning handoff review packet artifact manifest verification Markdown
 
 The system shall render planning handoff review packet artifact manifest verification results into deterministic Markdown. The rendered document shall include verification status, finding count, and path-scoped finding messages so reviewers can audit final review artifact integrity without reading machine-only verification payloads.
+
+## REQ-AUTO-062: Research cycle planning handoff review packet artifact archive
+
+The system shall build a final planning handoff review packet artifact archive. The archive shall contain the packaged review artifacts, their manifest, manifest Markdown, manifest verification result, and manifest verification Markdown as one deterministic in-memory object so storage adapters can persist a complete final review surface without recomputing or hand-assembling audit documents.
