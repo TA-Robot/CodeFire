@@ -8,6 +8,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningPacketBuilder,
     ResearchCyclePlanningPacketManifestBuilder,
     ResearchCyclePlanningPacketManifestMarkdown,
+    ResearchCyclePlanningPacketManifestVerifier,
     ResearchCyclePlanningPacketMarkdown,
     ResearchCyclePlanLint,
     ResearchCyclePlanLintMarkdown,
@@ -435,6 +436,68 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("| Path | SHA-256 | Bytes |", markdown)
         self.assertIn("| `cycle-11/planning-packet.md` | `sha256:", markdown)
         self.assertIn("| `cycle-11/lint.md` | `sha256:", markdown)
+
+    # cf-atom: TEST-research-cycle-planning-packet-manifest-verifier-detects-drift
+    def test_research_cycle_planning_packet_manifest_verifier_detects_drift(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-12",
+                    completed_runs=3,
+                    improved_candidates=1,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=4.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=1,
+                )
+            ]
+        )
+        packet = ResearchCyclePlanningPacketBuilder().build(
+            report,
+            active_capacity=1,
+            remaining_budget=2.0,
+            plan_title="Cycle 12 Plan",
+            lint_title="Cycle 12 Lint",
+        )
+        packet_markdown = ResearchCyclePlanningPacketMarkdown().render(packet, title="Cycle 12 Packet")
+        manifest = ResearchCyclePlanningPacketManifestBuilder().build(
+            packet,
+            packet_path="cycle-12/planning-packet.md",
+            plan_path="cycle-12/plan.md",
+            lint_path="cycle-12/lint.md",
+            packet_title="Cycle 12 Packet",
+        )
+
+        verifier = ResearchCyclePlanningPacketManifestVerifier()
+        clean = verifier.verify(
+            manifest,
+            {
+                "cycle-12/planning-packet.md": packet_markdown,
+                "cycle-12/plan.md": packet.plan_markdown,
+                "cycle-12/lint.md": packet.lint_markdown,
+            },
+        )
+        drifted = verifier.verify(
+            manifest,
+            {
+                "cycle-12/planning-packet.md": packet_markdown + "\nchanged\n",
+                "cycle-12/plan.md": packet.plan_markdown,
+            },
+        )
+
+        self.assertTrue(clean.ok)
+        self.assertFalse(drifted.ok)
+        self.assertEqual(
+            [(finding.path, finding.message) for finding in drifted.findings],
+            [
+                ("cycle-12/planning-packet.md", "sha256 digest mismatch"),
+                ("cycle-12/planning-packet.md", "byte count mismatch"),
+                ("cycle-12/lint.md", "artifact is missing"),
+            ],
+        )
 
 
 if __name__ == "__main__":

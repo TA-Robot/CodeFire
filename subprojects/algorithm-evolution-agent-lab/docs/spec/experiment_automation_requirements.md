@@ -187,3 +187,7 @@ The system shall build a deterministic manifest for planning packet handoff arti
 ## REQ-AUTO-047: Research cycle planning packet manifest Markdown
 
 The system shall render a planning packet manifest into deterministic Markdown for audit logs. The rendered document shall include source cycles, status, artifact count, and a stable table of artifact path, SHA-256 digest, and byte count so human reviewers can inspect the same handoff integrity metadata that automation validates.
+
+## REQ-AUTO-048: Research cycle planning packet manifest verification
+
+The system shall verify persisted planning packet artifact contents against a planning packet manifest. The verification shall report missing artifacts, SHA-256 digest mismatches, and byte count mismatches in deterministic manifest order so docs-first cycle handoff can detect drift between reviewed planning artifacts and stored artifacts before the next execution cycle begins.

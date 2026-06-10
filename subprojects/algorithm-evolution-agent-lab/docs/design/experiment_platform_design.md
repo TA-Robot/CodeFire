@@ -575,3 +575,20 @@ The document includes:
 - artifact table with path, SHA-256 digest, and byte count
 
 The renderer does not recompute hashes and does not inspect packet contents. It formats the manifest that automation already validated, preserving entry order so reviewer-facing logs and machine handoff metadata stay aligned.
+
+## DES-AUTO-030: Research cycle planning packet manifest verification
+
+The manifest verifier consumes:
+
+- `ResearchCyclePlanningPacketManifest`
+- a mapping from relative artifact path to UTF-8 content
+
+The output `ResearchCyclePlanningPacketManifestVerification` contains deterministic findings. A verification is `ok` only when every manifest entry has matching content.
+
+Findings include:
+
+- missing artifact
+- SHA-256 digest mismatch
+- byte count mismatch
+
+The verifier does not read files, write artifacts, or infer extra required paths outside the manifest. It walks manifest entries in order and can emit multiple findings for the same artifact when both hash and byte count drift. This keeps the integrity check independent from the eventual storage adapter while preserving enough detail for docs-first automation to stop a stale handoff before execution.

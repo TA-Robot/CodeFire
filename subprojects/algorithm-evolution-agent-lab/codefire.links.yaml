@@ -348,6 +348,15 @@ links:
   - from: REQ-AUTO-047
     to: TEST-research-cycle-planning-packet-manifest-markdown-renders-audit-table
     type: verified_by
+  - from: REQ-AUTO-048
+    to: DES-AUTO-030
+    type: refined_by
+  - from: DES-AUTO-030
+    to: CODE-ResearchCyclePlanningPacketManifestVerifier
+    type: implemented_by
+  - from: REQ-AUTO-048
+    to: TEST-research-cycle-planning-packet-manifest-verifier-detects-drift
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

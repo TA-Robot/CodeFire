@@ -213,6 +213,11 @@ ResearchCyclePlanningPacketManifestMarkdown.render(manifest)
   -> summarize source cycles, status, and artifact count
   -> preserve manifest entry order
   -> render artifact path, hash, and byte count as an audit table
+
+ResearchCyclePlanningPacketManifestVerifier.verify(manifest, artifact_contents)
+  -> compare manifest entries against provided UTF-8 artifact contents
+  -> report missing artifact, hash mismatch, and byte count mismatch findings
+  -> return deterministic verification state without reading or writing files
 ```
 
 Important implementation details:
@@ -226,6 +231,7 @@ Important implementation details:
 - Cycle planning packet Markdown embeds the already-rendered plan and lint documents so reviewers inspect the same objects automation will execute.
 - Cycle planning packet manifests hash the reviewed packet artifacts before any future writer persists them.
 - Cycle planning packet manifest Markdown formats manifest metadata only; it does not recompute hashes.
+- Cycle planning packet manifest verification compares persisted content to the manifest and remains independent from the storage adapter.
 
 ## 5. Experiment Automation Surface
 

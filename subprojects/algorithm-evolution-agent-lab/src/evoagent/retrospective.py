@@ -131,6 +131,21 @@ class ResearchCyclePlanningPacketManifest:
     entries: tuple[ResearchCyclePlanningPacketManifestEntry, ...]
 
 
+@dataclass(frozen=True)
+class ResearchCyclePlanningPacketManifestVerificationFinding:
+    path: str
+    message: str
+
+
+@dataclass(frozen=True)
+class ResearchCyclePlanningPacketManifestVerification:
+    findings: tuple[ResearchCyclePlanningPacketManifestVerificationFinding, ...]
+
+    @property
+    def ok(self) -> bool:
+        return not self.findings
+
+
 # cf-atom: CODE-ResearchCycleRetrospective
 class ResearchCycleRetrospective:
     def summarize(self, signals: list[ResearchCycleSignal]) -> ResearchCycleRetrospectiveReport:
@@ -603,6 +618,43 @@ class ResearchCyclePlanningPacketManifestMarkdown:
         for entry in manifest.entries:
             lines.append(f"| `{entry.path}` | `{entry.content_sha256}` | {entry.byte_count} |")
         return "\n".join(lines).rstrip() + "\n"
+
+
+# cf-atom: CODE-ResearchCyclePlanningPacketManifestVerifier
+class ResearchCyclePlanningPacketManifestVerifier:
+    def verify(
+        self,
+        manifest: ResearchCyclePlanningPacketManifest,
+        artifact_contents: dict[str, str],
+    ) -> ResearchCyclePlanningPacketManifestVerification:
+        findings: list[ResearchCyclePlanningPacketManifestVerificationFinding] = []
+        for entry in manifest.entries:
+            content = artifact_contents.get(entry.path)
+            if content is None:
+                findings.append(
+                    ResearchCyclePlanningPacketManifestVerificationFinding(
+                        path=entry.path,
+                        message="artifact is missing",
+                    )
+                )
+                continue
+            payload = content.encode("utf-8")
+            content_sha256 = f"sha256:{hashlib.sha256(payload).hexdigest()}"
+            if content_sha256 != entry.content_sha256:
+                findings.append(
+                    ResearchCyclePlanningPacketManifestVerificationFinding(
+                        path=entry.path,
+                        message="sha256 digest mismatch",
+                    )
+                )
+            if len(payload) != entry.byte_count:
+                findings.append(
+                    ResearchCyclePlanningPacketManifestVerificationFinding(
+                        path=entry.path,
+                        message="byte count mismatch",
+                    )
+                )
+        return ResearchCyclePlanningPacketManifestVerification(findings=tuple(findings))
 
 
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:

@@ -91,3 +91,4 @@
 | AE-087 | Reporting | planning packetを単一のcycle handoff Markdown文書へ整形する | done | `CODE-ResearchCyclePlanningPacketMarkdown`; `TEST-research-cycle-planning-packet-markdown-renders-review-document`; 151 tests pass |
 | AE-088 | Reporting | planning packet handoff artifactのpath/hash/byte manifestを生成する | done | `CODE-ResearchCyclePlanningPacketManifestBuilder`; `TEST-research-cycle-planning-packet-manifest-records-artifact-hashes`; 152 tests pass |
 | AE-089 | Reporting | planning packet manifestを監査用Markdown tableへ整形する | done | `CODE-ResearchCyclePlanningPacketManifestMarkdown`; `TEST-research-cycle-planning-packet-manifest-markdown-renders-audit-table`; 153 tests pass |
+| AE-090 | Planning QA | planning packet manifestと保存済みartifact内容のdriftを検出する | done | `CODE-ResearchCyclePlanningPacketManifestVerifier`; `TEST-research-cycle-planning-packet-manifest-verifier-detects-drift`; 154 tests pass |
