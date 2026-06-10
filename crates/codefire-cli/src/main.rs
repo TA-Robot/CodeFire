@@ -511,13 +511,30 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             }
             let options = parse_diff_args(&args[1..])?;
             let repo_root = optional_repo_root(&env::current_dir()?);
-            let output = diff_commitish_with_options(
+            let output = match diff_commitish_with_options(
                 repo_root.as_deref(),
                 &options.left,
                 &options.right,
                 &options.diff,
-            )?;
-            print!("{output}");
+            ) {
+                Ok(output) => output,
+                Err(error) if options.diff.json_output => {
+                    print_cli_error_json("diff", &error)?;
+                    return Err(CliError::CommandFailed(error.exit_status()));
+                }
+                Err(error) => return Err(error),
+            };
+            if options.diff.json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&diff_result_envelope(
+                        repo_root.as_deref(),
+                        &output,
+                    )?)?
+                );
+            } else {
+                print!("{output}");
+            }
             Ok(())
         }
         Some("review-pack") => {
@@ -1774,6 +1791,24 @@ fn print_data_result_json(command: &str, data: Value) -> Result<(), CliError> {
     Ok(())
 }
 
+fn diff_result_envelope(repo_root: Option<&Path>, output: &str) -> Result<Value, CliError> {
+    let data: Value = serde_json::from_str(output)?;
+    let next_actions = data
+        .get("next_actions")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    Ok(command_result_envelope(
+        "diff",
+        true,
+        0,
+        repo_root,
+        data,
+        Vec::new(),
+        next_actions,
+    ))
+}
+
 fn print_cli_error_json(command: &str, error: &CliError) -> Result<(), CliError> {
     println!(
         "{}",
@@ -1820,6 +1855,12 @@ fn cli_error_diagnostic(error: &CliError) -> Value {
 
 fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
     match error {
+        CliError::Usage(message) if message.starts_with("unknown branch:") => vec![json!({
+            "kind": "list_branches",
+            "command": cli_command("branch list --json"),
+            "reason": "inspect available branch names before retrying the command",
+            "target": {"error": message},
+        })],
         CliError::MissingEvidenceRef { evidence_id, .. } => vec![
             json!({
                 "kind": "create_evidence",

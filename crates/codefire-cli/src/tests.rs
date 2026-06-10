@@ -570,6 +570,33 @@ fn show_and_diff_local_branches() {
     assert!(diff.contains("+++ feature-session@CF-COMMIT-"));
     assert!(diff.contains("-    return 30"));
     assert!(diff.contains("+    return 15"));
+
+    let json_options = DiffOptions {
+        json_output: true,
+        ..DiffOptions::default()
+    };
+    let diff_json =
+        diff_commitish_with_options(Some(&repo_root), "main", "feature-session", &json_options)
+            .unwrap();
+    let diff_envelope = diff_result_envelope(Some(&repo_root), &diff_json).unwrap();
+    assert_eq!(diff_envelope["schema"], "codefire.command_result.v1");
+    assert_eq!(diff_envelope["command"], "diff");
+    assert_eq!(diff_envelope["ok"], true);
+    assert_eq!(diff_envelope["data"]["type"], "codefire_diff");
+    assert!(diff_envelope["data"]["left"]["label"]
+        .as_str()
+        .unwrap()
+        .starts_with("main@CF-COMMIT-"));
+
+    let missing =
+        diff_commitish_with_options(Some(&repo_root), "main", "DOES-NOT-EXIST", &json_options)
+            .unwrap_err();
+    let missing_envelope = cli_error_envelope("diff", &missing);
+    assert_eq!(missing_envelope["schema"], "codefire.command_result.v1");
+    assert_eq!(missing_envelope["command"], "diff");
+    assert_eq!(missing_envelope["ok"], false);
+    assert_eq!(missing_envelope["diagnostics"][0]["kind"], "command_error");
+    assert_eq!(missing_envelope["next_actions"][0]["kind"], "list_branches");
 }
 
 #[test]

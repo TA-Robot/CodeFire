@@ -485,7 +485,7 @@ binary fileはpayload diffを出さず、sizeとsha256 prefixのsummaryだけを
 --atomsはsealed commit内のAtomIndexを比較し、Atom IDのadded/removed/changedを表示する
 --traceはsealed commit内のTraceGraphを比較し、TraceLink IDのadded/removed/changedを表示する
 --impactはrequired-link policy上のmissing link増減と、changed Atomから予測されるfire impactを表示する
-diff --jsonはdiff結果をJSON objectとして出力し、impact有効時はmachine-readable next_actionsを含める
+diff --jsonはdiff結果を `codefire.command_result.v1` envelopeで出力し、既存の `codefire_diff` payloadを `data` に保持する。impact有効時はmachine-readable next_actionsを含める
 text diff payloadはunified hunk headerを持ち、file単位の最大出力byte数でboundedになり、超過時は省略したchanged line数を表示する
 --rename-detectionはexact hash renameを先に検出し、candidate pair数が上限を超えるinexact similarity計算はwarning付きでskipする
 ```
