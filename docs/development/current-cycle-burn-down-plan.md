@@ -69,10 +69,12 @@ Completion rule:
 | CFB-065 | fixed | Operation plan envelope | upload dry-run planのrepo/next_actionsをtop-levelへ持ち上げた |
 | CFB-069 | fixed | Verification diagnostic filtering | blocking-only next_actionsをblocking diagnosticsに限定した |
 | CFB-070 | fixed | Operation plan envelope | local dry-run planのrepo/next_actionsをtop-levelへ持ち上げた |
+| CFB-071 | fixed | CLI path contract | storage/doctor/migrateが`--path`/`--path=`を受けるようにした |
 | CFB-073 | fixed | Context bounded output metadata | context summary countsとcontext_expand next_actionを追加した |
 | CFB-076 | fixed | Batch dry-run validation | invalid link batch dry-runはtop-level ok:false/exit 2にした |
 | CFB-081 | fixed | Explain verification summary | passed warningをblocker扱いしないsummaryへ修正した |
 | CFB-083 | fixed | Branch list metrics | `branch list --metrics` がmetrics blockとhelpを返すようにした |
+| CFB-084 | fixed | Migrate JSON failure | migrate parser failureをJSON envelopeへ包んだ |
 | CFB-086 | fixed | Evidence/extinguish JSON | fixed済み。close auditで再確認する |
 | CFB-087 | fixed | Evidence/extinguish JSON failure envelope | fixed済み。missing evidence-ref JSON envelopeを確認した |
 | CFB-088 | fixed | Evidence dry-run JSON | fixed済み。close auditで再確認する |
@@ -99,7 +101,7 @@ Completion rule:
 
 Remaining open count for this batch:
 
-- 115 issues.
+- 113 issues.
 
 ## Global Issue Inventory
 
@@ -109,15 +111,15 @@ Current tracked issue inventory as of 2026-06-10:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 92 | 49 | 43 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFB dogfood issues | 92 | 51 | 41 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
 | CFR code review issues | 160 | 88 | 72 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. |
-| Total | 252 | 137 | 115 | This global batch is the whole known issue backlog. |
+| Total | 252 | 139 | 113 | This global batch is the whole known issue backlog. |
 
 Current active batch progress:
 
 - Frozen open issue count: 146.
-- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-040, CFB-041, CFB-042, CFB-044, CFB-052, CFB-057, CFB-058, CFB-060, CFB-062, CFB-064, CFB-065, CFB-069, CFB-070, CFB-073, CFB-076, CFB-081, CFB-083, CFR-085, CFR-086, CFR-096, CFR-098, CFR-115, CFR-125, CFR-126, CFR-127, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-154, CFR-155, CFR-157.
-- Remaining open: 115.
+- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-040, CFB-041, CFB-042, CFB-044, CFB-052, CFB-057, CFB-058, CFB-060, CFB-062, CFB-064, CFB-065, CFB-069, CFB-070, CFB-071, CFB-073, CFB-076, CFB-081, CFB-083, CFB-084, CFR-085, CFR-086, CFR-096, CFR-098, CFR-115, CFR-125, CFR-126, CFR-127, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-154, CFR-155, CFR-157.
+- Remaining open: 113.
 
 Burn-down interpretation:
 

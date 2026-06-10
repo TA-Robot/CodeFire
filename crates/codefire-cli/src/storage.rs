@@ -141,6 +141,13 @@ pub(crate) fn parse_storage_report_args(args: &[String]) -> Result<StorageReport
                 })?;
                 large_threshold_bytes = parse_byte_size(value)?;
             }
+            "--path" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--path requires a value".to_string()))?;
+                set_single_start(&mut start, value)?;
+            }
             value if value.starts_with("--large-threshold=") => {
                 large_threshold_bytes =
                     parse_byte_size(value.trim_start_matches("--large-threshold="))?;
@@ -148,17 +155,15 @@ pub(crate) fn parse_storage_report_args(args: &[String]) -> Result<StorageReport
             value if value.starts_with("--remote=") => {
                 remotes.push(value.trim_start_matches("--remote=").to_string());
             }
+            value if value.starts_with("--path=") => {
+                set_single_start(&mut start, value.trim_start_matches("--path="))?;
+            }
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported storage report option: {option}"
                 )));
             }
-            value if start.is_none() => start = Some(PathBuf::from(value)),
-            value => {
-                return Err(CliError::Usage(format!(
-                    "unexpected storage report argument: {value}"
-                )));
-            }
+            value => set_single_start(&mut start, value)?,
         }
         index += 1;
     }
@@ -169,6 +174,18 @@ pub(crate) fn parse_storage_report_args(args: &[String]) -> Result<StorageReport
         remotes,
         quick,
     })
+}
+
+fn set_single_start(start: &mut Option<PathBuf>, value: &str) -> Result<(), CliError> {
+    match start {
+        Some(_) => Err(CliError::Usage(
+            "path may only be specified once".to_string(),
+        )),
+        None => {
+            *start = Some(PathBuf::from(value));
+            Ok(())
+        }
+    }
 }
 
 pub(crate) fn run_storage_report(

@@ -72,20 +72,23 @@ pub(crate) fn parse_migrate_args(args: &[String]) -> Result<MigrateOptions, CliE
                 index += 1;
                 target_format = required_arg(rest, index, "--target-format")?.to_string();
             }
+            "--path" => {
+                index += 1;
+                let value = required_arg(rest, index, "--path")?;
+                set_single_start(&mut start, value)?;
+            }
             value if value.starts_with("--target-format=") => {
                 target_format = value.trim_start_matches("--target-format=").to_string();
+            }
+            value if value.starts_with("--path=") => {
+                set_single_start(&mut start, value.trim_start_matches("--path="))?;
             }
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported migrate option: {option}"
                 )));
             }
-            value if start.is_none() => start = Some(PathBuf::from(value)),
-            value => {
-                return Err(CliError::Usage(format!(
-                    "unexpected migrate argument: {value}"
-                )));
-            }
+            value => set_single_start(&mut start, value)?,
         }
         index += 1;
     }
@@ -95,6 +98,18 @@ pub(crate) fn parse_migrate_args(args: &[String]) -> Result<MigrateOptions, CliE
         target_format,
         json_output,
     })
+}
+
+fn set_single_start(start: &mut Option<PathBuf>, value: &str) -> Result<(), CliError> {
+    match start {
+        Some(_) => Err(CliError::Usage(
+            "path may only be specified once".to_string(),
+        )),
+        None => {
+            *start = Some(PathBuf::from(value));
+            Ok(())
+        }
+    }
 }
 
 pub(crate) fn run_migrate(options: &MigrateOptions) -> Result<MigrationReport, CliError> {

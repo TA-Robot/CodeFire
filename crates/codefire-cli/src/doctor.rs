@@ -67,29 +67,48 @@ pub(crate) fn parse_doctor_args(args: &[String]) -> Result<DoctorOptions, CliErr
     let mut start = None;
     let mut json_output = false;
     let mut quick = false;
-    for arg in args {
-        match arg.as_str() {
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
             "--json" => json_output = true,
             "--quick" => quick = true,
             "--full" => quick = false,
+            "--path" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--path requires a value".to_string()))?;
+                set_single_start(&mut start, value)?;
+            }
+            value if value.starts_with("--path=") => {
+                set_single_start(&mut start, value.trim_start_matches("--path="))?;
+            }
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported doctor option: {option}"
                 )));
             }
-            value if start.is_none() => start = Some(PathBuf::from(value)),
-            value => {
-                return Err(CliError::Usage(format!(
-                    "unexpected doctor argument: {value}"
-                )));
-            }
+            value => set_single_start(&mut start, value)?,
         }
+        index += 1;
     }
     Ok(DoctorOptions {
         start: start.unwrap_or(std::env::current_dir()?),
         json_output,
         quick,
     })
+}
+
+fn set_single_start(start: &mut Option<PathBuf>, value: &str) -> Result<(), CliError> {
+    match start {
+        Some(_) => Err(CliError::Usage(
+            "path may only be specified once".to_string(),
+        )),
+        None => {
+            *start = Some(PathBuf::from(value));
+            Ok(())
+        }
+    }
 }
 
 pub(crate) fn run_doctor(options: &DoctorOptions) -> Result<DoctorReport, CliError> {

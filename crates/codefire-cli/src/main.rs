@@ -778,15 +778,36 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     print!("{}", subcommand_help("storage"));
                     return Ok(());
                 }
-                let options = parse_storage_report_args(&args[2..])?;
+                let options = match parse_storage_report_args(&args[2..]) {
+                    Ok(options) => options,
+                    Err(error) if args_want_json(&args[2..]) => {
+                        print_cli_error_json("storage", &error)?;
+                        return Err(CliError::CommandFailed(error.exit_status()));
+                    }
+                    Err(error) => return Err(error),
+                };
                 run_storage_report_command(options)
             }
             Some(value) if value.starts_with("--") => {
-                let options = parse_storage_report_args(&args[1..])?;
+                let options = match parse_storage_report_args(&args[1..]) {
+                    Ok(options) => options,
+                    Err(error) if args_want_json(&args[1..]) => {
+                        print_cli_error_json("storage", &error)?;
+                        return Err(CliError::CommandFailed(error.exit_status()));
+                    }
+                    Err(error) => return Err(error),
+                };
                 run_storage_report_command(options)
             }
             Some(_) => {
-                let options = parse_storage_report_args(&args[1..])?;
+                let options = match parse_storage_report_args(&args[1..]) {
+                    Ok(options) => options,
+                    Err(error) if args_want_json(&args[1..]) => {
+                        print_cli_error_json("storage", &error)?;
+                        return Err(CliError::CommandFailed(error.exit_status()));
+                    }
+                    Err(error) => return Err(error),
+                };
                 run_storage_report_command(options)
             }
             None => {
@@ -799,7 +820,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 print!("{}", subcommand_help("doctor"));
                 Ok(())
             } else {
-                let options = parse_doctor_args(&args[1..])?;
+                let options = match parse_doctor_args(&args[1..]) {
+                    Ok(options) => options,
+                    Err(error) if args_want_json(&args[1..]) => {
+                        print_cli_error_json("doctor", &error)?;
+                        return Err(CliError::CommandFailed(error.exit_status()));
+                    }
+                    Err(error) => return Err(error),
+                };
                 let report = run_doctor(&options)?;
                 let exit_code = if report.ok {
                     ExitCode::Success
@@ -974,7 +1002,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("migrate") => {
-            let options = parse_migrate_args(&args[1..])?;
+            let options = match parse_migrate_args(&args[1..]) {
+                Ok(options) => options,
+                Err(error) if args_want_json(&args[1..]) => {
+                    print_cli_error_json("migrate", &error)?;
+                    return Err(CliError::CommandFailed(error.exit_status()));
+                }
+                Err(error) => return Err(error),
+            };
             let report = run_migrate(&options)?;
             let exit_code = if report.compatible {
                 ExitCode::Success

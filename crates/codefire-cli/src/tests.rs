@@ -911,6 +911,52 @@ fn parse_state_diagnostic_json_args() {
 }
 
 #[test]
+fn parse_health_recovery_commands_accept_common_path_option() {
+    let storage = parse_storage_report_args(&[
+        "--path=/tmp/example".to_string(),
+        "--json".to_string(),
+        "--quick".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(storage.start, PathBuf::from("/tmp/example"));
+    assert!(storage.json_output);
+    assert!(storage.quick);
+
+    let doctor = parse_doctor_args(&[
+        "--path".to_string(),
+        "/tmp/example".to_string(),
+        "--json".to_string(),
+        "--quick".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(doctor.start, PathBuf::from("/tmp/example"));
+    assert!(doctor.json_output);
+    assert!(doctor.quick);
+
+    let migrate = parse_migrate_args(&[
+        "check".to_string(),
+        "--path=/tmp/example".to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(migrate.start, PathBuf::from("/tmp/example"));
+    assert!(migrate.json_output);
+
+    let metrics_error = parse_migrate_args(&[
+        "check".to_string(),
+        "--path=/tmp/example".to_string(),
+        "--json".to_string(),
+        "--metrics".to_string(),
+    ])
+    .unwrap_err();
+    let envelope = cli_error_envelope("migrate", &metrics_error);
+    assert_eq!(envelope["schema"], "codefire.command_result.v1");
+    assert_eq!(envelope["command"], "migrate");
+    assert_eq!(envelope["ok"], false);
+    assert_eq!(envelope["diagnostics"][0]["kind"], "command_error");
+}
+
+#[test]
 fn cli_error_exit_codes_follow_stable_taxonomy() {
     assert_eq!(
         CliError::Usage("bad args".to_string()).exit_code(),
