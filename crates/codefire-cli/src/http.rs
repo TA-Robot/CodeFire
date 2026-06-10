@@ -123,7 +123,7 @@ pub(crate) fn http_json(
     payload: Option<Value>,
 ) -> Result<Value, CliError> {
     let endpoint = parse_http_url(url)?;
-    let timeout = http_timeout();
+    let timeout = http_timeout()?;
     let address = (endpoint.host.as_str(), endpoint.port)
         .to_socket_addrs()?
         .next()
@@ -330,13 +330,21 @@ fn parse_http_port(raw_port: &str) -> Result<u16, CliError> {
         .map_err(|_| CliError::Usage(format!("invalid HTTP port: {raw_port}")))
 }
 
-fn http_timeout() -> Duration {
-    std::env::var("CODEFIRE_HTTP_TIMEOUT_MS")
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-        .filter(|value| *value > 0)
-        .map(Duration::from_millis)
-        .unwrap_or_else(|| Duration::from_millis(DEFAULT_HTTP_TIMEOUT_MS))
+fn http_timeout() -> Result<Duration, CliError> {
+    let Ok(value) = std::env::var("CODEFIRE_HTTP_TIMEOUT_MS") else {
+        return Ok(Duration::from_millis(DEFAULT_HTTP_TIMEOUT_MS));
+    };
+    let parsed = value.parse::<u64>().map_err(|_| {
+        CliError::Usage(format!(
+            "invalid CODEFIRE_HTTP_TIMEOUT_MS: expected positive integer milliseconds, got {value}"
+        ))
+    })?;
+    if parsed == 0 {
+        return Err(CliError::Usage(format!(
+            "invalid CODEFIRE_HTTP_TIMEOUT_MS: expected positive integer milliseconds, got {value}"
+        )));
+    }
+    Ok(Duration::from_millis(parsed))
 }
 
 pub(crate) fn serve_http(options: &ServeOptions) -> Result<(), CliError> {
@@ -465,7 +473,7 @@ fn handle_tcp_http_connection(
 }
 
 fn configure_http_server_stream(stream: &TcpStream) -> Result<(), CliError> {
-    let timeout = http_timeout();
+    let timeout = http_timeout()?;
     stream.set_read_timeout(Some(timeout))?;
     stream.set_write_timeout(Some(timeout))?;
     Ok(())
@@ -1293,8 +1301,11 @@ mod tests {
     use super::*;
     use std::io::{Cursor, ErrorKind, Read, Write};
     use std::net::TcpStream;
+    use std::sync::Mutex;
     use std::thread;
     use std::time::{Duration, Instant};
+
+    static HTTP_TIMEOUT_ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn http_request_rejects_truncated_body() {
@@ -1328,13 +1339,32 @@ mod tests {
 
     #[test]
     fn http_timeout_uses_positive_env_override() {
+        let _guard = HTTP_TIMEOUT_ENV_LOCK.lock().unwrap();
         std::env::set_var("CODEFIRE_HTTP_TIMEOUT_MS", "1234");
-        assert_eq!(http_timeout(), Duration::from_millis(1234));
-        std::env::set_var("CODEFIRE_HTTP_TIMEOUT_MS", "0");
+        assert_eq!(http_timeout().unwrap(), Duration::from_millis(1234));
+        std::env::remove_var("CODEFIRE_HTTP_TIMEOUT_MS");
         assert_eq!(
-            http_timeout(),
+            http_timeout().unwrap(),
             Duration::from_millis(DEFAULT_HTTP_TIMEOUT_MS)
         );
+    }
+
+    #[test]
+    fn http_timeout_rejects_invalid_env_override() {
+        let _guard = HTTP_TIMEOUT_ENV_LOCK.lock().unwrap();
+        std::env::set_var("CODEFIRE_HTTP_TIMEOUT_MS", "abc");
+        let invalid = http_timeout().unwrap_err();
+        assert!(invalid.to_string().contains("CODEFIRE_HTTP_TIMEOUT_MS"));
+        assert!(invalid
+            .to_string()
+            .contains("positive integer milliseconds"));
+
+        std::env::set_var("CODEFIRE_HTTP_TIMEOUT_MS", "0");
+        let nonpositive = http_timeout().unwrap_err();
+        assert!(nonpositive.to_string().contains("CODEFIRE_HTTP_TIMEOUT_MS"));
+        assert!(nonpositive
+            .to_string()
+            .contains("positive integer milliseconds"));
         std::env::remove_var("CODEFIRE_HTTP_TIMEOUT_MS");
     }
 
