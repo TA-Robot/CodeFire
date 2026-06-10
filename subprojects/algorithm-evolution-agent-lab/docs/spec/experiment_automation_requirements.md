@@ -303,3 +303,7 @@ The system shall evaluate final archive summary artifact archive summary Markdow
 ## REQ-AUTO-076: Research cycle planning handoff review packet artifact archive summary artifact archive summary Markdown gate Markdown
 
 The system shall render final archive summary artifact archive summary Markdown gate results into deterministic Markdown. The rendered document shall include ready state, status, artifact count, checked artifact count, finding count, and blocker messages so reviewers can audit why a persisted archive summary audit index was accepted or blocked without reading machine-only gate payloads.
+
+## REQ-AUTO-077: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifacts
+
+The system shall package final archive summary artifact archive summary review surfaces into deterministic handoff artifacts. The artifact set shall include archive summary artifact archive summary Markdown and its Markdown gate audit at caller-controlled relative POSIX paths, plus the machine-readable summary and gate result, so storage adapters can persist the final audit index surface without recomputing summaries or revalidating Markdown later.

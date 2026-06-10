@@ -994,3 +994,18 @@ The rendered document contains:
 - blocker messages, or `none` when clean
 
 The renderer is pure and deterministic. It does not rerun the gate, inspect summary artifacts, parse files, write files, or mutate inputs.
+
+## DES-AUTO-059: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifacts
+
+The review packet artifact archive summary artifact archive summary artifact builder consumes `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchive`.
+
+The builder returns `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifacts` containing:
+
+- the source summary artifact archive
+- the machine-readable summary
+- summary Markdown
+- Markdown gate result
+- Markdown gate audit document
+- two packaged artifacts at caller-provided relative POSIX paths
+
+The builder composes the summary renderer, Markdown renderer, Markdown gate, and gate Markdown renderer. It validates output paths with the shared manifest path validator. It does not rebuild manifests, rerun archive verification, read files, write files, or mutate inputs.

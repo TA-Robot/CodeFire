@@ -11,6 +11,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown,
@@ -2034,6 +2035,72 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         )
         self.assertIn("- Ready: yes", clean)
         self.assertIn("- none", clean)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-builder-packages-gated-summary
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_builder_packages_gated_summary(
+        self,
+    ) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-41",
+                    completed_runs=20,
+                    improved_candidates=16,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.4,
+                    remaining_budget=20.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=16,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=16.0,
+            packet_path="cycle-41/planning-packet.md",
+            plan_path="cycle-41/plan.md",
+            lint_path="cycle-41/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-41/review-packet.md",
+            readiness_path="cycle-41/readiness.md",
+            manifest_path="cycle-41/manifest.md",
+            verification_path="cycle-41/verification.md",
+        )
+        handoff = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder().build(
+            archive,
+            summary_path="cycle-41/archive-summary.md",
+            gate_path="cycle-41/archive-summary-gate.md",
+        )
+        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+            handoff,
+        )
+
+        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder().build(
+            summary_archive,
+            summary_path="cycle-41/archive-summary-artifact-archive-summary.md",
+            gate_path="cycle-41/archive-summary-artifact-archive-summary-gate.md",
+            summary_title="Cycle 41 Archive Summary Artifact Archive Summary",
+            gate_title="Cycle 41 Archive Summary Artifact Archive Summary Markdown Gate",
+        )
+
+        self.assertEqual(summary_archive, packaged.archive)
+        self.assertEqual(["cycle-41"], packaged.summary["source_cycles"])
+        self.assertEqual("ok", packaged.summary["archive_status"])
+        self.assertTrue(packaged.gate_result["ready"])
+        self.assertIn("# Cycle 41 Archive Summary Artifact Archive Summary", packaged.summary_markdown)
+        self.assertIn("# Cycle 41 Archive Summary Artifact Archive Summary Markdown Gate", packaged.gate_markdown)
+        self.assertEqual(
+            ("cycle-41/archive-summary-artifact-archive-summary.md", "cycle-41/archive-summary-artifact-archive-summary-gate.md"),
+            tuple(artifact.path for artifact in packaged.artifacts),
+        )
+        self.assertEqual(packaged.summary_markdown, packaged.artifacts[0].content)
+        self.assertEqual(packaged.gate_markdown, packaged.artifacts[1].content)
 
 
 if __name__ == "__main__":
