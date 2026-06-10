@@ -191,3 +191,7 @@ The system shall render a planning packet manifest into deterministic Markdown f
 ## REQ-AUTO-048: Research cycle planning packet manifest verification
 
 The system shall verify persisted planning packet artifact contents against a planning packet manifest. The verification shall report missing artifacts, SHA-256 digest mismatches, and byte count mismatches in deterministic manifest order so docs-first cycle handoff can detect drift between reviewed planning artifacts and stored artifacts before the next execution cycle begins.
+
+## REQ-AUTO-049: Research cycle planning packet manifest verification Markdown
+
+The system shall render planning packet manifest verification results into deterministic Markdown for audit logs. The rendered document shall include verification status, finding count, and path-scoped finding messages so human reviewers can inspect artifact handoff drift without reading raw verification objects.

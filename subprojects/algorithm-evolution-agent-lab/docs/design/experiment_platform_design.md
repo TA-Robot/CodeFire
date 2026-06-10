@@ -592,3 +592,18 @@ Findings include:
 - byte count mismatch
 
 The verifier does not read files, write artifacts, or infer extra required paths outside the manifest. It walks manifest entries in order and can emit multiple findings for the same artifact when both hash and byte count drift. This keeps the integrity check independent from the eventual storage adapter while preserving enough detail for docs-first automation to stop a stale handoff before execution.
+
+## DES-AUTO-031: Research cycle planning packet manifest verification Markdown
+
+The manifest verification Markdown renderer consumes `ResearchCyclePlanningPacketManifestVerification` and emits a compact audit document.
+
+The document includes:
+
+- title
+- status: `ok` or `blocked`
+- finding count
+- findings section
+- explicit `none` finding line when verification is clean
+- path-scoped finding lines when verification detects drift
+
+The renderer does not recompute verification, read artifact contents, or suppress duplicate findings for the same path. It formats the already-computed verification result in deterministic order so the same object can drive automated blocking and human review logs.

@@ -657,6 +657,31 @@ class ResearchCyclePlanningPacketManifestVerifier:
         return ResearchCyclePlanningPacketManifestVerification(findings=tuple(findings))
 
 
+# cf-atom: CODE-ResearchCyclePlanningPacketManifestVerificationMarkdown
+class ResearchCyclePlanningPacketManifestVerificationMarkdown:
+    def render(
+        self,
+        verification: ResearchCyclePlanningPacketManifestVerification,
+        *,
+        title: str = "Research Cycle Planning Packet Manifest Verification",
+    ) -> str:
+        lines = [
+            f"# {title}",
+            "",
+            f"- Status: {'ok' if verification.ok else 'blocked'}",
+            f"- Finding count: {len(verification.findings)}",
+            "",
+            "## Findings",
+            "",
+        ]
+        if not verification.findings:
+            lines.append("- none")
+        else:
+            for finding in verification.findings:
+                lines.append(f"- `{finding.path}`: {finding.message}")
+        return "\n".join(lines).rstrip() + "\n"
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

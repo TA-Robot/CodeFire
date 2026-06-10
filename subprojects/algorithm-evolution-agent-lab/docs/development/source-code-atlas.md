@@ -218,6 +218,11 @@ ResearchCyclePlanningPacketManifestVerifier.verify(manifest, artifact_contents)
   -> compare manifest entries against provided UTF-8 artifact contents
   -> report missing artifact, hash mismatch, and byte count mismatch findings
   -> return deterministic verification state without reading or writing files
+
+ResearchCyclePlanningPacketManifestVerificationMarkdown.render(verification)
+  -> summarize verification status and finding count
+  -> render explicit none line for clean verification
+  -> render path-scoped drift findings for audit logs
 ```
 
 Important implementation details:
@@ -232,6 +237,7 @@ Important implementation details:
 - Cycle planning packet manifests hash the reviewed packet artifacts before any future writer persists them.
 - Cycle planning packet manifest Markdown formats manifest metadata only; it does not recompute hashes.
 - Cycle planning packet manifest verification compares persisted content to the manifest and remains independent from the storage adapter.
+- Cycle planning packet manifest verification Markdown formats the computed drift findings without rerunning verification.
 
 ## 5. Experiment Automation Surface
 
