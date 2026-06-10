@@ -93,3 +93,4 @@
 | AE-089 | Reporting | planning packet manifestを監査用Markdown tableへ整形する | done | `CODE-ResearchCyclePlanningPacketManifestMarkdown`; `TEST-research-cycle-planning-packet-manifest-markdown-renders-audit-table`; 153 tests pass |
 | AE-090 | Planning QA | planning packet manifestと保存済みartifact内容のdriftを検出する | done | `CODE-ResearchCyclePlanningPacketManifestVerifier`; `TEST-research-cycle-planning-packet-manifest-verifier-detects-drift`; 154 tests pass |
 | AE-091 | Reporting | planning packet manifest verification結果を監査用Markdownへ整形する | done | `CODE-ResearchCyclePlanningPacketManifestVerificationMarkdown`; `TEST-research-cycle-planning-packet-manifest-verification-markdown-renders-findings`; 155 tests pass |
+| AE-092 | Planning QA | planning packet、artifact、manifest、verification、監査Markdownをhandoff bundleへまとめる | done | `CODE-ResearchCyclePlanningHandoffBundleBuilder`; `TEST-research-cycle-planning-handoff-bundle-builds-artifacts-and-audits`; 156 tests pass |

@@ -96,6 +96,9 @@ from evoagent.reproduction import ReproductionChecklist, ReproductionChecklistBu
 from evoagent.regression import RegressionDetector, RegressionFinding
 from evoagent.risk import ExperimentRisk, ExperimentRiskRegister, RiskPriority, RiskSeverity, RiskStatus
 from evoagent.retrospective import (
+    ResearchCyclePlanningHandoffArtifact,
+    ResearchCyclePlanningHandoffBundle,
+    ResearchCyclePlanningHandoffBundleBuilder,
     ResearchCyclePlan,
     ResearchCyclePlanItem,
     ResearchCyclePlanLane,
@@ -278,6 +281,9 @@ __all__ = [
     "ResearchMemoryIndex",
     "ResearchProgressMeter",
     "ResearchProgressReport",
+    "ResearchCyclePlanningHandoffArtifact",
+    "ResearchCyclePlanningHandoffBundle",
+    "ResearchCyclePlanningHandoffBundleBuilder",
     "ResearchCyclePlan",
     "ResearchCyclePlanItem",
     "ResearchCyclePlanLane",

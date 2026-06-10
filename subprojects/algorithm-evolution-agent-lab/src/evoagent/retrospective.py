@@ -146,6 +146,22 @@ class ResearchCyclePlanningPacketManifestVerification:
         return not self.findings
 
 
+@dataclass(frozen=True)
+class ResearchCyclePlanningHandoffArtifact:
+    path: str
+    content: str
+
+
+@dataclass(frozen=True)
+class ResearchCyclePlanningHandoffBundle:
+    packet: ResearchCyclePlanningPacket
+    artifacts: tuple[ResearchCyclePlanningHandoffArtifact, ...]
+    manifest: ResearchCyclePlanningPacketManifest
+    manifest_markdown: str
+    verification: ResearchCyclePlanningPacketManifestVerification
+    verification_markdown: str
+
+
 # cf-atom: CODE-ResearchCycleRetrospective
 class ResearchCycleRetrospective:
     def summarize(self, signals: list[ResearchCycleSignal]) -> ResearchCycleRetrospectiveReport:
@@ -680,6 +696,61 @@ class ResearchCyclePlanningPacketManifestVerificationMarkdown:
             for finding in verification.findings:
                 lines.append(f"- `{finding.path}`: {finding.message}")
         return "\n".join(lines).rstrip() + "\n"
+
+
+# cf-atom: CODE-ResearchCyclePlanningHandoffBundleBuilder
+class ResearchCyclePlanningHandoffBundleBuilder:
+    def build(
+        self,
+        report: ResearchCycleRetrospectiveReport,
+        *,
+        active_capacity: int,
+        remaining_budget: float,
+        packet_path: str = "planning-packet.md",
+        plan_path: str = "plan.md",
+        lint_path: str = "lint.md",
+        plan_title: str = "Research Cycle Plan",
+        lint_title: str = "Research Cycle Plan Lint",
+        packet_title: str = "Research Cycle Planning Packet",
+        manifest_title: str = "Research Cycle Planning Packet Manifest",
+        verification_title: str = "Research Cycle Planning Packet Manifest Verification",
+    ) -> ResearchCyclePlanningHandoffBundle:
+        packet = ResearchCyclePlanningPacketBuilder().build(
+            report,
+            active_capacity=active_capacity,
+            remaining_budget=remaining_budget,
+            plan_title=plan_title,
+            lint_title=lint_title,
+        )
+        packet_markdown = ResearchCyclePlanningPacketMarkdown().render(packet, title=packet_title)
+        artifacts = (
+            ResearchCyclePlanningHandoffArtifact(packet_path, packet_markdown),
+            ResearchCyclePlanningHandoffArtifact(plan_path, packet.plan_markdown),
+            ResearchCyclePlanningHandoffArtifact(lint_path, packet.lint_markdown),
+        )
+        manifest = ResearchCyclePlanningPacketManifestBuilder().build(
+            packet,
+            packet_path=packet_path,
+            plan_path=plan_path,
+            lint_path=lint_path,
+            packet_title=packet_title,
+        )
+        artifact_contents = {artifact.path: artifact.content for artifact in artifacts}
+        verification = ResearchCyclePlanningPacketManifestVerifier().verify(manifest, artifact_contents)
+        return ResearchCyclePlanningHandoffBundle(
+            packet=packet,
+            artifacts=artifacts,
+            manifest=manifest,
+            manifest_markdown=ResearchCyclePlanningPacketManifestMarkdown().render(
+                manifest,
+                title=manifest_title,
+            ),
+            verification=verification,
+            verification_markdown=ResearchCyclePlanningPacketManifestVerificationMarkdown().render(
+                verification,
+                title=verification_title,
+            ),
+        )
 
 
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:

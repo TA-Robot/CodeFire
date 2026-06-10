@@ -607,3 +607,18 @@ The document includes:
 - path-scoped finding lines when verification detects drift
 
 The renderer does not recompute verification, read artifact contents, or suppress duplicate findings for the same path. It formats the already-computed verification result in deterministic order so the same object can drive automated blocking and human review logs.
+
+## DES-AUTO-032: Research cycle planning handoff bundle
+
+The handoff bundle builder consumes a `ResearchCycleRetrospectiveReport` plus active capacity, remaining budget, artifact paths, and reviewer-facing titles.
+
+The output `ResearchCyclePlanningHandoffBundle` contains:
+
+- `packet`
+- artifact contents for planning packet Markdown, plan Markdown, and lint Markdown
+- `manifest`
+- manifest Markdown
+- manifest verification result
+- manifest verification Markdown
+
+The builder composes the existing packet, manifest, verification, and Markdown components without adding new planning policy. It validates artifact paths through the manifest builder, verifies the generated artifact contents against the manifest before returning, and leaves all filesystem or storage writes to a future adapter.

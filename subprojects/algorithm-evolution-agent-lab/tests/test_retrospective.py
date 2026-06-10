@@ -2,6 +2,7 @@ import unittest
 
 from evoagent.retrospective import (
     ResearchCycleRetrospective,
+    ResearchCyclePlanningHandoffBundleBuilder,
     ResearchCyclePlanLane,
     ResearchCyclePlan,
     ResearchCyclePlanItem,
@@ -567,6 +568,53 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Finding count: 3", drifted_markdown)
         self.assertIn("`cycle-13/planning-packet.md`: sha256 digest mismatch", drifted_markdown)
         self.assertIn("`cycle-13/lint.md`: artifact is missing", drifted_markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-bundle-builds-artifacts-and-audits
+    def test_research_cycle_planning_handoff_bundle_builds_artifacts_and_audits(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-14",
+                    completed_runs=4,
+                    improved_candidates=1,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=4.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=1,
+                )
+            ]
+        )
+
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=1,
+            remaining_budget=2.0,
+            packet_path="cycle-14/planning-packet.md",
+            plan_path="cycle-14/plan.md",
+            lint_path="cycle-14/lint.md",
+            plan_title="Cycle 14 Plan",
+            lint_title="Cycle 14 Lint",
+            packet_title="Cycle 14 Packet",
+            manifest_title="Cycle 14 Manifest",
+            verification_title="Cycle 14 Verification",
+        )
+
+        self.assertEqual(bundle.packet.plan.source_cycles, ("cycle-14",))
+        self.assertEqual(
+            [artifact.path for artifact in bundle.artifacts],
+            ["cycle-14/planning-packet.md", "cycle-14/plan.md", "cycle-14/lint.md"],
+        )
+        self.assertEqual([entry.path for entry in bundle.manifest.entries], [artifact.path for artifact in bundle.artifacts])
+        self.assertTrue(bundle.verification.ok)
+        self.assertIn("# Cycle 14 Packet", bundle.artifacts[0].content)
+        self.assertIn("# Cycle 14 Manifest", bundle.manifest_markdown)
+        self.assertIn("| `cycle-14/planning-packet.md` | `sha256:", bundle.manifest_markdown)
+        self.assertIn("# Cycle 14 Verification", bundle.verification_markdown)
+        self.assertIn("- Status: ok", bundle.verification_markdown)
+        self.assertIn("- none", bundle.verification_markdown)
 
 
 if __name__ == "__main__":

@@ -366,6 +366,15 @@ links:
   - from: REQ-AUTO-049
     to: TEST-research-cycle-planning-packet-manifest-verification-markdown-renders-findings
     type: verified_by
+  - from: REQ-AUTO-050
+    to: DES-AUTO-032
+    type: refined_by
+  - from: DES-AUTO-032
+    to: CODE-ResearchCyclePlanningHandoffBundleBuilder
+    type: implemented_by
+  - from: REQ-AUTO-050
+    to: TEST-research-cycle-planning-handoff-bundle-builds-artifacts-and-audits
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

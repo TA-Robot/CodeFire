@@ -195,3 +195,7 @@ The system shall verify persisted planning packet artifact contents against a pl
 ## REQ-AUTO-049: Research cycle planning packet manifest verification Markdown
 
 The system shall render planning packet manifest verification results into deterministic Markdown for audit logs. The rendered document shall include verification status, finding count, and path-scoped finding messages so human reviewers can inspect artifact handoff drift without reading raw verification objects.
+
+## REQ-AUTO-050: Research cycle planning handoff bundle
+
+The system shall build a complete planning handoff bundle from a retrospective report. The bundle shall include the planning packet, artifact contents for the packet, plan, and lint Markdown, the manifest, manifest Markdown, manifest verification result, and verification Markdown so docs-first automation can pass one deterministic handoff object to future storage or review steps.

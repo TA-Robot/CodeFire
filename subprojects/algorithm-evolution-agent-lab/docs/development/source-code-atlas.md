@@ -223,6 +223,11 @@ ResearchCyclePlanningPacketManifestVerificationMarkdown.render(verification)
   -> summarize verification status and finding count
   -> render explicit none line for clean verification
   -> render path-scoped drift findings for audit logs
+
+ResearchCyclePlanningHandoffBundleBuilder.build(report, active_capacity, remaining_budget)
+  -> build packet, artifact contents, manifest, manifest Markdown, verification, and verification Markdown
+  -> validate artifact paths through manifest generation
+  -> return one deterministic handoff object without filesystem writes
 ```
 
 Important implementation details:
@@ -238,6 +243,7 @@ Important implementation details:
 - Cycle planning packet manifest Markdown formats manifest metadata only; it does not recompute hashes.
 - Cycle planning packet manifest verification compares persisted content to the manifest and remains independent from the storage adapter.
 - Cycle planning packet manifest verification Markdown formats the computed drift findings without rerunning verification.
+- Cycle planning handoff bundle building composes existing planning components and adds no new planning policy.
 
 ## 5. Experiment Automation Surface
 
