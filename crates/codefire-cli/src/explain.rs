@@ -268,7 +268,7 @@ fn explain_verify_failure(options: &ExplainOptions) -> Result<ExplainResult, Cli
     Ok(ExplainResult {
         repo_root: context.repo_root,
         diagnostics,
-        next_actions: verification_next_actions(&verification, &scan, true),
+        next_actions: verification_next_actions(&verification, &scan, true, Some(&options.path)),
         data,
     })
 }

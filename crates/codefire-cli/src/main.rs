@@ -1361,7 +1361,7 @@ fn run_scan_command(args: &[String]) -> Result<(), CliError> {
                 repo_root.as_deref(),
                 attach_metrics(scan_data_json(&scan), metrics.as_ref()),
                 scan_diagnostics_json(&scan),
-                scan_next_actions(&scan),
+                scan_next_actions(&scan, Some(&options.path)),
             ))?
         );
     } else {
@@ -1399,7 +1399,12 @@ fn run_verify_command(args: &[String]) -> Result<(), CliError> {
                     metrics.as_ref(),
                 ),
                 verification_diagnostics_json_with_filter(&verification, options.blocking_only),
-                verification_next_actions(&verification, &scan, options.blocking_only),
+                verification_next_actions(
+                    &verification,
+                    &scan,
+                    options.blocking_only,
+                    Some(&options.path)
+                ),
             ))?
         );
     } else {
@@ -1952,6 +1957,38 @@ fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
                 "error": message,
             },
         })],
+        CliError::Usage(message) if unsupported_option_command(message).is_some() => {
+            let command = unsupported_option_command(message).expect("checked above");
+            vec![json!({
+                "kind": "show_help",
+                "command": cli_command(format!("{command} --help")),
+                "reason": "inspect supported options before retrying the command",
+                "target": {
+                    "command": command,
+                    "error": message,
+                },
+            })]
+        }
+        CliError::NotOpen(path) => vec![json!({
+            "kind": "inspect_repository",
+            "command": cli_command(format!("doctor --path {} --json", command_arg(&path.to_string_lossy()))),
+            "reason": "inspect repository/open-directory discovery before retrying",
+            "target": {"path": path},
+        })],
+        CliError::InvalidMarker(_) | CliError::InvalidRepository(_) => vec![
+            json!({
+                "kind": "doctor",
+                "command": cli_command("doctor --json"),
+                "reason": "inspect repository health and corruption diagnostics",
+                "target": {"error": error.to_string()},
+            }),
+            json!({
+                "kind": "migrate_check",
+                "command": cli_command("migrate check --json"),
+                "reason": "inspect repository layout compatibility and planned repairs",
+                "target": {"error": error.to_string()},
+            }),
+        ],
         CliError::MissingEvidenceRef { evidence_id, .. } => vec![
             json!({
                 "kind": "create_evidence",
@@ -1967,6 +2004,27 @@ fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
             }),
         ],
         _ => Vec::new(),
+    }
+}
+
+fn unsupported_option_command(message: &str) -> Option<&str> {
+    let remainder = message.strip_prefix("unsupported ")?;
+    let command = remainder.split(" option:").next()?;
+    Some(match command {
+        "storage report" => "storage",
+        "batch extinguish" => "extinguish",
+        other => other,
+    })
+}
+
+fn command_arg(value: &str) -> String {
+    if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':'))
+    {
+        value.to_string()
+    } else {
+        format!("'{}'", value.replace('\'', "'\\''"))
     }
 }
 

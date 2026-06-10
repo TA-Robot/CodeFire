@@ -706,6 +706,36 @@ fn diff_manifest_matches_golden_fixture() {
     );
 }
 
+#[test]
+fn cli_error_next_actions_are_contextual() {
+    let unsupported = cli_error_envelope(
+        "migrate",
+        &CliError::Usage("unsupported migrate option: --metrics".to_string()),
+    );
+    assert_eq!(unsupported["next_actions"][0]["kind"], "show_help");
+    assert_eq!(
+        unsupported["next_actions"][0]["command"],
+        "codefire migrate --help"
+    );
+    assert_eq!(
+        unsupported["next_actions"][0]["target"]["command"],
+        "migrate"
+    );
+
+    let invalid = cli_error_envelope(
+        "status",
+        &CliError::InvalidRepository("missing .codefire".to_string()),
+    );
+    let kinds = invalid["next_actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|action| action["kind"].as_str())
+        .collect::<Vec<_>>();
+    assert!(kinds.contains(&"doctor"));
+    assert!(kinds.contains(&"migrate_check"));
+}
+
 fn assert_common_next_action_schema(action: &Value) {
     for field in ["kind", "id", "command", "reason", "description"] {
         assert!(

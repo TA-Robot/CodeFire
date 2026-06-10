@@ -1,5 +1,6 @@
 use crate::{scan_branch_state, Status};
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 pub(crate) const COMMAND_RESULT_SCHEMA: &str = "codefire.command_result.v1";
@@ -119,53 +120,71 @@ pub(crate) fn scan_diagnostics_json(scan: &codefire_core::ScanResult) -> Vec<Val
         .collect()
 }
 
-pub(crate) fn scan_next_actions(scan: &codefire_core::ScanResult) -> Vec<Value> {
+pub(crate) fn scan_next_actions(
+    scan: &codefire_core::ScanResult,
+    action_path: Option<&Path>,
+) -> Vec<Value> {
     let mut actions = Vec::new();
     if !scan.changed_atoms.is_empty() {
         actions.push(next_action(
             "context_changed",
-            cli_command("context --changed --json"),
+            cli_command(path_command("context --changed --json", action_path)),
             "inspect changed atoms and related trace context",
-            json!({"changed_atoms": &scan.changed_atoms}),
+            action_target(json!({"changed_atoms": &scan.changed_atoms}), action_path),
         ));
         actions.push(next_action(
             "verify",
-            cli_command("verify --details --json"),
+            cli_command(path_command("verify --details --json", action_path)),
             "run policy checks against the changed branch",
-            json!({"base_commit": &scan.base_commit}),
+            action_target(json!({"base_commit": &scan.base_commit}), action_path),
         ));
     }
     for fire in &scan.open_fires {
         actions.push(next_action(
             "context_fire",
-            cli_command(format!("context --fire {} --json", fire.display_id)),
+            cli_command(path_command(
+                format!("context --fire {} --json", fire.display_id),
+                action_path,
+            )),
             "inspect the fire source, target, and trace path",
-            json!({
-                "display_id": &fire.display_id,
-                "fire_uid": &fire.fire_uid,
-                "source_atom": &fire.source.atom_id,
-                "target_atom": &fire.target.atom_id,
-            }),
+            action_target(
+                json!({
+                    "display_id": &fire.display_id,
+                    "fire_uid": &fire.fire_uid,
+                    "source_atom": &fire.source.atom_id,
+                    "target_atom": &fire.target.atom_id,
+                }),
+                action_path,
+            ),
         ));
         actions.push(next_action(
             "extinguish_fire",
-            cli_command(format!(
-                "extinguish {} --resolution <type> --rationale <text>",
-                fire.display_id
+            cli_command(path_command(
+                format!(
+                    "extinguish {} --resolution <type> --rationale <text>",
+                    fire.display_id
+                ),
+                action_path,
             )),
             "record a resolution for the open fire",
-            json!({
-                "display_id": &fire.display_id,
-                "fire_uid": &fire.fire_uid,
-            }),
+            action_target(
+                json!({
+                    "display_id": &fire.display_id,
+                    "fire_uid": &fire.fire_uid,
+                }),
+                action_path,
+            ),
         ));
     }
     if actions.is_empty() {
         actions.push(next_action(
             "status",
-            cli_command("status --json"),
+            cli_command(path_command("status --json", action_path)),
             "scan is clean; inspect current branch state only if another command needs it",
-            json!({"base_commit": &scan.base_commit, "pending_changes": false}),
+            action_target(
+                json!({"base_commit": &scan.base_commit, "pending_changes": false}),
+                action_path,
+            ),
         ));
     }
     actions
@@ -316,22 +335,23 @@ pub(crate) fn verification_next_actions(
     verification: &codefire_core::Verification,
     scan: &codefire_core::ScanResult,
     blocking_only: bool,
+    action_path: Option<&Path>,
 ) -> Vec<Value> {
     let mut actions = Vec::new();
     if verification.result == "passed" {
         if has_pending_scan_changes(scan) {
             actions.push(next_action(
                 "commit",
-                cli_command("commit -m <message>"),
+                cli_command(path_command("commit -m <message>", action_path)),
                 "seal the verified open branch",
-                pending_changes_target(scan),
+                action_target(pending_changes_target(scan), action_path),
             ));
         } else {
             actions.push(next_action(
                 "status",
-                cli_command("status --json"),
+                cli_command(path_command("status --json", action_path)),
                 "branch is verified and has no pending scan changes to commit",
-                pending_changes_target(scan),
+                action_target(pending_changes_target(scan), action_path),
             ));
         }
         return actions;
@@ -339,62 +359,86 @@ pub(crate) fn verification_next_actions(
     if verification.open_required_fires > 0 {
         actions.push(next_action(
             "context_changed",
-            cli_command("context --changed --json"),
+            cli_command(path_command("context --changed --json", action_path)),
             "inspect changed atoms and open fire context",
-            json!({"open_required_fires": verification.open_required_fires}),
+            action_target(
+                json!({"open_required_fires": verification.open_required_fires}),
+                action_path,
+            ),
         ));
         actions.push(next_action(
             "scan",
-            cli_command("scan --json"),
+            cli_command(path_command("scan --json", action_path)),
             "refresh open fire diagnostics before extinguishing",
-            json!({}),
+            action_target(json!({}), action_path),
         ));
     }
     if !blocking_only || verification.trace_completeness_required {
         for item in &verification.missing_required_links {
             actions.push(next_action(
                 "context_atom",
-                cli_command(format!("context --atom {} --depth 2 --json", item.atom_id)),
+                cli_command(path_command(
+                    format!("context --atom {} --depth 2 --json", item.atom_id),
+                    action_path,
+                )),
                 "inspect the atom and nearby trace graph before adding the missing link",
-                json!({
-                    "atom_id": &item.atom_id,
-                    "required_type": &item.required_type,
-                    "target_kind": &item.target_kind,
-                    "min": item.min,
-                    "found": item.found,
-                    "blocking": verification.trace_completeness_required,
-                }),
+                action_target(
+                    json!({
+                        "atom_id": &item.atom_id,
+                        "required_type": &item.required_type,
+                        "target_kind": &item.target_kind,
+                        "min": item.min,
+                        "found": item.found,
+                        "blocking": verification.trace_completeness_required,
+                    }),
+                    action_path,
+                ),
             ));
         }
     }
     for item in &verification.stale_resolutions {
         actions.push(next_action(
             "refresh_resolution",
-            cli_command("extinguish <fire-id> --refresh --resolution <type> --rationale <text>"),
+            cli_command(path_command(
+                "extinguish <fire-id> --refresh --resolution <type> --rationale <text>",
+                action_path,
+            )),
             "refresh the stale resolution against the current atom and trace basis",
-            json!({
-                "resolution_uid": &item.resolution_uid,
-                "reason": &item.reason,
-            }),
+            action_target(
+                json!({
+                    "resolution_uid": &item.resolution_uid,
+                    "reason": &item.reason,
+                }),
+                action_path,
+            ),
         ));
     }
     for item in &verification.missing_evidence_refs {
         actions.push(next_action(
             "repair_evidence_ref",
-            cli_command("evidence add --artifact <path> --json"),
+            cli_command(path_command(
+                "evidence add --artifact <path> --json",
+                action_path,
+            )),
             "recreate or replace the missing evidence object referenced by the resolution",
-            json!({
-                "resolution_uid": &item.resolution_uid,
-                "evidence_id": &item.evidence_id,
-            }),
+            action_target(
+                json!({
+                    "resolution_uid": &item.resolution_uid,
+                    "evidence_id": &item.evidence_id,
+                }),
+                action_path,
+            ),
         ));
     }
     for atom_id in &verification.duplicate_atom_ids {
         actions.push(next_action(
             "context_atom",
-            cli_command(format!("context --atom {atom_id} --depth 1 --json")),
+            cli_command(path_command(
+                format!("context --atom {atom_id} --depth 1 --json"),
+                action_path,
+            )),
             "inspect duplicate Atom ID declarations and rename conflicting atoms",
-            json!({"atom_id": atom_id}),
+            action_target(json!({"atom_id": atom_id}), action_path),
         ));
     }
     for check in &verification.failed_checks {
@@ -463,17 +507,81 @@ pub(crate) fn bounded_next_actions(mut actions: Vec<Value>) -> Vec<Value> {
         return actions;
     }
     let omitted = actions.len() - (MAX_NEXT_ACTIONS - 1);
+    let omitted_actions = actions[(MAX_NEXT_ACTIONS - 1)..].to_vec();
+    let omitted_by_kind = omitted_actions_by_kind(&omitted_actions);
+    let first_omitted_targets = omitted_actions
+        .iter()
+        .take(3)
+        .map(|action| {
+            json!({
+                "kind": action.get("kind").or_else(|| action.get("id")).cloned().unwrap_or(Value::Null),
+                "target": action.get("target").or_else(|| action.get("context")).cloned().unwrap_or(Value::Null),
+                "command": action.get("command").cloned().unwrap_or(Value::Null),
+            })
+        })
+        .collect::<Vec<_>>();
+    let recovery_command = omitted_actions
+        .first()
+        .and_then(|action| action.get("command"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .unwrap_or_else(|| cli_command("status --json"));
     actions.truncate(MAX_NEXT_ACTIONS - 1);
     actions.push(next_action(
         "next_actions_omitted",
-        cli_command("status --json"),
-        "additional next actions were omitted to keep the command result bounded",
+        recovery_command,
+        "additional next actions were omitted; inspect omitted_by_kind and run the recovery command or rerun the source command with a narrower target",
         json!({
             "omitted": omitted,
             "limit": MAX_NEXT_ACTIONS,
+            "omitted_by_kind": omitted_by_kind,
+            "first_omitted_targets": first_omitted_targets,
         }),
     ));
     actions
+}
+
+fn omitted_actions_by_kind(actions: &[Value]) -> Value {
+    let mut counts = BTreeMap::new();
+    for action in actions {
+        let kind = action
+            .get("kind")
+            .or_else(|| action.get("id"))
+            .and_then(Value::as_str)
+            .unwrap_or("next_action");
+        *counts.entry(kind.to_string()).or_insert(0usize) += 1;
+    }
+    json!(counts)
+}
+
+fn action_target(mut target: Value, action_path: Option<&Path>) -> Value {
+    if let Some(path) = action_path {
+        if let Some(object) = target.as_object_mut() {
+            object
+                .entry("path")
+                .or_insert_with(|| Value::String(path.to_string_lossy().into_owned()));
+        }
+    }
+    target
+}
+
+fn path_command(command: impl AsRef<str>, action_path: Option<&Path>) -> String {
+    let command = command.as_ref();
+    match action_path {
+        Some(path) => format!("{command} --path {}", command_arg(&path.to_string_lossy())),
+        None => command.to_string(),
+    }
+}
+
+fn command_arg(value: &str) -> String {
+    if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':'))
+    {
+        value.to_string()
+    } else {
+        format!("'{}'", value.replace('\'', "'\\''"))
+    }
 }
 
 fn normalize_next_action(action: Value) -> Value {
@@ -642,11 +750,60 @@ mod tests {
 
     #[test]
     fn clean_scan_next_action_is_status_not_verify() {
-        let actions = scan_next_actions(&empty_scan());
+        let actions = scan_next_actions(&empty_scan(), None);
 
         assert_eq!(actions.len(), 1);
         assert_eq!(actions[0]["kind"], "status");
         assert_eq!(actions[0]["target"]["pending_changes"], false);
+    }
+
+    #[test]
+    fn scan_next_actions_preserve_explicit_path_context() {
+        let mut scan = empty_scan();
+        scan.changed_atoms.push("REQ-session".to_string());
+        scan.open_fires.push(test_fire("FIRE-001"));
+
+        let actions = scan_next_actions(&scan, Some(Path::new("/tmp/open")));
+        assert!(actions
+            .iter()
+            .all(|action| action["target"]["path"] == "/tmp/open"));
+        assert!(actions.iter().all(|action| action["command"]
+            .as_str()
+            .unwrap()
+            .contains("--path /tmp/open")));
+    }
+
+    #[test]
+    fn bounded_next_actions_report_omitted_kinds_and_recovery_command() {
+        let mut scan = empty_scan();
+        scan.changed_atoms.push("REQ-session".to_string());
+        for index in 0..6 {
+            scan.open_fires.push(test_fire(&format!("FIRE-{index:03}")));
+        }
+
+        let envelope = command_result_envelope(
+            "scan",
+            true,
+            0,
+            None,
+            json!({}),
+            Vec::new(),
+            scan_next_actions(&scan, Some(Path::new("/tmp/open"))),
+        );
+        let omitted = &envelope["next_actions"][MAX_NEXT_ACTIONS - 1];
+        assert_eq!(omitted["kind"], "next_actions_omitted");
+        assert_eq!(omitted["target"]["omitted"], 3);
+        assert_eq!(omitted["target"]["omitted_by_kind"]["extinguish_fire"], 2);
+        assert_eq!(omitted["target"]["omitted_by_kind"]["context_fire"], 1);
+        assert!(omitted["target"]["first_omitted_targets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|target| target["command"]
+                .as_str()
+                .unwrap()
+                .contains("--path /tmp/open")));
+        assert_ne!(omitted["command"], cli_command("status --json"));
     }
 
     #[test]
@@ -756,7 +913,7 @@ mod tests {
             verified_at: "2026-06-04T00:00:00Z".to_string(),
         };
 
-        let actions = verification_next_actions(&verification, &empty_scan(), false);
+        let actions = verification_next_actions(&verification, &empty_scan(), false, None);
         let kinds = actions
             .iter()
             .filter_map(|item| item.get("kind").and_then(Value::as_str))
@@ -773,7 +930,7 @@ mod tests {
     #[test]
     fn verification_next_actions_do_not_suggest_commit_for_clean_pass() {
         let verification = passed_verification();
-        let actions = verification_next_actions(&verification, &empty_scan(), false);
+        let actions = verification_next_actions(&verification, &empty_scan(), false, None);
 
         assert_eq!(actions.len(), 1);
         assert_eq!(actions[0]["kind"], "status");
@@ -785,12 +942,56 @@ mod tests {
         let verification = passed_verification();
         let mut scan = empty_scan();
         scan.changed_atoms.push("REQ-session".to_string());
-        let actions = verification_next_actions(&verification, &scan, false);
+        let actions = verification_next_actions(&verification, &scan, false, None);
 
         assert_eq!(actions.len(), 1);
         assert_eq!(actions[0]["kind"], "commit");
         assert_eq!(actions[0]["target"]["pending_changes"], true);
         assert_eq!(actions[0]["target"]["changed_atoms"][0], "REQ-session");
+    }
+
+    #[test]
+    fn verification_next_actions_preserve_explicit_path_context() {
+        let mut verification = passed_verification();
+        verification.result = "failed".to_string();
+        verification.open_required_fires = 1;
+        let actions =
+            verification_next_actions(&verification, &empty_scan(), false, Some(Path::new(".")));
+
+        assert!(actions.iter().any(|action| action["kind"] == "scan"
+            && action["command"].as_str().unwrap().contains("--path .")
+            && action["target"]["path"] == "."));
+        assert!(actions
+            .iter()
+            .any(|action| action["kind"] == "context_changed"
+                && action["command"].as_str().unwrap().contains("--path .")
+                && action["target"]["path"] == "."));
+    }
+
+    fn test_fire(display_id: &str) -> codefire_core::Fire {
+        codefire_core::Fire {
+            type_tag: "fire".to_string(),
+            version: 1,
+            fire_uid: format!("fire_{display_id}"),
+            display_id: display_id.to_string(),
+            status: "open".to_string(),
+            severity: "required".to_string(),
+            source: codefire_core::FireAtomRef {
+                atom_id: "REQ-session".to_string(),
+                content_hash_at_fire: None,
+            },
+            target: codefire_core::FireAtomRef {
+                atom_id: "DES-session".to_string(),
+                content_hash_at_fire: None,
+            },
+            reason: "required trace link missing".to_string(),
+            trace_path: Vec::new(),
+            created_by: "test".to_string(),
+            created_at: "2026-06-10T00:00:00Z".to_string(),
+            key: display_id.to_string(),
+            obsolete_at: None,
+            resolution_uid: None,
+        }
     }
 
     #[test]
@@ -845,7 +1046,7 @@ mod tests {
             verified_at: "2026-06-04T00:00:00Z".to_string(),
         };
 
-        let actions = verification_next_actions(&verification, &empty_scan(), true);
+        let actions = verification_next_actions(&verification, &empty_scan(), true, None);
         let kinds = actions
             .iter()
             .filter_map(|item| item.get("kind").and_then(Value::as_str))
