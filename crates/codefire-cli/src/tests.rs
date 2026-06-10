@@ -6709,14 +6709,33 @@ fn branch_list_reads_repo_from_open_marker_and_validates_heads() {
     let (_, explicit_detail) = branch_show_data(&detail_repo, Some(branch_name)).unwrap();
     assert_eq!(explicit_detail["branch"]["name"], branch_name);
 
-    let unsupported = cli_error_envelope(
-        "branch",
-        &CliError::Usage("unsupported branch command: unknown".to_string()),
-    );
+    let unsupported = branch_unsupported_command_envelope("unknown", Some(&repo_root), 2);
     assert_eq!(unsupported["schema"], "codefire.command_result.v1");
     assert_eq!(unsupported["command"], "branch");
     assert_eq!(unsupported["ok"], false);
-    assert_eq!(unsupported["diagnostics"][0]["kind"], "command_error");
+    assert_eq!(unsupported["repo"], repo_root.to_string_lossy().as_ref());
+    assert_eq!(unsupported["data"]["type"], "codefire_branch_error");
+    assert_eq!(unsupported["data"]["unsupported_subcommand"], "unknown");
+    assert_eq!(
+        unsupported["data"]["supported_subcommands"],
+        json!(["list", "show"])
+    );
+    assert_eq!(
+        unsupported["diagnostics"][0]["kind"],
+        "unsupported_subcommand"
+    );
+    assert_eq!(
+        unsupported["next_actions"][0]["command"],
+        "codefire branch --help"
+    );
+    assert_eq!(
+        unsupported["next_actions"][1]["command"],
+        "codefire branch list --json"
+    );
+    assert_eq!(
+        unsupported["next_actions"][2]["command"],
+        "codefire branch show --json"
+    );
 }
 
 #[test]

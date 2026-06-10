@@ -786,7 +786,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Some(command) => {
                 let error = CliError::Usage(format!("unsupported branch command: {command}"));
                 if args[1..].iter().any(|arg| arg == "--json") {
-                    print_cli_error_json("branch", &error)?;
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&branch_unsupported_command_envelope(
+                            command,
+                            branch_error_repo_root(&args[2..]).as_deref(),
+                            error.exit_code(),
+                        ))?
+                    );
                     return Err(CliError::CommandFailed(error.exit_status()));
                 }
                 Err(error)
@@ -2125,6 +2132,74 @@ fn branch_show_data(start: &Path, branch: Option<&str>) -> Result<(PathBuf, Valu
             },
         }),
     ))
+}
+
+fn branch_unsupported_command_envelope(
+    command: &str,
+    repo_root: Option<&Path>,
+    exit_code: i32,
+) -> Value {
+    let supported = vec!["list", "show"];
+    command_result_envelope(
+        "branch",
+        false,
+        exit_code,
+        repo_root,
+        json!({
+            "type": "codefire_branch_error",
+            "unsupported_subcommand": command,
+            "supported_subcommands": supported,
+        }),
+        vec![json!({
+            "kind": "unsupported_subcommand",
+            "severity": "blocking",
+            "command": "branch",
+            "subcommand": command,
+            "supported_subcommands": ["list", "show"],
+            "message": format!("unsupported branch command: {command}"),
+        })],
+        vec![
+            json!({
+                "kind": "show_help",
+                "command": "codefire branch --help",
+                "reason": "inspect supported branch subcommands",
+                "target": {"command": "branch", "supported_subcommands": ["list", "show"]},
+            }),
+            json!({
+                "kind": "branch_list",
+                "command": "codefire branch list --json",
+                "reason": "list known branches",
+                "target": {"command": "branch list"},
+            }),
+            json!({
+                "kind": "branch_show",
+                "command": "codefire branch show --json",
+                "reason": "show the current branch detail",
+                "target": {"command": "branch show"},
+            }),
+        ],
+    )
+}
+
+fn branch_error_repo_root(args: &[String]) -> Option<PathBuf> {
+    let mut path = env::current_dir().ok()?;
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--path" => {
+                index += 1;
+                if let Some(value) = args.get(index) {
+                    path = PathBuf::from(value);
+                }
+            }
+            value if value.starts_with("--path=") => {
+                path = PathBuf::from(value.trim_start_matches("--path="));
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+    find_repo_root(&path).ok()
 }
 
 fn print_scan(scan: &codefire_core::ScanResult) {
