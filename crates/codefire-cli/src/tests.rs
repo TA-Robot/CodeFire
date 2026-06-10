@@ -6530,6 +6530,62 @@ fn status_reads_python_compatible_open_directory() {
 }
 
 #[test]
+fn status_context_mismatch_returns_structured_diagnostic() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path();
+    let open_dir = repo_root.join("main");
+    let cf = repo_root.join(".codefire");
+    fs::create_dir_all(&open_dir).unwrap();
+    fs::create_dir_all(cf.join("opened")).unwrap();
+    fs::create_dir_all(cf.join("active").join("open_123")).unwrap();
+
+    let commit_id = write_valid_commit(&cf.join("objects"));
+    fs::write(
+        open_dir.join(".codefire-open"),
+        serde_json::to_string_pretty(&json!({
+            "version": 1,
+            "repository": {"path": cf, "repository_id": "repo_123"},
+            "branch": {"name": "main", "opened_from_commit": commit_id},
+            "open": {"open_instance_id": "open_123", "opened_at": "2026-06-04T00:00:00Z", "opened_path": open_dir}
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        repo_root.join(".codefire").join("opened").join("main.json"),
+        serde_json::to_string_pretty(&json!({
+            "version": 1,
+            "branch": {"name": "main"},
+            "open": {
+                "path": repo_root.join("different-open-dir"),
+                "open_instance_id": "open_123",
+                "opened_from_commit": commit_id,
+                "current_base_commit": commit_id,
+                "active_state_path": repo_root.join(".codefire").join("active").join("open_123")
+            },
+            "state": {"last_known": "open-clean"}
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let error = match open_context(&open_dir) {
+        Ok(_) => panic!("open context should reject mismatched registry path"),
+        Err(error) => error,
+    };
+    let envelope = cli_error_envelope("status", &error);
+    assert_eq!(envelope["schema"], "codefire.command_result.v1");
+    assert_eq!(envelope["command"], "status");
+    assert_eq!(envelope["ok"], false);
+    assert_eq!(envelope["diagnostics"][0]["kind"], "invalid_marker");
+    assert!(envelope["next_actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|action| action["kind"] == "doctor"));
+}
+
+#[test]
 fn verify_clean_branch_preserves_clean_state_without_degrading_status() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");

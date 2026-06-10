@@ -15,8 +15,8 @@
 - High: 36
 - Medium: 121
 - Low: 3
-- Fixed / closed: 146
-- Remaining open: 14
+- Fixed / closed: 148
+- Remaining open: 12
 
 ## Cycle 2 Source Review Expansion
 
@@ -150,6 +150,8 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | CFR-094 | global burn-down | `link --help` routingとJSON error contractをfixed済みとしてclose | `command_help_routes_before_mutating_parsers` |
 | CFR-095 | global burn-down | `CliError::diagnostic()` で全variantをstructured diagnosticへ写像 | `cli_error_diagnostics_cover_representative_error_classes` |
 | CFR-150 | global burn-down | command capability registryに`supports_metrics`を追加し`capabilities --json`で公開 | `command_capabilities_are_shared_by_help_completion_and_metrics_parser` |
+| CFR-113 | global burn-down | upload dry-run envelopeがtop-level repo/next_actionsを返す既存実装をclose auditで確認 | `file_remote_upload_clone_show_diff_and_merge_request_flow` |
+| CFR-093 | global burn-down | status JSONのrepo context取得失敗を握りつぶさずstructured diagnosticにした | `status_context_mismatch_returns_structured_diagnostic` |
 
 ### Open Area View
 
@@ -158,7 +160,7 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | Automation JSON / errors | [CFR-110](code-review-issues/cfr-110.md) |
 | CLI help and parser consistency | none |
 | View, diff, patch | [CFR-085](code-review-issues/cfr-085.md), [CFR-086](code-review-issues/cfr-086.md), [CFR-087](code-review-issues/cfr-087.md), [CFR-088](code-review-issues/cfr-088.md), [CFR-089](code-review-issues/cfr-089.md), [CFR-090](code-review-issues/cfr-090.md) |
-| Remote | [CFR-112](code-review-issues/cfr-112.md), [CFR-113](code-review-issues/cfr-113.md) |
+| Remote | [CFR-112](code-review-issues/cfr-112.md) |
 | Next actions and scan model | [CFR-096](code-review-issues/cfr-096.md), [CFR-097](code-review-issues/cfr-097.md), [CFR-098](code-review-issues/cfr-098.md), [CFR-117](code-review-issues/cfr-117.md) |
 | Batch | [CFR-100](code-review-issues/cfr-100.md), [CFR-101](code-review-issues/cfr-101.md), [CFR-102](code-review-issues/cfr-102.md) |
 | Storage and filesystem scan | [CFR-103](code-review-issues/cfr-103.md), [CFR-104](code-review-issues/cfr-104.md), [CFR-105](code-review-issues/cfr-105.md), [CFR-106](code-review-issues/cfr-106.md) |

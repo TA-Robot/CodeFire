@@ -851,12 +851,12 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             }
             let options = parse_path_json_args(&args[1..], "status")?;
             let started = Instant::now();
+            let context = open_context(&options.path)?;
             let status = read_status(&options.path)?;
             let metrics = options
                 .metrics
                 .then(|| status_metrics(started.elapsed(), &status));
             if options.json_output {
-                let repo_root = open_context(&options.path).ok().map(|context| context.repo_root);
                 let data = attach_metrics(
                     status_data_json_with_prediction(&status, &options.path),
                     metrics.as_ref(),
@@ -867,7 +867,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         "status",
                         true,
                         0,
-                        repo_root.as_deref(),
+                        Some(&context.repo_root),
                         data,
                         Vec::new(),
                         status_next_actions(&status),
