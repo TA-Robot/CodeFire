@@ -2900,6 +2900,10 @@ fn commit_dry_run_json_reports_blockers_and_bounds_changed_atoms() {
     assert_eq!(bounded_data["changed_atom_count"], 60);
     assert_eq!(bounded_data["changed_atoms"].as_array().unwrap().len(), 50);
     assert_eq!(bounded_data["changed_atoms_omitted"], 10);
+    assert_eq!(bounded_data["message"], "Bounded dry run");
+    assert_eq!(bounded_data["extinguished_fire_count"], 0);
+    assert_eq!(bounded_data["active_resolution_count"], 0);
+    assert_eq!(bounded_data["evidence_ref_count"], 0);
     assert_eq!(bounded.plan["changed_atoms_truncated"], true);
 
     let full = run_commit(&CommitOptions {
@@ -4426,6 +4430,27 @@ fn extinguish_evidence_ref_links_resolution_and_verify_detects_missing_ref() {
     let verification = run_verify(&open_dir).unwrap();
     assert_eq!(verification.result, "passed");
     assert!(verification.missing_evidence_refs.is_empty());
+
+    let commit = run_commit(&CommitOptions {
+        path: open_dir.clone(),
+        message: "Evidence-backed resolution".to_string(),
+        dry_run: true,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap();
+    let commit_data = commit_result_data_json(&commit);
+    assert_eq!(commit_data["message"], "Evidence-backed resolution");
+    assert_eq!(commit_data["extinguished_fire_count"], 1);
+    assert_eq!(commit_data["active_resolution_count"], 1);
+    assert_eq!(commit_data["evidence_ref_count"], 1);
+    assert_eq!(commit.plan["extinguished_fire_count"], 1);
+    assert_eq!(commit.plan["active_resolution_count"], 1);
+    assert_eq!(commit.plan["evidence_ref_count"], 1);
 
     fs::remove_file(
         repo_root

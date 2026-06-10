@@ -1849,10 +1849,39 @@ fn run_commit_command(args: &[String]) -> Result<(), CliError> {
             "Changed atoms: {}",
             result.plan["changed_atom_count"].as_u64().unwrap_or(0)
         );
+        println!(
+            "Extinguished fires: {}",
+            result.plan["extinguished_fire_count"].as_u64().unwrap_or(0)
+        );
+        println!(
+            "Active resolutions: {}",
+            result.plan["active_resolution_count"].as_u64().unwrap_or(0)
+        );
+        println!(
+            "Evidence refs: {}",
+            result.plan["evidence_ref_count"].as_u64().unwrap_or(0)
+        );
     } else {
         println!("Sealed commit created.");
         println!("Commit: {}", result.commit_id);
         println!("Branch: {}", result.branch);
+        println!("Message: {}", result.plan["message"].as_str().unwrap_or(""));
+        println!(
+            "Changed atoms: {}",
+            result.plan["changed_atom_count"].as_u64().unwrap_or(0)
+        );
+        println!(
+            "Extinguished fires: {}",
+            result.plan["extinguished_fire_count"].as_u64().unwrap_or(0)
+        );
+        println!(
+            "Active resolutions: {}",
+            result.plan["active_resolution_count"].as_u64().unwrap_or(0)
+        );
+        println!(
+            "Evidence refs: {}",
+            result.plan["evidence_ref_count"].as_u64().unwrap_or(0)
+        );
         println!("State: open-clean");
     }
     Ok(())
@@ -2193,9 +2222,13 @@ fn commit_result_data_json(result: &CommitResult) -> Value {
         "branch": &result.branch,
         "open_dir": &result.open_dir,
         "plan": &result.plan,
+        "message": &result.plan["message"],
         "changed_atom_count": &result.plan["changed_atom_count"],
         "changed_atoms": &result.plan["changed_atoms"],
         "changed_atoms_omitted": &result.plan["changed_atoms_omitted"],
+        "extinguished_fire_count": &result.plan["extinguished_fire_count"],
+        "active_resolution_count": &result.plan["active_resolution_count"],
+        "evidence_ref_count": &result.plan["evidence_ref_count"],
         "verification": &result.plan["verification"],
     })
 }
@@ -5240,6 +5273,21 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         } else {
             Vec::new()
         };
+    let extinguished_fire_count = extinguished_fires.len();
+    let active_resolution_count = resolutions
+        .iter()
+        .filter(|resolution| resolution.status == "active")
+        .count();
+    let evidence_ref_count = resolutions
+        .iter()
+        .filter(|resolution| resolution.status == "active")
+        .flat_map(|resolution| resolution.evidence_refs.iter())
+        .count();
+    let summary = CommitOperationSummary {
+        extinguished_fire_count,
+        active_resolution_count,
+        evidence_ref_count,
+    };
     let policy = codefire_core::parse_verification_policy(&context.open_dir)?;
     let parents = commit_parents_for_open(&context, &active_state_path)?;
     let plan = commit_operation_plan(
@@ -5249,6 +5297,7 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         &scan,
         &verification,
         &parents,
+        &summary,
     );
     if verification.result != "passed" {
         if options.dry_run {
@@ -5523,6 +5572,12 @@ fn extinguish_operation_plan(
     })
 }
 
+struct CommitOperationSummary {
+    extinguished_fire_count: usize,
+    active_resolution_count: usize,
+    evidence_ref_count: usize,
+}
+
 fn commit_operation_plan(
     options: &CommitOptions,
     context: &OpenContext,
@@ -5530,6 +5585,7 @@ fn commit_operation_plan(
     scan: &codefire_core::ScanResult,
     verification: &codefire_core::Verification,
     parents: &[String],
+    summary: &CommitOperationSummary,
 ) -> Value {
     const DEFAULT_COMMIT_CHANGED_ATOM_LIMIT: usize = 50;
     let changed_atom_limit = if options.full_output {
@@ -5576,6 +5632,9 @@ fn commit_operation_plan(
         "changed_atoms_sample_limit": changed_atom_limit,
         "changed_atoms_omitted": changed_atoms_omitted,
         "changed_atoms_truncated": changed_atoms_omitted > 0,
+        "extinguished_fire_count": summary.extinguished_fire_count,
+        "active_resolution_count": summary.active_resolution_count,
+        "evidence_ref_count": summary.evidence_ref_count,
         "verification": {
             "result": &verification.result,
             "open_required_fires": verification.open_required_fires,

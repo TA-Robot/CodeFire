@@ -366,7 +366,7 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- Remaining 33 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
+- Remaining 32 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
 - このglobal batchが0 openになるまで、新しいissue discovery batchへ進まない。
 
 ## Cycle Invariants

@@ -433,6 +433,7 @@ open stateをopen-cleanにする
 --dry-runはsealed object、branch head、open registry、active stateを書き換えず、codefire_operation_planを返す
 --dry-run --jsonはcodefire_commit_resultを返し、blockedの場合もok=falseのcommand_result envelopeでverification summaryとnext_actionsを返す
 commit JSONはtop-level repo、data.open_dir、data.branch、data.changed_atom_countを返す
+commit text/JSONはmessage、changed atom count、extinguished fire count、active resolution count、evidence ref countを要約として返す
 changed_atomsはdefaultで50件sampleに制限し、changed_atoms_omittedとchanged_atoms_truncatedを返す。--fullで全件を返す
 certificate.resultはverification.resultと同じ語彙を使い、現行成功commitはpassedを返す
 --idempotency-keyは成功したcommit resultを.codefire/idempotency/commit/へ記録する
