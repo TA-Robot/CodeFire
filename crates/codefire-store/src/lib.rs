@@ -170,6 +170,10 @@ fn object_subdir_by_id(object_id: &str) -> Option<&'static str> {
         .map(|kind| kind.subdir)
 }
 
+fn allows_unknown_subdir_lookup(object_id: &str) -> bool {
+    !object_id.starts_with("CF-") || object_id.starts_with("CF-OBJECT-")
+}
+
 pub fn object_record(type_tag: &str, payload: Value) -> Result<ObjectRecord, StoreError> {
     Ok(ObjectRecord {
         object_id: object_id(type_tag, &payload)?,
@@ -240,6 +244,9 @@ pub fn object_record_path(objects_root: &Path, object_id: &str) -> Option<PathBu
         if candidate.exists() {
             return Some(candidate);
         }
+        return None;
+    }
+    if !allows_unknown_subdir_lookup(object_id) {
         return None;
     }
     for entry in fs::read_dir(objects_root).ok()? {
@@ -762,6 +769,24 @@ mod tests {
 
         assert_eq!(object_record_path(&objects, commit_id), Some(path));
         assert_eq!(object_record_path(&objects, "CF-COMMIT-missing"), None);
+    }
+
+    #[test]
+    fn object_record_path_rejects_unknown_codefire_prefix_without_subdir_scan() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let custom = objects.join("custom");
+        fs::create_dir_all(&custom).unwrap();
+        let future_id = "CF-FUTURE-123456789abc";
+        let future_path = custom.join(format!("{future_id}.json"));
+        fs::write(future_path, "{}\n").unwrap();
+
+        assert_eq!(object_record_path(&objects, future_id), None);
+
+        let generic_id = "CF-OBJECT-123456789abc";
+        let generic_path = custom.join(format!("{generic_id}.json"));
+        fs::write(generic_path.as_path(), "{}\n").unwrap();
+        assert_eq!(object_record_path(&objects, generic_id), Some(generic_path));
     }
 
     #[test]
