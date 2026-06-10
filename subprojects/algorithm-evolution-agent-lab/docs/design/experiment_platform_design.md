@@ -824,3 +824,16 @@ The rendered document includes:
 - artifact table with path, byte count, and SHA-256 digest
 
 The renderer treats the summary as the single source of truth. It does not rebuild archives, recompute hashes, rerun verification, or read files.
+
+## DES-AUTO-047: Research cycle planning handoff review packet artifact archive summary Markdown gate
+
+The review packet artifact archive summary Markdown gate consumes a summary dictionary and the already-rendered summary Markdown.
+
+The gate returns a deterministic dictionary with:
+
+- `ready` and `status`
+- blocker messages for missing scalar lines or table rows
+- artifact count and finding count copied from the summary
+- checked artifact row count derived from the summary artifact list
+
+The gate verifies that the Markdown contains the source cycle line, archive/readiness/manifest/verification status lines, ready state, artifact count, finding count, audit availability lines, and one exact artifact table row for each artifact record. It does not rebuild the summary, render Markdown, recompute hashes, inspect archives, read files, or write files.

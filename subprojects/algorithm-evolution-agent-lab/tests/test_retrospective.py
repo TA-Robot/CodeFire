@@ -10,6 +10,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown,
@@ -1317,6 +1318,59 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("| `cycle-28/review-packet.md` | 123 | `sha256:abc123` |", markdown)
         self.assertIn("- Manifest Markdown: included", markdown)
         self.assertIn("- Verification Markdown: included", markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-markdown-gate-blocks-drift
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_markdown_gate_blocks_drift(
+        self,
+    ) -> None:
+        summary = {
+            "source_cycles": ["cycle-29"],
+            "archive_status": "ok",
+            "ready": True,
+            "readiness_status": "ready",
+            "manifest_status": "ok",
+            "verification_status": "ok",
+            "artifact_count": 1,
+            "finding_count": 0,
+            "audits": {
+                "manifest_markdown": True,
+                "verification_markdown": True,
+            },
+            "artifacts": [
+                {
+                    "path": "cycle-29/review-packet.md",
+                    "byte_count": 321,
+                    "content_sha256": "sha256:cycle29",
+                }
+            ],
+        }
+        renderer = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdown()
+        gate = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate()
+
+        clean = gate.evaluate(summary, renderer.render(summary, title="Cycle 29 Archive Summary"))
+
+        self.assertEqual(
+            {
+                "ready": True,
+                "status": "ready",
+                "blockers": [],
+                "artifact_count": 1,
+                "finding_count": 0,
+                "checked_artifact_count": 1,
+            },
+            clean,
+        )
+
+        drifted_summary = dict(summary)
+        drifted_summary["artifact_count"] = 2
+        drifted_markdown = renderer.render(summary).replace("- Verification status: ok\n", "")
+
+        blocked = gate.evaluate(drifted_summary, drifted_markdown)
+
+        self.assertEqual(False, blocked["ready"])
+        self.assertEqual("blocked", blocked["status"])
+        self.assertIn("verification status line is missing", blocked["blockers"])
+        self.assertIn("artifact count 2 does not match 1 artifact record(s)", blocked["blockers"])
 
 
 if __name__ == "__main__":

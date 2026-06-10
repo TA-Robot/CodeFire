@@ -298,6 +298,11 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdown.render(su
   -> render final review archive summary dictionaries as reviewer-facing Markdown indexes
   -> include statuses, counts, audit availability, and artifact path/hash/byte table
   -> avoid archive rebuilds, hash recomputation, verification reruns, and filesystem reads
+
+ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate.evaluate(summary, markdown)
+  -> compare final archive summary dictionaries against already-rendered Markdown
+  -> block missing status lines, mismatched artifact counts, missing audit lines, and missing artifact rows
+  -> avoid Markdown regeneration, archive inspection, hash recomputation, filesystem reads, and storage adapter coupling
 ```
 
 Important implementation details:
