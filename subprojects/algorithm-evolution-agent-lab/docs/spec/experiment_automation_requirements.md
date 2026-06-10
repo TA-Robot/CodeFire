@@ -315,3 +315,7 @@ The system shall generate a deterministic manifest for final archive summary art
 ## REQ-AUTO-079: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown
 
 The system shall render final archive summary artifact archive summary artifact manifests into deterministic Markdown. The rendered document shall include source cycles, status, artifact count, and a path, SHA-256 digest, and byte count table so reviewers can inspect persisted final audit index artifact manifests without reading machine-only manifest payloads.
+
+## REQ-AUTO-080: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verifier
+
+The system shall verify final archive summary artifact archive summary artifact manifest Markdown against its machine-readable manifest. The verifier shall detect missing source cycle, status, artifact count, table header, and artifact row lines, and shall report findings with paths so storage adapters can block stale or incomplete reviewer-facing manifest documents before final handoff.

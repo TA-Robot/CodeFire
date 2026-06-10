@@ -14,6 +14,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown,
@@ -2237,6 +2238,84 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("| Path | SHA-256 | Bytes |", markdown)
         for entry in manifest.entries:
             self.assertIn(f"| `{entry.path}` | `{entry.content_sha256}` | {entry.byte_count} |", markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verifier-detects-drift
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verifier_detects_drift(
+        self,
+    ) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-44",
+                    completed_runs=23,
+                    improved_candidates=19,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.34,
+                    remaining_budget=23.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=19,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=19.0,
+            packet_path="cycle-44/planning-packet.md",
+            plan_path="cycle-44/plan.md",
+            lint_path="cycle-44/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-44/review-packet.md",
+            readiness_path="cycle-44/readiness.md",
+            manifest_path="cycle-44/manifest.md",
+            verification_path="cycle-44/verification.md",
+        )
+        handoff = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder().build(
+            archive,
+            summary_path="cycle-44/archive-summary.md",
+            gate_path="cycle-44/archive-summary-gate.md",
+        )
+        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+            handoff,
+        )
+        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder().build(
+            summary_archive,
+            summary_path="cycle-44/archive-summary-artifact-archive-summary.md",
+            gate_path="cycle-44/archive-summary-artifact-archive-summary-gate.md",
+        )
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder().build(
+            packaged,
+        )
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown().render(
+            manifest,
+        )
+        verifier = (
+            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier()
+        )
+
+        clean = verifier.verify(manifest, markdown)
+        broken = verifier.verify(
+            manifest,
+            markdown.replace("- Artifact count: 2\n", "").replace(
+                f"| `{manifest.entries[0].path}` | `{manifest.entries[0].content_sha256}` | {manifest.entries[0].byte_count} |\n",
+                "",
+            ),
+        )
+
+        self.assertTrue(clean.ok)
+        self.assertFalse(broken.ok)
+        self.assertEqual(
+            [
+                ("manifest.md", "artifact count line is missing"),
+                (manifest.entries[0].path, "artifact row is missing"),
+            ],
+            [(finding.path, finding.message) for finding in broken.findings],
+        )
 
 
 if __name__ == "__main__":

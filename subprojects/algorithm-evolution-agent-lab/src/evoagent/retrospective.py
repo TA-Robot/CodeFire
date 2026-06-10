@@ -1666,6 +1666,40 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
         return ResearchCyclePlanningPacketManifestMarkdown().render(manifest, title=title)
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier:
+    def verify(
+        self,
+        manifest: ResearchCyclePlanningPacketManifest,
+        markdown: str,
+    ) -> ResearchCyclePlanningPacketManifestVerification:
+        findings: list[ResearchCyclePlanningPacketManifestVerificationFinding] = []
+        required_lines = [
+            (f"- Source cycles: {', '.join(manifest.source_cycles)}", "source cycle line is missing"),
+            (f"- Status: {manifest.status}", "status line is missing"),
+            (f"- Artifact count: {len(manifest.entries)}", "artifact count line is missing"),
+            ("| Path | SHA-256 | Bytes |", "manifest table header is missing"),
+        ]
+        for line, message in required_lines:
+            if line not in markdown:
+                findings.append(
+                    ResearchCyclePlanningPacketManifestVerificationFinding(
+                        path="manifest.md",
+                        message=message,
+                    )
+                )
+        for entry in manifest.entries:
+            row = f"| `{entry.path}` | `{entry.content_sha256}` | {entry.byte_count} |"
+            if row not in markdown:
+                findings.append(
+                    ResearchCyclePlanningPacketManifestVerificationFinding(
+                        path=entry.path,
+                        message="artifact row is missing",
+                    )
+                )
+        return ResearchCyclePlanningPacketManifestVerification(findings=tuple(findings))
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")
