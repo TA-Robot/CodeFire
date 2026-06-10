@@ -247,8 +247,23 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("context") => {
-            let options = parse_context_args(&args[1..])?;
-            let pack = build_context_pack(&options)?;
+            let json_requested = args_want_json(&args[1..]);
+            let options = match parse_context_args(&args[1..]) {
+                Ok(options) => options,
+                Err(error) if json_requested => {
+                    print_cli_error_json("context", &error)?;
+                    return Err(CliError::CommandFailed(error.exit_status()));
+                }
+                Err(error) => return Err(error),
+            };
+            let pack = match build_context_pack(&options) {
+                Ok(pack) => pack,
+                Err(error) if options.json_output => {
+                    print_cli_error_json("context", &error)?;
+                    return Err(CliError::CommandFailed(error.exit_status()));
+                }
+                Err(error) => return Err(error),
+            };
             if options.json_output {
                 println!(
                     "{}",
@@ -923,8 +938,23 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             )),
         },
         Some("explain") => {
-            let options = parse_explain_args(&args[1..])?;
-            let result = run_explain(&options)?;
+            let json_requested = args_want_json(&args[1..]);
+            let options = match parse_explain_args(&args[1..]) {
+                Ok(options) => options,
+                Err(error) if json_requested => {
+                    print_cli_error_json("explain", &error)?;
+                    return Err(CliError::CommandFailed(error.exit_status()));
+                }
+                Err(error) => return Err(error),
+            };
+            let result = match run_explain(&options) {
+                Ok(result) => result,
+                Err(error) if options.json_output => {
+                    print_cli_error_json("explain", &error)?;
+                    return Err(CliError::CommandFailed(error.exit_status()));
+                }
+                Err(error) => return Err(error),
+            };
             if options.json_output {
                 println!(
                     "{}",
@@ -1791,6 +1821,10 @@ fn print_data_result_json(command: &str, data: Value) -> Result<(), CliError> {
     Ok(())
 }
 
+fn args_want_json(args: &[String]) -> bool {
+    args.iter().any(|arg| arg == "--json")
+}
+
 fn diff_result_envelope(repo_root: Option<&Path>, output: &str) -> Result<Value, CliError> {
     let data: Value = serde_json::from_str(output)?;
     let next_actions = data
@@ -1845,6 +1879,20 @@ fn cli_error_diagnostic(error: &CliError) -> Value {
             "repo": repo_root,
             "message": error.to_string(),
         }),
+        CliError::Usage(message) if unknown_target_parts(message).is_some() => {
+            let (kind, id) = unknown_target_parts(message).expect("checked above");
+            json!({
+                "kind": "unknown_target",
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "target": {
+                    "kind": kind,
+                    "id": id,
+                },
+                "message": error.to_string(),
+            })
+        }
         _ => json!({
             "kind": "command_error",
             "severity": "blocking",
@@ -1860,6 +1908,14 @@ fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
             "command": cli_command("branch list --json"),
             "reason": "inspect available branch names before retrying the command",
             "target": {"error": message},
+        })],
+        CliError::Usage(message) if unknown_target_parts(message).is_some() => vec![json!({
+            "kind": "refresh_scan",
+            "command": cli_command("scan --json"),
+            "reason": "refresh changed atoms and open fires before retrying the target-specific command",
+            "target": {
+                "error": message,
+            },
         })],
         CliError::MissingEvidenceRef { evidence_id, .. } => vec![
             json!({
@@ -1877,6 +1933,17 @@ fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
         ],
         _ => Vec::new(),
     }
+}
+
+fn unknown_target_parts(message: &str) -> Option<(&'static str, &str)> {
+    message
+        .strip_prefix("unknown atom: ")
+        .map(|id| ("atom", id))
+        .or_else(|| {
+            message
+                .strip_prefix("unknown fire: ")
+                .map(|id| ("fire", id))
+        })
 }
 
 fn plan_result_envelope(command: &str, plan: &Value) -> Value {
@@ -2257,12 +2324,18 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
                     .ok_or_else(|| CliError::Usage("--path requires a value".to_string()))?;
                 path = Some(PathBuf::from(value));
             }
+            value if value.starts_with("--path=") => {
+                path = Some(PathBuf::from(value.trim_start_matches("--path=")));
+            }
             "--resolution" => {
                 index += 1;
                 resolution = args
                     .get(index)
                     .ok_or_else(|| CliError::Usage("--resolution requires a value".to_string()))?
                     .to_string();
+            }
+            value if value.starts_with("--resolution=") => {
+                resolution = value.trim_start_matches("--resolution=").to_string();
             }
             "--rationale" => {
                 index += 1;
@@ -2271,12 +2344,18 @@ fn parse_extinguish_args(args: &[String]) -> Result<ExtinguishOptions, CliError>
                     .ok_or_else(|| CliError::Usage("--rationale requires a value".to_string()))?
                     .to_string();
             }
+            value if value.starts_with("--rationale=") => {
+                rationale = value.trim_start_matches("--rationale=").to_string();
+            }
             "--evidence" => {
                 index += 1;
                 evidence = args
                     .get(index)
                     .ok_or_else(|| CliError::Usage("--evidence requires a value".to_string()))?
                     .to_string();
+            }
+            value if value.starts_with("--evidence=") => {
+                evidence = value.trim_start_matches("--evidence=").to_string();
             }
             "--evidence-ref" => {
                 index += 1;
@@ -2347,6 +2426,9 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
                 path = Some(PathBuf::from(take_option_value(
                     args, &mut index, "--path",
                 )?));
+            }
+            value if value.starts_with("--path=") => {
+                path = Some(PathBuf::from(value.trim_start_matches("--path=")));
             }
             "-m" | "--message" => {
                 message = Some(take_option_value(args, &mut index, "-m")?);

@@ -56,7 +56,8 @@ pub(crate) fn parse_context_args(args: &[String]) -> Result<ContextOptions, CliE
     let mut json_output = false;
     let mut index = 0usize;
     while index < args.len() {
-        match args[index].as_str() {
+        let arg = args[index].as_str();
+        match arg {
             "--json" => json_output = true,
             "--branch" => set_selector(&mut selector, ContextSelector::Branch)?,
             "--changed" => set_selector(&mut selector, ContextSelector::Changed)?,
@@ -103,6 +104,42 @@ pub(crate) fn parse_context_args(args: &[String]) -> Result<ContextOptions, CliE
                     .get(index)
                     .ok_or_else(|| CliError::Usage("--path requires a value".to_string()))?;
                 path = Some(PathBuf::from(value));
+            }
+            value if value.starts_with("--atom=") => {
+                set_selector(
+                    &mut selector,
+                    ContextSelector::Atom(value.trim_start_matches("--atom=").to_string()),
+                )?;
+            }
+            value if value.starts_with("--fire=") => {
+                set_selector(
+                    &mut selector,
+                    ContextSelector::Fire(value.trim_start_matches("--fire=").to_string()),
+                )?;
+            }
+            value if value.starts_with("--depth=") => {
+                depth = value
+                    .trim_start_matches("--depth=")
+                    .parse::<usize>()
+                    .map_err(|_| {
+                        CliError::Usage("--depth must be a non-negative integer".to_string())
+                    })?;
+            }
+            value if value.starts_with("--limit=") => {
+                limit = value
+                    .trim_start_matches("--limit=")
+                    .parse::<usize>()
+                    .map_err(|_| {
+                        CliError::Usage("--limit must be a positive integer".to_string())
+                    })?;
+                if limit == 0 {
+                    return Err(CliError::Usage(
+                        "--limit must be a positive integer".to_string(),
+                    ));
+                }
+            }
+            value if value.starts_with("--path=") => {
+                path = Some(PathBuf::from(value.trim_start_matches("--path=")));
             }
             value if value.starts_with("--") => {
                 return Err(CliError::Usage(format!(
@@ -762,14 +799,10 @@ mod tests {
     #[test]
     fn parse_context_args_accepts_selectors_depth_path_and_json() {
         let args = vec![
-            "--atom".to_string(),
-            "REQ-session".to_string(),
-            "--depth".to_string(),
-            "99".to_string(),
-            "--limit".to_string(),
-            "7".to_string(),
-            "--path".to_string(),
-            "/tmp/open".to_string(),
+            "--atom=REQ-session".to_string(),
+            "--depth=99".to_string(),
+            "--limit=7".to_string(),
+            "--path=/tmp/open".to_string(),
             "--json".to_string(),
         ];
         let parsed = parse_context_args(&args).unwrap();

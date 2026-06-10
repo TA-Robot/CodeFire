@@ -140,6 +140,31 @@ fn missing_evidence_ref_error_uses_json_envelope() {
 }
 
 #[test]
+fn unknown_target_errors_use_json_failure_envelope() {
+    let context_error = CliError::Usage("unknown atom: REQ-missing".to_string());
+    let context_envelope = cli_error_envelope("context", &context_error);
+    assert_eq!(context_envelope["schema"], "codefire.command_result.v1");
+    assert_eq!(context_envelope["command"], "context");
+    assert_eq!(context_envelope["ok"], false);
+    assert_eq!(
+        context_envelope["exit_code"],
+        ExitCode::InvalidUsageOrConfig.code()
+    );
+    assert_eq!(context_envelope["diagnostics"][0]["kind"], "unknown_target");
+    assert_eq!(
+        context_envelope["diagnostics"][0]["target"]["id"],
+        "REQ-missing"
+    );
+    assert_eq!(context_envelope["next_actions"][0]["kind"], "refresh_scan");
+
+    let explain_error = CliError::Usage("unknown fire: FIRE-missing".to_string());
+    let explain_envelope = cli_error_envelope("explain", &explain_error);
+    assert_eq!(explain_envelope["command"], "explain");
+    assert_eq!(explain_envelope["diagnostics"][0]["kind"], "unknown_target");
+    assert_eq!(explain_envelope["diagnostics"][0]["target"]["kind"], "fire");
+}
+
+#[test]
 fn init_creates_python_compatible_repo_layout() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
@@ -1801,8 +1826,7 @@ fn parse_mutating_dry_run_json_args() {
     let commit = parse_commit_args(&[
         "--dry-run".to_string(),
         "--json".to_string(),
-        "--path".to_string(),
-        "/tmp/open".to_string(),
+        "--path=/tmp/open".to_string(),
         "-m".to_string(),
         "Seal".to_string(),
         "--wait-lock".to_string(),
@@ -1821,12 +1845,9 @@ fn parse_mutating_dry_run_json_args() {
 
     let extinguish = parse_extinguish_args(&[
         "FIRE-001".to_string(),
-        "--path".to_string(),
-        "/tmp/open".to_string(),
-        "--resolution".to_string(),
-        "addressed".to_string(),
-        "--rationale".to_string(),
-        "fixed".to_string(),
+        "--path=/tmp/open".to_string(),
+        "--resolution=addressed".to_string(),
+        "--rationale=fixed".to_string(),
         "--evidence-ref".to_string(),
         "CF-EVIDENCE-test".to_string(),
         "--dry-run".to_string(),
