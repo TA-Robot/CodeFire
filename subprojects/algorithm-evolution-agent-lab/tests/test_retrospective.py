@@ -7,6 +7,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffBundleMarkdown,
     ResearchCyclePlanningHandoffReadinessGate,
     ResearchCyclePlanningHandoffReadinessMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketBuilder,
     ResearchCyclePlanningHandoffBundleSummary,
     ResearchCyclePlanLane,
     ResearchCyclePlan,
@@ -817,6 +818,46 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Status: blocked", blocked_markdown)
         self.assertIn("- Finding count: 1", blocked_markdown)
         self.assertIn("- verification has 1 finding(s)", blocked_markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-bundles-summary-and-readiness
+    def test_research_cycle_planning_handoff_review_packet_bundles_summary_and_readiness(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-19",
+                    completed_runs=5,
+                    improved_candidates=2,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=5.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=2,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=3.0,
+            packet_path="cycle-19/planning-packet.md",
+            plan_path="cycle-19/plan.md",
+            lint_path="cycle-19/lint.md",
+        )
+
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(
+            bundle,
+            readiness_title="Cycle 19 Readiness",
+        )
+
+        self.assertIs(packet.bundle, bundle)
+        self.assertEqual(packet.summary["source_cycles"], ["cycle-19"])
+        self.assertEqual(packet.summary["artifact_count"], 3)
+        self.assertTrue(packet.readiness["ready"])
+        self.assertEqual(packet.readiness["status"], "ready")
+        self.assertIn("# Cycle 19 Readiness", packet.readiness_markdown)
+        self.assertIn("- Ready: yes", packet.readiness_markdown)
 
 
 if __name__ == "__main__":

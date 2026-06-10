@@ -687,3 +687,16 @@ The document includes:
 - warnings section with `none` when empty
 
 The renderer does not inspect the bundle or recompute readiness. It only serializes an already-made routing decision so reviewers can audit the same data that automation used.
+
+## DES-AUTO-037: Research cycle planning handoff review packet
+
+The handoff review packet builder consumes an existing `ResearchCyclePlanningHandoffBundle`.
+
+The output `ResearchCyclePlanningHandoffReviewPacket` contains:
+
+- the original bundle
+- machine-readable handoff summary
+- readiness decision dictionary
+- readiness Markdown
+
+The builder composes `ResearchCyclePlanningHandoffBundleSummary`, `ResearchCyclePlanningHandoffReadinessGate`, and `ResearchCyclePlanningHandoffReadinessMarkdown`. It does not rebuild the packet, rerun manifest verification, or write files, keeping one already-reviewed bundle as the source of truth for downstream storage and reviewer workflows.

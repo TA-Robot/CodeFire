@@ -248,6 +248,11 @@ ResearchCyclePlanningHandoffReadinessMarkdown.render(readiness)
   -> render the already-computed readiness decision for reviewers
   -> include ready/status, artifact count, finding count, blockers, and warnings
   -> avoid bundle inspection so automation and reviewer logs share one decision source
+
+ResearchCyclePlanningHandoffReviewPacketBuilder.build(bundle)
+  -> compose an existing handoff bundle with summary, readiness, and readiness Markdown
+  -> keep the bundle as the single planning and verification source of truth
+  -> avoid filesystem writes and avoid recomputing planning or manifest verification
 ```
 
 Important implementation details:

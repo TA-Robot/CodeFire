@@ -162,6 +162,14 @@ class ResearchCyclePlanningHandoffBundle:
     verification_markdown: str
 
 
+@dataclass(frozen=True)
+class ResearchCyclePlanningHandoffReviewPacket:
+    bundle: ResearchCyclePlanningHandoffBundle
+    summary: dict[str, object]
+    readiness: dict[str, object]
+    readiness_markdown: str
+
+
 # cf-atom: CODE-ResearchCycleRetrospective
 class ResearchCycleRetrospective:
     def summarize(self, signals: list[ResearchCycleSignal]) -> ResearchCycleRetrospectiveReport:
@@ -875,6 +883,26 @@ class ResearchCyclePlanningHandoffReadinessMarkdown:
         else:
             lines.append("- none")
         return "\n".join(lines).rstrip() + "\n"
+
+
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketBuilder
+class ResearchCyclePlanningHandoffReviewPacketBuilder:
+    def build(
+        self,
+        bundle: ResearchCyclePlanningHandoffBundle,
+        *,
+        readiness_title: str = "Research Cycle Planning Handoff Readiness",
+    ) -> ResearchCyclePlanningHandoffReviewPacket:
+        readiness = ResearchCyclePlanningHandoffReadinessGate().evaluate(bundle)
+        return ResearchCyclePlanningHandoffReviewPacket(
+            bundle=bundle,
+            summary=ResearchCyclePlanningHandoffBundleSummary().summarize(bundle),
+            readiness=readiness,
+            readiness_markdown=ResearchCyclePlanningHandoffReadinessMarkdown().render(
+                readiness,
+                title=readiness_title,
+            ),
+        )
 
 
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:

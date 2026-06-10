@@ -98,3 +98,4 @@
 | AE-094 | Reporting | planning handoff bundleをmachine-readable summaryへ整形する | done | `CODE-ResearchCyclePlanningHandoffBundleSummary`; `TEST-research-cycle-planning-handoff-bundle-summary-reports-machine-readable-index`; 158 tests pass |
 | AE-095 | Planning QA | planning handoff bundleのstorage/reviewer readinessを判定する | done | `CODE-ResearchCyclePlanningHandoffReadinessGate`; `TEST-research-cycle-planning-handoff-readiness-gate-blocks-drifted-bundle`; 159 tests pass |
 | AE-096 | Reporting | planning handoff readinessを監査用Markdownへ整形する | done | `CODE-ResearchCyclePlanningHandoffReadinessMarkdown`; `TEST-research-cycle-planning-handoff-readiness-markdown-renders-status`; 160 tests pass |
+| AE-097 | Planning QA | planning handoff bundle、summary、readiness、readiness Markdownをreview packetへまとめる | done | `CODE-ResearchCyclePlanningHandoffReviewPacketBuilder`; `TEST-research-cycle-planning-handoff-review-packet-bundles-summary-and-readiness`; 161 tests pass |

@@ -215,3 +215,7 @@ The system shall evaluate a planning handoff bundle for storage or reviewer hand
 ## REQ-AUTO-054: Research cycle planning handoff readiness Markdown
 
 The system shall render planning handoff readiness results into deterministic Markdown. The rendered document shall include ready state, status, artifact count, finding count, blockers, and warnings so reviewers can audit the same routing decision that automation uses before storage or handoff.
+
+## REQ-AUTO-055: Research cycle planning handoff review packet
+
+The system shall assemble a planning handoff review packet from an already-built handoff bundle. The review packet shall include the original bundle, machine-readable bundle summary, readiness decision, and readiness Markdown so storage and reviewer workflows can consume one deterministic object without recomputing planning, verification, or routing state.
