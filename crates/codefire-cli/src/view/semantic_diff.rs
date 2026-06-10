@@ -331,7 +331,17 @@ pub(super) fn render_diff_json(context: DiffJsonContext<'_>) -> Result<String, C
             "rename_detection": context.options.rename_detection,
             "atoms": context.options.atom_diff,
             "trace": context.options.trace_diff,
-            "impact": context.options.impact_diff,
+            "impact": context.impact.is_some(),
+            "requested": {
+                "atoms": context.options.atom_diff,
+                "trace": context.options.trace_diff,
+                "impact": context.options.impact_diff,
+            },
+        },
+        "included_sections": {
+            "atoms": context.options.atom_diff,
+            "trace": context.options.trace_diff,
+            "impact": context.impact.is_some(),
         },
         "atoms": if context.options.atom_diff {
             atom_diff_json(context.left_index.expect("left atom index loaded"), context.right_index.expect("right atom index loaded"))

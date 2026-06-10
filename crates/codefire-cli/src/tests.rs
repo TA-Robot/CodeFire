@@ -790,6 +790,12 @@ fn show_and_diff_local_branches() {
     assert_eq!(diff_envelope["command"], "diff");
     assert_eq!(diff_envelope["ok"], true);
     assert_eq!(diff_envelope["data"]["type"], "codefire_diff");
+    assert_eq!(diff_envelope["data"]["options"]["impact"], true);
+    assert_eq!(
+        diff_envelope["data"]["options"]["requested"]["impact"],
+        false
+    );
+    assert_eq!(diff_envelope["data"]["included_sections"]["impact"], true);
     assert!(diff_envelope["data"]["left"]["label"]
         .as_str()
         .unwrap()
