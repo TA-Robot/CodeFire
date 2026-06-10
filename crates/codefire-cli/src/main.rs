@@ -40,7 +40,10 @@ use automation::{
     status_data_json, status_next_actions, verification_data_json_with_filter,
     verification_diagnostics_json_with_filter, verification_next_actions,
 };
-use batch::{has_batch_extinguish_arg, parse_extinguish_batch_args, run_extinguish_batch};
+use batch::{
+    batch_extinguish_data_json, has_batch_extinguish_arg, parse_extinguish_batch_args,
+    run_extinguish_batch,
+};
 pub(crate) use cli_model::*;
 use completion::{completion_script, help_text};
 use context::{build_context_pack, parse_context_args, print_context_summary};
@@ -1162,7 +1165,7 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--dry-run] [--json]\n       codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"from\":\"REQ-id\",\"to\":\"DES-id\",\"reason\":\"manual review\"}]}\n"
         }
         "extinguish" => {
-            "usage: codefire extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>) [--dry-run] [--json]\n       codefire extinguish --batch <file> [--path <open-dir>] [--dry-run] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"id\":\"FIRE-1\",\"resolution\":\"addressed\",\"rationale\":\"fixed\"}]}\n"
+            "usage: codefire extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>) [--dry-run] [--json]\n       codefire extinguish --batch <file> [--path <open-dir>] [--dry-run] [--full] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"id\":\"FIRE-1\",\"resolution\":\"addressed\",\"rationale\":\"fixed\"}]}\n"
         }
         "commit" => {
             "usage: codefire commit [path|--path <open-dir>] -m <message> [--dry-run] [--json] [--idempotency-key <key>]\n"
@@ -1600,7 +1603,23 @@ fn run_extinguish_command(args: &[String]) -> Result<(), CliError> {
             Err(error) => return Err(error),
         };
         if options.json_output {
-            print_plan_result_json("extinguish-batch", &result.plan)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&command_result_envelope(
+                    "extinguish-batch",
+                    true,
+                    0,
+                    Some(&result.repo_root),
+                    batch_extinguish_data_json(&result),
+                    Vec::new(),
+                    result
+                        .plan
+                        .get("next_actions")
+                        .and_then(Value::as_array)
+                        .cloned()
+                        .unwrap_or_default(),
+                ))?
+            );
         } else if options.dry_run {
             println!(
                 "extinguish batch dry-run: {} fires would be processed",

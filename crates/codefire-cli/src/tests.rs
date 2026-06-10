@@ -212,6 +212,7 @@ fn batch_file_read_errors_use_json_failure_envelope() {
         path: temp.path().to_path_buf(),
         batch_path: missing,
         dry_run: true,
+        full_output: false,
         json_output: true,
         lock: LockOptions::default(),
     })
@@ -229,6 +230,7 @@ fn batch_json_arrays_report_schema_errors_not_yaml_errors() {
         path: temp.path().to_path_buf(),
         batch_path,
         dry_run: true,
+        full_output: false,
         json_output: true,
         lock: LockOptions::default(),
     })
@@ -2847,6 +2849,7 @@ fires:
     assert_eq!(parsed.batch_path, batch_path);
     assert_eq!(parsed.path, open_dir);
     assert!(parsed.dry_run);
+    assert!(!parsed.full_output);
     assert!(parsed.json_output);
 
     let dry_run = run_extinguish_batch(&parsed).unwrap();
@@ -2855,6 +2858,8 @@ fires:
     assert_eq!(dry_run.plan["type"], "codefire_operation_plan");
     assert_eq!(dry_run.plan["command"], "extinguish-batch");
     assert_eq!(dry_run.plan["dry_run"], true);
+    assert_eq!(dry_run.applied_count, 0);
+    assert_eq!(dry_run.remaining_open_fire_count, scan.open_fires.len());
     assert!(!active.join("fires.json").exists());
     assert!(!active.join("resolutions.json").exists());
 
@@ -2862,11 +2867,20 @@ fires:
         path: open_dir.clone(),
         batch_path: parsed.batch_path,
         dry_run: false,
+        full_output: false,
         json_output: false,
         lock: LockOptions::default(),
     })
     .unwrap();
     assert_eq!(applied.item_count, 2);
+    assert_eq!(applied.applied_count, 2);
+    assert_eq!(applied.fire_ids.len(), 2);
+    assert_eq!(applied.resolution_uids.len(), 2);
+    assert_eq!(applied.remaining_open_fire_count, scan.open_fires.len() - 2);
+    let applied_data = batch_extinguish_data_json(&applied);
+    assert_eq!(applied_data["type"], "codefire_extinguish_batch_result");
+    assert_eq!(applied_data["applied_count"], 2);
+    assert_eq!(applied_data["plan"]["items_omitted"], 0);
     let fires: Vec<codefire_core::Fire> =
         serde_json::from_value(read_json(&active.join("fires.json")).unwrap()).unwrap();
     let resolutions: Vec<codefire_core::Resolution> =
@@ -2879,6 +2893,92 @@ fires:
         2
     );
     assert_eq!(resolutions.len(), 2);
+}
+
+#[test]
+fn extinguish_batch_dry_run_json_is_bounded_by_default() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    let batch_path = temp.path().join("large-fires.json");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir.join("docs").join("requirements").join("base.md"),
+        "## REQ-batch-base: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    for index in 0..25 {
+        fs::write(
+            open_dir
+                .join("docs")
+                .join("design")
+                .join(format!("session-{index}.md")),
+            format!("## DES-session-{index}: Design\nClock policy {index}\n"),
+        )
+        .unwrap();
+    }
+    let mut fires = Vec::new();
+    for index in 0..25 {
+        let result = run_fire(&fire::FireOptions {
+            path: open_dir.clone(),
+            source_atom: "REQ-batch-base".to_string(),
+            target_atom: format!("DES-session-{index}"),
+            reason: "large batch dry-run fixture".to_string(),
+            severity: "required".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+        })
+        .unwrap();
+        fires.push(result.fires[0].display_id.clone());
+    }
+    let batch_fires = fires
+        .iter()
+        .map(|fire_id| {
+            json!({
+                "id": fire_id,
+                "resolution": "addressed",
+                "rationale": "large batch dry-run bounded",
+            })
+        })
+        .collect::<Vec<_>>();
+    fs::write(
+        &batch_path,
+        serde_json::to_string_pretty(&json!({"version": 1, "fires": batch_fires})).unwrap(),
+    )
+    .unwrap();
+
+    let result = run_extinguish_batch(&batch::BatchExtinguishOptions {
+        path: open_dir,
+        batch_path,
+        dry_run: true,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    let data = batch_extinguish_data_json(&result);
+
+    assert_eq!(result.item_count, 25);
+    assert_eq!(result.plan["item_detail_limit"], 20);
+    assert_eq!(result.plan["items_omitted"], 5);
+    assert_eq!(result.plan["items"].as_array().unwrap().len(), 20);
+    assert_eq!(data["fire_ids"].as_array().unwrap().len(), 20);
+    assert_eq!(data["fire_ids_omitted"], 5);
 }
 
 #[test]

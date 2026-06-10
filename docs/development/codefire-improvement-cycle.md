@@ -307,9 +307,9 @@ The active CodeFire improvement cycle is a global burn-down. The initial frozen 
 
 Global inventory as of 2026-06-10:
 
-- CFB dogfood issues: 92 total, 57 fixed, 35 open.
-- CFR code review issues: 160 total, 105 fixed/closed, 55 open.
-- Combined tracked backlog: 252 total, 162 fixed/closed, 90 open.
+- CFB dogfood issues: 92 total, 58 fixed, 34 open.
+- CFR code review issues: 160 total, 108 fixed/closed, 52 open.
+- Combined tracked backlog: 252 total, 166 fixed/closed, 86 open.
 
 Active batch closed in this burn-down:
 
