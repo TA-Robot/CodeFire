@@ -1242,8 +1242,49 @@ fn verify_diagnostics_filter_nonblocking_missing_required_links() {
         crate::automation::verification_diagnostics_json_with_filter(&verification, true)
             .is_empty()
     );
+    let filtered_data =
+        crate::automation::verification_data_json_with_filter(&verification, "blocking_only");
+    assert!(filtered_data["missing_required_links"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert!(!filtered_data["all_missing_required_links"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert!(filtered_data["blocking_missing_required_links"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        filtered_data["diagnostic_summary"]["warning_count"],
+        all.len()
+    );
     assert!(verification::render_verification(&verification, true, true)
         .contains("Blocking checks: none"));
+
+    let explain = run_explain(
+        &parse_explain_args(&[
+            "verify-failure".to_string(),
+            "--path".to_string(),
+            open_dir.to_string_lossy().into_owned(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(explain.data["diagnostic_summary"]["blocking_count"], 0);
+    assert_eq!(
+        explain.data["diagnostic_summary"]["warning_count"],
+        all.len()
+    );
+    assert!(explain.data["summary"]
+        .as_str()
+        .unwrap()
+        .contains("verification passed"));
+    assert!(!explain.data["summary"]
+        .as_str()
+        .unwrap()
+        .contains("8 blocker"));
 }
 
 #[test]

@@ -1155,7 +1155,7 @@ fn run_verify_command(args: &[String]) -> Result<(), CliError> {
                     metrics.as_ref(),
                 ),
                 verification_diagnostics_json_with_filter(&verification, options.blocking_only),
-                verification_next_actions(&verification, &scan),
+                verification_next_actions(&verification, &scan, options.blocking_only),
             ))?
         );
     } else {

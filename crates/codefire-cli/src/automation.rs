@@ -189,7 +189,20 @@ pub(crate) fn verification_data_json_with_filter(
     diagnostic_filter: &str,
 ) -> Value {
     let mut data = verification_data_json(verification);
+    let blocking_only = diagnostic_filter == "blocking_only";
+    let all_missing_required_links = json!(&verification.missing_required_links);
+    let blocking_missing_required_links = if verification.trace_completeness_required {
+        json!(&verification.missing_required_links)
+    } else {
+        json!([])
+    };
+    data["all_missing_required_links"] = all_missing_required_links;
+    data["blocking_missing_required_links"] = blocking_missing_required_links.clone();
+    if blocking_only {
+        data["missing_required_links"] = blocking_missing_required_links;
+    }
     data["diagnostic_filter"] = Value::String(diagnostic_filter.to_string());
+    data["diagnostic_summary"] = verification_diagnostic_summary(verification, blocking_only);
     data
 }
 
@@ -302,6 +315,7 @@ fn push_diagnostic(diagnostics: &mut Vec<Value>, blocking_only: bool, diagnostic
 pub(crate) fn verification_next_actions(
     verification: &codefire_core::Verification,
     scan: &codefire_core::ScanResult,
+    blocking_only: bool,
 ) -> Vec<Value> {
     let mut actions = Vec::new();
     if verification.result == "passed" {
@@ -336,19 +350,22 @@ pub(crate) fn verification_next_actions(
             json!({}),
         ));
     }
-    for item in &verification.missing_required_links {
-        actions.push(next_action(
-            "context_atom",
-            cli_command(format!("context --atom {} --depth 2 --json", item.atom_id)),
-            "inspect the atom and nearby trace graph before adding the missing link",
-            json!({
-                "atom_id": &item.atom_id,
-                "required_type": &item.required_type,
-                "target_kind": &item.target_kind,
-                "min": item.min,
-                "found": item.found,
-            }),
-        ));
+    if !blocking_only || verification.trace_completeness_required {
+        for item in &verification.missing_required_links {
+            actions.push(next_action(
+                "context_atom",
+                cli_command(format!("context --atom {} --depth 2 --json", item.atom_id)),
+                "inspect the atom and nearby trace graph before adding the missing link",
+                json!({
+                    "atom_id": &item.atom_id,
+                    "required_type": &item.required_type,
+                    "target_kind": &item.target_kind,
+                    "min": item.min,
+                    "found": item.found,
+                    "blocking": verification.trace_completeness_required,
+                }),
+            ));
+        }
     }
     for item in &verification.stale_resolutions {
         actions.push(next_action(
@@ -392,6 +409,39 @@ pub(crate) fn verification_next_actions(
         ));
     }
     actions
+}
+
+fn verification_diagnostic_summary(
+    verification: &codefire_core::Verification,
+    blocking_only: bool,
+) -> Value {
+    let unfiltered = verification_diagnostics_json_with_filter(verification, false);
+    let filtered = verification_diagnostics_json_with_filter(verification, blocking_only);
+    let blocking_count = unfiltered
+        .iter()
+        .filter(|item| {
+            item.get("blocking")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+        .count();
+    let warning_count = unfiltered
+        .iter()
+        .filter(|item| {
+            !item
+                .get("blocking")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+        .count();
+    json!({
+        "filter": if blocking_only { "blocking_only" } else { "all" },
+        "filtered_count": filtered.len(),
+        "unfiltered_count": unfiltered.len(),
+        "blocking_count": blocking_count,
+        "warning_count": warning_count,
+        "missing_required_links_view": if blocking_only { "blocking" } else { "all" },
+    })
 }
 
 fn has_pending_scan_changes(scan: &codefire_core::ScanResult) -> bool {
@@ -606,7 +656,7 @@ mod tests {
             verified_at: "2026-06-04T00:00:00Z".to_string(),
         };
 
-        let actions = verification_next_actions(&verification, &empty_scan());
+        let actions = verification_next_actions(&verification, &empty_scan(), false);
         let kinds = actions
             .iter()
             .filter_map(|item| item.get("kind").and_then(Value::as_str))
@@ -623,7 +673,7 @@ mod tests {
     #[test]
     fn verification_next_actions_do_not_suggest_commit_for_clean_pass() {
         let verification = passed_verification();
-        let actions = verification_next_actions(&verification, &empty_scan());
+        let actions = verification_next_actions(&verification, &empty_scan(), false);
 
         assert_eq!(actions.len(), 1);
         assert_eq!(actions[0]["kind"], "status");
@@ -635,12 +685,74 @@ mod tests {
         let verification = passed_verification();
         let mut scan = empty_scan();
         scan.changed_atoms.push("REQ-session".to_string());
-        let actions = verification_next_actions(&verification, &scan);
+        let actions = verification_next_actions(&verification, &scan, false);
 
         assert_eq!(actions.len(), 1);
         assert_eq!(actions[0]["kind"], "commit");
         assert_eq!(actions[0]["target"]["pending_changes"], true);
         assert_eq!(actions[0]["target"]["changed_atoms"][0], "REQ-session");
+    }
+
+    #[test]
+    fn verification_blocking_only_json_filters_nonblocking_missing_links() {
+        let mut verification = passed_verification();
+        verification.trace_completeness_required = false;
+        verification.missing_required_links = vec![codefire_core::MissingRequiredLink {
+            atom_id: "REQ-session".to_string(),
+            required_type: "refined_by".to_string(),
+            target_kind: "design".to_string(),
+            min: 1,
+            found: 0,
+        }];
+
+        let data = verification_data_json_with_filter(&verification, "blocking_only");
+        assert!(data["missing_required_links"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            data["all_missing_required_links"].as_array().unwrap().len(),
+            1
+        );
+        assert!(data["blocking_missing_required_links"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert_eq!(data["diagnostic_summary"]["filtered_count"], 0);
+        assert_eq!(data["diagnostic_summary"]["unfiltered_count"], 1);
+        assert_eq!(data["diagnostic_summary"]["warning_count"], 1);
+    }
+
+    #[test]
+    fn verification_blocking_only_next_actions_skip_nonblocking_missing_links() {
+        let verification = codefire_core::Verification {
+            type_tag: "verification".to_string(),
+            version: 1,
+            result: "failed".to_string(),
+            trace_completeness_required: false,
+            open_required_fires: 2,
+            failed_checks: Vec::new(),
+            missing_required_links: vec![codefire_core::MissingRequiredLink {
+                atom_id: "REQ-session".to_string(),
+                required_type: "refined_by".to_string(),
+                target_kind: "design".to_string(),
+                min: 1,
+                found: 0,
+            }],
+            stale_resolutions: Vec::new(),
+            missing_evidence_refs: Vec::new(),
+            duplicate_atom_ids: Vec::new(),
+            verified_at: "2026-06-04T00:00:00Z".to_string(),
+        };
+
+        let actions = verification_next_actions(&verification, &empty_scan(), true);
+        let kinds = actions
+            .iter()
+            .filter_map(|item| item.get("kind").and_then(Value::as_str))
+            .collect::<Vec<_>>();
+        assert!(kinds.contains(&"context_changed"));
+        assert!(kinds.contains(&"scan"));
+        assert!(!kinds.contains(&"context_atom"));
     }
 
     fn passed_verification() -> codefire_core::Verification {

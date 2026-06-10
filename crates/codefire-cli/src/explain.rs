@@ -229,22 +229,41 @@ fn explain_verify_failure(options: &ExplainOptions) -> Result<ExplainResult, Cli
     let execution = compute_verify(&options.path, false)?;
     let scan = execution.scan;
     let verification = execution.verification;
-    let blocker_count = verification.open_required_fires
-        + verification.missing_required_links.len()
-        + verification.stale_resolutions.len()
-        + verification.duplicate_atom_ids.len()
-        + verification.failed_checks.len();
+    let diagnostics = verification_diagnostics_json(&verification);
+    let blocker_count = diagnostics
+        .iter()
+        .filter(|item| {
+            item.get("blocking")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+        .count();
+    let warning_count = diagnostics.len().saturating_sub(blocker_count);
+    let summary = if verification.result == "passed" {
+        format!(
+            "verification passed with {warning_count} warning(s) and {blocker_count} blocker(s)"
+        )
+    } else {
+        format!(
+            "verification result is {} with {blocker_count} blocker(s) and {warning_count} warning(s)",
+            verification.result
+        )
+    };
     let data = json!({
         "type": "codefire_explain",
         "version": 1,
         "target": {"kind": "verify-failure", "value": null},
-        "summary": format!("verification result is {} with {blocker_count} blocker(s)", verification.result),
+        "summary": summary,
+        "diagnostic_summary": {
+            "blocking_count": blocker_count,
+            "warning_count": warning_count,
+        },
         "verification": super::automation::verification_data_json(&verification),
     });
     Ok(ExplainResult {
         repo_root: context.repo_root,
-        diagnostics: verification_diagnostics_json(&verification),
-        next_actions: verification_next_actions(&verification, &scan),
+        diagnostics,
+        next_actions: verification_next_actions(&verification, &scan, true),
         data,
     })
 }
