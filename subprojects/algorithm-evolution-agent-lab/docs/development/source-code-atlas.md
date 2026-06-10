@@ -180,6 +180,11 @@ ResearchCyclePlanMarkdown.render(plan)
   -> write source cycles, priority, capacity, and budget
   -> group plan items by lane
   -> emit deterministic Markdown sections for review
+
+ResearchCyclePlanLint.lint(plan)
+  -> validate source cycle, capacity, budget, and item fields
+  -> detect active lane and budget overcommitment
+  -> return deterministic blocker/warning findings without mutating the plan
 ```
 
 Important implementation details:

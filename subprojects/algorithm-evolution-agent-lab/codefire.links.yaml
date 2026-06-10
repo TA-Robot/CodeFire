@@ -294,6 +294,15 @@ links:
   - from: REQ-AUTO-041
     to: TEST-research-cycle-plan-markdown-renders-lanes
     type: verified_by
+  - from: REQ-AUTO-042
+    to: DES-AUTO-024
+    type: refined_by
+  - from: DES-AUTO-024
+    to: CODE-ResearchCyclePlanLint
+    type: implemented_by
+  - from: REQ-AUTO-042
+    to: TEST-research-cycle-plan-lint-flags-invalid-plan
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

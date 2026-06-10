@@ -27,6 +27,11 @@ class ResearchCyclePlanLane(str, Enum):
     DEFERRED = "deferred"
 
 
+class ResearchCyclePlanLintSeverity(str, Enum):
+    BLOCKER = "blocker"
+    WARNING = "warning"
+
+
 @dataclass(frozen=True)
 class ResearchCycleSignal:
     cycle_id: str
@@ -77,6 +82,30 @@ class ResearchCyclePlan:
 
     def lane(self, lane: ResearchCyclePlanLane) -> tuple[ResearchCyclePlanItem, ...]:
         return tuple(item for item in self.items if item.lane == lane)
+
+
+@dataclass(frozen=True)
+class ResearchCyclePlanLintFinding:
+    severity: ResearchCyclePlanLintSeverity
+    field: str
+    message: str
+
+
+@dataclass(frozen=True)
+class ResearchCyclePlanLintReport:
+    findings: tuple[ResearchCyclePlanLintFinding, ...]
+
+    @property
+    def ok(self) -> bool:
+        return not any(finding.severity == ResearchCyclePlanLintSeverity.BLOCKER for finding in self.findings)
+
+    @property
+    def blocker_count(self) -> int:
+        return sum(1 for finding in self.findings if finding.severity == ResearchCyclePlanLintSeverity.BLOCKER)
+
+    @property
+    def warning_count(self) -> int:
+        return sum(1 for finding in self.findings if finding.severity == ResearchCyclePlanLintSeverity.WARNING)
 
 
 # cf-atom: CODE-ResearchCycleRetrospective
@@ -345,6 +374,98 @@ class ResearchCyclePlanMarkdown:
                     ]
                 )
         return "\n".join(lines).rstrip() + "\n"
+
+
+# cf-atom: CODE-ResearchCyclePlanLint
+class ResearchCyclePlanLint:
+    def lint(self, plan: ResearchCyclePlan) -> ResearchCyclePlanLintReport:
+        findings: list[ResearchCyclePlanLintFinding] = []
+        add_if(findings, not plan.source_cycles, ResearchCyclePlanLintSeverity.BLOCKER, "source_cycles", "at least one source cycle is required")
+        add_if(
+            findings,
+            any(not cycle_id for cycle_id in plan.source_cycles),
+            ResearchCyclePlanLintSeverity.BLOCKER,
+            "source_cycles",
+            "source cycle IDs must be non-empty",
+        )
+        add_if(
+            findings,
+            plan.active_capacity <= 0,
+            ResearchCyclePlanLintSeverity.BLOCKER,
+            "active_capacity",
+            "active capacity must be positive",
+        )
+        add_if(
+            findings,
+            plan.remaining_budget < 0,
+            ResearchCyclePlanLintSeverity.BLOCKER,
+            "remaining_budget",
+            "remaining budget must be non-negative",
+        )
+        add_if(findings, not plan.items, ResearchCyclePlanLintSeverity.WARNING, "items", "plan has no lane items")
+
+        active_items = plan.lane(ResearchCyclePlanLane.ACTIVE)
+        add_if(
+            findings,
+            len(active_items) > max(plan.active_capacity, 0),
+            ResearchCyclePlanLintSeverity.BLOCKER,
+            "items",
+            "active lane exceeds active capacity",
+        )
+        active_budget = sum(item.budget_hint for item in active_items)
+        add_if(
+            findings,
+            active_budget > plan.remaining_budget,
+            ResearchCyclePlanLintSeverity.BLOCKER,
+            "items.budget_hint",
+            "active budget hints exceed remaining budget",
+        )
+
+        seen_recommendations: set[RetrospectiveRecommendation] = set()
+        for index, item in enumerate(plan.items):
+            prefix = f"items[{index}]"
+            add_if(findings, not item.title, ResearchCyclePlanLintSeverity.BLOCKER, f"{prefix}.title", "title is required")
+            add_if(findings, not item.action, ResearchCyclePlanLintSeverity.BLOCKER, f"{prefix}.action", "action is required")
+            add_if(
+                findings,
+                not item.rationale,
+                ResearchCyclePlanLintSeverity.WARNING,
+                f"{prefix}.rationale",
+                "rationale is empty",
+            )
+            add_if(
+                findings,
+                item.budget_hint < 0,
+                ResearchCyclePlanLintSeverity.BLOCKER,
+                f"{prefix}.budget_hint",
+                "budget hint must be non-negative",
+            )
+            add_if(
+                findings,
+                item.recommendation in seen_recommendations,
+                ResearchCyclePlanLintSeverity.WARNING,
+                f"{prefix}.recommendation",
+                "recommendation appears more than once",
+            )
+            seen_recommendations.add(item.recommendation)
+
+        return ResearchCyclePlanLintReport(findings=tuple(sorted(findings, key=lint_finding_sort_key)))
+
+
+def add_if(
+    findings: list[ResearchCyclePlanLintFinding],
+    condition: bool,
+    severity: ResearchCyclePlanLintSeverity,
+    field: str,
+    message: str,
+) -> None:
+    if condition:
+        findings.append(ResearchCyclePlanLintFinding(severity=severity, field=field, message=message))
+
+
+def lint_finding_sort_key(finding: ResearchCyclePlanLintFinding) -> tuple[int, str, str]:
+    severity_rank = {ResearchCyclePlanLintSeverity.BLOCKER: 0, ResearchCyclePlanLintSeverity.WARNING: 1}
+    return (severity_rank[finding.severity], finding.field, finding.message)
 
 
 def plan_item_for(

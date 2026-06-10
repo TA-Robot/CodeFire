@@ -3,6 +3,10 @@ import unittest
 from evoagent.retrospective import (
     ResearchCycleRetrospective,
     ResearchCyclePlanLane,
+    ResearchCyclePlan,
+    ResearchCyclePlanItem,
+    ResearchCyclePlanLint,
+    ResearchCyclePlanLintSeverity,
     ResearchCyclePlanMarkdown,
     ResearchCyclePlanSynthesizer,
     ResearchCycleSignal,
@@ -166,6 +170,68 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("### Increase exploration diversity", markdown)
         self.assertIn("- Recommendation: increase_exploration", markdown)
         self.assertIn("- Budget hint: 2.00", markdown)
+
+    # cf-atom: TEST-research-cycle-plan-lint-flags-invalid-plan
+    def test_research_cycle_plan_lint_flags_invalid_plan(self) -> None:
+        plan = ResearchCyclePlan(
+            source_cycles=("",),
+            priority=RetrospectivePriority.MEDIUM,
+            active_capacity=1,
+            remaining_budget=1.0,
+            items=(
+                ResearchCyclePlanItem(
+                    lane=ResearchCyclePlanLane.ACTIVE,
+                    recommendation=RetrospectiveRecommendation.REDUCE_COST,
+                    title="",
+                    action="draft cheaper probe",
+                    rationale="",
+                    budget_hint=1.0,
+                ),
+                ResearchCyclePlanItem(
+                    lane=ResearchCyclePlanLane.ACTIVE,
+                    recommendation=RetrospectiveRecommendation.INCREASE_EXPLORATION,
+                    title="Explore alternate mechanism",
+                    action="sample a different frontier",
+                    rationale="low improvement",
+                    budget_hint=1.0,
+                ),
+            ),
+        )
+
+        report = ResearchCyclePlanLint().lint(plan)
+
+        self.assertFalse(report.ok)
+        self.assertEqual(report.blocker_count, 4)
+        self.assertEqual(report.warning_count, 1)
+        self.assertEqual(report.findings[0].severity, ResearchCyclePlanLintSeverity.BLOCKER)
+        self.assertIn("active lane exceeds active capacity", [finding.message for finding in report.findings])
+        self.assertIn("active budget hints exceed remaining budget", [finding.message for finding in report.findings])
+        self.assertIn("source cycle IDs must be non-empty", [finding.message for finding in report.findings])
+        self.assertIn("title is required", [finding.message for finding in report.findings])
+
+    def test_research_cycle_plan_lint_accepts_synthesized_plan(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-6",
+                    completed_runs=5,
+                    improved_candidates=2,
+                    regressed_candidates=0,
+                    failed_runs=1,
+                    blocked_items=0,
+                    mean_cost=2.0,
+                    remaining_budget=6.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=1,
+                )
+            ]
+        )
+        plan = ResearchCyclePlanSynthesizer().synthesize(report, active_capacity=2, remaining_budget=5.0)
+
+        lint = ResearchCyclePlanLint().lint(plan)
+
+        self.assertTrue(lint.ok)
+        self.assertEqual(lint.findings, ())
 
 
 if __name__ == "__main__":

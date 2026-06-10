@@ -465,3 +465,31 @@ The document includes:
 - recommendation, action, budget hint, and rationale fields
 
 The renderer does not inspect raw retrospective inputs, run logs, or evidence artifacts. It only formats the bounded plan object produced by `ResearchCyclePlanSynthesizer`. This keeps the planning artifact stable, reviewable, and cheap to regenerate after policy tuning.
+
+## DES-AUTO-024: Research cycle plan linting
+
+The research cycle plan linter consumes `ResearchCyclePlan` and returns `ResearchCyclePlanLintReport`.
+
+The report contains deterministic `ResearchCyclePlanLintFinding` entries with:
+
+- severity: `blocker` or `warning`
+- field path
+- message
+
+Blockers are used for execution safety:
+
+- missing source cycle IDs
+- non-positive active capacity
+- negative remaining budget
+- active lane item count above active capacity
+- active budget hints above remaining budget
+- missing item title or action
+- negative item budget hint
+
+Warnings are used for reviewer attention without blocking plan storage:
+
+- no lane items
+- empty item rationale
+- duplicated recommendation
+
+The linter does not mutate the plan, rerun retrospective analysis, or infer hidden state from logs. It only validates the bounded plan object that will be rendered, reviewed, and executed in the next docs-first cycle.

@@ -229,21 +229,21 @@ Current named cycle:
 - CodeFire次version系統: v1.0 Contract ValidationのPhase 1a以降を継続する。
 - Current plan: `docs/development/v1.0-contract-validation-plan.md`。
 - Current burn-down plan: `docs/development/current-cycle-burn-down-plan.md`。
-- Current phase: cycle 5 dogfood pass完了。今回のalgorithm開発ではCodeFire本体の新規CFBは発見されず、既知CFB/CFR open issueは0件。
+- Current phase: cycle 6 dogfood pass完了。今回のalgorithm開発ではCodeFire本体の新規CFBは発見されず、既知CFB/CFR open issueは0件。
 - Installed CodeFire: `/home/devuser/.local/bin/codefire`。
 - Installed version output: `codefire foundation 1`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
 - Latest pushed Git commits: current global burn-down commits through cycle 5 dogfood pass。
 - Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` は `open-clean`、open fires 0。
-- Latest algorithm CodeFire base: `CF-COMMIT-476c73ed58ac5e64be166e38`。
+- Latest algorithm CodeFire base: `CF-COMMIT-2de6ff5b70a1591e55786035`。
 
 Current global issue inventory:
 
 | Series | Total tracked | Fixed / closed | Open |
 |---|---:|---:|---:|
-| CFB dogfood issues | 93 | 93 | 0 |
+| CFB dogfood issues | 94 | 94 | 0 |
 | CFR code review issues | 160 | 160 | 0 |
-| Total | 253 | 253 | 0 |
+| Total | 254 | 254 | 0 |
 
 Close audit note:
 
@@ -251,6 +251,7 @@ Close audit note:
 - 最後に残っていた `CFR-120` は、`docs/development/issue-root-cause-map.json` と `issue_root_cause_map_covers_open_issues` で、今後のopen issueをroot cause計画へ機械的に接続する形でcloseした。
 - Cycle 4 dogfoodingでは `ResearchCyclePlanSynthesizer` を追加し、`CFB-093` を発見、同cycle内でfixedにした。
 - Cycle 5 dogfoodingでは `ResearchCyclePlanMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-476c73ed58ac5e64be166e38` でsealした。CodeFire本体issueは新規発見なし。
+- Cycle 6 dogfoodingでは `ResearchCyclePlanLint` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-e9809fabb758032363e80407` でsealした。その後、非Atomのみ変更のstatus next_actions欠落として `CFB-094` を発見し、同cycle内でfixedにした。最終algorithm baseは履歴追記seal後の `CF-COMMIT-2de6ff5b70a1591e55786035`。
 - 次のcycleでも、issue discovery後にこのmapまたは後継schemaへ全open issueを登録し、batchを全部消してから次のissue出しへ進む。
 
 ## Completed Two-Cycle Snapshot
@@ -325,7 +326,7 @@ Global inventory as of 2026-06-10:
 
 - CFB dogfood issues: 93 total, 93 fixed, 0 open.
 - CFR code review issues: 160 total, 160 fixed/closed, 0 open.
-- Combined tracked backlog: 253 total, 253 fixed/closed, 0 open.
+- Combined tracked backlog: 254 total, 254 fixed/closed, 0 open.
 
 Active batch closed in this burn-down:
 

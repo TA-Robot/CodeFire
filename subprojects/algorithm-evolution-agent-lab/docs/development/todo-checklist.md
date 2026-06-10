@@ -85,3 +85,4 @@
 | AE-081 | Reporting | research cycle retrospectiveを次cycle planning用Markdown summaryへ整形する | done | `CODE-RetrospectivePlanningSummary`; `TEST-retrospective-planning-summary-renders-markdown`; 144 tests pass |
 | AE-082 | Planning | retrospective recommendationをmitigation/active/review/archive/deferred laneを持つ次cycle planへ変換する | done | `CODE-ResearchCyclePlanSynthesizer`; `TEST-research-cycle-plan-synthesizer-builds-next-cycle-lanes`; 145 tests pass |
 | AE-083 | Reporting | synthesized research cycle planをlane別Markdownへ整形する | done | `CODE-ResearchCyclePlanMarkdown`; `TEST-research-cycle-plan-markdown-renders-lanes`; 146 tests pass |
+| AE-084 | Planning QA | research cycle planを実行前にlintし、capacity/budget/item欠落をblocker/warningとして返す | done | `CODE-ResearchCyclePlanLint`; `TEST-research-cycle-plan-lint-flags-invalid-plan`; 148 tests pass |

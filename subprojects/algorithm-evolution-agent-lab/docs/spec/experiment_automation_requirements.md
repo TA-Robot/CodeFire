@@ -163,3 +163,7 @@ The system shall synthesize a next-cycle plan from retrospective recommendations
 ## REQ-AUTO-041: Research cycle plan Markdown rendering
 
 The system shall render a synthesized research cycle plan into deterministic Markdown for docs-first planning. The rendered plan shall include source cycles, priority, active capacity, remaining budget, lane sections, item titles, source recommendations, concrete actions, budget hints, and rationales so future planning can be reviewed without inspecting Python objects or raw retrospective signals.
+
+## REQ-AUTO-042: Research cycle plan linting
+
+The system shall lint a synthesized or hand-authored research cycle plan before it is used as the next execution plan. The lint report shall detect missing source cycle IDs, invalid capacity or budget values, empty lane items, active-lane overcommitment, budget overcommitment, missing item titles or actions, empty rationales, negative budget hints, and duplicated recommendations. Findings shall be deterministic, severity-labeled, and machine-readable so docs-first planning can block unsafe execution while preserving non-blocking warnings for reviewer attention.

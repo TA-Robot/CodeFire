@@ -51,6 +51,24 @@
         "crates/codefire-cli/src/automation.rs::tests::burning_status_with_clean_prediction_suggests_commit",
         "subprojects/algorithm-evolution-agent-lab CodeFire commit CF-COMMIT-711547728f2ad3345d7bcc82"
       ]
+    },
+    {
+      "id": "CFB-094",
+      "status": "fixed",
+      "root_cause": "status_next_action_prediction_state_gate",
+      "fix_group": "status-prediction-next-actions",
+      "target_version": "cycle-6-burn-down",
+      "owner_module": "crates/codefire-cli/src/automation.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 6 dogfood burn-down",
+        "decision": "Use scan_prediction changed_count/open_fire_count to return commit next_actions for non-Atom-only pending changes even when persisted state remains open-clean."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-094.md",
+        "crates/codefire-cli/src/automation.rs::tests::clean_status_with_non_atom_prediction_suggests_commit",
+        "subprojects/algorithm-evolution-agent-lab cycle 6 non-Atom history update"
+      ]
     }
   ]
 }

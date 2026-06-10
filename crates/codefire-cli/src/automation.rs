@@ -96,20 +96,17 @@ pub(crate) fn status_next_actions(status: &Status) -> Vec<Value> {
 }
 
 pub(crate) fn status_next_actions_with_prediction(status: &Status, data: &Value) -> Vec<Value> {
-    if status.state == "open-burning"
-        && data
-            .get("scan_prediction")
-            .and_then(|prediction| prediction.get("changed_count"))
-            .and_then(Value::as_u64)
-            .unwrap_or(0)
-            > 0
-        && data
-            .get("scan_prediction")
-            .and_then(|prediction| prediction.get("open_fire_count"))
-            .and_then(Value::as_u64)
-            .unwrap_or(usize::MAX as u64)
-            == 0
-    {
+    let predicted_changed_count = data
+        .get("scan_prediction")
+        .and_then(|prediction| prediction.get("changed_count"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let predicted_open_fire_count = data
+        .get("scan_prediction")
+        .and_then(|prediction| prediction.get("open_fire_count"))
+        .and_then(Value::as_u64)
+        .unwrap_or(usize::MAX as u64);
+    if predicted_changed_count > 0 && predicted_open_fire_count == 0 && status.open_fires == 0 {
         return vec![next_action(
             "commit",
             cli_command("commit -m <message>"),
@@ -901,6 +898,30 @@ mod tests {
         let data = json!({
             "scan_prediction": {
                 "changed_count": 2,
+                "open_fire_count": 0
+            }
+        });
+
+        let actions = status_next_actions_with_prediction(&status, &data);
+
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0]["kind"], "commit");
+        assert_eq!(actions[0]["target"]["pending_changes"], true);
+    }
+
+    #[test]
+    fn clean_status_with_non_atom_prediction_suggests_commit() {
+        let status = Status {
+            branch: "main".to_string(),
+            state: "open-clean".to_string(),
+            base: "CF-COMMIT-base".to_string(),
+            open_fires: 0,
+        };
+        let data = json!({
+            "scan_prediction": {
+                "changed_atom_count": 0,
+                "non_atom_changed_file_count": 1,
+                "changed_count": 1,
                 "open_fire_count": 0
             }
         });
