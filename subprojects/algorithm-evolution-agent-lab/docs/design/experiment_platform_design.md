@@ -729,3 +729,16 @@ The builder emits `ResearchCyclePlanningHandoffArtifact` entries for:
 - verification Markdown
 
 All output paths are caller-controlled relative POSIX paths and are validated with the same manifest path rule used by planning packet artifacts. The builder renders only the review packet Markdown from the supplied packet and copies the already-computed readiness, manifest, and verification Markdown. It does not rebuild the handoff bundle, recompute readiness, rerun manifest verification, or write files.
+
+## DES-AUTO-040: Research cycle planning handoff review packet artifact manifest
+
+The review packet artifact manifest builder consumes a `ResearchCyclePlanningHandoffReviewPacket` and the packaged `ResearchCyclePlanningHandoffArtifact` entries.
+
+The builder emits a `ResearchCyclePlanningPacketManifest` with:
+
+- source cycles copied from `packet.summary["source_cycles"]`
+- status `ok`
+- one entry per packaged artifact
+- each entry containing the artifact path, SHA-256 digest, and byte count
+
+The builder reuses the shared manifest entry path validation and hashing helper. It does not render Markdown, rebuild the review packet, read files, or write files.

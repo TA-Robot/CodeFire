@@ -1001,6 +1001,20 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactBuilder:
         )
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder
+class ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder:
+    def build(
+        self,
+        packet: ResearchCyclePlanningHandoffReviewPacket,
+        artifacts: tuple[ResearchCyclePlanningHandoffArtifact, ...],
+    ) -> ResearchCyclePlanningPacketManifest:
+        return ResearchCyclePlanningPacketManifest(
+            source_cycles=tuple(str(cycle) for cycle in packet.summary.get("source_cycles", [])),
+            status="ok",
+            entries=tuple(manifest_entry(artifact.path, artifact.content) for artifact in artifacts),
+        )
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

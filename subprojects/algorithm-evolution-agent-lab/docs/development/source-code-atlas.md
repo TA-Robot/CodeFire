@@ -263,6 +263,11 @@ ResearchCyclePlanningHandoffReviewPacketArtifactBuilder.build(packet)
   -> package review packet Markdown, readiness Markdown, manifest Markdown, and verification Markdown as handoff artifacts
   -> validate all output paths with the shared relative POSIX manifest path rule
   -> avoid filesystem writes and copy already-computed audit Markdown from the packet and bundle
+
+ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder.build(packet, artifacts)
+  -> build a storage verification manifest for packaged review packet artifacts
+  -> preserve source cycles from the packet summary
+  -> reuse shared manifest entry hashing and path validation without reading or writing files
 ```
 
 Important implementation details:
