@@ -56,6 +56,7 @@ Implementation status note:
 - Rust v0.6 `codefire` supports `serve <storage-root> [--host] [--port] [--tls-cert] [--tls-key] [--tls-client-ca]` for `cf+http://` and `cf+https://`.
 - Rust v0.6 supports `--signer`, `--key-id`, `--request-key-id`, commit signature verification, key rotation/revocation policy, request timestamp skew checks, and request nonce replay cache for file-backed and HTTP remote mutators.
 - `install.sh` installs Rust v0.6 as the default `codefire` command and keeps Python v0.2 as `codefire-py`.
+- After install, `install.sh` reports the active `codefire` path resolved from PATH. If PATH resolves a different binary than the installed target, it prints a warning; if it resolves the installed target, it verifies active help/version and reports `active codefire verified`.
 - Python-only maintenance commands such as remote `gc` and token hash generation remain available through `codefire-py` / `./codefire` while Rust v0.6 is the default install CLI.
 
 Local repository mutators that acquire the repository lock accept:

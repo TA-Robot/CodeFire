@@ -49,6 +49,24 @@ verify_codefire_binary() {
   fi
 }
 
+report_active_codefire() {
+  local installed="$1"
+  local active
+  active="$(command -v codefire 2>/dev/null || true)"
+  if [[ -z "$active" ]]; then
+    echo "warning: no active codefire found on PATH; use ${installed} or add ${install_dir} to PATH" >&2
+    return 0
+  fi
+  echo "active codefire: ${active}"
+  if [[ "$active" != "$installed" ]]; then
+    echo "warning: PATH resolves codefire to ${active}, not installed target ${installed}" >&2
+    echo "warning: update PATH order, choose a prefix earlier on PATH, or invoke ${installed} directly" >&2
+    return 0
+  fi
+  verify_codefire_binary "$active"
+  echo "active codefire verified: ${active}"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --prefix)
@@ -203,3 +221,5 @@ if [[ -n "$completion_tmp" ]]; then
   install -m 0644 "$completion_tmp" "$completion_target"
   echo "installed: ${completion_target}"
 fi
+
+report_active_codefire "${install_dir}/codefire"

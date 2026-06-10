@@ -307,9 +307,9 @@ The active CodeFire improvement cycle is a global burn-down. The initial frozen 
 
 Global inventory as of 2026-06-10:
 
-- CFB dogfood issues: 92 total, 75 fixed, 17 open.
+- CFB dogfood issues: 92 total, 76 fixed, 16 open.
 - CFR code review issues: 160 total, 131 fixed/closed, 29 open.
-- Combined tracked backlog: 252 total, 206 fixed/closed, 46 open.
+- Combined tracked backlog: 252 total, 207 fixed/closed, 45 open.
 
 Active batch closed in this burn-down:
 
@@ -324,6 +324,7 @@ Active batch closed in this burn-down:
 - CFB-053: scan JSON defaults to bounded counts/samples with explicit full mode.
 - CFB-061: missing remote storage target is reported as invalid layout instead of silently disappearing.
 - CFB-063: review-pack and patch export have JSON metadata automation surfaces.
+- CFB-066: install reports the active `codefire` path and warns when PATH resolves a different binary than the installed target.
 - CFB-067: commit JSON uses typed result data and non-null top-level repo.
 - CFB-072: evidence dry-run plan reports resolved cwd and cwd source.
 - CFB-077: manual fire identity uses scan-compatible digest IDs.
@@ -353,7 +354,7 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- Remaining 46 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
+- Remaining 45 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
 - このglobal batchが0 openになるまで、新しいissue discovery batchへ進まない。
 
 ## Cycle Invariants

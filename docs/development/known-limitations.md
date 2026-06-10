@@ -65,6 +65,7 @@
 - remote GC health preflight before deleting unreachable objects
 - object record hash / id / filename mismatch diagnosis
 - repo / branch / object-store lock の最小実装
+- installer active PATH reporting
 
 ## 既知制約
 
@@ -73,6 +74,8 @@
 ### Rust default and Python fallback
 
 Rust v0.6 is the default installed `codefire` CLI. Python v0.2 remains the reference/fallback as installed `codefire-py` or repository-local `./codefire`.
+
+`install.sh` verifies the installed binary and reports which `codefire` command is active on PATH after installation. A successful install can still be shadowed by an earlier PATH entry; in that case the installer emits a warning and the operator must reorder PATH, install to the earlier prefix, or invoke the installed target directly.
 
 Python fallback freeze policy:
 
