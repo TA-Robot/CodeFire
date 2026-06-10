@@ -15,6 +15,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown,
@@ -2578,6 +2579,43 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- none", packaged.gate_markdown)
         self.assertEqual(packaged.verification_markdown, packaged.artifacts[0].content)
         self.assertEqual(packaged.gate_markdown, packaged.artifacts[1].content)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-records-artifacts
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_records_artifacts(
+        self,
+    ) -> None:
+        verification = ResearchCyclePlanningPacketManifestVerification(
+            findings=(
+                ResearchCyclePlanningPacketManifestVerificationFinding(
+                    path="manifest.md",
+                    message="manifest table header is missing",
+                ),
+            )
+        )
+        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+            verification,
+            verification_path="cycle-49/manifest-markdown-verification.md",
+            gate_path="cycle-49/manifest-markdown-verification-gate.md",
+        )
+
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder().build(
+            packaged,
+            source_cycles=("cycle-49",),
+        )
+
+        self.assertEqual(("cycle-49",), manifest.source_cycles)
+        self.assertEqual("ok", manifest.status)
+        self.assertEqual(
+            (
+                "cycle-49/manifest-markdown-verification.md",
+                "cycle-49/manifest-markdown-verification-gate.md",
+            ),
+            tuple(entry.path for entry in manifest.entries),
+        )
+        for artifact, entry in zip(packaged.artifacts, manifest.entries, strict=True):
+            self.assertEqual(len(artifact.content.encode("utf-8")), entry.byte_count)
+            self.assertTrue(entry.content_sha256.startswith("sha256:"))
+            self.assertEqual(71, len(entry.content_sha256))
 
 
 if __name__ == "__main__":

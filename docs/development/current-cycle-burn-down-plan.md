@@ -31,6 +31,7 @@ Current known open issue count:
 - Active frozen issue batch: none.
 - The historical 146-item global batch below is already closed. The number 146 is the old starting count, not a remaining-open count.
 - Closed issue detail files remain in `docs/development/bug-issues/` and `docs/development/code-review-issues/` as audit history. Counting files in those directories is not the open issue count; `Status: fixed` / `Status: fixed in v0.7` means closed.
+- Current detail issue status count: 255 issue files with status rows; 245 `fixed`, 10 `fixed in v0.7`, 0 `open`.
 - If a text search still finds `146`, treat it as one of these audit artifacts: closed batch starting size, historical work-log remaining count from the burn-down day, closed issue ID `CFR-146`, or an algorithm unittest count from an older dogfood pass. None of those are current open issues.
 - Current open-state verification is the status grep for explicit `open` statuses plus CodeFire `open_fires: 0`; both must be zero before starting another discovery pass.
 
@@ -213,7 +214,7 @@ Remaining open count for this batch:
 
 ## Global Issue Inventory
 
-This active batch is the whole known open backlog.
+There is no active frozen issue batch now. The closed global batch plus completed dogfood mini-batches are the whole known issue backlog.
 
 Current tracked issue inventory as of 2026-06-10:
 
@@ -1053,6 +1054,25 @@ Cycle 48 issue status:
 - Newly discovered CodeFire product issues: 0.
 - Newly frozen CFB/CFR batch size: 0.
 - Remaining known CFB/CFR open issue count: 0.
+
+## Cycle 49 Dogfood Pass
+
+After cycle 48 reached zero open issues, cycle 49 resumed algorithm development with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder` to generate deterministic path/byte/SHA-256 manifests for final verification Markdown artifact sets.
+- Added `REQ-AUTO-085`, `DES-AUTO-067`, `CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder`, and `TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-records-artifacts`.
+- Algorithm unittest result: 191 tests pass.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-482a31346865ec020f650862`.
+
+Cycle 49 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 255 tracked / 255 fixed or fixed-in-v0.7 / 0 open; the historical 146 count remains only a closed-batch starting count.
 
 Burn-down interpretation:
 
