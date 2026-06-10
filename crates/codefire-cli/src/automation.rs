@@ -191,6 +191,23 @@ pub(crate) fn scan_next_actions(
             action_target(json!({"base_commit": &scan.base_commit}), action_path),
         ));
     }
+    if scan.open_fires.len() > 1 {
+        actions.push(next_action(
+            "extinguish_batch_template",
+            cli_command(path_command(
+                "extinguish --batch-template --json",
+                action_path,
+            )),
+            "generate a reusable batch template for all current open fires",
+            action_target(
+                json!({
+                    "open_fires": scan.open_fires.len(),
+                    "template_format": "json",
+                }),
+                action_path,
+            ),
+        ));
+    }
     for fire in &scan.open_fires {
         actions.push(next_action(
             "context_fire",
@@ -424,6 +441,24 @@ pub(crate) fn verification_next_actions(
             "refresh open fire diagnostics before extinguishing",
             action_target(json!({}), action_path),
         ));
+        if verification.open_required_fires > 1 || scan.open_fires.len() > 1 {
+            actions.push(next_action(
+                "extinguish_batch_template",
+                cli_command(path_command(
+                    "extinguish --batch-template --json",
+                    action_path,
+                )),
+                "generate a batch extinguish template for the open required fires",
+                action_target(
+                    json!({
+                        "open_required_fires": verification.open_required_fires,
+                        "open_fires": scan.open_fires.len(),
+                        "template_format": "json",
+                    }),
+                    action_path,
+                ),
+            ));
+        }
     }
     if !blocking_only || verification.trace_completeness_required {
         for item in &verification.missing_required_links {
@@ -844,9 +879,9 @@ mod tests {
         );
         let omitted = &envelope["next_actions"][MAX_NEXT_ACTIONS - 1];
         assert_eq!(omitted["kind"], "next_actions_omitted");
-        assert_eq!(omitted["target"]["omitted"], 3);
+        assert_eq!(omitted["target"]["omitted"], 4);
         assert_eq!(omitted["target"]["omitted_by_kind"]["extinguish_fire"], 2);
-        assert_eq!(omitted["target"]["omitted_by_kind"]["context_fire"], 1);
+        assert_eq!(omitted["target"]["omitted_by_kind"]["context_fire"], 2);
         assert!(omitted["target"]["first_omitted_targets"]
             .as_array()
             .unwrap()

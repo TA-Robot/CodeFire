@@ -3416,6 +3416,79 @@ fn interactive_extinguish_plan_lists_open_fires_and_recent_evidence() {
 }
 
 #[test]
+fn extinguish_batch_template_generates_batch_wrapper_from_open_fires() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    let output = temp.path().join("fires-to-extinguish.json");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir
+            .join("docs")
+            .join("requirements")
+            .join("session.md"),
+        "## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design").join("session.md"),
+        "## DES-session: Design\nClock policy\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("codefire.links.yaml"),
+        "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
+    )
+    .unwrap();
+
+    let options = batch::parse_batch_template_args(&[
+        "--batch-template".to_string(),
+        "--path".to_string(),
+        open_dir.display().to_string(),
+        "--evidence".to_string(),
+        "cargo test --workspace: passed".to_string(),
+        "--output".to_string(),
+        output.display().to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    let result = batch::run_batch_template(&options).unwrap();
+    let template: Value = serde_json::from_str(&result.template).unwrap();
+
+    assert_eq!(template["version"], 1);
+    assert_eq!(
+        template["defaults"]["evidence"],
+        "cargo test --workspace: passed"
+    );
+    assert!(template["fires"].as_array().unwrap().len() >= 2);
+    assert!(result.plan["next_actions"][0]["command"]
+        .as_str()
+        .unwrap()
+        .contains("extinguish --batch"));
+    assert!(output.exists());
+
+    let scan = compute_scan(&open_dir, false).unwrap().scan;
+    let actions = scan_next_actions(&scan, Some(&open_dir));
+    assert!(actions
+        .iter()
+        .any(|action| action["kind"] == "extinguish_batch_template"));
+}
+
+#[test]
 fn all_matching_extinguish_extinguishes_source_target_subset() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");

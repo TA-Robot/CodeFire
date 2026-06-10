@@ -287,6 +287,11 @@ codefire extinguish FIRE-001 \
 
 codefire extinguish --interactive --json
 
+codefire extinguish --batch-template \
+  --resolution addressed \
+  --evidence "cargo test --workspace: passed" \
+  --output .codefire/fires-to-extinguish.json
+
 codefire extinguish --all-matching "REQ-session -> DES-session" \
   --resolution addressed \
   --rationale "同じsource/targetのfireを同一根拠で確認した"
@@ -312,6 +317,9 @@ basisとしてsource/target/link/policy hashを保存する
 同じ--idempotency-keyでfire/resolution/rationale/evidence/evidence-ref/refresh/open_dir/branchが異なるpayloadはexit code 33で拒否する
 --interactiveはopen fire、直近evidence object候補、editor付きdraft commandを返す
 --interactive --jsonはtype=codefire_extinguish_interactive_planを返す
+--batch-templateは現在のopen firesから`extinguish --batch` が受け取れるstrict JSON wrapperを生成する
+--batch-template --output <file>はtemplateを書き込み、未指定時はtemplateをstdoutへ出す
+--batch-template --jsonはcommand_result envelopeでtemplate本文、item_count、next_actionsを返す
 --all-matching "SOURCE -> TARGET"はsource_atom/target_atomが一致するopen fireを同じresolution/rationale/evidence/evidence-refで一括解消する
 --all-matching --dry-run --jsonはcommand=extinguish-all-matchingのcodefire_operation_planを返し、各fireの単発extinguish validation planをfiresに含める
 --batchはversion/defaults/firesだけを持つstrict limited YAMLまたは同等JSONを受け取る

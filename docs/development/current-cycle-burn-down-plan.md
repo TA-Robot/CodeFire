@@ -149,10 +149,15 @@ Completion rule:
 | CFR-159 | fixed | Commit certificate vocabulary | certificate result uses verification vocabulary with legacy compatibility |
 | CFR-160 | fixed | JSON envelope repo source | commit envelope repo comes from execution context |
 | CFB-066 | fixed | Install PATH precedence | install reports and verifies the active codefire path |
+| CFB-005 | fixed | Extinguish UX | interactive/all-matching/batch-template reduce repeated rationale and evidence input |
+| CFB-011 | fixed | Extinguish batch template | current open fires can generate an `extinguish --batch` JSON wrapper |
+| CFB-018 | fixed | Fire volume | batch-template and all-matching collapse repeated evidence entry across many fires |
+| CFB-020 | fixed | Extinguish output | success output includes source/target context and remaining open fire count |
+| CFB-027 | fixed | Scan/verify next_actions | multiple-fire next_actions include `extinguish --batch-template --json` |
 
 Remaining open count for this batch:
 
-- 45 issues.
+- 40 issues.
 
 ## Global Issue Inventory
 
@@ -162,15 +167,15 @@ Current tracked issue inventory as of 2026-06-10:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 92 | 76 | 16 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFB dogfood issues | 92 | 81 | 11 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-005/011/018/020, CFB-023 and later, plus later generated issues; CFB-001..004/006..010/012..017/019/021/022/025 are summary-only legacy entries. |
 | CFR code review issues | 160 | 131 | 29 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
-| Total | 252 | 207 | 45 | This global batch is the whole known issue backlog. |
+| Total | 252 | 212 | 40 | This global batch is the whole known issue backlog. |
 
 Current active batch progress:
 
 - Initial frozen open issue count: 146.
-- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-029, CFB-032, CFB-033, CFB-034, CFB-035, CFB-037, CFB-040, CFB-041, CFB-042, CFB-043, CFB-044, CFB-049, CFB-050, CFB-051, CFB-052, CFB-053, CFB-055, CFB-056, CFB-057, CFB-058, CFB-059, CFB-060, CFB-061, CFB-062, CFB-063, CFB-064, CFB-065, CFB-066, CFB-067, CFB-068, CFB-069, CFB-070, CFB-071, CFB-072, CFB-073, CFB-074, CFB-075, CFB-076, CFB-077, CFB-078, CFB-081, CFB-082, CFB-083, CFB-084, CFR-085, CFR-086, CFR-087, CFR-088, CFR-096, CFR-097, CFR-098, CFR-099, CFR-100, CFR-101, CFR-102, CFR-103, CFR-104, CFR-106, CFR-107, CFR-108, CFR-109, CFR-115, CFR-124, CFR-125, CFR-126, CFR-127, CFR-132, CFR-133, CFR-134, CFR-135, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-142, CFR-143, CFR-144, CFR-145, CFR-146, CFR-147, CFR-148, CFR-149, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-156, CFR-157, CFR-158, CFR-159, CFR-160.
-- Remaining open now: 45.
+- Fixed during global burn-down so far: CFB-005, CFB-006, CFB-011, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-018, CFB-020, CFB-022, CFB-027, CFB-028, CFB-029, CFB-032, CFB-033, CFB-034, CFB-035, CFB-037, CFB-040, CFB-041, CFB-042, CFB-043, CFB-044, CFB-049, CFB-050, CFB-051, CFB-052, CFB-053, CFB-055, CFB-056, CFB-057, CFB-058, CFB-059, CFB-060, CFB-061, CFB-062, CFB-063, CFB-064, CFB-065, CFB-066, CFB-067, CFB-068, CFB-069, CFB-070, CFB-071, CFB-072, CFB-073, CFB-074, CFB-075, CFB-076, CFB-077, CFB-078, CFB-081, CFB-082, CFB-083, CFB-084, CFR-085, CFR-086, CFR-087, CFR-088, CFR-096, CFR-097, CFR-098, CFR-099, CFR-100, CFR-101, CFR-102, CFR-103, CFR-104, CFR-106, CFR-107, CFR-108, CFR-109, CFR-115, CFR-124, CFR-125, CFR-126, CFR-127, CFR-132, CFR-133, CFR-134, CFR-135, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-142, CFR-143, CFR-144, CFR-145, CFR-146, CFR-147, CFR-148, CFR-149, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-156, CFR-157, CFR-158, CFR-159, CFR-160.
+- Remaining open now: 40.
 
 Burn-down interpretation:
 

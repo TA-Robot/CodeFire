@@ -75,6 +75,10 @@ pub(crate) struct ExtinguishOptions {
 pub(crate) struct ExtinguishResult {
     pub(crate) display_id: String,
     pub(crate) fire_uid: String,
+    pub(crate) source_atom: String,
+    pub(crate) target_atom: String,
+    pub(crate) reason: String,
+    pub(crate) remaining_open_fire_count: usize,
     pub(crate) plan: Value,
 }
 

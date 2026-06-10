@@ -307,12 +307,16 @@ The active CodeFire improvement cycle is a global burn-down. The initial frozen 
 
 Global inventory as of 2026-06-10:
 
-- CFB dogfood issues: 92 total, 76 fixed, 16 open.
+- CFB dogfood issues: 92 total, 81 fixed, 11 open.
 - CFR code review issues: 160 total, 131 fixed/closed, 29 open.
-- Combined tracked backlog: 252 total, 207 fixed/closed, 45 open.
+- Combined tracked backlog: 252 total, 212 fixed/closed, 40 open.
 
 Active batch closed in this burn-down:
 
+- CFB-005: interactive/all-matching/batch-template extinguish flows reduce repeated rationale and evidence input.
+- CFB-011: `extinguish --batch-template` generates a strict JSON batch wrapper from current open fires.
+- CFB-018: batch-template and all-matching extinguish reduce repeated evidence entry across many related fires.
+- CFB-020: extinguish text output includes source/target context and remaining open fire count.
 - CFB-037: failed evidence commands no longer create successful-looking evidence by default.
 - CFB-032: doctor no longer marks auto-creatable layout gaps as blocking invalid repo state.
 - CFB-033: doctor repairable layout warnings now point to migration plan review.
@@ -329,6 +333,7 @@ Active batch closed in this burn-down:
 - CFB-072: evidence dry-run plan reports resolved cwd and cwd source.
 - CFB-077: manual fire identity uses scan-compatible digest IDs.
 - CFB-078: manual fire cleanup without source changes returns to open-clean.
+- CFB-027: scan/verify next_actions offer `extinguish --batch-template --json` for multiple open fires.
 - CFB-082: storage quick mode reports inferred largest object types and type confidence.
 - CFB-087: missing evidence-ref dry-run failures are returned as JSON envelopes.
 - CFB-089: `atom-index` and `missing-links` handle shared `--path` / `--json` like normal commands.
@@ -354,7 +359,7 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- Remaining 45 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
+- Remaining 40 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
 - このglobal batchが0 openになるまで、新しいissue discovery batchへ進まない。
 
 ## Cycle Invariants

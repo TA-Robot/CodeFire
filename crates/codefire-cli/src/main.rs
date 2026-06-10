@@ -42,8 +42,9 @@ use automation::{
     verification_diagnostics_json_with_filter, verification_next_actions,
 };
 use batch::{
-    batch_extinguish_data_json, has_batch_extinguish_arg, parse_extinguish_batch_args,
-    run_extinguish_batch,
+    batch_extinguish_data_json, batch_template_data_json, has_batch_extinguish_arg,
+    has_batch_template_arg, parse_batch_template_args, parse_extinguish_batch_args,
+    print_batch_template_result, run_batch_template, run_extinguish_batch,
 };
 pub(crate) use cli_model::*;
 use completion::{completion_script, help_text};
@@ -1224,7 +1225,7 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--dry-run] [--full] [--json]\n       codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--full] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"from\":\"REQ-id\",\"to\":\"DES-id\",\"reason\":\"manual review\"}]}\n"
         }
         "extinguish" => {
-            "usage: codefire extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>) [--dry-run] [--json]\n       codefire extinguish --batch <file> [--path <open-dir>] [--dry-run] [--full] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"id\":\"FIRE-1\",\"resolution\":\"addressed\",\"rationale\":\"fixed\"}]}\n"
+            "usage: codefire extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>) [--dry-run] [--json]\n       codefire extinguish --batch <file> [--path <open-dir>] [--dry-run] [--full] [--json]\n       codefire extinguish --batch-template [--path <open-dir>] [--resolution <type>] [--rationale <text>|--evidence <text>|--evidence-ref <id>] [--output <file>] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"id\":\"FIRE-1\",\"resolution\":\"addressed\",\"rationale\":\"fixed\"}]}\n"
         }
         "commit" => {
             "usage: codefire commit [path|--path <open-dir>] -m <message> [--dry-run] [--json] [--idempotency-key <key>]\n"
@@ -1655,6 +1656,44 @@ fn run_extinguish_command(args: &[String]) -> Result<(), CliError> {
         } else {
             print_all_matching_extinguish_result(&options, &result);
         }
+    } else if has_batch_template_arg(args) {
+        let options = match parse_batch_template_args(args) {
+            Ok(options) => options,
+            Err(error) if args_want_json(args) => {
+                print_cli_error_json("extinguish-batch-template", &error)?;
+                return Err(CliError::CommandFailed(error.exit_status()));
+            }
+            Err(error) => return Err(error),
+        };
+        let result = match run_batch_template(&options) {
+            Ok(result) => result,
+            Err(error) if options.json_output => {
+                print_cli_error_json("extinguish-batch-template", &error)?;
+                return Err(CliError::CommandFailed(error.exit_status()));
+            }
+            Err(error) => return Err(error),
+        };
+        if options.json_output {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&command_result_envelope(
+                    "extinguish-batch-template",
+                    true,
+                    0,
+                    Some(&result.repo_root),
+                    batch_template_data_json(&result),
+                    Vec::new(),
+                    result
+                        .plan
+                        .get("next_actions")
+                        .and_then(Value::as_array)
+                        .cloned()
+                        .unwrap_or_default(),
+                ))?
+            );
+        } else {
+            print_batch_template_result(&result);
+        }
     } else if has_batch_extinguish_arg(args) {
         let options = match parse_extinguish_batch_args(args) {
             Ok(options) => options,
@@ -1695,8 +1734,13 @@ fn run_extinguish_command(args: &[String]) -> Result<(), CliError> {
                 "extinguish batch dry-run: {} fires would be processed",
                 result.item_count
             );
+            print_extinguish_batch_item_summary(&result.plan);
         } else {
-            println!("extinguished {} fires", result.item_count);
+            println!(
+                "extinguished {} fires; remaining open fires: {}",
+                result.item_count, result.remaining_open_fire_count
+            );
+            print_extinguish_batch_item_summary(&result.plan);
         }
     } else {
         let options = prepare_extinguish_options(parse_extinguish_args(args)?)?;
@@ -1712,9 +1756,11 @@ fn run_extinguish_command(args: &[String]) -> Result<(), CliError> {
             print_plan_result_json("extinguish", &result.plan)?;
         } else if options.dry_run {
             println!(
-                "extinguish dry-run: {} ({}) would be {}",
+                "extinguish dry-run: {} ({}) {} -> {} would be {}",
                 result.display_id,
                 result.fire_uid,
+                result.source_atom,
+                result.target_atom,
                 if options.refresh {
                     "refreshed"
                 } else {
@@ -1723,18 +1769,47 @@ fn run_extinguish_command(args: &[String]) -> Result<(), CliError> {
             );
         } else {
             println!(
-                "{} {} ({})",
+                "{} {} ({}) {} -> {}; remaining open fires: {}",
                 if options.refresh {
                     "refreshed"
                 } else {
                     "extinguished"
                 },
                 result.display_id,
-                result.fire_uid
+                result.fire_uid,
+                result.source_atom,
+                result.target_atom,
+                result.remaining_open_fire_count
             );
         }
     }
     Ok(())
+}
+
+fn print_extinguish_batch_item_summary(plan: &Value) {
+    let Some(items) = plan.get("items").and_then(Value::as_array) else {
+        return;
+    };
+    for item in items.iter().take(20) {
+        let display_id = item
+            .get("display_id")
+            .and_then(Value::as_str)
+            .unwrap_or("(unknown)");
+        let source = item
+            .get("source_atom")
+            .and_then(Value::as_str)
+            .unwrap_or("(unknown)");
+        let target = item
+            .get("target_atom")
+            .and_then(Value::as_str)
+            .unwrap_or("(unknown)");
+        println!("- {display_id}: {source} -> {target}");
+    }
+    if let Some(omitted) = plan.get("items_omitted").and_then(Value::as_u64) {
+        if omitted > 0 {
+            println!("- ... {omitted} more omitted; rerun with --full for all items");
+        }
+    }
 }
 
 fn run_commit_command(args: &[String]) -> Result<(), CliError> {
@@ -4905,6 +4980,9 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
     )?;
     let display_id = fires[fire_index].display_id.clone();
     let fire_uid = fires[fire_index].fire_uid.clone();
+    let source_atom = fires[fire_index].source.atom_id.clone();
+    let target_atom = fires[fire_index].target.atom_id.clone();
+    let reason = fires[fire_index].reason.clone();
     let plan = extinguish_operation_plan(
         options,
         &context,
@@ -4916,6 +4994,10 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
         return Ok(ExtinguishResult {
             display_id,
             fire_uid,
+            source_atom,
+            target_atom,
+            reason,
+            remaining_open_fire_count: scan.open_fires.len(),
             plan,
         });
     }
@@ -4947,6 +5029,10 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
     let result = ExtinguishResult {
         display_id,
         fire_uid,
+        source_atom,
+        target_atom,
+        reason,
+        remaining_open_fire_count: remaining_open_fires,
         plan,
     };
     if let Some(key) = options.idempotency_key.as_deref() {
@@ -5041,6 +5127,29 @@ fn load_extinguish_idempotency(
     Ok(Some(ExtinguishResult {
         display_id: required_string(&record, &["result", "display_id"])?,
         fire_uid: fire_uid.to_string(),
+        source_atom: record
+            .pointer("/result/source_atom")
+            .and_then(Value::as_str)
+            .or_else(|| plan.pointer("/fire/source_atom").and_then(Value::as_str))
+            .unwrap_or("(unknown)")
+            .to_string(),
+        target_atom: record
+            .pointer("/result/target_atom")
+            .and_then(Value::as_str)
+            .or_else(|| plan.pointer("/fire/target_atom").and_then(Value::as_str))
+            .unwrap_or("(unknown)")
+            .to_string(),
+        reason: record
+            .pointer("/result/reason")
+            .and_then(Value::as_str)
+            .or_else(|| plan.pointer("/fire/reason").and_then(Value::as_str))
+            .unwrap_or("(unknown)")
+            .to_string(),
+        remaining_open_fire_count: record
+            .pointer("/result/remaining_open_fire_count")
+            .and_then(Value::as_u64)
+            .map(|value| value as usize)
+            .unwrap_or_default(),
         plan,
     }))
 }
@@ -5062,6 +5171,10 @@ fn save_extinguish_idempotency(
         "result": {
             "display_id": &result.display_id,
             "fire_uid": &result.fire_uid,
+            "source_atom": &result.source_atom,
+            "target_atom": &result.target_atom,
+            "reason": &result.reason,
+            "remaining_open_fire_count": result.remaining_open_fire_count,
             "plan": &result.plan,
         },
         "created_at": now_iso_utc(),
@@ -5369,6 +5482,7 @@ fn extinguish_operation_plan(
             "fire_uid": &fire.fire_uid,
             "source_atom": &fire.source.atom_id,
             "target_atom": &fire.target.atom_id,
+            "reason": &fire.reason,
             "status": &fire.status,
         },
         "resolution": {

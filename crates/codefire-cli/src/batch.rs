@@ -5,6 +5,7 @@ use super::{
 use crate::{limited_yaml, read_batch_file};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 const YAML_CONTEXT: &str = "batch YAML";
@@ -31,6 +32,29 @@ pub(super) struct BatchExtinguishResult {
     pub(super) fire_ids: Vec<String>,
     pub(super) resolution_uids: Vec<String>,
     pub(super) remaining_open_fire_count: usize,
+    pub(super) plan: Value,
+}
+
+#[derive(Debug)]
+pub(super) struct BatchTemplateOptions {
+    pub(super) path: PathBuf,
+    pub(super) resolution: String,
+    pub(super) rationale: Option<String>,
+    pub(super) evidence: Option<String>,
+    pub(super) evidence_refs: Vec<String>,
+    pub(super) output: Option<PathBuf>,
+    pub(super) full_output: bool,
+    pub(super) json_output: bool,
+}
+
+#[derive(Debug)]
+pub(super) struct BatchTemplateResult {
+    pub(super) repo_root: PathBuf,
+    pub(super) branch: String,
+    pub(super) open_dir: PathBuf,
+    pub(super) item_count: usize,
+    pub(super) template: String,
+    pub(super) output: Option<PathBuf>,
     pub(super) plan: Value,
 }
 
@@ -79,6 +103,121 @@ struct ResolvedBatchFire {
 
 pub(super) fn has_batch_extinguish_arg(args: &[String]) -> bool {
     args.iter().any(|arg| arg == "--batch")
+}
+
+pub(super) fn has_batch_template_arg(args: &[String]) -> bool {
+    args.iter().any(|arg| arg == "--batch-template")
+}
+
+pub(super) fn parse_batch_template_args(args: &[String]) -> Result<BatchTemplateOptions, CliError> {
+    let mut path = None;
+    let mut resolution = "addressed".to_string();
+    let mut rationale = None;
+    let mut evidence = None;
+    let mut evidence_refs = Vec::new();
+    let mut output = None;
+    let mut full_output = false;
+    let mut json_output = false;
+    let mut saw_template = false;
+    let mut index = 0usize;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--batch-template" => saw_template = true,
+            "--path" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--path requires a value".to_string()))?;
+                path = Some(PathBuf::from(value));
+            }
+            "--resolution" => {
+                index += 1;
+                resolution = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--resolution requires a value".to_string()))?
+                    .to_string();
+            }
+            "--rationale" => {
+                index += 1;
+                rationale = Some(
+                    args.get(index)
+                        .ok_or_else(|| CliError::Usage("--rationale requires a value".to_string()))?
+                        .to_string(),
+                );
+            }
+            "--evidence" => {
+                index += 1;
+                evidence = Some(
+                    args.get(index)
+                        .ok_or_else(|| CliError::Usage("--evidence requires a value".to_string()))?
+                        .to_string(),
+                );
+            }
+            "--evidence-ref" => {
+                index += 1;
+                evidence_refs.push(
+                    args.get(index)
+                        .ok_or_else(|| {
+                            CliError::Usage("--evidence-ref requires a value".to_string())
+                        })?
+                        .to_string(),
+                );
+            }
+            "--output" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--output requires a value".to_string()))?;
+                output = Some(PathBuf::from(value));
+            }
+            "--full" => full_output = true,
+            "--json" => json_output = true,
+            value if value.starts_with("--path=") => {
+                path = Some(PathBuf::from(value.trim_start_matches("--path=")));
+            }
+            value if value.starts_with("--resolution=") => {
+                resolution = value.trim_start_matches("--resolution=").to_string();
+            }
+            value if value.starts_with("--rationale=") => {
+                rationale = Some(value.trim_start_matches("--rationale=").to_string());
+            }
+            value if value.starts_with("--evidence=") => {
+                evidence = Some(value.trim_start_matches("--evidence=").to_string());
+            }
+            value if value.starts_with("--evidence-ref=") => {
+                evidence_refs.push(value.trim_start_matches("--evidence-ref=").to_string());
+            }
+            value if value.starts_with("--output=") => {
+                output = Some(PathBuf::from(value.trim_start_matches("--output=")));
+            }
+            value if value.starts_with("--") => {
+                return Err(CliError::Usage(format!(
+                    "unsupported batch template option: {value}"
+                )));
+            }
+            value => {
+                return Err(CliError::Usage(format!(
+                    "unexpected batch template argument: {value}"
+                )));
+            }
+        }
+        index += 1;
+    }
+    if !saw_template {
+        return Err(CliError::Usage(
+            "usage: codefire extinguish --batch-template [--path <open-dir>] [--resolution <type>] [--rationale <text>|--evidence <text>|--evidence-ref <id>] [--output <file>] [--json]".to_string(),
+        ));
+    }
+    Ok(BatchTemplateOptions {
+        path: path.unwrap_or(std::env::current_dir()?),
+        resolution,
+        rationale,
+        evidence,
+        evidence_refs,
+        output,
+        full_output,
+        json_output,
+    })
 }
 
 pub(super) fn parse_extinguish_batch_args(
@@ -139,6 +278,107 @@ pub(super) fn parse_extinguish_batch_args(
         full_output,
         json_output,
         lock,
+    })
+}
+
+pub(super) fn run_batch_template(
+    options: &BatchTemplateOptions,
+) -> Result<BatchTemplateResult, CliError> {
+    let context = open_context(&options.path)?;
+    let scan_execution = compute_scan(&context.open_dir, false)?;
+    let open_fires = scan_execution
+        .fires
+        .iter()
+        .filter(|fire| fire.status == "open")
+        .collect::<Vec<_>>();
+    if open_fires.is_empty() {
+        return Err(CliError::Usage(
+            "batch template requires at least one open fire".to_string(),
+        ));
+    }
+    let defaults = batch_template_defaults(options);
+    let fires = open_fires
+        .iter()
+        .map(|fire| {
+            json!({
+                "id": &fire.display_id,
+                "rationale": format!("reviewed {} -> {}", fire.source.atom_id, fire.target.atom_id),
+            })
+        })
+        .collect::<Vec<_>>();
+    let template_value = json!({
+        "version": 1,
+        "defaults": defaults,
+        "fires": fires,
+    });
+    let template = serde_json::to_string_pretty(&template_value)?;
+    if let Some(path) = &options.output {
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, format!("{template}\n"))?;
+    }
+    let detail_limit = if options.full_output {
+        open_fires.len()
+    } else {
+        open_fires.len().min(DEFAULT_BATCH_DETAIL_LIMIT)
+    };
+    let fire_sample = open_fires
+        .iter()
+        .take(detail_limit)
+        .map(|fire| {
+            json!({
+                "display_id": &fire.display_id,
+                "fire_uid": &fire.fire_uid,
+                "source_atom": &fire.source.atom_id,
+                "target_atom": &fire.target.atom_id,
+                "reason": &fire.reason,
+                "severity": &fire.severity,
+            })
+        })
+        .collect::<Vec<_>>();
+    let output_target = options
+        .output
+        .as_ref()
+        .map(|path| command_arg(&path.to_string_lossy()))
+        .unwrap_or_else(|| "<template-file>".to_string());
+    let open_dir = command_arg(&context.open_dir.to_string_lossy());
+    let plan = json!({
+        "type": "codefire_extinguish_batch_template_plan",
+        "version": 1,
+        "command": "extinguish-batch-template",
+        "branch": &context.branch,
+        "open_dir": &context.open_dir,
+        "item_count": open_fires.len(),
+        "item_detail_limit": detail_limit,
+        "items_omitted": open_fires.len().saturating_sub(detail_limit),
+        "template_format": "json",
+        "output": &options.output,
+        "fires": fire_sample,
+        "next_actions": [
+            {
+                "kind": "extinguish_batch_dry_run",
+                "command": format!("codefire extinguish --batch {} --path {} --dry-run --json", output_target, open_dir),
+                "target": {"branch": &context.branch, "open_dir": &context.open_dir, "repo_root": &context.repo_root}
+            },
+            {
+                "kind": "extinguish_batch_apply",
+                "command": format!("codefire extinguish --batch {} --path {}", output_target, open_dir),
+                "target": {"branch": &context.branch, "open_dir": &context.open_dir, "repo_root": &context.repo_root}
+            },
+        ],
+    });
+    Ok(BatchTemplateResult {
+        repo_root: context.repo_root,
+        branch: context.branch,
+        open_dir: context.open_dir,
+        item_count: open_fires.len(),
+        template,
+        output: options.output.clone(),
+        plan,
     })
 }
 
@@ -237,6 +477,35 @@ pub(super) fn run_extinguish_batch(
         remaining_open_fire_count,
         plan,
     })
+}
+
+fn batch_template_defaults(options: &BatchTemplateOptions) -> Value {
+    let mut defaults = serde_json::Map::new();
+    defaults.insert(
+        "resolution".to_string(),
+        Value::String(options.resolution.clone()),
+    );
+    if let Some(rationale) = &options.rationale {
+        defaults.insert("rationale".to_string(), Value::String(rationale.clone()));
+    }
+    if let Some(evidence) = &options.evidence {
+        defaults.insert("evidence".to_string(), Value::String(evidence.clone()));
+    }
+    if !options.evidence_refs.is_empty() {
+        defaults.insert("evidence_refs".to_string(), json!(&options.evidence_refs));
+    }
+    Value::Object(defaults)
+}
+
+fn command_arg(value: &str) -> String {
+    if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':'))
+    {
+        value.to_string()
+    } else {
+        format!("'{}'", value.replace('\'', "'\\''"))
+    }
 }
 
 fn resolve_batch_fires(
@@ -441,6 +710,32 @@ pub(super) fn batch_extinguish_data_json(result: &BatchExtinguishResult) -> Valu
         "remaining_open_fire_count": result.remaining_open_fire_count,
         "plan": &result.plan,
     })
+}
+
+pub(super) fn batch_template_data_json(result: &BatchTemplateResult) -> Value {
+    json!({
+        "type": "codefire_extinguish_batch_template",
+        "version": 1,
+        "branch": &result.branch,
+        "open_dir": &result.open_dir,
+        "item_count": result.item_count,
+        "template_format": "json",
+        "template": &result.template,
+        "output": &result.output,
+        "plan": &result.plan,
+    })
+}
+
+pub(super) fn print_batch_template_result(result: &BatchTemplateResult) {
+    if let Some(path) = &result.output {
+        println!(
+            "wrote extinguish batch template: {} fires -> {}",
+            result.item_count,
+            path.display()
+        );
+    } else {
+        println!("{}", result.template);
+    }
 }
 
 fn parse_batch_extinguish_file(path: &Path) -> Result<BatchExtinguishFile, CliError> {
