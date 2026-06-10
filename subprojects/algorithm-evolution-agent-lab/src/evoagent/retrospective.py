@@ -1642,6 +1642,19 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
         )
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder:
+    def build(
+        self,
+        handoff: ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifacts,
+    ) -> ResearchCyclePlanningPacketManifest:
+        return ResearchCyclePlanningPacketManifest(
+            source_cycles=tuple(str(cycle) for cycle in handoff.summary.get("source_cycles", [])),
+            status="ok",
+            entries=tuple(manifest_entry(artifact.path, artifact.content) for artifact in handoff.artifacts),
+        )
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

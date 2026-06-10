@@ -618,6 +618,15 @@ links:
   - from: REQ-AUTO-077
     to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-builder-packages-gated-summary
     type: verified_by
+  - from: REQ-AUTO-078
+    to: DES-AUTO-060
+    type: refined_by
+  - from: DES-AUTO-060
+    to: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder
+    type: implemented_by
+  - from: REQ-AUTO-078
+    to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-records-summary-artifacts
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

@@ -1009,3 +1009,18 @@ The builder returns `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSumm
 - two packaged artifacts at caller-provided relative POSIX paths
 
 The builder composes the summary renderer, Markdown renderer, Markdown gate, and gate Markdown renderer. It validates output paths with the shared manifest path validator. It does not rebuild manifests, rerun archive verification, read files, write files, or mutate inputs.
+
+## DES-AUTO-060: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest
+
+The review packet artifact archive summary artifact archive summary artifact manifest builder consumes `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifacts`.
+
+The builder returns `ResearchCyclePlanningPacketManifest` containing:
+
+- source cycles copied from the machine-readable summary
+- `ok` manifest status
+- one manifest entry per packaged summary artifact
+- relative artifact path
+- UTF-8 byte count
+- SHA-256 content digest
+
+The builder reuses the shared manifest entry helper so digest and byte count semantics stay identical to earlier handoff artifact manifests. It does not render Markdown, verify drift, read files, write files, or mutate inputs.

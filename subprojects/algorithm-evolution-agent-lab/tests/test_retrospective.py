@@ -12,6 +12,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown,
@@ -2101,6 +2102,74 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         )
         self.assertEqual(packaged.summary_markdown, packaged.artifacts[0].content)
         self.assertEqual(packaged.gate_markdown, packaged.artifacts[1].content)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-records-summary-artifacts
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_records_summary_artifacts(
+        self,
+    ) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-42",
+                    completed_runs=21,
+                    improved_candidates=17,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.38,
+                    remaining_budget=21.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=17,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=17.0,
+            packet_path="cycle-42/planning-packet.md",
+            plan_path="cycle-42/plan.md",
+            lint_path="cycle-42/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-42/review-packet.md",
+            readiness_path="cycle-42/readiness.md",
+            manifest_path="cycle-42/manifest.md",
+            verification_path="cycle-42/verification.md",
+        )
+        handoff = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder().build(
+            archive,
+            summary_path="cycle-42/archive-summary.md",
+            gate_path="cycle-42/archive-summary-gate.md",
+        )
+        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+            handoff,
+        )
+        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder().build(
+            summary_archive,
+            summary_path="cycle-42/archive-summary-artifact-archive-summary.md",
+            gate_path="cycle-42/archive-summary-artifact-archive-summary-gate.md",
+        )
+
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder().build(
+            packaged,
+        )
+
+        self.assertEqual(("cycle-42",), manifest.source_cycles)
+        self.assertEqual("ok", manifest.status)
+        self.assertEqual(
+            [
+                "cycle-42/archive-summary-artifact-archive-summary.md",
+                "cycle-42/archive-summary-artifact-archive-summary-gate.md",
+            ],
+            [entry.path for entry in manifest.entries],
+        )
+        self.assertEqual(len(packaged.summary_markdown.encode("utf-8")), manifest.entries[0].byte_count)
+        self.assertTrue(manifest.entries[0].content_sha256.startswith("sha256:"))
+        self.assertEqual(len(packaged.gate_markdown.encode("utf-8")), manifest.entries[1].byte_count)
+        self.assertTrue(manifest.entries[1].content_sha256.startswith("sha256:"))
 
 
 if __name__ == "__main__":
