@@ -95,6 +95,31 @@ pub(crate) fn status_next_actions(status: &Status) -> Vec<Value> {
     actions
 }
 
+pub(crate) fn status_next_actions_with_prediction(status: &Status, data: &Value) -> Vec<Value> {
+    if status.state == "open-burning"
+        && data
+            .get("scan_prediction")
+            .and_then(|prediction| prediction.get("changed_count"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            > 0
+        && data
+            .get("scan_prediction")
+            .and_then(|prediction| prediction.get("open_fire_count"))
+            .and_then(Value::as_u64)
+            .unwrap_or(usize::MAX as u64)
+            == 0
+    {
+        return vec![next_action(
+            "commit",
+            cli_command("commit -m <message>"),
+            "seal the verified open branch",
+            json!({"branch": &status.branch, "base": &status.base, "pending_changes": true, "open_fires": 0}),
+        )];
+    }
+    status_next_actions(status)
+}
+
 pub(crate) fn scan_data_json_with_full(scan: &codefire_core::ScanResult, full: bool) -> Value {
     let changed_atom_count = scan.changed_atoms.len();
     let non_atom_changed_file_count = scan.non_atom_changed_files.len();
@@ -863,6 +888,28 @@ mod tests {
         };
 
         assert!(status_next_actions(&status).is_empty());
+    }
+
+    #[test]
+    fn burning_status_with_clean_prediction_suggests_commit() {
+        let status = Status {
+            branch: "main".to_string(),
+            state: "open-burning".to_string(),
+            base: "CF-COMMIT-base".to_string(),
+            open_fires: 0,
+        };
+        let data = json!({
+            "scan_prediction": {
+                "changed_count": 2,
+                "open_fire_count": 0
+            }
+        });
+
+        let actions = status_next_actions_with_prediction(&status, &data);
+
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0]["kind"], "commit");
+        assert_eq!(actions[0]["target"]["pending_changes"], true);
     }
 
     #[test]

@@ -2,6 +2,8 @@ import unittest
 
 from evoagent.retrospective import (
     ResearchCycleRetrospective,
+    ResearchCyclePlanLane,
+    ResearchCyclePlanSynthesizer,
     ResearchCycleSignal,
     RetrospectivePlanningSummary,
     RetrospectivePriority,
@@ -94,6 +96,42 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("## Recommendations", markdown)
         self.assertIn("- increase_exploration", markdown)
         self.assertIn("## Rationale", markdown)
+
+    # cf-atom: TEST-research-cycle-plan-synthesizer-builds-next-cycle-lanes
+    def test_research_cycle_plan_synthesizer_builds_next_cycle_lanes(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-4",
+                    completed_runs=8,
+                    improved_candidates=3,
+                    regressed_candidates=1,
+                    failed_runs=2,
+                    blocked_items=3,
+                    mean_cost=4.0,
+                    remaining_budget=1.0,
+                    high_frontier_drift=2,
+                    evidence_ready_claims=1,
+                )
+            ]
+        )
+
+        plan = ResearchCyclePlanSynthesizer().synthesize(
+            report,
+            active_capacity=1,
+            remaining_budget=3.0,
+        )
+
+        self.assertEqual(plan.source_cycles, ("cycle-4",))
+        self.assertEqual(plan.priority, RetrospectivePriority.HIGH)
+        self.assertEqual(len(plan.lane(ResearchCyclePlanLane.MITIGATION)), 1)
+        self.assertEqual(len(plan.lane(ResearchCyclePlanLane.ACTIVE)), 1)
+        self.assertEqual(len(plan.lane(ResearchCyclePlanLane.REVIEW)), 1)
+        self.assertIn(
+            RetrospectiveRecommendation.MITIGATE_RISK,
+            [item.recommendation for item in plan.items],
+        )
+        self.assertLessEqual(plan.lane(ResearchCyclePlanLane.ACTIVE)[0].budget_hint, 3.0)
 
 
 if __name__ == "__main__":

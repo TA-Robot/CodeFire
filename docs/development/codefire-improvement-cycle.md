@@ -229,26 +229,27 @@ Current named cycle:
 - CodeFire次version系統: v1.0 Contract ValidationのPhase 1a以降を継続する。
 - Current plan: `docs/development/v1.0-contract-validation-plan.md`。
 - Current burn-down plan: `docs/development/current-cycle-burn-down-plan.md`。
-- Current phase: `BATCH-2026-06-global-open-backlog` のBurn-down完了。既知CFB/CFR open issueは0件で、次は新しいDiscovery batchを開始できる。
+- Current phase: cycle 4 dogfood mini-batch `CFB-093` のBurn-down完了。既知CFB/CFR open issueは0件。
 - Installed CodeFire: `/home/devuser/.local/bin/codefire`。
 - Installed version output: `codefire foundation 1`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
 - Latest pushed Git commits: current global burn-down commits through issue root-cause map close audit。
 - Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` は `open-clean`、open fires 0。
-- Latest algorithm CodeFire base: `CF-COMMIT-568328cd5a5ad7db30e3b9b9`。
+- Latest algorithm CodeFire base: `CF-COMMIT-711547728f2ad3345d7bcc82`。
 
 Current global issue inventory:
 
 | Series | Total tracked | Fixed / closed | Open |
 |---|---:|---:|---:|
-| CFB dogfood issues | 92 | 92 | 0 |
+| CFB dogfood issues | 93 | 93 | 0 |
 | CFR code review issues | 160 | 160 | 0 |
-| Total | 252 | 252 | 0 |
+| Total | 253 | 253 | 0 |
 
 Close audit note:
 
 - 2026-06-10時点で残っていた146件は、`BATCH-2026-06-global-open-backlog` としてfreezeし、同batch内で全件fixedにした。
 - 最後に残っていた `CFR-120` は、`docs/development/issue-root-cause-map.json` と `issue_root_cause_map_covers_open_issues` で、今後のopen issueをroot cause計画へ機械的に接続する形でcloseした。
+- Cycle 4 dogfoodingでは `ResearchCyclePlanSynthesizer` を追加し、`CFB-093` を発見、同cycle内でfixedにした。
 - 次のcycleでは、issue discovery後にこのmapまたは後継schemaへ全open issueを登録し、batchを全部消してから次のissue出しへ進む。
 
 ## Completed Two-Cycle Snapshot
@@ -315,15 +316,15 @@ Git結果:
 
 - Pushed as `6d8361d Fix evidence JSON contracts` and `8978dfc Add retrospective planning summary`.
 
-## Current Open Work
+## Completed Global Burn-down Snapshot
 
-The active CodeFire improvement cycle is a global burn-down. The initial frozen batch was 146 open issues as of 2026-06-09; the current remaining count is tracked in `current-cycle-burn-down-plan.md`.
+The 2026-06-09 global burn-down batch started with 146 open CFB/CFR issues and is now complete. The authoritative current count is `docs/development/current-cycle-burn-down-plan.md`, and `docs/development/issue-root-cause-map.json` now guards future open-issue root-cause mapping.
 
 Global inventory as of 2026-06-10:
 
-- CFB dogfood issues: 92 total, 92 fixed, 0 open.
-- CFR code review issues: 160 total, 159 fixed/closed, 1 open.
-- Combined tracked backlog: 252 total, 251 fixed/closed, 1 open.
+- CFB dogfood issues: 93 total, 93 fixed, 0 open.
+- CFR code review issues: 160 total, 160 fixed/closed, 0 open.
+- Combined tracked backlog: 253 total, 253 fixed/closed, 0 open.
 
 Active batch closed in this burn-down:
 
@@ -388,6 +389,14 @@ Active batch closed in this burn-down:
 - CFB-090: bounded context reports endpoint omission metadata for omitted trace link endpoints.
 - CFB-092: extractor/hash schema changes are migration-aware and can be rebaselined.
 - CFR-132: migrate target format defaults to `current` and reports supported targets.
+- CFR-120: open issue root-cause mapping is enforced through `issue-root-cause-map.json` and `issue_root_cause_map_covers_open_issues`.
+- CFB-093: status JSON next_actions now use scan prediction to recommend commit for pending changes with zero open fires.
+
+Next cycle entry condition:
+
+- Start new discovery only while known open CFB/CFR count is 0.
+- Record the newly discovered batch with detail files, root-cause map entries, and a burn-down plan before implementation.
+- Burn down the newly frozen batch to 0 before opening another discovery batch.
 - CFR-133: repository layout is defined by a shared doctor/migrate registry.
 - CFR-114: context compares active scan freshness against the current preview scan.
 - CFR-137: branch context selector returns changed/open-fire atom context instead of an empty selection.

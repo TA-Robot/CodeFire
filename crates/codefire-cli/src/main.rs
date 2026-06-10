@@ -43,8 +43,9 @@ mod verification;
 mod view;
 use automation::{
     cli_command, command_result_envelope, scan_data_json_with_full, scan_diagnostics_json,
-    scan_next_actions, status_data_json, status_next_actions, verification_data_json_with_filter,
-    verification_diagnostics_json_with_filter, verification_next_actions,
+    scan_next_actions, status_data_json, status_next_actions_with_prediction,
+    verification_data_json_with_filter, verification_diagnostics_json_with_filter,
+    verification_next_actions,
 };
 use batch::{
     batch_extinguish_data_json, batch_template_data_json, has_batch_extinguish_arg,
@@ -904,6 +905,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     status_data_json_with_prediction(&status, &options.path),
                     metrics.as_ref(),
                 );
+                let next_actions = status_next_actions_with_prediction(&status, &data);
                 println!(
                     "{}",
                     serde_json::to_string_pretty(&command_result_envelope(
@@ -913,7 +915,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         Some(&context.repo_root),
                         data,
                         Vec::new(),
-                        status_next_actions(&status),
+                        next_actions,
                     ))?
                 );
             } else {

@@ -33,6 +33,24 @@
         "docs/development/code-review-issues/cfr-120.md",
         "docs/development/current-cycle-burn-down-plan.md"
       ]
+    },
+    {
+      "id": "CFB-093",
+      "status": "fixed",
+      "root_cause": "status_next_action_prediction_gap",
+      "fix_group": "status-prediction-next-actions",
+      "target_version": "cycle-4-burn-down",
+      "owner_module": "crates/codefire-cli/src/automation.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 4 dogfood burn-down",
+        "decision": "Use status scan_prediction to return commit next_actions when pending changes have no open fires."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-093.md",
+        "crates/codefire-cli/src/automation.rs::tests::burning_status_with_clean_prediction_suggests_commit",
+        "subprojects/algorithm-evolution-agent-lab CodeFire commit CF-COMMIT-711547728f2ad3345d7bcc82"
+      ]
     }
   ]
 }

@@ -155,3 +155,7 @@ The system shall summarize completed research cycles into policy adjustment reco
 ## REQ-AUTO-039: Retrospective planning summary
 
 The system shall render a research cycle retrospective into a compact planning summary suitable for the next docs-first development cycle. The summary shall include cycle IDs, priority, key rates, recommendations, and rationale in deterministic order so the next planning document can be generated without rereading raw run logs.
+
+## REQ-AUTO-040: Research cycle plan synthesis
+
+The system shall synthesize a next-cycle plan from retrospective recommendations. The plan shall assign deterministic lane items for mitigation, active experiments, review, archive, or deferred work; preserve the source cycle IDs and priority; enforce positive active capacity and non-negative remaining budget; and cap active experiment budget hints by the remaining budget so the next docs-first cycle can begin from a bounded execution plan rather than prose recommendations alone.

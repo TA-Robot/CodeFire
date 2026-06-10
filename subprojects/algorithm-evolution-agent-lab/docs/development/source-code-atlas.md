@@ -163,6 +163,18 @@ FrontierDriftReporter.report(previous, current)
   -> classify new/removed/rising/falling/stable/action_changed
   -> assign severity
   -> emit recommendation and summary
+
+ResearchCycleRetrospective.summarize(signals)
+  -> aggregate cycle rates, budget pressure, and risk pressure
+  -> emit policy recommendations and rationale
+
+RetrospectivePlanningSummary.render_markdown(report)
+  -> compact recommendation summary for docs-first planning
+
+ResearchCyclePlanSynthesizer.synthesize(report, active_capacity, remaining_budget)
+  -> map recommendations into mitigation/active/review/archive/deferred lanes
+  -> cap active work by capacity
+  -> preserve deferred overflow instead of dropping work
 ```
 
 Important implementation details:
@@ -171,6 +183,7 @@ Important implementation details:
 - Budget checks are conservative: over-budget frontiers are held or deferred.
 - Feedback updates are bounded: values are clamped and do not explode over repeated runs.
 - Drift reporting compares snapshots, not raw logs, so long campaigns can be summarized cheaply.
+- Cycle plan synthesis converts retrospective prose into lane-level work while keeping budget and active capacity explicit.
 
 ## 5. Experiment Automation Surface
 

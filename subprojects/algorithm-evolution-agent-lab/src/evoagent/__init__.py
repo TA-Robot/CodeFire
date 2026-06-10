@@ -95,6 +95,18 @@ from evoagent.reporting import LivingResearchReport, ReportOptions
 from evoagent.reproduction import ReproductionChecklist, ReproductionChecklistBuilder, ReproductionChecklistItem
 from evoagent.regression import RegressionDetector, RegressionFinding
 from evoagent.risk import ExperimentRisk, ExperimentRiskRegister, RiskPriority, RiskSeverity, RiskStatus
+from evoagent.retrospective import (
+    ResearchCyclePlan,
+    ResearchCyclePlanItem,
+    ResearchCyclePlanLane,
+    ResearchCyclePlanSynthesizer,
+    ResearchCycleRetrospective,
+    ResearchCycleRetrospectiveReport,
+    ResearchCycleSignal,
+    RetrospectivePlanningSummary,
+    RetrospectivePriority,
+    RetrospectiveRecommendation,
+)
 from evoagent.review import ReviewLedger, ReviewObjection
 from evoagent.roles import RoleComponent, RoleRegistry
 from evoagent.run_identity import RunIdentityLedger, RunIdentityRecord
@@ -249,6 +261,13 @@ __all__ = [
     "ResearchMemoryIndex",
     "ResearchProgressMeter",
     "ResearchProgressReport",
+    "ResearchCyclePlan",
+    "ResearchCyclePlanItem",
+    "ResearchCyclePlanLane",
+    "ResearchCyclePlanSynthesizer",
+    "ResearchCycleRetrospective",
+    "ResearchCycleRetrospectiveReport",
+    "ResearchCycleSignal",
     "ResearchSubgoal",
     "ReportOptions",
     "ReproductionChecklist",
@@ -290,6 +309,9 @@ __all__ = [
     "SurfacePriorityFinding",
     "VersionedEvidenceRef",
     "RepeatedRunSummary",
+    "RetrospectivePlanningSummary",
+    "RetrospectivePriority",
+    "RetrospectiveRecommendation",
     "can_claim_sota",
     "claim_readiness",
     "load_challenge_definition",

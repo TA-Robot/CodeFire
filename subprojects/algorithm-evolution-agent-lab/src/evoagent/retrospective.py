@@ -19,6 +19,14 @@ class RetrospectivePriority(str, Enum):
     LOW = "low"
 
 
+class ResearchCyclePlanLane(str, Enum):
+    MITIGATION = "mitigation"
+    ACTIVE = "active"
+    REVIEW = "review"
+    ARCHIVE = "archive"
+    DEFERRED = "deferred"
+
+
 @dataclass(frozen=True)
 class ResearchCycleSignal:
     cycle_id: str
@@ -47,6 +55,28 @@ class ResearchCycleRetrospectiveReport:
     recommendations: tuple[RetrospectiveRecommendation, ...]
     priority: RetrospectivePriority
     rationale: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ResearchCyclePlanItem:
+    lane: ResearchCyclePlanLane
+    recommendation: RetrospectiveRecommendation
+    title: str
+    action: str
+    rationale: str
+    budget_hint: float
+
+
+@dataclass(frozen=True)
+class ResearchCyclePlan:
+    source_cycles: tuple[str, ...]
+    priority: RetrospectivePriority
+    active_capacity: int
+    remaining_budget: float
+    items: tuple[ResearchCyclePlanItem, ...]
+
+    def lane(self, lane: ResearchCyclePlanLane) -> tuple[ResearchCyclePlanItem, ...]:
+        return tuple(item for item in self.items if item.lane == lane)
 
 
 # cf-atom: CODE-ResearchCycleRetrospective
@@ -253,3 +283,147 @@ class RetrospectivePlanningSummary:
         lines.extend(["", "## Rationale", ""])
         lines.extend(f"- {reason}" for reason in report.rationale)
         return "\n".join(lines).rstrip() + "\n"
+
+
+# cf-atom: CODE-ResearchCyclePlanSynthesizer
+class ResearchCyclePlanSynthesizer:
+    def synthesize(
+        self,
+        report: ResearchCycleRetrospectiveReport,
+        *,
+        active_capacity: int,
+        remaining_budget: float,
+    ) -> ResearchCyclePlan:
+        if active_capacity <= 0:
+            raise ValueError("active_capacity must be positive")
+        if remaining_budget < 0:
+            raise ValueError("remaining_budget must be non-negative")
+
+        items = [plan_item_for(recommendation, report, remaining_budget) for recommendation in report.recommendations]
+        items.sort(key=plan_item_sort_key)
+        return ResearchCyclePlan(
+            source_cycles=report.cycle_ids,
+            priority=report.priority,
+            active_capacity=active_capacity,
+            remaining_budget=remaining_budget,
+            items=tuple(bound_active_items(items, active_capacity)),
+        )
+
+
+def plan_item_for(
+    recommendation: RetrospectiveRecommendation,
+    report: ResearchCycleRetrospectiveReport,
+    remaining_budget: float,
+) -> ResearchCyclePlanItem:
+    rationale = rationale_for_recommendation(recommendation, report)
+    if recommendation == RetrospectiveRecommendation.MITIGATE_RISK:
+        return ResearchCyclePlanItem(
+            lane=ResearchCyclePlanLane.MITIGATION,
+            recommendation=recommendation,
+            title="Resolve blocking risks before expanding execution",
+            action="build or update the mitigation checklist for the highest-risk campaign items",
+            rationale=rationale,
+            budget_hint=0.0,
+        )
+    if recommendation == RetrospectiveRecommendation.REDUCE_COST:
+        return ResearchCyclePlanItem(
+            lane=ResearchCyclePlanLane.ACTIVE,
+            recommendation=recommendation,
+            title="Run cheaper information-gain probes",
+            action="draft bounded low-cost experiments and defer expensive replications",
+            rationale=rationale,
+            budget_hint=min(remaining_budget, max(report.average_cost * 0.5, 0.0)),
+        )
+    if recommendation == RetrospectiveRecommendation.CONSOLIDATE:
+        return ResearchCyclePlanItem(
+            lane=ResearchCyclePlanLane.REVIEW,
+            recommendation=recommendation,
+            title="Consolidate evidence-ready candidates",
+            action="prepare evidence packs, review queue items, and release gate inputs for promising candidates",
+            rationale=rationale,
+            budget_hint=0.0,
+        )
+    if recommendation == RetrospectiveRecommendation.INCREASE_EXPLORATION:
+        return ResearchCyclePlanItem(
+            lane=ResearchCyclePlanLane.ACTIVE,
+            recommendation=recommendation,
+            title="Increase exploration diversity",
+            action="sample frontier mechanisms that are not covered by recent negative results",
+            rationale=rationale,
+            budget_hint=min(remaining_budget, max(report.average_cost, 0.0)),
+        )
+    if recommendation == RetrospectiveRecommendation.ARCHIVE_STALE:
+        return ResearchCyclePlanItem(
+            lane=ResearchCyclePlanLane.ARCHIVE,
+            recommendation=recommendation,
+            title="Archive stale or repeatedly failing paths",
+            action="write negative-result records and remove stale paths from the active queue",
+            rationale=rationale,
+            budget_hint=0.0,
+        )
+    return ResearchCyclePlanItem(
+        lane=ResearchCyclePlanLane.DEFERRED,
+        recommendation=recommendation,
+        title="Keep current planning policy",
+        action="carry forward the current queue and monitor for stronger signals",
+        rationale=rationale,
+        budget_hint=0.0,
+    )
+
+
+def rationale_for_recommendation(
+    recommendation: RetrospectiveRecommendation,
+    report: ResearchCycleRetrospectiveReport,
+) -> str:
+    for reason in report.rationale:
+        if recommendation == RetrospectiveRecommendation.MITIGATE_RISK and "risk pressure" in reason:
+            return reason
+        if recommendation == RetrospectiveRecommendation.REDUCE_COST and "budget pressure" in reason:
+            return reason
+        if recommendation == RetrospectiveRecommendation.CONSOLIDATE and "improvement rate" in reason:
+            return reason
+        if recommendation == RetrospectiveRecommendation.INCREASE_EXPLORATION and "increase exploration" in reason:
+            return reason
+        if recommendation == RetrospectiveRecommendation.ARCHIVE_STALE and "failure rate" in reason:
+            return reason
+        if recommendation == RetrospectiveRecommendation.KEEP_POLICY and "keep the current" in reason:
+            return reason
+    return "recommendation came from the retrospective summary"
+
+
+def plan_item_sort_key(item: ResearchCyclePlanItem) -> tuple[int, str]:
+    lane_rank = {
+        ResearchCyclePlanLane.MITIGATION: 0,
+        ResearchCyclePlanLane.ACTIVE: 1,
+        ResearchCyclePlanLane.REVIEW: 2,
+        ResearchCyclePlanLane.ARCHIVE: 3,
+        ResearchCyclePlanLane.DEFERRED: 4,
+    }
+    return (lane_rank[item.lane], item.recommendation.value)
+
+
+def bound_active_items(
+    items: list[ResearchCyclePlanItem],
+    active_capacity: int,
+) -> list[ResearchCyclePlanItem]:
+    active_count = 0
+    bounded: list[ResearchCyclePlanItem] = []
+    for item in items:
+        if item.lane != ResearchCyclePlanLane.ACTIVE:
+            bounded.append(item)
+            continue
+        active_count += 1
+        if active_count <= active_capacity:
+            bounded.append(item)
+            continue
+        bounded.append(
+            ResearchCyclePlanItem(
+                lane=ResearchCyclePlanLane.DEFERRED,
+                recommendation=item.recommendation,
+                title=item.title,
+                action=item.action,
+                rationale=f"deferred because active capacity is {active_capacity}",
+                budget_hint=0.0,
+            )
+        )
+    return bounded

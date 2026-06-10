@@ -83,3 +83,4 @@
 | AE-079 | Planning | 長期campaignでfrontier順位・score・actionがどう変化したかをdrift reportとして要約する | done | `CODE-FrontierDriftReporter`; `TEST-frontier-drift-reporter-summarizes-priority-shifts`; 141 tests pass |
 | AE-080 | Planning | 複数research cycleの結果から次cycleの探索方針調整recommendationを生成する | done | `CODE-ResearchCycleRetrospective`; `TEST-research-cycle-retrospective-recommends-policy-adjustments`; 143 tests pass |
 | AE-081 | Reporting | research cycle retrospectiveを次cycle planning用Markdown summaryへ整形する | done | `CODE-RetrospectivePlanningSummary`; `TEST-retrospective-planning-summary-renders-markdown`; 144 tests pass |
+| AE-082 | Planning | retrospective recommendationをmitigation/active/review/archive/deferred laneを持つ次cycle planへ変換する | done | `CODE-ResearchCyclePlanSynthesizer`; `TEST-research-cycle-plan-synthesizer-builds-next-cycle-lanes`; 145 tests pass |

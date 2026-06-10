@@ -107,6 +107,7 @@
 | CFB-090 | fixed | Context / Bounded Graph | `context --changed --limit 5 --json` が省略されたAtomへ向かう `trace_links` を返し、dangling参照か省略済み参照かを区別できない | FrontierFeedbackIntegrator dogfoodingでchanged contextをbounded取得したとき | graph consumerが返却済みAtom集合だけでTrace Graphを構築すると欠落node参照になり、追加fetch判断もできない | fixed in active batch | bounded contextはlink endpointのreturned/omitted状態、omitted endpoint count、再取得commandを返す |
 | CFB-091 | fixed | Atom Extraction / Explicit Atom Span | 末尾側の明示 `cf-atom` の後ろに新しい明示Atomを追加すると、既存Atomのcontent hashが変わり余分なfireが出る | FrontierDriftReporter追加時に既存FrontierFeedbackIntegrator Atomと既存feedback test Atomにもfireが出たとき | 新機能追加だけで隣接する既存Atomの再証跡が必要になり、docs-first開発のfire数が膨らむ | fixed in next cycle | Python explicit Atomはmarker直後のclass/def/async def/decorated symbolのindent blockをhash範囲にし、後続Atom追加で前Atomが縮む挙動を避ける |
 | CFB-092 | fixed | Atom Extraction / Migration | 明示Atom抽出アルゴリズムを改善しただけで、対象プロジェクトのsourceが無変更でも大量の `atom_changed` fireが出る | CFB-091修正版をinstallし、`algorithm-evolution-agent-lab` をscanしたとき | 抽出ルール改善やhash仕様変更が、実装変更ではなくtool migrationであることをCodeFireが区別できず、100件超の消火と証跡処理が必要になる | fixed in active batch | atom hash schema versionとsource-unchanged検出によりtool migrationとして報告し、rebaseline commitで封印できるようにした |
+| CFB-093 | fixed | Status / Next actions | fire解消とverify成功後、`status --json` がscan prediction上commit可能なのにscan/verifyをnext_actionsへ出す | `ResearchCyclePlanSynthesizer` dogfoodingで6 fireを解消しverify passedになった直後 | AI/toolがcommit可能状態を再scan/再verifyループと誤認し、不要なtool callが増える | fixed in cycle 4 burn-down | `status_next_actions_with_prediction` がpending changesあり/open fires 0のpredictionからcommit next_actionを返す |
 
 ## Triage Notes
 
@@ -136,3 +137,4 @@
 - CFB-066からCFB-080は、cycle 2のalgorithm dogfoodingとclean-state probeで見つけた。主な傾向はinstall PATH、commit/dry-run envelope、next_actions path/filter/schema、health/storage path contract、context bounded output、manual fire identity/state recovery、trace-graph help/path/jsonである。
 - CFB-081からCFB-085は、cycle 2 dogfood issue目標20件へ到達するため、clean状態でexplain/storage/branch/migrate/context help surfaceを調査して追加した。主な傾向は、passed状態の要約不整合、quick reportの情報欠落、metrics flagの扱い、JSON failure envelope、help routingである。
 - CFB-086以降は、cycle 3のalgorithm dogfoodingで見つかったissueとして追加する。主な傾向は、v1.0で入れたhelp改善後に残るoperation JSON/evidence/next_actions/state freshnessである。
+- CFB-093は、cycle 4のalgorithm dogfoodingで見つかったstatus next_actionsのcommit導線不足である。今回のcycleでは発見後すぐに修正し、batchを0件に戻す。

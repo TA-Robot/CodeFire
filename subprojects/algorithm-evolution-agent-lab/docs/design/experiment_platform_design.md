@@ -417,3 +417,34 @@ The summary includes:
 - ordered rationale list
 
 Formatting is deterministic and intentionally compact. It does not include raw run logs, raw artifacts, or per-experiment debug output. This keeps the planning document focused on policy adjustment rather than rerunning the analysis step.
+
+## DES-AUTO-022: Research cycle plan synthesis
+
+The cycle plan synthesizer consumes a `ResearchCycleRetrospectiveReport` and converts recommendation-level guidance into lane-level next-cycle work.
+
+The output `ResearchCyclePlan` preserves:
+
+- source cycle IDs
+- retrospective priority
+- active experiment capacity
+- remaining budget
+- deterministic plan items
+
+Each plan item includes:
+
+- lane: `mitigation`, `active`, `review`, `archive`, or `deferred`
+- source recommendation
+- title
+- concrete next action
+- rationale
+- budget hint
+
+Lane assignment is deterministic:
+
+- `mitigate_risk` becomes mitigation work
+- `reduce_cost` and `increase_exploration` become active experiment planning work
+- `consolidate` becomes review work
+- `archive_stale` becomes archive work
+- `keep_policy` becomes deferred monitoring work
+
+The synthesizer validates positive active capacity and non-negative remaining budget. Active work is bounded by capacity, and budget hints are capped by the remaining budget. Overflow active work is converted to deferred items instead of being dropped, so the next cycle keeps visibility into lower-priority work without overcommitting execution.
