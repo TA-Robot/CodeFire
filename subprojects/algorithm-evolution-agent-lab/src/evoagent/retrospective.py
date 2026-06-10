@@ -1248,6 +1248,34 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate
         }
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown:
+    def render(
+        self,
+        result: dict[str, object],
+        *,
+        title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Markdown Gate",
+    ) -> str:
+        blockers = [str(blocker) for blocker in result.get("blockers", [])]
+        lines = [
+            f"# {title}",
+            "",
+            f"- Ready: {'yes' if result.get('ready') else 'no'}",
+            f"- Status: {result.get('status', 'unknown')}",
+            f"- Artifact count: {result.get('artifact_count', 0)}",
+            f"- Checked artifact count: {result.get('checked_artifact_count', 0)}",
+            f"- Finding count: {result.get('finding_count', 0)}",
+            "",
+            "## Blockers",
+            "",
+        ]
+        if blockers:
+            lines.extend(f"- {blocker}" for blocker in blockers)
+        else:
+            lines.append("- none")
+        return "\n".join(lines).rstrip() + "\n"
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

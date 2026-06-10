@@ -11,6 +11,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown,
@@ -1371,6 +1372,42 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertEqual("blocked", blocked["status"])
         self.assertIn("verification status line is missing", blocked["blockers"])
         self.assertIn("artifact count 2 does not match 1 artifact record(s)", blocked["blockers"])
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-markdown-gate-markdown-renders-blockers
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_markdown_gate_markdown_renders_blockers(
+        self,
+    ) -> None:
+        result = {
+            "ready": False,
+            "status": "blocked",
+            "artifact_count": 2,
+            "checked_artifact_count": 1,
+            "finding_count": 0,
+            "blockers": [
+                "verification status line is missing",
+                "artifact count 2 does not match 1 artifact record(s)",
+            ],
+        }
+
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown().render(
+            result,
+            title="Cycle 30 Archive Summary Markdown Gate",
+        )
+
+        self.assertIn("# Cycle 30 Archive Summary Markdown Gate", markdown)
+        self.assertIn("- Ready: no", markdown)
+        self.assertIn("- Status: blocked", markdown)
+        self.assertIn("- Artifact count: 2", markdown)
+        self.assertIn("- Checked artifact count: 1", markdown)
+        self.assertIn("- Finding count: 0", markdown)
+        self.assertIn("- verification status line is missing", markdown)
+        self.assertIn("- artifact count 2 does not match 1 artifact record(s)", markdown)
+
+        clean_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown().render(
+            {"ready": True, "status": "ready", "blockers": []}
+        )
+        self.assertIn("- Ready: yes", clean_markdown)
+        self.assertIn("- none", clean_markdown)
 
 
 if __name__ == "__main__":

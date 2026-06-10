@@ -837,3 +837,15 @@ The gate returns a deterministic dictionary with:
 - checked artifact row count derived from the summary artifact list
 
 The gate verifies that the Markdown contains the source cycle line, archive/readiness/manifest/verification status lines, ready state, artifact count, finding count, audit availability lines, and one exact artifact table row for each artifact record. It does not rebuild the summary, render Markdown, recompute hashes, inspect archives, read files, or write files.
+
+## DES-AUTO-048: Research cycle planning handoff review packet artifact archive summary Markdown gate Markdown
+
+The review packet artifact archive summary Markdown gate Markdown renderer consumes the dictionary emitted by `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate`.
+
+The rendered document contains:
+
+- ready state and status
+- artifact count, checked artifact count, and finding count
+- blocker messages, or `none` when clean
+
+The renderer treats the gate result as the single source of truth. It does not reevaluate the summary Markdown, rebuild the archive, recompute hashes, inspect artifacts, read files, or write files.

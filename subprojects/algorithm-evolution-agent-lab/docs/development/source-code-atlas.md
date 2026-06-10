@@ -303,6 +303,11 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate.evalu
   -> compare final archive summary dictionaries against already-rendered Markdown
   -> block missing status lines, mismatched artifact counts, missing audit lines, and missing artifact rows
   -> avoid Markdown regeneration, archive inspection, hash recomputation, filesystem reads, and storage adapter coupling
+
+ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown.render(result)
+  -> render archive summary Markdown gate decisions as reviewer-facing Markdown
+  -> include ready state, status, counts, and blocker messages
+  -> avoid gate reevaluation, archive inspection, hash recomputation, filesystem reads, and storage adapter coupling
 ```
 
 Important implementation details:
