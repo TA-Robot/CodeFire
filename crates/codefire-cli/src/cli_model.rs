@@ -121,12 +121,14 @@ pub(crate) struct DiffArgs {
 pub(crate) struct ReviewPackArgs {
     pub(crate) review: ReviewPackOptions,
     pub(crate) output: Option<PathBuf>,
+    pub(crate) json_output: bool,
 }
 
 #[derive(Debug)]
 pub(crate) struct PatchExportArgs {
     pub(crate) patch: PatchExportOptions,
     pub(crate) output: Option<PathBuf>,
+    pub(crate) json_output: bool,
 }
 
 #[derive(Debug)]

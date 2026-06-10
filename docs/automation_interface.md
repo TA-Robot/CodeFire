@@ -280,6 +280,32 @@ migrate: review_migration_plan, inspect_migration_blockers
 }
 ```
 
+`review-pack --json` returns metadata only:
+
+```json
+{
+  "type": "codefire_review_pack_result",
+  "version": 1,
+  "output_path": "review-pack.json",
+  "bytes": 12000,
+  "included_sections": ["base", "source", "options", "file_diff", "semantic_diff", "verification", "next_actions"],
+  "payload_in_envelope": false
+}
+```
+
+`patch export --json` returns metadata only. Large write content is omitted by default when it exceeds the configured caps:
+
+```json
+{
+  "type": "codefire_patch_export_result",
+  "version": 1,
+  "output_path": "change.cfpatch.json",
+  "summary": {"entries": 3, "omitted_entries": 1, "max_file_bytes": 1048576, "max_payload_bytes": 4194304},
+  "omissions": [{"path": "model.bin", "reason": "file_exceeds_max_file_bytes", "bytes": 8388608, "sha256": "..."}],
+  "payload_in_envelope": false
+}
+```
+
 `evidence add --json` data:
 
 ```json

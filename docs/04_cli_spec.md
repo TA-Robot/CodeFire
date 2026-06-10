@@ -496,6 +496,7 @@ text diff payloadはunified hunk headerを持ち、file単位の最大出力byte
 codefire review-pack feature-login
 codefire review-pack feature-login --base main --output review-pack.json
 codefire review-pack feature-login --base main --algorithm patience --no-rename-detection
+codefire review-pack feature-login --base main --output review-pack.json --json
 ```
 
 仕様：
@@ -509,6 +510,7 @@ file_diff.textにunified text diffを含める
 semantic_diffにAtom diff、TraceGraph diff、impact diff、next_actionsを含める
 verificationにbase/sourceそれぞれのverification summaryを含める
 --output指定時は指定fileへ書き込み、未指定時はstdoutへ出力する
+--json併用時はpayload本体ではなくcodefire.command_result.v1 envelopeでmetadataを返す。data.type=codefire_review_pack_result、output_path、bytes、base/source/options、included_sections、payload_in_envelope=falseを含める
 review-packはsealed commitから再現可能な情報だけで構成し、生成時刻などの非決定的値は含めない
 ```
 
@@ -643,6 +645,7 @@ v0.6で必要なmissing directoryはplanned_actions=create_directoryとして返
 ```bash
 codefire patch export feature-login --base main --output feature-login.cfpatch.json
 codefire patch export feature-login
+codefire patch export feature-login --json --max-file-bytes 1048576 --max-payload-bytes 4194304
 codefire patch import feature-login.cfpatch.json --dry-run --json
 codefire patch import feature-login.cfpatch.json
 codefire patch import feature-login.cfpatch.json --idempotency-key request-patch-import-001
@@ -656,6 +659,10 @@ patch exportはbase/source sealed commit間のmanifest deltaをcodefire_patch JS
 patch entriesはwrite/delete actionを持つ
 write entryはbase64 contentとbyte数を持つ
 delete entryはpathだけを持つ
+既定ではpatch exportは大きなwrite contentをboundedにし、max_file_bytesまたはmax_payload_bytesを超えるcontentはomit entryへ落とす
+omit entryはpath、bytes、sha256、reason、max_file_bytes、max_payload_bytesを持ち、contentを含まない
+--include-large-filesを明示した場合だけlarge contentをpayloadへ含める
+patch export JSON payloadはsummary、omissions、next_actionsを含む。--json併用時のcommand_result dataはcodefire_patch_export_result metadataであり、payload_in_envelope=false
 patch importはopen directory内で実行する
 patch importはpatch base commitとopen directoryのcurrent_base_commitが一致しない場合に拒否する
 patch import --dry-runはpath検証とbase照合だけを行い、file / active state / branch stateを変更しない

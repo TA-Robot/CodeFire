@@ -4230,6 +4230,7 @@ fn parse_review_pack_args_accepts_base_output_and_algorithm() {
         "review-pack.json".to_string(),
         "--algorithm=patience".to_string(),
         "--no-rename-detection".to_string(),
+        "--json".to_string(),
     ];
     let parsed = parse_review_pack_args(&args).unwrap();
     assert_eq!(parsed.review.source, "feature-session");
@@ -4237,6 +4238,7 @@ fn parse_review_pack_args_accepts_base_output_and_algorithm() {
     assert_eq!(parsed.review.algorithm, DiffAlgorithm::Patience);
     assert!(!parsed.review.rename_detection);
     assert_eq!(parsed.output, Some(PathBuf::from("review-pack.json")));
+    assert!(parsed.json_output);
 }
 
 #[test]
@@ -4336,6 +4338,16 @@ fn review_pack_exports_file_atom_verification_and_next_actions() {
     assert!(json["semantic_diff"]["trace"].is_object());
     assert!(json["verification"]["source"].is_object());
     assert!(json["next_actions"].is_array());
+
+    let result = review_pack_result_data(Some(&PathBuf::from("review-pack.json")), &pack).unwrap();
+    assert_eq!(result["type"], "codefire_review_pack_result");
+    assert_eq!(result["output_path"], "review-pack.json");
+    assert_eq!(result["payload_in_envelope"], false);
+    assert!(result["included_sections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|section| section == "semantic_diff"));
 }
 
 #[test]
@@ -4344,12 +4356,21 @@ fn parse_patch_args_accept_export_and_import_options() {
         "feature-session".to_string(),
         "--base".to_string(),
         "main".to_string(),
+        "--json".to_string(),
+        "--max-file-bytes=4096".to_string(),
+        "--max-payload-bytes".to_string(),
+        "8192".to_string(),
+        "--include-large-files".to_string(),
         "--output".to_string(),
         "change.cfpatch.json".to_string(),
     ])
     .unwrap();
     assert_eq!(export.patch.source, "feature-session");
     assert_eq!(export.patch.base.as_deref(), Some("main"));
+    assert!(export.json_output);
+    assert_eq!(export.patch.max_file_bytes, 4096);
+    assert_eq!(export.patch.max_payload_bytes, 8192);
+    assert!(export.patch.include_large_files);
     assert_eq!(export.output, Some(PathBuf::from("change.cfpatch.json")));
 
     let import = parse_patch_import_args(&[
@@ -4364,6 +4385,63 @@ fn parse_patch_args_accept_export_and_import_options() {
     assert!(import.dry_run);
     assert!(import.json_output);
     assert_eq!(import.idempotency_key.as_deref(), Some("patch-key-1"));
+}
+
+#[test]
+fn patch_export_json_metadata_and_large_file_omission_are_bounded() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit(&objects, "model.bin", "small\n");
+    let feature_commit = write_file_commit_with_parents(
+        &objects,
+        "model.bin",
+        "0123456789abcdef\n",
+        vec![base_commit.clone()],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-large",
+            "head": feature_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+
+    let patch = patch_export_with_options(
+        Some(&repo_root),
+        &PatchExportOptions {
+            source: "feature-large".to_string(),
+            base: Some(base_commit),
+            max_file_bytes: 4,
+            max_payload_bytes: DEFAULT_PATCH_EXPORT_MAX_PAYLOAD_BYTES,
+            include_large_files: false,
+        },
+    )
+    .unwrap();
+    let patch_json: Value = serde_json::from_str(&patch).unwrap();
+    assert_eq!(patch_json["summary"]["omitted_entries"], 1);
+    assert_eq!(patch_json["entries"][0]["action"], "omit");
+    assert_eq!(
+        patch_json["entries"][0]["reason"],
+        "file_exceeds_max_file_bytes"
+    );
+    assert!(patch_json["entries"][0].get("content").is_none());
+
+    let result = patch_export_result_data(None, &patch).unwrap();
+    assert_eq!(result["type"], "codefire_patch_export_result");
+    assert_eq!(result["payload_in_envelope"], false);
+    assert_eq!(result["summary"]["max_file_bytes"], 4);
+    assert_eq!(result["omissions"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        result["next_actions"][0]["kind"],
+        "patch_export_include_large_files"
+    );
 }
 
 #[test]
@@ -4446,6 +4524,9 @@ fn patch_export_import_applies_manifest_delta_to_open_directory() {
         &PatchExportOptions {
             source: "feature-session".to_string(),
             base: Some("main".to_string()),
+            max_file_bytes: DEFAULT_PATCH_EXPORT_MAX_FILE_BYTES,
+            max_payload_bytes: DEFAULT_PATCH_EXPORT_MAX_PAYLOAD_BYTES,
+            include_large_files: false,
         },
     )
     .unwrap();
@@ -4550,6 +4631,9 @@ fn patch_import_idempotency_replays_same_payload_and_rejects_conflict() {
         &PatchExportOptions {
             source: "feature-session".to_string(),
             base: Some("main".to_string()),
+            max_file_bytes: DEFAULT_PATCH_EXPORT_MAX_FILE_BYTES,
+            max_payload_bytes: DEFAULT_PATCH_EXPORT_MAX_PAYLOAD_BYTES,
+            include_large_files: false,
         },
     )
     .unwrap();

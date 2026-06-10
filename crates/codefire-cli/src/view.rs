@@ -17,6 +17,9 @@ use std::path::{Path, PathBuf};
 mod file_diff;
 mod semantic_diff;
 
+pub(crate) const DEFAULT_PATCH_EXPORT_MAX_FILE_BYTES: usize = 1_048_576;
+pub(crate) const DEFAULT_PATCH_EXPORT_MAX_PAYLOAD_BYTES: usize = 4_194_304;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DiffAlgorithm {
     Myers,
@@ -87,6 +90,9 @@ pub(crate) struct ReviewPackOptions {
 pub(crate) struct PatchExportOptions {
     pub(crate) source: String,
     pub(crate) base: Option<String>,
+    pub(crate) max_file_bytes: usize,
+    pub(crate) max_payload_bytes: usize,
+    pub(crate) include_large_files: bool,
 }
 
 pub(crate) fn show_commitish(repo_root: Option<&Path>, value: &str) -> Result<String, CliError> {
@@ -347,6 +353,12 @@ pub(crate) fn patch_export_with_options(
         .cloned()
         .collect::<std::collections::BTreeSet<_>>();
     let mut entries = Vec::new();
+    let mut omissions = Vec::new();
+    let mut included_content_bytes = 0usize;
+    let mut encoded_content_bytes = 0usize;
+    let mut write_entries = 0usize;
+    let mut delete_entries = 0usize;
+    let mut omitted_entries = 0usize;
     for path in paths {
         let base_data = base_files.get(&path);
         let source_data = source_files.get(&path);
@@ -354,14 +366,44 @@ pub(crate) fn patch_export_with_options(
             continue;
         }
         if let Some(data) = source_data {
-            entries.push(json!({
-                "path": path,
-                "action": "write",
-                "encoding": "base64",
-                "content": encode_base64(data),
-                "bytes": data.len(),
-            }));
+            let encoded_len = encoded_base64_len(data.len());
+            let omission_reason = if options.include_large_files {
+                None
+            } else if data.len() > options.max_file_bytes {
+                Some("file_exceeds_max_file_bytes")
+            } else if encoded_content_bytes.saturating_add(encoded_len) > options.max_payload_bytes
+            {
+                Some("payload_cap_exceeded")
+            } else {
+                None
+            };
+            if let Some(reason) = omission_reason {
+                let omission = json!({
+                    "path": path,
+                    "action": "omit",
+                    "reason": reason,
+                    "bytes": data.len(),
+                    "sha256": codefire_util::sha256_hex(data),
+                    "max_file_bytes": options.max_file_bytes,
+                    "max_payload_bytes": options.max_payload_bytes,
+                });
+                entries.push(omission.clone());
+                omissions.push(omission);
+                omitted_entries += 1;
+            } else {
+                included_content_bytes = included_content_bytes.saturating_add(data.len());
+                encoded_content_bytes = encoded_content_bytes.saturating_add(encoded_len);
+                write_entries += 1;
+                entries.push(json!({
+                    "path": path,
+                    "action": "write",
+                    "encoding": "base64",
+                    "content": encode_base64(data),
+                    "bytes": data.len(),
+                }));
+            }
         } else {
+            delete_entries += 1;
             entries.push(json!({
                 "path": path,
                 "action": "delete",
@@ -373,9 +415,38 @@ pub(crate) fn patch_export_with_options(
         "version": 1,
         "base": commit_review_summary(&base)?,
         "source": commit_review_summary(&source)?,
+        "summary": {
+            "entries": entries.len(),
+            "write_entries": write_entries,
+            "delete_entries": delete_entries,
+            "omitted_entries": omitted_entries,
+            "included_content_bytes": included_content_bytes,
+            "encoded_content_bytes": encoded_content_bytes,
+            "max_file_bytes": options.max_file_bytes,
+            "max_payload_bytes": options.max_payload_bytes,
+            "include_large_files": options.include_large_files,
+        },
+        "omissions": omissions,
+        "next_actions": patch_export_next_actions(omitted_entries),
         "entries": entries,
     });
     Ok(format!("{}\n", serde_json::to_string_pretty(&value)?))
+}
+
+fn encoded_base64_len(bytes: usize) -> usize {
+    bytes.div_ceil(3).saturating_mul(4)
+}
+
+fn patch_export_next_actions(omitted_entries: usize) -> Vec<Value> {
+    if omitted_entries == 0 {
+        return Vec::new();
+    }
+    vec![json!({
+        "kind": "patch_export_include_large_files",
+        "command": "codefire patch export <source> --include-large-files --output <path>",
+        "reason": "re-run only if omitted file content is intentionally needed in the patch payload",
+        "target": {"omitted_entries": omitted_entries},
+    })]
 }
 
 fn first_parent_commitish(source: &ResolvedCommitish) -> Result<ResolvedCommitish, CliError> {

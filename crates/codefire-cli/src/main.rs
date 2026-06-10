@@ -105,7 +105,8 @@ use verification::{parse_verify_args, print_verification};
 use view::{
     diff_commitish_with_options, manifest_contents, patch_export_with_options,
     review_pack_with_options, show_commitish, show_commitish_data, DiffAlgorithm, DiffOptions,
-    PatchExportOptions, ReviewPackOptions,
+    PatchExportOptions, ReviewPackOptions, DEFAULT_PATCH_EXPORT_MAX_FILE_BYTES,
+    DEFAULT_PATCH_EXPORT_MAX_PAYLOAD_BYTES,
 };
 
 pub(crate) fn scan_branch_state(changed_atoms: usize, open_fires: usize) -> &'static str {
@@ -556,14 +557,36 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             Ok(())
         }
         Some("review-pack") => {
-            let options = parse_review_pack_args(&args[1..])?;
+            let json_requested = args_want_json(&args[1..]);
+            let options = match parse_review_pack_args(&args[1..]) {
+                Ok(options) => options,
+                Err(error) if json_requested => {
+                    print_cli_error_json("review-pack", &error)?;
+                    return Err(CliError::CommandFailed(error.exit_status()));
+                }
+                Err(error) => return Err(error),
+            };
             let repo_root = optional_repo_root(&env::current_dir()?);
             let output = review_pack_with_options(repo_root.as_deref(), &options.review)?;
-            if let Some(path) = options.output {
+            if let Some(path) = options.output.as_ref() {
                 if let Some(parent) = path.parent() {
                     fs::create_dir_all(parent)?;
                 }
-                fs::write(path, output)?;
+                fs::write(path, &output)?;
+            }
+            if options.json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "review-pack",
+                        true,
+                        0,
+                        repo_root.as_deref(),
+                        review_pack_result_data(options.output.as_ref(), &output)?,
+                        Vec::new(),
+                        Vec::new(),
+                    ))?
+                );
             } else {
                 print!("{output}");
             }
@@ -571,14 +594,42 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         }
         Some("patch") => match args.get(1).map(String::as_str) {
             Some("export") => {
-                let options = parse_patch_export_args(&args[2..])?;
+                let json_requested = args_want_json(&args[2..]);
+                let options = match parse_patch_export_args(&args[2..]) {
+                    Ok(options) => options,
+                    Err(error) if json_requested => {
+                        print_cli_error_json("patch-export", &error)?;
+                        return Err(CliError::CommandFailed(error.exit_status()));
+                    }
+                    Err(error) => return Err(error),
+                };
                 let repo_root = optional_repo_root(&env::current_dir()?);
                 let output = patch_export_with_options(repo_root.as_deref(), &options.patch)?;
-                if let Some(path) = options.output {
+                if let Some(path) = options.output.as_ref() {
                     if let Some(parent) = path.parent() {
                         fs::create_dir_all(parent)?;
                     }
-                    fs::write(path, output)?;
+                    fs::write(path, &output)?;
+                }
+                if options.json_output {
+                    let data = patch_export_result_data(options.output.as_ref(), &output)?;
+                    let next_actions = data
+                        .get("next_actions")
+                        .and_then(Value::as_array)
+                        .cloned()
+                        .unwrap_or_default();
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&command_result_envelope(
+                            "patch-export",
+                            true,
+                            0,
+                            repo_root.as_deref(),
+                            data,
+                            Vec::new(),
+                            next_actions,
+                        ))?
+                    );
                 } else {
                     print!("{output}");
                 }
@@ -1223,13 +1274,13 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire diff [--algorithm myers|patience|histogram] [--context <lines>] [--rename-detection] [--atoms] [--trace] [--impact] [--json] <left> <right>\n"
         }
         "review-pack" => {
-            "usage: codefire review-pack <source> [--base <base>] [--output <path>] [--algorithm myers|patience|histogram] [--no-rename-detection]\n"
+            "usage: codefire review-pack <source> [--base <base>] [--output <path>] [--algorithm myers|patience|histogram] [--no-rename-detection] [--json]\n"
         }
         "patch" => {
             "usage: codefire patch export <source> [--base <base>] [--output <path>]\n       codefire patch import <patch-file> [--dry-run] [--json] [--idempotency-key <key>]\n"
         }
         "patch export" => {
-            "usage: codefire patch export <source> [--base <base>] [--output <path>]\n"
+            "usage: codefire patch export <source> [--base <base>] [--output <path>] [--max-file-bytes <bytes>] [--max-payload-bytes <bytes>] [--include-large-files] [--json]\n"
         }
         "patch import" => {
             "usage: codefire patch import <patch-file> [--dry-run] [--json] [--idempotency-key <key>]\n"
@@ -1985,6 +2036,55 @@ fn print_data_result_json(command: &str, data: Value) -> Result<(), CliError> {
         ))?
     );
     Ok(())
+}
+
+fn review_pack_result_data(
+    output_path: Option<&PathBuf>,
+    payload: &str,
+) -> Result<Value, CliError> {
+    let value: Value = serde_json::from_str(payload)?;
+    Ok(json!({
+        "type": "codefire_review_pack_result",
+        "version": 1,
+        "output_path": output_path,
+        "bytes": payload.len(),
+        "base": value.get("base").cloned().unwrap_or_else(|| json!(null)),
+        "source": value.get("source").cloned().unwrap_or_else(|| json!(null)),
+        "options": value.get("options").cloned().unwrap_or_else(|| json!({})),
+        "included_sections": [
+            "base",
+            "source",
+            "options",
+            "file_diff",
+            "semantic_diff",
+            "verification",
+            "next_actions"
+        ],
+        "payload_in_envelope": false,
+    }))
+}
+
+fn patch_export_result_data(
+    output_path: Option<&PathBuf>,
+    payload: &str,
+) -> Result<Value, CliError> {
+    let value: Value = serde_json::from_str(payload)?;
+    Ok(json!({
+        "type": "codefire_patch_export_result",
+        "version": 1,
+        "output_path": output_path,
+        "bytes": payload.len(),
+        "base": value.get("base").cloned().unwrap_or_else(|| json!(null)),
+        "source": value.get("source").cloned().unwrap_or_else(|| json!(null)),
+        "summary": value.get("summary").cloned().unwrap_or_else(|| json!({})),
+        "omissions": value.get("omissions").cloned().unwrap_or_else(|| json!([])),
+        "entries": value
+            .get("entries")
+            .and_then(Value::as_array)
+            .map_or(0, Vec::len),
+        "next_actions": value.get("next_actions").cloned().unwrap_or_else(|| json!([])),
+        "payload_in_envelope": false,
+    }))
 }
 
 fn args_want_json(args: &[String]) -> bool {
@@ -2946,6 +3046,7 @@ fn parse_review_pack_args(args: &[String]) -> Result<ReviewPackArgs, CliError> {
     let mut source = None;
     let mut base = None;
     let mut output = None;
+    let mut json_output = false;
     let mut algorithm = DiffAlgorithm::Myers;
     let mut rename_detection = true;
     let mut index = 0usize;
@@ -2963,6 +3064,8 @@ fn parse_review_pack_args(args: &[String]) -> Result<ReviewPackArgs, CliError> {
             output = Some(PathBuf::from(args.get(index).ok_or_else(|| {
                 CliError::Usage("--output requires a value".to_string())
             })?));
+        } else if value == "--json" {
+            json_output = true;
         } else if value == "--algorithm" {
             index += 1;
             let name = args
@@ -3001,6 +3104,7 @@ fn parse_review_pack_args(args: &[String]) -> Result<ReviewPackArgs, CliError> {
             rename_detection,
         },
         output,
+        json_output,
     })
 }
 
@@ -3008,6 +3112,10 @@ fn parse_patch_export_args(args: &[String]) -> Result<PatchExportArgs, CliError>
     let mut source = None;
     let mut base = None;
     let mut output = None;
+    let mut json_output = false;
+    let mut max_file_bytes = DEFAULT_PATCH_EXPORT_MAX_FILE_BYTES;
+    let mut max_payload_bytes = DEFAULT_PATCH_EXPORT_MAX_PAYLOAD_BYTES;
+    let mut include_large_files = false;
     let mut index = 0usize;
     while index < args.len() {
         let value = &args[index];
@@ -3023,6 +3131,30 @@ fn parse_patch_export_args(args: &[String]) -> Result<PatchExportArgs, CliError>
             output = Some(PathBuf::from(args.get(index).ok_or_else(|| {
                 CliError::Usage("--output requires a value".to_string())
             })?));
+        } else if value == "--json" {
+            json_output = true;
+        } else if value == "--include-large-files" {
+            include_large_files = true;
+        } else if value == "--max-file-bytes" {
+            index += 1;
+            max_file_bytes = parse_usize_arg(
+                args.get(index).ok_or_else(|| {
+                    CliError::Usage("--max-file-bytes requires a value".to_string())
+                })?,
+                "--max-file-bytes",
+            )?;
+        } else if let Some(bytes) = value.strip_prefix("--max-file-bytes=") {
+            max_file_bytes = parse_usize_arg(bytes, "--max-file-bytes")?;
+        } else if value == "--max-payload-bytes" {
+            index += 1;
+            max_payload_bytes = parse_usize_arg(
+                args.get(index).ok_or_else(|| {
+                    CliError::Usage("--max-payload-bytes requires a value".to_string())
+                })?,
+                "--max-payload-bytes",
+            )?;
+        } else if let Some(bytes) = value.strip_prefix("--max-payload-bytes=") {
+            max_payload_bytes = parse_usize_arg(bytes, "--max-payload-bytes")?;
         } else if value.starts_with("--") {
             return Err(CliError::Usage(format!(
                 "unsupported patch export option: {value}"
@@ -3045,9 +3177,19 @@ fn parse_patch_export_args(args: &[String]) -> Result<PatchExportArgs, CliError>
                 )
             })?,
             base,
+            max_file_bytes,
+            max_payload_bytes,
+            include_large_files,
         },
         output,
+        json_output,
     })
+}
+
+fn parse_usize_arg(value: &str, name: &str) -> Result<usize, CliError> {
+    value
+        .parse::<usize>()
+        .map_err(|_| CliError::Usage(format!("{name} must be a non-negative integer")))
 }
 
 fn parse_patch_import_args(args: &[String]) -> Result<PatchImportOptions, CliError> {

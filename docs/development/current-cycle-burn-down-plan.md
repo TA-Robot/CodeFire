@@ -122,10 +122,13 @@ Completion rule:
 | CFR-106 | fixed | Storage mode coverage | JSON reports quick/full coverage and skipped checks |
 | CFR-134 | fixed | Storage quick largest type | largest objects include inferred type and type confidence |
 | CFR-135 | fixed | Storage largest top-N | largest object aggregation keeps bounded top-N and reports limit |
+| CFB-063 | fixed | Review/patch JSON surface | review-pack and patch export return metadata command_result envelopes |
+| CFR-087 | fixed | Review/patch JSON envelope | generated payload metadata is structured without embedding payload body |
+| CFR-088 | fixed | Patch export bounded payload | large write content is omitted by default with hash/size metadata |
 
 Remaining open count for this batch:
 
-- 72 issues.
+- 69 issues.
 
 ## Global Issue Inventory
 
@@ -135,15 +138,15 @@ Current tracked issue inventory as of 2026-06-10:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 92 | 63 | 29 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
-| CFR code review issues | 160 | 117 | 43 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
-| Total | 252 | 180 | 72 | This global batch is the whole known issue backlog. |
+| CFB dogfood issues | 92 | 64 | 28 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFR code review issues | 160 | 119 | 41 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
+| Total | 252 | 183 | 69 | This global batch is the whole known issue backlog. |
 
 Current active batch progress:
 
 - Initial frozen open issue count: 146.
-- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-029, CFB-037, CFB-040, CFB-041, CFB-042, CFB-044, CFB-049, CFB-050, CFB-052, CFB-056, CFB-057, CFB-058, CFB-059, CFB-060, CFB-061, CFB-062, CFB-064, CFB-065, CFB-068, CFB-069, CFB-070, CFB-071, CFB-072, CFB-073, CFB-074, CFB-075, CFB-076, CFB-081, CFB-082, CFB-083, CFB-084, CFR-085, CFR-086, CFR-096, CFR-098, CFR-099, CFR-100, CFR-101, CFR-102, CFR-103, CFR-104, CFR-106, CFR-107, CFR-108, CFR-109, CFR-115, CFR-125, CFR-126, CFR-127, CFR-134, CFR-135, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-142, CFR-143, CFR-144, CFR-147, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-157.
-- Remaining open now: 72.
+- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-029, CFB-037, CFB-040, CFB-041, CFB-042, CFB-044, CFB-049, CFB-050, CFB-052, CFB-056, CFB-057, CFB-058, CFB-059, CFB-060, CFB-061, CFB-062, CFB-063, CFB-064, CFB-065, CFB-068, CFB-069, CFB-070, CFB-071, CFB-072, CFB-073, CFB-074, CFB-075, CFB-076, CFB-081, CFB-082, CFB-083, CFB-084, CFR-085, CFR-086, CFR-087, CFR-088, CFR-096, CFR-098, CFR-099, CFR-100, CFR-101, CFR-102, CFR-103, CFR-104, CFR-106, CFR-107, CFR-108, CFR-109, CFR-115, CFR-125, CFR-126, CFR-127, CFR-134, CFR-135, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-142, CFR-143, CFR-144, CFR-147, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-157.
+- Remaining open now: 69.
 
 Burn-down interpretation:
 
