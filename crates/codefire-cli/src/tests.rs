@@ -3253,12 +3253,23 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
     let quick_data = storage_report_data_json(&quick);
     assert!(quick.quick);
     assert_eq!(quick_data["mode"], "quick");
+    assert_eq!(quick_data["coverage"]["object_json_validation"], false);
+    assert_eq!(
+        quick_data["coverage"]["largest_object_type_source"],
+        "id_prefix_or_path"
+    );
+    assert_eq!(quick_data["objects"]["largest_limit"], 10);
     assert!(quick.object_types.is_empty());
     assert_eq!(quick_data["skipped_checks"][0], "object_json_validation");
     assert!(quick
         .largest_objects
         .iter()
-        .all(|object| object.type_tag == "unscanned"));
+        .any(|object| object.type_tag == "blob" && object.type_confidence == "id_prefix"));
+    assert!(quick_data["objects"]["largest"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|object| object["type"] == "blob" && object["type_confidence"] == "id_prefix"));
     assert!(quick
         .warnings
         .iter()
@@ -3349,6 +3360,13 @@ fn storage_report_counts_file_remote_project_storage() {
 
     assert_eq!(parsed.remotes.len(), 2);
     assert_eq!(report.remotes.len(), 2);
+    let missing = report
+        .remotes
+        .iter()
+        .find(|remote| remote.url == "cf:///tmp/missing/org/app")
+        .unwrap();
+    assert_eq!(missing.status, "invalid_layout");
+    assert!(!missing.missing_required_paths.is_empty());
     let remote = report
         .remotes
         .iter()
@@ -3384,6 +3402,20 @@ fn storage_report_counts_file_remote_project_storage() {
     assert_eq!(data["remotes"][0]["idempotency"]["expired_files"], 1);
     assert_eq!(data["remotes"][0]["nonce_cache"]["entry_count"], 1);
     assert_eq!(data["remotes"][0]["nonce_cache"]["max_entries"], 10000);
+    assert!(data["remotes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|remote| remote["url"] == "cf:///tmp/missing/org/app"
+            && remote["status"] == "invalid_layout"
+            && !remote["missing_required_paths"]
+                .as_array()
+                .unwrap()
+                .is_empty()));
+    assert!(report
+        .warnings
+        .iter()
+        .any(|warning| warning.kind == "remote_layout_invalid"));
     assert_eq!(
         data["remotes"][0]["objects_by_generation"][0]["generation"],
         7

@@ -307,15 +307,17 @@ The active CodeFire improvement cycle is a global burn-down. The initial frozen 
 
 Global inventory as of 2026-06-10:
 
-- CFB dogfood issues: 92 total, 61 fixed, 31 open.
-- CFR code review issues: 160 total, 112 fixed/closed, 48 open.
-- Combined tracked backlog: 252 total, 173 fixed/closed, 79 open.
+- CFB dogfood issues: 92 total, 63 fixed, 29 open.
+- CFR code review issues: 160 total, 117 fixed/closed, 43 open.
+- Combined tracked backlog: 252 total, 180 fixed/closed, 72 open.
 
 Active batch closed in this burn-down:
 
 - CFB-037: failed evidence commands no longer create successful-looking evidence by default.
 - CFB-049: evidence command capture cwd resolution is explicit and returned in JSON.
+- CFB-061: missing remote storage target is reported as invalid layout instead of silently disappearing.
 - CFB-072: evidence dry-run plan reports resolved cwd and cwd source.
+- CFB-082: storage quick mode reports inferred largest object types and type confidence.
 - CFB-087: missing evidence-ref dry-run failures are not JSON enveloped.
 - CFB-089: `atom-index` and `missing-links` do not handle shared `--path` / `--json` like normal commands.
 - CFB-090: bounded context can return trace links to omitted endpoints without endpoint omission metadata.
@@ -329,7 +331,7 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- Remaining 79 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
+- Remaining 72 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
 - このglobal batchが0 openになるまで、新しいissue discovery batchへ進まない。
 
 ## Cycle Invariants

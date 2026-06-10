@@ -244,11 +244,20 @@ migrate: review_migration_plan, inspect_migration_blockers
   "version": 1,
   "mode": "full",
   "skipped_checks": [],
+  "coverage": {
+    "object_json_validation": true,
+    "object_type_breakdown": true,
+    "external_artifact_refs": true,
+    "remote_layout_validation": true,
+    "largest_object_type_source": "object_record",
+    "requires_full_for": []
+  },
   "objects": {
     "files": 12,
     "bytes": 4096,
     "by_type": [{"type": "commit", "files": 1, "bytes": 512}],
-    "largest": [{"object_id": "CF-COMMIT-...", "type": "commit", "path": "/repo/.codefire/objects/commits/CF-COMMIT-....json", "bytes": 512}]
+    "largest_limit": 10,
+    "largest": [{"object_id": "CF-COMMIT-...", "type": "commit", "type_confidence": "object_record", "path": "/repo/.codefire/objects/commits/CF-COMMIT-....json", "bytes": 512}]
   },
   "active_state": {"files": 1, "bytes": 28},
   "idempotency": {"files": 0, "bytes": 0},
@@ -256,7 +265,9 @@ migrate: review_migration_plan, inspect_migration_blockers
   "remotes": [
     {
       "url": "cf:///srv/codefire/org/app",
+      "status": "ok",
       "project_root": "/srv/codefire/.codefire-server/projects/org/app",
+      "missing_required_paths": [],
       "objects": {"files": 20, "bytes": 8192},
       "branches": {"files": 2, "bytes": 256},
       "merge_requests": {"files": 1, "bytes": 512},

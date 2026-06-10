@@ -1,4 +1,4 @@
-use super::remote::{parse_cf_project_url, remote_dirs};
+use super::remote::{parse_cf_project_url, remote_dirs, RemoteDirs};
 use super::{find_repo_root, read_json, CliError};
 use crate::automation::{cli_command, next_action as automation_next_action};
 use serde_json::{json, Value};
@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const DEFAULT_LARGE_THRESHOLD_BYTES: u64 = 1_048_576;
+const LARGEST_OBJECT_LIMIT: usize = 10;
 
 #[derive(Debug)]
 pub(crate) struct StorageReportOptions {
@@ -30,6 +31,7 @@ pub(crate) struct StorageReport {
     pub(crate) warnings: Vec<StorageWarning>,
     pub(crate) quick: bool,
     pub(crate) skipped_checks: Vec<String>,
+    pub(crate) largest_limit: usize,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -49,6 +51,7 @@ pub(crate) struct ObjectTypeStats {
 pub(crate) struct ObjectFileStats {
     pub(crate) object_id: String,
     pub(crate) type_tag: String,
+    pub(crate) type_confidence: &'static str,
     pub(crate) path: PathBuf,
     pub(crate) bytes: u64,
 }
@@ -63,7 +66,9 @@ pub(crate) struct ExternalArtifactStats {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RemoteStorageStats {
     pub(crate) url: String,
+    pub(crate) status: String,
     pub(crate) project_root: PathBuf,
+    pub(crate) missing_required_paths: Vec<PathBuf>,
     pub(crate) objects: AreaStats,
     pub(crate) branches: AreaStats,
     pub(crate) merge_requests: AreaStats,
@@ -213,6 +218,7 @@ pub(crate) fn run_storage_report(
         warnings,
         quick: options.quick,
         skipped_checks: object_scan.skipped_checks,
+        largest_limit: LARGEST_OBJECT_LIMIT,
     })
 }
 
@@ -223,10 +229,19 @@ pub(crate) fn storage_report_data_json(report: &StorageReport) -> Value {
         "repo_root": &report.repo_root,
         "mode": if report.quick { "quick" } else { "full" },
         "skipped_checks": &report.skipped_checks,
+        "coverage": {
+            "object_json_validation": !report.quick,
+            "object_type_breakdown": !report.quick,
+            "external_artifact_refs": !report.quick,
+            "remote_layout_validation": true,
+            "largest_object_type_source": if report.quick { "id_prefix_or_path" } else { "object_record" },
+            "requires_full_for": &report.skipped_checks,
+        },
         "objects": {
             "files": report.objects.files,
             "bytes": report.objects.bytes,
             "by_type": report.object_types.iter().map(object_type_json).collect::<Vec<_>>(),
+            "largest_limit": report.largest_limit,
             "largest": report.largest_objects.iter().map(object_file_json).collect::<Vec<_>>(),
         },
         "active_state": {
@@ -301,8 +316,9 @@ pub(crate) fn print_storage_report(report: &StorageReport) {
     } else {
         for remote in &report.remotes {
             println!(
-                "  {}: objects {} files, {}; branches {}; merge requests {}",
+                "  {} [{}]: objects {} files, {}; branches {}; merge requests {}",
                 remote.url,
+                remote.status,
                 remote.objects.files,
                 format_bytes(remote.objects.bytes),
                 remote.branches.files,
@@ -395,7 +411,7 @@ fn scan_objects(
     } else {
         Vec::new()
     };
-    for path in collect_files(objects_root)? {
+    for path in collect_files_optional(objects_root)? {
         let bytes = fs::metadata(&path)?.len();
         area.files += 1;
         area.bytes += bytes;
@@ -413,12 +429,18 @@ fn scan_objects(
                     bytes: Some(bytes),
                 });
             }
-            largest_objects.push(ObjectFileStats {
-                object_id,
-                type_tag: "unscanned".to_string(),
-                path,
-                bytes,
-            });
+            let (type_tag, type_confidence) =
+                infer_object_type_for_quick_scan(objects_root, &path, &object_id);
+            push_largest_object(
+                &mut largest_objects,
+                ObjectFileStats {
+                    object_id,
+                    type_tag,
+                    type_confidence,
+                    path,
+                    bytes,
+                },
+            );
             continue;
         }
         let value = match read_json(&path) {
@@ -478,12 +500,16 @@ fn scan_objects(
                 bytes: Some(bytes),
             });
         }
-        largest_objects.push(ObjectFileStats {
-            object_id,
-            type_tag,
-            path,
-            bytes,
-        });
+        push_largest_object(
+            &mut largest_objects,
+            ObjectFileStats {
+                object_id,
+                type_tag,
+                type_confidence: "object_record",
+                path,
+                bytes,
+            },
+        );
     }
     let mut object_types = by_type
         .into_iter()
@@ -499,13 +525,6 @@ fn scan_objects(
             .cmp(&left.bytes)
             .then_with(|| left.type_tag.cmp(&right.type_tag))
     });
-    largest_objects.sort_by(|left, right| {
-        right
-            .bytes
-            .cmp(&left.bytes)
-            .then_with(|| left.object_id.cmp(&right.object_id))
-    });
-    largest_objects.truncate(10);
     Ok(ObjectScan {
         area,
         object_types,
@@ -518,11 +537,83 @@ fn scan_objects(
 
 fn scan_area(path: &Path) -> Result<AreaStats, CliError> {
     let mut stats = AreaStats::default();
-    for file in collect_files(path)? {
+    for file in collect_files_optional(path)? {
         stats.files += 1;
         stats.bytes += fs::metadata(file)?.len();
     }
     Ok(stats)
+}
+
+fn scan_area_required(path: &Path) -> Result<AreaStats, CliError> {
+    let mut stats = AreaStats::default();
+    for file in collect_files_required(path)? {
+        stats.files += 1;
+        stats.bytes += fs::metadata(file)?.len();
+    }
+    Ok(stats)
+}
+
+fn push_largest_object(largest_objects: &mut Vec<ObjectFileStats>, candidate: ObjectFileStats) {
+    largest_objects.push(candidate);
+    largest_objects.sort_by(|left, right| {
+        right
+            .bytes
+            .cmp(&left.bytes)
+            .then_with(|| left.object_id.cmp(&right.object_id))
+    });
+    largest_objects.truncate(LARGEST_OBJECT_LIMIT);
+}
+
+fn infer_object_type_for_quick_scan(
+    objects_root: &Path,
+    path: &Path,
+    object_id: &str,
+) -> (String, &'static str) {
+    for (prefix, type_tag) in [
+        ("CF-BLOB-", "blob"),
+        ("CF-MANIFEST-", "content_manifest"),
+        ("CF-ATOMINDEX-", "atom_index"),
+        ("CF-TRACE-", "trace_graph"),
+        ("CF-FIRELEDGER-", "fire_ledger"),
+        ("CF-RESOLUTION-", "resolution_ledger"),
+        ("CF-VERIFY-", "verification"),
+        ("CF-POLICY-", "policy"),
+        ("CF-ARTIFACT-", "artifact_ref"),
+        ("CF-EVIDENCE-", "evidence"),
+        ("CF-COMMIT-", "commit"),
+        ("CF-BRANCH-", "branch"),
+    ] {
+        if object_id.starts_with(prefix) {
+            return (type_tag.to_string(), "id_prefix");
+        }
+    }
+    let subdir = path
+        .strip_prefix(objects_root)
+        .ok()
+        .and_then(|relative| relative.components().next())
+        .and_then(|component| component.as_os_str().to_str());
+    let Some(subdir) = subdir else {
+        return ("unknown".to_string(), "unknown");
+    };
+    for (dir, type_tag) in [
+        ("blobs", "blob"),
+        ("content_manifests", "content_manifest"),
+        ("atom_indexes", "atom_index"),
+        ("trace_graphs", "trace_graph"),
+        ("fire_ledgers", "fire_ledger"),
+        ("resolution_ledgers", "resolution_ledger"),
+        ("verifications", "verification"),
+        ("policies", "policy"),
+        ("artifact_refs", "artifact_ref"),
+        ("evidence", "evidence"),
+        ("commits", "commit"),
+        ("branches", "branch"),
+    ] {
+        if subdir == dir {
+            return (type_tag.to_string(), "path_subdir");
+        }
+    }
+    ("unknown".to_string(), "unknown")
 }
 
 struct RemoteStorageScan {
@@ -537,8 +628,26 @@ fn scan_remote_storage(remote_urls: &[String]) -> Result<RemoteStorageScan, CliE
         let project = parse_cf_project_url(url)?;
         let project_root = project.project_root;
         let dirs = remote_dirs(&project_root);
+        let missing_required_paths = remote_layout_issues(&project_root, &dirs);
+        if !missing_required_paths.is_empty() {
+            warnings.push(StorageWarning {
+                kind: "remote_layout_invalid".to_string(),
+                message: format!(
+                    "remote storage target {url} is missing required path(s) or is not a directory"
+                ),
+                path: Some(project_root.clone()),
+                bytes: None,
+            });
+            remotes.push(empty_remote_storage_stats(
+                url,
+                project_root,
+                "invalid_layout",
+                missing_required_paths,
+            ));
+            continue;
+        }
         let retention = scan_remote_retention(&project_root)?;
-        let idempotency = scan_area(&dirs.idempotency)?;
+        let idempotency = scan_area_required(&dirs.idempotency)?;
         let idempotency_retention = scan_remote_idempotency_retention(
             &dirs.idempotency,
             retention.idempotency_retention_seconds,
@@ -556,10 +665,12 @@ fn scan_remote_storage(remote_urls: &[String]) -> Result<RemoteStorageScan, CliE
         }
         remotes.push(RemoteStorageStats {
             url: url.clone(),
+            status: "ok".to_string(),
             project_root: project_root.clone(),
-            objects: scan_area(&dirs.objects)?,
-            branches: scan_area(&dirs.branches)?,
-            merge_requests: scan_area(&dirs.merge_requests)?,
+            missing_required_paths: Vec::new(),
+            objects: scan_area_required(&dirs.objects)?,
+            branches: scan_area_required(&dirs.branches)?,
+            merge_requests: scan_area_required(&dirs.merge_requests)?,
             idempotency,
             idempotency_retention,
             nonce_cache: scan_remote_nonce_cache(&project_root)?,
@@ -568,6 +679,45 @@ fn scan_remote_storage(remote_urls: &[String]) -> Result<RemoteStorageScan, CliE
         });
     }
     Ok(RemoteStorageScan { remotes, warnings })
+}
+
+fn remote_layout_issues(project_root: &Path, dirs: &RemoteDirs) -> Vec<PathBuf> {
+    let mut issues = Vec::new();
+    for path in [
+        project_root,
+        &dirs.objects,
+        &dirs.branches,
+        &dirs.merge_requests,
+        &dirs.idempotency,
+    ] {
+        match fs::metadata(path) {
+            Ok(metadata) if metadata.is_dir() => {}
+            _ => issues.push(path.to_path_buf()),
+        }
+    }
+    issues
+}
+
+fn empty_remote_storage_stats(
+    url: &str,
+    project_root: PathBuf,
+    status: &str,
+    missing_required_paths: Vec<PathBuf>,
+) -> RemoteStorageStats {
+    RemoteStorageStats {
+        url: url.to_string(),
+        status: status.to_string(),
+        project_root,
+        missing_required_paths,
+        objects: AreaStats::default(),
+        branches: AreaStats::default(),
+        merge_requests: AreaStats::default(),
+        idempotency: AreaStats::default(),
+        idempotency_retention: RemoteIdempotencyRetentionStats::default(),
+        nonce_cache: RemoteNonceCacheStats::default(),
+        retention: RemoteRetentionStats::default(),
+        objects_by_generation: Vec::new(),
+    }
 }
 
 fn scan_remote_retention(project_root: &Path) -> Result<RemoteRetentionStats, CliError> {
@@ -638,7 +788,7 @@ fn scan_remote_idempotency_retention(
         retention_seconds,
         ..RemoteIdempotencyRetentionStats::default()
     };
-    for path in collect_files(idempotency_root)? {
+    for path in collect_files_required(idempotency_root)? {
         let bytes = fs::metadata(&path)?.len();
         let Ok(record) = read_json(&path) else {
             continue;
@@ -669,7 +819,7 @@ fn scan_remote_object_generations(
     objects_root: &Path,
 ) -> Result<Vec<RemoteGenerationStats>, CliError> {
     let mut by_generation = BTreeMap::<Option<u64>, AreaStats>::new();
-    for path in collect_files(objects_root)? {
+    for path in collect_files_required(objects_root)? {
         let bytes = fs::metadata(&path)?.len();
         let generation = read_json(&path).ok().and_then(|value| {
             value
@@ -699,10 +849,30 @@ fn read_optional_json_value(path: &Path) -> Result<Option<Value>, CliError> {
     }
 }
 
-fn collect_files(root: &Path) -> Result<Vec<PathBuf>, CliError> {
+fn collect_files_optional(root: &Path) -> Result<Vec<PathBuf>, CliError> {
     if !root.exists() {
         return Ok(Vec::new());
     }
+    collect_existing_files(root)
+}
+
+fn collect_files_required(root: &Path) -> Result<Vec<PathBuf>, CliError> {
+    if !root.exists() {
+        return Err(CliError::Usage(format!(
+            "required storage path is missing: {}",
+            root.display()
+        )));
+    }
+    if !root.is_dir() {
+        return Err(CliError::Usage(format!(
+            "required storage path is not a directory: {}",
+            root.display()
+        )));
+    }
+    collect_existing_files(root)
+}
+
+fn collect_existing_files(root: &Path) -> Result<Vec<PathBuf>, CliError> {
     let mut files = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(path) = stack.pop() {
@@ -732,6 +902,7 @@ fn object_file_json(stats: &ObjectFileStats) -> Value {
     json!({
         "object_id": &stats.object_id,
         "type": &stats.type_tag,
+        "type_confidence": stats.type_confidence,
         "path": &stats.path,
         "bytes": stats.bytes,
     })
@@ -749,7 +920,9 @@ fn storage_warning_json(warning: &StorageWarning) -> Value {
 fn remote_storage_json(stats: &RemoteStorageStats) -> Value {
     json!({
         "url": &stats.url,
+        "status": &stats.status,
         "project_root": &stats.project_root,
+        "missing_required_paths": &stats.missing_required_paths,
         "objects": {"files": stats.objects.files, "bytes": stats.objects.bytes},
         "branches": {"files": stats.branches.files, "bytes": stats.branches.bytes},
         "merge_requests": {"files": stats.merge_requests.files, "bytes": stats.merge_requests.bytes},
