@@ -307,9 +307,9 @@ The active CodeFire improvement cycle is a global burn-down. The initial frozen 
 
 Global inventory as of 2026-06-10:
 
-- CFB dogfood issues: 92 total, 72 fixed, 20 open.
-- CFR code review issues: 160 total, 129 fixed/closed, 31 open.
-- Combined tracked backlog: 252 total, 201 fixed/closed, 51 open.
+- CFB dogfood issues: 92 total, 75 fixed, 17 open.
+- CFR code review issues: 160 total, 131 fixed/closed, 29 open.
+- Combined tracked backlog: 252 total, 206 fixed/closed, 46 open.
 
 Active batch closed in this burn-down:
 
@@ -319,9 +319,12 @@ Active batch closed in this burn-down:
 - CFB-034: doctor and migrate share the same layout severity vocabulary.
 - CFB-035: migration planned actions are generated from the same layout registry as doctor findings.
 - CFB-049: evidence command capture cwd resolution is explicit and returned in JSON.
+- CFB-043: commit dry-run blockers return JSON commit result envelopes.
+- CFB-051: commit dry-run changed atoms are bounded by default.
 - CFB-053: scan JSON defaults to bounded counts/samples with explicit full mode.
 - CFB-061: missing remote storage target is reported as invalid layout instead of silently disappearing.
 - CFB-063: review-pack and patch export have JSON metadata automation surfaces.
+- CFB-067: commit JSON uses typed result data and non-null top-level repo.
 - CFB-072: evidence dry-run plan reports resolved cwd and cwd source.
 - CFB-077: manual fire identity uses scan-compatible digest IDs.
 - CFB-078: manual fire cleanup without source changes returns to open-clean.
@@ -339,6 +342,8 @@ Active batch closed in this burn-down:
 - CFR-149: doctor reports active state/open fire invariant violations.
 - CFR-156: migrate supports quick/full scan modes with skipped check metadata.
 - CFR-158: manual fire semantic identity is independent of base commit.
+- CFR-159: commit certificate result uses verification vocabulary with legacy compatibility.
+- CFR-160: commit JSON envelope repo comes from execution context.
 
 Important already-fixed issues from the latest two-cycle run:
 
@@ -348,7 +353,7 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- Remaining 51 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
+- Remaining 46 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
 - このglobal batchが0 openになるまで、新しいissue discovery batchへ進まない。
 
 ## Cycle Invariants

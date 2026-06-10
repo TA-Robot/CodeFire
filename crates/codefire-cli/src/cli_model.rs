@@ -1,3 +1,4 @@
+use crate::exit_code::ExitCode;
 use crate::view::{DiffOptions, PatchExportOptions, ReviewPackOptions};
 use serde_json::Value;
 use std::path::PathBuf;
@@ -82,6 +83,7 @@ pub(crate) struct CommitOptions {
     pub(crate) path: PathBuf,
     pub(crate) message: String,
     pub(crate) dry_run: bool,
+    pub(crate) full_output: bool,
     pub(crate) json_output: bool,
     pub(crate) lock: LockOptions,
     pub(crate) idempotency_key: Option<String>,
@@ -91,8 +93,13 @@ pub(crate) struct CommitOptions {
 
 #[derive(Debug)]
 pub(crate) struct CommitResult {
+    pub(crate) repo_root: PathBuf,
+    pub(crate) open_dir: PathBuf,
     pub(crate) commit_id: String,
     pub(crate) branch: String,
+    pub(crate) dry_run: bool,
+    pub(crate) blocked: bool,
+    pub(crate) exit_code: ExitCode,
     pub(crate) plan: Value,
 }
 

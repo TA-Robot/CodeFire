@@ -389,6 +389,7 @@ context packはlimitsとtruncatedを含め、scan.snapshot_source、scan.active_
 ```bash
 codefire commit -m "Implement login handler"
 codefire commit --dry-run --json -m "Implement login handler"
+codefire commit --path ./main-open --dry-run --full --json -m "Implement login handler"
 codefire commit -m "Implement login handler" --idempotency-key request-2026-06-05-001
 ```
 
@@ -401,6 +402,10 @@ branch headを更新する
 active stateをresetする
 open stateをopen-cleanにする
 --dry-runはsealed object、branch head、open registry、active stateを書き換えず、codefire_operation_planを返す
+--dry-run --jsonはcodefire_commit_resultを返し、blockedの場合もok=falseのcommand_result envelopeでverification summaryとnext_actionsを返す
+commit JSONはtop-level repo、data.open_dir、data.branch、data.changed_atom_countを返す
+changed_atomsはdefaultで50件sampleに制限し、changed_atoms_omittedとchanged_atoms_truncatedを返す。--fullで全件を返す
+certificate.resultはverification.resultと同じ語彙を使い、現行成功commitはpassedを返す
 --idempotency-keyは成功したcommit resultを.codefire/idempotency/commit/へ記録する
 同じ--idempotency-keyかつ同じcommit request payloadは保存済みcommit resultを返し、新しいcommitを作らない
 同じ--idempotency-keyでmessage/open_dir/branchが異なるpayloadはexit code 33で拒否する

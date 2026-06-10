@@ -2124,6 +2124,7 @@ fn manual_fire_cleanup_without_source_changes_returns_open_clean() {
         path: open_dir.clone(),
         message: "Seed manual fire atoms".to_string(),
         dry_run: false,
+        full_output: false,
         json_output: false,
         lock: LockOptions::default(),
         idempotency_key: None,
@@ -2772,6 +2773,7 @@ fn commit_dry_run_returns_plan_without_updating_branch() {
         path: open_dir.clone(),
         message: "Dry run".to_string(),
         dry_run: true,
+        full_output: false,
         json_output: true,
         lock: LockOptions::default(),
         idempotency_key: None,
@@ -2790,6 +2792,101 @@ fn commit_dry_run_returns_plan_without_updating_branch() {
     assert!(!active_state_path(&open_dir)
         .join("verification.json")
         .exists());
+}
+
+#[test]
+fn commit_dry_run_json_reports_blockers_and_bounds_changed_atoms() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    for index in 0..60 {
+        fs::write(
+            open_dir
+                .join("docs")
+                .join("requirements")
+                .join(format!("bulk-{index}.md")),
+            format!("## REQ-commit-bulk-{index}: Requirement\nBulk changed atom {index}\n"),
+        )
+        .unwrap();
+    }
+    fs::write(
+        open_dir.join("codefire.policy.yaml"),
+        "commit_policy:\n  require_trace_completeness: false\n",
+    )
+    .unwrap();
+
+    let bounded = run_commit(&CommitOptions {
+        path: open_dir.clone(),
+        message: "Bounded dry run".to_string(),
+        dry_run: true,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap();
+    let bounded_data = commit_result_data_json(&bounded);
+    assert_eq!(bounded_data["type"], "codefire_commit_result");
+    assert_eq!(bounded_data["dry_run"], true);
+    assert_eq!(bounded_data["changed_atom_count"], 60);
+    assert_eq!(bounded_data["changed_atoms"].as_array().unwrap().len(), 50);
+    assert_eq!(bounded_data["changed_atoms_omitted"], 10);
+    assert_eq!(bounded.plan["changed_atoms_truncated"], true);
+
+    let full = run_commit(&CommitOptions {
+        path: open_dir.clone(),
+        message: "Full dry run".to_string(),
+        dry_run: true,
+        full_output: true,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap();
+    assert_eq!(full.plan["changed_atoms"].as_array().unwrap().len(), 60);
+    assert_eq!(full.plan["changed_atoms_omitted"], 0);
+
+    fs::write(
+        open_dir.join("codefire.links.yaml"),
+        "links:\n  - from: REQ-commit-bulk-0\n    to: REQ-commit-bulk-1\n    type: refined_by\n",
+    )
+    .unwrap();
+    let blocked = run_commit(&CommitOptions {
+        path: open_dir,
+        message: "Blocked dry run".to_string(),
+        dry_run: true,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap();
+    assert!(blocked.blocked);
+    assert_ne!(blocked.exit_code.code(), 0);
+    let blocked_data = commit_result_data_json(&blocked);
+    assert_eq!(blocked_data["blocked"], true);
+    assert_eq!(blocked_data["verification"]["result"], "failed");
+    assert_eq!(blocked.plan["next_actions"][0]["kind"], "verify");
 }
 
 #[test]
@@ -2815,6 +2912,7 @@ fn commit_idempotency_key_replays_same_payload_and_rejects_conflict() {
         path: open_dir.clone(),
         message: "Seal once".to_string(),
         dry_run: false,
+        full_output: false,
         json_output: false,
         lock: LockOptions::default(),
         idempotency_key: Some("seal-main-once".to_string()),
@@ -2832,6 +2930,7 @@ fn commit_idempotency_key_replays_same_payload_and_rejects_conflict() {
         path: open_dir.clone(),
         message: "Seal once".to_string(),
         dry_run: false,
+        full_output: false,
         json_output: false,
         lock: LockOptions::default(),
         idempotency_key: Some("seal-main-once".to_string()),
@@ -2850,6 +2949,7 @@ fn commit_idempotency_key_replays_same_payload_and_rejects_conflict() {
         path: open_dir,
         message: "Different payload".to_string(),
         dry_run: false,
+        full_output: false,
         json_output: false,
         lock: LockOptions::default(),
         idempotency_key: Some("seal-main-once".to_string()),

@@ -1738,18 +1738,37 @@ fn run_extinguish_command(args: &[String]) -> Result<(), CliError> {
 }
 
 fn run_commit_command(args: &[String]) -> Result<(), CliError> {
-    let options = parse_commit_args(args)?;
-    let result = run_commit(&options)?;
+    let options = match parse_commit_args(args) {
+        Ok(options) => options,
+        Err(error) if args_want_json(args) => {
+            print_cli_error_json("commit", &error)?;
+            return Err(CliError::CommandFailed(error.exit_status()));
+        }
+        Err(error) => return Err(error),
+    };
+    let result = match run_commit(&options) {
+        Ok(result) => result,
+        Err(error) if options.json_output => {
+            print_cli_error_json("commit", &error)?;
+            return Err(CliError::CommandFailed(error.exit_status()));
+        }
+        Err(error) => return Err(error),
+    };
     if options.json_output {
-        print_plan_result_json("commit", &result.plan)?;
+        print_commit_result_json(&result)?;
+        if result.blocked {
+            return Err(CliError::CommandFailed(result.exit_code));
+        }
     } else if options.dry_run {
+        if result.blocked {
+            return Err(CliError::Usage(
+                "commit blocked: verification failed or consistency blockers remain".to_string(),
+            ));
+        }
         println!("commit dry-run: branch {} would be sealed", result.branch);
         println!(
             "Changed atoms: {}",
-            result.plan["changed_atoms"]
-                .as_array()
-                .map(Vec::len)
-                .unwrap_or(0)
+            result.plan["changed_atom_count"].as_u64().unwrap_or(0)
         );
     } else {
         println!("Sealed commit created.");
@@ -2040,6 +2059,50 @@ fn print_data_result_json(command: &str, data: Value) -> Result<(), CliError> {
         ))?
     );
     Ok(())
+}
+
+fn print_commit_result_json(result: &CommitResult) -> Result<(), CliError> {
+    let next_actions = if result.blocked || result.dry_run {
+        result
+            .plan
+            .get("next_actions")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&command_result_envelope(
+            "commit",
+            !result.blocked,
+            result.exit_code.code(),
+            Some(&result.repo_root),
+            commit_result_data_json(result),
+            Vec::new(),
+            next_actions,
+        ))?
+    );
+    Ok(())
+}
+
+fn commit_result_data_json(result: &CommitResult) -> Value {
+    json!({
+        "type": "codefire_commit_result",
+        "version": 1,
+        "dry_run": result.dry_run,
+        "blocked": result.blocked,
+        "applied": !result.dry_run && !result.blocked,
+        "commit_id": if result.commit_id.is_empty() { Value::Null } else { Value::String(result.commit_id.clone()) },
+        "branch": &result.branch,
+        "open_dir": &result.open_dir,
+        "plan": &result.plan,
+        "changed_atom_count": &result.plan["changed_atom_count"],
+        "changed_atoms": &result.plan["changed_atoms"],
+        "changed_atoms_omitted": &result.plan["changed_atoms_omitted"],
+        "verification": &result.plan["verification"],
+    })
 }
 
 fn review_pack_result_data(
@@ -2865,6 +2928,7 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
     let mut path = None;
     let mut message = None;
     let mut dry_run = false;
+    let mut full_output = false;
     let mut json_output = false;
     let mut lock = LockOptions::default();
     let mut idempotency_key = None;
@@ -2891,6 +2955,9 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
             }
             value if value.starts_with("--path=") => {
                 path = Some(PathBuf::from(value.trim_start_matches("--path=")));
+            }
+            "--full" => {
+                full_output = true;
             }
             "-m" | "--message" => {
                 message = Some(take_option_value(args, &mut index, "-m")?);
@@ -2920,6 +2987,7 @@ fn parse_commit_args(args: &[String]) -> Result<CommitOptions, CliError> {
         path: path.unwrap_or(env::current_dir()?),
         message: message.unwrap_or_else(|| "CodeFire commit".to_string()),
         dry_run,
+        full_output,
         json_output,
         lock,
         idempotency_key,
@@ -5020,11 +5088,6 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
     )?);
     let verify_execution = compute_verify(&context.open_dir, !options.dry_run)?;
     let verification = verify_execution.verification;
-    if verification.result != "passed" {
-        return Err(CliError::Usage(
-            "commit blocked: verification failed or consistency blockers remain".to_string(),
-        ));
-    }
 
     let objects = context.repo_root.join(".codefire").join("objects");
     let scan = verify_execution.scan;
@@ -5054,10 +5117,32 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         &verification,
         &parents,
     );
+    if verification.result != "passed" {
+        if options.dry_run {
+            return Ok(CommitResult {
+                repo_root: context.repo_root,
+                open_dir: context.open_dir,
+                commit_id: String::new(),
+                branch: context.branch,
+                dry_run: true,
+                blocked: true,
+                exit_code: verification_exit_code(&verification),
+                plan,
+            });
+        }
+        return Err(CliError::Usage(
+            "commit blocked: verification failed or consistency blockers remain".to_string(),
+        ));
+    }
     if options.dry_run {
         return Ok(CommitResult {
+            repo_root: context.repo_root,
+            open_dir: context.open_dir,
             commit_id: String::new(),
             branch: context.branch,
+            dry_run: true,
+            blocked: false,
+            exit_code: ExitCode::Success,
             plan,
         });
     }
@@ -5113,7 +5198,7 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
             "policy": policy_id,
         },
         "certificate": {
-            "result": "consistent",
+            "result": verification.result,
             "open_required_fires": verification.open_required_fires,
             "failed_checks": verification.failed_checks.len(),
             "missing_required_links": verification.missing_required_links.len(),
@@ -5144,8 +5229,13 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
     reset_active(&active_state_path, "open-clean")?;
 
     let result = CommitResult {
+        repo_root: context.repo_root.clone(),
+        open_dir: context.open_dir.clone(),
         commit_id,
         branch: context.branch,
+        dry_run: false,
+        blocked: false,
+        exit_code: ExitCode::Success,
         plan,
     };
     if let Some(key) = options.idempotency_key.as_deref() {
@@ -5218,8 +5308,18 @@ fn load_commit_idempotency(
     };
     verify_idempotency_record(&record, &path, "commit", key, payload)?;
     Ok(Some(CommitResult {
+        repo_root: repo_root.to_path_buf(),
+        open_dir: record
+            .get("result")
+            .and_then(|result| result.get("open_dir"))
+            .and_then(Value::as_str)
+            .map(PathBuf::from)
+            .unwrap_or_default(),
         commit_id: required_string(&record, &["result", "commit_id"])?,
         branch: required_string(&record, &["result", "branch"])?,
+        dry_run: false,
+        blocked: false,
+        exit_code: ExitCode::Success,
         plan: idempotency_result_plan(&record, &path)?,
     }))
 }
@@ -5241,6 +5341,7 @@ fn save_commit_idempotency(
         "result": {
             "commit_id": &result.commit_id,
             "branch": &result.branch,
+            "open_dir": &result.open_dir,
             "plan": &result.plan,
         },
         "created_at": now_iso_utc(),
@@ -5296,6 +5397,35 @@ fn commit_operation_plan(
     verification: &codefire_core::Verification,
     parents: &[String],
 ) -> Value {
+    const DEFAULT_COMMIT_CHANGED_ATOM_LIMIT: usize = 50;
+    let changed_atom_limit = if options.full_output {
+        scan.changed_atoms.len()
+    } else {
+        DEFAULT_COMMIT_CHANGED_ATOM_LIMIT
+    };
+    let changed_atoms = scan
+        .changed_atoms
+        .iter()
+        .take(changed_atom_limit)
+        .cloned()
+        .collect::<Vec<_>>();
+    let changed_atoms_sample = changed_atoms.clone();
+    let changed_atoms_omitted = scan.changed_atoms.len().saturating_sub(changed_atoms.len());
+    let next_actions = if verification.result != "passed" {
+        vec![json!({
+            "kind": "verify",
+            "command": format!("codefire verify --path {} --details --json", context.open_dir.display()),
+            "target": {"branch": &context.branch, "open_dir": &context.open_dir, "repo_root": &context.repo_root},
+        })]
+    } else if options.dry_run {
+        vec![json!({
+            "kind": "apply_commit",
+            "command": format!("codefire commit --path {} -m <message>", context.open_dir.display()),
+            "target": {"branch": &context.branch, "open_dir": &context.open_dir, "repo_root": &context.repo_root},
+        })]
+    } else {
+        Vec::new()
+    };
     json!({
         "type": "codefire_operation_plan",
         "version": 1,
@@ -5306,7 +5436,12 @@ fn commit_operation_plan(
         "open_dir": &context.open_dir,
         "message": &options.message,
         "parents": parents,
-        "changed_atoms": &scan.changed_atoms,
+        "changed_atom_count": scan.changed_atoms.len(),
+        "changed_atoms": changed_atoms,
+        "changed_atoms_sample": changed_atoms_sample,
+        "changed_atoms_sample_limit": changed_atom_limit,
+        "changed_atoms_omitted": changed_atoms_omitted,
+        "changed_atoms_truncated": changed_atoms_omitted > 0,
         "verification": {
             "result": &verification.result,
             "open_required_fires": verification.open_required_fires,
@@ -5331,9 +5466,7 @@ fn commit_operation_plan(
             {"kind": "update_open_registry", "path": &context.registry_path},
             {"kind": "reset_active_state", "path": active_state_path},
         ],
-        "next_actions": [
-            {"kind": "apply_commit", "command": "codefire commit -m <message>", "target": {"branch": &context.branch}},
-        ],
+        "next_actions": next_actions,
     })
 }
 

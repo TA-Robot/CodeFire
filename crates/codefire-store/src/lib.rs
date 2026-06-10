@@ -434,9 +434,12 @@ fn validate_sealed_commit_inner(
         .ok_or_else(|| {
             StoreError::InvalidSealedCommit("certificate must be an object".to_string())
         })?;
-    if certificate.get("result").and_then(Value::as_str) != Some("consistent") {
+    if !matches!(
+        certificate.get("result").and_then(Value::as_str),
+        Some("passed" | "consistent")
+    ) {
         return Err(StoreError::InvalidSealedCommit(
-            "certificate is not consistent".to_string(),
+            "certificate result is not passed".to_string(),
         ));
     }
     Ok(())
