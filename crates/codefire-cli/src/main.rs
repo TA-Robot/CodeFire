@@ -596,11 +596,41 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 }
                 Ok(())
             }
-            Some(command) => Err(CliError::Usage(format!(
-                "unsupported branch command: {command}"
-            ))),
+            Some("show") => {
+                if wants_help(&args[2..]) {
+                    print!("{}", subcommand_help("branch show"));
+                    return Ok(());
+                }
+                let options = parse_branch_show_args(&args[2..])?;
+                let (repo_root, data) = branch_show_data(&options.path, options.branch.as_deref())?;
+                if options.json_output {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&command_result_envelope(
+                            "branch-show",
+                            true,
+                            0,
+                            Some(&repo_root),
+                            data,
+                            Vec::new(),
+                            Vec::new(),
+                        ))?
+                    );
+                } else {
+                    print_branch_show(&data);
+                }
+                Ok(())
+            }
+            Some(command) => {
+                let error = CliError::Usage(format!("unsupported branch command: {command}"));
+                if args[1..].iter().any(|arg| arg == "--json") {
+                    print_cli_error_json("branch", &error)?;
+                    return Err(CliError::CommandFailed(error.exit_status()));
+                }
+                Err(error)
+            }
             None => Err(CliError::Usage(
-                "missing branch command; expected: list".to_string(),
+                "missing branch command; expected: list or show".to_string(),
             )),
         },
         Some("status") => {
@@ -894,6 +924,7 @@ fn command_help_for_args(args: &[String]) -> Option<&'static str> {
         },
         "branch" => match args.get(1).map(String::as_str) {
             Some("list") => Some(subcommand_help("branch list")),
+            Some("show") => Some(subcommand_help("branch show")),
             _ => Some(subcommand_help("branch")),
         },
         "evidence" => match args.get(1).map(String::as_str) {
@@ -956,8 +987,14 @@ fn subcommand_help(command: &str) -> &'static str {
         "commit" => {
             "usage: codefire commit [path|--path <open-dir>] -m <message> [--dry-run] [--json] [--idempotency-key <key>]\n"
         }
-        "branch" | "branch list" => {
+        "branch" => {
+            "usage: codefire branch list [path|--path <repo-or-open>] [--json] [--metrics]\n       codefire branch show [branch] [path|--path <repo-or-open>] [--json]\n\nInspect local branches.\n"
+        }
+        "branch list" => {
             "usage: codefire branch list [path|--path <repo-or-open>] [--json] [--metrics]\n\nList local branches.\n"
+        }
+        "branch show" => {
+            "usage: codefire branch show [branch] [path|--path <repo-or-open>] [--json]\n\nShow a local branch detail record.\n"
         }
         "context" => {
             "usage: codefire context (--changed|--atom <atom-id>|--fire <fire-id>|--branch <branch>) [--path <open-dir>] [--depth <n>] [--limit <n>] [--json]\n\nBuild a bounded context pack for an open directory.\n"
@@ -1398,12 +1435,96 @@ fn print_branches(branches: &[Branch]) {
     }
 }
 
+fn print_branch_show(data: &Value) {
+    let branch = data.get("branch").unwrap_or(&Value::Null);
+    println!(
+        "Branch: {}",
+        branch.get("name").and_then(Value::as_str).unwrap_or("")
+    );
+    println!(
+        "Head: {}",
+        branch.get("head").and_then(Value::as_str).unwrap_or("")
+    );
+    println!(
+        "State: {}",
+        branch.get("state").and_then(Value::as_str).unwrap_or("")
+    );
+    println!(
+        "Sealed: {}",
+        branch
+            .get("sealed_validation")
+            .and_then(|value| value.get("ok"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    );
+    let opened = branch.get("opened").unwrap_or(&Value::Null);
+    if opened.get("present").and_then(Value::as_bool) == Some(true) {
+        println!(
+            "Open path: {}",
+            opened
+                .get("open")
+                .and_then(|value| value.get("opened_path"))
+                .or_else(|| opened.get("open").and_then(|value| value.get("path")))
+                .and_then(Value::as_str)
+                .unwrap_or("")
+        );
+    }
+}
+
 fn branch_json(branch: &Branch) -> Value {
     json!({
         "name": &branch.name,
         "head": &branch.head,
         "state": &branch.state,
     })
+}
+
+fn branch_show_data(start: &Path, branch: Option<&str>) -> Result<(PathBuf, Value), CliError> {
+    let repo_root = find_repo_root(start)?;
+    let branch_name = match branch {
+        Some(branch) => branch.to_string(),
+        None => open_context(start)?.branch,
+    };
+    let record = load_branch_record(&repo_root, &branch_name)?;
+    let head = required_string(&record, &["head"])?;
+    let objects_root = repo_root.join(".codefire").join("objects");
+    codefire_store::validate_sealed_commit(&objects_root, &head)?;
+    let state = record
+        .get("state")
+        .and_then(Value::as_str)
+        .unwrap_or("closed");
+    let registry_path = opened_registry_path(&repo_root, &branch_name);
+    let opened = if registry_path.exists() {
+        let registry = read_json(&registry_path)?;
+        json!({
+            "present": true,
+            "registry_path": registry_path,
+            "branch": registry.get("branch").cloned().unwrap_or_else(|| json!({})),
+            "open": registry.get("open").cloned().unwrap_or_else(|| json!({})),
+        })
+    } else {
+        json!({
+            "present": false,
+            "registry_path": registry_path,
+        })
+    };
+    Ok((
+        repo_root,
+        json!({
+            "type": "codefire_branch_detail",
+            "version": 1,
+            "branch": {
+                "name": branch_name,
+                "head": head,
+                "state": state,
+                "sealed_validation": {
+                    "ok": true,
+                    "objects": objects_root,
+                },
+                "opened": opened,
+            },
+        }),
+    ))
 }
 
 fn print_scan(scan: &codefire_core::ScanResult) {
@@ -1600,6 +1721,13 @@ struct ShowOptions {
     json_output: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BranchShowOptions {
+    path: PathBuf,
+    branch: Option<String>,
+    json_output: bool,
+}
+
 fn parse_show_args(args: &[String]) -> Result<ShowOptions, CliError> {
     let mut target = None;
     let mut json_output = false;
@@ -1623,6 +1751,51 @@ fn parse_show_args(args: &[String]) -> Result<ShowOptions, CliError> {
         target: target.ok_or_else(|| {
             CliError::Usage("usage: codefire show <branch-or-commit> [--json]".to_string())
         })?,
+        json_output,
+    })
+}
+
+fn parse_branch_show_args(args: &[String]) -> Result<BranchShowOptions, CliError> {
+    let mut path = None;
+    let mut branch = None;
+    let mut json_output = false;
+    let mut index = 0usize;
+    while index < args.len() {
+        let value = &args[index];
+        match value.as_str() {
+            "--json" => json_output = true,
+            "--path" => {
+                index += 1;
+                let path_value = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--path requires a value".to_string()))?;
+                set_single_path(&mut path, path_value)?;
+            }
+            "--metrics" => {
+                return Err(CliError::Usage(
+                    "branch show does not support --metrics".to_string(),
+                ));
+            }
+            value if value.starts_with("--path=") => {
+                set_single_path(&mut path, value.trim_start_matches("--path="))?;
+            }
+            option if option.starts_with("--") => {
+                return Err(CliError::Usage(format!(
+                    "unsupported branch show option: {option}"
+                )));
+            }
+            value if branch.is_none() => branch = Some(value.to_string()),
+            value => {
+                return Err(CliError::Usage(format!(
+                    "unexpected branch show argument: {value}"
+                )));
+            }
+        }
+        index += 1;
+    }
+    Ok(BranchShowOptions {
+        path: path.unwrap_or(env::current_dir()?),
+        branch,
         json_output,
     })
 }

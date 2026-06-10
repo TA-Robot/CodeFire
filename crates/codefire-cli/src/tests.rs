@@ -63,6 +63,16 @@ fn command_help_routes_before_mutating_parsers() {
     ])
     .expect("branch list help should be routed");
     assert!(branch_list_help.contains("--metrics"));
+    let branch_help = command_help_for_args(&["branch".to_string(), "--help".to_string()])
+        .expect("branch help should be routed");
+    assert!(branch_help.contains("branch show"));
+    let branch_show_help = command_help_for_args(&[
+        "branch".to_string(),
+        "show".to_string(),
+        "--help".to_string(),
+    ])
+    .expect("branch show help should be routed");
+    assert!(branch_show_help.contains("usage: codefire branch show"));
 }
 
 #[test]
@@ -738,6 +748,16 @@ fn parse_diff_args_accepts_algorithm_forms() {
     assert_eq!(show.target, "main");
     assert!(show.json_output);
     assert!(parse_show_args(&["main".to_string(), "--metrics".to_string()]).is_err());
+    let branch_show = parse_branch_show_args(&[
+        "--path=/tmp/open".to_string(),
+        "--json".to_string(),
+        "main".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(branch_show.path, PathBuf::from("/tmp/open"));
+    assert_eq!(branch_show.branch.as_deref(), Some("main"));
+    assert!(branch_show.json_output);
+    assert!(parse_branch_show_args(&["--metrics".to_string()]).is_err());
 
     let args = vec![
         "--algorithm".to_string(),
@@ -5403,6 +5423,7 @@ fn branch_list_reads_repo_from_open_marker_and_validates_heads() {
     let open_dir = temp.path().join("worktree");
     let cf = repo_root.join(".codefire");
     fs::create_dir_all(cf.join("branches")).unwrap();
+    fs::create_dir_all(cf.join("opened")).unwrap();
     fs::create_dir_all(&open_dir).unwrap();
 
     let commit_id = write_valid_commit(&cf.join("objects"));
@@ -5432,6 +5453,18 @@ fn branch_list_reads_repo_from_open_marker_and_validates_heads() {
             .unwrap(),
         )
         .unwrap();
+    fs::write(
+        cf.join("opened")
+            .join(format!("{}.json", ref_file_name(branch_name))),
+        serde_json::to_string_pretty(&json!({
+            "type": "opened",
+            "version": 1,
+            "branch": {"name": branch_name, "opened_from_commit": commit_id},
+            "open": {"open_instance_id": "open_123", "opened_at": "2026-06-04T00:00:00Z", "path": open_dir}
+        }))
+        .unwrap(),
+    )
+    .unwrap();
 
     let branches = list_branches(&open_dir).unwrap();
 
@@ -5439,10 +5472,35 @@ fn branch_list_reads_repo_from_open_marker_and_validates_heads() {
         branches,
         vec![Branch {
             name: branch_name.to_string(),
-            head: commit_id,
+            head: commit_id.clone(),
             state: "open-clean".to_string()
         }]
     );
+
+    let (detail_repo, detail) = branch_show_data(&open_dir, None).unwrap();
+    assert_eq!(detail_repo, repo_root);
+    assert_eq!(detail["type"], "codefire_branch_detail");
+    assert_eq!(detail["branch"]["name"], branch_name);
+    assert_eq!(detail["branch"]["head"], commit_id);
+    assert_eq!(detail["branch"]["state"], "open-clean");
+    assert_eq!(detail["branch"]["sealed_validation"]["ok"], true);
+    assert_eq!(detail["branch"]["opened"]["present"], true);
+    assert_eq!(
+        detail["branch"]["opened"]["open"]["open_instance_id"],
+        "open_123"
+    );
+
+    let (_, explicit_detail) = branch_show_data(&detail_repo, Some(branch_name)).unwrap();
+    assert_eq!(explicit_detail["branch"]["name"], branch_name);
+
+    let unsupported = cli_error_envelope(
+        "branch",
+        &CliError::Usage("unsupported branch command: unknown".to_string()),
+    );
+    assert_eq!(unsupported["schema"], "codefire.command_result.v1");
+    assert_eq!(unsupported["command"], "branch");
+    assert_eq!(unsupported["ok"], false);
+    assert_eq!(unsupported["diagnostics"][0]["kind"], "command_error");
 }
 
 #[test]

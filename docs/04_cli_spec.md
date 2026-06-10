@@ -6,6 +6,7 @@
 codefire init
 
 codefire branch list [--json] [--metrics]
+codefire branch show [branch] [--json]
 
 codefire open <branch> <path>
 codefire close <branch>
