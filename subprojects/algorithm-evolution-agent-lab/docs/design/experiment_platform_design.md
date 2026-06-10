@@ -849,3 +849,18 @@ The rendered document contains:
 - blocker messages, or `none` when clean
 
 The renderer treats the gate result as the single source of truth. It does not reevaluate the summary Markdown, rebuild the archive, recompute hashes, inspect artifacts, read files, or write files.
+
+## DES-AUTO-049: Research cycle planning handoff review packet artifact archive summary artifacts
+
+The review packet artifact archive summary artifact builder consumes `ResearchCyclePlanningHandoffReviewPacketArtifactArchive` and caller-controlled relative POSIX output paths.
+
+The builder returns one deterministic handoff object with:
+
+- the source archive
+- machine-readable archive summary
+- archive summary Markdown
+- archive summary Markdown gate result
+- archive summary Markdown gate Markdown
+- two packaged artifacts: summary Markdown and gate Markdown
+
+The builder composes the existing archive summary, summary Markdown renderer, summary Markdown gate, and gate Markdown renderer. It validates output paths with the shared manifest path rule. It does not rebuild the archive, rerun archive manifest verification, read files, write files, or mutate the archive.

@@ -180,6 +180,16 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchive:
     verification_markdown: str
 
 
+@dataclass(frozen=True)
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifacts:
+    archive: ResearchCyclePlanningHandoffReviewPacketArtifactArchive
+    summary: dict[str, object]
+    summary_markdown: str
+    gate_result: dict[str, object]
+    gate_markdown: str
+    artifacts: tuple[ResearchCyclePlanningHandoffArtifact, ...]
+
+
 # cf-atom: CODE-ResearchCycleRetrospective
 class ResearchCycleRetrospective:
     def summarize(self, signals: list[ResearchCycleSignal]) -> ResearchCycleRetrospectiveReport:
@@ -1274,6 +1284,46 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate
         else:
             lines.append("- none")
         return "\n".join(lines).rstrip() + "\n"
+
+
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder:
+    def build(
+        self,
+        archive: ResearchCyclePlanningHandoffReviewPacketArtifactArchive,
+        *,
+        summary_path: str = "archive-summary.md",
+        gate_path: str = "archive-summary-gate.md",
+        summary_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary",
+        gate_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Markdown Gate",
+    ) -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifacts:
+        for path in (summary_path, gate_path):
+            validate_manifest_path(path)
+        summary = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary().summarize(archive)
+        summary_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdown().render(
+            summary,
+            title=summary_title,
+        )
+        gate_result = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate().evaluate(
+            summary,
+            summary_markdown,
+        )
+        gate_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown().render(
+            gate_result,
+            title=gate_title,
+        )
+        artifacts = (
+            ResearchCyclePlanningHandoffArtifact(path=summary_path, content=summary_markdown),
+            ResearchCyclePlanningHandoffArtifact(path=gate_path, content=gate_markdown),
+        )
+        return ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifacts(
+            archive=archive,
+            summary=summary,
+            summary_markdown=summary_markdown,
+            gate_result=gate_result,
+            gate_markdown=gate_markdown,
+            artifacts=artifacts,
+        )
 
 
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:

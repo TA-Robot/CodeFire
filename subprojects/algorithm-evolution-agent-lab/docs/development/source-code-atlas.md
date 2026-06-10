@@ -308,6 +308,11 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdo
   -> render archive summary Markdown gate decisions as reviewer-facing Markdown
   -> include ready state, status, counts, and blocker messages
   -> avoid gate reevaluation, archive inspection, hash recomputation, filesystem reads, and storage adapter coupling
+
+ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder.build(archive)
+  -> summarize final review archives, render summary Markdown, evaluate the summary Markdown gate, and render the gate audit
+  -> package summary Markdown and gate Markdown as storage-ready handoff artifacts
+  -> avoid archive rebuilds, archive manifest verification reruns, filesystem reads, and storage adapter coupling
 ```
 
 Important implementation details:

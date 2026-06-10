@@ -519,6 +519,15 @@ links:
   - from: REQ-AUTO-066
     to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-markdown-gate-markdown-renders-blockers
     type: verified_by
+  - from: REQ-AUTO-067
+    to: DES-AUTO-049
+    type: refined_by
+  - from: DES-AUTO-049
+    to: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder
+    type: implemented_by
+  - from: REQ-AUTO-067
+    to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-builder-packages-gated-summary
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by
