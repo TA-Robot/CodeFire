@@ -6,6 +6,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffBundleBuilder,
     ResearchCyclePlanningHandoffBundleMarkdown,
     ResearchCyclePlanningHandoffReadinessGate,
+    ResearchCyclePlanningHandoffReadinessMarkdown,
     ResearchCyclePlanningHandoffBundleSummary,
     ResearchCyclePlanLane,
     ResearchCyclePlan,
@@ -760,6 +761,62 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("verification audit Markdown is missing", blocked["blockers"])
         self.assertEqual(blocked["artifact_count"], 3)
         self.assertEqual(blocked["finding_count"], 1)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-readiness-markdown-renders-status
+    def test_research_cycle_planning_handoff_readiness_markdown_renders_status(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-18",
+                    completed_runs=5,
+                    improved_candidates=2,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=5.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=2,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=3.0,
+            packet_path="cycle-18/planning-packet.md",
+            plan_path="cycle-18/plan.md",
+            lint_path="cycle-18/lint.md",
+        )
+        drifted = replace(
+            bundle,
+            verification=ResearchCyclePlanningPacketManifestVerification(
+                (
+                    ResearchCyclePlanningPacketManifestVerificationFinding(
+                        path="cycle-18/plan.md",
+                        message="sha256 digest mismatch",
+                    ),
+                )
+            ),
+        )
+
+        clean_markdown = ResearchCyclePlanningHandoffReadinessMarkdown().render(
+            ResearchCyclePlanningHandoffReadinessGate().evaluate(bundle),
+            title="Cycle 18 Readiness",
+        )
+        blocked_markdown = ResearchCyclePlanningHandoffReadinessMarkdown().render(
+            ResearchCyclePlanningHandoffReadinessGate().evaluate(drifted),
+            title="Cycle 18 Readiness",
+        )
+
+        self.assertIn("# Cycle 18 Readiness", clean_markdown)
+        self.assertIn("- Ready: yes", clean_markdown)
+        self.assertIn("- Status: ready", clean_markdown)
+        self.assertIn("- none", clean_markdown)
+        self.assertIn("- Ready: no", blocked_markdown)
+        self.assertIn("- Status: blocked", blocked_markdown)
+        self.assertIn("- Finding count: 1", blocked_markdown)
+        self.assertIn("- verification has 1 finding(s)", blocked_markdown)
 
 
 if __name__ == "__main__":

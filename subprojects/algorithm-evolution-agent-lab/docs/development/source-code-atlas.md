@@ -243,6 +243,11 @@ ResearchCyclePlanningHandoffReadinessGate.evaluate(bundle)
   -> return ready/status/blocker/warning routing data for a handoff bundle
   -> block drifted, incomplete, empty, or missing-audit handoffs before storage
   -> preserve lint warnings as non-blocking routing metadata
+
+ResearchCyclePlanningHandoffReadinessMarkdown.render(readiness)
+  -> render the already-computed readiness decision for reviewers
+  -> include ready/status, artifact count, finding count, blockers, and warnings
+  -> avoid bundle inspection so automation and reviewer logs share one decision source
 ```
 
 Important implementation details:

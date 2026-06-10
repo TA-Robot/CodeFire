@@ -402,6 +402,15 @@ links:
   - from: REQ-AUTO-053
     to: TEST-research-cycle-planning-handoff-readiness-gate-blocks-drifted-bundle
     type: verified_by
+  - from: REQ-AUTO-054
+    to: DES-AUTO-036
+    type: refined_by
+  - from: DES-AUTO-036
+    to: CODE-ResearchCyclePlanningHandoffReadinessMarkdown
+    type: implemented_by
+  - from: REQ-AUTO-054
+    to: TEST-research-cycle-planning-handoff-readiness-markdown-renders-status
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

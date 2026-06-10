@@ -211,3 +211,7 @@ The system shall summarize a planning handoff bundle into a deterministic machin
 ## REQ-AUTO-053: Research cycle planning handoff readiness gate
 
 The system shall evaluate a planning handoff bundle for storage or reviewer handoff readiness. The readiness result shall include a boolean ready flag, status label, blockers, warnings, artifact count, and verification finding count so automation can reject drifted or incomplete handoffs before persisting or forwarding them.
+
+## REQ-AUTO-054: Research cycle planning handoff readiness Markdown
+
+The system shall render planning handoff readiness results into deterministic Markdown. The rendered document shall include ready state, status, artifact count, finding count, blockers, and warnings so reviewers can audit the same routing decision that automation uses before storage or handoff.

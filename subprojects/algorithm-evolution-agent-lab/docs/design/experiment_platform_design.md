@@ -671,3 +671,19 @@ The gate blocks when:
 - verification audit Markdown is missing
 
 The gate preserves lint warnings as non-blocking warning strings. It does not write files, rerun manifest verification, or mutate the bundle; it only turns the already-built handoff state into a storage/reviewer routing decision.
+
+## DES-AUTO-036: Research cycle planning handoff readiness Markdown
+
+The readiness Markdown renderer consumes the plain dictionary returned by `ResearchCyclePlanningHandoffReadinessGate.evaluate`.
+
+The document includes:
+
+- title
+- ready yes/no value
+- status
+- artifact count
+- finding count
+- blockers section with `none` when empty
+- warnings section with `none` when empty
+
+The renderer does not inspect the bundle or recompute readiness. It only serializes an already-made routing decision so reviewers can audit the same data that automation used.
