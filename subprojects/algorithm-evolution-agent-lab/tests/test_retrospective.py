@@ -7,6 +7,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffBundleMarkdown,
     ResearchCyclePlanningHandoffReadinessGate,
     ResearchCyclePlanningHandoffReadinessMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketBuilder,
     ResearchCyclePlanningHandoffReviewPacketMarkdown,
     ResearchCyclePlanningHandoffBundleSummary,
@@ -902,6 +903,56 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Readiness Markdown: included", markdown)
         self.assertIn("- Manifest Markdown: included", markdown)
         self.assertIn("- Verification Markdown: included", markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-builder-packages-audits
+    def test_research_cycle_planning_handoff_review_packet_artifact_builder_packages_audits(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-21",
+                    completed_runs=6,
+                    improved_candidates=3,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=6.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=3,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=4.0,
+            packet_path="cycle-21/planning-packet.md",
+            plan_path="cycle-21/plan.md",
+            lint_path="cycle-21/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+
+        artifacts = ResearchCyclePlanningHandoffReviewPacketArtifactBuilder().build(
+            packet,
+            review_path="cycle-21/review-packet.md",
+            readiness_path="cycle-21/readiness.md",
+            manifest_path="cycle-21/manifest.md",
+            verification_path="cycle-21/verification.md",
+        )
+
+        self.assertEqual(
+            [artifact.path for artifact in artifacts],
+            [
+                "cycle-21/review-packet.md",
+                "cycle-21/readiness.md",
+                "cycle-21/manifest.md",
+                "cycle-21/verification.md",
+            ],
+        )
+        self.assertIn("# Research Cycle Planning Handoff Review Packet", artifacts[0].content)
+        self.assertIn("- Ready: yes", artifacts[1].content)
+        self.assertIn("| `cycle-21/plan.md` |", artifacts[2].content)
+        self.assertIn("Manifest Verification", artifacts[3].content)
 
 
 if __name__ == "__main__":

@@ -968,6 +968,39 @@ class ResearchCyclePlanningHandoffReviewPacketMarkdown:
         return "\n".join(lines).rstrip() + "\n"
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactBuilder
+class ResearchCyclePlanningHandoffReviewPacketArtifactBuilder:
+    def build(
+        self,
+        packet: ResearchCyclePlanningHandoffReviewPacket,
+        *,
+        review_path: str = "review-packet.md",
+        readiness_path: str = "readiness.md",
+        manifest_path: str = "manifest.md",
+        verification_path: str = "verification.md",
+    ) -> tuple[ResearchCyclePlanningHandoffArtifact, ...]:
+        for path in (review_path, readiness_path, manifest_path, verification_path):
+            validate_manifest_path(path)
+        return (
+            ResearchCyclePlanningHandoffArtifact(
+                path=review_path,
+                content=ResearchCyclePlanningHandoffReviewPacketMarkdown().render(packet),
+            ),
+            ResearchCyclePlanningHandoffArtifact(
+                path=readiness_path,
+                content=packet.readiness_markdown,
+            ),
+            ResearchCyclePlanningHandoffArtifact(
+                path=manifest_path,
+                content=packet.bundle.manifest_markdown,
+            ),
+            ResearchCyclePlanningHandoffArtifact(
+                path=verification_path,
+                content=packet.bundle.verification_markdown,
+            ),
+        )
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

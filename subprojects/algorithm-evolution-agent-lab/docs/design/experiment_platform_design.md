@@ -716,3 +716,16 @@ The rendered document contains:
 - audit document availability for readiness, manifest, and verification Markdown
 
 The renderer only serializes data already present in the packet. It does not rebuild the handoff bundle, recompute readiness, rerun manifest verification, or read artifact files from disk.
+
+## DES-AUTO-039: Research cycle planning handoff review packet artifacts
+
+The review packet artifact builder consumes a `ResearchCyclePlanningHandoffReviewPacket`.
+
+The builder emits `ResearchCyclePlanningHandoffArtifact` entries for:
+
+- review packet Markdown
+- readiness Markdown
+- manifest Markdown
+- verification Markdown
+
+All output paths are caller-controlled relative POSIX paths and are validated with the same manifest path rule used by planning packet artifacts. The builder renders only the review packet Markdown from the supplied packet and copies the already-computed readiness, manifest, and verification Markdown. It does not rebuild the handoff bundle, recompute readiness, rerun manifest verification, or write files.

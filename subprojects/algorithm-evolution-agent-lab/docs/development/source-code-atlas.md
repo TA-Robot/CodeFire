@@ -258,6 +258,11 @@ ResearchCyclePlanningHandoffReviewPacketMarkdown.render(packet)
   -> render a final reviewer-facing Markdown document from the already-built review packet
   -> include source cycles, readiness, statuses, artifact digest table, blockers, warnings, and audit availability
   -> avoid bundle rebuilds, readiness recomputation, manifest verification, and filesystem reads
+
+ResearchCyclePlanningHandoffReviewPacketArtifactBuilder.build(packet)
+  -> package review packet Markdown, readiness Markdown, manifest Markdown, and verification Markdown as handoff artifacts
+  -> validate all output paths with the shared relative POSIX manifest path rule
+  -> avoid filesystem writes and copy already-computed audit Markdown from the packet and bundle
 ```
 
 Important implementation details:
