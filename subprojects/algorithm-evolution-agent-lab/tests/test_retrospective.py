@@ -13,6 +13,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown,
@@ -2170,6 +2171,72 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertTrue(manifest.entries[0].content_sha256.startswith("sha256:"))
         self.assertEqual(len(packaged.gate_markdown.encode("utf-8")), manifest.entries[1].byte_count)
         self.assertTrue(manifest.entries[1].content_sha256.startswith("sha256:"))
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-renders-table
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_renders_table(
+        self,
+    ) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-43",
+                    completed_runs=22,
+                    improved_candidates=18,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.36,
+                    remaining_budget=22.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=18,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=18.0,
+            packet_path="cycle-43/planning-packet.md",
+            plan_path="cycle-43/plan.md",
+            lint_path="cycle-43/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-43/review-packet.md",
+            readiness_path="cycle-43/readiness.md",
+            manifest_path="cycle-43/manifest.md",
+            verification_path="cycle-43/verification.md",
+        )
+        handoff = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder().build(
+            archive,
+            summary_path="cycle-43/archive-summary.md",
+            gate_path="cycle-43/archive-summary-gate.md",
+        )
+        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+            handoff,
+        )
+        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder().build(
+            summary_archive,
+            summary_path="cycle-43/archive-summary-artifact-archive-summary.md",
+            gate_path="cycle-43/archive-summary-artifact-archive-summary-gate.md",
+        )
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder().build(
+            packaged,
+        )
+
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown().render(
+            manifest,
+            title="Cycle 43 Archive Summary Artifact Archive Summary Artifact Manifest",
+        )
+
+        self.assertIn("# Cycle 43 Archive Summary Artifact Archive Summary Artifact Manifest", markdown)
+        self.assertIn("- Source cycles: cycle-43", markdown)
+        self.assertIn("- Status: ok", markdown)
+        self.assertIn("- Artifact count: 2", markdown)
+        self.assertIn("| Path | SHA-256 | Bytes |", markdown)
+        for entry in manifest.entries:
+            self.assertIn(f"| `{entry.path}` | `{entry.content_sha256}` | {entry.byte_count} |", markdown)
 
 
 if __name__ == "__main__":

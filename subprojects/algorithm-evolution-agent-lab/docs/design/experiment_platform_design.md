@@ -1024,3 +1024,17 @@ The builder returns `ResearchCyclePlanningPacketManifest` containing:
 - SHA-256 content digest
 
 The builder reuses the shared manifest entry helper so digest and byte count semantics stay identical to earlier handoff artifact manifests. It does not render Markdown, verify drift, read files, write files, or mutate inputs.
+
+## DES-AUTO-061: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown
+
+The review packet artifact archive summary artifact archive summary artifact manifest Markdown renderer consumes `ResearchCyclePlanningPacketManifest`.
+
+The rendered document contains:
+
+- title
+- source cycles
+- status
+- artifact count
+- table rows for path, SHA-256 digest, and byte count
+
+The renderer delegates to the shared planning packet manifest Markdown renderer so table shape and ordering stay consistent across all handoff manifest surfaces. It does not rebuild manifests, verify drift, read files, write files, or mutate inputs.
