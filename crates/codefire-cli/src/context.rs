@@ -30,6 +30,7 @@ pub(crate) enum ContextSelector {
 pub(crate) struct ContextPack {
     pub(crate) repo_root: PathBuf,
     pub(crate) data: Value,
+    pub(crate) next_actions: Vec<Value>,
 }
 
 struct ContextSnapshot {
@@ -44,6 +45,7 @@ struct ContextSnapshot {
 struct Selection {
     atom_ids: BTreeSet<String>,
     truncated_atoms: bool,
+    omitted_neighbors: usize,
 }
 
 pub(crate) fn parse_context_args(args: &[String]) -> Result<ContextOptions, CliError> {
@@ -128,9 +130,11 @@ pub(crate) fn parse_context_args(args: &[String]) -> Result<ContextOptions, CliE
 pub(crate) fn build_context_pack(options: &ContextOptions) -> Result<ContextPack, CliError> {
     let snapshot = context_snapshot(&options.path)?;
     let data = context_data_json(&snapshot, &options.selector, options.depth, options.limit)?;
+    let next_actions = context_next_actions(options, &data);
     Ok(ContextPack {
         repo_root: snapshot.open.repo_root,
         data,
+        next_actions,
     })
 }
 
@@ -159,6 +163,25 @@ pub(crate) fn print_context_summary(data: &Value) {
             .map(Vec::len)
             .unwrap_or(0)
     );
+    let omissions = omission_counts(data);
+    if omissions.has_any() {
+        println!(
+            "Omitted: atoms={} trace_links={} fires={} changed_atoms={} open_fires={} omitted_endpoints={} omitted_neighbors={}",
+            omissions.atoms,
+            omissions.trace_links,
+            omissions.fires,
+            omissions.scan_changed_atoms,
+            omissions.scan_open_fires,
+            omissions.trace_links_with_omitted_endpoints,
+            omissions.omitted_neighbors
+        );
+        let limit = data["limits"]["limit"].as_u64().unwrap_or(1);
+        println!(
+            "Next: codefire context {} --limit {} --json",
+            selector_args_from_data(data),
+            next_limit(limit)
+        );
+    }
 }
 
 fn set_selector(
@@ -382,6 +405,9 @@ fn context_data_json(
                 "returned": scan_open_fires.len(),
                 "omitted": snapshot.scan.open_fires.len().saturating_sub(scan_open_fires.len()),
             },
+            "atom_neighbors": {
+                "omitted": selection.omitted_neighbors,
+            },
         },
         "branch": {
             "name": &snapshot.open.branch,
@@ -414,9 +440,10 @@ fn selected_atom_ids(
         ContextSelector::Branch => Ok(selection(BTreeSet::new(), false)),
         ContextSelector::Changed => {
             let total = scan.changed_atoms.len();
-            Ok(selection(
+            Ok(selection_with_omitted_neighbors(
                 scan.changed_atoms.iter().take(limit).cloned().collect(),
                 total > limit,
+                0,
             ))
         }
         ContextSelector::Atom(atom_id) => {
@@ -441,15 +468,24 @@ fn selected_atom_ids(
             if total > limit {
                 ids = ids.into_iter().take(limit).collect();
             }
-            Ok(selection(ids, total > limit))
+            Ok(selection_with_omitted_neighbors(ids, total > limit, 0))
         }
     }
 }
 
 fn selection(atom_ids: BTreeSet<String>, truncated_atoms: bool) -> Selection {
+    selection_with_omitted_neighbors(atom_ids, truncated_atoms, 0)
+}
+
+fn selection_with_omitted_neighbors(
+    atom_ids: BTreeSet<String>,
+    truncated_atoms: bool,
+    omitted_neighbors: usize,
+) -> Selection {
     Selection {
         atom_ids,
         truncated_atoms,
+        omitted_neighbors,
     }
 }
 
@@ -461,6 +497,7 @@ fn atom_neighborhood(
 ) -> Selection {
     let adjacency = trace_adjacency(trace_graph);
     let mut seen = BTreeSet::new();
+    let mut omitted_neighbors = BTreeSet::new();
     let mut queue = VecDeque::new();
     let mut truncated = false;
     seen.insert(start.to_string());
@@ -471,18 +508,146 @@ fn atom_neighborhood(
         }
         if let Some(next) = adjacency.get(atom_id.as_str()) {
             for neighbor in next {
-                if seen.insert(neighbor.clone()) {
-                    if seen.len() > limit {
-                        seen.remove(neighbor);
+                if !seen.contains(neighbor) {
+                    if seen.len() >= limit {
                         truncated = true;
+                        omitted_neighbors.insert(neighbor.clone());
                         continue;
                     }
+                    seen.insert(neighbor.clone());
                     queue.push_back((neighbor.clone(), distance + 1));
                 }
             }
         }
     }
-    selection(seen, truncated)
+    selection_with_omitted_neighbors(seen, truncated, omitted_neighbors.len())
+}
+
+fn context_next_actions(options: &ContextOptions, data: &Value) -> Vec<Value> {
+    let omissions = omission_counts(data);
+    if !omissions.has_any() {
+        return Vec::new();
+    }
+    let suggested_limit = next_limit(options.limit as u64);
+    vec![json!({
+        "kind": "context_expand",
+        "command": format!(
+            "codefire context --path {} {} --limit {} --json",
+            command_arg(&options.path.to_string_lossy()),
+            selector_args(&options.selector, options.depth),
+            suggested_limit
+        ),
+        "reason": "fetch omitted context entries and omitted trace endpoints",
+        "target": {
+            "path": options.path.to_string_lossy(),
+            "selector": data["selector"].clone(),
+            "current_limit": options.limit,
+            "suggested_limit": suggested_limit,
+            "omitted": omissions.to_json(),
+        },
+    })]
+}
+
+#[derive(Default)]
+struct OmissionCounts {
+    atoms: u64,
+    trace_links: u64,
+    fires: u64,
+    scan_changed_atoms: u64,
+    scan_open_fires: u64,
+    trace_links_with_omitted_endpoints: u64,
+    omitted_neighbors: u64,
+}
+
+impl OmissionCounts {
+    fn has_any(&self) -> bool {
+        self.atoms > 0
+            || self.trace_links > 0
+            || self.fires > 0
+            || self.scan_changed_atoms > 0
+            || self.scan_open_fires > 0
+            || self.trace_links_with_omitted_endpoints > 0
+            || self.omitted_neighbors > 0
+    }
+
+    fn to_json(&self) -> Value {
+        json!({
+            "atoms": self.atoms,
+            "trace_links": self.trace_links,
+            "fires": self.fires,
+            "scan_changed_atoms": self.scan_changed_atoms,
+            "scan_open_fires": self.scan_open_fires,
+            "trace_links_with_omitted_endpoints": self.trace_links_with_omitted_endpoints,
+            "atom_neighbors": self.omitted_neighbors,
+        })
+    }
+}
+
+fn omission_counts(data: &Value) -> OmissionCounts {
+    OmissionCounts {
+        atoms: summary_u64(data, "atoms", "omitted"),
+        trace_links: summary_u64(data, "trace_links", "omitted"),
+        fires: summary_u64(data, "fires", "omitted"),
+        scan_changed_atoms: summary_u64(data, "scan_changed_atoms", "omitted"),
+        scan_open_fires: summary_u64(data, "scan_open_fires", "omitted"),
+        trace_links_with_omitted_endpoints: summary_u64(
+            data,
+            "trace_links",
+            "with_omitted_endpoints",
+        ),
+        omitted_neighbors: summary_u64(data, "atom_neighbors", "omitted"),
+    }
+}
+
+fn summary_u64(data: &Value, section: &str, field: &str) -> u64 {
+    data["summary"][section][field].as_u64().unwrap_or(0)
+}
+
+fn next_limit(limit: u64) -> u64 {
+    limit.saturating_mul(2).max(limit.saturating_add(1))
+}
+
+fn selector_args(selector: &ContextSelector, depth: usize) -> String {
+    match selector {
+        ContextSelector::Atom(value) => {
+            format!("--atom {} --depth {depth}", command_arg(value))
+        }
+        ContextSelector::Fire(value) => {
+            format!("--fire {} --depth {depth}", command_arg(value))
+        }
+        ContextSelector::Changed => format!("--changed --depth {depth}"),
+        ContextSelector::Branch => format!("--branch --depth {depth}"),
+    }
+}
+
+fn selector_args_from_data(data: &Value) -> String {
+    let selector = &data["selector"];
+    let kind = selector["kind"].as_str().unwrap_or("branch");
+    let depth = selector["depth"].as_u64().unwrap_or(1);
+    match kind {
+        "atom" => format!(
+            "--atom {} --depth {depth}",
+            command_arg(selector["value"].as_str().unwrap_or(""))
+        ),
+        "fire" => format!(
+            "--fire {} --depth {depth}",
+            command_arg(selector["value"].as_str().unwrap_or(""))
+        ),
+        "changed" => format!("--changed --depth {depth}"),
+        _ => format!("--branch --depth {depth}"),
+    }
+}
+
+fn command_arg(value: &str) -> String {
+    if !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-'))
+    {
+        value.to_string()
+    } else {
+        format!("'{}'", value.replace('\'', "'\\''"))
+    }
 }
 
 fn trace_adjacency(trace_graph: &codefire_core::TraceGraph) -> BTreeMap<&str, Vec<String>> {
@@ -681,5 +846,6 @@ mod tests {
         let selection = atom_neighborhood(&trace_graph, "REQ-session", 1, 2);
         assert_eq!(selection.atom_ids.len(), 2);
         assert!(selection.truncated_atoms);
+        assert_eq!(selection.omitted_neighbors, 1);
     }
 }

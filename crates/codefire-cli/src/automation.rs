@@ -299,15 +299,27 @@ fn push_diagnostic(diagnostics: &mut Vec<Value>, blocking_only: bool, diagnostic
     }
 }
 
-pub(crate) fn verification_next_actions(verification: &codefire_core::Verification) -> Vec<Value> {
+pub(crate) fn verification_next_actions(
+    verification: &codefire_core::Verification,
+    scan: &codefire_core::ScanResult,
+) -> Vec<Value> {
     let mut actions = Vec::new();
     if verification.result == "passed" {
-        actions.push(next_action(
-            "commit",
-            cli_command("commit -m <message>"),
-            "seal the verified open branch",
-            json!({}),
-        ));
+        if has_pending_scan_changes(scan) {
+            actions.push(next_action(
+                "commit",
+                cli_command("commit -m <message>"),
+                "seal the verified open branch",
+                pending_changes_target(scan),
+            ));
+        } else {
+            actions.push(next_action(
+                "status",
+                cli_command("status --json"),
+                "branch is verified and has no pending scan changes to commit",
+                pending_changes_target(scan),
+            ));
+        }
         return actions;
     }
     if verification.open_required_fires > 0 {
@@ -380,6 +392,20 @@ pub(crate) fn verification_next_actions(verification: &codefire_core::Verificati
         ));
     }
     actions
+}
+
+fn has_pending_scan_changes(scan: &codefire_core::ScanResult) -> bool {
+    !scan.changed_atoms.is_empty() || !scan.open_fires.is_empty() || scan.tool_migration.is_some()
+}
+
+fn pending_changes_target(scan: &codefire_core::ScanResult) -> Value {
+    json!({
+        "base_commit": &scan.base_commit,
+        "pending_changes": has_pending_scan_changes(scan),
+        "changed_atoms": &scan.changed_atoms,
+        "open_fires": scan.open_fires.len(),
+        "tool_migration": &scan.tool_migration,
+    })
 }
 
 pub(crate) fn bounded_next_actions(mut actions: Vec<Value>) -> Vec<Value> {
@@ -580,7 +606,7 @@ mod tests {
             verified_at: "2026-06-04T00:00:00Z".to_string(),
         };
 
-        let actions = verification_next_actions(&verification);
+        let actions = verification_next_actions(&verification, &empty_scan());
         let kinds = actions
             .iter()
             .filter_map(|item| item.get("kind").and_then(Value::as_str))
@@ -592,5 +618,67 @@ mod tests {
         assert!(kinds.contains(&"rerun_check"));
         assert!(actions.iter().all(|item| item.get("command").is_some()));
         assert!(actions.iter().all(|item| item.get("target").is_some()));
+    }
+
+    #[test]
+    fn verification_next_actions_do_not_suggest_commit_for_clean_pass() {
+        let verification = passed_verification();
+        let actions = verification_next_actions(&verification, &empty_scan());
+
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0]["kind"], "status");
+        assert_eq!(actions[0]["target"]["pending_changes"], false);
+    }
+
+    #[test]
+    fn verification_next_actions_suggest_commit_for_dirty_pass() {
+        let verification = passed_verification();
+        let mut scan = empty_scan();
+        scan.changed_atoms.push("REQ-session".to_string());
+        let actions = verification_next_actions(&verification, &scan);
+
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0]["kind"], "commit");
+        assert_eq!(actions[0]["target"]["pending_changes"], true);
+        assert_eq!(actions[0]["target"]["changed_atoms"][0], "REQ-session");
+    }
+
+    fn passed_verification() -> codefire_core::Verification {
+        codefire_core::Verification {
+            type_tag: "verification".to_string(),
+            version: 1,
+            result: "passed".to_string(),
+            trace_completeness_required: true,
+            open_required_fires: 0,
+            failed_checks: Vec::new(),
+            missing_required_links: Vec::new(),
+            stale_resolutions: Vec::new(),
+            missing_evidence_refs: Vec::new(),
+            duplicate_atom_ids: Vec::new(),
+            verified_at: "2026-06-04T00:00:00Z".to_string(),
+        }
+    }
+
+    fn empty_scan() -> codefire_core::ScanResult {
+        codefire_core::ScanResult {
+            type_tag: "scan_result".to_string(),
+            version: 1,
+            base_commit: "CF-COMMIT-base".to_string(),
+            atom_index: codefire_core::AtomIndex {
+                type_tag: "atom_index".to_string(),
+                version: 1,
+                hash_schema_version: codefire_core::ATOM_HASH_SCHEMA_VERSION,
+                atoms: Vec::new(),
+                duplicate_atom_ids: Vec::new(),
+            },
+            trace_graph: codefire_core::TraceGraph {
+                type_tag: "trace_graph".to_string(),
+                version: 1,
+                links: Vec::new(),
+            },
+            changed_atoms: Vec::new(),
+            open_fires: Vec::new(),
+            tool_migration: None,
+        }
     }
 }

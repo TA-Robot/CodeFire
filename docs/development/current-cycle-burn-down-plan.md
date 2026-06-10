@@ -26,25 +26,30 @@ Burn-down中に別の問題を見つけた場合の扱い:
 
 Active batch ID:
 
-- `BATCH-2026-06-cycle3-dogfood`
+- `BATCH-2026-06-global-open-backlog`
 
 Scope:
 
-- algorithm cycle 3 dogfoodingと、その直後の2周目改善サイクル中に見つけた `CFB-086..CFB-092`。
-- 古いopen CFB/CFRはこのbatchの対象外。ただし、同じroot causeで同時に潰せるものは修正時にclose候補として扱ってよい。
+- 2026-06-09時点でopenだった全既知issue。
+- CFB dogfood issue: 68 open。
+- CFR code review issue: 78 open。
+- 合計146件を同一burn-down対象としてfreezeする。
+- 新規issue探索は、このglobal batchを0件にするまで行わない。作業中に見つけた周辺問題は、修正blockerでない限り採番せず、次回discovery候補として短くメモする。
 
 Completion rule:
 
-- `CFB-086..CFB-092` の全件が `fixed` または明示 `wontfix` になっている。
+- freeze済み146件の全件が `fixed` または明示 `wontfix` になっている。
 - `wontfix` は原則使わない。仕様として残す場合だけ、理由と代替運用を書く。
 - `cargo fmt --check`、`cargo test --workspace`、`cargo clippy --workspace --all-targets -- -D warnings` が通る。
 - 修正版をinstallし、algorithm projectで該当再現コマンドを再実行する。
-- `docs/development/bug-backlog.md` と `docs/development/bug-issues/cfb-*.md` が一致している。
+- `docs/development/bug-backlog.md`、`docs/development/bug-issues/cfb-*.md`、`docs/development/code-review-issues-2026-06-06.md`、`docs/development/code-review-issues/cfr-*.md` が一致している。
 
 ## Issue Status
 
 | Issue | Status | Root fix group | Current decision |
 |---|---|---|---|
+| CFB-052 | fixed | Verify next_actions state awareness | clean passed verifyはcommitではなくstatusを返す |
+| CFB-073 | fixed | Context bounded output metadata | context summary countsとcontext_expand next_actionを追加した |
 | CFB-086 | fixed | Evidence/extinguish JSON | fixed済み。close auditで再確認する |
 | CFB-087 | fixed | Evidence/extinguish JSON failure envelope | fixed済み。missing evidence-ref JSON envelopeを確認した |
 | CFB-088 | fixed | Evidence dry-run JSON | fixed済み。close auditで再確認する |
@@ -52,34 +57,37 @@ Completion rule:
 | CFB-090 | fixed | Bounded context graph metadata | fixed済み。trace endpoint omission metadataを確認した |
 | CFB-091 | fixed | Explicit atom span stability | fixed済み。close auditで再確認する |
 | CFB-092 | fixed | Extractor/hash schema migration | fixed済み。schema migration detectionとrebaseline commitを確認した |
+| CFR-136 | fixed | Context bounded output metadata | omitted countsとtext follow-up commandを追加した |
+| CFR-141 | fixed | Verify next_actions state awareness | verify next_actionsをscan-awareにした |
+| CFR-157 | fixed | Context bounded atom traversal | omitted neighbor countとcontext_expand next_actionを追加した |
 
 Remaining open count for this batch:
 
-- 0 issues.
+- 141 issues.
 
 ## Global Issue Inventory
 
-This active batch is not the whole backlog.
+This active batch is the whole known open backlog.
 
-Current tracked issue inventory as of 2026-06-09:
+Current tracked issue inventory as of 2026-06-10:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 92 | 24 | 68 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
-| CFR code review issues | 160 | 82 | 78 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. |
-| Total | 252 | 106 | 146 | This is the whole known issue backlog, not the current burn-down batch. |
+| CFB dogfood issues | 92 | 26 | 66 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFR code review issues | 160 | 85 | 75 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. |
+| Total | 252 | 111 | 141 | This global batch is the whole known issue backlog. |
 
-Current active batch size:
+Current active batch progress:
 
-- 7 CFB issues total: CFB-086..CFB-092.
-- 7 fixed: CFB-086, CFB-087, CFB-088, CFB-089, CFB-090, CFB-091, CFB-092.
-- 0 remaining open.
+- Frozen open issue count: 146.
+- Fixed during global burn-down so far: CFB-052, CFB-073, CFR-136, CFR-141, CFR-157.
+- Remaining open: 141.
 
 Burn-down interpretation:
 
-- The current cycle closed the active batch first.
-- Older CFB/CFR remain tracked backlog and must be assigned to later burn-down batches.
-- A future release-quality cycle should create larger batches from the global backlog root-cause groups, but still obey the same rule: freeze a batch, fix all issues in that batch, then start the next discovery/batch.
+- The current cycle is no longer scoped to only CFB-086..CFB-092.
+- All open CFB/CFR are part of this single global burn-down batch.
+- Root-cause grouping is allowed only to reduce duplicate implementation work; it must not exclude issues from the batch.
 
 ## Root Fix Groups
 

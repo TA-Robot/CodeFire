@@ -227,6 +227,7 @@ fn explain_atom(options: &ExplainOptions, value: &str) -> Result<ExplainResult, 
 fn explain_verify_failure(options: &ExplainOptions) -> Result<ExplainResult, CliError> {
     let context = open_context(&options.path)?;
     let execution = compute_verify(&options.path, false)?;
+    let scan = execution.scan;
     let verification = execution.verification;
     let blocker_count = verification.open_required_fires
         + verification.missing_required_links.len()
@@ -243,7 +244,7 @@ fn explain_verify_failure(options: &ExplainOptions) -> Result<ExplainResult, Cli
     Ok(ExplainResult {
         repo_root: context.repo_root,
         diagnostics: verification_diagnostics_json(&verification),
-        next_actions: verification_next_actions(&verification),
+        next_actions: verification_next_actions(&verification, &scan),
         data,
     })
 }

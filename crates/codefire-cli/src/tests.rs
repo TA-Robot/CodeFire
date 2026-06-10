@@ -1118,6 +1118,16 @@ fn context_pack_returns_atom_changed_and_fire_views() {
         bounded_changed_pack.data["summary"]["trace_links"]["with_omitted_endpoints"],
         1
     );
+    assert_eq!(bounded_changed_pack.next_actions.len(), 1);
+    assert_eq!(
+        bounded_changed_pack.next_actions[0]["kind"],
+        "context_expand"
+    );
+    assert_eq!(
+        bounded_changed_pack.next_actions[0]["target"]["omitted"]
+            ["trace_links_with_omitted_endpoints"],
+        1
+    );
     assert!(bounded_changed_pack.data["trace_link_endpoints"]
         .as_array()
         .unwrap()

@@ -253,7 +253,7 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         Some(&pack.repo_root),
                         pack.data,
                         Vec::new(),
-                        Vec::new(),
+                        pack.next_actions,
                     ))?
                 );
             } else {
@@ -1132,7 +1132,9 @@ fn run_scan_command(args: &[String]) -> Result<(), CliError> {
 fn run_verify_command(args: &[String]) -> Result<(), CliError> {
     let options = parse_verify_args(args)?;
     let started = Instant::now();
-    let verification = run_verify(&options.path)?;
+    let execution = compute_verify(&options.path, true)?;
+    let verification = execution.verification;
+    let scan = execution.scan;
     let metrics = options
         .metrics
         .then(|| verification_metrics(started.elapsed(), &verification));
@@ -1153,7 +1155,7 @@ fn run_verify_command(args: &[String]) -> Result<(), CliError> {
                     metrics.as_ref(),
                 ),
                 verification_diagnostics_json_with_filter(&verification, options.blocking_only),
-                verification_next_actions(&verification),
+                verification_next_actions(&verification, &scan),
             ))?
         );
     } else {
@@ -3578,6 +3580,7 @@ fn compute_scan(start: &Path, persist: bool) -> Result<ScanExecution, CliError> 
     })
 }
 
+#[cfg(test)]
 fn run_verify(start: &Path) -> Result<codefire_core::Verification, CliError> {
     Ok(compute_verify(start, true)?.verification)
 }
