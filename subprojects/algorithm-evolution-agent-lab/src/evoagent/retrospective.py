@@ -190,6 +190,16 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifacts:
     artifacts: tuple[ResearchCyclePlanningHandoffArtifact, ...]
 
 
+@dataclass(frozen=True)
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchive:
+    handoff: ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifacts
+    artifacts: tuple[ResearchCyclePlanningHandoffArtifact, ...]
+    manifest: ResearchCyclePlanningPacketManifest
+    manifest_markdown: str
+    verification: ResearchCyclePlanningPacketManifestVerification
+    verification_markdown: str
+
+
 # cf-atom: CODE-ResearchCycleRetrospective
 class ResearchCycleRetrospective:
     def summarize(self, signals: list[ResearchCycleSignal]) -> ResearchCycleRetrospectiveReport:
@@ -1371,6 +1381,39 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactMani
         return ResearchCyclePlanningPacketManifestVerificationMarkdown().render(
             verification,
             title=title,
+        )
+
+
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder:
+    def build(
+        self,
+        handoff: ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifacts,
+        *,
+        manifest_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Manifest",
+        verification_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Manifest Verification",
+    ) -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchive:
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder().build(
+            handoff,
+        )
+        artifact_contents = {artifact.path: artifact.content for artifact in handoff.artifacts}
+        verification = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerifier().verify(
+            manifest,
+            artifact_contents,
+        )
+        return ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchive(
+            handoff=handoff,
+            artifacts=handoff.artifacts,
+            manifest=manifest,
+            manifest_markdown=ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown().render(
+                manifest,
+                title=manifest_title,
+            ),
+            verification=verification,
+            verification_markdown=ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerificationMarkdown().render(
+                verification,
+                title=verification_title,
+            ),
         )
 
 

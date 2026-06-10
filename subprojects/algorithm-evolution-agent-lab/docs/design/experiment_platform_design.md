@@ -914,3 +914,18 @@ The rendered document contains:
 - path-scoped finding messages, or `none` when clean
 
 The renderer delegates finding layout to the shared manifest verification Markdown shape while providing an archive-summary-specific title and trace atom. It does not rerun verification, inspect artifacts, recompute hashes, read files, or write files.
+
+## DES-AUTO-054: Research cycle planning handoff review packet artifact archive summary artifact archive
+
+The review packet artifact archive summary artifact archive builder consumes `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifacts`.
+
+The builder returns one deterministic in-memory archive with:
+
+- the source summary artifact handoff
+- the packaged summary artifacts
+- the summary artifact manifest
+- manifest Markdown
+- manifest verification result
+- manifest verification Markdown
+
+The builder composes the existing summary artifact manifest builder, manifest Markdown renderer, manifest verifier, and verification Markdown renderer. It does not rebuild the final review archive, rerender summary or gate Markdown, read files, write files, or mutate inputs.
