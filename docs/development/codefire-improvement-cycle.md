@@ -229,13 +229,13 @@ Current named cycle:
 - CodeFire次version系統: v1.0 Contract ValidationのPhase 1a以降を継続する。
 - Current plan: `docs/development/v1.0-contract-validation-plan.md`。
 - Current burn-down plan: `docs/development/current-cycle-burn-down-plan.md`。
-- Current phase: cycle 44 dogfood pass完了。今回のalgorithm開発ではCodeFire本体の新規CFBは発見されず、既知CFB/CFR open issueは0件。
+- Current phase: cycle 45 dogfood pass完了。今回のalgorithm開発ではCodeFire本体の新規CFBは発見されず、既知CFB/CFR open issueは0件。
 - Installed CodeFire: `/home/devuser/.local/bin/codefire`。
 - Installed version output: `codefire foundation 1`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
-- Latest pushed Git commits: current global burn-down commits through cycle 44 dogfood pass。
+- Latest pushed Git commits: current global burn-down commits through cycle 45 dogfood pass。
 - Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` は `open-clean`、open fires 0。
-- Latest algorithm CodeFire base: `CF-COMMIT-75c6cd1b8a7c40c48f669cff`。
+- Latest algorithm CodeFire base: `CF-COMMIT-f0d2c55ac285ef2989ee174f`。
 
 Current global issue inventory:
 
@@ -250,6 +250,7 @@ Close audit note:
 - 2026-06-10時点で残っていた146件は、過去の `BATCH-2026-06-global-open-backlog` の初期open数であり、現在のopen数ではない。同batchは同cycle内で全件fixedにした。
 - 現在のCFB/CFR open issueは0件。`146` は履歴ログに出る開始件数であって、現残数ではない。
 - `docs/development/bug-issues/` と `docs/development/code-review-issues/` のファイル数は監査履歴を含む総数であり、open数ではない。open判定は各issueの `Status` とこのinventory表を正とする。
+- `146` が検索で見える場合も、closed batch starting size、過去のburn-down履歴、`CFR-146` のissue ID、またはalgorithm側の古いunittest countであり、open issue残数ではない。
 - 最後に残っていた `CFR-120` は、`docs/development/issue-root-cause-map.json` と `issue_root_cause_map_covers_open_issues` で、今後のopen issueをroot cause計画へ機械的に接続する形でcloseした。
 - Cycle 4 dogfoodingでは `ResearchCyclePlanSynthesizer` を追加し、`CFB-093` を発見、同cycle内でfixedにした。
 - Cycle 5 dogfoodingでは `ResearchCyclePlanMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-476c73ed58ac5e64be166e38` でsealした。CodeFire本体issueは新規発見なし。
@@ -292,6 +293,7 @@ Close audit note:
 - Cycle 42 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-9fb5e3367603990b5a2efed4` でsealした。CodeFire本体issueは新規発見なし。
 - Cycle 43 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-adfe508b71f97f0fda8f2203` でsealした。CodeFire本体issueは新規発見なし。
 - Cycle 44 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-75c6cd1b8a7c40c48f669cff` でsealした。CodeFire本体issueは新規発見なし。
+- Cycle 45 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-f0d2c55ac285ef2989ee174f` でsealした。CodeFire本体issueは新規発見なし。146件は閉じた履歴batchの開始数であり、現open数ではないことを現状態欄へ再明記した。
 - 次のcycleでも、issue discovery後にこのmapまたは後継schemaへ全open issueを登録し、batchを全部消してから次のissue出しへ進む。
 
 ## Completed Two-Cycle Snapshot

@@ -1052,3 +1052,16 @@ The verifier returns `ResearchCyclePlanningPacketManifestVerification` findings 
 - missing per-artifact table row
 
 Document-level findings use path `manifest.md`. Per-artifact findings use the affected artifact path. The verifier is pure and deterministic. It does not recompute artifact hashes, read files, write files, or mutate inputs.
+
+## DES-AUTO-063: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown
+
+The review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown renderer consumes `ResearchCyclePlanningPacketManifestVerification`.
+
+The rendered document contains:
+
+- title
+- status
+- finding count
+- path-specific finding list, or `none` when clean
+
+The renderer delegates to the shared planning packet manifest verification Markdown renderer so status vocabulary and finding list shape stay consistent across all handoff manifest verification surfaces. It does not rerun verification, read files, write files, or mutate inputs.

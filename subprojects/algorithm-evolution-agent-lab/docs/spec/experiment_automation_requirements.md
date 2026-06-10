@@ -319,3 +319,7 @@ The system shall render final archive summary artifact archive summary artifact 
 ## REQ-AUTO-080: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verifier
 
 The system shall verify final archive summary artifact archive summary artifact manifest Markdown against its machine-readable manifest. The verifier shall detect missing source cycle, status, artifact count, table header, and artifact row lines, and shall report findings with paths so storage adapters can block stale or incomplete reviewer-facing manifest documents before final handoff.
+
+## REQ-AUTO-081: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown
+
+The system shall render final archive summary artifact archive summary artifact manifest Markdown verification results into deterministic Markdown. The rendered document shall include status, finding count, and path-specific findings or `none` when clean so reviewers can audit manifest Markdown readiness without reading machine-only verification payloads.

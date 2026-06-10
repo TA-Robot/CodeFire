@@ -31,6 +31,8 @@ Current known open issue count:
 - Active frozen issue batch: none.
 - The historical 146-item global batch below is already closed. The number 146 is the old starting count, not a remaining-open count.
 - Closed issue detail files remain in `docs/development/bug-issues/` and `docs/development/code-review-issues/` as audit history. Counting files in those directories is not the open issue count; `Status: fixed` / `Status: fixed in v0.7` means closed.
+- If a text search still finds `146`, treat it as one of these audit artifacts: closed batch starting size, historical work-log remaining count from the burn-down day, closed issue ID `CFR-146`, or an algorithm unittest count from an older dogfood pass. None of those are current open issues.
+- Current open-state verification is the status grep for explicit `open` statuses plus CodeFire `open_fires: 0`; both must be zero before starting another discovery pass.
 
 ## Closed Historical Batch
 
@@ -978,6 +980,25 @@ Cycle 44 issue status:
 - Newly discovered CodeFire product issues: 0.
 - Newly frozen CFB/CFR batch size: 0.
 - Remaining known CFB/CFR open issue count: 0.
+
+## Cycle 45 Dogfood Pass
+
+After cycle 44 reached zero open issues, cycle 45 resumed algorithm development with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown` to render archive summary artifact archive summary artifact manifest Markdown verification results into deterministic reviewer Markdown.
+- Added `REQ-AUTO-081`, `DES-AUTO-063`, `CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown`, and `TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-renders-findings`.
+- Algorithm unittest result: 187 tests pass.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-f0d2c55ac285ef2989ee174f`.
+
+Cycle 45 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- `146` remains only as closed-batch/history/test-count text, not as open issue inventory.
 
 Burn-down interpretation:
 

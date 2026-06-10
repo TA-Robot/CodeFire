@@ -1700,6 +1700,20 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
         return ResearchCyclePlanningPacketManifestVerification(findings=tuple(findings))
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown:
+    def render(
+        self,
+        verification: ResearchCyclePlanningPacketManifestVerification,
+        *,
+        title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary Artifact Manifest Markdown Verification",
+    ) -> str:
+        return ResearchCyclePlanningPacketManifestVerificationMarkdown().render(
+            verification,
+            title=title,
+        )
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

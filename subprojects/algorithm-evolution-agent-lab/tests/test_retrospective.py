@@ -14,6 +14,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate,
@@ -2316,6 +2317,79 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             ],
             [(finding.path, finding.message) for finding in broken.findings],
         )
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-renders-findings
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_renders_findings(
+        self,
+    ) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-45",
+                    completed_runs=24,
+                    improved_candidates=20,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.32,
+                    remaining_budget=24.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=20,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=20.0,
+            packet_path="cycle-45/planning-packet.md",
+            plan_path="cycle-45/plan.md",
+            lint_path="cycle-45/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-45/review-packet.md",
+            readiness_path="cycle-45/readiness.md",
+            manifest_path="cycle-45/manifest.md",
+            verification_path="cycle-45/verification.md",
+        )
+        handoff = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder().build(
+            archive,
+            summary_path="cycle-45/archive-summary.md",
+            gate_path="cycle-45/archive-summary-gate.md",
+        )
+        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+            handoff,
+        )
+        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder().build(
+            summary_archive,
+            summary_path="cycle-45/archive-summary-artifact-archive-summary.md",
+            gate_path="cycle-45/archive-summary-artifact-archive-summary-gate.md",
+        )
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder().build(
+            packaged,
+        )
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown().render(
+            manifest,
+        )
+        verification = (
+            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier().verify(
+                manifest,
+                markdown.replace("| Path | SHA-256 | Bytes |\n", ""),
+            )
+        )
+
+        rendered = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown().render(
+            verification,
+            title="Cycle 45 Manifest Markdown Verification",
+        )
+
+        self.assertIn("# Cycle 45 Manifest Markdown Verification", rendered)
+        self.assertIn("- Status: blocked", rendered)
+        self.assertIn("- Finding count: 1", rendered)
+        self.assertIn("- `manifest.md`: manifest table header is missing", rendered)
+        self.assertNotIn("- none", rendered)
 
 
 if __name__ == "__main__":
