@@ -218,7 +218,7 @@ Current tracked issue inventory as of 2026-06-10:
 |---|---:|---:|---:|---|
 | CFB dogfood issues | 95 | 95 | 0 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for every `CFB-001..CFB-095` issue. |
 | CFR code review issues | 160 | 160 | 0 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
-| Total | 255 | 255 | 0 | This global batch plus cycle 4 through cycle 34 dogfood passes are the whole known issue backlog. |
+| Total | 255 | 255 | 0 | This global batch plus cycle 4 through cycle 35 dogfood passes are the whole known issue backlog. |
 
 Completed global batch progress:
 
@@ -792,6 +792,24 @@ Algorithm work:
 - All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-d8910ff757e08b1119b03d12`.
 
 Cycle 34 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+
+## Cycle 35 Dogfood Pass
+
+After cycle 34 reached zero open issues, cycle 35 resumed algorithm development with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerificationMarkdown` to render archive summary artifact manifest verification findings into deterministic reviewer-facing Markdown.
+- Added `REQ-AUTO-071`, `DES-AUTO-053`, `CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerificationMarkdown`, and `TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-manifest-verification-markdown-renders-findings`.
+- Algorithm unittest result: 177 tests pass.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-b4d96c977703356c86890ec9`.
+
+Cycle 35 issue status:
 
 - Newly discovered CodeFire product issues: 0.
 - Newly frozen CFB/CFR batch size: 0.

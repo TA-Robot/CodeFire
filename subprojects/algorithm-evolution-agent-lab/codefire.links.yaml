@@ -555,6 +555,15 @@ links:
   - from: REQ-AUTO-070
     to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-manifest-verifier-detects-drift
     type: verified_by
+  - from: REQ-AUTO-071
+    to: DES-AUTO-053
+    type: refined_by
+  - from: DES-AUTO-053
+    to: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerificationMarkdown
+    type: implemented_by
+  - from: REQ-AUTO-071
+    to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-manifest-verification-markdown-renders-findings
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

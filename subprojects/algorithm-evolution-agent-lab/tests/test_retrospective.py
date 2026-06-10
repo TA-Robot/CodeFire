@@ -12,6 +12,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerifier,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate,
@@ -1656,6 +1657,68 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             ],
             [(finding.path, finding.message) for finding in result.findings],
         )
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-manifest-verification-markdown-renders-findings
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_manifest_verification_markdown_renders_findings(
+        self,
+    ) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-35",
+                    completed_runs=15,
+                    improved_candidates=11,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.4,
+                    remaining_budget=15.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=11,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=11.0,
+            packet_path="cycle-35/planning-packet.md",
+            plan_path="cycle-35/plan.md",
+            lint_path="cycle-35/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-35/review-packet.md",
+            readiness_path="cycle-35/readiness.md",
+            manifest_path="cycle-35/manifest.md",
+            verification_path="cycle-35/verification.md",
+        )
+        handoff = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder().build(
+            archive,
+            summary_path="cycle-35/archive-summary.md",
+            gate_path="cycle-35/archive-summary-gate.md",
+        )
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder().build(
+            handoff,
+        )
+        artifact_contents = {artifact.path: artifact.content for artifact in handoff.artifacts}
+        artifact_contents["cycle-35/archive-summary.md"] = "corrupted summary"
+        verification = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerifier().verify(
+            manifest,
+            artifact_contents,
+        )
+
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerificationMarkdown().render(
+            verification,
+            title="Cycle 35 Archive Summary Artifact Manifest Verification",
+        )
+
+        self.assertIn("# Cycle 35 Archive Summary Artifact Manifest Verification", markdown)
+        self.assertIn("- Status: blocked", markdown)
+        self.assertIn("- Finding count: 2", markdown)
+        self.assertIn("- `cycle-35/archive-summary.md`: sha256 digest mismatch", markdown)
+        self.assertIn("- `cycle-35/archive-summary.md`: byte count mismatch", markdown)
 
 
 if __name__ == "__main__":

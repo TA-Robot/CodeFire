@@ -279,3 +279,7 @@ The system shall render final planning handoff review packet artifact archive su
 ## REQ-AUTO-070: Research cycle planning handoff review packet artifact archive summary artifact manifest verification
 
 The system shall verify final planning handoff review packet artifact archive summary artifact manifests against artifact contents. The verification shall detect missing artifacts, SHA-256 digest drift, and byte count drift using the shared planning packet manifest verification shape so storage adapters can reject corrupted archive summary and gate audit documents before reviewer handoff.
+
+## REQ-AUTO-071: Research cycle planning handoff review packet artifact archive summary artifact manifest verification Markdown
+
+The system shall render final planning handoff review packet artifact archive summary artifact manifest verification results into deterministic Markdown. The rendered document shall include verification status, finding count, and path-scoped finding messages so reviewers can audit archive summary and gate audit artifact integrity without reading machine-only verification payloads.

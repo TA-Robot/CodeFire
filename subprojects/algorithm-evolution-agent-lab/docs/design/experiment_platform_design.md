@@ -902,3 +902,15 @@ The verifier emits `ResearchCyclePlanningPacketManifestVerification` with one fi
 - byte count mismatch
 
 The verifier delegates integrity semantics to the shared manifest verifier while providing an archive-summary-specific trace atom. It does not rebuild summary artifacts, rerender Markdown, read files, write files, or mutate the archive.
+
+## DES-AUTO-053: Research cycle planning handoff review packet artifact archive summary artifact manifest verification Markdown
+
+The review packet artifact archive summary artifact manifest verification Markdown renderer consumes `ResearchCyclePlanningPacketManifestVerification`.
+
+The rendered document contains:
+
+- verification status
+- finding count
+- path-scoped finding messages, or `none` when clean
+
+The renderer delegates finding layout to the shared manifest verification Markdown shape while providing an archive-summary-specific title and trace atom. It does not rerun verification, inspect artifacts, recompute hashes, read files, or write files.
