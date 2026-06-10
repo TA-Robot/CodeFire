@@ -215,7 +215,7 @@ Current tracked issue inventory as of 2026-06-10:
 |---|---:|---:|---:|---|
 | CFB dogfood issues | 95 | 95 | 0 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for every `CFB-001..CFB-095` issue. |
 | CFR code review issues | 160 | 160 | 0 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
-| Total | 255 | 255 | 0 | This global batch plus cycle 4/5/6/7/8/9/10/11/12/13/14/15/16/17/18/19 dogfood passes are the whole known issue backlog. |
+| Total | 255 | 255 | 0 | This global batch plus cycle 4/5/6/7/8/9/10/11/12/13/14/15/16/17/18/19/20 dogfood passes are the whole known issue backlog. |
 
 Completed global batch progress:
 
@@ -519,6 +519,24 @@ Algorithm work:
 - All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-b1606907ae8c9c0ef9f8d86d`.
 
 Cycle 19 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+
+## Cycle 20 Dogfood Pass
+
+After cycle 19 reached zero open issues, cycle 20 resumed algorithm development with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `ResearchCyclePlanningHandoffReviewPacketMarkdown` to render an already-built review packet into one reviewer-facing Markdown document with readiness, status, artifact digest, blocker, warning, and audit availability sections.
+- Added `REQ-AUTO-056`, `DES-AUTO-038`, `CODE-ResearchCyclePlanningHandoffReviewPacketMarkdown`, and `TEST-research-cycle-planning-handoff-review-packet-markdown-renders-review-document`.
+- Algorithm unittest result: 162 tests pass.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-8bfb09c524a9502892cb6fcc`.
+
+Cycle 20 issue status:
 
 - Newly discovered CodeFire product issues: 0.
 - Newly frozen CFB/CFR batch size: 0.

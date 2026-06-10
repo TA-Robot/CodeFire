@@ -905,6 +905,69 @@ class ResearchCyclePlanningHandoffReviewPacketBuilder:
         )
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketMarkdown
+class ResearchCyclePlanningHandoffReviewPacketMarkdown:
+    def render(
+        self,
+        packet: ResearchCyclePlanningHandoffReviewPacket,
+        *,
+        title: str = "Research Cycle Planning Handoff Review Packet",
+    ) -> str:
+        summary = packet.summary
+        readiness = packet.readiness
+        artifacts = list(summary.get("artifacts", []))
+        blockers = [str(blocker) for blocker in readiness.get("blockers", [])]
+        warnings = [str(warning) for warning in readiness.get("warnings", [])]
+        source_cycles = ", ".join(str(cycle) for cycle in summary.get("source_cycles", []))
+        lines = [
+            f"# {title}",
+            "",
+            f"- Source cycles: {source_cycles}",
+            f"- Ready: {'yes' if readiness.get('ready') else 'no'}",
+            f"- Status: {readiness.get('status', 'unknown')}",
+            f"- Packet status: {summary.get('packet_status', 'unknown')}",
+            f"- Manifest status: {summary.get('manifest_status', 'unknown')}",
+            f"- Verification status: {summary.get('verification_status', 'unknown')}",
+            f"- Artifact count: {summary.get('artifact_count', 0)}",
+            f"- Finding count: {summary.get('finding_count', 0)}",
+            "",
+            "## Artifacts",
+            "",
+            "| Path | Bytes | SHA-256 |",
+            "|---|---:|---|",
+        ]
+        for artifact in artifacts:
+            if isinstance(artifact, dict):
+                path = artifact.get("path", "")
+                byte_count = artifact.get("byte_count", 0)
+                digest = artifact.get("content_sha256", "")
+                lines.append(f"| `{path}` | {byte_count} | `{digest}` |")
+        lines.extend(["", "## Blockers", ""])
+        if blockers:
+            lines.extend(f"- {blocker}" for blocker in blockers)
+        else:
+            lines.append("- none")
+        lines.extend(["", "## Warnings", ""])
+        if warnings:
+            lines.extend(f"- {warning}" for warning in warnings)
+        else:
+            lines.append("- none")
+        audits = summary.get("audits", {})
+        manifest_markdown = bool(isinstance(audits, dict) and audits.get("manifest_markdown"))
+        verification_markdown = bool(isinstance(audits, dict) and audits.get("verification_markdown"))
+        lines.extend(
+            [
+                "",
+                "## Audits",
+                "",
+                f"- Readiness Markdown: {'included' if packet.readiness_markdown.strip() else 'missing'}",
+                f"- Manifest Markdown: {'included' if manifest_markdown else 'missing'}",
+                f"- Verification Markdown: {'included' if verification_markdown else 'missing'}",
+            ]
+        )
+        return "\n".join(lines).rstrip() + "\n"
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

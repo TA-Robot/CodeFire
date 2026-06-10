@@ -8,6 +8,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReadinessGate,
     ResearchCyclePlanningHandoffReadinessMarkdown,
     ResearchCyclePlanningHandoffReviewPacketBuilder,
+    ResearchCyclePlanningHandoffReviewPacketMarkdown,
     ResearchCyclePlanningHandoffBundleSummary,
     ResearchCyclePlanLane,
     ResearchCyclePlan,
@@ -858,6 +859,49 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertEqual(packet.readiness["status"], "ready")
         self.assertIn("# Cycle 19 Readiness", packet.readiness_markdown)
         self.assertIn("- Ready: yes", packet.readiness_markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-markdown-renders-review-document
+    def test_research_cycle_planning_handoff_review_packet_markdown_renders_review_document(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-20",
+                    completed_runs=6,
+                    improved_candidates=3,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=6.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=3,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=4.0,
+            packet_path="cycle-20/planning-packet.md",
+            plan_path="cycle-20/plan.md",
+            lint_path="cycle-20/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+
+        markdown = ResearchCyclePlanningHandoffReviewPacketMarkdown().render(
+            packet,
+            title="Cycle 20 Review Packet",
+        )
+
+        self.assertIn("# Cycle 20 Review Packet", markdown)
+        self.assertIn("- Source cycles: cycle-20", markdown)
+        self.assertIn("- Ready: yes", markdown)
+        self.assertIn("- Packet status: ok", markdown)
+        self.assertIn("| `cycle-20/plan.md` |", markdown)
+        self.assertIn("sha256:", markdown)
+        self.assertIn("- Readiness Markdown: included", markdown)
+        self.assertIn("- Manifest Markdown: included", markdown)
+        self.assertIn("- Verification Markdown: included", markdown)
 
 
 if __name__ == "__main__":

@@ -219,3 +219,7 @@ The system shall render planning handoff readiness results into deterministic Ma
 ## REQ-AUTO-055: Research cycle planning handoff review packet
 
 The system shall assemble a planning handoff review packet from an already-built handoff bundle. The review packet shall include the original bundle, machine-readable bundle summary, readiness decision, and readiness Markdown so storage and reviewer workflows can consume one deterministic object without recomputing planning, verification, or routing state.
+
+## REQ-AUTO-056: Research cycle planning handoff review packet Markdown
+
+The system shall render a planning handoff review packet into deterministic Markdown. The rendered document shall include source cycles, readiness status, packet, manifest, and verification statuses, artifact count, finding count, artifact paths with byte sizes and content digests, blockers, warnings, and audit document availability so reviewers can inspect the final handoff decision from one document.

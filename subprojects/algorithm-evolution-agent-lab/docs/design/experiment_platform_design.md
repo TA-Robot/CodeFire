@@ -700,3 +700,19 @@ The output `ResearchCyclePlanningHandoffReviewPacket` contains:
 - readiness Markdown
 
 The builder composes `ResearchCyclePlanningHandoffBundleSummary`, `ResearchCyclePlanningHandoffReadinessGate`, and `ResearchCyclePlanningHandoffReadinessMarkdown`. It does not rebuild the packet, rerun manifest verification, or write files, keeping one already-reviewed bundle as the source of truth for downstream storage and reviewer workflows.
+
+## DES-AUTO-038: Research cycle planning handoff review packet Markdown
+
+The review packet Markdown renderer consumes a `ResearchCyclePlanningHandoffReviewPacket`.
+
+The rendered document contains:
+
+- source cycles
+- ready yes/no value and readiness status
+- packet, manifest, and verification statuses
+- artifact count and verification finding count
+- artifact table with path, byte count, and SHA-256 digest
+- blockers and warnings with `none` when empty
+- audit document availability for readiness, manifest, and verification Markdown
+
+The renderer only serializes data already present in the packet. It does not rebuild the handoff bundle, recompute readiness, rerun manifest verification, or read artifact files from disk.

@@ -253,6 +253,11 @@ ResearchCyclePlanningHandoffReviewPacketBuilder.build(bundle)
   -> compose an existing handoff bundle with summary, readiness, and readiness Markdown
   -> keep the bundle as the single planning and verification source of truth
   -> avoid filesystem writes and avoid recomputing planning or manifest verification
+
+ResearchCyclePlanningHandoffReviewPacketMarkdown.render(packet)
+  -> render a final reviewer-facing Markdown document from the already-built review packet
+  -> include source cycles, readiness, statuses, artifact digest table, blockers, warnings, and audit availability
+  -> avoid bundle rebuilds, readiness recomputation, manifest verification, and filesystem reads
 ```
 
 Important implementation details:

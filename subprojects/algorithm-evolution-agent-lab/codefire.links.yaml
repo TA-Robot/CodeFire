@@ -420,6 +420,15 @@ links:
   - from: REQ-AUTO-055
     to: TEST-research-cycle-planning-handoff-review-packet-bundles-summary-and-readiness
     type: verified_by
+  - from: REQ-AUTO-056
+    to: DES-AUTO-038
+    type: refined_by
+  - from: DES-AUTO-038
+    to: CODE-ResearchCyclePlanningHandoffReviewPacketMarkdown
+    type: implemented_by
+  - from: REQ-AUTO-056
+    to: TEST-research-cycle-planning-handoff-review-packet-markdown-renders-review-document
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by
