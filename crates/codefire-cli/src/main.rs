@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 mod automation;
 mod batch;
 mod cli_model;
+mod command_registry;
 mod completion;
 mod context;
 mod doctor;
@@ -47,6 +48,7 @@ use batch::{
     print_batch_template_result, run_batch_template, run_extinguish_batch,
 };
 pub(crate) use cli_model::*;
+use command_registry::{capabilities_data_json, supports_metrics};
 use completion::{completion_script, help_text};
 use context::{build_context_pack, parse_context_args, print_context_summary};
 use doctor::{
@@ -132,12 +134,20 @@ fn status_state(raw_state: &str, open_fires: usize) -> String {
 }
 
 fn main() {
-    if let Err(error) = run(env::args().skip(1).collect()) {
+    let args = env::args().skip(1).collect::<Vec<_>>();
+    if let Err(error) = run(args.clone()) {
         if !matches!(
             error,
             CliError::VerificationFailed(_) | CliError::CommandFailed(_)
         ) {
-            eprintln!("error: {error}");
+            if args_want_json(&args) {
+                let command = command_name_for_args(&args);
+                if let Err(render_error) = print_cli_error_json(command, &error) {
+                    eprintln!("error: {render_error}");
+                }
+            } else {
+                eprintln!("error: {error}");
+            }
         }
         std::process::exit(error.exit_code());
     }
@@ -170,6 +180,38 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 CliError::Usage("usage: codefire completion <bash|zsh>".to_string())
             })?;
             print!("{script}");
+            Ok(())
+        }
+        Some("capabilities") => {
+            if wants_help(&args[1..]) {
+                print!("{}", subcommand_help("capabilities"));
+                return Ok(());
+            }
+            let json_output = args_want_json(&args[1..]);
+            for arg in &args[1..] {
+                if arg != "--json" {
+                    return Err(CliError::Usage(format!(
+                        "unsupported capabilities option: {arg}"
+                    )));
+                }
+            }
+            let data = capabilities_data_json();
+            if json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&command_result_envelope(
+                        "capabilities",
+                        true,
+                        0,
+                        None,
+                        data,
+                        Vec::new(),
+                        Vec::new(),
+                    ))?
+                );
+            } else {
+                println!("{}", serde_json::to_string_pretty(&data)?);
+            }
             Ok(())
         }
         Some("atom-index") => {
@@ -1162,6 +1204,16 @@ fn wants_help(args: &[String]) -> bool {
     args.iter().any(|arg| arg == "-h" || arg == "--help")
 }
 
+fn command_name_for_args(args: &[String]) -> &str {
+    match args.first().map(String::as_str) {
+        Some("branch") => "branch",
+        Some("patch") => "patch",
+        Some("evidence") => "evidence",
+        Some(command) => command,
+        None => "help",
+    }
+}
+
 fn command_help_for_args(args: &[String]) -> Option<&'static str> {
     let command = args.first()?.as_str();
     if !wants_help(&args[1..]) {
@@ -1171,7 +1223,7 @@ fn command_help_for_args(args: &[String]) -> Option<&'static str> {
         "status" | "scan" | "verify" | "fire" | "extinguish" | "commit" | "init" | "open"
         | "clone" | "upload" | "list" | "request-merge" | "request-list" | "request-review"
         | "request-apply" | "review-pack" | "storage" | "doctor" | "show" | "diff" | "context"
-        | "explain" | "atom-index" | "trace-graph" | "missing-links" | "link" => {
+        | "explain" | "atom-index" | "trace-graph" | "missing-links" | "link" | "capabilities" => {
             Some(subcommand_help(command))
         }
         "migrate" => match args.get(1).map(String::as_str) {
@@ -1302,6 +1354,9 @@ fn subcommand_help(command: &str) -> &'static str {
         "patch import" => {
             "usage: codefire patch import <patch-file> [--dry-run] [--json] [--idempotency-key <key>]\n"
         }
+        "capabilities" => {
+            "usage: codefire capabilities [--json]\n\nList CLI command automation capabilities.\n"
+        }
         _ => "usage: codefire <command> [options]\n",
     }
 }
@@ -1389,6 +1444,128 @@ impl CliError {
 
     fn exit_code(&self) -> i32 {
         self.exit_status().code()
+    }
+
+    fn diagnostic(&self) -> Value {
+        match self {
+            CliError::MissingEvidenceRef {
+                evidence_id,
+                repo_root,
+            } => json!({
+                "kind": "missing_evidence_ref",
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "evidence_id": evidence_id,
+                "repo": repo_root,
+                "exit_code": self.exit_code(),
+                "message": self.to_string(),
+            }),
+            CliError::Usage(message) if unknown_target_parts(message).is_some() => {
+                let (kind, id) = unknown_target_parts(message).expect("checked above");
+                json!({
+                    "kind": "unknown_target",
+                    "severity": "blocking",
+                    "blocking": true,
+                    "repairable": true,
+                    "target": {
+                        "kind": kind,
+                        "id": id,
+                    },
+                    "exit_code": self.exit_code(),
+                    "message": self.to_string(),
+                })
+            }
+            CliError::Usage(message) if batch_schema_command(message).is_some() => json!({
+                "kind": "batch_schema_error",
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "command": batch_schema_command(message).expect("checked above"),
+                "exit_code": self.exit_code(),
+                "message": self.to_string(),
+            }),
+            CliError::Usage(message) => json!({
+                "kind": usage_diagnostic_kind(message),
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "exit_code": self.exit_code(),
+                "message": self.to_string(),
+            }),
+            CliError::BatchFileRead {
+                operation,
+                path,
+                kind,
+                ..
+            } => json!({
+                "kind": batch_file_diagnostic_kind(*kind),
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "operation": operation,
+                "path": path,
+                "exit_code": self.exit_code(),
+                "message": self.to_string(),
+            }),
+            CliError::EvidenceCommandFailed {
+                exit_code,
+                timed_out,
+                cwd,
+                ..
+            } => json!({
+                "kind": "evidence_command_failed",
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "exit_code": self.exit_code(),
+                "process_exit_code": exit_code,
+                "timed_out": timed_out,
+                "cwd": cwd,
+                "message": self.to_string(),
+            }),
+            CliError::Io(_) => self.simple_diagnostic("io_error", true),
+            CliError::Json(_) => self.simple_diagnostic("json_error", false),
+            CliError::Core(_) => self.simple_diagnostic("core_error", true),
+            CliError::Store(_) => self.simple_diagnostic("store_error", false),
+            CliError::AuthenticationOrSignature(_) => {
+                self.simple_diagnostic("authentication_or_signature_error", true)
+            }
+            CliError::IdempotencyConflict(_) => {
+                self.simple_diagnostic("idempotency_conflict", true)
+            }
+            CliError::HttpPayloadTooLarge(_) => {
+                self.simple_diagnostic("http_payload_too_large", true)
+            }
+            CliError::MigrationIncompatibility(_) => {
+                self.simple_diagnostic("migration_incompatibility", true)
+            }
+            CliError::VerificationFailed(_) => self.simple_diagnostic("verification_failed", true),
+            CliError::CommandFailed(_) => self.simple_diagnostic("command_failed", true),
+            CliError::NotOpen(path) => json!({
+                "kind": "not_open",
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "path": path,
+                "exit_code": self.exit_code(),
+                "message": self.to_string(),
+            }),
+            CliError::InvalidMarker(_) => self.simple_diagnostic("invalid_marker", true),
+            CliError::InvalidRepository(_) => self.simple_diagnostic("invalid_repository", true),
+            CliError::LockContention(_) => self.simple_diagnostic("lock_contention", true),
+        }
+    }
+
+    fn simple_diagnostic(&self, kind: &str, repairable: bool) -> Value {
+        json!({
+            "kind": kind,
+            "severity": "blocking",
+            "blocking": true,
+            "repairable": repairable,
+            "exit_code": self.exit_code(),
+            "message": self.to_string(),
+        })
     }
 }
 
@@ -2433,78 +2610,17 @@ fn cli_error_envelope(command: &str, error: &CliError) -> Value {
 }
 
 fn cli_error_diagnostic(error: &CliError) -> Value {
-    match error {
-        CliError::MissingEvidenceRef {
-            evidence_id,
-            repo_root,
-        } => json!({
-            "kind": "missing_evidence_ref",
-            "severity": "blocking",
-            "evidence_id": evidence_id,
-            "repo": repo_root,
-            "message": error.to_string(),
-        }),
-        CliError::Usage(message) if unknown_target_parts(message).is_some() => {
-            let (kind, id) = unknown_target_parts(message).expect("checked above");
-            json!({
-                "kind": "unknown_target",
-                "severity": "blocking",
-                "blocking": true,
-                "repairable": true,
-                "target": {
-                    "kind": kind,
-                    "id": id,
-                },
-                "message": error.to_string(),
-            })
-        }
-        CliError::Usage(message) if batch_schema_command(message).is_some() => json!({
-            "kind": "batch_schema_error",
-            "severity": "blocking",
-            "blocking": true,
-            "repairable": true,
-            "command": batch_schema_command(message).expect("checked above"),
-            "message": error.to_string(),
-        }),
-        CliError::BatchFileRead {
-            operation,
-            path,
-            kind,
-            ..
-        } => json!({
-            "kind": batch_file_diagnostic_kind(*kind),
-            "severity": "blocking",
-            "blocking": true,
-            "repairable": true,
-            "operation": operation,
-            "path": path,
-            "message": error.to_string(),
-        }),
-        CliError::EvidenceCommandFailed {
-            exit_code,
-            timed_out,
-            cwd,
-            ..
-        } => json!({
-            "kind": "evidence_command_failed",
-            "severity": "blocking",
-            "blocking": true,
-            "repairable": true,
-            "exit_code": exit_code,
-            "timed_out": timed_out,
-            "cwd": cwd,
-            "message": error.to_string(),
-        }),
-        _ => json!({
-            "kind": "command_error",
-            "severity": "blocking",
-            "message": error.to_string(),
-        }),
-    }
+    error.diagnostic()
 }
 
 fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
     match error {
+        CliError::Usage(message) if message.starts_with("unsupported command:") => vec![json!({
+            "kind": "show_help",
+            "command": cli_command("--help"),
+            "reason": "inspect supported commands before retrying",
+            "target": {"error": message},
+        })],
         CliError::Usage(message) if message.starts_with("unknown branch:") => vec![json!({
             "kind": "list_branches",
             "command": cli_command("branch list --json"),
@@ -2623,6 +2739,22 @@ fn batch_file_diagnostic_kind(kind: ErrorKind) -> &'static str {
     }
 }
 
+fn usage_diagnostic_kind(message: &str) -> &'static str {
+    if message.starts_with("unsupported command:") {
+        "unsupported_command"
+    } else if (message.contains("unsupported") && message.contains("option"))
+        || message.contains("does not support --")
+    {
+        "unsupported_option"
+    } else if message.starts_with("usage:") {
+        "usage_error"
+    } else if message.starts_with("unknown branch:") {
+        "unknown_branch"
+    } else {
+        "invalid_usage"
+    }
+}
+
 fn batch_schema_command(message: &str) -> Option<&'static str> {
     if message.contains("batch extinguish JSON")
         || message.contains("batch extinguish YAML")
@@ -2667,6 +2799,9 @@ fn batch_operation_help_command(operation: &str) -> &'static str {
 }
 
 fn unsupported_option_command(message: &str) -> Option<&str> {
+    if !message.contains(" option:") {
+        return None;
+    }
     let remainder = message.strip_prefix("unsupported ")?;
     let command = remainder.split(" option:").next()?;
     Some(match command {
@@ -3006,6 +3141,11 @@ fn parse_path_json_args(args: &[String], command: &str) -> Result<PathJsonOption
     while index < args.len() {
         let arg = &args[index];
         if parse_path_json_metrics_option(arg, &mut json_output, &mut metrics) {
+            if arg == "--metrics" && !supports_metrics(command) {
+                return Err(CliError::Usage(format!(
+                    "{command} does not support --metrics"
+                )));
+            }
             index += 1;
             continue;
         }

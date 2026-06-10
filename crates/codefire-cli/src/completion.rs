@@ -1,35 +1,4 @@
-pub(crate) const COMPLETION_COMMANDS: &[&str] = &[
-    "init",
-    "open",
-    "branch",
-    "status",
-    "scan",
-    "fire",
-    "extinguish",
-    "verify",
-    "commit",
-    "clone",
-    "merge",
-    "upload",
-    "list",
-    "request-merge",
-    "request-list",
-    "request-review",
-    "request-apply",
-    "show",
-    "diff",
-    "review-pack",
-    "patch",
-    "doctor",
-    "storage",
-    "evidence",
-    "explain",
-    "context",
-    "migrate",
-    "serve",
-    "completion",
-    "version",
-];
+use crate::command_registry::COMMAND_NAMES;
 
 pub(crate) fn help_text() -> String {
     format!(
@@ -51,7 +20,7 @@ common:
   codefire completion <bash|zsh>
 ",
         version = codefire_core::VERSION,
-        commands = COMPLETION_COMMANDS.join(" "),
+        commands = COMMAND_NAMES.join(" "),
     )
 }
 
@@ -64,7 +33,7 @@ pub(crate) fn completion_script(shell: &str) -> Option<String> {
 }
 
 pub(crate) fn bash_completion_script() -> String {
-    let commands = COMPLETION_COMMANDS.join(" ");
+    let commands = COMMAND_NAMES.join(" ");
     format!(
         r#"# bash completion for codefire
 _codefire_complete()
@@ -147,7 +116,7 @@ complete -F _codefire_complete codefire
 }
 
 pub(crate) fn zsh_completion_script() -> String {
-    let command_entries = COMPLETION_COMMANDS
+    let command_entries = COMMAND_NAMES
         .iter()
         .map(|command| format!("{command}\\:{command}"))
         .collect::<Vec<_>>()

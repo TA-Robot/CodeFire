@@ -165,7 +165,7 @@ codefire context --fire FIRE-001 --json
 
 Use `scan --json --full` only when the complete changed atom/open fire arrays are needed. Default JSON is bounded for large initial imports.
 
-When `--metrics` is present on `status`, `scan`, or `verify`, the command data includes:
+When `--metrics` is present on `status`, `scan`, `verify`, or `branch list`, the command data includes:
 
 ```json
 {

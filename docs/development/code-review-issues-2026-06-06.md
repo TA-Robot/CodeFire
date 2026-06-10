@@ -15,8 +15,8 @@
 - High: 36
 - Medium: 121
 - Low: 3
-- Fixed / closed: 139
-- Remaining open: 21
+- Fixed / closed: 146
+- Remaining open: 14
 
 ## Cycle 2 Source Review Expansion
 
@@ -143,15 +143,22 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 |---|---|---|---|
 | CFR-091 | v0.9 Phase A | `init --help` をparser前にread-only helpとして処理 | `command_help_routes_before_mutating_parsers` |
 | CFR-131 | v1.0 Phase 1a | `context` / `explain` / `migrate` / debug read-only commandsのhelp routingを追加 | `command_help_routes_before_mutating_parsers` |
+| CFR-081 | global burn-down | top-level JSON failure fallbackをcommon command_result envelopeへ統一 | `cargo run -p codefire-cli --bin codefire-rs -- definitely-not-a-command --json` |
+| CFR-082 | global burn-down | command registryを追加し、help/completion/capability JSONのcommand listを共有 | `command_capabilities_are_shared_by_help_completion_and_metrics_parser` |
+| CFR-083 | global burn-down | debug read-only commandの`--json` envelopeと`--path` contractを確認 | `command_help_routes_before_mutating_parsers` |
+| CFR-084 | global burn-down | remote `list --json` / `request-list --json` をcommand_result envelope化済みとしてclose | `file_remote_upload_clone_show_diff_and_merge_request_flow` |
+| CFR-094 | global burn-down | `link --help` routingとJSON error contractをfixed済みとしてclose | `command_help_routes_before_mutating_parsers` |
+| CFR-095 | global burn-down | `CliError::diagnostic()` で全variantをstructured diagnosticへ写像 | `cli_error_diagnostics_cover_representative_error_classes` |
+| CFR-150 | global burn-down | command capability registryに`supports_metrics`を追加し`capabilities --json`で公開 | `command_capabilities_are_shared_by_help_completion_and_metrics_parser` |
 
 ### Open Area View
 
 | Area | Issues |
 |---|---|
-| Automation JSON / errors | [CFR-081](code-review-issues/cfr-081.md), [CFR-083](code-review-issues/cfr-083.md), [CFR-095](code-review-issues/cfr-095.md), [CFR-110](code-review-issues/cfr-110.md) |
-| CLI help and parser consistency | [CFR-082](code-review-issues/cfr-082.md), [CFR-091](code-review-issues/cfr-091.md), [CFR-092](code-review-issues/cfr-092.md), [CFR-094](code-review-issues/cfr-094.md), [CFR-099](code-review-issues/cfr-099.md) |
+| Automation JSON / errors | [CFR-110](code-review-issues/cfr-110.md) |
+| CLI help and parser consistency | none |
 | View, diff, patch | [CFR-085](code-review-issues/cfr-085.md), [CFR-086](code-review-issues/cfr-086.md), [CFR-087](code-review-issues/cfr-087.md), [CFR-088](code-review-issues/cfr-088.md), [CFR-089](code-review-issues/cfr-089.md), [CFR-090](code-review-issues/cfr-090.md) |
-| Remote | [CFR-084](code-review-issues/cfr-084.md), [CFR-112](code-review-issues/cfr-112.md), [CFR-113](code-review-issues/cfr-113.md) |
+| Remote | [CFR-112](code-review-issues/cfr-112.md), [CFR-113](code-review-issues/cfr-113.md) |
 | Next actions and scan model | [CFR-096](code-review-issues/cfr-096.md), [CFR-097](code-review-issues/cfr-097.md), [CFR-098](code-review-issues/cfr-098.md), [CFR-117](code-review-issues/cfr-117.md) |
 | Batch | [CFR-100](code-review-issues/cfr-100.md), [CFR-101](code-review-issues/cfr-101.md), [CFR-102](code-review-issues/cfr-102.md) |
 | Storage and filesystem scan | [CFR-103](code-review-issues/cfr-103.md), [CFR-104](code-review-issues/cfr-104.md), [CFR-105](code-review-issues/cfr-105.md), [CFR-106](code-review-issues/cfr-106.md) |

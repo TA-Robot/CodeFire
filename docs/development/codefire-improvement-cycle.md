@@ -308,8 +308,8 @@ The active CodeFire improvement cycle is a global burn-down. The initial frozen 
 Global inventory as of 2026-06-10:
 
 - CFB dogfood issues: 92 total, 88 fixed, 4 open.
-- CFR code review issues: 160 total, 139 fixed/closed, 21 open.
-- Combined tracked backlog: 252 total, 227 fixed/closed, 25 open.
+- CFR code review issues: 160 total, 146 fixed/closed, 14 open.
+- Combined tracked backlog: 252 total, 234 fixed/closed, 18 open.
 
 Active batch closed in this burn-down:
 
@@ -324,6 +324,13 @@ Active batch closed in this burn-down:
 - CFR-128: HTTP client response body limit rejects oversized Content-Length before reading.
 - CFR-118: unknown CF-* object prefixes no longer trigger fallback subdir scans.
 - CFR-121: sealed commit validation requires the resolution ledger root.
+- CFR-081: uncaught `--json` failures now return the common command_result error envelope.
+- CFR-082: command capability metadata is shared by help, completion, and capability JSON.
+- CFR-083: read-only debug commands use `--path` and JSON envelopes.
+- CFR-084: remote read commands expose branch/MR data through JSON envelopes.
+- CFR-094: link help routing and JSON error contracts are parser-before-mutation and structured.
+- CFR-095: `CliError::diagnostic()` maps error variants to typed automation diagnostics.
+- CFR-150: metrics support is declared in the command capability registry and exposed by `capabilities --json`.
 - CFB-025: core policy parser accepts legacy `verification.required` command lists.
 - CFB-026: context data exposes scan-compatible changed/open fire summary fields.
 - CFB-045: diff JSON distinguishes requested options from actually included sections.
@@ -372,7 +379,7 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- Remaining 25 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
+- Remaining 18 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
 - このglobal batchが0 openになるまで、新しいissue discovery batchへ進まない。
 
 ## Cycle Invariants

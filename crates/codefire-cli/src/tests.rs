@@ -43,6 +43,10 @@ fn command_help_routes_before_mutating_parsers() {
             vec!["missing-links", "--help"],
             "usage: codefire missing-links",
         ),
+        (
+            vec!["capabilities", "--help"],
+            "usage: codefire capabilities",
+        ),
     ] {
         let args = args.into_iter().map(str::to_string).collect::<Vec<_>>();
         let help = command_help_for_args(&args).expect("help should be routed");
@@ -73,6 +77,65 @@ fn command_help_routes_before_mutating_parsers() {
     ])
     .expect("branch show help should be routed");
     assert!(branch_show_help.contains("usage: codefire branch show"));
+}
+
+#[test]
+fn command_capabilities_are_shared_by_help_completion_and_metrics_parser() {
+    let capabilities = command_registry::capabilities_data_json();
+    let commands = capabilities["commands"].as_array().unwrap();
+    assert_eq!(commands.len(), command_registry::COMMAND_NAMES.len());
+    assert!(commands.iter().any(|command| {
+        command["name"] == "status"
+            && command["supports_json"] == true
+            && command["supports_metrics"] == true
+    }));
+    assert!(commands
+        .iter()
+        .any(|command| { command["name"] == "capabilities" && command["supports_json"] == true }));
+    assert!(help_text().contains("capabilities"));
+
+    let branch_list = parse_path_json_args(&["--metrics".to_string()], "branch list").unwrap();
+    assert!(branch_list.metrics);
+
+    let storage_error =
+        parse_path_json_args(&["--metrics".to_string()], "storage report").unwrap_err();
+    assert!(matches!(
+        storage_error,
+        CliError::Usage(ref message) if message == "storage report does not support --metrics"
+    ));
+    let envelope = cli_error_envelope("storage", &storage_error);
+    assert_eq!(envelope["diagnostics"][0]["kind"], "unsupported_option");
+    assert_eq!(
+        envelope["diagnostics"][0]["exit_code"],
+        storage_error.exit_code()
+    );
+}
+
+#[test]
+fn cli_error_diagnostics_cover_representative_error_classes() {
+    let usage = CliError::Usage("unsupported show option: --metrics".to_string());
+    assert_eq!(usage.diagnostic()["kind"], "unsupported_option");
+    assert_eq!(usage.diagnostic()["repairable"], true);
+
+    let repo = CliError::InvalidRepository("missing refs".to_string());
+    assert_eq!(repo.diagnostic()["kind"], "invalid_repository");
+    assert_eq!(repo.diagnostic()["repairable"], true);
+
+    let remote = CliError::AuthenticationOrSignature("signature rejected".to_string());
+    assert_eq!(
+        remote.diagnostic()["kind"],
+        "authentication_or_signature_error"
+    );
+
+    let parse = CliError::Json(serde_json::from_str::<serde_json::Value>("{").unwrap_err());
+    assert_eq!(parse.diagnostic()["kind"], "json_error");
+
+    let unsupported = cli_error_envelope(
+        "definitely-not-a-command",
+        &CliError::Usage("unsupported command: definitely-not-a-command".to_string()),
+    );
+    assert_eq!(unsupported["diagnostics"][0]["kind"], "unsupported_command");
+    assert_eq!(unsupported["next_actions"][0]["command"], "codefire --help");
 }
 
 #[test]
@@ -808,7 +871,7 @@ fn show_and_diff_local_branches() {
     assert_eq!(missing_envelope["schema"], "codefire.command_result.v1");
     assert_eq!(missing_envelope["command"], "diff");
     assert_eq!(missing_envelope["ok"], false);
-    assert_eq!(missing_envelope["diagnostics"][0]["kind"], "command_error");
+    assert_eq!(missing_envelope["diagnostics"][0]["kind"], "unknown_branch");
     assert_eq!(missing_envelope["next_actions"][0]["kind"], "list_branches");
 }
 
@@ -1182,7 +1245,7 @@ fn parse_health_recovery_commands_accept_common_path_option() {
     assert_eq!(envelope["schema"], "codefire.command_result.v1");
     assert_eq!(envelope["command"], "migrate");
     assert_eq!(envelope["ok"], false);
-    assert_eq!(envelope["diagnostics"][0]["kind"], "command_error");
+    assert_eq!(envelope["diagnostics"][0]["kind"], "unsupported_option");
 }
 
 #[test]
@@ -4194,7 +4257,11 @@ fn evidence_command_failure_is_blocking_by_default_and_allowable_explicitly() {
         envelope["diagnostics"][0]["kind"],
         "evidence_command_failed"
     );
-    assert_eq!(envelope["diagnostics"][0]["exit_code"], 7);
+    assert_eq!(
+        envelope["diagnostics"][0]["exit_code"],
+        ExitCode::InvalidUsageOrConfig.code()
+    );
+    assert_eq!(envelope["diagnostics"][0]["process_exit_code"], 7);
     assert_eq!(
         fs::read_dir(repo_root.join(".codefire").join("objects").join("evidence"))
             .unwrap()

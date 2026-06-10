@@ -48,6 +48,7 @@ codefire migrate check [path] [--json]
 codefire migrate dry-run [path] [--target-format v0.6] [--json]
 codefire serve <storage-root> [--host <host>] [--port <port>] [--tls-cert <cert>] [--tls-key <key>] [--tls-client-ca <ca-pem>]
 codefire completion <bash|zsh>
+codefire capabilities [--json]
 ```
 
 Implementation status note:
@@ -58,6 +59,7 @@ Implementation status note:
 - `install.sh` installs Rust v0.6 as the default `codefire` command and keeps Python v0.2 as `codefire-py`.
 - After install, `install.sh` reports the active `codefire` path resolved from PATH. If PATH resolves a different binary than the installed target, it prints a warning; if it resolves the installed target, it verifies active help/version and reports `active codefire verified`.
 - Python-only maintenance commands such as remote `gc` and token hash generation remain available through `codefire-py` / `./codefire` while Rust v0.6 is the default install CLI.
+- `codefire capabilities --json` returns the command capability registry used by help/completion and exposes per-command `supports_json` and `supports_metrics`.
 
 Local repository mutators that acquire the repository lock accept:
 

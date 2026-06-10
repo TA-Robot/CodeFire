@@ -1,6 +1,5 @@
-use crate::completion::{
-    bash_completion_script, help_text, zsh_completion_script, COMPLETION_COMMANDS,
-};
+use crate::command_registry::COMMAND_NAMES;
+use crate::completion::{bash_completion_script, help_text, zsh_completion_script};
 
 #[test]
 fn help_and_completion_scripts_cover_rust_default_cli() {
@@ -52,7 +51,7 @@ fn known_limitations_python_fallback_commands_stay_out_of_rust_cli() {
             .collect::<std::collections::BTreeSet<_>>()
     );
 
-    let rust_commands = COMPLETION_COMMANDS
+    let rust_commands = COMMAND_NAMES
         .iter()
         .map(|command| (*command).to_string())
         .collect::<std::collections::BTreeSet<_>>();
