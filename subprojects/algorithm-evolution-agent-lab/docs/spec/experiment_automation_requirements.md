@@ -207,3 +207,7 @@ The system shall render a planning handoff bundle into deterministic Markdown in
 ## REQ-AUTO-052: Research cycle planning handoff bundle summary
 
 The system shall summarize a planning handoff bundle into a deterministic machine-readable index. The summary shall include source cycles, packet status, manifest status, verification status, artifact count, per-artifact path, byte count, SHA-256 digest, audit document availability, and verification finding count so automation can route clean or blocked handoff bundles without parsing Markdown.
+
+## REQ-AUTO-053: Research cycle planning handoff readiness gate
+
+The system shall evaluate a planning handoff bundle for storage or reviewer handoff readiness. The readiness result shall include a boolean ready flag, status label, blockers, warnings, artifact count, and verification finding count so automation can reject drifted or incomplete handoffs before persisting or forwarding them.

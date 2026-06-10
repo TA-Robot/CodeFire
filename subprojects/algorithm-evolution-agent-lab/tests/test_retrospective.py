@@ -1,9 +1,11 @@
+from dataclasses import replace
 import unittest
 
 from evoagent.retrospective import (
     ResearchCycleRetrospective,
     ResearchCyclePlanningHandoffBundleBuilder,
     ResearchCyclePlanningHandoffBundleMarkdown,
+    ResearchCyclePlanningHandoffReadinessGate,
     ResearchCyclePlanningHandoffBundleSummary,
     ResearchCyclePlanLane,
     ResearchCyclePlan,
@@ -11,6 +13,8 @@ from evoagent.retrospective import (
     ResearchCyclePlanningPacketBuilder,
     ResearchCyclePlanningPacketManifestBuilder,
     ResearchCyclePlanningPacketManifestMarkdown,
+    ResearchCyclePlanningPacketManifestVerification,
+    ResearchCyclePlanningPacketManifestVerificationFinding,
     ResearchCyclePlanningPacketManifestVerificationMarkdown,
     ResearchCyclePlanningPacketManifestVerifier,
     ResearchCyclePlanningPacketMarkdown,
@@ -705,6 +709,57 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         first_artifact = summary["artifacts"][0]  # type: ignore[index]
         self.assertTrue(first_artifact["content_sha256"].startswith("sha256:"))  # type: ignore[index]
         self.assertGreater(first_artifact["byte_count"], 0)  # type: ignore[index]
+
+    # cf-atom: TEST-research-cycle-planning-handoff-readiness-gate-blocks-drifted-bundle
+    def test_research_cycle_planning_handoff_readiness_gate_blocks_drifted_bundle(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-17",
+                    completed_runs=5,
+                    improved_candidates=2,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=5.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=2,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=3.0,
+            packet_path="cycle-17/planning-packet.md",
+            plan_path="cycle-17/plan.md",
+            lint_path="cycle-17/lint.md",
+        )
+
+        clean = ResearchCyclePlanningHandoffReadinessGate().evaluate(bundle)
+        drifted = replace(
+            bundle,
+            verification=ResearchCyclePlanningPacketManifestVerification(
+                (
+                    ResearchCyclePlanningPacketManifestVerificationFinding(
+                        path="cycle-17/plan.md",
+                        message="sha256 digest mismatch",
+                    ),
+                )
+            ),
+            verification_markdown="",
+        )
+        blocked = ResearchCyclePlanningHandoffReadinessGate().evaluate(drifted)
+
+        self.assertTrue(clean["ready"])
+        self.assertEqual(clean["status"], "ready")
+        self.assertFalse(blocked["ready"])
+        self.assertEqual(blocked["status"], "blocked")
+        self.assertIn("verification has 1 finding(s)", blocked["blockers"])
+        self.assertIn("verification audit Markdown is missing", blocked["blockers"])
+        self.assertEqual(blocked["artifact_count"], 3)
+        self.assertEqual(blocked["finding_count"], 1)
 
 
 if __name__ == "__main__":

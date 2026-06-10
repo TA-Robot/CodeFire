@@ -393,6 +393,15 @@ links:
   - from: REQ-AUTO-052
     to: TEST-research-cycle-planning-handoff-bundle-summary-reports-machine-readable-index
     type: verified_by
+  - from: REQ-AUTO-053
+    to: DES-AUTO-035
+    type: refined_by
+  - from: DES-AUTO-035
+    to: CODE-ResearchCyclePlanningHandoffReadinessGate
+    type: implemented_by
+  - from: REQ-AUTO-053
+    to: TEST-research-cycle-planning-handoff-readiness-gate-blocks-drifted-bundle
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

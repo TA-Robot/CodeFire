@@ -656,3 +656,18 @@ The dictionary includes:
 - `finding_count`
 
 The summarizer does not read or write files, rerun retrospective planning, or rerun manifest verification. It only reflects the already-built bundle plus artifact content digests so downstream orchestration can decide whether a handoff is clean without scraping Markdown.
+
+## DES-AUTO-035: Research cycle planning handoff readiness gate
+
+The handoff readiness gate consumes `ResearchCyclePlanningHandoffBundle` and returns a plain Python dictionary with `ready`, `status`, `blockers`, `warnings`, `artifact_count`, and `finding_count`.
+
+The gate blocks when:
+
+- packet lint has blocker findings
+- manifest status is not `ok`
+- manifest verification has findings
+- no handoff artifacts exist
+- manifest audit Markdown is missing
+- verification audit Markdown is missing
+
+The gate preserves lint warnings as non-blocking warning strings. It does not write files, rerun manifest verification, or mutate the bundle; it only turns the already-built handoff state into a storage/reviewer routing decision.

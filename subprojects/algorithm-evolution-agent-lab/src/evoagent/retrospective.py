@@ -814,6 +814,36 @@ class ResearchCyclePlanningHandoffBundleSummary:
         }
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReadinessGate
+class ResearchCyclePlanningHandoffReadinessGate:
+    def evaluate(self, bundle: ResearchCyclePlanningHandoffBundle) -> dict[str, object]:
+        blockers: list[str] = []
+        warnings: list[str] = []
+        if not bundle.packet.lint_report.ok:
+            blockers.append("packet lint has blocker findings")
+        for finding in bundle.packet.lint_report.findings:
+            if finding.severity == ResearchCyclePlanLintSeverity.WARNING:
+                warnings.append(f"{finding.field}: {finding.message}")
+        if bundle.manifest.status != "ok":
+            blockers.append(f"manifest status is {bundle.manifest.status}")
+        if bundle.verification.findings:
+            blockers.append(f"verification has {len(bundle.verification.findings)} finding(s)")
+        if not bundle.artifacts:
+            blockers.append("handoff has no artifacts")
+        if not bundle.manifest_markdown.strip():
+            blockers.append("manifest audit Markdown is missing")
+        if not bundle.verification_markdown.strip():
+            blockers.append("verification audit Markdown is missing")
+        return {
+            "ready": not blockers,
+            "status": "ready" if not blockers else "blocked",
+            "blockers": blockers,
+            "warnings": warnings,
+            "artifact_count": len(bundle.artifacts),
+            "finding_count": len(bundle.verification.findings),
+        }
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

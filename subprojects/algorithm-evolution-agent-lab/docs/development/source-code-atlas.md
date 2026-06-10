@@ -238,6 +238,11 @@ ResearchCyclePlanningHandoffBundleSummary.summarize(bundle)
   -> return packet, manifest, and verification status as plain data
   -> return artifact path, byte size, and SHA-256 digest for each artifact
   -> expose audit document availability and finding count for automation routing
+
+ResearchCyclePlanningHandoffReadinessGate.evaluate(bundle)
+  -> return ready/status/blocker/warning routing data for a handoff bundle
+  -> block drifted, incomplete, empty, or missing-audit handoffs before storage
+  -> preserve lint warnings as non-blocking routing metadata
 ```
 
 Important implementation details:

@@ -96,3 +96,4 @@
 | AE-092 | Planning QA | planning packet、artifact、manifest、verification、監査Markdownをhandoff bundleへまとめる | done | `CODE-ResearchCyclePlanningHandoffBundleBuilder`; `TEST-research-cycle-planning-handoff-bundle-builds-artifacts-and-audits`; 156 tests pass |
 | AE-093 | Reporting | planning handoff bundleをartifact/audit index Markdownへ整形する | done | `CODE-ResearchCyclePlanningHandoffBundleMarkdown`; `TEST-research-cycle-planning-handoff-bundle-markdown-renders-index`; 157 tests pass |
 | AE-094 | Reporting | planning handoff bundleをmachine-readable summaryへ整形する | done | `CODE-ResearchCyclePlanningHandoffBundleSummary`; `TEST-research-cycle-planning-handoff-bundle-summary-reports-machine-readable-index`; 158 tests pass |
+| AE-095 | Planning QA | planning handoff bundleのstorage/reviewer readinessを判定する | done | `CODE-ResearchCyclePlanningHandoffReadinessGate`; `TEST-research-cycle-planning-handoff-readiness-gate-blocks-drifted-bundle`; 159 tests pass |
