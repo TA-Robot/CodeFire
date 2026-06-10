@@ -15,6 +15,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate,
@@ -2390,6 +2391,104 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Finding count: 1", rendered)
         self.assertIn("- `manifest.md`: manifest table header is missing", rendered)
         self.assertNotIn("- none", rendered)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-gate-blocks-drift
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_gate_blocks_drift(
+        self,
+    ) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-46",
+                    completed_runs=25,
+                    improved_candidates=21,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=0.30,
+                    remaining_budget=25.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=21,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=21.0,
+            packet_path="cycle-46/planning-packet.md",
+            plan_path="cycle-46/plan.md",
+            lint_path="cycle-46/lint.md",
+        )
+        packet = ResearchCyclePlanningHandoffReviewPacketBuilder().build(bundle)
+        archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder().build(
+            packet,
+            review_path="cycle-46/review-packet.md",
+            readiness_path="cycle-46/readiness.md",
+            manifest_path="cycle-46/manifest.md",
+            verification_path="cycle-46/verification.md",
+        )
+        handoff = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder().build(
+            archive,
+            summary_path="cycle-46/archive-summary.md",
+            gate_path="cycle-46/archive-summary-gate.md",
+        )
+        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+            handoff,
+        )
+        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder().build(
+            summary_archive,
+            summary_path="cycle-46/archive-summary-artifact-archive-summary.md",
+            gate_path="cycle-46/archive-summary-artifact-archive-summary-gate.md",
+        )
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder().build(
+            packaged,
+        )
+        manifest_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown().render(
+            manifest,
+        )
+        verification = (
+            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier().verify(
+                manifest,
+                manifest_markdown.replace("| Path | SHA-256 | Bytes |\n", ""),
+            )
+        )
+        verification_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown().render(
+            verification,
+        )
+        gate = (
+            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate()
+        )
+
+        clean = gate.evaluate(verification, verification_markdown)
+        broken = gate.evaluate(
+            verification,
+            verification_markdown.replace("- Finding count: 1\n", "").replace(
+                "- `manifest.md`: manifest table header is missing\n",
+                "",
+            ),
+        )
+        empty_verification = ResearchCyclePlanningPacketManifestVerification(findings=())
+        empty_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown().render(
+            empty_verification,
+        )
+        empty_clean = gate.evaluate(empty_verification, empty_markdown)
+
+        self.assertTrue(clean["ready"])
+        self.assertEqual("ready", clean["status"])
+        self.assertEqual("blocked", clean["verification_status"])
+        self.assertEqual(1, clean["finding_count"])
+        self.assertFalse(broken["ready"])
+        self.assertEqual(
+            [
+                "finding count line is missing",
+                "finding line is missing for manifest.md",
+            ],
+            broken["blockers"],
+        )
+        self.assertTrue(empty_clean["ready"])
+        self.assertEqual("ok", empty_clean["verification_status"])
+        self.assertEqual(0, empty_clean["finding_count"])
 
 
 if __name__ == "__main__":

@@ -323,3 +323,7 @@ The system shall verify final archive summary artifact archive summary artifact 
 ## REQ-AUTO-081: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown
 
 The system shall render final archive summary artifact archive summary artifact manifest Markdown verification results into deterministic Markdown. The rendered document shall include status, finding count, and path-specific findings or `none` when clean so reviewers can audit manifest Markdown readiness without reading machine-only verification payloads.
+
+## REQ-AUTO-082: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown gate
+
+The system shall evaluate final archive summary artifact archive summary artifact manifest Markdown verification Markdown for reviewer handoff readiness. The gate shall compare the supplied verification result and rendered Markdown for status, finding count, and each path-specific finding line, or the clean `none` line when no findings exist, so storage adapters can block stale or incomplete verification audit documents before final handoff.

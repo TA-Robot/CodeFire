@@ -1714,6 +1714,42 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
         )
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate:
+    def evaluate(
+        self,
+        verification: ResearchCyclePlanningPacketManifestVerification,
+        markdown: str,
+    ) -> dict[str, object]:
+        blockers: list[str] = []
+        verification_status = "ok" if verification.ok else "blocked"
+        finding_count = len(verification.findings)
+        required_lines = [
+            (f"- Status: {verification_status}", "status line is missing"),
+            (f"- Finding count: {finding_count}", "finding count line is missing"),
+        ]
+        for line, message in required_lines:
+            if line not in markdown:
+                blockers.append(message)
+
+        if verification.findings:
+            for finding in verification.findings:
+                line = f"- `{finding.path}`: {finding.message}"
+                if line not in markdown:
+                    blockers.append(f"finding line is missing for {finding.path}")
+        elif "- none" not in markdown:
+            blockers.append("clean finding line is missing")
+
+        return {
+            "ready": not blockers,
+            "status": "ready" if not blockers else "blocked",
+            "verification_status": verification_status,
+            "blockers": blockers,
+            "finding_count": finding_count,
+            "checked_finding_count": finding_count,
+        }
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")
