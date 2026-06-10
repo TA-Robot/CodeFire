@@ -250,9 +250,11 @@ fn doctor_reports_clean_repo_and_corrupted_object_record() {
     let data = doctor_report_data_json(&corrupted);
     assert_eq!(data["mode"], "full");
     assert!(data["issue_counts"]["blocking"].as_u64().unwrap() >= 1);
-    assert!(doctor_report_next_actions(&corrupted)
+    let doctor_actions = doctor_report_next_actions(&corrupted);
+    assert!(doctor_actions
         .iter()
         .any(|action| action["id"] == "inspect_object_store_corruption"));
+    assert_common_next_action_schema(&doctor_actions[0]);
 }
 
 #[test]
@@ -702,6 +704,17 @@ fn diff_manifest_matches_golden_fixture() {
         normalized.trim_end(),
         include_str!("../tests/fixtures/diff_manifest.golden").trim_end()
     );
+}
+
+fn assert_common_next_action_schema(action: &Value) {
+    for field in ["kind", "id", "command", "reason", "description"] {
+        assert!(
+            action.get(field).and_then(Value::as_str).is_some(),
+            "missing string next_action field {field}: {action}"
+        );
+    }
+    assert!(action.get("target").is_some(), "missing target: {action}");
+    assert!(action.get("context").is_some(), "missing context: {action}");
 }
 
 #[test]
@@ -2993,7 +3006,9 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
         .iter()
         .any(|stats| stats["type"] == "blob"));
     assert!(!storage_report_diagnostics_json(&report).is_empty());
-    assert!(!storage_report_next_actions(&report).is_empty());
+    let storage_actions = storage_report_next_actions(&report);
+    assert!(!storage_actions.is_empty());
+    assert_common_next_action_schema(&storage_actions[0]);
 
     let quick = run_storage_report(
         &parse_storage_report_args(&[
@@ -3768,6 +3783,7 @@ fn explain_fire_atom_verify_and_storage_targets_return_actions() {
         .next_actions
         .iter()
         .any(|action| action["id"] == "extinguish_fire"));
+    assert_common_next_action_schema(&fire.next_actions[0]);
 
     let atom = run_explain(
         &parse_explain_args(&[
@@ -3871,6 +3887,7 @@ fn migrate_check_and_dry_run_report_compatibility_and_blockers() {
         migration_report_next_actions(&broken)[0]["id"],
         "inspect_migration_blockers"
     );
+    assert_common_next_action_schema(&migration_report_next_actions(&broken)[0]);
 }
 
 #[test]

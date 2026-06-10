@@ -15,7 +15,12 @@ pub(crate) fn command_result_envelope(
     diagnostics: Vec<Value>,
     next_actions: Vec<Value>,
 ) -> Value {
-    let next_actions = bounded_next_actions(next_actions);
+    let next_actions = bounded_next_actions(
+        next_actions
+            .into_iter()
+            .map(normalize_next_action)
+            .collect::<Vec<_>>(),
+    );
     json!({
         "schema": COMMAND_RESULT_SCHEMA,
         "command": command,
@@ -471,17 +476,71 @@ pub(crate) fn bounded_next_actions(mut actions: Vec<Value>) -> Vec<Value> {
     actions
 }
 
-fn next_action(
+fn normalize_next_action(action: Value) -> Value {
+    let Some(object) = action.as_object() else {
+        return next_action(
+            "invalid_next_action",
+            cli_command("status --json"),
+            "inspect status because a next_action payload was not an object",
+            json!({"raw": action}),
+        );
+    };
+    let kind = object
+        .get("kind")
+        .or_else(|| object.get("id"))
+        .and_then(Value::as_str)
+        .unwrap_or("next_action")
+        .to_string();
+    let command = object
+        .get("command")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let reason = object
+        .get("reason")
+        .or_else(|| object.get("description"))
+        .and_then(Value::as_str)
+        .unwrap_or("follow the recommended next action")
+        .to_string();
+    let target = object
+        .get("target")
+        .or_else(|| object.get("context"))
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let mut normalized = action;
+    if let Some(map) = normalized.as_object_mut() {
+        map.entry("kind")
+            .or_insert_with(|| Value::String(kind.clone()));
+        map.entry("id").or_insert_with(|| Value::String(kind));
+        map.entry("command")
+            .or_insert_with(|| Value::String(command));
+        map.entry("reason")
+            .or_insert_with(|| Value::String(reason.clone()));
+        map.entry("description")
+            .or_insert_with(|| Value::String(reason));
+        map.entry("target").or_insert_with(|| target.clone());
+        map.entry("context").or_insert(target);
+    }
+    normalized
+}
+
+pub(crate) fn next_action(
     kind: impl Into<String>,
     command: impl Into<String>,
     reason: impl Into<String>,
     target: Value,
 ) -> Value {
+    let kind = kind.into();
+    let command = command.into();
+    let reason = reason.into();
     json!({
-        "kind": kind.into(),
-        "command": command.into(),
-        "reason": reason.into(),
-        "target": target,
+        "kind": &kind,
+        "id": &kind,
+        "command": command,
+        "reason": &reason,
+        "description": &reason,
+        "target": &target,
+        "context": target,
     })
 }
 
@@ -542,6 +601,31 @@ mod tests {
             bounded[MAX_NEXT_ACTIONS - 1]["target"]["limit"],
             MAX_NEXT_ACTIONS
         );
+    }
+
+    #[test]
+    fn command_result_envelope_normalizes_legacy_next_actions() {
+        let envelope = command_result_envelope(
+            "doctor",
+            false,
+            20,
+            None,
+            json!({}),
+            Vec::new(),
+            vec![json!({
+                "id": "inspect_doctor_report",
+                "command": cli_command("doctor --json"),
+                "description": "inspect repository diagnostics",
+                "context": {"issues": 1},
+            })],
+        );
+        let action = &envelope["next_actions"][0];
+        assert_eq!(action["kind"], "inspect_doctor_report");
+        assert_eq!(action["id"], "inspect_doctor_report");
+        assert_eq!(action["reason"], "inspect repository diagnostics");
+        assert_eq!(action["description"], "inspect repository diagnostics");
+        assert_eq!(action["target"]["issues"], 1);
+        assert_eq!(action["context"]["issues"], 1);
     }
 
     #[test]

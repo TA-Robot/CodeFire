@@ -1,4 +1,6 @@
-use super::automation::{verification_diagnostics_json, verification_next_actions};
+use super::automation::{
+    next_action as automation_next_action, verification_diagnostics_json, verification_next_actions,
+};
 use super::context::{build_context_pack, ContextOptions, ContextSelector, DEFAULT_CONTEXT_LIMIT};
 use super::storage::{
     run_storage_report, storage_report_diagnostics_json, storage_report_next_actions,
@@ -131,7 +133,10 @@ pub(crate) fn print_explain_result(result: &ExplainResult) {
         for action in &result.next_actions {
             println!(
                 "  {}: {}",
-                action["id"].as_str().unwrap_or("(action)"),
+                action["kind"]
+                    .as_str()
+                    .or_else(|| action["id"].as_str())
+                    .unwrap_or("(action)"),
                 action["command"].as_str().unwrap_or("")
             );
         }
@@ -171,13 +176,13 @@ fn explain_fire(options: &ExplainOptions, value: &str) -> Result<ExplainResult, 
             "reason": &fire.reason,
         })],
         next_actions: vec![
-            next_action(
+            automation_next_action(
                 "context_fire",
                 format!("codefire context --fire {} --json", fire.display_id),
                 "inspect source, target, and trace context for this fire",
                 json!({"display_id": &fire.display_id}),
             ),
-            next_action(
+            automation_next_action(
                 "extinguish_fire",
                 format!(
                     "codefire extinguish {} --resolution <type> --rationale <text>",
@@ -211,7 +216,7 @@ fn explain_atom(options: &ExplainOptions, value: &str) -> Result<ExplainResult, 
     Ok(ExplainResult {
         repo_root: pack.repo_root,
         diagnostics: Vec::new(),
-        next_actions: vec![next_action(
+        next_actions: vec![automation_next_action(
             "context_atom",
             format!(
                 "codefire context --atom {value} --depth {} --json",
@@ -308,15 +313,6 @@ fn explain_storage_warning(options: &ExplainOptions) -> Result<ExplainResult, Cl
         diagnostics: storage_report_diagnostics_json(&report),
         next_actions: storage_report_next_actions(&report),
         data,
-    })
-}
-
-fn next_action(id: &str, command: impl Into<String>, description: &str, context: Value) -> Value {
-    json!({
-        "id": id,
-        "command": command.into(),
-        "description": description,
-        "context": context,
     })
 }
 

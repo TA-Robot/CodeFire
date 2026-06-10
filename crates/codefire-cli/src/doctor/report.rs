@@ -1,5 +1,5 @@
 use super::{DoctorIssue, DoctorReport, DoctorSeverity};
-use crate::automation::cli_command;
+use crate::automation::{cli_command, next_action as automation_next_action};
 use serde_json::{json, Value};
 
 pub(crate) fn doctor_report_data_json(report: &DoctorReport) -> Value {
@@ -41,7 +41,7 @@ pub(crate) fn doctor_report_next_actions(report: &DoctorReport) -> Vec<Value> {
                 | "unknown_object_type"
         )
     }) {
-        actions.push(next_action(
+        actions.push(automation_next_action(
             "inspect_object_store_corruption",
             cli_command("doctor --json"),
             "inspect object record integrity errors before opening or uploading branches",
@@ -54,7 +54,7 @@ pub(crate) fn doctor_report_next_actions(report: &DoctorReport) -> Vec<Value> {
             "invalid_branch_record" | "missing_branch_head" | "invalid_branch_head"
         )
     }) {
-        actions.push(next_action(
+        actions.push(automation_next_action(
             "repair_branch_head",
             cli_command("branch list"),
             "identify branch heads that no longer point to valid sealed commits",
@@ -82,7 +82,7 @@ pub(crate) fn doctor_report_next_actions(report: &DoctorReport) -> Vec<Value> {
                 | "missing_open_registry_state"
         )
     }) {
-        actions.push(next_action(
+        actions.push(automation_next_action(
             "reopen_branch_workspace",
             cli_command("open <branch> <path>"),
             "reopen affected workspaces from a valid sealed commit after preserving local edits",
@@ -90,7 +90,7 @@ pub(crate) fn doctor_report_next_actions(report: &DoctorReport) -> Vec<Value> {
         ));
     }
     if actions.is_empty() {
-        actions.push(next_action(
+        actions.push(automation_next_action(
             "inspect_doctor_report",
             cli_command("doctor --json"),
             "inspect repository diagnostics",
@@ -167,15 +167,6 @@ fn issue_json(issue: &DoctorIssue) -> Value {
         "kind": &issue.kind,
         "message": &issue.message,
         "path": &issue.path,
-    })
-}
-
-fn next_action(id: &str, command: String, description: &str, context: Value) -> Value {
-    json!({
-        "id": id,
-        "command": command,
-        "description": description,
-        "context": context,
     })
 }
 

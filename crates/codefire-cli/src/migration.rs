@@ -1,5 +1,5 @@
 use super::{find_repo_root, read_json, CliError};
-use crate::automation::cli_command;
+use crate::automation::{cli_command, next_action as automation_next_action};
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -178,14 +178,14 @@ pub(crate) fn migration_report_next_actions(report: &MigrationReport) -> Vec<Val
         if report.planned_actions.is_empty() {
             return Vec::new();
         }
-        return vec![next_action(
+        return vec![automation_next_action(
             "review_migration_plan",
             cli_command("migrate dry-run --json"),
             "review v0.6 migration planned actions",
             json!({"planned_actions": report.planned_actions.len()}),
         )];
     }
-    vec![next_action(
+    vec![automation_next_action(
         "inspect_migration_blockers",
         cli_command("migrate check --json"),
         "inspect migration compatibility blockers",
@@ -409,15 +409,6 @@ fn action_json(action: &MigrationAction) -> Value {
         "kind": &action.kind,
         "path": &action.path,
         "description": &action.description,
-    })
-}
-
-fn next_action(id: &str, command: String, description: &str, context: Value) -> Value {
-    json!({
-        "id": id,
-        "command": command,
-        "description": description,
-        "context": context,
     })
 }
 

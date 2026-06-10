@@ -1,6 +1,6 @@
 use super::remote::{parse_cf_project_url, remote_dirs};
 use super::{find_repo_root, read_json, CliError};
-use crate::automation::cli_command;
+use crate::automation::{cli_command, next_action as automation_next_action};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::fs;
@@ -259,12 +259,12 @@ pub(crate) fn storage_report_next_actions(report: &StorageReport) -> Vec<Value> 
     if report.warnings.is_empty() {
         return Vec::new();
     }
-    vec![json!({
-        "id": "inspect_storage_warnings",
-        "command": cli_command("storage report --json"),
-        "description": "inspect storage warnings and largest objects",
-        "context": {"warnings": report.warnings.len()},
-    })]
+    vec![automation_next_action(
+        "inspect_storage_warnings",
+        cli_command("storage report --json"),
+        "inspect storage warnings and largest objects",
+        json!({"warnings": report.warnings.len()}),
+    )]
 }
 
 pub(crate) fn print_storage_report(report: &StorageReport) {

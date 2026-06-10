@@ -71,6 +71,7 @@ Completion rule:
 | CFB-070 | fixed | Operation plan envelope | local dry-run planのrepo/next_actionsをtop-levelへ持ち上げた |
 | CFB-071 | fixed | CLI path contract | storage/doctor/migrateが`--path`/`--path=`を受けるようにした |
 | CFB-073 | fixed | Context bounded output metadata | context summary countsとcontext_expand next_actionを追加した |
+| CFB-074 | fixed | Next action schema | explain/storage/migration/doctorを共通next_action schemaへ寄せた |
 | CFB-076 | fixed | Batch dry-run validation | invalid link batch dry-runはtop-level ok:false/exit 2にした |
 | CFB-081 | fixed | Explain verification summary | passed warningをblocker扱いしないsummaryへ修正した |
 | CFB-083 | fixed | Branch list metrics | `branch list --metrics` がmetrics blockとhelpを返すようにした |
@@ -86,6 +87,11 @@ Completion rule:
 | CFR-136 | fixed | Context bounded output metadata | omitted countsとtext follow-up commandを追加した |
 | CFR-140 | fixed | Verification diagnostic filtering | filtered/unfiltered diagnostic summaryをJSON dataへ追加した |
 | CFR-141 | fixed | Verify next_actions state awareness | verify next_actionsをscan-awareにした |
+| CFR-143 | fixed | Next action schema | command_result envelopeでlegacy actionを正規化し、共通serializerを使うようにした |
+| CFR-144 | fixed | Explain action rendering | explain text rendererをkind優先/id fallbackにした |
+| CFR-151 | fixed | Migration next action schema | migration next_actionsを共通schemaへ移行した |
+| CFR-152 | fixed | Storage next action schema | storage next_actionsを共通schemaへ移行した |
+| CFR-153 | fixed | Doctor next action schema | doctor next_actionsを共通schemaへ移行した |
 | CFR-157 | fixed | Context bounded atom traversal | omitted neighbor countとcontext_expand next_actionを追加した |
 | CFR-115 | fixed | Context/explain JSON failure | unknown target errorをtyped JSON diagnosticへ包んだ |
 | CFR-138 | fixed | CLI parser consistency | context主要optionのequals形式を受け付けた |
@@ -101,7 +107,7 @@ Completion rule:
 
 Remaining open count for this batch:
 
-- 113 issues.
+- 107 issues.
 
 ## Global Issue Inventory
 
@@ -111,15 +117,15 @@ Current tracked issue inventory as of 2026-06-10:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 92 | 51 | 41 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
-| CFR code review issues | 160 | 88 | 72 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. |
-| Total | 252 | 139 | 113 | This global batch is the whole known issue backlog. |
+| CFB dogfood issues | 92 | 52 | 40 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFR code review issues | 160 | 93 | 67 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. |
+| Total | 252 | 145 | 107 | This global batch is the whole known issue backlog. |
 
 Current active batch progress:
 
 - Frozen open issue count: 146.
-- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-040, CFB-041, CFB-042, CFB-044, CFB-052, CFB-057, CFB-058, CFB-060, CFB-062, CFB-064, CFB-065, CFB-069, CFB-070, CFB-071, CFB-073, CFB-076, CFB-081, CFB-083, CFB-084, CFR-085, CFR-086, CFR-096, CFR-098, CFR-115, CFR-125, CFR-126, CFR-127, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-154, CFR-155, CFR-157.
-- Remaining open: 113.
+- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-040, CFB-041, CFB-042, CFB-044, CFB-052, CFB-057, CFB-058, CFB-060, CFB-062, CFB-064, CFB-065, CFB-069, CFB-070, CFB-071, CFB-073, CFB-074, CFB-076, CFB-081, CFB-083, CFB-084, CFR-085, CFR-086, CFR-096, CFR-098, CFR-115, CFR-125, CFR-126, CFR-127, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-143, CFR-144, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-157.
+- Remaining open: 107.
 
 Burn-down interpretation:
 
