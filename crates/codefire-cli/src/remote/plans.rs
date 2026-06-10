@@ -2,14 +2,19 @@ use super::{RequestApplyOptions, RequestMergeOptions, RequestReviewOptions, Uplo
 use serde_json::{json, Value};
 use std::path::Path;
 
+pub(super) struct UploadPlanRemote<'a> {
+    pub(super) transport: &'a str,
+    pub(super) branch: &'a str,
+    pub(super) object_count: Option<usize>,
+    pub(super) diagnostics: Vec<Value>,
+    pub(super) validations: Vec<Value>,
+}
+
 pub(super) fn upload_operation_plan(
     options: &UploadOptions,
     repo_root: &Path,
     head: &str,
-    transport: &str,
-    remote_branch: &str,
-    object_count: Option<usize>,
-    diagnostics: Vec<Value>,
+    remote: UploadPlanRemote<'_>,
 ) -> Value {
     json!({
         "type": "codefire_operation_plan",
@@ -21,14 +26,15 @@ pub(super) fn upload_operation_plan(
         "branch": &options.branch,
         "head": head,
         "remote_url": &options.remote_url,
-        "remote_branch": remote_branch,
-        "transport": transport,
-        "object_count": object_count,
-        "diagnostics": diagnostics,
+        "remote_branch": remote.branch,
+        "transport": remote.transport,
+        "object_count": remote.object_count,
+        "diagnostics": remote.diagnostics,
+        "validations": remote.validations,
         "operations": [
             {"kind": "validate_local_branch", "branch": &options.branch, "head": head},
             {"kind": "copy_object_graph", "commit": head},
-            {"kind": "write_remote_branch", "branch": remote_branch, "head": head},
+            {"kind": "write_remote_branch", "branch": remote.branch, "head": head},
         ],
         "next_actions": [
             {"kind": "list_remote", "command": "codefire list <cf-project-url>", "target": {"remote_url": &options.remote_url}},

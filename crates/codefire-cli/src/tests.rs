@@ -2,6 +2,8 @@ use super::*;
 use crate::doctor::DoctorOptions;
 use crate::remote::{next_remote_generation, remote_idempotency_key, RemoteGenerationLock};
 use serde_json::{json, Map};
+use std::io::{Read, Write};
+use std::net::TcpListener;
 use std::sync::{Arc, Barrier};
 use tempfile::tempdir;
 
@@ -5455,6 +5457,10 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
     .unwrap();
     assert_eq!(upload_dry_run.plan["type"], "codefire_operation_plan");
     assert_eq!(upload_dry_run.plan["command"], "upload");
+    assert_eq!(
+        upload_dry_run.plan["validations"][0]["status"],
+        "missing_would_create"
+    );
     let upload_envelope = plan_result_envelope("upload", &upload_dry_run.plan);
     assert_eq!(
         upload_envelope["repo"],
@@ -5647,6 +5653,95 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         .unwrap(),
         applied.head
     );
+}
+
+#[test]
+fn file_remote_upload_dry_run_rejects_existing_invalid_layout() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let server = temp.path().join("server");
+    init_repo(&repo_root, false).unwrap();
+    let remote_url = format!("cf://{}/org/broken/main", server.display());
+    let remote_project_root = parse_cf_url(&remote_url).unwrap().project_root;
+    fs::create_dir_all(remote_project_root.join("objects")).unwrap();
+
+    let error = upload_branch(
+        &repo_root,
+        &UploadOptions {
+            branch: "main".to_string(),
+            remote_url,
+            dry_run: true,
+            json_output: true,
+            idempotency_key: None,
+            request_key_id: None,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap_err();
+
+    assert!(error.to_string().contains("remote layout invalid"));
+}
+
+#[test]
+fn http_request_merge_dry_run_validates_branch_heads() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let address = listener.local_addr().unwrap();
+    let body = json!({
+        "branches": [
+            {"name": "main", "head": "CF-COMMIT-main-head"},
+            {"name": "feature", "head": "CF-COMMIT-feature-head"}
+        ]
+    })
+    .to_string();
+    let server = std::thread::spawn(move || {
+        for _ in 0..3 {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0u8; 1024];
+            let _ = stream.read(&mut request).unwrap();
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+        }
+    });
+    let project_url = format!("cf+http://{address}/org/app");
+    let main_url = format!("{project_url}/main");
+    let feature_url = format!("{project_url}/feature");
+    let missing_url = format!("{project_url}/missing");
+
+    let missing_error = request_merge(&RequestMergeOptions {
+        source_url: missing_url,
+        target_url: main_url.clone(),
+        dry_run: true,
+        json_output: true,
+        idempotency_key: None,
+        request_key_id: None,
+        lock: LockOptions::default(),
+    })
+    .unwrap_err();
+    assert!(missing_error
+        .to_string()
+        .contains("remote branch not found: missing"));
+
+    let dry_run = request_merge(&RequestMergeOptions {
+        source_url: feature_url,
+        target_url: main_url,
+        dry_run: true,
+        json_output: true,
+        idempotency_key: None,
+        request_key_id: None,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+
+    assert_eq!(dry_run.source_head, "CF-COMMIT-feature-head");
+    assert_eq!(dry_run.target_head, "CF-COMMIT-main-head");
+    assert_eq!(dry_run.plan["source_head"], "CF-COMMIT-feature-head");
+    assert_eq!(dry_run.plan["target_head"], "CF-COMMIT-main-head");
+    assert_eq!(dry_run.plan["merge_request_id"], "pending");
+    server.join().unwrap();
 }
 
 #[test]

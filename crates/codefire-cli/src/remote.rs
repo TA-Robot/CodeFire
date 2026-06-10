@@ -1,5 +1,6 @@
 use super::http::{
     http_json, http_remote_path, is_cf_http_url, parse_cf_http_project_url, parse_cf_http_url,
+    CfHttpProjectUrl, CfHttpUrl,
 };
 use super::*;
 use serde_json::{json, Value};
@@ -19,7 +20,7 @@ pub(crate) use idempotency::{
 };
 use plans::{
     request_apply_operation_plan, request_merge_operation_plan, request_review_operation_plan,
-    upload_operation_plan,
+    upload_operation_plan, UploadPlanRemote,
 };
 
 #[derive(Debug)]
@@ -182,10 +183,15 @@ pub(crate) fn upload_branch(
             options,
             &repo_root,
             &head,
-            transport,
-            remote.branch.as_str(),
-            Some(object_records.len()),
-            diagnostics,
+            UploadPlanRemote {
+                transport,
+                branch: remote.branch.as_str(),
+                object_count: Some(object_records.len()),
+                diagnostics,
+                validations: vec![
+                    json!({"kind": "remote_validation", "mode": "server_apply_path"}),
+                ],
+            },
         );
         if options.dry_run {
             return Ok(UploadResult { head, plan });
@@ -232,6 +238,11 @@ pub(crate) fn upload_branch(
 
     let remote = parse_cf_url(&options.remote_url)?;
     let remote_branch = remote.branch.clone();
+    let dry_run_validations = if options.dry_run {
+        validate_remote_upload_dry_run_preconditions(&remote.project_root, &local_objects, &head)?
+    } else {
+        Vec::new()
+    };
     if !options.dry_run {
         ensure_remote_layout(&remote.project_root)?;
         let actor = "local";
@@ -294,10 +305,13 @@ pub(crate) fn upload_branch(
         options,
         &repo_root,
         &head,
-        "file",
-        remote_branch.as_str(),
-        Some(object_records.len()),
-        diagnostics,
+        UploadPlanRemote {
+            transport: "file",
+            branch: remote_branch.as_str(),
+            object_count: Some(object_records.len()),
+            diagnostics,
+            validations: dry_run_validations,
+        },
     );
     if options.dry_run {
         return Ok(UploadResult { head, plan });
@@ -337,28 +351,7 @@ pub(crate) fn upload_branch(
 pub(crate) fn list_remote_branches(project_url: &str) -> Result<Vec<RemoteBranch>, CliError> {
     if is_cf_http_url(project_url) {
         let project = parse_cf_http_project_url(project_url)?;
-        let response = http_json(
-            "GET",
-            &http_remote_path(&project.endpoint, &project.org, &project.app, &["branches"]),
-            None,
-        )?;
-        let branches = response
-            .get("branches")
-            .and_then(Value::as_array)
-            .ok_or_else(|| {
-                CliError::InvalidRepository(
-                    "HTTP remote returned an invalid branch list".to_string(),
-                )
-            })?;
-        return branches
-            .iter()
-            .map(|branch| {
-                Ok(RemoteBranch {
-                    name: required_string(branch, &["name"])?,
-                    head: required_string(branch, &["head"])?,
-                })
-            })
-            .collect();
+        return list_http_remote_branches(&project);
     }
     let project = parse_cf_project_url(project_url)?;
     let dirs = remote_dirs(&project.project_root);
@@ -386,6 +379,41 @@ pub(crate) fn list_remote_branches(project_url: &str) -> Result<Vec<RemoteBranch
     Ok(branches)
 }
 
+fn list_http_remote_branches(project: &CfHttpProjectUrl) -> Result<Vec<RemoteBranch>, CliError> {
+    let response = http_json(
+        "GET",
+        &http_remote_path(&project.endpoint, &project.org, &project.app, &["branches"]),
+        None,
+    )?;
+    let branches = response
+        .get("branches")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            CliError::InvalidRepository("HTTP remote returned an invalid branch list".to_string())
+        })?;
+    branches
+        .iter()
+        .map(|branch| {
+            Ok(RemoteBranch {
+                name: required_string(branch, &["name"])?,
+                head: required_string(branch, &["head"])?,
+            })
+        })
+        .collect()
+}
+
+fn load_http_remote_branch(remote: &CfHttpUrl) -> Result<RemoteBranch, CliError> {
+    let project = CfHttpProjectUrl {
+        endpoint: remote.endpoint.clone(),
+        org: remote.org.clone(),
+        app: remote.app.clone(),
+    };
+    list_http_remote_branches(&project)?
+        .into_iter()
+        .find(|branch| branch.name == remote.branch)
+        .ok_or_else(|| CliError::Usage(format!("remote branch not found: {}", remote.branch)))
+}
+
 pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMergeResult, CliError> {
     if is_cf_http_url(&options.source_url) || is_cf_http_url(&options.target_url) {
         if !is_cf_http_url(&options.source_url) || !is_cf_http_url(&options.target_url) {
@@ -393,20 +421,23 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
                 "request-merge requires both URLs to use the same remote transport".to_string(),
             ));
         }
+        let source = parse_cf_http_url(&options.source_url)?;
         let target = parse_cf_http_url(&options.target_url)?;
-        let plan = request_merge_operation_plan(
-            options,
-            "",
-            "",
-            "pending",
-            target.endpoint_scheme(),
-            &target.branch,
-        );
         if options.dry_run {
+            let source_branch = load_http_remote_branch(&source)?;
+            let target_branch = load_http_remote_branch(&target)?;
+            let plan = request_merge_operation_plan(
+                options,
+                &source_branch.head,
+                &target_branch.head,
+                "pending",
+                target.endpoint_scheme(),
+                &target.branch,
+            );
             return Ok(RequestMergeResult {
                 id: String::new(),
-                source_head: String::new(),
-                target_head: String::new(),
+                source_head: source_branch.head,
+                target_head: target_branch.head,
                 plan,
             });
         }
@@ -442,10 +473,21 @@ pub(crate) fn request_merge(options: &RequestMergeOptions) -> Result<RequestMerg
             ),
             Some(payload),
         )?;
+        let source_head = required_string(&response, &["source"])?;
+        let target_head = required_string(&response, &["target"])?;
+        let mr_id = required_string(&response, &["id"])?;
+        let plan = request_merge_operation_plan(
+            options,
+            &source_head,
+            &target_head,
+            &mr_id,
+            target.endpoint_scheme(),
+            &target.branch,
+        );
         return Ok(RequestMergeResult {
-            id: required_string(&response, &["id"])?,
-            source_head: required_string(&response, &["source"])?,
-            target_head: required_string(&response, &["target"])?,
+            id: mr_id,
+            source_head,
+            target_head,
             plan,
         });
     }
@@ -1019,6 +1061,61 @@ pub(crate) fn ensure_remote_layout(project_root: &Path) -> Result<(), CliError> 
     ] {
         fs::create_dir_all(dirs.objects.join(subdir))?;
     }
+    Ok(())
+}
+
+fn validate_remote_upload_dry_run_preconditions(
+    project_root: &Path,
+    local_objects: &Path,
+    head: &str,
+) -> Result<Vec<Value>, CliError> {
+    if !project_root.exists() {
+        return Ok(vec![
+            json!({"kind": "remote_project_root", "status": "missing_would_create", "path": project_root}),
+            json!({"kind": "remote_layout", "status": "planned_create"}),
+        ]);
+    }
+    validate_existing_remote_layout(project_root)?;
+    super::signatures::enforce_remote_commit_signature_policy(project_root, local_objects, head)?;
+    Ok(vec![
+        json!({"kind": "remote_project_root", "status": "exists", "path": project_root}),
+        json!({"kind": "remote_layout", "status": "validated"}),
+        json!({"kind": "remote_commit_signature_policy", "status": "validated"}),
+    ])
+}
+
+fn validate_existing_remote_layout(project_root: &Path) -> Result<(), CliError> {
+    if !project_root.is_dir() {
+        return Err(CliError::InvalidRepository(format!(
+            "remote layout invalid: project root is not a directory: {}",
+            project_root.display()
+        )));
+    }
+    let dirs = remote_dirs(project_root);
+    for path in [
+        dirs.objects.clone(),
+        dirs.branches,
+        dirs.merge_requests,
+        dirs.locks,
+        dirs.idempotency,
+    ] {
+        if !path.is_dir() {
+            return Err(CliError::InvalidRepository(format!(
+                "remote layout invalid: missing directory {}",
+                path.display()
+            )));
+        }
+    }
+    for subdir in codefire_store::known_object_subdirs() {
+        let path = dirs.objects.join(subdir);
+        if !path.is_dir() {
+            return Err(CliError::InvalidRepository(format!(
+                "remote layout invalid: missing object directory {}",
+                path.display()
+            )));
+        }
+    }
+    read_optional_json(&project_root.join("server_policy.json"))?;
     Ok(())
 }
 
