@@ -49,7 +49,11 @@ Completion rule:
 | Issue | Status | Root fix group | Current decision |
 |---|---|---|---|
 | CFB-006 | fixed | Verification diagnostic filtering | blocking-only viewでnon-blocking missing linksを分離した |
+| CFB-012 | fixed | State reducer | verify passed後にfire 0でburning表示を残さない |
 | CFB-013 | fixed | Scan/verify text summaries | clean scanはempty stateを明示する |
+| CFB-014 | fixed | State reducer | open fire正ならstatusはopen-burningへ補正する |
+| CFB-015 | fixed | State reducer | clean verifyはopen-cleanを維持する |
+| CFB-016 | fixed | State reducer | open fire正ならstatusはopen-cleanを返さない |
 | CFB-022 | fixed | Scan/verify text summaries | passed verifyもblocking summary/countersを表示する |
 | CFB-028 | fixed | Verification diagnostic filtering | blocking-only JSON dataをfiltered viewにした |
 | CFB-052 | fixed | Verify next_actions state awareness | clean passed verifyはcommitではなくstatusを返す |
@@ -68,10 +72,12 @@ Completion rule:
 | CFR-140 | fixed | Verification diagnostic filtering | filtered/unfiltered diagnostic summaryをJSON dataへ追加した |
 | CFR-141 | fixed | Verify next_actions state awareness | verify next_actionsをscan-awareにした |
 | CFR-157 | fixed | Context bounded atom traversal | omitted neighbor countとcontext_expand next_actionを追加した |
+| CFR-096 | fixed | Automation next_actions | open-clean statusはverify loopを出さない |
+| CFR-098 | fixed | Automation next_actions | clean scanはverifyではなくstatus確認へ誘導する |
 
 Remaining open count for this batch:
 
-- 133 issues.
+- 127 issues.
 
 ## Global Issue Inventory
 
@@ -81,15 +87,15 @@ Current tracked issue inventory as of 2026-06-10:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 92 | 32 | 60 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
-| CFR code review issues | 160 | 87 | 73 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. |
-| Total | 252 | 119 | 133 | This global batch is the whole known issue backlog. |
+| CFB dogfood issues | 92 | 36 | 56 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFR code review issues | 160 | 89 | 71 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. |
+| Total | 252 | 125 | 127 | This global batch is the whole known issue backlog. |
 
 Current active batch progress:
 
 - Frozen open issue count: 146.
-- Fixed during global burn-down so far: CFB-006, CFB-013, CFB-022, CFB-028, CFB-052, CFB-069, CFB-073, CFB-081, CFR-127, CFR-136, CFR-140, CFR-141, CFR-157.
-- Remaining open: 133.
+- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-052, CFB-069, CFB-073, CFB-081, CFR-096, CFR-098, CFR-127, CFR-136, CFR-140, CFR-141, CFR-157.
+- Remaining open: 127.
 
 Burn-down interpretation:
 

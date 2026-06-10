@@ -5186,7 +5186,7 @@ fn status_reads_python_compatible_open_directory() {
 }
 
 #[test]
-fn verify_clean_branch_persists_consistent_state_without_degrading_status() {
+fn verify_clean_branch_preserves_clean_state_without_degrading_status() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
     let open_dir = temp.path().join("main-open");
@@ -5211,7 +5211,7 @@ fn verify_clean_branch_persists_consistent_state_without_degrading_status() {
     assert_eq!(verification.result, "passed");
 
     let after = read_status(&open_dir).unwrap();
-    assert_eq!(after.state, "open-consistent");
+    assert_eq!(after.state, "open-clean");
     assert_eq!(after.open_fires, 0);
     let active = active_state_path(&open_dir);
     assert!(active.join("scan.json").exists());
@@ -5219,7 +5219,7 @@ fn verify_clean_branch_persists_consistent_state_without_degrading_status() {
     assert!(active.join("verification.json").exists());
     assert_eq!(
         read_json(&active.join("state.json")).unwrap()["state"],
-        "open-consistent"
+        "open-clean"
     );
 }
 

@@ -3620,7 +3620,7 @@ fn compute_verify(start: &Path, persist: bool) -> Result<VerifyExecution, CliErr
         &now_iso_utc(),
     );
     if persist {
-        persist_verification_result_state(&context, &active_state_path, &verification)?;
+        persist_verification_result_state(&context, &active_state_path, &scan, &verification)?;
     }
     Ok(VerifyExecution { scan, verification })
 }
@@ -3628,6 +3628,7 @@ fn compute_verify(start: &Path, persist: bool) -> Result<VerifyExecution, CliErr
 fn persist_verification_result_state(
     context: &OpenContext,
     active_state_path: &Path,
+    scan: &codefire_core::ScanResult,
     verification: &codefire_core::Verification,
 ) -> Result<(), CliError> {
     write_json_atomic(
@@ -3637,15 +3638,21 @@ fn persist_verification_result_state(
     set_open_state(
         context,
         active_state_path,
-        verification_open_state(verification),
+        verification_open_state(verification, scan),
     )
 }
 
-fn verification_open_state(verification: &codefire_core::Verification) -> &'static str {
-    if verification.result == "passed" {
-        "open-consistent"
+fn verification_open_state(
+    verification: &codefire_core::Verification,
+    scan: &codefire_core::ScanResult,
+) -> &'static str {
+    if verification.result != "passed" {
+        return "open-burning";
+    }
+    if scan.changed_atoms.is_empty() && scan.open_fires.is_empty() {
+        "open-clean"
     } else {
-        "open-burning"
+        "open-consistent"
     }
 }
 

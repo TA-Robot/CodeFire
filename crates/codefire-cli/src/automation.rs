@@ -49,12 +49,7 @@ pub(crate) fn status_data_json(status: &Status) -> Value {
 pub(crate) fn status_next_actions(status: &Status) -> Vec<Value> {
     let mut actions = Vec::new();
     match status.state.as_str() {
-        "open-clean" => actions.push(next_action(
-            "verify",
-            cli_command("verify --json"),
-            "confirm the open branch is consistent before commit",
-            json!({"branch": &status.branch}),
-        )),
+        "open-clean" => {}
         "open-burning" => {
             actions.push(next_action(
                 "scan",
@@ -162,10 +157,10 @@ pub(crate) fn scan_next_actions(scan: &codefire_core::ScanResult) -> Vec<Value> 
     }
     if actions.is_empty() {
         actions.push(next_action(
-            "verify",
-            cli_command("verify --json"),
-            "confirm the clean scan satisfies verification policy",
-            json!({"base_commit": &scan.base_commit}),
+            "status",
+            cli_command("status --json"),
+            "scan is clean; inspect current branch state only if another command needs it",
+            json!({"base_commit": &scan.base_commit, "pending_changes": false}),
         ));
     }
     actions
@@ -547,6 +542,27 @@ mod tests {
             bounded[MAX_NEXT_ACTIONS - 1]["target"]["limit"],
             MAX_NEXT_ACTIONS
         );
+    }
+
+    #[test]
+    fn clean_status_has_no_next_action_loop() {
+        let status = Status {
+            branch: "main".to_string(),
+            state: "open-clean".to_string(),
+            base: "CF-COMMIT-base".to_string(),
+            open_fires: 0,
+        };
+
+        assert!(status_next_actions(&status).is_empty());
+    }
+
+    #[test]
+    fn clean_scan_next_action_is_status_not_verify() {
+        let actions = scan_next_actions(&empty_scan());
+
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0]["kind"], "status");
+        assert_eq!(actions[0]["target"]["pending_changes"], false);
     }
 
     #[test]
