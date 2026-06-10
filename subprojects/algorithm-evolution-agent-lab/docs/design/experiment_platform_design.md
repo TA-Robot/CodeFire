@@ -448,3 +448,20 @@ Lane assignment is deterministic:
 - `keep_policy` becomes deferred monitoring work
 
 The synthesizer validates positive active capacity and non-negative remaining budget. Active work is bounded by capacity, and budget hints are capped by the remaining budget. Overflow active work is converted to deferred items instead of being dropped, so the next cycle keeps visibility into lower-priority work without overcommitting execution.
+
+## DES-AUTO-023: Research cycle plan Markdown rendering
+
+The research cycle plan renderer consumes `ResearchCyclePlan` and emits deterministic Markdown.
+
+The document includes:
+
+- title
+- source cycle IDs
+- retrospective priority
+- active capacity
+- remaining budget
+- lane sections in enum order
+- one subsection per plan item
+- recommendation, action, budget hint, and rationale fields
+
+The renderer does not inspect raw retrospective inputs, run logs, or evidence artifacts. It only formats the bounded plan object produced by `ResearchCyclePlanSynthesizer`. This keeps the planning artifact stable, reviewable, and cheap to regenerate after policy tuning.

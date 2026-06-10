@@ -175,6 +175,11 @@ ResearchCyclePlanSynthesizer.synthesize(report, active_capacity, remaining_budge
   -> map recommendations into mitigation/active/review/archive/deferred lanes
   -> cap active work by capacity
   -> preserve deferred overflow instead of dropping work
+
+ResearchCyclePlanMarkdown.render(plan)
+  -> write source cycles, priority, capacity, and budget
+  -> group plan items by lane
+  -> emit deterministic Markdown sections for review
 ```
 
 Important implementation details:
@@ -184,6 +189,7 @@ Important implementation details:
 - Feedback updates are bounded: values are clamped and do not explode over repeated runs.
 - Drift reporting compares snapshots, not raw logs, so long campaigns can be summarized cheaply.
 - Cycle plan synthesis converts retrospective prose into lane-level work while keeping budget and active capacity explicit.
+- Cycle plan Markdown rendering formats the bounded plan object; it does not re-run retrospective analysis or inspect raw logs.
 
 ## 5. Experiment Automation Surface
 

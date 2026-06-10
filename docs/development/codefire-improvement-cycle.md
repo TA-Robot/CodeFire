@@ -229,13 +229,13 @@ Current named cycle:
 - CodeFire次version系統: v1.0 Contract ValidationのPhase 1a以降を継続する。
 - Current plan: `docs/development/v1.0-contract-validation-plan.md`。
 - Current burn-down plan: `docs/development/current-cycle-burn-down-plan.md`。
-- Current phase: cycle 4 dogfood mini-batch `CFB-093` のBurn-down完了。既知CFB/CFR open issueは0件。
+- Current phase: cycle 5 dogfood pass完了。今回のalgorithm開発ではCodeFire本体の新規CFBは発見されず、既知CFB/CFR open issueは0件。
 - Installed CodeFire: `/home/devuser/.local/bin/codefire`。
 - Installed version output: `codefire foundation 1`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
-- Latest pushed Git commits: current global burn-down commits through issue root-cause map close audit。
+- Latest pushed Git commits: current global burn-down commits through cycle 5 dogfood pass。
 - Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` は `open-clean`、open fires 0。
-- Latest algorithm CodeFire base: `CF-COMMIT-711547728f2ad3345d7bcc82`。
+- Latest algorithm CodeFire base: `CF-COMMIT-476c73ed58ac5e64be166e38`。
 
 Current global issue inventory:
 
@@ -247,10 +247,11 @@ Current global issue inventory:
 
 Close audit note:
 
-- 2026-06-10時点で残っていた146件は、`BATCH-2026-06-global-open-backlog` としてfreezeし、同batch内で全件fixedにした。
+- 2026-06-10時点で残っていた146件は、過去の `BATCH-2026-06-global-open-backlog` の初期open数であり、現在のopen数ではない。同batchは同cycle内で全件fixedにした。
 - 最後に残っていた `CFR-120` は、`docs/development/issue-root-cause-map.json` と `issue_root_cause_map_covers_open_issues` で、今後のopen issueをroot cause計画へ機械的に接続する形でcloseした。
 - Cycle 4 dogfoodingでは `ResearchCyclePlanSynthesizer` を追加し、`CFB-093` を発見、同cycle内でfixedにした。
-- 次のcycleでは、issue discovery後にこのmapまたは後継schemaへ全open issueを登録し、batchを全部消してから次のissue出しへ進む。
+- Cycle 5 dogfoodingでは `ResearchCyclePlanMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-476c73ed58ac5e64be166e38` でsealした。CodeFire本体issueは新規発見なし。
+- 次のcycleでも、issue discovery後にこのmapまたは後継schemaへ全open issueを登録し、batchを全部消してから次のissue出しへ進む。
 
 ## Completed Two-Cycle Snapshot
 
@@ -418,8 +419,8 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- Remaining 7 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
-- このglobal batchが0 openになるまで、新しいissue discovery batchへ進まない。
+- Known CFB/CFR open issueは0件のため、次は新しいalgorithm dogfood discoveryを開始できる。
+- 新issueを見つけた場合はそのcycle batchへfreezeし、全件burn downしてから次のissue discoveryへ進む。
 
 ## Cycle Invariants
 

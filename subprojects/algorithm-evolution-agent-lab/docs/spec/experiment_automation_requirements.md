@@ -159,3 +159,7 @@ The system shall render a research cycle retrospective into a compact planning s
 ## REQ-AUTO-040: Research cycle plan synthesis
 
 The system shall synthesize a next-cycle plan from retrospective recommendations. The plan shall assign deterministic lane items for mitigation, active experiments, review, archive, or deferred work; preserve the source cycle IDs and priority; enforce positive active capacity and non-negative remaining budget; and cap active experiment budget hints by the remaining budget so the next docs-first cycle can begin from a bounded execution plan rather than prose recommendations alone.
+
+## REQ-AUTO-041: Research cycle plan Markdown rendering
+
+The system shall render a synthesized research cycle plan into deterministic Markdown for docs-first planning. The rendered plan shall include source cycles, priority, active capacity, remaining budget, lane sections, item titles, source recommendations, concrete actions, budget hints, and rationales so future planning can be reviewed without inspecting Python objects or raw retrospective signals.

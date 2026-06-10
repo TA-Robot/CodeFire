@@ -3,6 +3,7 @@ import unittest
 from evoagent.retrospective import (
     ResearchCycleRetrospective,
     ResearchCyclePlanLane,
+    ResearchCyclePlanMarkdown,
     ResearchCyclePlanSynthesizer,
     ResearchCycleSignal,
     RetrospectivePlanningSummary,
@@ -132,6 +133,39 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             [item.recommendation for item in plan.items],
         )
         self.assertLessEqual(plan.lane(ResearchCyclePlanLane.ACTIVE)[0].budget_hint, 3.0)
+
+    # cf-atom: TEST-research-cycle-plan-markdown-renders-lanes
+    def test_research_cycle_plan_markdown_renders_lanes(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-5",
+                    completed_runs=4,
+                    improved_candidates=0,
+                    regressed_candidates=0,
+                    failed_runs=1,
+                    blocked_items=0,
+                    mean_cost=2.0,
+                    remaining_budget=10.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=0,
+                )
+            ]
+        )
+        plan = ResearchCyclePlanSynthesizer().synthesize(
+            report,
+            active_capacity=2,
+            remaining_budget=5.0,
+        )
+
+        markdown = ResearchCyclePlanMarkdown().render(plan, title="Cycle 5 Plan")
+
+        self.assertIn("# Cycle 5 Plan", markdown)
+        self.assertIn("- Source cycles: cycle-5", markdown)
+        self.assertIn("## Active", markdown)
+        self.assertIn("### Increase exploration diversity", markdown)
+        self.assertIn("- Recommendation: increase_exploration", markdown)
+        self.assertIn("- Budget hint: 2.00", markdown)
 
 
 if __name__ == "__main__":

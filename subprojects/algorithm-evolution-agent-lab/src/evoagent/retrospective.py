@@ -310,6 +310,43 @@ class ResearchCyclePlanSynthesizer:
         )
 
 
+# cf-atom: CODE-ResearchCyclePlanMarkdown
+class ResearchCyclePlanMarkdown:
+    def render(
+        self,
+        plan: ResearchCyclePlan,
+        *,
+        title: str = "Next Research Cycle Plan",
+    ) -> str:
+        lines = [
+            f"# {title}",
+            "",
+            f"- Source cycles: {', '.join(plan.source_cycles)}",
+            f"- Priority: {plan.priority.value}",
+            f"- Active capacity: {plan.active_capacity}",
+            f"- Remaining budget: {plan.remaining_budget:.2f}",
+            "",
+        ]
+        for lane in ResearchCyclePlanLane:
+            lane_items = plan.lane(lane)
+            if not lane_items:
+                continue
+            lines.extend([f"## {lane.value.title()}", ""])
+            for item in lane_items:
+                lines.extend(
+                    [
+                        f"### {item.title}",
+                        "",
+                        f"- Recommendation: {item.recommendation.value}",
+                        f"- Action: {item.action}",
+                        f"- Budget hint: {item.budget_hint:.2f}",
+                        f"- Rationale: {item.rationale}",
+                        "",
+                    ]
+                )
+        return "\n".join(lines).rstrip() + "\n"
+
+
 def plan_item_for(
     recommendation: RetrospectiveRecommendation,
     report: ResearchCycleRetrospectiveReport,
