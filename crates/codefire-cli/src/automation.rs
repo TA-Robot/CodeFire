@@ -6,6 +6,7 @@ use std::path::Path;
 pub(crate) const COMMAND_RESULT_SCHEMA: &str = "codefire.command_result.v1";
 pub(crate) const CLI_DISPLAY_NAME: &str = "codefire";
 pub(crate) const MAX_NEXT_ACTIONS: usize = 12;
+pub(crate) const MAX_SCAN_JSON_SAMPLE: usize = 50;
 
 pub(crate) fn command_result_envelope(
     command: &str,
@@ -94,13 +95,64 @@ pub(crate) fn status_next_actions(status: &Status) -> Vec<Value> {
     actions
 }
 
-pub(crate) fn scan_data_json(scan: &codefire_core::ScanResult) -> Value {
+pub(crate) fn scan_data_json_with_full(scan: &codefire_core::ScanResult, full: bool) -> Value {
+    let changed_count = scan.changed_atoms.len();
+    let open_fire_count = scan.open_fires.len();
+    let changed_limit = if full {
+        changed_count
+    } else {
+        MAX_SCAN_JSON_SAMPLE
+    };
+    let fire_limit = if full {
+        open_fire_count
+    } else {
+        MAX_SCAN_JSON_SAMPLE
+    };
+    let changed_atom_ids = scan
+        .changed_atoms
+        .iter()
+        .take(changed_limit)
+        .cloned()
+        .collect::<Vec<_>>();
+    let open_fires = scan
+        .open_fires
+        .iter()
+        .take(fire_limit)
+        .cloned()
+        .collect::<Vec<_>>();
+    let atom_by_id = scan
+        .atom_index
+        .atoms
+        .iter()
+        .map(|atom| (atom.atom_id.as_str(), atom))
+        .collect::<BTreeMap<_, _>>();
+    let changed_atoms_sample = changed_atom_ids
+        .iter()
+        .map(|atom_id| {
+            let atom = atom_by_id.get(atom_id.as_str());
+            json!({
+                "atom_id": atom_id,
+                "kind": atom.map(|atom| atom.kind.as_str()),
+                "path": atom.map(|atom| atom.artifact_path.as_str()),
+                "selector": atom.map(|atom| &atom.selector),
+                "content_hash": atom.map(|atom| atom.content_hash.as_str()),
+            })
+        })
+        .collect::<Vec<_>>();
     json!({
         "branch_state": scan_branch_state(scan.changed_atoms.len(), scan.open_fires.len()),
         "base_commit": &scan.base_commit,
         "tool_migration": &scan.tool_migration,
-        "changed_atoms": &scan.changed_atoms,
-        "open_fires": &scan.open_fires,
+        "full": full,
+        "sample_limit": MAX_SCAN_JSON_SAMPLE,
+        "changed_count": changed_count,
+        "open_fire_count": open_fire_count,
+        "changed_atoms_omitted": changed_count.saturating_sub(changed_atom_ids.len()),
+        "open_fires_omitted": open_fire_count.saturating_sub(open_fires.len()),
+        "changed_atom_ids": &changed_atom_ids,
+        "changed_atoms": &changed_atom_ids,
+        "changed_atoms_sample": changed_atoms_sample,
+        "open_fires": &open_fires,
     })
 }
 
@@ -966,6 +1018,61 @@ mod tests {
             .any(|action| action["kind"] == "context_changed"
                 && action["command"].as_str().unwrap().contains("--path .")
                 && action["target"]["path"] == "."));
+    }
+
+    #[test]
+    fn scan_json_is_bounded_and_reports_changed_atom_details() {
+        let mut scan = empty_scan();
+        for index in 0..(MAX_SCAN_JSON_SAMPLE + 3) {
+            let atom_id = format!("REQ-{index:03}");
+            scan.changed_atoms.push(atom_id.clone());
+            scan.atom_index.atoms.push(codefire_core::Atom {
+                atom_id,
+                kind: "requirement".to_string(),
+                artifact_path: format!("docs/spec/{index:03}.md"),
+                selector: codefire_core::Selector {
+                    selector_type: "heading".to_string(),
+                    value: format!("REQ-{index:03}"),
+                },
+                content_hash: format!("sha256:{index:03}"),
+            });
+        }
+        for index in 0..(MAX_SCAN_JSON_SAMPLE + 2) {
+            scan.open_fires.push(test_fire(&format!("FIRE-{index:03}")));
+        }
+
+        let bounded = scan_data_json_with_full(&scan, false);
+        assert_eq!(bounded["full"], false);
+        assert_eq!(bounded["changed_count"], MAX_SCAN_JSON_SAMPLE + 3);
+        assert_eq!(bounded["open_fire_count"], MAX_SCAN_JSON_SAMPLE + 2);
+        assert_eq!(
+            bounded["changed_atom_ids"].as_array().unwrap().len(),
+            MAX_SCAN_JSON_SAMPLE
+        );
+        assert_eq!(
+            bounded["changed_atoms_sample"].as_array().unwrap().len(),
+            MAX_SCAN_JSON_SAMPLE
+        );
+        assert_eq!(bounded["changed_atoms_omitted"], 3);
+        assert_eq!(bounded["open_fires_omitted"], 2);
+        assert_eq!(bounded["changed_atoms_sample"][0]["atom_id"], "REQ-000");
+        assert_eq!(bounded["changed_atoms_sample"][0]["kind"], "requirement");
+        assert_eq!(
+            bounded["changed_atoms_sample"][0]["path"],
+            "docs/spec/000.md"
+        );
+
+        let full = scan_data_json_with_full(&scan, true);
+        assert_eq!(
+            full["changed_atom_ids"].as_array().unwrap().len(),
+            MAX_SCAN_JSON_SAMPLE + 3
+        );
+        assert_eq!(
+            full["open_fires"].as_array().unwrap().len(),
+            MAX_SCAN_JSON_SAMPLE + 2
+        );
+        assert_eq!(full["changed_atoms_omitted"], 0);
+        assert_eq!(full["open_fires_omitted"], 0);
     }
 
     fn test_fire(display_id: &str) -> codefire_core::Fire {

@@ -36,8 +36,8 @@ mod storage;
 mod verification;
 mod view;
 use automation::{
-    cli_command, command_result_envelope, scan_data_json, scan_diagnostics_json, scan_next_actions,
-    status_data_json, status_next_actions, verification_data_json_with_filter,
+    cli_command, command_result_envelope, scan_data_json_with_full, scan_diagnostics_json,
+    scan_next_actions, status_data_json, status_next_actions, verification_data_json_with_filter,
     verification_diagnostics_json_with_filter, verification_next_actions,
 };
 use batch::{
@@ -1214,7 +1214,7 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire status [path|--path <path>] [--json] [--metrics]\n\nShow the current open branch state.\n"
         }
         "scan" => {
-            "usage: codefire scan [path|--path <path>] [--json] [--metrics]\n\nDetect changed atoms and open fires for an open directory.\n"
+            "usage: codefire scan [path|--path <path>] [--json] [--metrics] [--full]\n\nDetect changed atoms and open fires for an open directory.\n"
         }
         "verify" => {
             "usage: codefire verify [path|--path <path>] [--details] [--blocking-only] [--json] [--metrics]\n\nRun CodeFire verification checks for an open directory.\n"
@@ -1485,7 +1485,10 @@ fn run_scan_command(args: &[String]) -> Result<(), CliError> {
                 true,
                 0,
                 repo_root.as_deref(),
-                attach_metrics(scan_data_json(&scan), metrics.as_ref()),
+                attach_metrics(
+                    scan_data_json_with_full(&scan, options.full),
+                    metrics.as_ref(),
+                ),
                 scan_diagnostics_json(&scan),
                 scan_next_actions(&scan, Some(&options.path)),
             ))?
@@ -2702,6 +2705,7 @@ fn parse_path_json_args(args: &[String], command: &str) -> Result<PathJsonOption
     let mut path = None;
     let mut json_output = false;
     let mut metrics = false;
+    let mut full = false;
     let mut index = 0usize;
     while index < args.len() {
         let arg = &args[index];
@@ -2719,6 +2723,9 @@ fn parse_path_json_args(args: &[String], command: &str) -> Result<PathJsonOption
             }
             value if value.starts_with("--path=") => {
                 path = Some(PathBuf::from(value.trim_start_matches("--path=")));
+            }
+            "--full" if command == "scan" => {
+                full = true;
             }
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
@@ -2740,6 +2747,7 @@ fn parse_path_json_args(args: &[String], command: &str) -> Result<PathJsonOption
         path: path.unwrap_or(env::current_dir()?),
         json_output,
         metrics,
+        full,
     })
 }
 

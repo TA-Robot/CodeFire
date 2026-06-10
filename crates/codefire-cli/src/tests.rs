@@ -5899,7 +5899,7 @@ fn metrics_attach_to_status_scan_and_verify_data() {
 
     let scan = run_scan(&open_dir).unwrap();
     let scan_data = attach_metrics(
-        scan_data_json(&scan),
+        scan_data_json_with_full(&scan, false),
         Some(&scan_metrics(Duration::from_millis(5), &scan)),
     );
     assert_eq!(scan_data["metrics"]["command"], "scan");

@@ -197,6 +197,7 @@ codefire scan
 codefire scan --json
 codefire scan --metrics
 codefire scan --json --metrics
+codefire scan --json --full
 ```
 
 仕様：
@@ -209,7 +210,10 @@ scan生成fireのfire_uidはSHA-256由来のstable IDで、display_idもfire key
 text出力のopen fire行はdisplay_idとfire_uidを併記する
 obsolete fireを整理する
 branch stateを更新する
---jsonはcodefire.command_result.v1 envelopeを出力し、data.changed_atoms、data.open_fires、diagnosticsを含める
+--jsonはcodefire.command_result.v1 envelopeを出力し、既定ではchanged atoms/open firesをbounded sampleとして返す
+data.changed_count、data.open_fire_count、data.changed_atoms_omitted、data.open_fires_omittedで全体件数と省略件数を返す
+data.changed_atom_idsとdata.changed_atomsは後方互換のID sample配列、data.changed_atoms_sampleはpath/kind/selector/content_hashを含むobject sample
+--full --jsonはchanged atom IDとopen fireを全量返す
 --jsonはchanged atoms、open fires、verifyに進むためのmachine-readable next_actionsを含める
 --metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
 metricsは `total_ms` / `scan_pipeline_ms` / `atom_extraction_ms` / `trace_parse_ms` / `fire_build_ms` の安定phase key、`phases[].measured`、cache status metadataを含める

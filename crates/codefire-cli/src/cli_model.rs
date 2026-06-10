@@ -51,6 +51,7 @@ pub(crate) struct PathJsonOptions {
     pub(crate) path: PathBuf,
     pub(crate) json_output: bool,
     pub(crate) metrics: bool,
+    pub(crate) full: bool,
 }
 
 #[derive(Debug)]

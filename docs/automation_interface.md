@@ -138,10 +138,28 @@ codefire context --fire FIRE-001 --json
 {
   "branch_state": "open-burning",
   "base_commit": "CF-COMMIT-...",
+  "full": false,
+  "sample_limit": 50,
+  "changed_count": 1,
+  "open_fire_count": 0,
+  "changed_atoms_omitted": 0,
+  "open_fires_omitted": 0,
+  "changed_atom_ids": ["REQ-session"],
   "changed_atoms": ["REQ-session"],
+  "changed_atoms_sample": [
+    {
+      "atom_id": "REQ-session",
+      "kind": "requirement",
+      "path": "docs/spec/session.md",
+      "selector": {"type": "heading", "value": "REQ-session"},
+      "content_hash": "sha256:..."
+    }
+  ],
   "open_fires": []
 }
 ```
+
+Use `scan --json --full` only when the complete changed atom/open fire arrays are needed. Default JSON is bounded for large initial imports.
 
 When `--metrics` is present on `status`, `scan`, or `verify`, the command data includes:
 
