@@ -69,6 +69,24 @@
         "crates/codefire-cli/src/automation.rs::tests::clean_status_with_non_atom_prediction_suggests_commit",
         "subprojects/algorithm-evolution-agent-lab cycle 6 non-Atom history update"
       ]
+    },
+    {
+      "id": "CFB-095",
+      "status": "fixed",
+      "root_cause": "status_next_action_prediction_open_fire_gap",
+      "fix_group": "status-prediction-next-actions",
+      "target_version": "cycle-10-burn-down",
+      "owner_module": "crates/codefire-cli/src/automation.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 10 dogfood burn-down",
+        "decision": "Use scan_prediction changed_count/open_fire_count to return scan and verify next_actions when prediction-only open fires exist."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-095.md",
+        "crates/codefire-cli/src/automation.rs::tests::clean_status_with_open_fire_prediction_suggests_scan_and_verify",
+        "subprojects/algorithm-evolution-agent-lab cycle 10 test atom formatting update"
+      ]
     }
   ]
 }

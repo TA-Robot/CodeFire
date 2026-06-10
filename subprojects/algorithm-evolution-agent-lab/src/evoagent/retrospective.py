@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from enum import Enum
 
@@ -114,6 +115,20 @@ class ResearchCyclePlanningPacket:
     lint_report: ResearchCyclePlanLintReport
     plan_markdown: str
     lint_markdown: str
+
+
+@dataclass(frozen=True)
+class ResearchCyclePlanningPacketManifestEntry:
+    path: str
+    content_sha256: str
+    byte_count: int
+
+
+@dataclass(frozen=True)
+class ResearchCyclePlanningPacketManifest:
+    source_cycles: tuple[str, ...]
+    status: str
+    entries: tuple[ResearchCyclePlanningPacketManifestEntry, ...]
 
 
 # cf-atom: CODE-ResearchCycleRetrospective
@@ -541,6 +556,47 @@ class ResearchCyclePlanningPacketMarkdown:
             demote_markdown_headings(packet.lint_markdown).rstrip(),
         ]
         return "\n".join(lines).rstrip() + "\n"
+
+
+# cf-atom: CODE-ResearchCyclePlanningPacketManifestBuilder
+class ResearchCyclePlanningPacketManifestBuilder:
+    def build(
+        self,
+        packet: ResearchCyclePlanningPacket,
+        *,
+        packet_path: str = "planning-packet.md",
+        plan_path: str = "plan.md",
+        lint_path: str = "lint.md",
+        packet_title: str = "Research Cycle Planning Packet",
+    ) -> ResearchCyclePlanningPacketManifest:
+        packet_markdown = ResearchCyclePlanningPacketMarkdown().render(packet, title=packet_title)
+        entries = (
+            manifest_entry(packet_path, packet_markdown),
+            manifest_entry(plan_path, packet.plan_markdown),
+            manifest_entry(lint_path, packet.lint_markdown),
+        )
+        return ResearchCyclePlanningPacketManifest(
+            source_cycles=packet.plan.source_cycles,
+            status="ok" if packet.lint_report.ok else "blocked",
+            entries=entries,
+        )
+
+
+def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
+    validate_manifest_path(path)
+    payload = content.encode("utf-8")
+    return ResearchCyclePlanningPacketManifestEntry(
+        path=path,
+        content_sha256=f"sha256:{hashlib.sha256(payload).hexdigest()}",
+        byte_count=len(payload),
+    )
+
+
+def validate_manifest_path(path: str) -> None:
+    if not path or path.startswith("/") or "\\" in path:
+        raise ValueError("manifest paths must be relative POSIX paths")
+    if any(part in {"", ".", ".."} for part in path.split("/")):
+        raise ValueError("manifest paths must not contain empty, current, or parent segments")
 
 
 def demote_markdown_headings(markdown: str) -> str:

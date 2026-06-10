@@ -114,6 +114,32 @@ pub(crate) fn status_next_actions_with_prediction(status: &Status, data: &Value)
             json!({"branch": &status.branch, "base": &status.base, "pending_changes": true, "open_fires": 0}),
         )];
     }
+    if predicted_changed_count > 0 && predicted_open_fire_count > 0 && status.open_fires == 0 {
+        return vec![
+            next_action(
+                "scan",
+                cli_command("scan --json"),
+                "refresh predicted open fire diagnostics",
+                json!({
+                    "branch": &status.branch,
+                    "base": &status.base,
+                    "pending_changes": true,
+                    "predicted_open_fires": predicted_open_fire_count,
+                }),
+            ),
+            next_action(
+                "verify",
+                cli_command("verify --details --json"),
+                "inspect predicted blocking verification diagnostics",
+                json!({
+                    "branch": &status.branch,
+                    "base": &status.base,
+                    "pending_changes": true,
+                    "predicted_open_fires": predicted_open_fire_count,
+                }),
+            ),
+        ];
+    }
     status_next_actions(status)
 }
 
@@ -931,6 +957,32 @@ mod tests {
         assert_eq!(actions.len(), 1);
         assert_eq!(actions[0]["kind"], "commit");
         assert_eq!(actions[0]["target"]["pending_changes"], true);
+    }
+
+    #[test]
+    fn clean_status_with_open_fire_prediction_suggests_scan_and_verify() {
+        let status = Status {
+            branch: "main".to_string(),
+            state: "open-clean".to_string(),
+            base: "CF-COMMIT-base".to_string(),
+            open_fires: 0,
+        };
+        let data = json!({
+            "scan_prediction": {
+                "changed_atom_count": 1,
+                "non_atom_changed_file_count": 0,
+                "changed_count": 1,
+                "open_fire_count": 1
+            }
+        });
+
+        let actions = status_next_actions_with_prediction(&status, &data);
+
+        assert_eq!(actions.len(), 2);
+        assert_eq!(actions[0]["kind"], "scan");
+        assert_eq!(actions[0]["target"]["pending_changes"], true);
+        assert_eq!(actions[0]["target"]["predicted_open_fires"], 1);
+        assert_eq!(actions[1]["kind"], "verify");
     }
 
     #[test]

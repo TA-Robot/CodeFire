@@ -6,6 +6,7 @@ from evoagent.retrospective import (
     ResearchCyclePlan,
     ResearchCyclePlanItem,
     ResearchCyclePlanningPacketBuilder,
+    ResearchCyclePlanningPacketManifestBuilder,
     ResearchCyclePlanningPacketMarkdown,
     ResearchCyclePlanLint,
     ResearchCyclePlanLintMarkdown,
@@ -339,6 +340,54 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("## Cycle 9 Plan", markdown)
         self.assertIn("## Cycle 9 Lint", markdown)
         self.assertIn("#### Increase exploration diversity", markdown)
+
+    # cf-atom: TEST-research-cycle-planning-packet-manifest-records-artifact-hashes
+    def test_research_cycle_planning_packet_manifest_records_artifact_hashes(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-10",
+                    completed_runs=5,
+                    improved_candidates=1,
+                    regressed_candidates=0,
+                    failed_runs=1,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=5.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=0,
+                )
+            ]
+        )
+        packet = ResearchCyclePlanningPacketBuilder().build(
+            report,
+            active_capacity=1,
+            remaining_budget=2.0,
+            plan_title="Cycle 10 Plan",
+            lint_title="Cycle 10 Lint",
+        )
+
+        manifest = ResearchCyclePlanningPacketManifestBuilder().build(
+            packet,
+            packet_path="cycle-10/planning-packet.md",
+            plan_path="cycle-10/plan.md",
+            lint_path="cycle-10/lint.md",
+            packet_title="Cycle 10 Packet",
+        )
+
+        self.assertEqual(manifest.source_cycles, ("cycle-10",))
+        self.assertEqual(manifest.status, "ok")
+        self.assertEqual(
+            [entry.path for entry in manifest.entries],
+            ["cycle-10/planning-packet.md", "cycle-10/plan.md", "cycle-10/lint.md"],
+        )
+        self.assertTrue(all(entry.content_sha256.startswith("sha256:") for entry in manifest.entries))
+        self.assertTrue(all(entry.byte_count > 0 for entry in manifest.entries))
+        with self.assertRaisesRegex(ValueError, "relative POSIX"):
+            ResearchCyclePlanningPacketManifestBuilder().build(
+                packet,
+                packet_path="/tmp/planning-packet.md",
+            )
 
 
 if __name__ == "__main__":

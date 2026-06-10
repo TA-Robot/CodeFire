@@ -179,3 +179,7 @@ The system shall build a complete next-cycle planning packet from a retrospectiv
 ## REQ-AUTO-045: Research cycle planning packet Markdown
 
 The system shall render a complete research cycle planning packet into one deterministic Markdown review document. The document shall include packet-level source cycles, priority, lint status, active item count, remaining budget, blocker count, warning count, the demoted plan Markdown, and the demoted lint Markdown so docs-first cycle handoff can persist one readable artifact without losing the underlying plan or safety decision.
+
+## REQ-AUTO-046: Research cycle planning packet manifest
+
+The system shall build a deterministic manifest for planning packet handoff artifacts. The manifest shall record source cycles, lint status, relative artifact paths, content SHA-256 digests, and byte counts for the combined packet Markdown, plan Markdown, and lint Markdown so downstream automation can verify that persisted handoff files still match the reviewed planning packet.

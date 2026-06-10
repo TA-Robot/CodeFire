@@ -109,6 +109,7 @@
 | CFB-092 | fixed | Atom Extraction / Migration | 明示Atom抽出アルゴリズムを改善しただけで、対象プロジェクトのsourceが無変更でも大量の `atom_changed` fireが出る | CFB-091修正版をinstallし、`algorithm-evolution-agent-lab` をscanしたとき | 抽出ルール改善やhash仕様変更が、実装変更ではなくtool migrationであることをCodeFireが区別できず、100件超の消火と証跡処理が必要になる | fixed in active batch | atom hash schema versionとsource-unchanged検出によりtool migrationとして報告し、rebaseline commitで封印できるようにした |
 | CFB-093 | fixed | Status / Next actions | fire解消とverify成功後、`status --json` がscan prediction上commit可能なのにscan/verifyをnext_actionsへ出す | `ResearchCyclePlanSynthesizer` dogfoodingで6 fireを解消しverify passedになった直後 | AI/toolがcommit可能状態を再scan/再verifyループと誤認し、不要なtool callが増える | fixed in cycle 4 burn-down | `status_next_actions_with_prediction` がpending changesあり/open fires 0のpredictionからcommit next_actionを返す |
 | CFB-094 | fixed | Status / Next actions | 非Atomのみの未seal変更があるのに `status --json` のnext_actionsが空になる | `ResearchCyclePlanLint` dogfoodingでCodeFire commit IDをalgorithm historyへ追記した直後 | automationがbranchをcleanと誤認し、非Atom docs変更をsealし忘れる | fixed in cycle 6 burn-down | `status_next_actions_with_prediction` がstate名ではなくpredictionのchanged_count/open_fire_countからcommit可能性を判定する |
+| CFB-095 | fixed | Status / Next actions | changed Atomと予測open fireがあるのに `status --json` のnext_actionsが空になる | `ResearchCyclePlanningPacketManifestBuilder` dogfooding後のtest atom整形で `scan_prediction.open_fire_count=1` になった直後 | automationが必要なscan/fire消火へ進まず、未seal変更をcleanと誤認しうる | fixed in cycle 10 burn-down | `status_next_actions_with_prediction` がprediction上のopen fireに対してscan/verify next_actionを返す |
 
 ## Triage Notes
 
@@ -139,3 +140,4 @@
 - CFB-081からCFB-085は、cycle 2 dogfood issue目標20件へ到達するため、clean状態でexplain/storage/branch/migrate/context help surfaceを調査して追加した。主な傾向は、passed状態の要約不整合、quick reportの情報欠落、metrics flagの扱い、JSON failure envelope、help routingである。
 - CFB-086以降は、cycle 3のalgorithm dogfoodingで見つかったissueとして追加する。主な傾向は、v1.0で入れたhelp改善後に残るoperation JSON/evidence/next_actions/state freshnessである。
 - CFB-093は、cycle 4のalgorithm dogfoodingで見つかったstatus next_actionsのcommit導線不足である。今回のcycleでは発見後すぐに修正し、batchを0件に戻す。
+- CFB-095は、cycle 10のalgorithm dogfoodingで見つかったstatus next_actionsのscan/verify導線不足である。prediction-only open fireをstatusから見つけた場合も、同cycle内で修正し、batchを0件に戻す。

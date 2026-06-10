@@ -330,6 +330,15 @@ links:
   - from: REQ-AUTO-045
     to: TEST-research-cycle-planning-packet-markdown-renders-review-document
     type: verified_by
+  - from: REQ-AUTO-046
+    to: DES-AUTO-028
+    type: refined_by
+  - from: DES-AUTO-028
+    to: CODE-ResearchCyclePlanningPacketManifestBuilder
+    type: implemented_by
+  - from: REQ-AUTO-046
+    to: TEST-research-cycle-planning-packet-manifest-records-artifact-hashes
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

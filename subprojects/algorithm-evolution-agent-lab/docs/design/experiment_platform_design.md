@@ -547,3 +547,17 @@ The document includes:
 - lint section
 
 The renderer reuses the packet's existing `plan_markdown` and `lint_markdown` fields rather than rerunning planning or linting. It demotes headings inside those embedded documents by one level so the packet remains a single coherent Markdown artifact with a stable hierarchy.
+
+## DES-AUTO-028: Research cycle planning packet manifest
+
+The planning packet manifest builder consumes `ResearchCyclePlanningPacket` and derives artifact metadata without writing files.
+
+The manifest includes:
+
+- source cycle IDs
+- status: `ok` or `blocked`
+- combined planning packet Markdown artifact entry
+- plan Markdown artifact entry
+- lint Markdown artifact entry
+
+Each entry stores a relative POSIX path, `sha256:<hex>` digest, and UTF-8 byte count. Absolute paths, Windows separators, empty segments, current-directory segments, and parent-directory segments are rejected before any manifest entry is returned. This keeps the handoff contract deterministic and safe to pass to a future writer or storage adapter.

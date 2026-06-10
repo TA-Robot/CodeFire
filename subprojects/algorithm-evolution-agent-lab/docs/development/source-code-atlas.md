@@ -202,6 +202,12 @@ ResearchCyclePlanningPacketMarkdown.render(packet)
   -> embed demoted plan Markdown
   -> embed demoted lint Markdown
   -> return one deterministic cycle handoff document
+
+ResearchCyclePlanningPacketManifestBuilder.build(packet)
+  -> render the combined planning packet Markdown
+  -> hash combined packet, plan, and lint artifacts
+  -> reject unsafe handoff paths
+  -> return deterministic artifact metadata without writing files
 ```
 
 Important implementation details:
@@ -213,6 +219,7 @@ Important implementation details:
 - Cycle plan synthesis converts retrospective prose into lane-level work while keeping budget and active capacity explicit.
 - Cycle plan Markdown rendering formats the bounded plan object; it does not re-run retrospective analysis or inspect raw logs.
 - Cycle planning packet Markdown embeds the already-rendered plan and lint documents so reviewers inspect the same objects automation will execute.
+- Cycle planning packet manifests hash the reviewed packet artifacts before any future writer persists them.
 
 ## 5. Experiment Automation Surface
 
