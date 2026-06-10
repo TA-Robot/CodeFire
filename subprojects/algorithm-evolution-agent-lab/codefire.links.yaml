@@ -672,6 +672,15 @@ links:
   - from: REQ-AUTO-083
     to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-gate-markdown-renders-blockers
     type: verified_by
+  - from: REQ-AUTO-084
+    to: DES-AUTO-066
+    type: refined_by
+  - from: DES-AUTO-066
+    to: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder
+    type: implemented_by
+  - from: REQ-AUTO-084
+    to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-builder-packages-gate-audit
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

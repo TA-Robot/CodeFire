@@ -210,6 +210,15 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
     artifacts: tuple[ResearchCyclePlanningHandoffArtifact, ...]
 
 
+@dataclass(frozen=True)
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifacts:
+    verification: ResearchCyclePlanningPacketManifestVerification
+    verification_markdown: str
+    gate_result: dict[str, object]
+    gate_markdown: str
+    artifacts: tuple[ResearchCyclePlanningHandoffArtifact, ...]
+
+
 # cf-atom: CODE-ResearchCycleRetrospective
 class ResearchCycleRetrospective:
     def summarize(self, signals: list[ResearchCycleSignal]) -> ResearchCycleRetrospectiveReport:
@@ -1776,6 +1785,50 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
         else:
             lines.append("- none")
         return "\n".join(lines).rstrip() + "\n"
+
+
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder:
+    def build(
+        self,
+        verification: ResearchCyclePlanningPacketManifestVerification,
+        *,
+        verification_path: str = "manifest-markdown-verification.md",
+        gate_path: str = "manifest-markdown-verification-gate.md",
+        verification_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary Artifact Manifest Markdown Verification",
+        gate_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary Artifact Manifest Markdown Verification Markdown Gate",
+    ) -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifacts:
+        for path in (verification_path, gate_path):
+            validate_manifest_path(path)
+        verification_markdown = (
+            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown().render(
+                verification,
+                title=verification_title,
+            )
+        )
+        gate_result = (
+            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate().evaluate(
+                verification,
+                verification_markdown,
+            )
+        )
+        gate_markdown = (
+            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown().render(
+                gate_result,
+                title=gate_title,
+            )
+        )
+        artifacts = (
+            ResearchCyclePlanningHandoffArtifact(path=verification_path, content=verification_markdown),
+            ResearchCyclePlanningHandoffArtifact(path=gate_path, content=gate_markdown),
+        )
+        return ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifacts(
+            verification=verification,
+            verification_markdown=verification_markdown,
+            gate_result=gate_result,
+            gate_markdown=gate_markdown,
+            artifacts=artifacts,
+        )
 
 
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:

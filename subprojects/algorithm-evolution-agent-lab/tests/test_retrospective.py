@@ -14,6 +14,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown,
@@ -2535,6 +2536,48 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Status: ready", clean)
         self.assertIn("- Verification status: ok", clean)
         self.assertIn("- none", clean)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-builder-packages-gate-audit
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_builder_packages_gate_audit(
+        self,
+    ) -> None:
+        verification = ResearchCyclePlanningPacketManifestVerification(
+            findings=(
+                ResearchCyclePlanningPacketManifestVerificationFinding(
+                    path="manifest.md",
+                    message="manifest table header is missing",
+                ),
+            )
+        )
+
+        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+            verification,
+            verification_path="cycle-48/manifest-markdown-verification.md",
+            gate_path="cycle-48/manifest-markdown-verification-gate.md",
+            verification_title="Cycle 48 Manifest Markdown Verification",
+            gate_title="Cycle 48 Manifest Markdown Verification Gate",
+        )
+
+        self.assertEqual(
+            (
+                "cycle-48/manifest-markdown-verification.md",
+                "cycle-48/manifest-markdown-verification-gate.md",
+            ),
+            tuple(artifact.path for artifact in packaged.artifacts),
+        )
+        self.assertIs(packaged.verification, verification)
+        self.assertIn("# Cycle 48 Manifest Markdown Verification", packaged.verification_markdown)
+        self.assertIn("- Status: blocked", packaged.verification_markdown)
+        self.assertIn("- `manifest.md`: manifest table header is missing", packaged.verification_markdown)
+        self.assertEqual(True, packaged.gate_result["ready"])
+        self.assertEqual("ready", packaged.gate_result["status"])
+        self.assertEqual("blocked", packaged.gate_result["verification_status"])
+        self.assertIn("# Cycle 48 Manifest Markdown Verification Gate", packaged.gate_markdown)
+        self.assertIn("- Ready: yes", packaged.gate_markdown)
+        self.assertIn("- Verification status: blocked", packaged.gate_markdown)
+        self.assertIn("- none", packaged.gate_markdown)
+        self.assertEqual(packaged.verification_markdown, packaged.artifacts[0].content)
+        self.assertEqual(packaged.gate_markdown, packaged.artifacts[1].content)
 
 
 if __name__ == "__main__":
