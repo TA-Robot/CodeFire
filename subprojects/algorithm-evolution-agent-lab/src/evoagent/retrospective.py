@@ -108,6 +108,14 @@ class ResearchCyclePlanLintReport:
         return sum(1 for finding in self.findings if finding.severity == ResearchCyclePlanLintSeverity.WARNING)
 
 
+@dataclass(frozen=True)
+class ResearchCyclePlanningPacket:
+    plan: ResearchCyclePlan
+    lint_report: ResearchCyclePlanLintReport
+    plan_markdown: str
+    lint_markdown: str
+
+
 # cf-atom: CODE-ResearchCycleRetrospective
 class ResearchCycleRetrospective:
     def summarize(self, signals: list[ResearchCycleSignal]) -> ResearchCycleRetrospectiveReport:
@@ -478,6 +486,31 @@ class ResearchCyclePlanLintMarkdown:
         if not report.findings:
             lines.extend(["## Findings", "", "- none", ""])
         return "\n".join(lines).rstrip() + "\n"
+
+
+# cf-atom: CODE-ResearchCyclePlanningPacketBuilder
+class ResearchCyclePlanningPacketBuilder:
+    def build(
+        self,
+        report: ResearchCycleRetrospectiveReport,
+        *,
+        active_capacity: int,
+        remaining_budget: float,
+        plan_title: str = "Next Research Cycle Plan",
+        lint_title: str = "Research Cycle Plan Lint",
+    ) -> ResearchCyclePlanningPacket:
+        plan = ResearchCyclePlanSynthesizer().synthesize(
+            report,
+            active_capacity=active_capacity,
+            remaining_budget=remaining_budget,
+        )
+        lint_report = ResearchCyclePlanLint().lint(plan)
+        return ResearchCyclePlanningPacket(
+            plan=plan,
+            lint_report=lint_report,
+            plan_markdown=ResearchCyclePlanMarkdown().render(plan, title=plan_title),
+            lint_markdown=ResearchCyclePlanLintMarkdown().render(lint_report, title=lint_title),
+        )
 
 
 def add_if(

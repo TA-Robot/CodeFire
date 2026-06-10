@@ -171,3 +171,7 @@ The system shall lint a synthesized or hand-authored research cycle plan before 
 ## REQ-AUTO-043: Research cycle plan lint Markdown rendering
 
 The system shall render a research cycle plan lint report into deterministic Markdown for reviewer-facing planning logs. The rendered report shall include overall status, blocker count, warning count, severity sections, field paths, and finding messages so plan safety decisions can be reviewed without inspecting Python objects or raw lint tuples.
+
+## REQ-AUTO-044: Research cycle planning packet
+
+The system shall build a complete next-cycle planning packet from a retrospective report. The packet shall contain the synthesized plan, lint report, plan Markdown, and lint Markdown using the same deterministic rules as the individual plan synthesis, lint, and renderer components. This packet shall give docs-first automation one stable object to persist, review, and hand off without recomputing each planning artifact separately.

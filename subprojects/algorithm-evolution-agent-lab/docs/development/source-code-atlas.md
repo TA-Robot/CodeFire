@@ -190,6 +190,12 @@ ResearchCyclePlanLintMarkdown.render(report)
   -> summarize status, blocker count, and warning count
   -> group findings into severity sections
   -> emit field path and message lines for review logs
+
+ResearchCyclePlanningPacketBuilder.build(report, active_capacity, remaining_budget)
+  -> synthesize the next-cycle plan
+  -> lint the plan
+  -> render plan Markdown and lint Markdown
+  -> return a synchronized planning packet for docs-first handoff
 ```
 
 Important implementation details:

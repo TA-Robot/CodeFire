@@ -5,6 +5,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanLane,
     ResearchCyclePlan,
     ResearchCyclePlanItem,
+    ResearchCyclePlanningPacketBuilder,
     ResearchCyclePlanLint,
     ResearchCyclePlanLintMarkdown,
     ResearchCyclePlanLintSeverity,
@@ -264,6 +265,41 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("`items.budget_hint`: active budget hints exceed remaining budget", markdown)
         self.assertIn("## Warnings", markdown)
         self.assertIn("`items[0].rationale`: rationale is empty", markdown)
+
+    # cf-atom: TEST-research-cycle-planning-packet-builds-plan-lint-and-markdown
+    def test_research_cycle_planning_packet_builds_plan_lint_and_markdown(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-8",
+                    completed_runs=6,
+                    improved_candidates=0,
+                    regressed_candidates=0,
+                    failed_runs=1,
+                    blocked_items=0,
+                    mean_cost=1.5,
+                    remaining_budget=8.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=0,
+                )
+            ]
+        )
+
+        packet = ResearchCyclePlanningPacketBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=4.0,
+            plan_title="Cycle 8 Plan",
+            lint_title="Cycle 8 Lint",
+        )
+
+        self.assertEqual(packet.plan.source_cycles, ("cycle-8",))
+        self.assertTrue(packet.lint_report.ok)
+        self.assertIn("# Cycle 8 Plan", packet.plan_markdown)
+        self.assertIn("### Increase exploration diversity", packet.plan_markdown)
+        self.assertIn("# Cycle 8 Lint", packet.lint_markdown)
+        self.assertIn("- Status: ok", packet.lint_markdown)
+        self.assertIn("- none", packet.lint_markdown)
 
 
 if __name__ == "__main__":

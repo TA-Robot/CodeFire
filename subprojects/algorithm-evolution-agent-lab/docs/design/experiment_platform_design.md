@@ -510,3 +510,21 @@ The document includes:
 - explicit `none` finding line when the report has no findings
 
 Findings are rendered in the already-sorted report order and grouped by severity. The renderer does not rerun linting, inspect the original plan, or hide warnings behind a passing status. This keeps automated planning logs stable and lets reviewers see why a plan is blocked or merely needs attention.
+
+## DES-AUTO-026: Research cycle planning packet
+
+The planning packet builder consumes a `ResearchCycleRetrospectiveReport` plus active capacity and remaining budget, then composes the existing planning components:
+
+- `ResearchCyclePlanSynthesizer`
+- `ResearchCyclePlanLint`
+- `ResearchCyclePlanMarkdown`
+- `ResearchCyclePlanLintMarkdown`
+
+The output `ResearchCyclePlanningPacket` contains:
+
+- `plan`
+- `lint_report`
+- `plan_markdown`
+- `lint_markdown`
+
+The builder does not add new planning policy. It is a deterministic orchestration layer that keeps the plan object, safety decision, and reviewer-facing Markdown synchronized for docs-first cycle handoff.
