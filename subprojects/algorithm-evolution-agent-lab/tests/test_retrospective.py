@@ -3,6 +3,7 @@ import unittest
 from evoagent.retrospective import (
     ResearchCycleRetrospective,
     ResearchCyclePlanningHandoffBundleBuilder,
+    ResearchCyclePlanningHandoffBundleMarkdown,
     ResearchCyclePlanLane,
     ResearchCyclePlan,
     ResearchCyclePlanItem,
@@ -615,6 +616,50 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("# Cycle 14 Verification", bundle.verification_markdown)
         self.assertIn("- Status: ok", bundle.verification_markdown)
         self.assertIn("- none", bundle.verification_markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-bundle-markdown-renders-index
+    def test_research_cycle_planning_handoff_bundle_markdown_renders_index(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-15",
+                    completed_runs=4,
+                    improved_candidates=1,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=4.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=1,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=1,
+            remaining_budget=2.0,
+            packet_path="cycle-15/planning-packet.md",
+            plan_path="cycle-15/plan.md",
+            lint_path="cycle-15/lint.md",
+            packet_title="Cycle 15 Packet",
+        )
+
+        markdown = ResearchCyclePlanningHandoffBundleMarkdown().render(
+            bundle,
+            title="Cycle 15 Handoff",
+        )
+
+        self.assertIn("# Cycle 15 Handoff", markdown)
+        self.assertIn("- Source cycles: cycle-15", markdown)
+        self.assertIn("- Packet status: ok", markdown)
+        self.assertIn("- Manifest status: ok", markdown)
+        self.assertIn("- Verification status: ok", markdown)
+        self.assertIn("- Artifact count: 3", markdown)
+        self.assertIn("| Path | Bytes |", markdown)
+        self.assertIn("| `cycle-15/planning-packet.md` |", markdown)
+        self.assertIn("- Manifest Markdown: included", markdown)
+        self.assertIn("- Verification Markdown: included", markdown)
 
 
 if __name__ == "__main__":

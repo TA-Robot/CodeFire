@@ -622,3 +622,20 @@ The output `ResearchCyclePlanningHandoffBundle` contains:
 - manifest verification Markdown
 
 The builder composes the existing packet, manifest, verification, and Markdown components without adding new planning policy. It validates artifact paths through the manifest builder, verifies the generated artifact contents against the manifest before returning, and leaves all filesystem or storage writes to a future adapter.
+
+## DES-AUTO-033: Research cycle planning handoff bundle Markdown
+
+The handoff bundle Markdown renderer consumes `ResearchCyclePlanningHandoffBundle` and emits a compact index document.
+
+The document includes:
+
+- title
+- source cycle IDs
+- packet status
+- manifest status
+- verification status
+- artifact count
+- artifact table with path and byte size
+- audit availability lines for manifest Markdown and verification Markdown
+
+The renderer does not rebuild the packet, rehash artifacts, rerun verification, or inspect external storage. It formats the already-built bundle so a reviewer or future storage adapter can see which handoff artifacts exist and whether the bundle is clean before opening the full packet, manifest, or verification documents.

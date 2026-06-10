@@ -753,6 +753,42 @@ class ResearchCyclePlanningHandoffBundleBuilder:
         )
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffBundleMarkdown
+class ResearchCyclePlanningHandoffBundleMarkdown:
+    def render(
+        self,
+        bundle: ResearchCyclePlanningHandoffBundle,
+        *,
+        title: str = "Research Cycle Planning Handoff Bundle",
+    ) -> str:
+        lines = [
+            f"# {title}",
+            "",
+            f"- Source cycles: {', '.join(bundle.packet.plan.source_cycles)}",
+            f"- Packet status: {'ok' if bundle.packet.lint_report.ok else 'blocked'}",
+            f"- Manifest status: {bundle.manifest.status}",
+            f"- Verification status: {'ok' if bundle.verification.ok else 'blocked'}",
+            f"- Artifact count: {len(bundle.artifacts)}",
+            "",
+            "## Artifacts",
+            "",
+            "| Path | Bytes |",
+            "|---|---:|",
+        ]
+        for artifact in bundle.artifacts:
+            lines.append(f"| `{artifact.path}` | {len(artifact.content.encode('utf-8'))} |")
+        lines.extend(
+            [
+                "",
+                "## Audits",
+                "",
+                "- Manifest Markdown: included",
+                "- Verification Markdown: included",
+            ]
+        )
+        return "\n".join(lines).rstrip() + "\n"
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

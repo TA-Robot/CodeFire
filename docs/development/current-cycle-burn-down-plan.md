@@ -213,9 +213,9 @@ Current tracked issue inventory as of 2026-06-10:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 95 | 95 | 0 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-005/009/010/011/017/018/020/021/025, CFB-023 and later, plus later generated issues; CFB-001..004/006..008/012..016/019/022 are summary-only legacy entries. |
+| CFB dogfood issues | 95 | 95 | 0 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for every `CFB-001..CFB-095` issue. |
 | CFR code review issues | 160 | 160 | 0 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
-| Total | 255 | 255 | 0 | This global batch plus cycle 4/5/6/7/8/9/10/11/12/13/14 dogfood passes are the whole known issue backlog. |
+| Total | 255 | 255 | 0 | This global batch plus cycle 4/5/6/7/8/9/10/11/12/13/14/15 dogfood passes are the whole known issue backlog. |
 
 Completed global batch progress:
 
@@ -429,6 +429,24 @@ Algorithm work:
 - All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-a8a2133eebf4e2d25a6b5ff4`.
 
 Cycle 14 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+
+## Cycle 15 Dogfood Pass
+
+After cycle 14 reached zero open issues, cycle 15 resumed algorithm development with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `ResearchCyclePlanningHandoffBundleMarkdown` to render planning handoff bundles as artifact and audit index Markdown.
+- Added `REQ-AUTO-051`, `DES-AUTO-033`, `CODE-ResearchCyclePlanningHandoffBundleMarkdown`, and `TEST-research-cycle-planning-handoff-bundle-markdown-renders-index`.
+- Algorithm unittest result: 157 tests pass.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-f28a264a7eb8ba11f09c6f69`.
+
+Cycle 15 issue status:
 
 - Newly discovered CodeFire product issues: 0.
 - Newly frozen CFB/CFR batch size: 0.
