@@ -4,6 +4,7 @@ from evoagent.retrospective import (
     ResearchCycleRetrospective,
     ResearchCyclePlanningHandoffBundleBuilder,
     ResearchCyclePlanningHandoffBundleMarkdown,
+    ResearchCyclePlanningHandoffBundleSummary,
     ResearchCyclePlanLane,
     ResearchCyclePlan,
     ResearchCyclePlanItem,
@@ -660,6 +661,50 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("| `cycle-15/planning-packet.md` |", markdown)
         self.assertIn("- Manifest Markdown: included", markdown)
         self.assertIn("- Verification Markdown: included", markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-bundle-summary-reports-machine-readable-index
+    def test_research_cycle_planning_handoff_bundle_summary_reports_machine_readable_index(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-16",
+                    completed_runs=5,
+                    improved_candidates=2,
+                    regressed_candidates=0,
+                    failed_runs=0,
+                    blocked_items=0,
+                    mean_cost=1.0,
+                    remaining_budget=5.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=2,
+                )
+            ]
+        )
+        bundle = ResearchCyclePlanningHandoffBundleBuilder().build(
+            report,
+            active_capacity=2,
+            remaining_budget=3.0,
+            packet_path="cycle-16/planning-packet.md",
+            plan_path="cycle-16/plan.md",
+            lint_path="cycle-16/lint.md",
+        )
+
+        summary = ResearchCyclePlanningHandoffBundleSummary().summarize(bundle)
+
+        self.assertEqual(summary["source_cycles"], ["cycle-16"])
+        self.assertEqual(summary["packet_status"], "ok")
+        self.assertEqual(summary["manifest_status"], "ok")
+        self.assertEqual(summary["verification_status"], "ok")
+        self.assertEqual(summary["artifact_count"], 3)
+        self.assertEqual(summary["finding_count"], 0)
+        self.assertEqual(summary["audits"], {"manifest_markdown": True, "verification_markdown": True})
+        self.assertEqual(
+            [artifact["path"] for artifact in summary["artifacts"]],  # type: ignore[index]
+            ["cycle-16/planning-packet.md", "cycle-16/plan.md", "cycle-16/lint.md"],
+        )
+        first_artifact = summary["artifacts"][0]  # type: ignore[index]
+        self.assertTrue(first_artifact["content_sha256"].startswith("sha256:"))  # type: ignore[index]
+        self.assertGreater(first_artifact["byte_count"], 0)  # type: ignore[index]
 
 
 if __name__ == "__main__":

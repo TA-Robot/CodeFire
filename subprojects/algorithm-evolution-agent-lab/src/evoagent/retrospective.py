@@ -789,6 +789,31 @@ class ResearchCyclePlanningHandoffBundleMarkdown:
         return "\n".join(lines).rstrip() + "\n"
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffBundleSummary
+class ResearchCyclePlanningHandoffBundleSummary:
+    def summarize(self, bundle: ResearchCyclePlanningHandoffBundle) -> dict[str, object]:
+        return {
+            "source_cycles": list(bundle.packet.plan.source_cycles),
+            "packet_status": "ok" if bundle.packet.lint_report.ok else "blocked",
+            "manifest_status": bundle.manifest.status,
+            "verification_status": "ok" if bundle.verification.ok else "blocked",
+            "artifact_count": len(bundle.artifacts),
+            "artifacts": [
+                {
+                    "path": artifact.path,
+                    "byte_count": len(artifact.content.encode("utf-8")),
+                    "content_sha256": f"sha256:{hashlib.sha256(artifact.content.encode('utf-8')).hexdigest()}",
+                }
+                for artifact in bundle.artifacts
+            ],
+            "audits": {
+                "manifest_markdown": bool(bundle.manifest_markdown.strip()),
+                "verification_markdown": bool(bundle.verification_markdown.strip()),
+            },
+            "finding_count": len(bundle.verification.findings),
+        }
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

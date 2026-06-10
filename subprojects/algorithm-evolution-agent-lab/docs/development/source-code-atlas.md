@@ -233,6 +233,11 @@ ResearchCyclePlanningHandoffBundleMarkdown.render(bundle)
   -> summarize packet, manifest, and verification status
   -> render artifact path and byte-size index
   -> expose included audit documents without opening each artifact
+
+ResearchCyclePlanningHandoffBundleSummary.summarize(bundle)
+  -> return packet, manifest, and verification status as plain data
+  -> return artifact path, byte size, and SHA-256 digest for each artifact
+  -> expose audit document availability and finding count for automation routing
 ```
 
 Important implementation details:

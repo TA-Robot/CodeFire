@@ -639,3 +639,20 @@ The document includes:
 - audit availability lines for manifest Markdown and verification Markdown
 
 The renderer does not rebuild the packet, rehash artifacts, rerun verification, or inspect external storage. It formats the already-built bundle so a reviewer or future storage adapter can see which handoff artifacts exist and whether the bundle is clean before opening the full packet, manifest, or verification documents.
+
+## DES-AUTO-034: Research cycle planning handoff bundle summary
+
+The handoff bundle summary consumes `ResearchCyclePlanningHandoffBundle` and returns a plain Python dictionary for automation.
+
+The dictionary includes:
+
+- `source_cycles`
+- `packet_status`
+- `manifest_status`
+- `verification_status`
+- `artifact_count`
+- `artifacts` with path, byte count, and SHA-256 digest
+- audit availability booleans for manifest Markdown and verification Markdown
+- `finding_count`
+
+The summarizer does not read or write files, rerun retrospective planning, or rerun manifest verification. It only reflects the already-built bundle plus artifact content digests so downstream orchestration can decide whether a handoff is clean without scraping Markdown.
