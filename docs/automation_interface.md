@@ -278,7 +278,10 @@ migrate: review_migration_plan, inspect_migration_blockers
   "evidence_id": "CF-EVIDENCE-...",
   "artifact_ref_id": "CF-ARTIFACT-...",
   "command_exit_code": 0,
-  "command_timed_out": false
+  "command_timed_out": false,
+  "command_cwd": "/workspace/project",
+  "command_cwd_source": "caller_cwd",
+  "repo_relative_command_cwd": null
 }
 ```
 

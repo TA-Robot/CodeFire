@@ -184,6 +184,7 @@ fn batch_file_read_errors_use_json_failure_envelope() {
         command_cwd: None,
         command_timeout_ms: 300_000,
         max_output_bytes: 64 * 1024,
+        allow_failed_command: false,
     })
     .unwrap_err();
     assert_batch_missing_envelope("evidence-add-batch", &evidence_error);
@@ -3418,6 +3419,11 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
     assert!(artifact_ref_id.starts_with("CF-ARTIFACT-"));
     assert_eq!(result.command_exit_code, Some(0));
     assert!(!result.command_timed_out);
+    assert_eq!(data["command_cwd_source"], "caller_cwd");
+    assert_eq!(
+        data["command_cwd"].as_str(),
+        Some(std::env::current_dir().unwrap().to_string_lossy().as_ref())
+    );
     assert_eq!(data["type"], "codefire_evidence_add_result");
     assert_eq!(data["dry_run"], false);
     assert_eq!(data["created"], true);
@@ -3457,6 +3463,7 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
     );
     let evidence = codefire_store::read_object(&objects, &result.evidence_id).unwrap();
     assert_eq!(evidence["type"], "evidence");
+    assert_eq!(evidence["proof_status"], "command-passed");
     assert_eq!(
         evidence["artifact_ref"].as_str(),
         Some(artifact_ref_id.as_str())
@@ -3468,7 +3475,7 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
     assert_eq!(evidence["command"]["timeout_ms"], 300000);
     assert_eq!(
         evidence["command"]["cwd"].as_str(),
-        Some(repo_root.to_string_lossy().as_ref())
+        Some(std::env::current_dir().unwrap().to_string_lossy().as_ref())
     );
     assert_eq!(evidence["command"]["stdout"], "ok");
     assert_eq!(evidence["command"]["stdout_truncated"], true);
@@ -3517,6 +3524,8 @@ fn evidence_add_single_dry_run_returns_plan_without_writing_object() {
     assert!(data["evidence_id"].is_null());
     assert_eq!(data["plan"]["command"], "evidence-add");
     assert_eq!(data["plan"]["would_apply"], false);
+    assert_eq!(data["plan"]["cwd_source"], "caller_cwd");
+    assert!(data["plan"]["resolved_cwd"].as_str().is_some());
     assert_eq!(
         fs::read_dir(objects.join("evidence")).unwrap().count(),
         before
@@ -3570,7 +3579,58 @@ fn evidence_artifact_ref_uses_repo_relative_path_and_warns_for_large_artifact() 
 }
 
 #[test]
-fn evidence_command_timeout_kills_child_and_records_timeout() {
+fn evidence_command_failure_is_blocking_by_default_and_allowable_explicitly() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+
+    let failing = parse_evidence_add_args(&[
+        "--path".to_string(),
+        repo_root.to_string_lossy().into_owned(),
+        "--from-command".to_string(),
+        "printf nope >&2; exit 7".to_string(),
+        "--json".to_string(),
+    ])
+    .unwrap();
+    let error = run_evidence_add(&failing).unwrap_err();
+    let envelope = cli_error_envelope("evidence-add", &error);
+    assert_eq!(
+        envelope["diagnostics"][0]["kind"],
+        "evidence_command_failed"
+    );
+    assert_eq!(envelope["diagnostics"][0]["exit_code"], 7);
+    assert_eq!(
+        fs::read_dir(repo_root.join(".codefire").join("objects").join("evidence"))
+            .unwrap()
+            .count(),
+        0
+    );
+
+    let allowed = parse_evidence_add_args(&[
+        "--path".to_string(),
+        repo_root.to_string_lossy().into_owned(),
+        "--from-command".to_string(),
+        "printf nope >&2; exit 7".to_string(),
+        "--allow-failed-command".to_string(),
+    ])
+    .unwrap();
+    let result = run_evidence_add(&allowed).unwrap();
+
+    assert_eq!(result.command_exit_code, Some(7));
+    assert!(!result.command_timed_out);
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic["kind"] == "evidence_command_failed"));
+    let objects = repo_root.join(".codefire").join("objects");
+    let evidence = codefire_store::read_object(&objects, &result.evidence_id).unwrap();
+    assert_eq!(evidence["proof_status"], "failed-command-captured");
+    assert_eq!(evidence["command"]["success"], false);
+    assert_eq!(evidence["command"]["exit_code"], 7);
+}
+
+#[test]
+fn evidence_command_timeout_requires_allow_failed_command_to_store() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
     init_repo(&repo_root, false).unwrap();
@@ -3583,15 +3643,21 @@ fn evidence_command_timeout_kills_child_and_records_timeout() {
         "--timeout-ms=20".to_string(),
     ])
     .unwrap();
-    let result = run_evidence_add(&parsed).unwrap();
+    let error = run_evidence_add(&parsed).unwrap_err();
+    assert_eq!(error.exit_code(), ExitCode::InvalidUsageOrConfig.code());
 
+    let allowed = parse_evidence_add_args(&[
+        "--path".to_string(),
+        repo_root.to_string_lossy().into_owned(),
+        "--from-command".to_string(),
+        "while :; do :; done".to_string(),
+        "--timeout-ms=20".to_string(),
+        "--allow-failed-command".to_string(),
+    ])
+    .unwrap();
+    let result = run_evidence_add(&allowed).unwrap();
     assert_eq!(result.command_exit_code, None);
     assert!(result.command_timed_out);
-    let objects = repo_root.join(".codefire").join("objects");
-    let evidence = codefire_store::read_object(&objects, &result.evidence_id).unwrap();
-    assert_eq!(evidence["command"]["timed_out"], true);
-    assert_eq!(evidence["command"]["success"], false);
-    assert_eq!(evidence["command"]["timeout_ms"], 20);
 }
 
 #[test]
@@ -3699,6 +3765,7 @@ fn evidence_batch_validates_all_items_before_writing_objects() {
         command_cwd: None,
         command_timeout_ms: 300_000,
         max_output_bytes: 64 * 1024,
+        allow_failed_command: false,
     })
     .unwrap();
     assert_eq!(applied.item_count, 3);
@@ -3726,6 +3793,7 @@ fn evidence_batch_validates_all_items_before_writing_objects() {
         command_cwd: None,
         command_timeout_ms: 300_000,
         max_output_bytes: 64 * 1024,
+        allow_failed_command: false,
     })
     .unwrap_err();
     assert!(invalid.to_string().contains("missing.bin"));
@@ -3767,6 +3835,7 @@ fn extinguish_evidence_ref_links_resolution_and_verify_detects_missing_ref() {
         command_cwd: None,
         command_timeout_ms: 300_000,
         max_output_bytes: 128,
+        allow_failed_command: false,
     })
     .unwrap();
     let active = active_state_path(&open_dir);

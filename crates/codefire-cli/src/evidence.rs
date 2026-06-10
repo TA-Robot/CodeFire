@@ -31,6 +31,7 @@ pub(crate) struct EvidenceAddOptions {
     pub(crate) command_cwd: Option<PathBuf>,
     pub(crate) command_timeout_ms: u64,
     pub(crate) max_output_bytes: usize,
+    pub(crate) allow_failed_command: bool,
 }
 
 #[derive(Debug)]
@@ -46,8 +47,19 @@ pub(crate) struct EvidenceAddResult {
     pub(crate) command_stdout_truncated: bool,
     pub(crate) command_stderr_summary: Option<String>,
     pub(crate) command_stderr_truncated: bool,
+    pub(crate) command_cwd: Option<PathBuf>,
+    pub(crate) command_cwd_source: Option<&'static str>,
+    pub(crate) repo_relative_command_cwd: Option<String>,
     pub(crate) diagnostics: Vec<Value>,
     pub(crate) plan: Option<Value>,
+}
+
+#[derive(Debug, Clone)]
+struct CommandCwdResolution {
+    requested: Option<PathBuf>,
+    resolved: PathBuf,
+    source: &'static str,
+    repo_relative: Option<String>,
 }
 
 pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOptions, CliError> {
@@ -63,6 +75,7 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
     let mut command_cwd = None;
     let mut command_timeout_ms = DEFAULT_COMMAND_TIMEOUT_MS;
     let mut max_output_bytes = DEFAULT_MAX_OUTPUT_BYTES;
+    let mut allow_failed_command = false;
     let mut index = 0usize;
     while index < args.len() {
         match args[index].as_str() {
@@ -108,6 +121,7 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
                 index += 1;
                 command_cwd = Some(PathBuf::from(required_arg(args, index, "--cwd")?));
             }
+            "--allow-failed-command" => allow_failed_command = true,
             "--timeout" | "--timeout-ms" => {
                 index += 1;
                 command_timeout_ms = parse_duration_ms(required_arg(args, index, "--timeout")?)?;
@@ -145,6 +159,12 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
             }
             value if value.starts_with("--cwd=") => {
                 command_cwd = Some(PathBuf::from(value.trim_start_matches("--cwd=")));
+            }
+            "--allow-failed-command=true" => {
+                allow_failed_command = true;
+            }
+            "--allow-failed-command=false" => {
+                allow_failed_command = false;
             }
             value if value.starts_with("--timeout=") => {
                 command_timeout_ms = parse_duration_ms(value.trim_start_matches("--timeout="))?;
@@ -207,6 +227,7 @@ pub(crate) fn parse_evidence_add_args(args: &[String]) -> Result<EvidenceAddOpti
         command_cwd,
         command_timeout_ms,
         max_output_bytes,
+        allow_failed_command,
     })
 }
 
@@ -215,6 +236,11 @@ pub(crate) fn run_evidence_add(
 ) -> Result<EvidenceAddResult, CliError> {
     let repo_root = find_repo_root(&options.start)?;
     validate_evidence_add_options(options)?;
+    let command_cwd = if options.command.is_some() || options.command_argv.is_some() {
+        Some(resolve_command_cwd(options, &repo_root)?)
+    } else {
+        None
+    };
     if options.dry_run {
         return Ok(EvidenceAddResult {
             repo_root,
@@ -228,8 +254,13 @@ pub(crate) fn run_evidence_add(
             command_stdout_truncated: false,
             command_stderr_summary: None,
             command_stderr_truncated: false,
+            command_cwd: command_cwd.as_ref().map(|cwd| cwd.resolved.clone()),
+            command_cwd_source: command_cwd.as_ref().map(|cwd| cwd.source),
+            repo_relative_command_cwd: command_cwd
+                .as_ref()
+                .and_then(|cwd| cwd.repo_relative.clone()),
             diagnostics: Vec::new(),
-            plan: Some(evidence_add_operation_plan(options)),
+            plan: Some(evidence_add_operation_plan(options, command_cwd.as_ref())),
         });
     }
     let objects = repo_root.join(".codefire").join("objects");
@@ -243,12 +274,23 @@ pub(crate) fn run_evidence_add(
         None => None,
     };
     let command_capture = if let Some(command) = options.command.as_deref() {
-        Some(capture_shell_command(command, options, &repo_root)?)
+        Some(capture_shell_command(
+            command,
+            options,
+            command_cwd.as_ref().expect("command cwd resolved"),
+        )?)
     } else if let Some(argv) = options.command_argv.as_deref() {
-        Some(capture_argv_command(argv, options, &repo_root)?)
+        Some(capture_argv_command(
+            argv,
+            options,
+            command_cwd.as_ref().expect("command cwd resolved"),
+        )?)
     } else {
         None
     };
+    if let Some(capture) = command_capture.as_ref() {
+        validate_command_capture_success(capture, options)?;
+    }
     let command_exit_code = command_capture
         .as_ref()
         .and_then(|capture| capture.exit_code);
@@ -266,6 +308,26 @@ pub(crate) fn run_evidence_add(
         .as_ref()
         .map(|capture| capture.stderr_truncated)
         .unwrap_or(false);
+    let command_cwd_result = command_cwd.as_ref().map(|cwd| cwd.resolved.clone());
+    let command_cwd_source = command_cwd.as_ref().map(|cwd| cwd.source);
+    let repo_relative_command_cwd = command_cwd
+        .as_ref()
+        .and_then(|cwd| cwd.repo_relative.clone());
+    let proof_status = command_capture
+        .as_ref()
+        .map(|capture| {
+            if capture.success {
+                "command-passed"
+            } else {
+                "failed-command-captured"
+            }
+        })
+        .unwrap_or("captured");
+    if let Some(capture) = command_capture.as_ref() {
+        if !capture.success {
+            diagnostics.push(command_failure_diagnostic(capture, "warning"));
+        }
+    }
     let evidence_id = codefire_store::store_object(
         &objects,
         "evidence",
@@ -275,6 +337,10 @@ pub(crate) fn run_evidence_add(
             "label": &options.label,
             "artifact_ref": &artifact_ref_id,
             "command": command_capture.as_ref().map(CommandCapture::to_json),
+            "proof_status": proof_status,
+            "command_cwd": &command_cwd_result,
+            "command_cwd_source": command_cwd_source,
+            "repo_relative_command_cwd": &repo_relative_command_cwd,
             "created_at": now_iso_utc(),
         }),
     )?;
@@ -294,6 +360,9 @@ pub(crate) fn run_evidence_add(
         command_stdout_truncated,
         command_stderr_summary,
         command_stderr_truncated,
+        command_cwd: command_cwd_result,
+        command_cwd_source,
+        repo_relative_command_cwd,
         diagnostics,
         plan: None,
     })
@@ -372,6 +441,9 @@ pub(crate) fn evidence_add_data_json(result: &EvidenceAddResult) -> Value {
         "command_stdout_truncated": result.command_stdout_truncated,
         "command_stderr_summary": &result.command_stderr_summary,
         "command_stderr_truncated": result.command_stderr_truncated,
+        "command_cwd": &result.command_cwd,
+        "command_cwd_source": result.command_cwd_source,
+        "repo_relative_command_cwd": &result.repo_relative_command_cwd,
         "diagnostics": &result.diagnostics,
         "plan": &result.plan,
     })
@@ -402,7 +474,10 @@ pub(crate) fn print_evidence_add_result(result: &EvidenceAddResult) {
     }
 }
 
-fn evidence_add_operation_plan(options: &EvidenceAddOptions) -> Value {
+fn evidence_add_operation_plan(
+    options: &EvidenceAddOptions,
+    command_cwd: Option<&CommandCwdResolution>,
+) -> Value {
     json!({
         "type": "codefire_operation_plan",
         "version": 1,
@@ -417,9 +492,14 @@ fn evidence_add_operation_plan(options: &EvidenceAddOptions) -> Value {
         "from_command": &options.command,
         "has_command_argv": options.command_argv.is_some(),
         "command_argv": &options.command_argv,
-        "cwd": &options.command_cwd,
+        "requested_cwd": command_cwd.and_then(|cwd| cwd.requested.as_ref()),
+        "cwd": command_cwd.map(|cwd| &cwd.resolved),
+        "resolved_cwd": command_cwd.map(|cwd| &cwd.resolved),
+        "cwd_source": command_cwd.map(|cwd| cwd.source),
+        "repo_relative_cwd": command_cwd.and_then(|cwd| cwd.repo_relative.as_ref()),
         "timeout_ms": options.command_timeout_ms,
         "max_output_bytes": options.max_output_bytes,
+        "allow_failed_command": options.allow_failed_command,
         "operations": [
             {"kind": "validate_capture_inputs"},
             {"kind": "store_artifact_ref", "enabled": options.artifact_path.is_some()},
@@ -477,6 +557,38 @@ fn path_slash_string(path: &Path) -> String {
         .map(|component| component.as_os_str().to_string_lossy())
         .collect::<Vec<_>>()
         .join("/")
+}
+
+fn resolve_command_cwd(
+    options: &EvidenceAddOptions,
+    repo_root: &Path,
+) -> Result<CommandCwdResolution, CliError> {
+    let (requested, resolved, source) = if let Some(cwd) = options.command_cwd.as_deref() {
+        (
+            Some(cwd.to_path_buf()),
+            absolute_existing_path(cwd)?,
+            "explicit_cwd",
+        )
+    } else {
+        (
+            None,
+            absolute_existing_path(&std::env::current_dir()?)?,
+            "caller_cwd",
+        )
+    };
+    if !resolved.is_dir() {
+        return Err(CliError::Usage(format!(
+            "command cwd must be a directory: {}",
+            resolved.display()
+        )));
+    }
+    let repo_relative = resolved.strip_prefix(repo_root).ok().map(path_slash_string);
+    Ok(CommandCwdResolution {
+        requested,
+        resolved,
+        source,
+        repo_relative,
+    })
 }
 
 fn store_artifact_ref(
@@ -585,17 +697,13 @@ impl CommandCapture {
 fn capture_shell_command(
     command: &str,
     options: &EvidenceAddOptions,
-    repo_root: &Path,
+    cwd: &CommandCwdResolution,
 ) -> Result<CommandCapture, CliError> {
-    let cwd = options
-        .command_cwd
-        .clone()
-        .unwrap_or_else(|| repo_root.to_path_buf());
     let mut command_process = Command::new("sh");
     command_process
         .arg("-c")
         .arg(command)
-        .current_dir(&cwd)
+        .current_dir(&cwd.resolved)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let child = command_process.spawn()?;
@@ -604,7 +712,7 @@ fn capture_shell_command(
         None,
         "shell",
         true,
-        cwd,
+        cwd.resolved.clone(),
         child,
         options,
     )
@@ -613,12 +721,8 @@ fn capture_shell_command(
 fn capture_argv_command(
     argv: &[String],
     options: &EvidenceAddOptions,
-    repo_root: &Path,
+    cwd: &CommandCwdResolution,
 ) -> Result<CommandCapture, CliError> {
-    let cwd = options
-        .command_cwd
-        .clone()
-        .unwrap_or_else(|| repo_root.to_path_buf());
     let Some((program, args)) = argv.split_first() else {
         return Err(CliError::Usage(
             "evidence add --from-argv requires a program".to_string(),
@@ -627,7 +731,7 @@ fn capture_argv_command(
     let mut command_process = Command::new(program);
     command_process
         .args(args)
-        .current_dir(&cwd)
+        .current_dir(&cwd.resolved)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let child = command_process.spawn()?;
@@ -636,10 +740,56 @@ fn capture_argv_command(
         Some(argv.to_vec()),
         "argv",
         false,
-        cwd,
+        cwd.resolved.clone(),
         child,
         options,
     )
+}
+
+fn validate_command_capture_success(
+    capture: &CommandCapture,
+    options: &EvidenceAddOptions,
+) -> Result<(), CliError> {
+    if capture.success || options.allow_failed_command {
+        return Ok(());
+    }
+    Err(CliError::EvidenceCommandFailed {
+        exit_code: capture.exit_code,
+        timed_out: capture.timed_out,
+        cwd: capture.cwd.clone(),
+        message: command_failure_message(capture),
+    })
+}
+
+fn command_failure_diagnostic(capture: &CommandCapture, severity: &str) -> Value {
+    json!({
+        "kind": "evidence_command_failed",
+        "severity": severity,
+        "blocking": severity == "blocking",
+        "exit_code": capture.exit_code,
+        "timed_out": capture.timed_out,
+        "cwd": &capture.cwd,
+        "message": command_failure_message(capture),
+    })
+}
+
+fn command_failure_message(capture: &CommandCapture) -> String {
+    if capture.timed_out {
+        format!(
+            "evidence command timed out after {}ms in {}",
+            capture.timeout_ms,
+            capture.cwd.display()
+        )
+    } else {
+        format!(
+            "evidence command failed with exit code {} in {}",
+            capture
+                .exit_code
+                .map(|code| code.to_string())
+                .unwrap_or_else(|| "unknown".to_string()),
+            capture.cwd.display()
+        )
+    }
 }
 
 fn finish_command_capture(

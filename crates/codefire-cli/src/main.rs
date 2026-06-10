@@ -969,7 +969,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         println!("recorded evidence batch: {} items", result.item_count);
                     }
                 } else {
-                    let result = run_evidence_add(&options)?;
+                    let result = match run_evidence_add(&options) {
+                        Ok(result) => result,
+                        Err(error) if options.json_output => {
+                            print_cli_error_json("evidence-add", &error)?;
+                            return Err(CliError::CommandFailed(error.exit_status()));
+                        }
+                        Err(error) => return Err(error),
+                    };
                     if options.json_output {
                         println!(
                             "{}",
@@ -1207,7 +1214,7 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire doctor [path] [--quick|--full] [--json]\n\nInspect repository health.\n"
         }
         "evidence" | "evidence add" => {
-            "usage: codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>|--from-argv <program> [--argv <arg>...]|--batch <file>) [--label <text>] [--cwd <dir>] [--timeout <duration>] [--max-output-bytes <bytes>] [--dry-run] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"items\":[{\"from_command\":\"cargo test --workspace\",\"label\":\"tests\"}]}\n"
+            "usage: codefire evidence add [--path <repo-or-open>] (--artifact <path>|--from-command <command>|--from-argv <program> [--argv <arg>...]|--batch <file>) [--label <text>] [--cwd <dir>] [--timeout <duration>] [--max-output-bytes <bytes>] [--allow-failed-command] [--dry-run] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"items\":[{\"from_command\":\"cargo test --workspace\",\"label\":\"tests\"}]}\n"
         }
         "show" => {
             "usage: codefire show <branch-or-commit> [--json]\n\nShow a sealed commitish.\n"
@@ -1275,6 +1282,12 @@ enum CliError {
         kind: ErrorKind,
         message: String,
     },
+    EvidenceCommandFailed {
+        exit_code: Option<i32>,
+        timed_out: bool,
+        cwd: PathBuf,
+        message: String,
+    },
     MissingEvidenceRef {
         evidence_id: String,
         repo_root: PathBuf,
@@ -1301,6 +1314,7 @@ impl CliError {
             }
             CliError::LockContention(_) => ExitCode::LockContention,
             CliError::BatchFileRead { .. } => ExitCode::InvalidUsageOrConfig,
+            CliError::EvidenceCommandFailed { .. } => ExitCode::InvalidUsageOrConfig,
             CliError::MissingEvidenceRef { .. } => ExitCode::ObjectReferenceInvalid,
         }
     }
@@ -1346,6 +1360,7 @@ impl fmt::Display for CliError {
                 "{operation} file read failed: {}: {message}",
                 path.display()
             ),
+            CliError::EvidenceCommandFailed { message, .. } => write!(f, "{message}"),
             CliError::MissingEvidenceRef { evidence_id, .. } => {
                 write!(f, "missing evidence object: {evidence_id}")
             }
@@ -2066,6 +2081,21 @@ fn cli_error_diagnostic(error: &CliError) -> Value {
             "path": path,
             "message": error.to_string(),
         }),
+        CliError::EvidenceCommandFailed {
+            exit_code,
+            timed_out,
+            cwd,
+            ..
+        } => json!({
+            "kind": "evidence_command_failed",
+            "severity": "blocking",
+            "blocking": true,
+            "repairable": true,
+            "exit_code": exit_code,
+            "timed_out": timed_out,
+            "cwd": cwd,
+            "message": error.to_string(),
+        }),
         _ => json!({
             "kind": "command_error",
             "severity": "blocking",
@@ -2139,6 +2169,15 @@ fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
                 },
             }),
         ],
+        CliError::EvidenceCommandFailed { cwd, .. } => vec![json!({
+            "kind": "allow_failed_command",
+            "command": cli_command("evidence add ... --allow-failed-command --json"),
+            "reason": "retry only if a failed command log is intentionally being captured as evidence",
+            "target": {
+                "cwd": cwd,
+                "error": error.to_string(),
+            },
+        })],
         CliError::NotOpen(path) => vec![json!({
             "kind": "inspect_repository",
             "command": cli_command(format!("doctor --path {} --json", command_arg(&path.to_string_lossy()))),

@@ -158,6 +158,7 @@ fn resolve_item(
             .max_output_bytes
             .or(defaults.max_output_bytes)
             .unwrap_or(DEFAULT_MAX_OUTPUT_BYTES),
+        allow_failed_command: options.allow_failed_command,
     }
 }
 

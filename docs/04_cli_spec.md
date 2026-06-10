@@ -566,6 +566,7 @@ codefire evidence add --artifact runs/model.bin --label "best checkpoint" --json
 codefire evidence add --from-command "cargo test --workspace" --json
 codefire evidence add --from-argv cargo --argv test --argv --workspace --json
 codefire evidence add --artifact runs/model.bin --from-command "python eval.py" --timeout 30s --max-output-bytes 65536
+codefire evidence add --from-command "python debug_failure.py" --allow-failed-command --json
 codefire evidence add --batch evidence-batch.yaml --dry-run --json
 codefire evidence add --batch evidence-batch.json --json
 ```
@@ -582,9 +583,11 @@ artifact_refはpath/path_kind/local_path_redacted/uri/hash_algorithm/content_has
 --from-argvはshellを使わずprogramと--argvで指定した引数配列を直接実行し、stdout/stderr/exit_code/success/timed_out/timeout_ms/duration_ms/cwd/mode/shell/argvを保存する
 --from-commandと--from-argvは同時指定できない。--from-commandは`mode: "shell"` / `shell: true`、--from-argvは`mode: "argv"` / `shell: false`として保存する
 --timeoutまたは--timeout-msはcommand captureの待機上限を指定する。未指定時は300000ms
---cwd未指定時のcommand cwdは探索されたrepository root
+--cwd未指定時のcommand cwdは呼び出しprocessのcurrent working directory。--cwd指定時はそのdirectoryをcanonicalizeして使う
+dry-run planとapply resultはresolved command cwd、cwd_source、repo_relative_cwdを返す
 stdout/stderrは--max-output-bytesでそれぞれtruncateされ、truncated flagを保存する
-commandがnon-zeroまたはtimeoutでもevidence capture自体は成功し、command_exit_codeとcommand_timed_outを返す
+commandがnon-zeroまたはtimeoutになった場合、デフォルトではevidence objectを作らずok=falseの`evidence_command_failed` diagnosticを返す
+失敗ログを意図的に証跡化する場合だけ--allow-failed-commandを指定する。この場合はwarning diagnosticと`proof_status=failed-command-captured`を保存する
 --jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_evidence_add_resultを含める
 --batchはJSONまたは限定YAMLのversion/items形式を読み、全itemのartifact path/cwd/必須fieldを事前検証してからevidence objectを作る
 --batch --dry-runはartifact_ref/evidence objectを書き込まず、codefire_operation_planを返す
