@@ -3070,7 +3070,7 @@ fn commit_transaction_marker_is_clean_after_success_and_doctor_reports_pending()
     fs::write(open_dir.join("README.md"), "initial import\n").unwrap();
 
     let failed_active = active_state_path(&open_dir);
-    set_commit_transaction_failure_for_test("after_content_manifest");
+    set_commit_transaction_failure_for_test(&failed_active, "after_content_manifest");
     let failed = run_commit(&CommitOptions {
         path: open_dir.clone(),
         message: "Injected failure".to_string(),

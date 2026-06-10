@@ -5661,7 +5661,7 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         "stored_content_manifest",
         Some(&manifest_id),
     )?;
-    maybe_fail_commit_transaction_for_test("after_content_manifest")?;
+    maybe_fail_commit_transaction_for_test(&active_state_path, "after_content_manifest")?;
     let atom_id = codefire_store::store_object(
         &objects,
         "atom_index",
@@ -6145,11 +6145,16 @@ fn commit_transaction_path(active_state_path: &Path) -> PathBuf {
 }
 
 #[cfg(test)]
-fn maybe_fail_commit_transaction_for_test(phase: &str) -> Result<(), CliError> {
+fn maybe_fail_commit_transaction_for_test(
+    active_state_path: &Path,
+    phase: &str,
+) -> Result<(), CliError> {
     let mut guard = COMMIT_TRANSACTION_FAILURE_PHASE
         .lock()
         .expect("commit transaction failure phase lock poisoned");
-    if guard.as_deref() == Some(phase) {
+    if guard.as_ref().is_some_and(|injection| {
+        injection.phase == phase && injection.active_state_path == active_state_path
+    }) {
         *guard = None;
         return Err(CliError::Usage(format!(
             "injected commit transaction failure at {phase}"
@@ -6159,15 +6164,22 @@ fn maybe_fail_commit_transaction_for_test(phase: &str) -> Result<(), CliError> {
 }
 
 #[cfg(not(test))]
-fn maybe_fail_commit_transaction_for_test(_phase: &str) -> Result<(), CliError> {
+fn maybe_fail_commit_transaction_for_test(
+    _active_state_path: &Path,
+    _phase: &str,
+) -> Result<(), CliError> {
     Ok(())
 }
 
 #[cfg(test)]
-fn set_commit_transaction_failure_for_test(phase: &str) {
+fn set_commit_transaction_failure_for_test(active_state_path: &Path, phase: &str) {
     *COMMIT_TRANSACTION_FAILURE_PHASE
         .lock()
-        .expect("commit transaction failure phase lock poisoned") = Some(phase.to_string());
+        .expect("commit transaction failure phase lock poisoned") =
+        Some(CommitTransactionFailureInjection {
+            active_state_path: active_state_path.to_path_buf(),
+            phase: phase.to_string(),
+        });
 }
 
 fn commit_parents_for_open(
@@ -6415,7 +6427,14 @@ fn stable_hash_48(bytes: &[u8]) -> u64 {
 
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 #[cfg(test)]
-static COMMIT_TRANSACTION_FAILURE_PHASE: Mutex<Option<String>> = Mutex::new(None);
+#[derive(Debug)]
+struct CommitTransactionFailureInjection {
+    active_state_path: PathBuf,
+    phase: String,
+}
+#[cfg(test)]
+static COMMIT_TRANSACTION_FAILURE_PHASE: Mutex<Option<CommitTransactionFailureInjection>> =
+    Mutex::new(None);
 
 fn write_json_atomic(path: &Path, value: &Value) -> Result<(), CliError> {
     let parent = path

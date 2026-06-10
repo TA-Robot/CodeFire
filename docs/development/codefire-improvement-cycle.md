@@ -229,13 +229,27 @@ Current named cycle:
 - CodeFire次version系統: v1.0 Contract ValidationのPhase 1a以降を継続する。
 - Current plan: `docs/development/v1.0-contract-validation-plan.md`。
 - Current burn-down plan: `docs/development/current-cycle-burn-down-plan.md`。
-- Current phase: `BATCH-2026-06-cycle3-dogfood` のBurn-down完了。次は次cycle discoveryを開始できる。
+- Current phase: `BATCH-2026-06-global-open-backlog` のBurn-down完了。既知CFB/CFR open issueは0件で、次は新しいDiscovery batchを開始できる。
 - Installed CodeFire: `/home/devuser/.local/bin/codefire`。
 - Installed version output: `codefire foundation 1`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
-- Latest pushed Git commits: `6d8361d Fix evidence JSON contracts`, `8978dfc Add retrospective planning summary`。
+- Latest pushed Git commits: current global burn-down commits through issue root-cause map close audit。
 - Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` は `open-clean`、open fires 0。
 - Latest algorithm CodeFire base: `CF-COMMIT-568328cd5a5ad7db30e3b9b9`。
+
+Current global issue inventory:
+
+| Series | Total tracked | Fixed / closed | Open |
+|---|---:|---:|---:|
+| CFB dogfood issues | 92 | 92 | 0 |
+| CFR code review issues | 160 | 160 | 0 |
+| Total | 252 | 252 | 0 |
+
+Close audit note:
+
+- 2026-06-10時点で残っていた146件は、`BATCH-2026-06-global-open-backlog` としてfreezeし、同batch内で全件fixedにした。
+- 最後に残っていた `CFR-120` は、`docs/development/issue-root-cause-map.json` と `issue_root_cause_map_covers_open_issues` で、今後のopen issueをroot cause計画へ機械的に接続する形でcloseした。
+- 次のcycleでは、issue discovery後にこのmapまたは後継schemaへ全open issueを登録し、batchを全部消してから次のissue出しへ進む。
 
 ## Completed Two-Cycle Snapshot
 

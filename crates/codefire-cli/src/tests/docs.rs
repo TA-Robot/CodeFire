@@ -1,5 +1,8 @@
 use crate::command_registry::COMMAND_NAMES;
 use crate::completion::{bash_completion_script, help_text, zsh_completion_script};
+use serde_json::Value;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn help_and_completion_scripts_cover_rust_default_cli() {
@@ -70,6 +73,91 @@ fn known_limitations_python_fallback_commands_stay_out_of_rust_cli() {
     }
 }
 
+#[test]
+fn issue_root_cause_map_covers_open_issues() {
+    let repo_root = repo_root();
+    let map_text =
+        std::fs::read_to_string(repo_root.join("docs/development/issue-root-cause-map.json"))
+            .expect("issue-root-cause-map.json must be readable");
+    let map: Value =
+        serde_json::from_str(&map_text).expect("issue-root-cause-map.json must be valid JSON");
+    assert_eq!(
+        map.get("type").and_then(Value::as_str),
+        Some("codefire.issue_root_cause_map.v1")
+    );
+
+    let mut mapped_issues = BTreeMap::new();
+    let issues = map
+        .get("issues")
+        .and_then(Value::as_array)
+        .expect("issue-root-cause-map.json must contain an issues array");
+    assert!(
+        !issues.is_empty(),
+        "issue-root-cause-map.json must contain at least one audited issue"
+    );
+
+    for issue in issues {
+        let id = required_str(issue, "id");
+        assert!(
+            mapped_issues.insert(id.to_string(), issue).is_none(),
+            "duplicate issue root cause map entry for {id}"
+        );
+        for field in [
+            "status",
+            "root_cause",
+            "fix_group",
+            "target_version",
+            "owner_module",
+        ] {
+            let value = required_str(issue, field);
+            assert!(!value.trim().is_empty(), "{id} has empty {field}");
+        }
+        let evidence = issue
+            .get("close_evidence")
+            .and_then(Value::as_array)
+            .expect("mapped issue must contain close_evidence array");
+        assert!(!evidence.is_empty(), "{id} has no close_evidence");
+        assert!(
+            issue.get("next_plan_mapping").is_some(),
+            "{id} has no next_plan_mapping"
+        );
+    }
+
+    assert!(
+        mapped_issues.contains_key("CFR-120"),
+        "CFR-120 close evidence must remain in the root cause map"
+    );
+    assert!(
+        mapped_issues["CFR-120"]
+            .get("close_evidence")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .any(|value| value.contains("issue_root_cause_map_covers_open_issues")),
+        "CFR-120 must cite this consistency test as close evidence"
+    );
+
+    let detail_statuses = detail_issue_statuses(&repo_root);
+    for (id, status) in &detail_statuses {
+        if status == "open" {
+            assert!(
+                mapped_issues.contains_key(id),
+                "{id} is open but missing from issue-root-cause-map.json"
+            );
+        }
+    }
+    for (id, issue) in mapped_issues {
+        if let Some(detail_status) = detail_statuses.get(&id) {
+            assert_eq!(
+                required_str(issue, "status"),
+                detail_status,
+                "{id} status differs between detail file and root cause map"
+            );
+        }
+    }
+}
+
 fn documented_python_fallback_commands() -> std::collections::BTreeSet<String> {
     let docs = include_str!("../../../../docs/development/known-limitations.md");
     let mut commands = std::collections::BTreeSet::new();
@@ -126,4 +214,65 @@ fn help_command_set(help: &str) -> std::collections::BTreeSet<String> {
         .split_whitespace()
         .map(str::to_string)
         .collect()
+}
+
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("codefire-cli crate must live under crates/codefire-cli")
+        .to_path_buf()
+}
+
+fn required_str<'a>(value: &'a Value, field: &str) -> &'a str {
+    value
+        .get(field)
+        .and_then(Value::as_str)
+        .unwrap_or_else(|| panic!("mapped issue is missing string field {field}"))
+}
+
+fn detail_issue_statuses(repo_root: &Path) -> BTreeMap<String, String> {
+    let mut statuses = BTreeMap::new();
+    for dir in [
+        "docs/development/bug-issues",
+        "docs/development/code-review-issues",
+    ] {
+        let path = repo_root.join(dir);
+        for entry in std::fs::read_dir(&path)
+            .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()))
+        {
+            let entry = entry.expect("issue detail directory entry must be readable");
+            let issue_path = entry.path();
+            if issue_path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+                continue;
+            }
+            let Some(stem) = issue_path.file_stem().and_then(|stem| stem.to_str()) else {
+                continue;
+            };
+            if !(stem.starts_with("cfb-") || stem.starts_with("cfr-")) {
+                continue;
+            }
+            let id = stem.to_ascii_uppercase();
+            let text = std::fs::read_to_string(&issue_path)
+                .unwrap_or_else(|error| panic!("failed to read {}: {error}", issue_path.display()));
+            let status = parse_detail_status(&text)
+                .unwrap_or_else(|| panic!("{} has no Summary status row", issue_path.display()));
+            statuses.insert(id, status);
+        }
+    }
+    statuses
+}
+
+fn parse_detail_status(text: &str) -> Option<String> {
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with("| Status |") {
+            continue;
+        }
+        let mut cells = trimmed.trim_matches('|').split('|').map(|cell| cell.trim());
+        if cells.next() == Some("Status") {
+            return cells.next().map(str::to_string);
+        }
+    }
+    None
 }

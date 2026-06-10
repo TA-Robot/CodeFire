@@ -1,0 +1,38 @@
+{
+  "type": "codefire.issue_root_cause_map.v1",
+  "version": 1,
+  "updated_at": "2026-06-10",
+  "sources": [
+    "docs/development/bug-backlog.md",
+    "docs/development/bug-issues/",
+    "docs/development/code-review-issues-2026-06-06.md",
+    "docs/development/code-review-issues/",
+    "docs/development/current-cycle-burn-down-plan.md"
+  ],
+  "policy": {
+    "batch_rule": "issueを出す -> 全部消す -> issueを出す",
+    "required_for": "All open CFB/CFR detail issue files must have an issue entry with root_cause, fix_group, target_version, owner_module, close_evidence, and next_plan_mapping.",
+    "close_rule": "An issue can move to fixed only after the detail file, summary index, cycle plan, history, and evidence links agree."
+  },
+  "issues": [
+    {
+      "id": "CFR-120",
+      "status": "fixed",
+      "root_cause": "issue_management_index_schema_gap",
+      "fix_group": "issue-root-cause-map",
+      "target_version": "global-burn-down",
+      "owner_module": "docs/development",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Close audit",
+        "decision": "Use this machine-readable map plus a docs consistency test as the root-cause mapping source of truth for future open CFB/CFR batches."
+      },
+      "close_evidence": [
+        "docs/development/issue-root-cause-map.json",
+        "crates/codefire-cli/src/tests/docs.rs::issue_root_cause_map_covers_open_issues",
+        "docs/development/code-review-issues/cfr-120.md",
+        "docs/development/current-cycle-burn-down-plan.md"
+      ]
+    }
+  ]
+}

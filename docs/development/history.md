@@ -13,6 +13,7 @@
 
 | Date | Area | Summary | Artifacts | Notes |
 |---|---|---|---|---|
+| 2026-06-10 | Global Burn-down | 既知CFB/CFR open issueを全件closeし、最後のCFR-120としてopen issueをroot cause/fix group/target version/owner module/close evidenceへ接続するmachine-readable mapとdocs consistency testを追加した | `docs/development/issue-root-cause-map.json`, `crates/codefire-cli/src/tests/docs.rs`, `docs/development/current-cycle-burn-down-plan.md`, `docs/development/code-review-issues/cfr-120.md` | Global issue inventory: 252 tracked / 252 fixed / 0 open。今後はissue discovery後、全open issueをmapへ接続してからburn-downする |
 | 2026-06-07 | Documentation | sourceを開く前に実装構造を再構成できるよう、source reconstruction guideとdata model catalogを追加した | `docs/development/source-code-reconstruction-guide.md`, `docs/development/source-data-model-catalog.md`, source navigation docs | workspace tree、`main.rs` の帯、command skeleton、主要Rust型、active state JSON、object record、debug matrixを文書化 |
 | 2026-06-07 | Source Docs | ドキュメントだけでRust sourceの配置と処理形状を想像できるように、実装アトラスを追加し、crate/module、`main.rs` 関数帯、command ownership、主要型、永続化先、変更recipeを一枚化した | `docs/development/source-code-implementation-atlas.md`, `docs/development/source-code-map.md`, `docs/11_internal_architecture.md`, `README.md` | docs-only source navigation update |
 | 2026-06-03 | Bootstrap | `codefire_docs_v0.2.zip` を `project/` 直下に展開した | `README.md`, `docs/`, `adr/`, `schemas/`, `diagrams/`, design document | この基盤リポジトリのルールに合わせ、archive内の `examples/` は展開対象から除外した |
