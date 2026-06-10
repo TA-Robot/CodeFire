@@ -524,6 +524,7 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
     let mut in_extinguish_policy = false;
     let mut in_no_change_required_policy = false;
     let mut in_verification = false;
+    let mut in_verification_required_wrapper = false;
     let mut current_kind = None::<String>;
     let mut current_rule = None::<RequiredLinkRuleDraft>;
     let mut current_check = None::<VerificationCommandDraft>;
@@ -544,6 +545,7 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
                 in_extinguish_policy = false;
                 in_no_change_required_policy = false;
                 in_verification = false;
+                in_verification_required_wrapper = false;
                 current_kind = None;
             } else if stripped == "required_links:" {
                 flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
@@ -553,6 +555,7 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
                 in_extinguish_policy = false;
                 in_no_change_required_policy = false;
                 in_verification = false;
+                in_verification_required_wrapper = false;
                 current_kind = None;
             } else if stripped == "commit_policy:" {
                 flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
@@ -562,6 +565,7 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
                 in_extinguish_policy = false;
                 in_no_change_required_policy = false;
                 in_verification = false;
+                in_verification_required_wrapper = false;
                 current_kind = None;
             } else if stripped == "extinguish_policy:" {
                 flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
@@ -571,6 +575,7 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
                 in_extinguish_policy = true;
                 in_no_change_required_policy = false;
                 in_verification = false;
+                in_verification_required_wrapper = false;
                 current_kind = None;
             } else if stripped == "verification:" {
                 flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
@@ -580,6 +585,7 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
                 in_extinguish_policy = false;
                 in_no_change_required_policy = false;
                 in_verification = true;
+                in_verification_required_wrapper = false;
                 current_kind = None;
             } else {
                 flush_required_rule(&mut required_links, &current_kind, current_rule.take())?;
@@ -630,7 +636,22 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
             )));
         }
         if in_verification {
-            if line.indent == 2 && stripped.starts_with("- ") {
+            if line.indent == 2 && stripped == "required:" {
+                flush_verification_check(&mut checks, current_check.take())?;
+                in_verification_required_wrapper = true;
+                continue;
+            }
+            let item_indent = if in_verification_required_wrapper {
+                4
+            } else {
+                2
+            };
+            let field_indent = if in_verification_required_wrapper {
+                6
+            } else {
+                4
+            };
+            if line.indent == item_indent && stripped.starts_with("- ") {
                 let item = stripped.trim_start_matches("- ").trim();
                 let Some((key, value)) = limited_yaml_key(item) else {
                     return Err(CoreError::Config(format!(
@@ -647,9 +668,9 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
                 current_check = Some(check);
                 continue;
             }
-            if line.indent != 4 {
+            if line.indent != field_indent {
                 return Err(CoreError::Config(format!(
-                    "unsupported codefire.policy.yaml: unsupported verification indentation at line {line_no}"
+                    "unsupported codefire.policy.yaml: unsupported verification indentation at line {line_no}; use verification: [items] or legacy verification.required: [items]"
                 )));
             }
             let Some(check) = current_check.as_mut() else {
@@ -2398,6 +2419,26 @@ mod tests {
         assert!(!policy.require_no_required_fires);
         assert!(!policy.reject_duplicate_atom_ids);
         assert!(policy.require_trace_completeness);
+        assert_eq!(
+            policy.verification,
+            vec![VerificationCommand {
+                id: "unit".to_string(),
+                command: "cargo test".to_string(),
+                cwd: "crates/app".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn verification_policy_accepts_legacy_required_wrapper() {
+        let temp = tempdir().unwrap();
+        write_file(
+            &temp.path().join("codefire.policy.yaml"),
+            "verification:\n  required:\n    - id: unit\n      command: cargo test\n      cwd: crates/app\n",
+        );
+
+        let policy = parse_verification_policy(temp.path()).unwrap();
+
         assert_eq!(
             policy.verification,
             vec![VerificationCommand {
