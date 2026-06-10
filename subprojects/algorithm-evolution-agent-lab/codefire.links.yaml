@@ -321,6 +321,15 @@ links:
   - from: REQ-AUTO-044
     to: TEST-research-cycle-planning-packet-builds-plan-lint-and-markdown
     type: verified_by
+  - from: REQ-AUTO-045
+    to: DES-AUTO-027
+    type: refined_by
+  - from: DES-AUTO-027
+    to: CODE-ResearchCyclePlanningPacketMarkdown
+    type: implemented_by
+  - from: REQ-AUTO-045
+    to: TEST-research-cycle-planning-packet-markdown-renders-review-document
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

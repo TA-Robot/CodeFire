@@ -513,6 +513,47 @@ class ResearchCyclePlanningPacketBuilder:
         )
 
 
+# cf-atom: CODE-ResearchCyclePlanningPacketMarkdown
+class ResearchCyclePlanningPacketMarkdown:
+    def render(
+        self,
+        packet: ResearchCyclePlanningPacket,
+        *,
+        title: str = "Research Cycle Planning Packet",
+    ) -> str:
+        lines = [
+            f"# {title}",
+            "",
+            f"- Source cycles: {', '.join(packet.plan.source_cycles)}",
+            f"- Priority: {packet.plan.priority.value}",
+            f"- Status: {'ok' if packet.lint_report.ok else 'blocked'}",
+            f"- Active items: {len(packet.plan.lane(ResearchCyclePlanLane.ACTIVE))}",
+            f"- Remaining budget: {packet.plan.remaining_budget:.2f}",
+            f"- Blockers: {packet.lint_report.blocker_count}",
+            f"- Warnings: {packet.lint_report.warning_count}",
+            "",
+            "## Plan",
+            "",
+            demote_markdown_headings(packet.plan_markdown).rstrip(),
+            "",
+            "## Lint",
+            "",
+            demote_markdown_headings(packet.lint_markdown).rstrip(),
+        ]
+        return "\n".join(lines).rstrip() + "\n"
+
+
+def demote_markdown_headings(markdown: str) -> str:
+    lines: list[str] = []
+    for line in markdown.rstrip().splitlines():
+        heading_level = len(line) - len(line.lstrip("#"))
+        if heading_level > 0 and heading_level < len(line) and line[heading_level] == " ":
+            lines.append(f"#{line}")
+            continue
+        lines.append(line)
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def add_if(
     findings: list[ResearchCyclePlanLintFinding],
     condition: bool,

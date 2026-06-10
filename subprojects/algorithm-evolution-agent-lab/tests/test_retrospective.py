@@ -6,6 +6,7 @@ from evoagent.retrospective import (
     ResearchCyclePlan,
     ResearchCyclePlanItem,
     ResearchCyclePlanningPacketBuilder,
+    ResearchCyclePlanningPacketMarkdown,
     ResearchCyclePlanLint,
     ResearchCyclePlanLintMarkdown,
     ResearchCyclePlanLintSeverity,
@@ -300,6 +301,44 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("# Cycle 8 Lint", packet.lint_markdown)
         self.assertIn("- Status: ok", packet.lint_markdown)
         self.assertIn("- none", packet.lint_markdown)
+
+    # cf-atom: TEST-research-cycle-planning-packet-markdown-renders-review-document
+    def test_research_cycle_planning_packet_markdown_renders_review_document(self) -> None:
+        report = ResearchCycleRetrospective().summarize(
+            [
+                ResearchCycleSignal(
+                    cycle_id="cycle-9",
+                    completed_runs=4,
+                    improved_candidates=0,
+                    regressed_candidates=0,
+                    failed_runs=1,
+                    blocked_items=0,
+                    mean_cost=1.25,
+                    remaining_budget=6.0,
+                    high_frontier_drift=0,
+                    evidence_ready_claims=0,
+                )
+            ]
+        )
+        packet = ResearchCyclePlanningPacketBuilder().build(
+            report,
+            active_capacity=1,
+            remaining_budget=3.0,
+            plan_title="Cycle 9 Plan",
+            lint_title="Cycle 9 Lint",
+        )
+
+        markdown = ResearchCyclePlanningPacketMarkdown().render(packet, title="Cycle 9 Packet")
+
+        self.assertIn("# Cycle 9 Packet", markdown)
+        self.assertIn("- Source cycles: cycle-9", markdown)
+        self.assertIn("- Status: ok", markdown)
+        self.assertIn("- Active items: 1", markdown)
+        self.assertIn("## Plan", markdown)
+        self.assertIn("## Lint", markdown)
+        self.assertIn("## Cycle 9 Plan", markdown)
+        self.assertIn("## Cycle 9 Lint", markdown)
+        self.assertIn("#### Increase exploration diversity", markdown)
 
 
 if __name__ == "__main__":

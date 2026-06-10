@@ -88,3 +88,4 @@
 | AE-084 | Planning QA | research cycle planを実行前にlintし、capacity/budget/item欠落をblocker/warningとして返す | done | `CODE-ResearchCyclePlanLint`; `TEST-research-cycle-plan-lint-flags-invalid-plan`; 148 tests pass |
 | AE-085 | Reporting | research cycle plan lint reportをレビュー用Markdownへ整形する | done | `CODE-ResearchCyclePlanLintMarkdown`; `TEST-research-cycle-plan-lint-markdown-renders-findings`; 149 tests pass |
 | AE-086 | Planning QA | retrospectiveからplan/lint/Markdown一式をplanning packetとして生成する | done | `CODE-ResearchCyclePlanningPacketBuilder`; `TEST-research-cycle-planning-packet-builds-plan-lint-and-markdown`; 150 tests pass |
+| AE-087 | Reporting | planning packetを単一のcycle handoff Markdown文書へ整形する | done | `CODE-ResearchCyclePlanningPacketMarkdown`; `TEST-research-cycle-planning-packet-markdown-renders-review-document`; 151 tests pass |

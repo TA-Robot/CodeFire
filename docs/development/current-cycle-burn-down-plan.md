@@ -209,7 +209,7 @@ Current tracked issue inventory as of 2026-06-10:
 |---|---:|---:|---:|---|
 | CFB dogfood issues | 94 | 94 | 0 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-005/009/010/011/017/018/020/021/025, CFB-023 and later, plus later generated issues; CFB-001..004/006..008/012..016/019/022 are summary-only legacy entries. |
 | CFR code review issues | 160 | 160 | 0 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
-| Total | 254 | 254 | 0 | This global batch plus cycle 4/5/6/7/8 dogfood passes are the whole known issue backlog. |
+| Total | 254 | 254 | 0 | This global batch plus cycle 4/5/6/7/8/9 dogfood passes are the whole known issue backlog. |
 
 Current active batch progress:
 
@@ -306,6 +306,24 @@ Algorithm work:
 - All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-7000b03b972c87a78bda0893`.
 
 Cycle 8 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+
+## Cycle 9 Dogfood Pass
+
+After cycle 8 reached zero open issues, cycle 9 resumed algorithm development with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `ResearchCyclePlanningPacketMarkdown` to render a synchronized planning packet as one cycle handoff Markdown document.
+- Added `REQ-AUTO-045`, `DES-AUTO-027`, `CODE-ResearchCyclePlanningPacketMarkdown`, and `TEST-research-cycle-planning-packet-markdown-renders-review-document`.
+- Algorithm unittest result: 151 tests pass.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-f16f1f0a0de14e661cbde9d0`.
+
+Cycle 9 issue status:
 
 - Newly discovered CodeFire product issues: 0.
 - Newly frozen CFB/CFR batch size: 0.

@@ -175,3 +175,7 @@ The system shall render a research cycle plan lint report into deterministic Mar
 ## REQ-AUTO-044: Research cycle planning packet
 
 The system shall build a complete next-cycle planning packet from a retrospective report. The packet shall contain the synthesized plan, lint report, plan Markdown, and lint Markdown using the same deterministic rules as the individual plan synthesis, lint, and renderer components. This packet shall give docs-first automation one stable object to persist, review, and hand off without recomputing each planning artifact separately.
+
+## REQ-AUTO-045: Research cycle planning packet Markdown
+
+The system shall render a complete research cycle planning packet into one deterministic Markdown review document. The document shall include packet-level source cycles, priority, lint status, active item count, remaining budget, blocker count, warning count, the demoted plan Markdown, and the demoted lint Markdown so docs-first cycle handoff can persist one readable artifact without losing the underlying plan or safety decision.

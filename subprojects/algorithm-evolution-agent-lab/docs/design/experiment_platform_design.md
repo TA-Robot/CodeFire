@@ -528,3 +528,22 @@ The output `ResearchCyclePlanningPacket` contains:
 - `lint_markdown`
 
 The builder does not add new planning policy. It is a deterministic orchestration layer that keeps the plan object, safety decision, and reviewer-facing Markdown synchronized for docs-first cycle handoff.
+
+## DES-AUTO-027: Research cycle planning packet Markdown
+
+The planning packet Markdown renderer consumes `ResearchCyclePlanningPacket` and emits one review document for cycle handoff.
+
+The document includes:
+
+- title
+- source cycle IDs
+- priority
+- lint status
+- active item count
+- remaining budget
+- blocker count
+- warning count
+- plan section
+- lint section
+
+The renderer reuses the packet's existing `plan_markdown` and `lint_markdown` fields rather than rerunning planning or linting. It demotes headings inside those embedded documents by one level so the packet remains a single coherent Markdown artifact with a stable hierarchy.
