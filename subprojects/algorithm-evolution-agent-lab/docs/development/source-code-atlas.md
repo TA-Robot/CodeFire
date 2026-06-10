@@ -278,6 +278,11 @@ ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier.verify(manifest
   -> verify packaged review packet artifacts against manifest path, hash, and byte count records
   -> return the shared manifest verification result and finding shape
   -> detect missing artifacts, digest drift, and byte-count drift without filesystem access
+
+ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerificationMarkdown.render(verification)
+  -> render packaged review packet artifact manifest verification results as reviewer-facing Markdown
+  -> include status, finding count, and path-scoped finding messages
+  -> reuse the shared manifest verification Markdown renderer without recomputing verification
 ```
 
 Important implementation details:

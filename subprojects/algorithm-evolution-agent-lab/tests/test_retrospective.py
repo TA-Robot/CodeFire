@@ -10,6 +10,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier,
     ResearchCyclePlanningHandoffReviewPacketBuilder,
     ResearchCyclePlanningHandoffReviewPacketMarkdown,
@@ -1114,6 +1115,42 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("sha256 digest mismatch", [finding.message for finding in drifted.findings])
         self.assertIn("byte count mismatch", [finding.message for finding in drifted.findings])
         self.assertIn("artifact is missing", [finding.message for finding in drifted.findings])
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-manifest-verification-markdown-renders-findings
+    def test_research_cycle_planning_handoff_review_packet_artifact_manifest_verification_markdown_renders_findings(
+        self,
+    ) -> None:
+        clean = ResearchCyclePlanningPacketManifestVerification(findings=())
+        drifted = ResearchCyclePlanningPacketManifestVerification(
+            findings=(
+                ResearchCyclePlanningPacketManifestVerificationFinding(
+                    path="cycle-25/review-packet.md",
+                    message="sha256 digest mismatch",
+                ),
+                ResearchCyclePlanningPacketManifestVerificationFinding(
+                    path="cycle-25/readiness.md",
+                    message="artifact is missing",
+                ),
+            )
+        )
+
+        clean_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerificationMarkdown().render(
+            clean,
+            title="Cycle 25 Artifact Manifest Verification",
+        )
+        drifted_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerificationMarkdown().render(
+            drifted,
+            title="Cycle 25 Artifact Manifest Verification",
+        )
+
+        self.assertIn("# Cycle 25 Artifact Manifest Verification", clean_markdown)
+        self.assertIn("- Status: ok", clean_markdown)
+        self.assertIn("- Finding count: 0", clean_markdown)
+        self.assertIn("- none", clean_markdown)
+        self.assertIn("- Status: blocked", drifted_markdown)
+        self.assertIn("- Finding count: 2", drifted_markdown)
+        self.assertIn("`cycle-25/review-packet.md`: sha256 digest mismatch", drifted_markdown)
+        self.assertIn("`cycle-25/readiness.md`: artifact is missing", drifted_markdown)
 
 
 if __name__ == "__main__":

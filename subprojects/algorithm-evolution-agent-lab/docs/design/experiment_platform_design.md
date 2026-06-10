@@ -768,3 +768,16 @@ The verifier returns `ResearchCyclePlanningPacketManifestVerification` with:
 - `ok` true only when no findings exist
 
 The verifier delegates checksum and byte-count semantics to the existing planning packet manifest verifier. It does not read or write files and keeps review packet storage validation aligned with the rest of the planning handoff audit pipeline.
+
+## DES-AUTO-043: Research cycle planning handoff review packet artifact manifest verification Markdown
+
+The review packet artifact manifest verification Markdown renderer consumes `ResearchCyclePlanningPacketManifestVerification` and returns a deterministic Markdown audit document.
+
+The document includes:
+
+- a review-packet-specific title
+- `ok` or `blocked` status
+- finding count
+- one bullet per path-scoped finding, or `none` when clean
+
+The renderer delegates formatting semantics to the existing planning packet manifest verification Markdown renderer while providing a dedicated trace atom and default title for final review artifact audits. It does not recompute verification, inspect artifacts, or write files.

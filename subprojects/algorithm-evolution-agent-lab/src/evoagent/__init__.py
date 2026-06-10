@@ -106,6 +106,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestVerifier,
     ResearchCyclePlanningHandoffReviewPacketBuilder,
     ResearchCyclePlanningHandoffReviewPacketMarkdown,
