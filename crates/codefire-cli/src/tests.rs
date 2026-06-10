@@ -447,7 +447,7 @@ fn doctor_checks_layout_active_state_and_open_marker_shape() {
     .unwrap();
     assert!(!report.ok);
     for expected in [
-        "missing_repo_directory",
+        "missing_repairable_directory",
         "invalid_active_state_shape",
         "open_marker_instance_mismatch",
     ] {
@@ -459,6 +459,83 @@ fn doctor_checks_layout_active_state_and_open_marker_shape() {
     assert!(doctor_report_next_actions(&report)
         .iter()
         .any(|action| action["id"] == "reopen_branch_workspace"));
+    assert!(doctor_report_next_actions(&report)
+        .iter()
+        .any(|action| action["id"] == "review_migration_plan"));
+}
+
+#[test]
+fn doctor_reports_active_state_missing_file_and_invariant_violation() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let registry_path = opened_registry_path(&repo_root, "main");
+    let registry = read_json(&registry_path).unwrap();
+    let active_state_path = PathBuf::from(
+        registry["open"]["active_state_path"]
+            .as_str()
+            .expect("active state path"),
+    );
+    fs::remove_file(active_state_path.join("state.json")).unwrap();
+    let missing = run_doctor(&DoctorOptions {
+        start: repo_root.clone(),
+        json_output: false,
+        quick: true,
+    })
+    .unwrap();
+    assert!(missing
+        .issues
+        .iter()
+        .any(|issue| issue.kind == "missing_active_state_file"));
+
+    write_json_atomic(
+        &active_state_path.join("state.json"),
+        &json!({"state": "open-clean"}),
+    )
+    .unwrap();
+    write_json_atomic(
+        &active_state_path.join("fires.json"),
+        &json!([{
+            "type": "fire",
+            "version": 1,
+            "fire_uid": "fire_test",
+            "display_id": "FIRE-TEST",
+            "status": "open",
+            "severity": "required",
+            "source": {"atom_id": "REQ-session"},
+            "target": {"atom_id": "DES-session"},
+            "reason": "required trace link missing",
+            "trace_path": [],
+            "created_by": "test",
+            "created_at": "2026-06-10T00:00:00Z",
+            "key": "fire-test"
+        }]),
+    )
+    .unwrap();
+    let inconsistent = run_doctor(&DoctorOptions {
+        start: repo_root,
+        json_output: false,
+        quick: true,
+    })
+    .unwrap();
+    assert!(inconsistent
+        .issues
+        .iter()
+        .any(|issue| issue.kind == "active_state_invariant_violation"));
 }
 
 #[test]
@@ -4179,9 +4256,30 @@ fn migrate_check_and_dry_run_report_compatibility_and_blockers() {
     assert!(report.checked_objects >= 8);
     assert_eq!(report.checked_branches, 1);
     assert_eq!(data["type"], "codefire_migration_report");
+    assert_eq!(data["target_format"], "current");
+    assert!(data["supported_target_formats"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|format| format == "current"));
     assert_eq!(data["compatible"], true);
     assert!(migration_report_diagnostics_json(&report).is_empty());
     assert!(migration_report_next_actions(&report).is_empty());
+
+    let quick = run_migrate(
+        &parse_migrate_args(&[
+            "check".to_string(),
+            repo_root.to_string_lossy().into_owned(),
+            "--quick".to_string(),
+            "--json".to_string(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    assert!(quick.compatible);
+    assert_eq!(quick.checked_objects, 0);
+    assert_eq!(migration_report_data_json(&quick)["scan_mode"], "quick");
+    assert_eq!(quick.skipped_checks, vec!["object_record_integrity"]);
 
     let dry_run = run_migrate(
         &parse_migrate_args(&[
@@ -4195,6 +4293,40 @@ fn migrate_check_and_dry_run_report_compatibility_and_blockers() {
     assert_eq!(dry_run.mode, migration::MigrateMode::DryRun);
     assert!(dry_run.compatible);
     assert!(dry_run.planned_actions.is_empty());
+
+    fs::remove_dir_all(repo_root.join(".codefire").join("idempotency")).unwrap();
+    fs::remove_dir_all(
+        repo_root
+            .join(".codefire")
+            .join("objects")
+            .join("artifact_refs"),
+    )
+    .unwrap();
+    let doctor = run_doctor(&DoctorOptions {
+        start: repo_root.clone(),
+        json_output: false,
+        quick: true,
+    })
+    .unwrap();
+    assert!(doctor.ok);
+    assert!(doctor
+        .issues
+        .iter()
+        .any(|issue| issue.kind == "missing_repairable_directory"));
+    assert!(doctor
+        .issues
+        .iter()
+        .any(|issue| issue.kind == "missing_repairable_object_subdirectory"));
+    let repair_plan = run_migrate(&parsed).unwrap();
+    assert!(repair_plan.compatible);
+    assert!(repair_plan
+        .planned_actions
+        .iter()
+        .any(|action| action.path.ends_with("idempotency")));
+    assert!(repair_plan
+        .planned_actions
+        .iter()
+        .any(|action| action.path.ends_with("artifact_refs")));
 
     let branch = json!({
         "type": "branch",

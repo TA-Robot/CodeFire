@@ -1,5 +1,6 @@
 use super::{find_repo_root, read_json, CliError};
 use crate::automation::{cli_command, next_action as automation_next_action};
+use crate::repo_layout::{object_subdir_requirement, LayoutRequirement, REPO_DIRS};
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -10,6 +11,7 @@ pub(crate) struct MigrateOptions {
     pub(crate) mode: MigrateMode,
     pub(crate) target_format: String,
     pub(crate) json_output: bool,
+    pub(crate) quick: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,10 +25,13 @@ pub(crate) struct MigrationReport {
     pub(crate) repo_root: PathBuf,
     pub(crate) mode: MigrateMode,
     pub(crate) target_format: String,
+    pub(crate) supported_target_formats: Vec<String>,
     pub(crate) repository_version: Option<i64>,
     pub(crate) compatible: bool,
     pub(crate) checked_objects: usize,
     pub(crate) checked_branches: usize,
+    pub(crate) quick: bool,
+    pub(crate) skipped_checks: Vec<String>,
     pub(crate) blockers: Vec<MigrationIssue>,
     pub(crate) warnings: Vec<MigrationIssue>,
     pub(crate) planned_actions: Vec<MigrationAction>,
@@ -57,17 +62,20 @@ pub(crate) fn parse_migrate_args(args: &[String]) -> Result<MigrateOptions, CliE
                 )))
             }
             None => return Err(CliError::Usage(
-                "usage: codefire migrate (check|dry-run) [path] [--json] [--target-format v0.6]"
+                "usage: codefire migrate (check|dry-run) [path] [--json] [--target-format current|v0.6] [--quick|--full]"
                     .to_string(),
             )),
         };
     let mut start = None;
-    let mut target_format = "v0.6".to_string();
+    let mut target_format = CURRENT_FORMAT.to_string();
     let mut json_output = false;
+    let mut quick = false;
     let mut index = 0usize;
     while index < rest.len() {
         match rest[index].as_str() {
             "--json" => json_output = true,
+            "--quick" => quick = true,
+            "--full" => quick = false,
             "--target-format" => {
                 index += 1;
                 target_format = required_arg(rest, index, "--target-format")?.to_string();
@@ -97,7 +105,15 @@ pub(crate) fn parse_migrate_args(args: &[String]) -> Result<MigrateOptions, CliE
         mode,
         target_format,
         json_output,
+        quick,
     })
+}
+
+const CURRENT_FORMAT: &str = "current";
+const LEGACY_V06_FORMAT: &str = "v0.6";
+
+fn supported_target_formats() -> Vec<String> {
+    vec![CURRENT_FORMAT.to_string(), LEGACY_V06_FORMAT.to_string()]
 }
 
 fn set_single_start(start: &mut Option<PathBuf>, value: &str) -> Result<(), CliError> {
@@ -119,28 +135,44 @@ pub(crate) fn run_migrate(options: &MigrateOptions) -> Result<MigrationReport, C
     let mut warnings = Vec::new();
     let mut planned_actions = Vec::new();
 
-    if options.target_format != "v0.6" {
+    if !supported_target_formats()
+        .iter()
+        .any(|target| target == &options.target_format)
+    {
         blockers.push(MigrationIssue {
             kind: "unsupported_target_format".to_string(),
-            message: format!("unsupported target format: {}", options.target_format),
+            message: format!(
+                "unsupported target format: {}; supported: {}",
+                options.target_format,
+                supported_target_formats().join(", ")
+            ),
             path: None,
         });
     }
 
     let repository_version = check_repo_json(&cf, &mut blockers)?;
-    let checked_objects = check_objects(&cf.join("objects"), &mut blockers, &mut warnings)?;
+    let mut skipped_checks = Vec::new();
+    let checked_objects = if options.quick {
+        skipped_checks.push("object_record_integrity".to_string());
+        0
+    } else {
+        check_objects(&cf.join("objects"), &mut blockers, &mut warnings)?
+    };
     let checked_branches = check_branches(&cf, &mut blockers)?;
-    collect_missing_v06_dirs(&cf, &mut planned_actions);
+    collect_missing_layout_actions(&cf, &mut planned_actions);
     let compatible = blockers.is_empty();
 
     Ok(MigrationReport {
         repo_root,
         mode: options.mode,
         target_format: options.target_format.clone(),
+        supported_target_formats: supported_target_formats(),
         repository_version,
         compatible,
         checked_objects,
         checked_branches,
+        quick: options.quick,
+        skipped_checks,
         blockers,
         warnings,
         planned_actions,
@@ -153,8 +185,12 @@ pub(crate) fn migration_report_data_json(report: &MigrationReport) -> Value {
         "version": 1,
         "mode": mode_name(report.mode),
         "target_format": &report.target_format,
+        "current_format": CURRENT_FORMAT,
+        "supported_target_formats": &report.supported_target_formats,
         "repository_version": report.repository_version,
         "compatible": report.compatible,
+        "scan_mode": if report.quick { "quick" } else { "full" },
+        "skipped_checks": &report.skipped_checks,
         "checked_objects": report.checked_objects,
         "checked_branches": report.checked_branches,
         "blockers": report.blockers.iter().map(issue_json).collect::<Vec<_>>(),
@@ -181,7 +217,7 @@ pub(crate) fn migration_report_next_actions(report: &MigrationReport) -> Vec<Val
         return vec![automation_next_action(
             "review_migration_plan",
             cli_command("migrate dry-run --json"),
-            "review v0.6 migration planned actions",
+            "review migration planned actions",
             json!({"planned_actions": report.planned_actions.len()}),
         )];
     }
@@ -197,6 +233,10 @@ pub(crate) fn print_migration_report(report: &MigrationReport) {
     println!("CodeFire migration {}", mode_name(report.mode));
     println!("repo: {}", report.repo_root.display());
     println!("target format: {}", report.target_format);
+    println!("scan mode: {}", if report.quick { "quick" } else { "full" });
+    if !report.skipped_checks.is_empty() {
+        println!("skipped checks: {}", report.skipped_checks.join(", "));
+    }
     println!("compatible: {}", report.compatible);
     println!("checked objects: {}", report.checked_objects);
     println!("checked branches: {}", report.checked_branches);
@@ -354,21 +394,28 @@ fn check_branches(cf: &Path, blockers: &mut Vec<MigrationIssue>) -> Result<usize
     Ok(checked)
 }
 
-fn collect_missing_v06_dirs(cf: &Path, actions: &mut Vec<MigrationAction>) {
-    for relative in [
-        "objects/artifact_refs",
-        "objects/evidence",
-        "idempotency",
-        "locks",
-        "remotes",
-    ] {
-        let path = cf.join(relative);
+fn collect_missing_layout_actions(cf: &Path, actions: &mut Vec<MigrationAction>) {
+    for entry in REPO_DIRS {
+        let path = cf.join(entry.relative);
         if !path.exists() {
             actions.push(MigrationAction {
                 kind: "create_directory".to_string(),
                 path,
-                description: format!("create .codefire/{relative}"),
+                description: format!("create .codefire/{}", entry.relative),
             });
+        }
+    }
+    let objects = cf.join("objects");
+    for subdir in codefire_store::known_object_subdirs() {
+        if object_subdir_requirement(subdir) == LayoutRequirement::AutoCreate {
+            let path = objects.join(subdir);
+            if !path.exists() {
+                actions.push(MigrationAction {
+                    kind: "create_directory".to_string(),
+                    path,
+                    description: format!("create .codefire/objects/{subdir}"),
+                });
+            }
         }
     }
 }

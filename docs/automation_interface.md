@@ -254,6 +254,10 @@ migrate: review_migration_plan, inspect_migration_blockers
 
 `doctor --quick --json` keeps layout, branch, opened registry, and active state shape checks, but skips full object store integrity scanning. The skipped check names are returned in `data.skipped_checks`.
 
+Doctor layout diagnostics use the shared repository layout registry. Required layout gaps are blocking errors. Auto-creatable layout gaps are non-blocking repairable warnings and produce a `review_migration_plan` next action that points to `migrate dry-run --json`.
+
+Doctor active state diagnostics include `missing_active_state_file` when an active state directory lacks `state.json`, and `active_state_invariant_violation` when `open-clean` / `open-consistent` coexists with non-empty `fires.json`.
+
 `storage report --json` data:
 
 ```json
@@ -378,9 +382,13 @@ Supported explain targets are `fire <id>`, `atom <id>`, `verify-failure`, and `s
   "type": "codefire_migration_report",
   "version": 1,
   "mode": "check",
-  "target_format": "v0.6",
+  "target_format": "current",
+  "current_format": "current",
+  "supported_target_formats": ["current", "v0.6"],
   "repository_version": 1,
   "compatible": true,
+  "scan_mode": "full",
+  "skipped_checks": [],
   "checked_objects": 12,
   "checked_branches": 1,
   "blockers": [],
@@ -389,6 +397,8 @@ Supported explain targets are `fire <id>`, `atom <id>`, `verify-failure`, and `s
   "would_write": false
 }
 ```
+
+`migrate check --quick --json` skips object record integrity scanning, sets `scan_mode:"quick"`, returns `checked_objects:0`, and lists `object_record_integrity` in `skipped_checks`.
 
 When compatibility blockers exist, `migrate check --json` sets `ok=false` and `exit_code=40`.
 

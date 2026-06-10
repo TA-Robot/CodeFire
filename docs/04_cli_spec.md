@@ -108,13 +108,14 @@ codefire doctor [path] [--quick|--full] [--json]
 
 ```text
 repository layout、object record integrity、branch head sealed commit、opened registry、active state JSONをread-onlyで検査する
-repo layoutはobjects/branches/opened/active/cache/locks/remotes/idempotencyと既知object subdirを検査する
+repo layoutはshared layout registryに基づき、objects/branches/opened/activeのrequired directory、cache/locks/remotes/idempotencyのauto-create directory、既知object subdirを検査する
+auto-create可能なlayout不足はnon-blocking warningとして扱い、migrate dry-runのrepair planへ接続する
 object recordはhash/id/filename/type directoryの整合性を検査する
 --quickはobject store全件integrity走査をskipし、layout、branch head、opened registry、active state shape中心に検査する
 JSON data.modeはquick/full、data.skipped_checksはquickで省略した検査名を返す
 branch headとopened registry current_base_commitはsealed commit validationを実行する
 opened registryのopen.path、active_state_path、.codefire-open marker、branch名、open_instance_idを相互検証する
-active state filesはJSONとして読めるだけでなく、state/fires/resolutions/scan/verificationの最低限のshapeを検証する
+active state filesはJSONとして読めるだけでなく、state/fires/resolutions/scan/verificationの最低限のshapeを検証する。active state directoryにstate.jsonがない場合はmissing_active_state_fileを出し、open-clean/open-consistentとnon-empty fires.jsonの矛盾はactive_state_invariant_violationを出す
 --jsonはcodefire.command_result.v1 envelopeを返し、破損時はok=false、exit_code=20、diagnosticsとnext_actionsを含める
 doctor diagnosticsはseverity、category、repairable、blocking、kind、message、pathを含める
 ```
@@ -629,7 +630,8 @@ storage-warningはstorage reportを実行し、large object/invalid JSON warning
 ```bash
 codefire migrate check
 codefire migrate check /path/to/repo --json
-codefire migrate dry-run /path/to/repo --target-format v0.6 --json
+codefire migrate dry-run /path/to/repo --target-format current --json
+codefire migrate check /path/to/repo --quick --json
 ```
 
 仕様：
@@ -637,11 +639,13 @@ codefire migrate dry-run /path/to/repo --target-format v0.6 --json
 ```text
 repository rootを探索し、repo.json、object record、branch head sealed commitを検証する
 checkは互換性blockerとwarningを返し、互換性がない場合はexit code 40で終了する
-dry-runはtarget format v0.6へ向けたplanned_actionsを返すが、file systemを書き換えない
+target formatはcurrentがdefaultで、supported target listにはcurrentとv0.6を含める。unsupported targetはsupported list付きblockerを返す
+dry-runはtarget formatへ向けたplanned_actionsを返すが、file systemを書き換えない
 object recordはobject_id/hash/filenameとpayload canonical digestを再検証する
 branch recordはheadがvalid sealed commit graphを指していることを検証する
-v0.6で必要なmissing directoryはplanned_actions=create_directoryとして返す
---jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_migration_reportを含める
+shared layout registry上のmissing auto-create directoryとobject subdirはplanned_actions=create_directoryとして返す
+--quickはobject record integrity scanをskipし、data.scan_mode=quick、data.skipped_checksにobject_record_integrityを返す
+--jsonはcodefire.command_result.v1 envelopeを出力し、data.type=codefire_migration_report、current_format、supported_target_formats、scan_mode、skipped_checksを含める
 ```
 
 ## 4.22 `patch`

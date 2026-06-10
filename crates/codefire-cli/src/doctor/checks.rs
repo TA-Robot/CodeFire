@@ -1,19 +1,10 @@
 use super::DoctorIssue;
+use crate::repo_layout::{object_subdir_requirement, LayoutRequirement, REPO_DIRS};
 use crate::{read_json, CliError};
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const REQUIRED_REPO_DIRS: &[&str] = &[
-    "objects",
-    "branches",
-    "opened",
-    "active",
-    "cache",
-    "locks",
-    "remotes",
-    "idempotency",
-];
 const ACTIVE_STATE_FILES: &[&str] = &[
     "state.json",
     "fires.json",
@@ -61,25 +52,41 @@ fn check_repo_layout(cf: &Path, issues: &mut Vec<DoctorIssue>) {
         ));
         return;
     }
-    for relative in REQUIRED_REPO_DIRS {
-        let path = cf.join(relative);
+    for entry in REPO_DIRS {
+        let path = cf.join(entry.relative);
         if !path.is_dir() {
-            issues.push(DoctorIssue::error(
-                "missing_repo_directory",
-                format!("missing .codefire/{relative} directory"),
-                Some(path),
-            ));
+            let message = format!("missing .codefire/{} directory", entry.relative);
+            match entry.requirement {
+                LayoutRequirement::Required => issues.push(DoctorIssue::error(
+                    "missing_repo_directory",
+                    message,
+                    Some(path),
+                )),
+                LayoutRequirement::AutoCreate => issues.push(DoctorIssue::warning(
+                    "missing_repairable_directory",
+                    message,
+                    Some(path),
+                )),
+            }
         }
     }
     let objects = cf.join("objects");
     for subdir in codefire_store::known_object_subdirs() {
         let path = objects.join(subdir);
         if !path.is_dir() {
-            issues.push(DoctorIssue::error(
-                "missing_object_subdirectory",
-                format!("missing .codefire/objects/{subdir} directory"),
-                Some(path),
-            ));
+            let message = format!("missing .codefire/objects/{subdir} directory");
+            match object_subdir_requirement(subdir) {
+                LayoutRequirement::Required => issues.push(DoctorIssue::error(
+                    "missing_object_subdirectory",
+                    message,
+                    Some(path),
+                )),
+                LayoutRequirement::AutoCreate => issues.push(DoctorIssue::warning(
+                    "missing_repairable_object_subdirectory",
+                    message,
+                    Some(path),
+                )),
+            }
         }
     }
 }
@@ -392,14 +399,33 @@ fn check_active_state_files(cf: &Path, issues: &mut Vec<DoctorIssue>) -> Result<
     }
     let mut checked = 0usize;
     for state_dir in collect_dirs(&active)? {
-        for file_name in ACTIVE_STATE_FILES {
+        if !state_dir.join("state.json").exists() {
+            issues.push(DoctorIssue::error(
+                "missing_active_state_file",
+                "active state directory is missing required state.json",
+                Some(state_dir.join("state.json")),
+            ));
+        }
+        let mut state_value = None::<String>;
+        let mut open_fire_count = None::<usize>;
+        for &file_name in ACTIVE_STATE_FILES {
             let path = state_dir.join(file_name);
             if !path.exists() {
                 continue;
             }
             match read_json(&path) {
-                Ok(value) => match validate_active_state_shape(file_name, value) {
-                    Ok(()) => checked += 1,
+                Ok(value) => match validate_active_state_shape(file_name, value.clone()) {
+                    Ok(()) => {
+                        if file_name == "state.json" {
+                            state_value = value
+                                .get("state")
+                                .and_then(Value::as_str)
+                                .map(str::to_string);
+                        } else if file_name == "fires.json" {
+                            open_fire_count = value.as_array().map(Vec::len);
+                        }
+                        checked += 1;
+                    }
                     Err(message) => issues.push(DoctorIssue::error(
                         "invalid_active_state_shape",
                         message,
@@ -412,6 +438,17 @@ fn check_active_state_files(cf: &Path, issues: &mut Vec<DoctorIssue>) -> Result<
                     Some(path),
                 )),
             }
+        }
+        if matches!(
+            state_value.as_deref(),
+            Some("open-clean" | "open-consistent")
+        ) && open_fire_count.unwrap_or(0) > 0
+        {
+            issues.push(DoctorIssue::error(
+                "active_state_invariant_violation",
+                "state is clean/consistent but fires.json contains open fires",
+                Some(state_dir.to_path_buf()),
+            ));
         }
     }
     Ok(checked)

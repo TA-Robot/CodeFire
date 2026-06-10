@@ -69,8 +69,10 @@ pub(crate) fn doctor_report_next_actions(report: &DoctorReport) -> Vec<Value> {
                 | "missing_open_base_commit"
                 | "missing_active_state_path"
                 | "missing_active_state_dir"
+                | "missing_active_state_file"
                 | "invalid_active_state_json"
                 | "invalid_active_state_shape"
+                | "active_state_invariant_violation"
                 | "missing_open_path"
                 | "missing_open_path_dir"
                 | "missing_open_marker"
@@ -86,7 +88,20 @@ pub(crate) fn doctor_report_next_actions(report: &DoctorReport) -> Vec<Value> {
             "reopen_branch_workspace",
             cli_command("open <branch> <path>"),
             "reopen affected workspaces from a valid sealed commit after preserving local edits",
-            json!({"affected": count_kinds(report, &["invalid_open_registry", "invalid_open_base_commit", "missing_open_base_commit", "missing_active_state_path", "missing_active_state_dir", "invalid_active_state_json", "invalid_active_state_shape", "missing_open_path", "missing_open_path_dir", "missing_open_marker", "invalid_open_marker", "open_marker_repository_mismatch", "open_marker_branch_mismatch", "open_marker_instance_mismatch", "open_marker_path_mismatch", "missing_open_registry_state"])}),
+            json!({"affected": count_kinds(report, &["invalid_open_registry", "invalid_open_base_commit", "missing_open_base_commit", "missing_active_state_path", "missing_active_state_dir", "missing_active_state_file", "invalid_active_state_json", "invalid_active_state_shape", "active_state_invariant_violation", "missing_open_path", "missing_open_path_dir", "missing_open_marker", "invalid_open_marker", "open_marker_repository_mismatch", "open_marker_branch_mismatch", "open_marker_instance_mismatch", "open_marker_path_mismatch", "missing_open_registry_state"])}),
+        ));
+    }
+    if report.issues.iter().any(|issue| {
+        matches!(
+            issue.kind.as_str(),
+            "missing_repairable_directory" | "missing_repairable_object_subdirectory"
+        )
+    }) {
+        actions.push(automation_next_action(
+            "review_migration_plan",
+            cli_command("migrate dry-run --json"),
+            "review the directory creation plan for repairable layout findings",
+            json!({"affected": count_kinds(report, &["missing_repairable_directory", "missing_repairable_object_subdirectory"])}),
         ));
     }
     if actions.is_empty() {
@@ -182,6 +197,8 @@ fn issue_category(issue: &DoctorIssue) -> &'static str {
         "missing_codefire_dir"
         | "missing_repo_directory"
         | "missing_object_subdirectory"
+        | "missing_repairable_directory"
+        | "missing_repairable_object_subdirectory"
         | "empty_object_store" => "layout",
         "invalid_object_record"
         | "object_integrity_error"
@@ -204,7 +221,10 @@ fn issue_category(issue: &DoctorIssue) -> &'static str {
         | "open_marker_instance_mismatch"
         | "open_marker_path_mismatch"
         | "missing_open_registry_state" => "opened_registry",
-        "invalid_active_state_json" | "invalid_active_state_shape" => "active_state",
+        "invalid_active_state_json"
+        | "invalid_active_state_shape"
+        | "missing_active_state_file"
+        | "active_state_invariant_violation" => "active_state",
         _ => "repository",
     }
 }
@@ -214,11 +234,15 @@ fn issue_repairable(issue: &DoctorIssue) -> bool {
         issue.kind.as_str(),
         "missing_repo_directory"
             | "missing_object_subdirectory"
+            | "missing_repairable_directory"
+            | "missing_repairable_object_subdirectory"
             | "empty_object_store"
             | "missing_open_path_dir"
             | "missing_active_state_dir"
             | "invalid_active_state_json"
             | "invalid_active_state_shape"
+            | "missing_active_state_file"
+            | "active_state_invariant_violation"
             | "missing_open_marker"
             | "invalid_open_marker"
             | "open_marker_repository_mismatch"

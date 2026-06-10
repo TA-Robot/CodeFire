@@ -128,10 +128,19 @@ Completion rule:
 | CFB-053 | fixed | Scan JSON boundedness | default scan JSON returns counts, samples, and omitted metadata |
 | CFB-055 | fixed | Scan changed atom shape | changed_atom_ids and changed_atoms_sample clarify ID vs object shape |
 | CFR-097 | fixed | Scan changed atom detail | changed atom sample includes kind, path, selector, and content hash |
+| CFB-032 | fixed | Doctor/migrate layout health | auto-creatable layout gaps are non-blocking doctor warnings |
+| CFB-033 | fixed | Doctor repair next_actions | repairable layout issues route to `migrate dry-run --json` |
+| CFB-034 | fixed | Doctor/migrate layout health | doctor and migrate share layout severity vocabulary |
+| CFB-035 | fixed | Doctor/migrate layout health | migration planned actions come from the same layout registry as doctor |
+| CFR-132 | fixed | Migration target registry | `current` is default and supported targets are returned in JSON/errors |
+| CFR-133 | fixed | Repository layout registry | doctor and migration consume a shared layout definition |
+| CFR-148 | fixed | Doctor active state diagnostics | missing active `state.json` is explicitly diagnosed |
+| CFR-149 | fixed | Doctor active state invariants | clean/consistent state with open fires is diagnosed |
+| CFR-156 | fixed | Migration quick/full scan mode | quick mode skips object integrity and reports skipped checks |
 
 Remaining open count for this batch:
 
-- 66 issues.
+- 57 issues.
 
 ## Global Issue Inventory
 
@@ -141,15 +150,15 @@ Current tracked issue inventory as of 2026-06-10:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 92 | 66 | 26 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
-| CFR code review issues | 160 | 120 | 40 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
-| Total | 252 | 186 | 66 | This global batch is the whole known issue backlog. |
+| CFB dogfood issues | 92 | 70 | 22 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for CFB-023 and later, plus later generated issues; CFB-001..022/025 are summary-only legacy entries. |
+| CFR code review issues | 160 | 125 | 35 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
+| Total | 252 | 195 | 57 | This global batch is the whole known issue backlog. |
 
 Current active batch progress:
 
 - Initial frozen open issue count: 146.
-- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-029, CFB-037, CFB-040, CFB-041, CFB-042, CFB-044, CFB-049, CFB-050, CFB-052, CFB-053, CFB-055, CFB-056, CFB-057, CFB-058, CFB-059, CFB-060, CFB-061, CFB-062, CFB-063, CFB-064, CFB-065, CFB-068, CFB-069, CFB-070, CFB-071, CFB-072, CFB-073, CFB-074, CFB-075, CFB-076, CFB-081, CFB-082, CFB-083, CFB-084, CFR-085, CFR-086, CFR-087, CFR-088, CFR-096, CFR-097, CFR-098, CFR-099, CFR-100, CFR-101, CFR-102, CFR-103, CFR-104, CFR-106, CFR-107, CFR-108, CFR-109, CFR-115, CFR-125, CFR-126, CFR-127, CFR-134, CFR-135, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-142, CFR-143, CFR-144, CFR-147, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-157.
-- Remaining open now: 66.
+- Fixed during global burn-down so far: CFB-006, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-022, CFB-028, CFB-029, CFB-032, CFB-033, CFB-034, CFB-035, CFB-037, CFB-040, CFB-041, CFB-042, CFB-044, CFB-049, CFB-050, CFB-052, CFB-053, CFB-055, CFB-056, CFB-057, CFB-058, CFB-059, CFB-060, CFB-061, CFB-062, CFB-063, CFB-064, CFB-065, CFB-068, CFB-069, CFB-070, CFB-071, CFB-072, CFB-073, CFB-074, CFB-075, CFB-076, CFB-081, CFB-082, CFB-083, CFB-084, CFR-085, CFR-086, CFR-087, CFR-088, CFR-096, CFR-097, CFR-098, CFR-099, CFR-100, CFR-101, CFR-102, CFR-103, CFR-104, CFR-106, CFR-107, CFR-108, CFR-109, CFR-115, CFR-125, CFR-126, CFR-127, CFR-132, CFR-133, CFR-134, CFR-135, CFR-136, CFR-138, CFR-139, CFR-140, CFR-141, CFR-142, CFR-143, CFR-144, CFR-147, CFR-148, CFR-149, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-156, CFR-157.
+- Remaining open now: 57.
 
 Burn-down interpretation:
 

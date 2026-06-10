@@ -307,23 +307,32 @@ The active CodeFire improvement cycle is a global burn-down. The initial frozen 
 
 Global inventory as of 2026-06-10:
 
-- CFB dogfood issues: 92 total, 66 fixed, 26 open.
-- CFR code review issues: 160 total, 120 fixed/closed, 40 open.
-- Combined tracked backlog: 252 total, 186 fixed/closed, 66 open.
+- CFB dogfood issues: 92 total, 70 fixed, 22 open.
+- CFR code review issues: 160 total, 125 fixed/closed, 35 open.
+- Combined tracked backlog: 252 total, 195 fixed/closed, 57 open.
 
 Active batch closed in this burn-down:
 
 - CFB-037: failed evidence commands no longer create successful-looking evidence by default.
+- CFB-032: doctor no longer marks auto-creatable layout gaps as blocking invalid repo state.
+- CFB-033: doctor repairable layout warnings now point to migration plan review.
+- CFB-034: doctor and migrate share the same layout severity vocabulary.
+- CFB-035: migration planned actions are generated from the same layout registry as doctor findings.
 - CFB-049: evidence command capture cwd resolution is explicit and returned in JSON.
 - CFB-053: scan JSON defaults to bounded counts/samples with explicit full mode.
 - CFB-061: missing remote storage target is reported as invalid layout instead of silently disappearing.
 - CFB-063: review-pack and patch export have JSON metadata automation surfaces.
 - CFB-072: evidence dry-run plan reports resolved cwd and cwd source.
 - CFB-082: storage quick mode reports inferred largest object types and type confidence.
-- CFB-087: missing evidence-ref dry-run failures are not JSON enveloped.
-- CFB-089: `atom-index` and `missing-links` do not handle shared `--path` / `--json` like normal commands.
-- CFB-090: bounded context can return trace links to omitted endpoints without endpoint omission metadata.
-- CFB-092: extractor/hash schema changes need migration-aware rebaseline workflow.
+- CFB-087: missing evidence-ref dry-run failures are returned as JSON envelopes.
+- CFB-089: `atom-index` and `missing-links` handle shared `--path` / `--json` like normal commands.
+- CFB-090: bounded context reports endpoint omission metadata for omitted trace link endpoints.
+- CFB-092: extractor/hash schema changes are migration-aware and can be rebaselined.
+- CFR-132: migrate target format defaults to `current` and reports supported targets.
+- CFR-133: repository layout is defined by a shared doctor/migrate registry.
+- CFR-148: doctor reports missing active `state.json`.
+- CFR-149: doctor reports active state/open fire invariant violations.
+- CFR-156: migrate supports quick/full scan modes with skipped check metadata.
 
 Important already-fixed issues from the latest two-cycle run:
 
@@ -333,7 +342,7 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- Remaining 66 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
+- Remaining 57 open CFB/CFR issues in the global batchを引き続きroot-cause groupごとに修正する。
 - このglobal batchが0 openになるまで、新しいissue discovery batchへ進まない。
 
 ## Cycle Invariants

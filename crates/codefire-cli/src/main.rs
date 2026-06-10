@@ -31,6 +31,7 @@ mod metrics;
 mod migration;
 mod open_clone_idempotency;
 mod remote;
+mod repo_layout;
 mod signatures;
 mod storage;
 mod verification;
