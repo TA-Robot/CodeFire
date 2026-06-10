@@ -101,8 +101,8 @@ use storage::{
 use verification::{parse_verify_args, print_verification};
 use view::{
     diff_commitish_with_options, manifest_contents, patch_export_with_options,
-    review_pack_with_options, show_commitish, DiffAlgorithm, DiffOptions, PatchExportOptions,
-    ReviewPackOptions,
+    review_pack_with_options, show_commitish, show_commitish_data, DiffAlgorithm, DiffOptions,
+    PatchExportOptions, ReviewPackOptions,
 };
 
 pub(crate) fn scan_branch_state(changed_atoms: usize, open_fires: usize) -> &'static str {
@@ -407,12 +407,31 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 print!("{}", subcommand_help("show"));
                 return Ok(());
             }
-            let target = args.get(1).ok_or_else(|| {
-                CliError::Usage("usage: codefire show <branch-or-commit>".to_string())
-            })?;
+            let options = parse_show_args(&args[1..])?;
             let repo_root = optional_repo_root(&env::current_dir()?);
-            let output = show_commitish(repo_root.as_deref(), target)?;
-            print!("{output}");
+            if options.json_output {
+                match show_commitish_data(repo_root.as_deref(), &options.target) {
+                    Ok(data) => println!(
+                        "{}",
+                        serde_json::to_string_pretty(&command_result_envelope(
+                            "show",
+                            true,
+                            0,
+                            repo_root.as_deref(),
+                            data,
+                            Vec::new(),
+                            Vec::new(),
+                        ))?
+                    ),
+                    Err(error) => {
+                        print_cli_error_json("show", &error)?;
+                        return Err(CliError::CommandFailed(error.exit_status()));
+                    }
+                }
+            } else {
+                let output = show_commitish(repo_root.as_deref(), &options.target)?;
+                print!("{output}");
+            }
             Ok(())
         }
         Some("diff") => {
@@ -1034,7 +1053,7 @@ enum CliError {
 }
 
 impl CliError {
-    fn exit_code(&self) -> i32 {
+    fn exit_status(&self) -> ExitCode {
         match self {
             CliError::Io(_) => ExitCode::GenericFailure,
             CliError::Json(_) => ExitCode::RepositoryCorruption,
@@ -1054,7 +1073,10 @@ impl CliError {
             CliError::LockContention(_) => ExitCode::LockContention,
             CliError::MissingEvidenceRef { .. } => ExitCode::ObjectReferenceInvalid,
         }
-        .code()
+    }
+
+    fn exit_code(&self) -> i32 {
+        self.exit_status().code()
     }
 }
 
@@ -1570,6 +1592,39 @@ fn lock_contention_envelope(command: &str, error: &CliError) -> Value {
 struct ReadOnlyDebugOptions {
     path: PathBuf,
     json_output: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ShowOptions {
+    target: String,
+    json_output: bool,
+}
+
+fn parse_show_args(args: &[String]) -> Result<ShowOptions, CliError> {
+    let mut target = None;
+    let mut json_output = false;
+    for value in args {
+        match value.as_str() {
+            "--json" => json_output = true,
+            option if option.starts_with("--") => {
+                return Err(CliError::Usage(format!(
+                    "unsupported show option: {option}"
+                )));
+            }
+            value if target.is_none() => target = Some(value.to_string()),
+            value => {
+                return Err(CliError::Usage(format!(
+                    "unexpected show argument: {value}"
+                )));
+            }
+        }
+    }
+    Ok(ShowOptions {
+        target: target.ok_or_else(|| {
+            CliError::Usage("usage: codefire show <branch-or-commit> [--json]".to_string())
+        })?,
+        json_output,
+    })
 }
 
 fn parse_read_only_debug_args(

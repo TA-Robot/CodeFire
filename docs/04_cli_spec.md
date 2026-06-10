@@ -455,6 +455,7 @@ cf+http uploadのserver側tmp object directoryはrequestごとに一意化され
 
 ```bash
 codefire show feature-login
+codefire show feature-login --json
 codefire diff main feature-login
 codefire diff --algorithm patience main feature-login
 codefire diff main feature-login --algorithm=histogram
@@ -470,6 +471,7 @@ codefire diff --impact --json main feature-login
 ```text
 local branch、sealed commit ID、cf:// URL、cf+http:// URLを参照できる
 参照先のsealed commit妥当性を検証してから表示する
+show --jsonは `codefire.command_result.v1` envelopeでsealed commit summaryを返す
 diffのdefault algorithmはmyers
 --algorithmはmyers、patience、histogramを受け付ける
 --contextはtext diff hunkに含める前後context行数を指定する。defaultは3
@@ -482,7 +484,7 @@ binary fileはpayload diffを出さず、sizeとsha256 prefixのsummaryだけを
 --atomsはsealed commit内のAtomIndexを比較し、Atom IDのadded/removed/changedを表示する
 --traceはsealed commit内のTraceGraphを比較し、TraceLink IDのadded/removed/changedを表示する
 --impactはrequired-link policy上のmissing link増減と、changed Atomから予測されるfire impactを表示する
---jsonはdiff結果をJSON objectとして出力し、impact有効時はmachine-readable next_actionsを含める
+diff --jsonはdiff結果をJSON objectとして出力し、impact有効時はmachine-readable next_actionsを含める
 text diff payloadはunified hunk headerを持ち、file単位の最大出力byte数でboundedになり、超過時は省略したchanged line数を表示する
 --rename-detectionはexact hash renameを先に検出し、candidate pair数が上限を超えるinexact similarity計算はwarning付きでskipする
 ```

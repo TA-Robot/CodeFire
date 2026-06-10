@@ -90,6 +90,47 @@ pub(crate) struct PatchExportOptions {
 }
 
 pub(crate) fn show_commitish(repo_root: Option<&Path>, value: &str) -> Result<String, CliError> {
+    let data = show_commitish_data(repo_root, value)?;
+    let show = data
+        .get("show")
+        .and_then(Value::as_object)
+        .ok_or_else(|| CliError::InvalidRepository("invalid show result".to_string()))?;
+    let label = show.get("label").and_then(Value::as_str).unwrap_or("");
+    let commit_id = show.get("commit").and_then(Value::as_str).unwrap_or("");
+    let message = show.get("message").and_then(Value::as_str).unwrap_or("");
+    let parents = show
+        .get("parents")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
+        .filter(|items| !items.is_empty())
+        .unwrap_or_else(|| "(none)".to_string());
+    let files = show.get("files").and_then(Value::as_u64).unwrap_or(0);
+    let atoms = show.get("atoms").and_then(Value::as_u64).unwrap_or(0);
+    let certificate = show
+        .get("certificate")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let signature = show
+        .get("signature")
+        .and_then(|value| value.get("summary"))
+        .and_then(Value::as_str)
+        .unwrap_or("(none)");
+
+    Ok(format!(
+        "Object: {label}\nCommit: {commit_id}\nMessage: {message}\nParents: {parents}\nFiles: {files}\nAtoms: {atoms}\nCertificate: {certificate}\nSignature: {signature}\n",
+    ))
+}
+
+pub(crate) fn show_commitish_data(
+    repo_root: Option<&Path>,
+    value: &str,
+) -> Result<Value, CliError> {
     let resolved = resolve_commitish_any(repo_root, value)?;
     let commit = codefire_store::read_object(&resolved.objects, &resolved.commit_id)?;
     let manifest = root_object(&resolved.objects, &commit, "content_manifest")?;
@@ -106,22 +147,15 @@ pub(crate) fn show_commitish(repo_root: Option<&Path>, value: &str) -> Result<St
     let parents = commit
         .get("parents")
         .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(Value::as_str)
-                .collect::<Vec<_>>()
-                .join(", ")
-        })
-        .filter(|items| !items.is_empty())
-        .unwrap_or_else(|| "(none)".to_string());
+        .map(|items| items.iter().filter_map(Value::as_str).collect::<Vec<_>>())
+        .unwrap_or_default();
     let certificate = commit
         .get("certificate")
         .and_then(|value| value.get("result"))
         .and_then(Value::as_str)
         .unwrap_or("unknown");
     let signature = commit.get("signature").and_then(Value::as_object);
-    let signature = signature
+    let signature_summary = signature
         .map(|item| {
             format!(
                 "{} ({})",
@@ -135,10 +169,26 @@ pub(crate) fn show_commitish(repo_root: Option<&Path>, value: &str) -> Result<St
         })
         .unwrap_or_else(|| "(none)".to_string());
 
-    Ok(format!(
-        "Object: {}\nCommit: {}\nMessage: {message}\nParents: {parents}\nFiles: {files}\nAtoms: {atoms}\nCertificate: {certificate}\nSignature: {signature}\n",
-        resolved.label, resolved.commit_id
-    ))
+    Ok(json!({
+        "type": "codefire_show_result",
+        "version": 1,
+        "show": {
+            "target": value,
+            "label": resolved.label,
+            "commit": resolved.commit_id,
+            "message": message,
+            "parents": parents,
+            "files": files,
+            "atoms": atoms,
+            "certificate": certificate,
+            "roots": commit.get("roots").cloned().unwrap_or_else(|| json!({})),
+            "signature": {
+                "present": signature.is_some(),
+                "summary": signature_summary,
+                "details": signature.cloned().map(Value::Object).unwrap_or(Value::Null),
+            },
+        },
+    }))
 }
 
 pub(crate) fn diff_commitish_with_options(

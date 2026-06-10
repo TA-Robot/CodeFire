@@ -527,6 +527,28 @@ fn show_and_diff_local_branches() {
     assert!(show.contains("Files: 1"));
     assert!(show.contains("Certificate: consistent"));
 
+    let show_data = show_commitish_data(Some(&repo_root), "feature-session").unwrap();
+    assert_eq!(show_data["type"], "codefire_show_result");
+    assert_eq!(show_data["show"]["target"], "feature-session");
+    assert_eq!(show_data["show"]["message"], "test commit");
+    assert_eq!(show_data["show"]["files"], 1);
+    assert_eq!(show_data["show"]["atoms"], 0);
+    assert_eq!(show_data["show"]["certificate"], "consistent");
+    assert_eq!(show_data["show"]["signature"]["present"], false);
+    assert_eq!(show_data["show"]["signature"]["summary"], "(none)");
+    let show_envelope = command_result_envelope(
+        "show",
+        true,
+        0,
+        Some(&repo_root),
+        show_data,
+        Vec::new(),
+        Vec::new(),
+    );
+    assert_eq!(show_envelope["schema"], "codefire.command_result.v1");
+    assert_eq!(show_envelope["command"], "show");
+    assert_eq!(show_envelope["data"]["show"]["target"], "feature-session");
+
     let diff = diff_commitish_with_options(
         Some(&repo_root),
         "main",
@@ -712,6 +734,11 @@ fn codefire_text_diff_matches_git_payload_lines() {
 
 #[test]
 fn parse_diff_args_accepts_algorithm_forms() {
+    let show = parse_show_args(&["main".to_string(), "--json".to_string()]).unwrap();
+    assert_eq!(show.target, "main");
+    assert!(show.json_output);
+    assert!(parse_show_args(&["main".to_string(), "--metrics".to_string()]).is_err());
+
     let args = vec![
         "--algorithm".to_string(),
         "patience".to_string(),
