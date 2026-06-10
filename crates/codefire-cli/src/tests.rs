@@ -6624,6 +6624,44 @@ fn verify_clean_branch_preserves_clean_state_without_degrading_status() {
 }
 
 #[test]
+fn verification_command_contract_controls_failure_timeout_and_output() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("codefire.policy.yaml"),
+        "verification:\n  - id: nonblocking\n    command: false\n    allow_failure: true\n  - id: timeout\n    command: printf abcdefghij; sleep 1\n    timeout_ms: 10\n    max_output_bytes: 4\n",
+    )
+    .unwrap();
+
+    let verification = run_verify(&open_dir).unwrap();
+
+    assert_eq!(verification.result, "failed");
+    assert_eq!(verification.failed_checks.len(), 1);
+    assert_eq!(verification.failed_checks[0].id, "timeout");
+    assert!(verification.failed_checks[0].output.contains("abcd"));
+    assert!(verification.failed_checks[0]
+        .output
+        .contains("truncated at 4 bytes"));
+    assert!(verification.failed_checks[0]
+        .output
+        .contains("timed out after 10ms"));
+}
+
+#[test]
 fn metrics_attach_to_status_scan_and_verify_data() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");

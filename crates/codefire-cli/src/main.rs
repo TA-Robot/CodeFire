@@ -6,8 +6,9 @@ use std::fmt;
 use std::fs::{self, File};
 use std::io::{ErrorKind, Write};
 use std::path::{Component, Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::thread;
 use std::time::{Duration, Instant};
 
 mod automation;
@@ -5982,15 +5983,15 @@ fn run_verification_commands(
 ) -> Result<Vec<codefire_core::FailedCheck>, CliError> {
     let mut failures = Vec::new();
     for check in &policy.verification {
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(&check.command)
-            .current_dir(open_dir.join(&check.cwd))
-            .output()?;
-        if !output.status.success() {
-            let mut combined = String::new();
-            combined.push_str(&String::from_utf8_lossy(&output.stdout));
-            combined.push_str(&String::from_utf8_lossy(&output.stderr));
+        let output = run_verification_command(open_dir, check)?;
+        if output.timed_out || (!output.success && !check.allow_failure) {
+            let mut combined = output.combined_output;
+            if output.timed_out {
+                combined.push_str(&format!(
+                    "\nverification command timed out after {}ms",
+                    check.timeout_ms
+                ));
+            }
             failures.push(codefire_core::FailedCheck {
                 id: check.id.clone(),
                 command: check.command.clone(),
@@ -5999,6 +6000,72 @@ fn run_verification_commands(
         }
     }
     Ok(failures)
+}
+
+struct VerificationCommandRun {
+    success: bool,
+    timed_out: bool,
+    combined_output: String,
+}
+
+fn run_verification_command(
+    open_dir: &Path,
+    check: &codefire_core::VerificationCommand,
+) -> Result<VerificationCommandRun, CliError> {
+    let mut command = Command::new("sh");
+    command
+        .arg("-c")
+        .arg(&check.command)
+        .current_dir(open_dir.join(&check.cwd))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if !check.inherit_env {
+        command.env_clear();
+    }
+    for (key, value) in &check.env {
+        command.env(key, value);
+    }
+    let mut child = command.spawn()?;
+    let started = Instant::now();
+    let timeout = Duration::from_millis(check.timeout_ms);
+    let mut timed_out = false;
+    while child.try_wait()?.is_none() {
+        if started.elapsed() >= timeout {
+            timed_out = true;
+            let _ = child.kill();
+            break;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    let output = child.wait_with_output()?;
+    let mut combined = Vec::with_capacity(output.stdout.len() + output.stderr.len());
+    combined.extend_from_slice(&output.stdout);
+    combined.extend_from_slice(&output.stderr);
+    let (combined_output, truncated) = lossy_truncated(&combined, check.max_output_bytes);
+    let combined_output = if truncated {
+        format!(
+            "{combined_output}\n[verification output truncated at {} bytes]",
+            check.max_output_bytes
+        )
+    } else {
+        combined_output
+    };
+    Ok(VerificationCommandRun {
+        success: output.status.success() && !timed_out,
+        timed_out,
+        combined_output,
+    })
+}
+
+fn lossy_truncated(bytes: &[u8], limit: usize) -> (String, bool) {
+    if bytes.len() <= limit {
+        return (String::from_utf8_lossy(bytes).into_owned(), false);
+    }
+    let mut end = limit;
+    while end > 0 && std::str::from_utf8(&bytes[..end]).is_err() {
+        end -= 1;
+    }
+    (String::from_utf8_lossy(&bytes[..end]).into_owned(), true)
 }
 
 fn load_base_atom_index(

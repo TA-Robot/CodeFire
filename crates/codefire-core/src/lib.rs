@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 
 pub const VERSION: u32 = 1;
 pub const ATOM_HASH_SCHEMA_VERSION: u32 = 2;
+pub const DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS: u64 = 300_000;
+pub const DEFAULT_VERIFICATION_COMMAND_MAX_OUTPUT_BYTES: usize = 64 * 1024;
 
 fn legacy_atom_hash_schema_version() -> u32 {
     1
@@ -13,6 +15,14 @@ fn legacy_atom_hash_schema_version() -> u32 {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_verification_command_timeout_ms() -> u64 {
+    DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS
+}
+
+fn default_verification_command_max_output_bytes() -> usize {
+    DEFAULT_VERIFICATION_COMMAND_MAX_OUTPUT_BYTES
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -134,6 +144,16 @@ pub struct VerificationCommand {
     pub id: String,
     pub command: String,
     pub cwd: String,
+    #[serde(default = "default_verification_command_timeout_ms")]
+    pub timeout_ms: u64,
+    #[serde(default = "default_verification_command_max_output_bytes")]
+    pub max_output_bytes: usize,
+    #[serde(default = "default_true")]
+    pub inherit_env: bool,
+    #[serde(default)]
+    pub env: BTreeMap<String, String>,
+    #[serde(default)]
+    pub allow_failure: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -675,6 +695,11 @@ pub fn parse_verification_policy(open_dir: &Path) -> Result<VerificationPolicy, 
                     id: None,
                     command: None,
                     cwd: Some(".".to_string()),
+                    timeout_ms: None,
+                    max_output_bytes: None,
+                    inherit_env: None,
+                    env: BTreeMap::new(),
+                    allow_failure: None,
                 };
                 set_verification_check_field(&mut check, key, value, line_no)?;
                 current_check = Some(check);
@@ -804,6 +829,11 @@ struct VerificationCommandDraft {
     id: Option<String>,
     command: Option<String>,
     cwd: Option<String>,
+    timeout_ms: Option<u64>,
+    max_output_bytes: Option<usize>,
+    inherit_env: Option<bool>,
+    env: BTreeMap<String, String>,
+    allow_failure: Option<bool>,
 }
 
 fn flush_verification_check(
@@ -825,6 +855,15 @@ fn flush_verification_check(
         id,
         command,
         cwd: draft.cwd.unwrap_or_else(|| ".".to_string()),
+        timeout_ms: draft
+            .timeout_ms
+            .unwrap_or(DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS),
+        max_output_bytes: draft
+            .max_output_bytes
+            .unwrap_or(DEFAULT_VERIFICATION_COMMAND_MAX_OUTPUT_BYTES),
+        inherit_env: draft.inherit_env.unwrap_or(true),
+        env: draft.env,
+        allow_failure: draft.allow_failure.unwrap_or(false),
     });
     Ok(())
 }
@@ -839,6 +878,18 @@ fn set_verification_check_field(
         "id" => check.id = Some(unquote(value)),
         "command" => check.command = Some(unquote(value)),
         "cwd" => check.cwd = Some(unquote(value)),
+        "timeout_ms" => {
+            check.timeout_ms = Some(parse_u64_field("verification timeout_ms", value.trim())?)
+        }
+        "max_output_bytes" => {
+            check.max_output_bytes = Some(parse_usize_field(
+                "verification max_output_bytes",
+                value.trim(),
+            )?)
+        }
+        "inherit_env" => check.inherit_env = Some(parse_bool_field(value)?),
+        "env" => check.env = parse_env_field(value, line_no)?,
+        "allow_failure" => check.allow_failure = Some(parse_bool_field(value)?),
         _ => {
             return Err(CoreError::Config(format!(
                 "unsupported codefire.policy.yaml: verification field {key} at line {line_no}"
@@ -1359,6 +1410,44 @@ fn parse_usize_field(field: &str, value: &str) -> Result<usize, CoreError> {
             "invalid codefire.policy.yaml: {field} must be an integer"
         ))
     })
+}
+
+fn parse_u64_field(field: &str, value: &str) -> Result<u64, CoreError> {
+    let parsed = unquote(value).parse::<u64>().map_err(|_| {
+        CoreError::Config(format!(
+            "invalid codefire.policy.yaml: {field} must be an integer"
+        ))
+    })?;
+    if parsed == 0 {
+        return Err(CoreError::Config(format!(
+            "invalid codefire.policy.yaml: {field} must be greater than zero"
+        )));
+    }
+    Ok(parsed)
+}
+
+fn parse_env_field(value: &str, line_no: usize) -> Result<BTreeMap<String, String>, CoreError> {
+    let rendered = unquote(value);
+    let mut env = BTreeMap::new();
+    for item in rendered
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+    {
+        let Some((key, value)) = item.split_once('=') else {
+            return Err(CoreError::Config(format!(
+                "invalid codefire.policy.yaml: verification env entry at line {line_no} must be KEY=VALUE"
+            )));
+        };
+        let key = key.trim();
+        if key.is_empty() {
+            return Err(CoreError::Config(format!(
+                "invalid codefire.policy.yaml: verification env key at line {line_no} is empty"
+            )));
+        }
+        env.insert(key.to_string(), value.trim().to_string());
+    }
+    Ok(env)
 }
 
 fn trace_link_hash(
@@ -2438,6 +2527,11 @@ mod tests {
                 id: "unit".to_string(),
                 command: "cargo test".to_string(),
                 cwd: "crates/app".to_string(),
+                timeout_ms: DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS,
+                max_output_bytes: DEFAULT_VERIFICATION_COMMAND_MAX_OUTPUT_BYTES,
+                inherit_env: true,
+                env: BTreeMap::new(),
+                allow_failure: false,
             }]
         );
     }
@@ -2458,8 +2552,37 @@ mod tests {
                 id: "unit".to_string(),
                 command: "cargo test".to_string(),
                 cwd: "crates/app".to_string(),
+                timeout_ms: DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS,
+                max_output_bytes: DEFAULT_VERIFICATION_COMMAND_MAX_OUTPUT_BYTES,
+                inherit_env: true,
+                env: BTreeMap::new(),
+                allow_failure: false,
             }]
         );
+    }
+
+    #[test]
+    fn verification_policy_parses_command_execution_contract() {
+        let temp = tempdir().unwrap();
+        write_file(
+            &temp.path().join("codefire.policy.yaml"),
+            "verification:\n  - id: lint\n    command: cargo clippy\n    timeout_ms: 120000\n    max_output_bytes: 4096\n    inherit_env: false\n    env: RUST_BACKTRACE=1,CARGO_TERM_COLOR=never\n    allow_failure: true\n",
+        );
+
+        let policy = parse_verification_policy(temp.path()).unwrap();
+
+        assert_eq!(policy.verification[0].timeout_ms, 120_000);
+        assert_eq!(policy.verification[0].max_output_bytes, 4096);
+        assert!(!policy.verification[0].inherit_env);
+        assert_eq!(
+            policy.verification[0].env.get("RUST_BACKTRACE"),
+            Some(&"1".to_string())
+        );
+        assert_eq!(
+            policy.verification[0].env.get("CARGO_TERM_COLOR"),
+            Some(&"never".to_string())
+        );
+        assert!(policy.verification[0].allow_failure);
     }
 
     #[test]

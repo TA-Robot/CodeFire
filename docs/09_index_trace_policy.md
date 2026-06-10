@@ -350,6 +350,8 @@ required_links:
 
 `codefire.policy.yaml` もCodeFire schema向けの限定YAML subsetとして読む。対応root sectionは `version`、`required_links`、`commit_policy`、`extinguish_policy`、`verification` で、各section内のunsupported fieldやunsupported indentationはline number付きconfig errorにする。
 
+`verification` itemは `id`、`command`、`cwd` に加えて、実行契約として `timeout_ms`、`max_output_bytes`、`inherit_env`、`env`、`allow_failure` を持てる。未指定時は300秒timeout、64KiB output cap、環境変数継承、失敗blockingで実行する。
+
 必須linkが欠落している場合、commit不可である。
 
 ## 9.11 propagation policy

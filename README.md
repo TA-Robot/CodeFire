@@ -134,10 +134,10 @@ Python v0.2はPython標準ライブラリのみを使う単一ファイルCLIで
 - Python v0.2 remote server はローカルファイル-backed実装に加えて、`codefire-py serve` によるHTTP/HTTPS transportを持ちます。file-backedは `cf:///tmp/server/org/app/main`、HTTPは `cf+http://127.0.0.1:8080/org/app/main`、HTTPSは `cf+https://127.0.0.1:8443/org/app/main` のようなURLを使います。
 - Rust v0.6 remoteはfile-backed、`cf+http://`、`cf+https://` を実装済みです。
 - HTTP transportは現時点で `upload` / `list` / `clone` / `show` / `diff` / `request-merge` / `request-list` / `request-review` / `request-apply` / `doctor` / `gc` に対応します。
-- upload時にsealed commitのobject hash、parents/roots/certificate構造、parent履歴、root object type、certificate、verification rootを検証します。
+- upload時にsealed commitのobject hash、parents/roots/certificate構造、parent履歴、root object type、root payload shape、certificateとverification rootの一致を検証します。
 - remote projectの `server_policy.json` により、upload時のserver-side verification commandを実行できます。server-side verificationは `cwd`、`env`、`timeout_seconds` を指定でき、`cwd` はremote project内に制限されます。
 - `codefire.policy.yaml` の `commit_policy` で commit blocker とする検査を制御できます。
-- `codefire.policy.yaml` の `verification.required` は複数commandを順に実行できます。
+- `codefire.policy.yaml` の `verification.required` は複数commandを順に実行できます。各commandは `timeout_ms`、`max_output_bytes`、`inherit_env`、`env`、`allow_failure` を持てます。
 - `codefire.policy.yaml` の `required_links` で Atom kind ごとの必須Trace Linkを設定できます。
 - merge requestにはreview recordを追加できます。`request-list` / `request-review` / `request-apply` はMR内のsealed commit参照を検証します。
 - approved merge requestはfast-forward条件を満たす場合にserver上でapplyできます。

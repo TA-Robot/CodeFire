@@ -436,6 +436,7 @@ fn validate_sealed_commit_inner(
                 )));
             }
         }
+        validate_root_payload(root, &payload)?;
         validate_root_references(objects_root, root, &payload)?;
     }
 
@@ -453,6 +454,14 @@ fn validate_sealed_commit_inner(
             "certificate result is not passed".to_string(),
         ));
     }
+    let verification_id = roots
+        .get("verification")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            StoreError::InvalidSealedCommit("root verification must be an object id".to_string())
+        })?;
+    let verification = read_object(objects_root, verification_id)?;
+    validate_certificate_matches_verification(certificate, &verification)?;
     Ok(())
 }
 
@@ -507,6 +516,113 @@ fn validate_root_references(
         "verification" => validate_verification_references(objects_root, payload),
         _ => Ok(()),
     }
+}
+
+fn validate_root_payload(root: &str, payload: &Value) -> Result<(), StoreError> {
+    required_u64(payload, "version", root)?;
+    match root {
+        "content_manifest" => validate_content_manifest_shape(payload),
+        "atom_index" => validate_atom_index_shape(payload),
+        "trace_graph" => validate_trace_graph_shape(payload),
+        "fire_delta" => validate_fire_ledger_shape(payload),
+        "resolution_ledger" => validate_resolution_ledger_shape(payload),
+        "verification" => validate_verification_shape(payload),
+        "policy" => validate_policy_shape(payload),
+        _ => Ok(()),
+    }
+}
+
+fn validate_content_manifest_shape(manifest: &Value) -> Result<(), StoreError> {
+    let entries = required_array(manifest, "entries", "content_manifest")?;
+    for (index, entry) in entries.iter().enumerate() {
+        let context = format!("content_manifest.entries[{index}]");
+        required_string(entry, "path", &context)?;
+        required_string(entry, "kind", &context)?;
+        if entry.get("kind").and_then(Value::as_str) == Some("file") {
+            required_string(entry, "mode", &context)?;
+            required_string(entry, "blob", &context)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_atom_index_shape(atom_index: &Value) -> Result<(), StoreError> {
+    let atoms = required_array(atom_index, "atoms", "atom_index")?;
+    required_string_array(atom_index, "duplicate_atom_ids", "atom_index")?;
+    for (index, atom) in atoms.iter().enumerate() {
+        let context = format!("atom_index.atoms[{index}]");
+        required_string(atom, "atom_id", &context)?;
+        required_string(atom, "kind", &context)?;
+        required_string(atom, "artifact_path", &context)?;
+        required_string(atom, "content_hash", &context)?;
+        let selector = atom
+            .get("selector")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                StoreError::InvalidSealedCommit(format!("{context}.selector must be an object"))
+            })?;
+        required_string(
+            &Value::Object(selector.clone()),
+            "type",
+            &format!("{context}.selector"),
+        )?;
+        required_string(
+            &Value::Object(selector.clone()),
+            "value",
+            &format!("{context}.selector"),
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_trace_graph_shape(trace_graph: &Value) -> Result<(), StoreError> {
+    let links = required_array(trace_graph, "links", "trace_graph")?;
+    for (index, link) in links.iter().enumerate() {
+        let context = format!("trace_graph.links[{index}]");
+        required_string(link, "from", &context)?;
+        required_string(link, "to", &context)?;
+        required_string(link, "type", &context)?;
+        required_string(link, "link_id", &context)?;
+        required_string(link, "link_hash", &context)?;
+    }
+    Ok(())
+}
+
+fn validate_fire_ledger_shape(ledger: &Value) -> Result<(), StoreError> {
+    required_array(ledger, "fires", "fire_delta")?;
+    Ok(())
+}
+
+fn validate_resolution_ledger_shape(ledger: &Value) -> Result<(), StoreError> {
+    required_array(ledger, "resolutions", "resolution_ledger")?;
+    Ok(())
+}
+
+fn validate_verification_shape(verification: &Value) -> Result<(), StoreError> {
+    if let Some(result) = verification.get("result") {
+        if !matches!(result.as_str(), Some("passed" | "failed")) {
+            return Err(StoreError::InvalidSealedCommit(
+                "verification.result must be passed or failed".to_string(),
+            ));
+        }
+    }
+    optional_u64(verification, "open_required_fires")?;
+    optional_array(verification, "failed_checks")?;
+    optional_array(verification, "missing_required_links")?;
+    optional_array(verification, "stale_resolutions")?;
+    optional_array(verification, "missing_evidence_refs")?;
+    optional_array(verification, "duplicate_atom_ids")?;
+    Ok(())
+}
+
+fn validate_policy_shape(policy: &Value) -> Result<(), StoreError> {
+    policy
+        .get("policy")
+        .and_then(Value::as_object)
+        .ok_or_else(|| {
+            StoreError::InvalidSealedCommit("policy.policy must be an object".to_string())
+        })?;
+    Ok(())
 }
 
 fn validate_manifest_references(objects_root: &Path, manifest: &Value) -> Result<(), StoreError> {
@@ -608,6 +724,126 @@ fn optional_array<'a>(payload: &'a Value, field: &str) -> Result<&'a [Value], St
         ))),
         None => Ok(&[]),
     }
+}
+
+fn required_array<'a>(
+    payload: &'a Value,
+    field: &str,
+    context: &str,
+) -> Result<&'a [Value], StoreError> {
+    payload
+        .get(field)
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .ok_or_else(|| StoreError::InvalidSealedCommit(format!("{context}.{field} must be a list")))
+}
+
+fn required_string<'a>(
+    payload: &'a Value,
+    field: &str,
+    context: &str,
+) -> Result<&'a str, StoreError> {
+    payload.get(field).and_then(Value::as_str).ok_or_else(|| {
+        StoreError::InvalidSealedCommit(format!("{context}.{field} must be a string"))
+    })
+}
+
+fn required_string_array(payload: &Value, field: &str, context: &str) -> Result<(), StoreError> {
+    let values = required_array(payload, field, context)?;
+    for (index, value) in values.iter().enumerate() {
+        if !value.is_string() {
+            return Err(StoreError::InvalidSealedCommit(format!(
+                "{context}.{field}[{index}] must be a string"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn required_u64(payload: &Value, field: &str, context: &str) -> Result<u64, StoreError> {
+    payload.get(field).and_then(Value::as_u64).ok_or_else(|| {
+        StoreError::InvalidSealedCommit(format!("{context}.{field} must be an unsigned integer"))
+    })
+}
+
+fn optional_u64(payload: &Value, field: &str) -> Result<(), StoreError> {
+    match payload.get(field) {
+        Some(value) if value.as_u64().is_some() => Ok(()),
+        Some(_) => Err(StoreError::InvalidSealedCommit(format!(
+            "{field} must be an unsigned integer"
+        ))),
+        None => Ok(()),
+    }
+}
+
+fn validate_certificate_matches_verification(
+    certificate: &Map<String, Value>,
+    verification: &Value,
+) -> Result<(), StoreError> {
+    let verification_result = verification.get("result").and_then(Value::as_str);
+    if let Some(verification_result) = verification_result {
+        let certificate_result = certificate
+            .get("result")
+            .and_then(Value::as_str)
+            .unwrap_or("(missing)");
+        if !certificate_result_matches_verification(certificate_result, verification_result) {
+            return Err(StoreError::InvalidSealedCommit(format!(
+                "certificate result {certificate_result} does not match verification result {verification_result}"
+            )));
+        }
+    }
+    for (field, verification_count) in [
+        (
+            "open_required_fires",
+            verification
+                .get("open_required_fires")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+        ),
+        (
+            "failed_checks",
+            array_len_u64(verification, "failed_checks"),
+        ),
+        (
+            "missing_required_links",
+            array_len_u64(verification, "missing_required_links"),
+        ),
+        (
+            "stale_resolutions",
+            array_len_u64(verification, "stale_resolutions"),
+        ),
+        (
+            "missing_evidence_refs",
+            array_len_u64(verification, "missing_evidence_refs"),
+        ),
+        (
+            "duplicate_atom_ids",
+            array_len_u64(verification, "duplicate_atom_ids"),
+        ),
+    ] {
+        if let Some(certificate_count) = certificate.get(field).and_then(Value::as_u64) {
+            if certificate_count != verification_count {
+                return Err(StoreError::InvalidSealedCommit(format!(
+                    "certificate {field} count {certificate_count} does not match verification count {verification_count}"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn certificate_result_matches_verification(certificate: &str, verification: &str) -> bool {
+    matches!(
+        (certificate, verification),
+        ("passed", "passed") | ("consistent", "passed")
+    )
+}
+
+fn array_len_u64(payload: &Value, field: &str) -> u64 {
+    payload
+        .get(field)
+        .and_then(Value::as_array)
+        .map_or(0, |values| values.len() as u64)
 }
 
 fn required_reference<'a>(
@@ -1115,6 +1351,93 @@ mod tests {
     }
 
     #[test]
+    fn validate_sealed_commit_rejects_malformed_root_payloads() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let mut roots = write_required_roots(&objects);
+        let atom_index = store_object(
+            &objects,
+            "atom_index",
+            json!({"type": "atom_index", "version": 1, "atoms": "not-a-list", "duplicate_atom_ids": []}),
+        )
+        .unwrap();
+        roots.insert("atom_index".to_string(), Value::String(atom_index));
+        let commit = commit_payload(vec![], roots, consistent_certificate());
+        let commit_id = store_object(&objects, "commit", commit).unwrap();
+
+        let error = validate_sealed_commit(&objects, &commit_id).unwrap_err();
+
+        assert!(
+            matches!(error, StoreError::InvalidSealedCommit(message) if message.contains("atom_index.atoms must be a list"))
+        );
+    }
+
+    #[test]
+    fn validate_sealed_commit_rejects_certificate_verification_mismatch() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let mut roots = write_required_roots(&objects);
+        let verification = store_object(
+            &objects,
+            "verification",
+            json!({
+                "type": "verification",
+                "version": 1,
+                "result": "failed",
+                "open_required_fires": 0,
+                "failed_checks": [{"id": "unit", "command": "false", "output": "failed"}],
+                "missing_required_links": [],
+                "stale_resolutions": [],
+                "missing_evidence_refs": [],
+                "duplicate_atom_ids": [],
+                "verified_at": "2026-06-10T00:00:00Z"
+            }),
+        )
+        .unwrap();
+        roots.insert("verification".to_string(), Value::String(verification));
+        let commit = commit_payload(vec![], roots, consistent_certificate());
+        let commit_id = store_object(&objects, "commit", commit).unwrap();
+
+        let error = validate_sealed_commit(&objects, &commit_id).unwrap_err();
+
+        assert!(
+            matches!(error, StoreError::InvalidSealedCommit(message) if message.contains("certificate result consistent does not match verification result failed"))
+        );
+    }
+
+    #[test]
+    fn current_required_commit_roots_have_payload_validators() {
+        for root in CURRENT_REQUIRED_COMMIT_ROOTS {
+            assert!(
+                expected_root_type(root).is_some(),
+                "{root} must have an expected type"
+            );
+            let malformed = malformed_payload_for_root(root);
+            assert!(
+                validate_root_payload(root, &malformed).is_err(),
+                "{root} validator must reject incomplete payloads"
+            );
+        }
+    }
+
+    fn malformed_payload_for_root(root: &str) -> Value {
+        match root {
+            "content_manifest" => json!({"type": "content_manifest", "version": 1}),
+            "atom_index" => {
+                json!({"type": "atom_index", "version": 1, "atoms": "bad", "duplicate_atom_ids": []})
+            }
+            "trace_graph" => json!({"type": "trace_graph", "version": 1, "links": "bad"}),
+            "fire_delta" => json!({"type": "fire_ledger", "version": 1, "fires": "bad"}),
+            "resolution_ledger" => {
+                json!({"type": "resolution_ledger", "version": 1, "resolutions": "bad"})
+            }
+            "verification" => json!({"type": "verification", "version": 1, "result": "maybe"}),
+            "policy" => json!({"type": "policy", "version": 1}),
+            _ => json!({"type": expected_root_type(root).unwrap_or("unknown"), "version": 1}),
+        }
+    }
+
+    #[test]
     fn validate_sealed_commit_rejects_invalid_parent_id() {
         let temp = tempdir().unwrap();
         let objects = temp.path().join("objects");
@@ -1179,7 +1502,18 @@ mod tests {
         let verification = store_object(
             objects,
             "verification",
-            json!({"type": "verification", "version": 1, "checks": []}),
+            json!({
+                "type": "verification",
+                "version": 1,
+                "result": "passed",
+                "open_required_fires": 0,
+                "failed_checks": [],
+                "missing_required_links": [],
+                "stale_resolutions": [],
+                "missing_evidence_refs": [],
+                "duplicate_atom_ids": [],
+                "verified_at": "2026-06-10T00:00:00Z"
+            }),
         )
         .unwrap();
         let policy = store_object(

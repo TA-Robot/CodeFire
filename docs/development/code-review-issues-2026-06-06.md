@@ -15,8 +15,8 @@
 - High: 36
 - Medium: 121
 - Low: 3
-- Fixed / closed: 150
-- Remaining open: 10
+- Fixed / closed: 153
+- Remaining open: 7
 
 ## Cycle 2 Source Review Expansion
 
@@ -131,7 +131,6 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | CFR-111 | low | ux | HTTP client config | `CODEFIRE_HTTP_TIMEOUT_MS` の不正値が診断されない | [CFR-111](code-review-issues/cfr-111.md) |
 | CFR-113 | medium | ux | Remote upload JSON | upload dry-run envelopeのrepo/next_actionsがtop-levelで弱い | [CFR-113](code-review-issues/cfr-113.md) |
 | CFR-115 | medium | ux | Context/Explain | context/explainのunknown target errorがJSON contractへ乗らない | [CFR-115](code-review-issues/cfr-115.md) |
-| CFR-116 | medium | correctness-risk | Verification policy | VerificationCommandがenv/max_output/timeoutの契約をcore型で十分表現しない | [CFR-116](code-review-issues/cfr-116.md) |
 | CFR-117 | medium | maintainability | Core scan model | ScanResultがchanged atom詳細とnon-Atom変更を同じ粒度で表現しない | [CFR-117](code-review-issues/cfr-117.md) |
 | CFR-118 | medium | performance | Object lookup | unknown object ID lookupがsubdir全走査へ落ちる | [CFR-118](code-review-issues/cfr-118.md) |
 | CFR-119 | medium | correctness-risk | Durability helpers | object store writeのfsync/rename方針がactive metadata writeと別々に進化しやすい | [CFR-119](code-review-issues/cfr-119.md) |
@@ -154,6 +153,9 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | CFR-093 | global burn-down | status JSONのrepo context取得失敗を握りつぶさずstructured diagnosticにした | `status_context_mismatch_returns_structured_diagnostic` |
 | CFR-090 | global burn-down | HTTP remote view bundle temp directoryを呼び出しごとの一意pathとDrop cleanupへ変更 | `view::tests::http_bundle_temp_dirs_are_unique_and_cleaned_on_drop` |
 | CFR-110 | global burn-down | HTTP error responseを`RemoteDiagnostic`として保持しremote diagnostic kind/statusをJSONへ伝播 | `http::tests::http_remote_error_preserves_structured_diagnostic` |
+| CFR-116 | global burn-down | VerificationCommandのtimeout/output/env/allow_failure契約をcore型とlocal runnerへ追加 | `verification_policy_parses_command_execution_contract`; `verification_command_contract_controls_failure_timeout_and_output` |
+| CFR-122 | global burn-down | sealed commit validationでcertificateとverification root result/countを相互検証 | `validate_sealed_commit_rejects_certificate_verification_mismatch` |
+| CFR-123 | global burn-down | required root payload shape validatorsとcoverage testを追加 | `validate_sealed_commit_rejects_malformed_root_payloads`; `current_required_commit_roots_have_payload_validators` |
 
 ### Open Area View
 
@@ -161,16 +163,16 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 |---|---|
 | Automation JSON / errors | none |
 | CLI help and parser consistency | none |
-| View, diff, patch | [CFR-085](code-review-issues/cfr-085.md), [CFR-086](code-review-issues/cfr-086.md), [CFR-087](code-review-issues/cfr-087.md), [CFR-088](code-review-issues/cfr-088.md), [CFR-089](code-review-issues/cfr-089.md), [CFR-090](code-review-issues/cfr-090.md) |
-| Remote | [CFR-112](code-review-issues/cfr-112.md) |
-| Next actions and scan model | [CFR-096](code-review-issues/cfr-096.md), [CFR-097](code-review-issues/cfr-097.md), [CFR-098](code-review-issues/cfr-098.md), [CFR-117](code-review-issues/cfr-117.md) |
-| Batch | [CFR-100](code-review-issues/cfr-100.md), [CFR-101](code-review-issues/cfr-101.md), [CFR-102](code-review-issues/cfr-102.md) |
-| Storage and filesystem scan | [CFR-103](code-review-issues/cfr-103.md), [CFR-104](code-review-issues/cfr-104.md), [CFR-105](code-review-issues/cfr-105.md), [CFR-106](code-review-issues/cfr-106.md) |
-| Evidence | [CFR-107](code-review-issues/cfr-107.md), [CFR-108](code-review-issues/cfr-108.md), [CFR-109](code-review-issues/cfr-109.md) |
-| Context and explain | [CFR-114](code-review-issues/cfr-114.md), [CFR-115](code-review-issues/cfr-115.md) |
-| HTTP config | [CFR-111](code-review-issues/cfr-111.md) |
-| Verification policy | [CFR-116](code-review-issues/cfr-116.md) |
-| Object store and durability | [CFR-118](code-review-issues/cfr-118.md), [CFR-119](code-review-issues/cfr-119.md) |
+| View, diff, patch | [CFR-089](code-review-issues/cfr-089.md) |
+| Remote | [CFR-112](code-review-issues/cfr-112.md), [CFR-129](code-review-issues/cfr-129.md) |
+| Next actions and scan model | none |
+| Batch | none |
+| Storage and filesystem scan | [CFR-105](code-review-issues/cfr-105.md) |
+| Evidence | none |
+| Context and explain | none |
+| HTTP config | none |
+| Verification policy | none |
+| Object store and durability | [CFR-119](code-review-issues/cfr-119.md), [CFR-130](code-review-issues/cfr-130.md) |
 | Development process | [CFR-120](code-review-issues/cfr-120.md) |
 
 ## v0.7 Progress
@@ -182,7 +184,7 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 - Batch 5 fixed: [CFR-025](code-review-issues/cfr-025.md), [CFR-026](code-review-issues/cfr-026.md), [CFR-027](code-review-issues/cfr-027.md), [CFR-028](code-review-issues/cfr-028.md), [CFR-029](code-review-issues/cfr-029.md)
 - Batch 6 fixed: [CFR-030](code-review-issues/cfr-030.md), [CFR-033](code-review-issues/cfr-033.md), [CFR-034](code-review-issues/cfr-034.md), [CFR-035](code-review-issues/cfr-035.md), [CFR-068](code-review-issues/cfr-068.md), [CFR-069](code-review-issues/cfr-069.md), [CFR-070](code-review-issues/cfr-070.md), [CFR-078](code-review-issues/cfr-078.md), [CFR-079](code-review-issues/cfr-079.md)
 - Batch 7 partial fixed: [CFR-041](code-review-issues/cfr-041.md), [CFR-042](code-review-issues/cfr-042.md), [CFR-043](code-review-issues/cfr-043.md), [CFR-044](code-review-issues/cfr-044.md), [CFR-045](code-review-issues/cfr-045.md), [CFR-046](code-review-issues/cfr-046.md), [CFR-048](code-review-issues/cfr-048.md), [CFR-049](code-review-issues/cfr-049.md), [CFR-050](code-review-issues/cfr-050.md), [CFR-051](code-review-issues/cfr-051.md), [CFR-052](code-review-issues/cfr-052.md), [CFR-053](code-review-issues/cfr-053.md), [CFR-054](code-review-issues/cfr-054.md), [CFR-055](code-review-issues/cfr-055.md), [CFR-056](code-review-issues/cfr-056.md).
-- Global burn-down fixed: [CFR-085](code-review-issues/cfr-085.md), [CFR-086](code-review-issues/cfr-086.md), [CFR-087](code-review-issues/cfr-087.md), [CFR-088](code-review-issues/cfr-088.md), [CFR-096](code-review-issues/cfr-096.md), [CFR-097](code-review-issues/cfr-097.md), [CFR-098](code-review-issues/cfr-098.md), [CFR-099](code-review-issues/cfr-099.md), [CFR-100](code-review-issues/cfr-100.md), [CFR-101](code-review-issues/cfr-101.md), [CFR-102](code-review-issues/cfr-102.md), [CFR-103](code-review-issues/cfr-103.md), [CFR-104](code-review-issues/cfr-104.md), [CFR-106](code-review-issues/cfr-106.md), [CFR-107](code-review-issues/cfr-107.md), [CFR-108](code-review-issues/cfr-108.md), [CFR-109](code-review-issues/cfr-109.md), [CFR-115](code-review-issues/cfr-115.md), [CFR-124](code-review-issues/cfr-124.md), [CFR-125](code-review-issues/cfr-125.md), [CFR-126](code-review-issues/cfr-126.md), [CFR-127](code-review-issues/cfr-127.md), [CFR-132](code-review-issues/cfr-132.md), [CFR-133](code-review-issues/cfr-133.md), [CFR-134](code-review-issues/cfr-134.md), [CFR-135](code-review-issues/cfr-135.md), [CFR-136](code-review-issues/cfr-136.md), [CFR-138](code-review-issues/cfr-138.md), [CFR-139](code-review-issues/cfr-139.md), [CFR-140](code-review-issues/cfr-140.md), [CFR-141](code-review-issues/cfr-141.md), [CFR-142](code-review-issues/cfr-142.md), [CFR-143](code-review-issues/cfr-143.md), [CFR-144](code-review-issues/cfr-144.md), [CFR-145](code-review-issues/cfr-145.md), [CFR-146](code-review-issues/cfr-146.md), [CFR-147](code-review-issues/cfr-147.md), [CFR-148](code-review-issues/cfr-148.md), [CFR-149](code-review-issues/cfr-149.md), [CFR-151](code-review-issues/cfr-151.md), [CFR-152](code-review-issues/cfr-152.md), [CFR-153](code-review-issues/cfr-153.md), [CFR-154](code-review-issues/cfr-154.md), [CFR-155](code-review-issues/cfr-155.md), [CFR-156](code-review-issues/cfr-156.md), [CFR-157](code-review-issues/cfr-157.md), [CFR-158](code-review-issues/cfr-158.md), [CFR-159](code-review-issues/cfr-159.md), [CFR-160](code-review-issues/cfr-160.md).
+- Global burn-down fixed: [CFR-085](code-review-issues/cfr-085.md), [CFR-086](code-review-issues/cfr-086.md), [CFR-087](code-review-issues/cfr-087.md), [CFR-088](code-review-issues/cfr-088.md), [CFR-096](code-review-issues/cfr-096.md), [CFR-097](code-review-issues/cfr-097.md), [CFR-098](code-review-issues/cfr-098.md), [CFR-099](code-review-issues/cfr-099.md), [CFR-100](code-review-issues/cfr-100.md), [CFR-101](code-review-issues/cfr-101.md), [CFR-102](code-review-issues/cfr-102.md), [CFR-103](code-review-issues/cfr-103.md), [CFR-104](code-review-issues/cfr-104.md), [CFR-106](code-review-issues/cfr-106.md), [CFR-107](code-review-issues/cfr-107.md), [CFR-108](code-review-issues/cfr-108.md), [CFR-109](code-review-issues/cfr-109.md), [CFR-115](code-review-issues/cfr-115.md), [CFR-116](code-review-issues/cfr-116.md), [CFR-122](code-review-issues/cfr-122.md), [CFR-123](code-review-issues/cfr-123.md), [CFR-124](code-review-issues/cfr-124.md), [CFR-125](code-review-issues/cfr-125.md), [CFR-126](code-review-issues/cfr-126.md), [CFR-127](code-review-issues/cfr-127.md), [CFR-132](code-review-issues/cfr-132.md), [CFR-133](code-review-issues/cfr-133.md), [CFR-134](code-review-issues/cfr-134.md), [CFR-135](code-review-issues/cfr-135.md), [CFR-136](code-review-issues/cfr-136.md), [CFR-138](code-review-issues/cfr-138.md), [CFR-139](code-review-issues/cfr-139.md), [CFR-140](code-review-issues/cfr-140.md), [CFR-141](code-review-issues/cfr-141.md), [CFR-142](code-review-issues/cfr-142.md), [CFR-143](code-review-issues/cfr-143.md), [CFR-144](code-review-issues/cfr-144.md), [CFR-145](code-review-issues/cfr-145.md), [CFR-146](code-review-issues/cfr-146.md), [CFR-147](code-review-issues/cfr-147.md), [CFR-148](code-review-issues/cfr-148.md), [CFR-149](code-review-issues/cfr-149.md), [CFR-151](code-review-issues/cfr-151.md), [CFR-152](code-review-issues/cfr-152.md), [CFR-153](code-review-issues/cfr-153.md), [CFR-154](code-review-issues/cfr-154.md), [CFR-155](code-review-issues/cfr-155.md), [CFR-156](code-review-issues/cfr-156.md), [CFR-157](code-review-issues/cfr-157.md), [CFR-158](code-review-issues/cfr-158.md), [CFR-159](code-review-issues/cfr-159.md), [CFR-160](code-review-issues/cfr-160.md).
 - Plan: [v0.7-issue-improvement-plan.md](v0.7-issue-improvement-plan.md)
 
 ## Priority Buckets

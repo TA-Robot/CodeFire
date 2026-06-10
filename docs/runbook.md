@@ -101,10 +101,19 @@ verification:
     - id: unit-tests
       command: "python3 -m unittest discover -s tests"
       cwd: "."
+      timeout_ms: 300000
+      max_output_bytes: 65536
+      inherit_env: true
     - id: lint-smoke
       command: "python3 -m py_compile src/auth.py"
       cwd: "."
+      env: PYTHONDONTWRITEBYTECODE=1
+      allow_failure: false
 ```
+
+verification commandのdefaultは `timeout_ms: 300000`、`max_output_bytes: 65536`、`inherit_env: true`、`env: ""`、`allow_failure: false` である。`inherit_env: false` を指定するとcommand実行前にenvironmentをclearし、`env` の `KEY=VALUE` comma-separated listだけを追加する。`allow_failure: true` は非ゼロ終了をblocking failureにしないが、timeoutは失敗として扱う。
+
+commit certificateの `result` はverification rootから導出される。現行語彙は `passed` / `failed` で、既存commit互換のためcertificate側の `consistent` は `verification.result=passed` のlegacy aliasとしてだけ受理する。
 
 `codefire.yaml` / `codefire.links.yaml` / `codefire.policy.yaml` は標準ライブラリのみの限定YAML subsetとして読む。subset内で必須項目が欠けている場合は、`verify` / `scan` 時に `invalid codefire.*.yaml` エラーとして失敗する。
 
