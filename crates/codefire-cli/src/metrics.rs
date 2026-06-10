@@ -1,4 +1,4 @@
-use crate::Status;
+use crate::{Branch, Status};
 use serde_json::{json, Map, Value};
 use std::time::Duration;
 
@@ -48,6 +48,29 @@ pub(crate) fn status_metrics(elapsed: Duration, status: &Status) -> CommandMetri
         counters: vec![
             counter("open_fires", status.open_fires),
             counter("state_known", usize::from(!status.state.is_empty())),
+        ],
+        cache: cache_unimplemented(),
+    }
+}
+
+pub(crate) fn branch_list_metrics(elapsed: Duration, branches: &[Branch]) -> CommandMetrics {
+    let total_ms = elapsed.as_millis();
+    CommandMetrics {
+        command: "branch-list",
+        total_ms,
+        phases: vec![
+            measured_phase("total", total_ms),
+            measured_phase("branch_list_load", total_ms),
+        ],
+        counters: vec![
+            counter("branches", branches.len()),
+            counter(
+                "open_branches",
+                branches
+                    .iter()
+                    .filter(|branch| branch.state.starts_with("open-"))
+                    .count(),
+            ),
         ],
         cache: cache_unimplemented(),
     }

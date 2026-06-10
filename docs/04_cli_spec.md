@@ -5,7 +5,7 @@
 ```bash
 codefire init
 
-codefire branch list
+codefire branch list [--json] [--metrics]
 
 codefire open <branch> <path>
 codefire close <branch>

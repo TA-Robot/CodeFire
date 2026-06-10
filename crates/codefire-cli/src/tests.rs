@@ -55,6 +55,14 @@ fn command_help_routes_before_mutating_parsers() {
 
     let init_options = parse_init_args(&["--help".to_string()]).unwrap();
     assert_eq!(init_options.path, PathBuf::from("--help"));
+
+    let branch_list_help = command_help_for_args(&[
+        "branch".to_string(),
+        "list".to_string(),
+        "--help".to_string(),
+    ])
+    .expect("branch list help should be routed");
+    assert!(branch_list_help.contains("--metrics"));
 }
 
 #[test]
@@ -5300,6 +5308,44 @@ fn metrics_attach_to_status_scan_and_verify_data() {
         .any(|counter| counter["name"] == "atoms" && counter["value"] == 1));
     assert_eq!(scan_data["metrics"]["cache_status"], "unavailable");
     assert!(scan_data["metrics"].get("cache").is_none());
+
+    let branch_data = attach_metrics(
+        json!({
+            "type": "codefire_branch_list",
+            "version": 1,
+            "branches": [],
+        }),
+        Some(&branch_list_metrics(
+            Duration::from_millis(4),
+            &[
+                Branch {
+                    name: "main".to_string(),
+                    head: "CF-COMMIT-main".to_string(),
+                    state: "closed".to_string(),
+                },
+                Branch {
+                    name: "feature".to_string(),
+                    head: "CF-COMMIT-feature".to_string(),
+                    state: "open-clean".to_string(),
+                },
+            ],
+        )),
+    );
+    assert_eq!(branch_data["metrics"]["command"], "branch-list");
+    assert_eq!(
+        branch_data["metrics"]["phase_timings"]["branch_list_load_ms"],
+        4
+    );
+    assert!(branch_data["metrics"]["counters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|counter| counter["name"] == "branches" && counter["value"] == 2));
+    assert!(branch_data["metrics"]["counters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|counter| counter["name"] == "open_branches" && counter["value"] == 1));
 
     let verification = run_verify(&open_dir).unwrap();
     let verify_data = attach_metrics(

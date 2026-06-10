@@ -76,7 +76,10 @@ use merge_patch_idempotency::{
     load_merge_idempotency, load_patch_import_idempotency, merge_idempotency_payload,
     patch_import_idempotency_payload, save_merge_idempotency, save_patch_import_idempotency,
 };
-use metrics::{attach_metrics, print_metrics, scan_metrics, status_metrics, verification_metrics};
+use metrics::{
+    attach_metrics, branch_list_metrics, print_metrics, scan_metrics, status_metrics,
+    verification_metrics,
+};
 use migration::{
     migration_report_data_json, migration_report_diagnostics_json, migration_report_next_actions,
     parse_migrate_args, print_migration_report, run_migrate,
@@ -543,7 +546,11 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 }
                 let options = parse_path_json_args(&args[2..], "branch list")?;
                 let start = options.path;
+                let started = Instant::now();
                 let branches = list_branches(&start)?;
+                let metrics = options
+                    .metrics
+                    .then(|| branch_list_metrics(started.elapsed(), &branches));
                 if options.json_output {
                     let repo_root = find_repo_root(&start).ok();
                     println!(
@@ -553,17 +560,20 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                             true,
                             0,
                             repo_root.as_deref(),
-                            json!({
+                            attach_metrics(json!({
                                 "type": "codefire_branch_list",
                                 "version": 1,
                                 "branches": branches.iter().map(branch_json).collect::<Vec<_>>(),
-                            }),
+                            }), metrics.as_ref()),
                             Vec::new(),
                             Vec::new(),
                         ))?
                     );
                 } else {
                     print_branches(&branches);
+                    if let Some(metrics) = metrics.as_ref() {
+                        print_metrics(metrics);
+                    }
                 }
                 Ok(())
             }
@@ -928,7 +938,7 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire commit [path|--path <open-dir>] -m <message> [--dry-run] [--json] [--idempotency-key <key>]\n"
         }
         "branch" | "branch list" => {
-            "usage: codefire branch list [path|--path <repo-or-open>] [--json]\n\nList local branches.\n"
+            "usage: codefire branch list [path|--path <repo-or-open>] [--json] [--metrics]\n\nList local branches.\n"
         }
         "context" => {
             "usage: codefire context (--changed|--atom <atom-id>|--fire <fire-id>|--branch <branch>) [--path <open-dir>] [--depth <n>] [--limit <n>] [--json]\n\nBuild a bounded context pack for an open directory.\n"
