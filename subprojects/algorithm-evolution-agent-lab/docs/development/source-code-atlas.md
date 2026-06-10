@@ -293,6 +293,11 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary.summarize(archive
   -> expose archive status, readiness, artifacts, audit availability, and finding counts as machine-readable data
   -> recompute only per-artifact byte counts and hashes from in-memory archive contents
   -> avoid archive rebuilds, verification reruns, filesystem reads, and storage adapter coupling
+
+ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdown.render(summary)
+  -> render final review archive summary dictionaries as reviewer-facing Markdown indexes
+  -> include statuses, counts, audit availability, and artifact path/hash/byte table
+  -> avoid archive rebuilds, hash recomputation, verification reruns, and filesystem reads
 ```
 
 Important implementation details:

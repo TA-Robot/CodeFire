@@ -9,6 +9,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReadinessMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown,
@@ -1267,6 +1268,55 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertEqual("cycle-27/review-packet.md", artifacts[0]["path"])
         self.assertGreater(artifacts[0]["byte_count"], 0)
         self.assertTrue(artifacts[0]["content_sha256"].startswith("sha256:"))
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-markdown-renders-index
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_markdown_renders_index(
+        self,
+    ) -> None:
+        summary = {
+            "source_cycles": ["cycle-28"],
+            "archive_status": "ok",
+            "ready": True,
+            "readiness_status": "ready",
+            "manifest_status": "ok",
+            "verification_status": "ok",
+            "artifact_count": 2,
+            "finding_count": 0,
+            "audits": {
+                "manifest_markdown": True,
+                "verification_markdown": True,
+            },
+            "artifacts": [
+                {
+                    "path": "cycle-28/review-packet.md",
+                    "byte_count": 123,
+                    "content_sha256": "sha256:abc123",
+                },
+                {
+                    "path": "cycle-28/readiness.md",
+                    "byte_count": 45,
+                    "content_sha256": "sha256:def456",
+                },
+            ],
+        }
+
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdown().render(
+            summary,
+            title="Cycle 28 Archive Summary",
+        )
+
+        self.assertIn("# Cycle 28 Archive Summary", markdown)
+        self.assertIn("- Source cycles: cycle-28", markdown)
+        self.assertIn("- Archive status: ok", markdown)
+        self.assertIn("- Ready: yes", markdown)
+        self.assertIn("- Readiness status: ready", markdown)
+        self.assertIn("- Manifest status: ok", markdown)
+        self.assertIn("- Verification status: ok", markdown)
+        self.assertIn("- Artifact count: 2", markdown)
+        self.assertIn("- Finding count: 0", markdown)
+        self.assertIn("| `cycle-28/review-packet.md` | 123 | `sha256:abc123` |", markdown)
+        self.assertIn("- Manifest Markdown: included", markdown)
+        self.assertIn("- Verification Markdown: included", markdown)
 
 
 if __name__ == "__main__":

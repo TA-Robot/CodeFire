@@ -810,3 +810,17 @@ The summary contains:
 - audit document availability for manifest Markdown and verification Markdown
 
 The summarizer recomputes only per-artifact digest metadata from in-memory artifact contents. It does not rebuild the archive, rerun verification, read files, or mutate the packet.
+
+## DES-AUTO-046: Research cycle planning handoff review packet artifact archive summary Markdown
+
+The review packet artifact archive summary Markdown renderer consumes the dictionary emitted by `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary`.
+
+The rendered document includes:
+
+- source cycles
+- archive, readiness, manifest, and verification status
+- artifact count and finding count
+- audit availability for manifest and verification Markdown
+- artifact table with path, byte count, and SHA-256 digest
+
+The renderer treats the summary as the single source of truth. It does not rebuild archives, recompute hashes, rerun verification, or read files.
