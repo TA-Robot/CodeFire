@@ -15,8 +15,8 @@
 - High: 36
 - Medium: 121
 - Low: 3
-- Fixed / closed: 148
-- Remaining open: 12
+- Fixed / closed: 149
+- Remaining open: 11
 
 ## Cycle 2 Source Review Expansion
 
@@ -152,6 +152,7 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | CFR-150 | global burn-down | command capability registryに`supports_metrics`を追加し`capabilities --json`で公開 | `command_capabilities_are_shared_by_help_completion_and_metrics_parser` |
 | CFR-113 | global burn-down | upload dry-run envelopeがtop-level repo/next_actionsを返す既存実装をclose auditで確認 | `file_remote_upload_clone_show_diff_and_merge_request_flow` |
 | CFR-093 | global burn-down | status JSONのrepo context取得失敗を握りつぶさずstructured diagnosticにした | `status_context_mismatch_returns_structured_diagnostic` |
+| CFR-090 | global burn-down | HTTP remote view bundle temp directoryを呼び出しごとの一意pathとDrop cleanupへ変更 | `view::tests::http_bundle_temp_dirs_are_unique_and_cleaned_on_drop` |
 
 ### Open Area View
 

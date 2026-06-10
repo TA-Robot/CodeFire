@@ -13,6 +13,8 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 mod file_diff;
 mod semantic_diff;
@@ -76,7 +78,21 @@ struct ResolvedCommitish {
     objects: PathBuf,
     commit_id: String,
     label: String,
+    _temp_objects: Option<Arc<TempObjectDir>>,
 }
+
+#[derive(Debug)]
+struct TempObjectDir {
+    path: PathBuf,
+}
+
+impl Drop for TempObjectDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
+}
+
+static HTTP_BUNDLE_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
 pub(crate) struct ReviewPackOptions {
@@ -463,6 +479,7 @@ fn first_parent_commitish(source: &ResolvedCommitish) -> Result<ResolvedCommitis
         objects: source.objects.clone(),
         commit_id: parent.to_string(),
         label: format!("parent@{parent}"),
+        _temp_objects: source._temp_objects.clone(),
     })
 }
 
@@ -536,22 +553,19 @@ fn resolve_commitish_any(
                     "HTTP remote returned an invalid branch bundle".to_string(),
                 )
             })?;
-        let temp_objects = env::temp_dir().join(format!(
-            "codefire-http-objects-{}-{}",
-            std::process::id(),
-            stable_hash_48(value.as_bytes())
-        ));
-        if temp_objects.exists() {
-            fs::remove_dir_all(&temp_objects)?;
-        }
+        let temp_objects = unique_http_bundle_objects_dir(value)?;
         ensure_object_dirs(&temp_objects)?;
         write_object_records(&temp_objects, records.iter().cloned())?;
         let head = required_string(branch, &["head"])?;
         codefire_store::validate_sealed_commit(&temp_objects, &head)?;
+        let temp_guard = Arc::new(TempObjectDir {
+            path: temp_objects.clone(),
+        });
         return Ok(ResolvedCommitish {
             objects: temp_objects,
             commit_id: head.clone(),
             label: format!("{value}@{head}"),
+            _temp_objects: Some(temp_guard),
         });
     }
     if value.starts_with("cf://") {
@@ -564,6 +578,7 @@ fn resolve_commitish_any(
             objects,
             commit_id: head.clone(),
             label: format!("{value}@{head}"),
+            _temp_objects: None,
         });
     }
     let repo_root = repo_root.ok_or_else(|| {
@@ -576,7 +591,25 @@ fn resolve_commitish_any(
         objects: repo_root.join(".codefire").join("objects"),
         commit_id,
         label,
+        _temp_objects: None,
     })
+}
+
+fn unique_http_bundle_objects_dir(value: &str) -> Result<PathBuf, CliError> {
+    let prefix = format!(
+        "codefire-http-objects-{}-{}",
+        std::process::id(),
+        stable_hash_48(value.as_bytes())
+    );
+    loop {
+        let counter = HTTP_BUNDLE_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = env::temp_dir().join(format!("{prefix}-{counter}"));
+        match fs::create_dir(&path) {
+            Ok(()) => return Ok(path),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(CliError::Io(error)),
+        }
+    }
 }
 
 fn root_object(objects: &Path, commit: &Value, root_name: &str) -> Result<Value, CliError> {
@@ -614,4 +647,31 @@ pub(crate) fn manifest_contents(
         contents.insert(rel_path, decode_base64(&content)?);
     }
     Ok(contents)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn http_bundle_temp_dirs_are_unique_and_cleaned_on_drop() {
+        let value = "cf+http://127.0.0.1:9/org/app/main";
+        let first = unique_http_bundle_objects_dir(value).unwrap();
+        let second = unique_http_bundle_objects_dir(value).unwrap();
+        assert_ne!(first, second);
+        assert!(first.exists());
+        assert!(second.exists());
+
+        let first_guard = Arc::new(TempObjectDir {
+            path: first.clone(),
+        });
+        let second_guard = Arc::new(TempObjectDir {
+            path: second.clone(),
+        });
+        drop(first_guard);
+        drop(second_guard);
+
+        assert!(!first.exists());
+        assert!(!second.exists());
+    }
 }
