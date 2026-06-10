@@ -5,6 +5,7 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 const DEFAULT_LARGE_THRESHOLD_BYTES: u64 = 1_048_576;
 const LARGEST_OBJECT_LIMIT: usize = 10;
@@ -29,6 +30,7 @@ pub(crate) struct StorageReport {
     pub(crate) external_artifacts: ExternalArtifactStats,
     pub(crate) remotes: Vec<RemoteStorageStats>,
     pub(crate) warnings: Vec<StorageWarning>,
+    pub(crate) object_scan: ObjectScanMetrics,
     pub(crate) quick: bool,
     pub(crate) skipped_checks: Vec<String>,
     pub(crate) largest_limit: usize,
@@ -118,6 +120,16 @@ pub(crate) struct StorageWarning {
     pub(crate) message: String,
     pub(crate) path: Option<PathBuf>,
     pub(crate) bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ObjectScanMetrics {
+    pub(crate) mode: String,
+    pub(crate) elapsed_ms: u64,
+    pub(crate) files_seen: u64,
+    pub(crate) bytes_seen: u64,
+    pub(crate) json_records_parsed: u64,
+    pub(crate) invalid_records: u64,
 }
 
 pub(crate) fn parse_storage_report_args(args: &[String]) -> Result<StorageReportOptions, CliError> {
@@ -216,6 +228,7 @@ pub(crate) fn run_storage_report(
         external_artifacts: object_scan.external_artifacts,
         remotes: remote_scan.remotes,
         warnings,
+        object_scan: object_scan.metrics,
         quick: options.quick,
         skipped_checks: object_scan.skipped_checks,
         largest_limit: LARGEST_OBJECT_LIMIT,
@@ -240,6 +253,7 @@ pub(crate) fn storage_report_data_json(report: &StorageReport) -> Value {
         "objects": {
             "files": report.objects.files,
             "bytes": report.objects.bytes,
+            "scan": object_scan_metrics_json(&report.object_scan),
             "by_type": report.object_types.iter().map(object_type_json).collect::<Vec<_>>(),
             "largest_limit": report.largest_limit,
             "largest": report.largest_objects.iter().map(object_file_json).collect::<Vec<_>>(),
@@ -390,6 +404,7 @@ struct ObjectScan {
     external_artifacts: ExternalArtifactStats,
     warnings: Vec<StorageWarning>,
     skipped_checks: Vec<String>,
+    metrics: ObjectScanMetrics,
 }
 
 fn scan_objects(
@@ -397,6 +412,7 @@ fn scan_objects(
     large_threshold_bytes: u64,
     quick: bool,
 ) -> Result<ObjectScan, CliError> {
+    let started = Instant::now();
     let mut area = AreaStats::default();
     let mut by_type = BTreeMap::<String, AreaStats>::new();
     let mut largest_objects = Vec::new();
@@ -411,6 +427,8 @@ fn scan_objects(
     } else {
         Vec::new()
     };
+    let mut json_records_parsed = 0u64;
+    let mut invalid_records = 0u64;
     for path in collect_files_optional(objects_root)? {
         let bytes = fs::metadata(&path)?.len();
         area.files += 1;
@@ -446,6 +464,7 @@ fn scan_objects(
         let value = match read_json(&path) {
             Ok(value) => value,
             Err(error) => {
+                invalid_records += 1;
                 warnings.push(StorageWarning {
                     kind: "invalid_object_json".to_string(),
                     message: error.to_string(),
@@ -456,8 +475,12 @@ fn scan_objects(
             }
         };
         let record = match serde_json::from_value::<codefire_store::ObjectRecord>(value) {
-            Ok(record) => record,
+            Ok(record) => {
+                json_records_parsed += 1;
+                record
+            }
             Err(error) => {
+                invalid_records += 1;
                 warnings.push(StorageWarning {
                     kind: "invalid_object_record".to_string(),
                     message: error.to_string(),
@@ -525,6 +548,14 @@ fn scan_objects(
             .cmp(&left.bytes)
             .then_with(|| left.type_tag.cmp(&right.type_tag))
     });
+    let metrics = ObjectScanMetrics {
+        mode: if quick { "quick" } else { "full" }.to_string(),
+        elapsed_ms: started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64,
+        files_seen: area.files,
+        bytes_seen: area.bytes,
+        json_records_parsed,
+        invalid_records,
+    };
     Ok(ObjectScan {
         area,
         object_types,
@@ -532,6 +563,18 @@ fn scan_objects(
         external_artifacts,
         warnings,
         skipped_checks,
+        metrics,
+    })
+}
+
+fn object_scan_metrics_json(metrics: &ObjectScanMetrics) -> Value {
+    json!({
+        "mode": &metrics.mode,
+        "elapsed_ms": metrics.elapsed_ms,
+        "files_seen": metrics.files_seen,
+        "bytes_seen": metrics.bytes_seen,
+        "json_records_parsed": metrics.json_records_parsed,
+        "invalid_records": metrics.invalid_records,
     })
 }
 

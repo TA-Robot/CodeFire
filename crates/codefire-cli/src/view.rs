@@ -19,6 +19,8 @@ use std::sync::Arc;
 mod file_diff;
 mod semantic_diff;
 
+type ManifestContents = BTreeMap<String, Vec<u8>>;
+
 pub(crate) const DEFAULT_PATCH_EXPORT_MAX_FILE_BYTES: usize = 1_048_576;
 pub(crate) const DEFAULT_PATCH_EXPORT_MAX_PAYLOAD_BYTES: usize = 4_194_304;
 
@@ -84,6 +86,11 @@ struct ResolvedCommitish {
 #[derive(Debug)]
 struct TempObjectDir {
     path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ManifestBlobEntry {
+    blob_id: String,
 }
 
 impl Drop for TempObjectDir {
@@ -229,8 +236,19 @@ fn diff_resolved_commitish_with_options(
     right: &ResolvedCommitish,
     options: &DiffOptions,
 ) -> Result<String, CliError> {
-    let left_files = manifest_contents(&left.objects, &left.commit_id)?;
-    let right_files = manifest_contents(&right.objects, &right.commit_id)?;
+    let (left_files, right_files) = if options.rename_detection {
+        (
+            manifest_contents(&left.objects, &left.commit_id)?,
+            manifest_contents(&right.objects, &right.commit_id)?,
+        )
+    } else {
+        manifest_diff_contents(
+            &left.objects,
+            &left.commit_id,
+            &right.objects,
+            &right.commit_id,
+        )?
+    };
     let left_index = (options.atom_diff || options.impact_diff || options.json_output)
         .then(|| load_atom_index(&left.objects, &left.commit_id))
         .transpose()?;
@@ -361,11 +379,11 @@ pub(crate) fn patch_export_with_options(
     } else {
         first_parent_commitish(&source)?
     };
-    let base_files = manifest_contents(&base.objects, &base.commit_id)?;
-    let source_files = manifest_contents(&source.objects, &source.commit_id)?;
-    let paths = base_files
+    let base_entries = manifest_blob_entries(&base.objects, &base.commit_id)?;
+    let source_entries = manifest_blob_entries(&source.objects, &source.commit_id)?;
+    let paths = base_entries
         .keys()
-        .chain(source_files.keys())
+        .chain(source_entries.keys())
         .cloned()
         .collect::<std::collections::BTreeSet<_>>();
     let mut entries = Vec::new();
@@ -376,12 +394,13 @@ pub(crate) fn patch_export_with_options(
     let mut delete_entries = 0usize;
     let mut omitted_entries = 0usize;
     for path in paths {
-        let base_data = base_files.get(&path);
-        let source_data = source_files.get(&path);
-        if base_data == source_data {
+        let base_entry = base_entries.get(&path);
+        let source_entry = source_entries.get(&path);
+        if base_entry == source_entry {
             continue;
         }
-        if let Some(data) = source_data {
+        if let Some(source_entry) = source_entry {
+            let data = read_blob_content(&source.objects, &source_entry.blob_id)?;
             let encoded_len = encoded_base64_len(data.len());
             let omission_reason = if options.include_large_files {
                 None
@@ -399,7 +418,7 @@ pub(crate) fn patch_export_with_options(
                     "action": "omit",
                     "reason": reason,
                     "bytes": data.len(),
-                    "sha256": codefire_util::sha256_hex(data),
+                    "sha256": codefire_util::sha256_hex(&data),
                     "max_file_bytes": options.max_file_bytes,
                     "max_payload_bytes": options.max_payload_bytes,
                 });
@@ -414,7 +433,7 @@ pub(crate) fn patch_export_with_options(
                     "path": path,
                     "action": "write",
                     "encoding": "base64",
-                    "content": encode_base64(data),
+                    "content": encode_base64(&data),
                     "bytes": data.len(),
                 }));
             }
@@ -620,7 +639,7 @@ fn root_object(objects: &Path, commit: &Value, root_name: &str) -> Result<Value,
 pub(crate) fn manifest_contents(
     objects: &Path,
     commit_id: &str,
-) -> Result<BTreeMap<String, Vec<u8>>, CliError> {
+) -> Result<ManifestContents, CliError> {
     let commit = codefire_store::read_object(objects, commit_id)?;
     let manifest = root_object(objects, &commit, "content_manifest")?;
     let entries = manifest
@@ -636,22 +655,136 @@ pub(crate) fn manifest_contents(
         }
         let rel_path = required_string(entry, &["path"])?;
         let blob_id = required_string(entry, &["blob"])?;
-        let blob = codefire_store::read_object(objects, &blob_id)?;
-        let encoding = required_string(&blob, &["encoding"])?;
-        if encoding != "base64" {
-            return Err(CliError::InvalidRepository(format!(
-                "unsupported blob encoding: {encoding}"
-            )));
-        }
-        let content = required_string(&blob, &["content"])?;
-        contents.insert(rel_path, decode_base64(&content)?);
+        contents.insert(rel_path, read_blob_content(objects, &blob_id)?);
     }
     Ok(contents)
+}
+
+fn manifest_diff_contents(
+    left_objects: &Path,
+    left_commit_id: &str,
+    right_objects: &Path,
+    right_commit_id: &str,
+) -> Result<(ManifestContents, ManifestContents), CliError> {
+    let left_entries = manifest_blob_entries(left_objects, left_commit_id)?;
+    let right_entries = manifest_blob_entries(right_objects, right_commit_id)?;
+    let paths = left_entries
+        .keys()
+        .chain(right_entries.keys())
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut left_contents = BTreeMap::new();
+    let mut right_contents = BTreeMap::new();
+    for path in paths {
+        let left = left_entries.get(&path);
+        let right = right_entries.get(&path);
+        if left == right {
+            continue;
+        }
+        if let Some(entry) = left {
+            left_contents.insert(
+                path.clone(),
+                read_blob_content(left_objects, &entry.blob_id)?,
+            );
+        }
+        if let Some(entry) = right {
+            right_contents.insert(path, read_blob_content(right_objects, &entry.blob_id)?);
+        }
+    }
+    Ok((left_contents, right_contents))
+}
+
+fn manifest_blob_entries(
+    objects: &Path,
+    commit_id: &str,
+) -> Result<BTreeMap<String, ManifestBlobEntry>, CliError> {
+    let commit = codefire_store::read_object(objects, commit_id)?;
+    let manifest = root_object(objects, &commit, "content_manifest")?;
+    let entries = manifest
+        .get("entries")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            CliError::InvalidRepository("content manifest entries must be a list".to_string())
+        })?;
+    let mut blobs = BTreeMap::new();
+    for entry in entries {
+        if entry.get("kind").and_then(Value::as_str) != Some("file") {
+            continue;
+        }
+        let rel_path = required_string(entry, &["path"])?;
+        let blob_id = required_string(entry, &["blob"])?;
+        blobs.insert(rel_path, ManifestBlobEntry { blob_id });
+    }
+    Ok(blobs)
+}
+
+fn read_blob_content(objects: &Path, blob_id: &str) -> Result<Vec<u8>, CliError> {
+    let blob = codefire_store::read_object(objects, blob_id)?;
+    let encoding = required_string(&blob, &["encoding"])?;
+    if encoding != "base64" {
+        return Err(CliError::InvalidRepository(format!(
+            "unsupported blob encoding: {encoding}"
+        )));
+    }
+    let content = required_string(&blob, &["content"])?;
+    decode_base64(&content)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn manifest_diff_contents_skips_unchanged_blob_reads() {
+        let temp = tempfile::tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        ensure_object_dirs(&objects).unwrap();
+        let missing_unchanged_blob = "CF-BLOB-missing-unchanged";
+        let left_changed = codefire_store::store_object(
+            &objects,
+            "blob",
+            json!({
+                "type": "blob",
+                "version": 1,
+                "encoding": "base64",
+                "content": "bGVmdAo=",
+            }),
+        )
+        .unwrap();
+        let right_changed = codefire_store::store_object(
+            &objects,
+            "blob",
+            json!({
+                "type": "blob",
+                "version": 1,
+                "encoding": "base64",
+                "content": "cmlnaHQK",
+            }),
+        )
+        .unwrap();
+        let left_commit = write_manifest_only_commit(
+            &objects,
+            &[
+                ("changed.txt", left_changed.as_str()),
+                ("unchanged.txt", missing_unchanged_blob),
+            ],
+        );
+        let right_commit = write_manifest_only_commit(
+            &objects,
+            &[
+                ("changed.txt", right_changed.as_str()),
+                ("unchanged.txt", missing_unchanged_blob),
+            ],
+        );
+
+        let (left, right) =
+            manifest_diff_contents(&objects, &left_commit, &objects, &right_commit).unwrap();
+
+        assert_eq!(left.keys().collect::<Vec<_>>(), vec!["changed.txt"]);
+        assert_eq!(right.keys().collect::<Vec<_>>(), vec!["changed.txt"]);
+        assert_eq!(left["changed.txt"], b"left\n");
+        assert_eq!(right["changed.txt"], b"right\n");
+    }
 
     #[test]
     fn http_bundle_temp_dirs_are_unique_and_cleaned_on_drop() {
@@ -673,5 +806,33 @@ mod tests {
 
         assert!(!first.exists());
         assert!(!second.exists());
+    }
+
+    fn write_manifest_only_commit(objects: &Path, entries: &[(&str, &str)]) -> String {
+        let manifest = codefire_store::store_object(
+            objects,
+            "content_manifest",
+            json!({
+                "type": "content_manifest",
+                "version": 1,
+                "entries": entries.iter().map(|(path, blob)| {
+                    json!({"path": path, "kind": "file", "mode": "100644", "blob": blob})
+                }).collect::<Vec<_>>(),
+            }),
+        )
+        .unwrap();
+        codefire_store::store_object(
+            objects,
+            "commit",
+            json!({
+                "type": "commit",
+                "version": 1,
+                "parents": [],
+                "message": "manifest fixture",
+                "roots": {"content_manifest": manifest},
+                "created_at": "2026-06-10T00:00:00Z",
+            }),
+        )
+        .unwrap()
     }
 }

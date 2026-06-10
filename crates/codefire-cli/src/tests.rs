@@ -3918,6 +3918,15 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
         .iter()
         .any(|warning| warning.kind == "payload_type_mismatch"));
     assert_eq!(data["type"], "codefire_storage_report");
+    assert_eq!(data["objects"]["scan"]["mode"], "full");
+    assert!(data["objects"]["scan"]["files_seen"].as_u64().unwrap() >= 10);
+    assert!(data["objects"]["scan"]["bytes_seen"].as_u64().unwrap() > 0);
+    assert!(
+        data["objects"]["scan"]["json_records_parsed"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
     assert!(data["objects"]["by_type"]
         .as_array()
         .unwrap()
@@ -3941,6 +3950,14 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
     let quick_data = storage_report_data_json(&quick);
     assert!(quick.quick);
     assert_eq!(quick_data["mode"], "quick");
+    assert_eq!(quick_data["objects"]["scan"]["mode"], "quick");
+    assert_eq!(quick_data["objects"]["scan"]["json_records_parsed"], 0);
+    assert!(
+        quick_data["objects"]["scan"]["files_seen"]
+            .as_u64()
+            .unwrap()
+            >= 10
+    );
     assert_eq!(quick_data["coverage"]["object_json_validation"], false);
     assert_eq!(
         quick_data["coverage"]["largest_object_type_source"],

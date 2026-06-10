@@ -15,8 +15,8 @@
 - High: 36
 - Medium: 121
 - Low: 3
-- Fixed / closed: 155
-- Remaining open: 5
+- Fixed / closed: 157
+- Remaining open: 3
 
 ## Cycle 2 Source Review Expansion
 
@@ -157,6 +157,8 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | CFR-123 | global burn-down | required root payload shape validatorsとcoverage testを追加 | `validate_sealed_commit_rejects_malformed_root_payloads`; `current_required_commit_roots_have_payload_validators` |
 | CFR-112 | global burn-down | file remote upload dry-runで既存remote layoutをread-only検証しplanへvalidationsを追加 | `file_remote_upload_dry_run_rejects_existing_invalid_layout`; `file_remote_upload_clone_show_diff_and_merge_request_flow` |
 | CFR-129 | global burn-down | HTTP request-merge dry-runでremote branch headを解決し空head planを廃止 | `http_request_merge_dry_run_validates_branch_heads` |
+| CFR-089 | global burn-down | manifest metadata差分で変更候補を決め、通常diff/patch exportで未変更blobのcontent readを避ける | `view::tests::manifest_diff_contents_skips_unchanged_blob_reads`; `patch_export_json_metadata_and_large_file_omission_are_bounded` |
+| CFR-105 | global burn-down | storage report JSONにobject scan metricsを追加し、quick/fullのJSON parse件数を可視化 | `storage_report_counts_objects_by_type_and_warns_large_objects` |
 
 ### Open Area View
 
@@ -164,11 +166,11 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 |---|---|
 | Automation JSON / errors | none |
 | CLI help and parser consistency | none |
-| View, diff, patch | [CFR-089](code-review-issues/cfr-089.md) |
+| View, diff, patch | none |
 | Remote | none |
 | Next actions and scan model | none |
 | Batch | none |
-| Storage and filesystem scan | [CFR-105](code-review-issues/cfr-105.md) |
+| Storage and filesystem scan | none |
 | Evidence | none |
 | Context and explain | none |
 | HTTP config | none |

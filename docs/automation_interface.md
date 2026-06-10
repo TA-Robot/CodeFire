@@ -281,6 +281,14 @@ Doctor active state diagnostics include `missing_active_state_file` when an acti
   "objects": {
     "files": 12,
     "bytes": 4096,
+    "scan": {
+      "mode": "full",
+      "elapsed_ms": 3,
+      "files_seen": 12,
+      "bytes_seen": 4096,
+      "json_records_parsed": 12,
+      "invalid_records": 0
+    },
     "by_type": [{"type": "commit", "files": 1, "bytes": 512}],
     "largest_limit": 10,
     "largest": [{"object_id": "CF-COMMIT-...", "type": "commit", "type_confidence": "object_record", "path": "/repo/.codefire/objects/commits/CF-COMMIT-....json", "bytes": 512}]

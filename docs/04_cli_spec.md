@@ -597,7 +597,7 @@ codefire storage report --remote cf:///srv/codefire/org/app --json
 repository rootを探索し、.codefire/objects、.codefire/active、.codefire/idempotencyのfile数とbytesを集計する
 full modeではobject storeをObjectRecord wrapperとしてparseし、record type別のfile数/bytesとlargest object上位を返す
 --quickはobject JSON parseを省略し、file数/bytes/largest/large_object warningだけをmetadataから返す。largest objectのtypeはobject ID prefixまたはobject subdirから推定し、`type_confidence` を返す
-JSON dataは `mode`、`coverage`、`skipped_checks`、`objects.largest_limit` を返し、quick/fullの保証範囲をmachine-readableにする
+JSON dataは `mode`、`coverage`、`skipped_checks`、`objects.largest_limit`、`objects.scan` を返し、quick/fullの保証範囲、object scan所要時間、files/bytes、JSON parse件数、invalid record件数をmachine-readableにする
 --large-threshold以上のobjectはlarge_object warningとしてdiagnosticsに出す
 object JSONが読めない場合はinvalid_object_json warningとしてdiagnosticsに出し、report自体は継続する
 ObjectRecordのrecord typeとpayload.typeが異なる場合はpayload_type_mismatch warningとしてdiagnosticsに出す
