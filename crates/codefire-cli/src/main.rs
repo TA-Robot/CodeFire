@@ -1881,6 +1881,11 @@ fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
 
 fn plan_result_envelope(command: &str, plan: &Value) -> Value {
     let repo_root = plan_repo_root(plan);
+    let next_actions = plan
+        .get("next_actions")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     command_result_envelope(
         command,
         true,
@@ -1891,14 +1896,19 @@ fn plan_result_envelope(command: &str, plan: &Value) -> Value {
             "plan": plan,
         }),
         Vec::new(),
-        Vec::new(),
+        next_actions,
     )
 }
 
 fn plan_repo_root(plan: &Value) -> Option<PathBuf> {
-    plan.get("repo_root")
+    for key in ["repo_root", "repo"] {
+        if let Some(path) = plan.get(key).and_then(Value::as_str) {
+            return Some(PathBuf::from(path));
+        }
+    }
+    plan.get("open_dir")
         .and_then(Value::as_str)
-        .map(PathBuf::from)
+        .and_then(|path| find_repo_root(Path::new(path)).ok())
 }
 
 fn lock_contention_envelope(command: &str, error: &CliError) -> Value {

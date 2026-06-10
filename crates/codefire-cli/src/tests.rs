@@ -1021,6 +1021,9 @@ fn legacy_plan_json_outputs_are_wrapped_in_command_result_envelope() {
         "version": 1,
         "repo_root": "/tmp/codefire-repo",
         "dry_run": true,
+        "next_actions": [
+            {"kind": "verify", "command": "codefire verify --json"}
+        ],
     });
 
     let envelope = plan_result_envelope("commit", &plan);
@@ -1030,6 +1033,7 @@ fn legacy_plan_json_outputs_are_wrapped_in_command_result_envelope() {
     assert_eq!(envelope["ok"], true);
     assert_eq!(envelope["exit_code"], 0);
     assert_eq!(envelope["repo"], "/tmp/codefire-repo");
+    assert_eq!(envelope["next_actions"][0]["kind"], "verify");
     assert_eq!(envelope["data"]["type"], "codefire_plan_result");
     assert_eq!(envelope["data"]["plan"], plan);
 }
@@ -3494,6 +3498,12 @@ fn extinguish_evidence_ref_links_resolution_and_verify_detects_missing_ref() {
         dry_run.plan["resolution"]["evidence_refs"],
         json!([evidence.evidence_id.clone()])
     );
+    let dry_run_envelope = plan_result_envelope("extinguish", &dry_run.plan);
+    assert_eq!(
+        dry_run_envelope["repo"],
+        repo_root.to_string_lossy().as_ref()
+    );
+    assert_eq!(dry_run_envelope["next_actions"][0]["kind"], "verify");
 
     run_extinguish(&ExtinguishOptions {
         path: open_dir.clone(),
@@ -4240,6 +4250,12 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
     .unwrap();
     assert_eq!(upload_dry_run.plan["type"], "codefire_operation_plan");
     assert_eq!(upload_dry_run.plan["command"], "upload");
+    let upload_envelope = plan_result_envelope("upload", &upload_dry_run.plan);
+    assert_eq!(
+        upload_envelope["repo"],
+        repo_root.to_string_lossy().as_ref()
+    );
+    assert_eq!(upload_envelope["next_actions"][0]["kind"], "list_remote");
     assert!(!remote_project_root.exists());
 
     upload_branch(
