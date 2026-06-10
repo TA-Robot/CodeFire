@@ -459,6 +459,8 @@ commit text/JSONはmessage、changed atom count、non-Atom changed file count、
 changed_atomsはdefaultで50件sampleに制限し、changed_atoms_omittedとchanged_atoms_truncatedを返す。--fullで全件を返す
 non_atom_changed_filesもdefaultで50件sampleに制限し、non_atom_changed_files_omittedとnon_atom_changed_files_truncatedを返す。--fullで全件を返す
 certificate.resultはverification.resultと同じ語彙を使い、現行成功commitはpassedを返す
+適用時はactive stateに `commit_transaction.json` をpending markerとして作り、root objectごとのphaseと書き込み済みobject IDを記録する
+正常完了後は `commit_transaction.json` を削除する。途中失敗で残ったmarkerはdoctorが `pending_commit_transaction` として診断する
 --idempotency-keyは成功したcommit resultを.codefire/idempotency/commit/へ記録する
 同じ--idempotency-keyかつ同じcommit request payloadは保存済みcommit resultを返し、新しいcommitを作らない
 同じ--idempotency-keyでmessage/open_dir/branchが異なるpayloadはexit code 33で拒否する

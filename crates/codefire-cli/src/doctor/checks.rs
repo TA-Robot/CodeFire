@@ -11,6 +11,7 @@ const ACTIVE_STATE_FILES: &[&str] = &[
     "resolutions.json",
     "scan.json",
     "verification.json",
+    "commit_transaction.json",
 ];
 
 #[derive(Debug)]
@@ -423,6 +424,24 @@ fn check_active_state_files(cf: &Path, issues: &mut Vec<DoctorIssue>) -> Result<
                                 .map(str::to_string);
                         } else if file_name == "fires.json" {
                             open_fire_count = value.as_array().map(Vec::len);
+                        } else if file_name == "commit_transaction.json"
+                            && value.get("status").and_then(Value::as_str) == Some("pending")
+                        {
+                            let phase = value
+                                .get("phase")
+                                .and_then(Value::as_str)
+                                .unwrap_or("unknown");
+                            let objects = value
+                                .get("objects")
+                                .and_then(Value::as_array)
+                                .map_or(0, Vec::len);
+                            issues.push(DoctorIssue::error(
+                                "pending_commit_transaction",
+                                format!(
+                                    "commit transaction is pending at phase {phase} with {objects} stored object(s)"
+                                ),
+                                Some(path.clone()),
+                            ));
                         }
                         checked += 1;
                     }
@@ -484,8 +503,38 @@ fn validate_active_state_shape(file_name: &str, value: Value) -> Result<(), Stri
         "verification.json" => serde_json::from_value::<codefire_core::Verification>(value)
             .map(|_| ())
             .map_err(|error| format!("verification.json shape is invalid: {error}")),
+        "commit_transaction.json" => validate_commit_transaction_shape(value),
         _ => Ok(()),
     }
+}
+
+fn validate_commit_transaction_shape(value: Value) -> Result<(), String> {
+    let status = value
+        .get("status")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "commit_transaction.json must contain string field status".to_string())?;
+    if !matches!(status, "pending" | "complete") {
+        return Err(format!(
+            "commit_transaction.json contains unsupported status: {status}"
+        ));
+    }
+    for field in [
+        "transaction_id",
+        "phase",
+        "branch",
+        "started_at",
+        "updated_at",
+    ] {
+        if !value.get(field).is_some_and(Value::is_string) {
+            return Err(format!(
+                "commit_transaction.json must contain string field {field}"
+            ));
+        }
+    }
+    if !value.get("objects").is_some_and(Value::is_array) {
+        return Err("commit_transaction.json must contain list field objects".to_string());
+    }
+    Ok(())
 }
 
 fn value_string(value: &Value, path: &[&str]) -> Option<String> {

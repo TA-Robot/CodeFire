@@ -668,6 +668,7 @@ Recovery strategy:
 - open registry/marker mismatch is blocking for mutation.
 - cache can be deleted and rebuilt.
 - active state corruption can be diagnosed; recovery must not fabricate file content.
+- pending `commit_transaction.json` markers are diagnostic evidence for interrupted multi-object commits; doctor reports the phase and stored object count instead of guessing recovery.
 
 `doctor` explains the state. `migrate` changes layout/policy when the change is known and bounded. Neither should silently mutate by default.
 

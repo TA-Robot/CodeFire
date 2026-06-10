@@ -308,8 +308,8 @@ The active CodeFire improvement cycle is a global burn-down. The initial frozen 
 Global inventory as of 2026-06-10:
 
 - CFB dogfood issues: 92 total, 92 fixed, 0 open.
-- CFR code review issues: 160 total, 157 fixed/closed, 3 open.
-- Combined tracked backlog: 252 total, 249 fixed/closed, 3 open.
+- CFR code review issues: 160 total, 159 fixed/closed, 1 open.
+- Combined tracked backlog: 252 total, 251 fixed/closed, 1 open.
 
 Active batch closed in this burn-down:
 
@@ -346,6 +346,7 @@ Active batch closed in this burn-down:
 - CFB-048: `codefire import` adopts existing non-empty directories with dry-run/apply/idempotency support.
 - CFR-089: normal diff and patch export now use manifest metadata to avoid reading unchanged blob content.
 - CFR-105: storage report JSON now exposes object scan metrics and quick/full JSON parse counts.
+- CFR-119/CFR-130: commit now records a pending transaction marker during multi-object writes, successful commits clean it, and doctor reports interrupted commits.
 - CFB-025: core policy parser accepts legacy `verification.required` command lists.
 - CFB-026: context data exposes scan-compatible changed/open fire summary fields.
 - CFB-045: diff JSON distinguishes requested options from actually included sections.

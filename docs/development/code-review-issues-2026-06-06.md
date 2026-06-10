@@ -15,8 +15,8 @@
 - High: 36
 - Medium: 121
 - Low: 3
-- Fixed / closed: 157
-- Remaining open: 3
+- Fixed / closed: 159
+- Remaining open: 1
 
 ## Cycle 2 Source Review Expansion
 
@@ -159,6 +159,8 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | CFR-129 | global burn-down | HTTP request-merge dry-runでremote branch headを解決し空head planを廃止 | `http_request_merge_dry_run_validates_branch_heads` |
 | CFR-089 | global burn-down | manifest metadata差分で変更候補を決め、通常diff/patch exportで未変更blobのcontent readを避ける | `view::tests::manifest_diff_contents_skips_unchanged_blob_reads`; `patch_export_json_metadata_and_large_file_omission_are_bounded` |
 | CFR-105 | global burn-down | storage report JSONにobject scan metricsを追加し、quick/fullのJSON parse件数を可視化 | `storage_report_counts_objects_by_type_and_warns_large_objects` |
+| CFR-119 | global burn-down | durable write/commit transaction contractを文書化し、pending markerをdoctor診断へ接続 | `commit_transaction_marker_is_clean_after_success_and_doctor_reports_pending` |
+| CFR-130 | global burn-down | commit multi-object transaction markerで途中失敗phaseと書き込み済みobjectを説明可能にした | `commit_transaction_marker_is_clean_after_success_and_doctor_reports_pending` |
 
 ### Open Area View
 
@@ -175,7 +177,8 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | Context and explain | none |
 | HTTP config | none |
 | Verification policy | none |
-| Object store and durability | [CFR-119](code-review-issues/cfr-119.md), [CFR-130](code-review-issues/cfr-130.md) |
+| Object store and durability | none |
+| Development process | [CFR-120](code-review-issues/cfr-120.md) |
 | Development process | [CFR-120](code-review-issues/cfr-120.md) |
 
 ## v0.7 Progress

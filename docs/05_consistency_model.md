@@ -112,3 +112,16 @@ policy hash
 
 certificateは、そのcommitがそのpolicyのもとで整合条件を満たしたことを示す。
 
+## 5.7 Durable Write And Commit Transaction
+
+CodeFireの永続化は、immutable object writeとmutable metadata publishを分けて扱う。
+
+- object store writeはcontent-addressed object recordをtemp fileへ書き、file sync後にpublishする。既存objectは再利用される。
+- branch head、opened registry、active stateなどのmetadata writeはatomic JSON write helperを通す。
+- commitは複数root objectを書いてからbranch headを進めるmulti-object operationである。
+
+commit適用時は `.codefire/active/<open_instance_id>/commit_transaction.json` をpending markerとして作成する。markerはtransaction_id、phase、parents、branch、message、書き込み済みobject ID、started_at、updated_atを持つ。
+
+正常commitでは、branch headとopened registryを更新し、active stateをresetした後にtransaction markerを削除する。したがって成功後のactive stateには `commit_transaction.json` が残らない。
+
+途中失敗時はmarkerが残り、doctorが `pending_commit_transaction` としてphaseと書き込み済みobject数を報告する。残ったobjectはimmutableであり、branch headから参照されていない限り未完了commit由来の残骸として扱う。将来GCはこのmarkerを見て未完了operationを説明できる必要がある。

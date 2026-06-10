@@ -8,6 +8,8 @@ use std::io::{ErrorKind, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(test)]
+use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -5647,40 +5649,84 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         });
     }
 
+    let transaction_id = begin_commit_transaction(&context, &active_state_path, options, &parents)?;
     let manifest_id = codefire_store::store_object(
         &objects,
         "content_manifest",
         build_manifest(&objects, &context.open_dir)?,
     )?;
+    update_commit_transaction(
+        &active_state_path,
+        &transaction_id,
+        "stored_content_manifest",
+        Some(&manifest_id),
+    )?;
+    maybe_fail_commit_transaction_for_test("after_content_manifest")?;
     let atom_id = codefire_store::store_object(
         &objects,
         "atom_index",
         serde_json::to_value(&scan.atom_index)?,
+    )?;
+    update_commit_transaction(
+        &active_state_path,
+        &transaction_id,
+        "stored_atom_index",
+        Some(&atom_id),
     )?;
     let trace_id = codefire_store::store_object(
         &objects,
         "trace_graph",
         serde_json::to_value(&scan.trace_graph)?,
     )?;
+    update_commit_transaction(
+        &active_state_path,
+        &transaction_id,
+        "stored_trace_graph",
+        Some(&trace_id),
+    )?;
     let fire_id = codefire_store::store_object(
         &objects,
         "fire_ledger",
         json!({"type": "fire_ledger", "version": 1, "fires": fires}),
+    )?;
+    update_commit_transaction(
+        &active_state_path,
+        &transaction_id,
+        "stored_fire_ledger",
+        Some(&fire_id),
     )?;
     let resolution_id = codefire_store::store_object(
         &objects,
         "resolution_ledger",
         json!({"type": "resolution_ledger", "version": 1, "resolutions": resolutions}),
     )?;
+    update_commit_transaction(
+        &active_state_path,
+        &transaction_id,
+        "stored_resolution_ledger",
+        Some(&resolution_id),
+    )?;
     let verification_id = codefire_store::store_object(
         &objects,
         "verification",
         serde_json::to_value(&verification)?,
     )?;
+    update_commit_transaction(
+        &active_state_path,
+        &transaction_id,
+        "stored_verification",
+        Some(&verification_id),
+    )?;
     let policy_id = codefire_store::store_object(
         &objects,
         "policy",
         json!({"type": "policy", "version": 1, "policy": policy}),
+    )?;
+    update_commit_transaction(
+        &active_state_path,
+        &transaction_id,
+        "stored_policy",
+        Some(&policy_id),
     )?;
 
     let commit = json!({
@@ -5718,6 +5764,12 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         commit_signature_required(&context.open_dir)?,
     )?;
     let commit_id = codefire_store::store_object(&objects, "commit", commit)?;
+    update_commit_transaction(
+        &active_state_path,
+        &transaction_id,
+        "publishing_branch",
+        Some(&commit_id),
+    )?;
 
     let mut branch = load_branch_record(&context.repo_root, &context.branch)?;
     branch["head"] = Value::String(commit_id.clone());
@@ -5727,7 +5779,14 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
     registry["open"]["current_base_commit"] = Value::String(commit_id.clone());
     registry["state"]["last_known"] = Value::String("open-clean".to_string());
     write_json_atomic(&context.registry_path, &registry)?;
+    update_commit_transaction(
+        &active_state_path,
+        &transaction_id,
+        "resetting_active_state",
+        None,
+    )?;
     reset_active(&active_state_path, "open-clean")?;
+    complete_commit_transaction(&active_state_path)?;
 
     let result = CommitResult {
         repo_root: context.repo_root.clone(),
@@ -5991,14 +6050,124 @@ fn commit_operation_plan(
             "policy",
             "commit",
         ],
+        "transaction": {
+            "marker": active_state_path.join("commit_transaction.json"),
+            "cleanup": "removed_after_success",
+        },
         "operations": [
+            {"kind": "begin_commit_transaction", "path": active_state_path.join("commit_transaction.json")},
             {"kind": "store_objects", "path": context.repo_root.join(".codefire").join("objects")},
             {"kind": "update_branch_head", "branch": &context.branch},
             {"kind": "update_open_registry", "path": &context.registry_path},
             {"kind": "reset_active_state", "path": active_state_path},
+            {"kind": "clear_commit_transaction", "path": active_state_path.join("commit_transaction.json")},
         ],
         "next_actions": next_actions,
     })
+}
+
+fn begin_commit_transaction(
+    context: &OpenContext,
+    active_state_path: &Path,
+    options: &CommitOptions,
+    parents: &[String],
+) -> Result<String, CliError> {
+    let started_at = now_iso_utc();
+    let transaction_id = format!(
+        "commit_tx_{:012x}",
+        stable_hash_48(
+            format!(
+                "{}:{}:{}:{started_at}",
+                context.branch,
+                context.open_dir.display(),
+                options.message
+            )
+            .as_bytes(),
+        )
+    );
+    write_json_atomic(
+        &commit_transaction_path(active_state_path),
+        &json!({
+            "version": 1,
+            "transaction_id": transaction_id,
+            "status": "pending",
+            "phase": "started",
+            "branch": &context.branch,
+            "open_dir": &context.open_dir,
+            "parents": parents,
+            "message": &options.message,
+            "objects": [],
+            "started_at": started_at,
+            "updated_at": started_at,
+        }),
+    )?;
+    Ok(transaction_id)
+}
+
+fn update_commit_transaction(
+    active_state_path: &Path,
+    transaction_id: &str,
+    phase: &str,
+    object_id: Option<&str>,
+) -> Result<(), CliError> {
+    let path = commit_transaction_path(active_state_path);
+    let mut record = read_json(&path)?;
+    if required_string(&record, &["transaction_id"])? != transaction_id {
+        return Err(CliError::InvalidRepository(
+            "commit transaction id changed during commit".to_string(),
+        ));
+    }
+    record["phase"] = Value::String(phase.to_string());
+    record["updated_at"] = Value::String(now_iso_utc());
+    if let Some(object_id) = object_id {
+        let objects = record
+            .get_mut("objects")
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| {
+                CliError::InvalidRepository("commit transaction objects must be a list".to_string())
+            })?;
+        objects.push(Value::String(object_id.to_string()));
+    }
+    write_json_atomic(&path, &record)
+}
+
+fn complete_commit_transaction(active_state_path: &Path) -> Result<(), CliError> {
+    let path = commit_transaction_path(active_state_path);
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(CliError::Io(error)),
+    }
+}
+
+fn commit_transaction_path(active_state_path: &Path) -> PathBuf {
+    active_state_path.join("commit_transaction.json")
+}
+
+#[cfg(test)]
+fn maybe_fail_commit_transaction_for_test(phase: &str) -> Result<(), CliError> {
+    let mut guard = COMMIT_TRANSACTION_FAILURE_PHASE
+        .lock()
+        .expect("commit transaction failure phase lock poisoned");
+    if guard.as_deref() == Some(phase) {
+        *guard = None;
+        return Err(CliError::Usage(format!(
+            "injected commit transaction failure at {phase}"
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(not(test))]
+fn maybe_fail_commit_transaction_for_test(_phase: &str) -> Result<(), CliError> {
+    Ok(())
+}
+
+#[cfg(test)]
+fn set_commit_transaction_failure_for_test(phase: &str) {
+    *COMMIT_TRANSACTION_FAILURE_PHASE
+        .lock()
+        .expect("commit transaction failure phase lock poisoned") = Some(phase.to_string());
 }
 
 fn commit_parents_for_open(
@@ -6245,6 +6414,8 @@ fn stable_hash_48(bytes: &[u8]) -> u64 {
 }
 
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
+#[cfg(test)]
+static COMMIT_TRANSACTION_FAILURE_PHASE: Mutex<Option<String>> = Mutex::new(None);
 
 fn write_json_atomic(path: &Path, value: &Value) -> Result<(), CliError> {
     let parent = path
@@ -6897,6 +7068,7 @@ fn reset_active(active_state_path: &Path, state: &str) -> Result<(), CliError> {
         "resolutions.json",
         "scan.json",
         "verification.json",
+        "commit_transaction.json",
     ] {
         let path = active_state_path.join(name);
         if path.exists() {

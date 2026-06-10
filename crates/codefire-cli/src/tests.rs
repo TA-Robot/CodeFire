@@ -3050,6 +3050,81 @@ fn commit_dry_run_returns_plan_without_updating_branch() {
 }
 
 #[test]
+fn commit_transaction_marker_is_clean_after_success_and_doctor_reports_pending() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::write(open_dir.join("README.md"), "initial import\n").unwrap();
+
+    let failed_active = active_state_path(&open_dir);
+    set_commit_transaction_failure_for_test("after_content_manifest");
+    let failed = run_commit(&CommitOptions {
+        path: open_dir.clone(),
+        message: "Injected failure".to_string(),
+        dry_run: false,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap_err();
+    assert!(failed
+        .to_string()
+        .contains("injected commit transaction failure"));
+    let marker_path = failed_active.join("commit_transaction.json");
+    assert!(marker_path.exists());
+    let marker = read_json(&marker_path).unwrap();
+    assert_eq!(marker["status"], "pending");
+    assert_eq!(marker["phase"], "stored_content_manifest");
+    assert_eq!(marker["objects"].as_array().unwrap().len(), 1);
+
+    let doctor = run_doctor(&DoctorOptions {
+        start: repo_root.clone(),
+        quick: false,
+        json_output: true,
+    })
+    .unwrap();
+    assert!(doctor
+        .issues
+        .iter()
+        .any(|issue| issue.kind == "pending_commit_transaction"));
+
+    fs::remove_file(&marker_path).unwrap();
+    let committed = run_commit(&CommitOptions {
+        path: open_dir.clone(),
+        message: "Successful commit".to_string(),
+        dry_run: false,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap();
+
+    assert!(!committed.commit_id.is_empty());
+    assert!(!active_state_path(&open_dir)
+        .join("commit_transaction.json")
+        .exists());
+}
+
+#[test]
 fn commit_dry_run_json_reports_blockers_and_bounds_changed_atoms() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
