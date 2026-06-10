@@ -288,6 +288,11 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder.build(packet)
   -> package review packet artifacts, manifest, manifest Markdown, verification, and verification Markdown
   -> verify the in-memory artifact contents that were just packaged
   -> return a complete final review archive without filesystem access or hand-assembled audit state
+
+ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary.summarize(archive)
+  -> expose archive status, readiness, artifacts, audit availability, and finding counts as machine-readable data
+  -> recompute only per-artifact byte counts and hashes from in-memory archive contents
+  -> avoid archive rebuilds, verification reruns, filesystem reads, and storage adapter coupling
 ```
 
 Important implementation details:

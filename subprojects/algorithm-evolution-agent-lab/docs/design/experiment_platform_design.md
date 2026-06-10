@@ -795,3 +795,18 @@ The builder returns a single archive object with:
 - artifact manifest verification Markdown
 
 The builder composes the existing artifact builder, manifest builder, manifest Markdown renderer, manifest verifier, and verification Markdown renderer. It builds verification from the in-memory artifact contents it just packaged, so clean archives have `verification.ok == true` unless the constituent builders disagree. It does not write files, read storage, or mutate the review packet.
+
+## DES-AUTO-045: Research cycle planning handoff review packet artifact archive summary
+
+The review packet artifact archive summary consumes `ResearchCyclePlanningHandoffReviewPacketArtifactArchive` and returns a JSON-serializable dictionary.
+
+The summary contains:
+
+- source cycles copied from the archive manifest
+- archive status derived from manifest and verification status
+- readiness status copied from the review packet readiness gate
+- artifact count and artifact path, byte count, and SHA-256 digest records
+- manifest status, verification status, and finding count
+- audit document availability for manifest Markdown and verification Markdown
+
+The summarizer recomputes only per-artifact digest metadata from in-memory artifact contents. It does not rebuild the archive, rerun verification, read files, or mutate the packet.

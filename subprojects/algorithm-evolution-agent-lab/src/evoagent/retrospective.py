@@ -1102,6 +1102,35 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder:
         )
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary
+class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary:
+    def summarize(self, archive: ResearchCyclePlanningHandoffReviewPacketArtifactArchive) -> dict[str, object]:
+        verification_status = "ok" if archive.verification.ok else "blocked"
+        archive_status = "ok" if archive.manifest.status == "ok" and archive.verification.ok else "blocked"
+        return {
+            "source_cycles": list(archive.manifest.source_cycles),
+            "archive_status": archive_status,
+            "readiness_status": archive.packet.readiness.get("status", "unknown"),
+            "ready": bool(archive.packet.readiness.get("ready")),
+            "manifest_status": archive.manifest.status,
+            "verification_status": verification_status,
+            "artifact_count": len(archive.artifacts),
+            "artifacts": [
+                {
+                    "path": artifact.path,
+                    "byte_count": len(artifact.content.encode("utf-8")),
+                    "content_sha256": f"sha256:{hashlib.sha256(artifact.content.encode('utf-8')).hexdigest()}",
+                }
+                for artifact in archive.artifacts
+            ],
+            "audits": {
+                "manifest_markdown": bool(archive.manifest_markdown.strip()),
+                "verification_markdown": bool(archive.verification_markdown.strip()),
+            },
+            "finding_count": len(archive.verification.findings),
+        }
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")
