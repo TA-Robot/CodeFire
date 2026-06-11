@@ -1181,3 +1181,19 @@ The gate returns a deterministic dictionary containing:
 - blocker messages
 
 The gate delegates to the shared manifest Markdown verification Markdown gate so status, count, finding row, and clean `none` checks stay consistent across all handoff verification audit surfaces. It does not rerun verification, inspect manifests, parse files, write files, or mutate inputs.
+
+## DES-AUTO-072: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown artifact manifest Markdown verification Markdown gate Markdown
+
+The review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown artifact manifest Markdown verification Markdown gate Markdown renderer consumes the dictionary emitted by `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate`.
+
+The rendered document contains:
+
+- title
+- ready state
+- gate status
+- verification status
+- finding count
+- checked finding count
+- blocker messages, or `none` when clean
+
+The renderer delegates to the shared manifest Markdown verification Markdown gate Markdown renderer so audit document shape stays consistent across all handoff verification readiness surfaces. It does not rerun the gate, inspect manifests, parse files, write files, or mutate inputs.

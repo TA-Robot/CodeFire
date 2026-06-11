@@ -19,6 +19,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate,
@@ -2776,6 +2777,52 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         )
         self.assertTrue(empty_clean["ready"])
         self.assertEqual("ok", empty_clean["verification_status"])
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-gate-markdown-renders-blockers
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verification_markdown_gate_markdown_renders_blockers(
+        self,
+    ) -> None:
+        gate_result = {
+            "ready": False,
+            "status": "blocked",
+            "verification_status": "blocked",
+            "finding_count": 1,
+            "checked_finding_count": 1,
+            "blockers": [
+                "finding line is missing for cycle-54/manifest-markdown-verification-gate.md",
+            ],
+        }
+
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown().render(
+            gate_result,
+            title="Cycle 54 Verification Markdown Artifact Manifest Markdown Verification Gate",
+        )
+        clean = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown().render(
+            {
+                "ready": True,
+                "status": "ready",
+                "verification_status": "ok",
+                "finding_count": 0,
+                "checked_finding_count": 0,
+                "blockers": [],
+            },
+            title="Cycle 54 Verification Markdown Artifact Manifest Markdown Verification Gate",
+        )
+
+        self.assertIn("# Cycle 54 Verification Markdown Artifact Manifest Markdown Verification Gate", markdown)
+        self.assertIn("- Ready: no", markdown)
+        self.assertIn("- Status: blocked", markdown)
+        self.assertIn("- Verification status: blocked", markdown)
+        self.assertIn("- Finding count: 1", markdown)
+        self.assertIn("- Checked finding count: 1", markdown)
+        self.assertIn(
+            "- finding line is missing for cycle-54/manifest-markdown-verification-gate.md",
+            markdown,
+        )
+        self.assertIn("- Ready: yes", clean)
+        self.assertIn("- Status: ready", clean)
+        self.assertIn("- Verification status: ok", clean)
+        self.assertIn("- none", clean)
 
 
 if __name__ == "__main__":
