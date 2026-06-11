@@ -201,7 +201,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 @dataclass(frozen=True)
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifacts:
+class SummaryIndexArtifacts:
     archive: ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchive
     summary: dict[str, object]
     summary_markdown: str
@@ -211,7 +211,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 @dataclass(frozen=True)
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifacts:
+class ManifestVerifyArtifacts:
     verification: ResearchCyclePlanningPacketManifestVerification
     verification_markdown: str
     gate_result: dict[str, object]
@@ -220,7 +220,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 @dataclass(frozen=True)
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifacts:
+class FinalVerifyArtifacts:
     verification: ResearchCyclePlanningPacketManifestVerification
     verification_markdown: str
     gate_result: dict[str, object]
@@ -1297,7 +1297,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown:
+class ArchiveSummaryGateMd:
     def render(
         self,
         result: dict[str, object],
@@ -1346,7 +1346,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuil
             summary,
             summary_markdown,
         )
-        gate_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown().render(
+        gate_markdown = ArchiveSummaryGateMd().render(
             gate_result,
             title=gate_title,
         )
@@ -1365,7 +1365,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuil
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder:
+class SummaryManifestBuilder:
     def build(
         self,
         handoff: ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifacts,
@@ -1378,7 +1378,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactMani
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown:
+class SummaryManifestMd:
     def render(
         self,
         manifest: ResearchCyclePlanningPacketManifest,
@@ -1389,7 +1389,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactMani
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerifier
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerifier:
+class SummaryManifestVerifier:
     def verify(
         self,
         manifest: ResearchCyclePlanningPacketManifest,
@@ -1399,7 +1399,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactMani
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerificationMarkdown
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerificationMarkdown:
+class SummaryManifestVerifyMd:
     def render(
         self,
         verification: ResearchCyclePlanningPacketManifestVerification,
@@ -1413,7 +1413,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactMani
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder:
+class SummaryAuditArchiveBuilder:
     def build(
         self,
         handoff: ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifacts,
@@ -1421,11 +1421,11 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
         manifest_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Manifest",
         verification_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Manifest Verification",
     ) -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchive:
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder().build(
+        manifest = SummaryManifestBuilder().build(
             handoff,
         )
         artifact_contents = {artifact.path: artifact.content for artifact in handoff.artifacts}
-        verification = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerifier().verify(
+        verification = SummaryManifestVerifier().verify(
             manifest,
             artifact_contents,
         )
@@ -1433,12 +1433,12 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
             handoff=handoff,
             artifacts=handoff.artifacts,
             manifest=manifest,
-            manifest_markdown=ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown().render(
+            manifest_markdown=SummaryManifestMd().render(
                 manifest,
                 title=manifest_title,
             ),
             verification=verification,
-            verification_markdown=ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerificationMarkdown().render(
+            verification_markdown=SummaryManifestVerifyMd().render(
                 verification,
                 title=verification_title,
             ),
@@ -1446,7 +1446,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary:
+class SummaryAuditIndex:
     def summarize(
         self,
         archive: ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchive,
@@ -1477,7 +1477,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown:
+class SummaryAuditIndexMd:
     def render(
         self,
         summary: dict[str, object],
@@ -1525,7 +1525,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate:
+class SummaryAuditIndexGate:
     def evaluate(self, summary: dict[str, object], markdown: str) -> dict[str, object]:
         blockers: list[str] = []
         source_cycles = ", ".join(str(cycle) for cycle in summary.get("source_cycles", []))
@@ -1591,7 +1591,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown:
+class SummaryAuditIndexGateMd:
     def render(
         self,
         result: dict[str, object],
@@ -1619,7 +1619,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder:
+class SummaryIndexArtifactsBuilder:
     def build(
         self,
         archive: ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchive,
@@ -1628,21 +1628,21 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
         gate_path: str = "archive-summary-artifact-archive-summary-gate.md",
         summary_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary",
         gate_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary Markdown Gate",
-    ) -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifacts:
+    ) -> SummaryIndexArtifacts:
         for path in (summary_path, gate_path):
             validate_manifest_path(path)
-        summary = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary().summarize(
+        summary = SummaryAuditIndex().summarize(
             archive,
         )
-        summary_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown().render(
+        summary_markdown = SummaryAuditIndexMd().render(
             summary,
             title=summary_title,
         )
-        gate_result = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate().evaluate(
+        gate_result = SummaryAuditIndexGate().evaluate(
             summary,
             summary_markdown,
         )
-        gate_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown().render(
+        gate_markdown = SummaryAuditIndexGateMd().render(
             gate_result,
             title=gate_title,
         )
@@ -1650,7 +1650,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
             ResearchCyclePlanningHandoffArtifact(path=summary_path, content=summary_markdown),
             ResearchCyclePlanningHandoffArtifact(path=gate_path, content=gate_markdown),
         )
-        return ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifacts(
+        return SummaryIndexArtifacts(
             archive=archive,
             summary=summary,
             summary_markdown=summary_markdown,
@@ -1661,10 +1661,10 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder:
+class SummaryIndexManifestBuilder:
     def build(
         self,
-        handoff: ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifacts,
+        handoff: SummaryIndexArtifacts,
     ) -> ResearchCyclePlanningPacketManifest:
         return ResearchCyclePlanningPacketManifest(
             source_cycles=tuple(str(cycle) for cycle in handoff.summary.get("source_cycles", [])),
@@ -1674,7 +1674,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown:
+class SummaryIndexManifestMd:
     def render(
         self,
         manifest: ResearchCyclePlanningPacketManifest,
@@ -1685,7 +1685,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier:
+class SummaryIndexManifestVerifier:
     def verify(
         self,
         manifest: ResearchCyclePlanningPacketManifest,
@@ -1719,7 +1719,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown:
+class SummaryIndexVerifyMd:
     def render(
         self,
         verification: ResearchCyclePlanningPacketManifestVerification,
@@ -1733,7 +1733,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate:
+class SummaryIndexVerifyGate:
     def evaluate(
         self,
         verification: ResearchCyclePlanningPacketManifestVerification,
@@ -1769,7 +1769,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown:
+class SummaryIndexVerifyGateMd:
     def render(
         self,
         result: dict[str, object],
@@ -1797,7 +1797,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder:
+class ManifestVerifyArtifactsBuilder:
     def build(
         self,
         verification: ResearchCyclePlanningPacketManifestVerification,
@@ -1806,23 +1806,23 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
         gate_path: str = "manifest-markdown-verification-gate.md",
         verification_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary Artifact Manifest Markdown Verification",
         gate_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary Artifact Manifest Markdown Verification Markdown Gate",
-    ) -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifacts:
+    ) -> ManifestVerifyArtifacts:
         for path in (verification_path, gate_path):
             validate_manifest_path(path)
         verification_markdown = (
-            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown().render(
+            SummaryIndexVerifyMd().render(
                 verification,
                 title=verification_title,
             )
         )
         gate_result = (
-            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate().evaluate(
+            SummaryIndexVerifyGate().evaluate(
                 verification,
                 verification_markdown,
             )
         )
         gate_markdown = (
-            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown().render(
+            SummaryIndexVerifyGateMd().render(
                 gate_result,
                 title=gate_title,
             )
@@ -1831,7 +1831,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
             ResearchCyclePlanningHandoffArtifact(path=verification_path, content=verification_markdown),
             ResearchCyclePlanningHandoffArtifact(path=gate_path, content=gate_markdown),
         )
-        return ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifacts(
+        return ManifestVerifyArtifacts(
             verification=verification,
             verification_markdown=verification_markdown,
             gate_result=gate_result,
@@ -1841,10 +1841,10 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder:
+class ManifestVerifyManifestBuilder:
     def build(
         self,
-        handoff: ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifacts,
+        handoff: ManifestVerifyArtifacts,
         *,
         source_cycles: tuple[str, ...] = (),
     ) -> ResearchCyclePlanningPacketManifest:
@@ -1856,7 +1856,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown:
+class ManifestVerifyManifestMd:
     def render(
         self,
         manifest: ResearchCyclePlanningPacketManifest,
@@ -1867,20 +1867,20 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier:
+class ManifestVerifyManifestVerifier:
     def verify(
         self,
         manifest: ResearchCyclePlanningPacketManifest,
         markdown: str,
     ) -> ResearchCyclePlanningPacketManifestVerification:
-        return ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier().verify(
+        return SummaryIndexManifestVerifier().verify(
             manifest,
             markdown,
         )
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown:
+class ManifestVerifyResultMd:
     def render(
         self,
         verification: ResearchCyclePlanningPacketManifestVerification,
@@ -1894,34 +1894,34 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate:
+class ManifestVerifyResultGate:
     def evaluate(
         self,
         verification: ResearchCyclePlanningPacketManifestVerification,
         markdown: str,
     ) -> dict[str, object]:
-        return ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate().evaluate(
+        return SummaryIndexVerifyGate().evaluate(
             verification,
             markdown,
         )
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown:
+class ManifestVerifyResultGateMd:
     def render(
         self,
         result: dict[str, object],
         *,
         title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary Artifact Manifest Markdown Verification Markdown Artifact Manifest Markdown Verification Markdown Gate",
     ) -> str:
-        return ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown().render(
+        return SummaryIndexVerifyGateMd().render(
             result,
             title=title,
         )
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder:
+class FinalVerifyArtifactsBuilder:
     def build(
         self,
         verification: ResearchCyclePlanningPacketManifestVerification,
@@ -1930,23 +1930,23 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
         gate_path: str = "manifest-markdown-verification-gate.md",
         verification_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary Artifact Manifest Markdown Verification Markdown Artifact Manifest Markdown Verification",
         gate_title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary Artifact Manifest Markdown Verification Markdown Artifact Manifest Markdown Verification Markdown Gate",
-    ) -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifacts:
+    ) -> FinalVerifyArtifacts:
         for path in (verification_path, gate_path):
             validate_manifest_path(path)
         verification_markdown = (
-            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown().render(
+            ManifestVerifyResultMd().render(
                 verification,
                 title=verification_title,
             )
         )
         gate_result = (
-            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate().evaluate(
+            ManifestVerifyResultGate().evaluate(
                 verification,
                 verification_markdown,
             )
         )
         gate_markdown = (
-            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown().render(
+            ManifestVerifyResultGateMd().render(
                 gate_result,
                 title=gate_title,
             )
@@ -1955,7 +1955,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
             ResearchCyclePlanningHandoffArtifact(path=verification_path, content=verification_markdown),
             ResearchCyclePlanningHandoffArtifact(path=gate_path, content=gate_markdown),
         )
-        return ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifacts(
+        return FinalVerifyArtifacts(
             verification=verification,
             verification_markdown=verification_markdown,
             gate_result=gate_result,
@@ -1965,10 +1965,10 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder:
+class FinalVerifyManifestBuilder:
     def build(
         self,
-        handoff: ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifacts,
+        handoff: FinalVerifyArtifacts,
         *,
         source_cycles: tuple[str, ...] = (),
     ) -> ResearchCyclePlanningPacketManifest:
@@ -1980,7 +1980,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown
-class FinalVerificationArtifactManifestMarkdown:
+class FinalManifestMd:
     def render(
         self,
         manifest: ResearchCyclePlanningPacketManifest,
@@ -1991,20 +1991,20 @@ class FinalVerificationArtifactManifestMarkdown:
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier
-class FinalVerificationArtifactManifestMarkdownVerifier:
+class FinalManifestMdCheck:
     def verify(
         self,
         manifest: ResearchCyclePlanningPacketManifest,
         markdown: str,
     ) -> ResearchCyclePlanningPacketManifestVerification:
-        return ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier().verify(
+        return ManifestVerifyManifestVerifier().verify(
             manifest,
             markdown,
         )
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown
-class FinalVerificationArtifactManifestVerificationMarkdown:
+class FinalManifestCheckMd:
     def render(
         self,
         verification: ResearchCyclePlanningPacketManifestVerification,

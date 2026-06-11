@@ -114,8 +114,9 @@ CodeFireでは特に、以下を妥協しない。
 - CodeFire Atom ID、requirement ID、test atom IDはtraceabilityのために長くなることがある。
 - 実装上のclass、struct、enum、function、module、test function名へ、長いAtom IDをそのまま写さない。
 - 人間が読む実装識別子は、責務を表す短いdomain名にする。
-  - 良い例: `FinalVerificationArtifactManifestMarkdownVerifier`
+  - 良い例: `FinalManifestMdCheck`
   - 悪い例: requirement/design/testの階層語を全て連結した300文字級のclass名
+- Pythonのclass名、function名、test method名は80文字をhard capとし、通常は40文字以内を目安にする。
 - 実装識別子が長くなり始めたら、責務の抽象名を決める。
   - `final verification artifact manifest`
   - `branch context selector`

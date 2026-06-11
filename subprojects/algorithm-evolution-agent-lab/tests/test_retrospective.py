@@ -2,9 +2,9 @@ from dataclasses import replace
 import unittest
 
 from evoagent.retrospective import (
-    FinalVerificationArtifactManifestMarkdown,
-    FinalVerificationArtifactManifestVerificationMarkdown,
-    FinalVerificationArtifactManifestMarkdownVerifier,
+    FinalManifestMd,
+    FinalManifestCheckMd,
+    FinalManifestMdCheck,
     ResearchCycleRetrospective,
     ResearchCyclePlanningHandoffBundleBuilder,
     ResearchCyclePlanningHandoffBundleMarkdown,
@@ -12,35 +12,35 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReadinessMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummary,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown,
+    SummaryAuditArchiveBuilder,
+    SummaryAuditIndex,
+    SummaryIndexArtifactsBuilder,
+    SummaryIndexManifestBuilder,
+    SummaryIndexManifestMd,
+    ManifestVerifyArtifactsBuilder,
+    ManifestVerifyManifestBuilder,
+    ManifestVerifyManifestMd,
+    ManifestVerifyResultMd,
+    FinalVerifyArtifactsBuilder,
+    FinalVerifyManifestBuilder,
+    ManifestVerifyResultGate,
+    ManifestVerifyResultGateMd,
+    ManifestVerifyManifestVerifier,
+    SummaryIndexVerifyMd,
+    SummaryIndexVerifyGate,
+    SummaryIndexVerifyGateMd,
+    SummaryIndexManifestVerifier,
+    SummaryAuditIndexMd,
+    SummaryAuditIndexGate,
+    SummaryAuditIndexGateMd,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerificationMarkdown,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerifier,
+    SummaryManifestBuilder,
+    SummaryManifestMd,
+    SummaryManifestVerifyMd,
+    SummaryManifestVerifier,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown,
+    ArchiveSummaryGateMd,
     ResearchCyclePlanningHandoffReviewPacketArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactManifestMarkdown,
@@ -550,7 +550,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         )
 
     # cf-atom: TEST-research-cycle-planning-packet-manifest-verification-markdown-renders-findings
-    def test_research_cycle_planning_packet_manifest_verification_markdown_renders_findings(self) -> None:
+    def test_ret_surface_001(self) -> None:
         report = ResearchCycleRetrospective().summarize(
             [
                 ResearchCycleSignal(
@@ -709,7 +709,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Verification Markdown: included", markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-bundle-summary-reports-machine-readable-index
-    def test_research_cycle_planning_handoff_bundle_summary_reports_machine_readable_index(self) -> None:
+    def test_ret_surface_002(self) -> None:
         report = ResearchCycleRetrospective().summarize(
             [
                 ResearchCycleSignal(
@@ -900,7 +900,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Ready: yes", packet.readiness_markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-markdown-renders-review-document
-    def test_research_cycle_planning_handoff_review_packet_markdown_renders_review_document(self) -> None:
+    def test_ret_surface_003(self) -> None:
         report = ResearchCycleRetrospective().summarize(
             [
                 ResearchCycleSignal(
@@ -943,7 +943,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Verification Markdown: included", markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-builder-packages-audits
-    def test_research_cycle_planning_handoff_review_packet_artifact_builder_packages_audits(self) -> None:
+    def test_ret_surface_004(self) -> None:
         report = ResearchCycleRetrospective().summarize(
             [
                 ResearchCycleSignal(
@@ -993,7 +993,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("Manifest Verification", artifacts[3].content)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-manifest-records-artifacts
-    def test_research_cycle_planning_handoff_review_packet_artifact_manifest_records_artifacts(self) -> None:
+    def test_ret_surface_005(self) -> None:
         report = ResearchCycleRetrospective().summarize(
             [
                 ResearchCycleSignal(
@@ -1042,7 +1042,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         )
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-manifest-markdown-renders-table
-    def test_research_cycle_planning_handoff_review_packet_artifact_manifest_markdown_renders_table(self) -> None:
+    def test_ret_surface_006(self) -> None:
         report = ResearchCycleRetrospective().summarize(
             [
                 ResearchCycleSignal(
@@ -1093,7 +1093,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("sha256:", markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-manifest-verifier-detects-drift
-    def test_research_cycle_planning_handoff_review_packet_artifact_manifest_verifier_detects_drift(self) -> None:
+    def test_ret_surface_007(self) -> None:
         report = ResearchCycleRetrospective().summarize(
             [
                 ResearchCycleSignal(
@@ -1151,7 +1151,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("artifact is missing", [finding.message for finding in drifted.findings])
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-manifest-verification-markdown-renders-findings
-    def test_research_cycle_planning_handoff_review_packet_artifact_manifest_verification_markdown_renders_findings(
+    def test_ret_surface_008(
         self,
     ) -> None:
         clean = ResearchCyclePlanningPacketManifestVerification(findings=())
@@ -1187,7 +1187,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("`cycle-25/readiness.md`: artifact is missing", drifted_markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-builder-builds-final-audits
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_builder_builds_final_audits(self) -> None:
+    def test_ret_surface_009(self) -> None:
         report = ResearchCycleRetrospective().summarize(
             [
                 ResearchCycleSignal(
@@ -1243,7 +1243,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         )
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-reports-index
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_reports_index(self) -> None:
+    def test_ret_surface_010(self) -> None:
         report = ResearchCycleRetrospective().summarize(
             [
                 ResearchCycleSignal(
@@ -1301,7 +1301,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertTrue(artifacts[0]["content_sha256"].startswith("sha256:"))
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-markdown-renders-index
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_markdown_renders_index(
+    def test_ret_surface_011(
         self,
     ) -> None:
         summary = {
@@ -1350,7 +1350,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Verification Markdown: included", markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-markdown-gate-blocks-drift
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_markdown_gate_blocks_drift(
+    def test_ret_surface_012(
         self,
     ) -> None:
         summary = {
@@ -1403,7 +1403,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("artifact count 2 does not match 1 artifact record(s)", blocked["blockers"])
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-markdown-gate-markdown-renders-blockers
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_markdown_gate_markdown_renders_blockers(
+    def test_ret_surface_013(
         self,
     ) -> None:
         result = {
@@ -1418,7 +1418,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             ],
         }
 
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown().render(
+        markdown = ArchiveSummaryGateMd().render(
             result,
             title="Cycle 30 Archive Summary Markdown Gate",
         )
@@ -1432,14 +1432,14 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- verification status line is missing", markdown)
         self.assertIn("- artifact count 2 does not match 1 artifact record(s)", markdown)
 
-        clean_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown().render(
+        clean_markdown = ArchiveSummaryGateMd().render(
             {"ready": True, "status": "ready", "blockers": []}
         )
         self.assertIn("- Ready: yes", clean_markdown)
         self.assertIn("- none", clean_markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-builder-packages-gated-summary
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_builder_packages_gated_summary(
+    def test_ret_surface_014(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -1499,7 +1499,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertEqual(handoff.gate_markdown, handoff.artifacts[1].content)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-manifest-records-summary-artifacts
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_manifest_records_summary_artifacts(
+    def test_ret_surface_015(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -1540,7 +1540,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             gate_path="cycle-32/archive-summary-gate.md",
         )
 
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder().build(
+        manifest = SummaryManifestBuilder().build(
             handoff,
         )
 
@@ -1559,7 +1559,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertTrue(manifest.entries[1].content_sha256.startswith("sha256:"))
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-manifest-markdown-renders-table
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_manifest_markdown_renders_table(
+    def test_ret_surface_016(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -1599,11 +1599,11 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             summary_path="cycle-33/archive-summary.md",
             gate_path="cycle-33/archive-summary-gate.md",
         )
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder().build(
+        manifest = SummaryManifestBuilder().build(
             handoff,
         )
 
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown().render(
+        markdown = SummaryManifestMd().render(
             manifest,
             title="Cycle 33 Archive Summary Artifact Manifest",
         )
@@ -1617,7 +1617,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("| `cycle-33/archive-summary-gate.md` |", markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-manifest-verifier-detects-drift
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_manifest_verifier_detects_drift(
+    def test_ret_surface_017(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -1657,11 +1657,11 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             summary_path="cycle-34/archive-summary.md",
             gate_path="cycle-34/archive-summary-gate.md",
         )
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder().build(
+        manifest = SummaryManifestBuilder().build(
             handoff,
         )
         artifact_contents = {artifact.path: artifact.content for artifact in handoff.artifacts}
-        verifier = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerifier()
+        verifier = SummaryManifestVerifier()
 
         clean = verifier.verify(manifest, artifact_contents)
         self.assertTrue(clean.ok)
@@ -1683,7 +1683,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         )
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-manifest-verification-markdown-renders-findings
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_manifest_verification_markdown_renders_findings(
+    def test_ret_surface_018(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -1723,17 +1723,17 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             summary_path="cycle-35/archive-summary.md",
             gate_path="cycle-35/archive-summary-gate.md",
         )
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder().build(
+        manifest = SummaryManifestBuilder().build(
             handoff,
         )
         artifact_contents = {artifact.path: artifact.content for artifact in handoff.artifacts}
         artifact_contents["cycle-35/archive-summary.md"] = "corrupted summary"
-        verification = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerifier().verify(
+        verification = SummaryManifestVerifier().verify(
             manifest,
             artifact_contents,
         )
 
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerificationMarkdown().render(
+        markdown = SummaryManifestVerifyMd().render(
             verification,
             title="Cycle 35 Archive Summary Artifact Manifest Verification",
         )
@@ -1745,7 +1745,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- `cycle-35/archive-summary.md`: byte count mismatch", markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-builder-builds-audits
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_builder_builds_audits(
+    def test_ret_surface_019(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -1786,7 +1786,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             gate_path="cycle-36/archive-summary-gate.md",
         )
 
-        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+        summary_archive = SummaryAuditArchiveBuilder().build(
             handoff,
             manifest_title="Cycle 36 Archive Summary Artifact Manifest",
             verification_title="Cycle 36 Archive Summary Artifact Manifest Verification",
@@ -1806,7 +1806,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- none", summary_archive.verification_markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-reports-index
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_reports_index(
+    def test_ret_surface_020(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -1846,11 +1846,11 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             summary_path="cycle-37/archive-summary.md",
             gate_path="cycle-37/archive-summary-gate.md",
         )
-        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+        summary_archive = SummaryAuditArchiveBuilder().build(
             handoff,
         )
 
-        summary = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary().summarize(
+        summary = SummaryAuditIndex().summarize(
             summary_archive,
         )
 
@@ -1873,7 +1873,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertEqual("cycle-37/archive-summary-gate.md", artifacts[1]["path"])
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-markdown-renders-index
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_markdown_renders_index(
+    def test_ret_surface_021(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -1913,14 +1913,14 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             summary_path="cycle-38/archive-summary.md",
             gate_path="cycle-38/archive-summary-gate.md",
         )
-        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+        summary_archive = SummaryAuditArchiveBuilder().build(
             handoff,
         )
-        summary = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary().summarize(
+        summary = SummaryAuditIndex().summarize(
             summary_archive,
         )
 
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown().render(
+        markdown = SummaryAuditIndexMd().render(
             summary,
             title="Cycle 38 Archive Summary Artifact Archive Summary",
         )
@@ -1939,7 +1939,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Verification Markdown: included", markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-markdown-gate-blocks-drift
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_markdown_gate_blocks_drift(
+    def test_ret_surface_022(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -1979,16 +1979,16 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             summary_path="cycle-39/archive-summary.md",
             gate_path="cycle-39/archive-summary-gate.md",
         )
-        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+        summary_archive = SummaryAuditArchiveBuilder().build(
             handoff,
         )
-        summary = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary().summarize(
+        summary = SummaryAuditIndex().summarize(
             summary_archive,
         )
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown().render(
+        markdown = SummaryAuditIndexMd().render(
             summary,
         )
-        gate = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate()
+        gate = SummaryAuditIndexGate()
 
         clean = gate.evaluate(summary, markdown)
         self.assertTrue(clean["ready"])
@@ -2019,7 +2019,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         )
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-markdown-gate-markdown-renders-blockers
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_markdown_gate_markdown_renders_blockers(
+    def test_ret_surface_023(
         self,
     ) -> None:
         result = {
@@ -2034,7 +2034,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             ],
         }
 
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown().render(
+        markdown = SummaryAuditIndexGateMd().render(
             result,
             title="Cycle 40 Archive Summary Artifact Archive Summary Markdown Gate",
         )
@@ -2048,14 +2048,14 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- parent archive status line is missing", markdown)
         self.assertIn("- artifact row is missing for cycle-40/archive-summary-gate.md", markdown)
 
-        clean = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown().render(
+        clean = SummaryAuditIndexGateMd().render(
             {"ready": True, "status": "ready", "artifact_count": 2, "checked_artifact_count": 2, "finding_count": 0},
         )
         self.assertIn("- Ready: yes", clean)
         self.assertIn("- none", clean)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-builder-packages-gated-summary
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_builder_packages_gated_summary(
+    def test_ret_surface_024(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -2095,11 +2095,11 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             summary_path="cycle-41/archive-summary.md",
             gate_path="cycle-41/archive-summary-gate.md",
         )
-        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+        summary_archive = SummaryAuditArchiveBuilder().build(
             handoff,
         )
 
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder().build(
+        packaged = SummaryIndexArtifactsBuilder().build(
             summary_archive,
             summary_path="cycle-41/archive-summary-artifact-archive-summary.md",
             gate_path="cycle-41/archive-summary-artifact-archive-summary-gate.md",
@@ -2121,7 +2121,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertEqual(packaged.gate_markdown, packaged.artifacts[1].content)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-records-summary-artifacts
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_records_summary_artifacts(
+    def test_ret_surface_025(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -2161,16 +2161,16 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             summary_path="cycle-42/archive-summary.md",
             gate_path="cycle-42/archive-summary-gate.md",
         )
-        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+        summary_archive = SummaryAuditArchiveBuilder().build(
             handoff,
         )
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder().build(
+        packaged = SummaryIndexArtifactsBuilder().build(
             summary_archive,
             summary_path="cycle-42/archive-summary-artifact-archive-summary.md",
             gate_path="cycle-42/archive-summary-artifact-archive-summary-gate.md",
         )
 
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder().build(
+        manifest = SummaryIndexManifestBuilder().build(
             packaged,
         )
 
@@ -2189,7 +2189,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertTrue(manifest.entries[1].content_sha256.startswith("sha256:"))
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-renders-table
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_renders_table(
+    def test_ret_surface_026(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -2229,19 +2229,19 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             summary_path="cycle-43/archive-summary.md",
             gate_path="cycle-43/archive-summary-gate.md",
         )
-        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+        summary_archive = SummaryAuditArchiveBuilder().build(
             handoff,
         )
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder().build(
+        packaged = SummaryIndexArtifactsBuilder().build(
             summary_archive,
             summary_path="cycle-43/archive-summary-artifact-archive-summary.md",
             gate_path="cycle-43/archive-summary-artifact-archive-summary-gate.md",
         )
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder().build(
+        manifest = SummaryIndexManifestBuilder().build(
             packaged,
         )
 
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown().render(
+        markdown = SummaryIndexManifestMd().render(
             manifest,
             title="Cycle 43 Archive Summary Artifact Archive Summary Artifact Manifest",
         )
@@ -2255,7 +2255,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             self.assertIn(f"| `{entry.path}` | `{entry.content_sha256}` | {entry.byte_count} |", markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verifier-detects-drift
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verifier_detects_drift(
+    def test_ret_surface_027(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -2295,22 +2295,22 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             summary_path="cycle-44/archive-summary.md",
             gate_path="cycle-44/archive-summary-gate.md",
         )
-        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+        summary_archive = SummaryAuditArchiveBuilder().build(
             handoff,
         )
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder().build(
+        packaged = SummaryIndexArtifactsBuilder().build(
             summary_archive,
             summary_path="cycle-44/archive-summary-artifact-archive-summary.md",
             gate_path="cycle-44/archive-summary-artifact-archive-summary-gate.md",
         )
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder().build(
+        manifest = SummaryIndexManifestBuilder().build(
             packaged,
         )
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown().render(
+        markdown = SummaryIndexManifestMd().render(
             manifest,
         )
         verifier = (
-            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier()
+            SummaryIndexManifestVerifier()
         )
 
         clean = verifier.verify(manifest, markdown)
@@ -2333,7 +2333,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         )
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-renders-findings
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_renders_findings(
+    def test_ret_surface_028(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -2373,28 +2373,28 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             summary_path="cycle-45/archive-summary.md",
             gate_path="cycle-45/archive-summary-gate.md",
         )
-        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+        summary_archive = SummaryAuditArchiveBuilder().build(
             handoff,
         )
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder().build(
+        packaged = SummaryIndexArtifactsBuilder().build(
             summary_archive,
             summary_path="cycle-45/archive-summary-artifact-archive-summary.md",
             gate_path="cycle-45/archive-summary-artifact-archive-summary-gate.md",
         )
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder().build(
+        manifest = SummaryIndexManifestBuilder().build(
             packaged,
         )
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown().render(
+        markdown = SummaryIndexManifestMd().render(
             manifest,
         )
         verification = (
-            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier().verify(
+            SummaryIndexManifestVerifier().verify(
                 manifest,
                 markdown.replace("| Path | SHA-256 | Bytes |\n", ""),
             )
         )
 
-        rendered = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown().render(
+        rendered = SummaryIndexVerifyMd().render(
             verification,
             title="Cycle 45 Manifest Markdown Verification",
         )
@@ -2406,7 +2406,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertNotIn("- none", rendered)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-gate-blocks-drift
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_gate_blocks_drift(
+    def test_ret_surface_029(
         self,
     ) -> None:
         report = ResearchCycleRetrospective().summarize(
@@ -2446,31 +2446,31 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             summary_path="cycle-46/archive-summary.md",
             gate_path="cycle-46/archive-summary-gate.md",
         )
-        summary_archive = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder().build(
+        summary_archive = SummaryAuditArchiveBuilder().build(
             handoff,
         )
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder().build(
+        packaged = SummaryIndexArtifactsBuilder().build(
             summary_archive,
             summary_path="cycle-46/archive-summary-artifact-archive-summary.md",
             gate_path="cycle-46/archive-summary-artifact-archive-summary-gate.md",
         )
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder().build(
+        manifest = SummaryIndexManifestBuilder().build(
             packaged,
         )
-        manifest_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown().render(
+        manifest_markdown = SummaryIndexManifestMd().render(
             manifest,
         )
         verification = (
-            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier().verify(
+            SummaryIndexManifestVerifier().verify(
                 manifest,
                 manifest_markdown.replace("| Path | SHA-256 | Bytes |\n", ""),
             )
         )
-        verification_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown().render(
+        verification_markdown = SummaryIndexVerifyMd().render(
             verification,
         )
         gate = (
-            ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate()
+            SummaryIndexVerifyGate()
         )
 
         clean = gate.evaluate(verification, verification_markdown)
@@ -2482,7 +2482,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             ),
         )
         empty_verification = ResearchCyclePlanningPacketManifestVerification(findings=())
-        empty_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown().render(
+        empty_markdown = SummaryIndexVerifyMd().render(
             empty_verification,
         )
         empty_clean = gate.evaluate(empty_verification, empty_markdown)
@@ -2504,7 +2504,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertEqual(0, empty_clean["finding_count"])
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-gate-markdown-renders-blockers
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_gate_markdown_renders_blockers(
+    def test_ret_surface_030(
         self,
     ) -> None:
         gate_result = {
@@ -2519,11 +2519,11 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             ],
         }
 
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown().render(
+        markdown = SummaryIndexVerifyGateMd().render(
             gate_result,
             title="Cycle 47 Verification Markdown Gate",
         )
-        clean = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown().render(
+        clean = SummaryIndexVerifyGateMd().render(
             {
                 "ready": True,
                 "status": "ready",
@@ -2549,7 +2549,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- none", clean)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-builder-packages-gate-audit
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_builder_packages_gate_audit(
+    def test_ret_surface_031(
         self,
     ) -> None:
         verification = ResearchCyclePlanningPacketManifestVerification(
@@ -2561,7 +2561,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             )
         )
 
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+        packaged = ManifestVerifyArtifactsBuilder().build(
             verification,
             verification_path="cycle-48/manifest-markdown-verification.md",
             gate_path="cycle-48/manifest-markdown-verification-gate.md",
@@ -2591,7 +2591,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertEqual(packaged.gate_markdown, packaged.artifacts[1].content)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-records-artifacts
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_records_artifacts(
+    def test_ret_surface_032(
         self,
     ) -> None:
         verification = ResearchCyclePlanningPacketManifestVerification(
@@ -2602,13 +2602,13 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
                 ),
             )
         )
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+        packaged = ManifestVerifyArtifactsBuilder().build(
             verification,
             verification_path="cycle-49/manifest-markdown-verification.md",
             gate_path="cycle-49/manifest-markdown-verification-gate.md",
         )
 
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder().build(
+        manifest = ManifestVerifyManifestBuilder().build(
             packaged,
             source_cycles=("cycle-49",),
         )
@@ -2628,7 +2628,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             self.assertEqual(71, len(entry.content_sha256))
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-renders-table
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_renders_table(
+    def test_ret_surface_033(
         self,
     ) -> None:
         verification = ResearchCyclePlanningPacketManifestVerification(
@@ -2639,17 +2639,17 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
                 ),
             )
         )
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+        packaged = ManifestVerifyArtifactsBuilder().build(
             verification,
             verification_path="cycle-50/manifest-markdown-verification.md",
             gate_path="cycle-50/manifest-markdown-verification-gate.md",
         )
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder().build(
+        manifest = ManifestVerifyManifestBuilder().build(
             packaged,
             source_cycles=("cycle-50",),
         )
 
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown().render(
+        markdown = ManifestVerifyManifestMd().render(
             manifest,
             title="Cycle 50 Verification Markdown Artifact Manifest",
         )
@@ -2663,29 +2663,29 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("| `cycle-50/manifest-markdown-verification-gate.md` | `sha256:", markdown)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verifier-detects-drift
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verifier_detects_drift(
+    def test_ret_surface_034(
         self,
     ) -> None:
         verification = ResearchCyclePlanningPacketManifestVerification(findings=())
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+        packaged = ManifestVerifyArtifactsBuilder().build(
             verification,
             verification_path="cycle-51/manifest-markdown-verification.md",
             gate_path="cycle-51/manifest-markdown-verification-gate.md",
         )
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder().build(
+        manifest = ManifestVerifyManifestBuilder().build(
             packaged,
             source_cycles=("cycle-51",),
         )
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown().render(
+        markdown = ManifestVerifyManifestMd().render(
             manifest,
             title="Cycle 51 Verification Markdown Artifact Manifest",
         )
 
-        clean = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier().verify(
+        clean = ManifestVerifyManifestVerifier().verify(
             manifest,
             markdown,
         )
-        broken = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier().verify(
+        broken = ManifestVerifyManifestVerifier().verify(
             manifest,
             markdown.replace("- Artifact count: 2\n", "").replace(
                 "| `cycle-51/manifest-markdown-verification-gate.md` |",
@@ -2703,7 +2703,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         )
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-renders-findings
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verification_markdown_renders_findings(
+    def test_ret_surface_035(
         self,
     ) -> None:
         verification = ResearchCyclePlanningPacketManifestVerification(
@@ -2715,11 +2715,11 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             )
         )
 
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown().render(
+        markdown = ManifestVerifyResultMd().render(
             verification,
             title="Cycle 52 Verification Markdown Artifact Manifest Markdown Verification",
         )
-        clean = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown().render(
+        clean = ManifestVerifyResultMd().render(
             ResearchCyclePlanningPacketManifestVerification(findings=()),
             title="Cycle 52 Verification Markdown Artifact Manifest Markdown Verification",
         )
@@ -2736,7 +2736,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- none", clean)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-gate-blocks-drift
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verification_markdown_gate_blocks_drift(
+    def test_ret_surface_036(
         self,
     ) -> None:
         verification = ResearchCyclePlanningPacketManifestVerification(
@@ -2747,11 +2747,11 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
                 ),
             )
         )
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown().render(
+        markdown = ManifestVerifyResultMd().render(
             verification,
             title="Cycle 53 Verification Markdown Artifact Manifest Markdown Verification",
         )
-        gate = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate()
+        gate = ManifestVerifyResultGate()
 
         clean = gate.evaluate(verification, markdown)
         broken = gate.evaluate(
@@ -2762,7 +2762,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             ),
         )
         empty_verification = ResearchCyclePlanningPacketManifestVerification(findings=())
-        empty_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown().render(
+        empty_markdown = ManifestVerifyResultMd().render(
             empty_verification,
             title="Cycle 53 Verification Markdown Artifact Manifest Markdown Verification",
         )
@@ -2784,7 +2784,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertEqual("ok", empty_clean["verification_status"])
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-gate-markdown-renders-blockers
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verification_markdown_gate_markdown_renders_blockers(
+    def test_ret_surface_037(
         self,
     ) -> None:
         gate_result = {
@@ -2798,11 +2798,11 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             ],
         }
 
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown().render(
+        markdown = ManifestVerifyResultGateMd().render(
             gate_result,
             title="Cycle 54 Verification Markdown Artifact Manifest Markdown Verification Gate",
         )
-        clean = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown().render(
+        clean = ManifestVerifyResultGateMd().render(
             {
                 "ready": True,
                 "status": "ready",
@@ -2830,7 +2830,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- none", clean)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-artifact-builder-packages-gate-audit
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verification_markdown_artifact_builder_packages_gate_audit(
+    def test_ret_surface_038(
         self,
     ) -> None:
         verification = ResearchCyclePlanningPacketManifestVerification(
@@ -2842,7 +2842,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             )
         )
 
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+        packaged = FinalVerifyArtifactsBuilder().build(
             verification,
             verification_path="cycle-55/manifest-markdown-verification.md",
             gate_path="cycle-55/manifest-markdown-verification-gate.md",
@@ -2867,17 +2867,17 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertEqual(packaged.gate_markdown, packaged.artifacts[1].content)
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-artifact-manifest-records-artifacts
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verification_markdown_artifact_manifest_records_artifacts(
+    def test_ret_surface_039(
         self,
     ) -> None:
         verification = ResearchCyclePlanningPacketManifestVerification(findings=())
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+        packaged = FinalVerifyArtifactsBuilder().build(
             verification,
             verification_path="cycle-56/manifest-markdown-verification.md",
             gate_path="cycle-56/manifest-markdown-verification-gate.md",
         )
 
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder().build(
+        manifest = FinalVerifyManifestBuilder().build(
             packaged,
             source_cycles=("cycle-56",),
         )
@@ -2902,17 +2902,17 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self,
     ) -> None:
         verification = ResearchCyclePlanningPacketManifestVerification(findings=())
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+        packaged = FinalVerifyArtifactsBuilder().build(
             verification,
             verification_path="cycle-57/manifest-markdown-verification.md",
             gate_path="cycle-57/manifest-markdown-verification-gate.md",
         )
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder().build(
+        manifest = FinalVerifyManifestBuilder().build(
             packaged,
             source_cycles=("cycle-57",),
         )
 
-        markdown = FinalVerificationArtifactManifestMarkdown().render(
+        markdown = FinalManifestMd().render(
             manifest,
             title="Cycle 57 Artifact Manifest",
         )
@@ -2930,25 +2930,25 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self,
     ) -> None:
         verification = ResearchCyclePlanningPacketManifestVerification(findings=())
-        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+        packaged = FinalVerifyArtifactsBuilder().build(
             verification,
             verification_path="cycle-58/manifest-markdown-verification.md",
             gate_path="cycle-58/manifest-markdown-verification-gate.md",
         )
-        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder().build(
+        manifest = FinalVerifyManifestBuilder().build(
             packaged,
             source_cycles=("cycle-58",),
         )
-        markdown = FinalVerificationArtifactManifestMarkdown().render(
+        markdown = FinalManifestMd().render(
             manifest,
             title="Cycle 58 Artifact Manifest",
         )
 
-        clean = FinalVerificationArtifactManifestMarkdownVerifier().verify(
+        clean = FinalManifestMdCheck().verify(
             manifest,
             markdown,
         )
-        broken = FinalVerificationArtifactManifestMarkdownVerifier().verify(
+        broken = FinalManifestMdCheck().verify(
             manifest,
             markdown.replace("- Artifact count: 2", "- Artifact count: 1"),
         )
@@ -2971,11 +2971,11 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             )
         )
 
-        markdown = FinalVerificationArtifactManifestVerificationMarkdown().render(
+        markdown = FinalManifestCheckMd().render(
             verification,
             title="Cycle 59 Artifact Manifest Verification",
         )
-        clean = FinalVerificationArtifactManifestVerificationMarkdown().render(
+        clean = FinalManifestCheckMd().render(
             ResearchCyclePlanningPacketManifestVerification(findings=()),
             title="Cycle 59 Artifact Manifest Verification",
         )

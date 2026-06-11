@@ -304,7 +304,7 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGate.evalu
   -> block missing status lines, mismatched artifact counts, missing audit lines, and missing artifact rows
   -> avoid Markdown regeneration, archive inspection, hash recomputation, filesystem reads, and storage adapter coupling
 
-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryMarkdownGateMarkdown.render(result)
+ArchiveSummaryGateMd.render(result)
   -> render archive summary Markdown gate decisions as reviewer-facing Markdown
   -> include ready state, status, counts, and blocker messages
   -> avoid gate reevaluation, archive inspection, hash recomputation, filesystem reads, and storage adapter coupling
@@ -314,12 +314,12 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder.bu
   -> package summary Markdown and gate Markdown as storage-ready handoff artifacts
   -> avoid archive rebuilds, archive manifest verification reruns, filesystem reads, and storage adapter coupling
 
-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder.build(handoff)
+SummaryManifestBuilder.build(handoff)
   -> build a manifest for archive summary and gate Markdown artifacts
   -> preserve source cycles from the machine-readable summary and record path/hash/byte metadata
   -> avoid summary artifact rebuilds, Markdown rendering, archive inspection, filesystem reads, and storage adapter coupling
 
-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown.render(manifest)
+SummaryManifestMd.render(manifest)
   -> render archive summary artifact manifests as reviewer-facing Markdown tables
   -> include source cycles, manifest status, artifact count, path, hash, and byte count
   -> reuse the shared manifest Markdown renderer without reading artifact contents
@@ -443,11 +443,11 @@ Current example:
 
 | Trace role | Long trace ID remains where | Short implementation name |
 |---|---|---|
-| final artifact manifest Markdown renderer | `# cf-atom: CODE-...ArtifactManifestMarkdown` and `codefire.links.yaml` | `FinalVerificationArtifactManifestMarkdown` |
-| final artifact manifest Markdown verifier | `# cf-atom: CODE-...ArtifactManifestMarkdownVerifier` and `codefire.links.yaml` | `FinalVerificationArtifactManifestMarkdownVerifier` |
-| final artifact manifest verification Markdown renderer | `# cf-atom: CODE-...ArtifactManifestMarkdownVerificationMarkdown` and `codefire.links.yaml` | `FinalVerificationArtifactManifestVerificationMarkdown` |
+| final artifact manifest Markdown renderer | `# cf-atom: CODE-...ArtifactManifestMarkdown` and `codefire.links.yaml` | `FinalManifestMd` |
+| final artifact manifest Markdown verifier | `# cf-atom: CODE-...ArtifactManifestMarkdownVerifier` and `codefire.links.yaml` | `FinalManifestMdCheck` |
+| final artifact manifest verification Markdown renderer | `# cf-atom: CODE-...ArtifactManifestMarkdownVerificationMarkdown` and `codefire.links.yaml` | `FinalManifestCheckMd` |
 
-When adding a new surface, choose the short implementation name first, then attach the long CodeFire atom through the marker and trace links. If the only available name is over roughly 80 characters, the design likely needs a domain abstraction before more code is added.
+When adding a new surface, choose the short implementation name first, then attach the long CodeFire atom through the marker and trace links. Python class names, function names, and test method names have an 80-character hard cap and should usually stay under 40 characters. If the only available name is over that cap, the design needs a domain abstraction before more code is added.
 
 ## 10. Change Recipes
 
@@ -465,34 +465,34 @@ Current archive summary artifact flow:
 ```text
 ResearchCyclePlanningHandoffReviewPacketArtifactArchive
   -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactBuilder.build(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestBuilder.build(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestMarkdown.render(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerifier.verify(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactManifestVerificationMarkdown.render(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveBuilder.build(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummary.summarize(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdown.render(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGate.evaluate(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryMarkdownGateMarkdown.render(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactBuilder.build(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestBuilder.build(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdown.render(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerifier.verify(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown.render(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate.evaluate(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown.render(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder.build(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder.build(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown.render(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier.verify(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown.render(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate.evaluate(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown.render(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder.build(...)
-  -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder.build(...)
-  -> FinalVerificationArtifactManifestMarkdown.render(...)
-  -> FinalVerificationArtifactManifestMarkdownVerifier.verify(...)
-  -> FinalVerificationArtifactManifestVerificationMarkdown.render(...)
+  -> SummaryManifestBuilder.build(...)
+  -> SummaryManifestMd.render(...)
+  -> SummaryManifestVerifier.verify(...)
+  -> SummaryManifestVerifyMd.render(...)
+  -> SummaryAuditArchiveBuilder.build(...)
+  -> SummaryAuditIndex.summarize(...)
+  -> SummaryAuditIndexMd.render(...)
+  -> SummaryAuditIndexGate.evaluate(...)
+  -> SummaryAuditIndexGateMd.render(...)
+  -> SummaryIndexArtifactsBuilder.build(...)
+  -> SummaryIndexManifestBuilder.build(...)
+  -> SummaryIndexManifestMd.render(...)
+  -> SummaryIndexManifestVerifier.verify(...)
+  -> SummaryIndexVerifyMd.render(...)
+  -> SummaryIndexVerifyGate.evaluate(...)
+  -> SummaryIndexVerifyGateMd.render(...)
+  -> ManifestVerifyArtifactsBuilder.build(...)
+  -> ManifestVerifyManifestBuilder.build(...)
+  -> ManifestVerifyManifestMd.render(...)
+  -> ManifestVerifyManifestVerifier.verify(...)
+  -> ManifestVerifyResultMd.render(...)
+  -> ManifestVerifyResultGate.evaluate(...)
+  -> ManifestVerifyResultGateMd.render(...)
+  -> FinalVerifyArtifactsBuilder.build(...)
+  -> FinalVerifyManifestBuilder.build(...)
+  -> FinalManifestMd.render(...)
+  -> FinalManifestMdCheck.verify(...)
+  -> FinalManifestCheckMd.render(...)
 ```
 
 ### Add a new governance gate
