@@ -20,6 +20,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier,
@@ -2893,6 +2894,34 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             tuple(entry.byte_count for entry in manifest.entries),
         )
         self.assertTrue(all(entry.content_sha256.startswith("sha256:") for entry in manifest.entries))
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-renders-table
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_renders_table(
+        self,
+    ) -> None:
+        verification = ResearchCyclePlanningPacketManifestVerification(findings=())
+        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+            verification,
+            verification_path="cycle-57/manifest-markdown-verification.md",
+            gate_path="cycle-57/manifest-markdown-verification-gate.md",
+        )
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder().build(
+            packaged,
+            source_cycles=("cycle-57",),
+        )
+
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown().render(
+            manifest,
+            title="Cycle 57 Artifact Manifest",
+        )
+
+        self.assertIn("# Cycle 57 Artifact Manifest", markdown)
+        self.assertIn("- Source cycles: cycle-57", markdown)
+        self.assertIn("- Status: ok", markdown)
+        self.assertIn("- Artifact count: 2", markdown)
+        self.assertIn("| Path | SHA-256 | Bytes |", markdown)
+        self.assertIn("| `cycle-57/manifest-markdown-verification.md` | `sha256:", markdown)
+        self.assertIn("| `cycle-57/manifest-markdown-verification-gate.md` | `sha256:", markdown)
 
 
 if __name__ == "__main__":
