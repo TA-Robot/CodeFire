@@ -18,6 +18,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate,
@@ -2727,6 +2728,54 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Status: ok", clean)
         self.assertIn("- Finding count: 0", clean)
         self.assertIn("- none", clean)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-gate-blocks-drift
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verification_markdown_gate_blocks_drift(
+        self,
+    ) -> None:
+        verification = ResearchCyclePlanningPacketManifestVerification(
+            findings=(
+                ResearchCyclePlanningPacketManifestVerificationFinding(
+                    path="cycle-53/manifest-markdown-verification-gate.md",
+                    message="artifact row is missing",
+                ),
+            )
+        )
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown().render(
+            verification,
+            title="Cycle 53 Verification Markdown Artifact Manifest Markdown Verification",
+        )
+        gate = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate()
+
+        clean = gate.evaluate(verification, markdown)
+        broken = gate.evaluate(
+            verification,
+            markdown.replace("- Finding count: 1\n", "").replace(
+                "- `cycle-53/manifest-markdown-verification-gate.md`: artifact row is missing\n",
+                "",
+            ),
+        )
+        empty_verification = ResearchCyclePlanningPacketManifestVerification(findings=())
+        empty_markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown().render(
+            empty_verification,
+            title="Cycle 53 Verification Markdown Artifact Manifest Markdown Verification",
+        )
+        empty_clean = gate.evaluate(empty_verification, empty_markdown)
+
+        self.assertTrue(clean["ready"])
+        self.assertEqual("ready", clean["status"])
+        self.assertEqual("blocked", clean["verification_status"])
+        self.assertEqual(1, clean["finding_count"])
+        self.assertFalse(broken["ready"])
+        self.assertEqual(
+            [
+                "finding count line is missing",
+                "finding line is missing for cycle-53/manifest-markdown-verification-gate.md",
+            ],
+            broken["blockers"],
+        )
+        self.assertTrue(empty_clean["ready"])
+        self.assertEqual("ok", empty_clean["verification_status"])
 
 
 if __name__ == "__main__":
