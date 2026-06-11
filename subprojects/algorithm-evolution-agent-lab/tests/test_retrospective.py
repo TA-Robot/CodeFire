@@ -3,6 +3,7 @@ import unittest
 
 from evoagent.retrospective import (
     FinalVerificationArtifactManifestMarkdown,
+    FinalVerificationArtifactManifestVerificationMarkdown,
     FinalVerificationArtifactManifestMarkdownVerifier,
     ResearchCycleRetrospective,
     ResearchCyclePlanningHandoffBundleBuilder,
@@ -2956,6 +2957,36 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertFalse(broken.ok)
         self.assertEqual("manifest.md", broken.findings[0].path)
         self.assertEqual("artifact count line is missing", broken.findings[0].message)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-renders-findings
+    def test_final_verification_artifact_manifest_verification_markdown_renders_findings(
+        self,
+    ) -> None:
+        verification = ResearchCyclePlanningPacketManifestVerification(
+            findings=(
+                ResearchCyclePlanningPacketManifestVerificationFinding(
+                    path="cycle-59/manifest.md",
+                    message="artifact count line is missing",
+                ),
+            )
+        )
+
+        markdown = FinalVerificationArtifactManifestVerificationMarkdown().render(
+            verification,
+            title="Cycle 59 Artifact Manifest Verification",
+        )
+        clean = FinalVerificationArtifactManifestVerificationMarkdown().render(
+            ResearchCyclePlanningPacketManifestVerification(findings=()),
+            title="Cycle 59 Artifact Manifest Verification",
+        )
+
+        self.assertIn("# Cycle 59 Artifact Manifest Verification", markdown)
+        self.assertIn("- Status: blocked", markdown)
+        self.assertIn("- Finding count: 1", markdown)
+        self.assertIn("- `cycle-59/manifest.md`: artifact count line is missing", markdown)
+        self.assertIn("- Status: ok", clean)
+        self.assertIn("- Finding count: 0", clean)
+        self.assertIn("- none", clean)
 
 
 if __name__ == "__main__":

@@ -445,6 +445,7 @@ Current example:
 |---|---|---|
 | final artifact manifest Markdown renderer | `# cf-atom: CODE-...ArtifactManifestMarkdown` and `codefire.links.yaml` | `FinalVerificationArtifactManifestMarkdown` |
 | final artifact manifest Markdown verifier | `# cf-atom: CODE-...ArtifactManifestMarkdownVerifier` and `codefire.links.yaml` | `FinalVerificationArtifactManifestMarkdownVerifier` |
+| final artifact manifest verification Markdown renderer | `# cf-atom: CODE-...ArtifactManifestMarkdownVerificationMarkdown` and `codefire.links.yaml` | `FinalVerificationArtifactManifestVerificationMarkdown` |
 
 When adding a new surface, choose the short implementation name first, then attach the long CodeFire atom through the marker and trace links. If the only available name is over roughly 80 characters, the design likely needs a domain abstraction before more code is added.
 
@@ -491,6 +492,7 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchive
   -> ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder.build(...)
   -> FinalVerificationArtifactManifestMarkdown.render(...)
   -> FinalVerificationArtifactManifestMarkdownVerifier.verify(...)
+  -> FinalVerificationArtifactManifestVerificationMarkdown.render(...)
 ```
 
 ### Add a new governance gate

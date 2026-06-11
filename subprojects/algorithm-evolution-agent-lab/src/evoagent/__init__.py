@@ -97,6 +97,7 @@ from evoagent.regression import RegressionDetector, RegressionFinding
 from evoagent.risk import ExperimentRisk, ExperimentRiskRegister, RiskPriority, RiskSeverity, RiskStatus
 from evoagent.retrospective import (
     FinalVerificationArtifactManifestMarkdown,
+    FinalVerificationArtifactManifestVerificationMarkdown,
     FinalVerificationArtifactManifestMarkdownVerifier,
     ResearchCyclePlanningHandoffArtifact,
     ResearchCyclePlanningHandoffBundle,
@@ -194,6 +195,7 @@ from evoagent.triage import ExperimentTriageBoard, ExperimentTriageItem, Experim
 
 __all__ = [
     "FinalVerificationArtifactManifestMarkdown",
+    "FinalVerificationArtifactManifestVerificationMarkdown",
     "FinalVerificationArtifactManifestMarkdownVerifier",
     "CandidateAlgorithm",
     "CandidateEvolutionOperators",
