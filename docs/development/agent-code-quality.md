@@ -109,6 +109,24 @@ CodeFireでは特に、以下を妥協しない。
 - 例外的な処理には理由を残す。
 - コメントは「なぜその設計か」「どの不変条件を守っているか」に使う。
 
+## 命名と識別子
+
+- CodeFire Atom ID、requirement ID、test atom IDはtraceabilityのために長くなることがある。
+- 実装上のclass、struct、enum、function、module、test function名へ、長いAtom IDをそのまま写さない。
+- 人間が読む実装識別子は、責務を表す短いdomain名にする。
+  - 良い例: `FinalVerificationArtifactManifestMarkdownVerifier`
+  - 悪い例: requirement/design/testの階層語を全て連結した300文字級のclass名
+- 実装識別子が長くなり始めたら、責務の抽象名を決める。
+  - `final verification artifact manifest`
+  - `branch context selector`
+  - `commit certificate`
+  - `storage report`
+- 「何のtrace atomか」は `# cf-atom:`、`codefire.links.yaml`、docs/spec、docs/designで表現する。
+- 「何をする実装か」は短い型名・関数名で表現する。
+- 同じ語が2回以上連続して現れる名前は、抽象化不足として見直す。
+- 長い履歴由来の名前を互換のために残す場合は、public facadeを短名にし、長名は非推奨またはtrace-onlyに寄せる。
+- test名も同様に、behaviorを短く表す。CodeFireの `TEST-*` Atom IDとPython/Rust test function名は一致しなくてよい。
+
 ## テストと検証
 
 - 小さい変更でも、壊れる可能性がある不変条件をテストする。

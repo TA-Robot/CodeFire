@@ -429,7 +429,26 @@ Every implemented module has a matching `tests/test_*.py` file. The tests are th
 
 When adding a module, add its test in the same naming pattern. When adding a CodeFire atom, keep requirement, design, code, and test IDs connected in `codefire.links.yaml`.
 
-## 9. Change Recipes
+## 9. Naming Contract
+
+CodeFire trace IDs and source identifiers have different jobs.
+
+- Atom IDs preserve requirement/design/code/test traceability.
+- Python class/function/test names preserve reader comprehension.
+- Do not copy a long `CODE-*` or `TEST-*` atom into a Python identifier.
+- Keep implementation names short enough to scan in imports, stack traces, and test output.
+- Prefer a concise domain name once a flow name repeats more than one nested handoff/archive/manifest layer.
+
+Current example:
+
+| Trace role | Long trace ID remains where | Short implementation name |
+|---|---|---|
+| final artifact manifest Markdown renderer | `# cf-atom: CODE-...ArtifactManifestMarkdown` and `codefire.links.yaml` | `FinalVerificationArtifactManifestMarkdown` |
+| final artifact manifest Markdown verifier | `# cf-atom: CODE-...ArtifactManifestMarkdownVerifier` and `codefire.links.yaml` | `FinalVerificationArtifactManifestMarkdownVerifier` |
+
+When adding a new surface, choose the short implementation name first, then attach the long CodeFire atom through the marker and trace links. If the only available name is over roughly 80 characters, the design likely needs a domain abstraction before more code is added.
+
+## 10. Change Recipes
 
 ### Add a new planning primitive
 
@@ -486,7 +505,7 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchive
 
 Do not hide it inside the planner. Add a runner abstraction or policy-gated adapter, then make the execution boundary explicit in docs and tests.
 
-## 10. What The Source Should Feel Like
+## 11. What The Source Should Feel Like
 
 Before opening code, a reader should expect:
 
@@ -497,5 +516,6 @@ Before opening code, a reader should expect:
 - limited filesystem/subprocess I/O, concentrated in runner/report/challenge modules;
 - tests that describe the behavior at module boundary level;
 - CodeFire trace links that connect requirements, design, code, and tests.
+- implementation identifiers that are shorter than their CodeFire trace atom IDs.
 
 If an implementation no longer matches this source shape, update this atlas before extending the feature.

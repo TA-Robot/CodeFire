@@ -235,7 +235,7 @@ Current named cycle:
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
 - Latest pushed Git commits: current global burn-down commits through cycle 58 dogfood pass。
 - Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` は `open-clean`、open fires 0。
-- Latest algorithm CodeFire base: `CF-COMMIT-59909ff6c51b761403c72b28`。
+- Latest algorithm CodeFire base: `CF-COMMIT-59591483ad842cee15b7778b`。
 
 Current global issue inventory:
 
@@ -304,6 +304,7 @@ Close audit note:
 - Cycle 56 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-b7d400637cce32d0e937e272` でsealした。CodeFire本体issueは新規発見なし。
 - Cycle 57 dogfoodingでは `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-daac7bb9c2c6411be2839a69` でsealした。CodeFire本体issueは新規発見なし。146件は閉じた履歴batchの開始数であり、現open数ではないことを現状態欄で再確認した。
 - Cycle 58 dogfoodingでは `FinalVerificationArtifactManifestMarkdownVerifier` をdocs-firstで追加し、直前rendererも `FinalVerificationArtifactManifestMarkdown` へ短名化した。8件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-59909ff6c51b761403c72b28` でsealした。CodeFire本体issueは新規発見なし。
+- Cycle 58 follow-up docsでは、CodeFire Atom IDと実装識別子を分離する命名方針をroot品質基準、algorithm `AGENTS.md`、source atlasへ追記し、docs-only変更を `CF-COMMIT-59591483ad842cee15b7778b` でsealした。
 - 次のcycleでも、issue discovery後にこのmapまたは後継schemaへ全open issueを登録し、batchを全部消してから次のissue出しへ進む。
 
 ## Completed Two-Cycle Snapshot

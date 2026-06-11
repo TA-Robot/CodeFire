@@ -2,6 +2,7 @@
 
 | Date | Area | Change | Evidence |
 |---|---|---|---|
+| 2026-06-11 | Documentation | CodeFire Atom IDとPython実装識別子を分離する命名方針を `AGENTS.md` と source atlas に明文化した | docs-only naming policy; long trace IDs remain in `# cf-atom:` / `codefire.links.yaml`, implementation names stay short |
 | 2026-06-10 | Reporting | `ResearchCyclePlanMarkdown` を追加し、synthesized cycle planをlane別Markdownとしてレビュー可能にした | `REQ-AUTO-041`; `DES-AUTO-023`; `CODE-ResearchCyclePlanMarkdown`; `TEST-research-cycle-plan-markdown-renders-lanes`; 146 tests pass |
 | 2026-06-10 | Planning | `ResearchCyclePlanSynthesizer` を追加し、retrospective recommendationをmitigation/active/review/archive/deferred laneの次cycle planへ変換できるようにした | `REQ-AUTO-040`; `DES-AUTO-022`; `CODE-ResearchCyclePlanSynthesizer`; `TEST-research-cycle-plan-synthesizer-builds-next-cycle-lanes`; 145 tests pass |
 | 2026-06-04 | Project | 実験自動化AIエージェント用リポジトリを作成した | initial scaffold |
