@@ -17,6 +17,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGateMarkdown,
@@ -2652,6 +2653,46 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("| Path | SHA-256 | Bytes |", markdown)
         self.assertIn("| `cycle-50/manifest-markdown-verification.md` | `sha256:", markdown)
         self.assertIn("| `cycle-50/manifest-markdown-verification-gate.md` | `sha256:", markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verifier-detects-drift
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verifier_detects_drift(
+        self,
+    ) -> None:
+        verification = ResearchCyclePlanningPacketManifestVerification(findings=())
+        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+            verification,
+            verification_path="cycle-51/manifest-markdown-verification.md",
+            gate_path="cycle-51/manifest-markdown-verification-gate.md",
+        )
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder().build(
+            packaged,
+            source_cycles=("cycle-51",),
+        )
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown().render(
+            manifest,
+            title="Cycle 51 Verification Markdown Artifact Manifest",
+        )
+
+        clean = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier().verify(
+            manifest,
+            markdown,
+        )
+        broken = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier().verify(
+            manifest,
+            markdown.replace("- Artifact count: 2\n", "").replace(
+                "| `cycle-51/manifest-markdown-verification-gate.md` |",
+                "| `cycle-51/missing.md` |",
+            ),
+        )
+
+        self.assertTrue(clean.ok)
+        self.assertEqual(
+            (
+                ("manifest.md", "artifact count line is missing"),
+                ("cycle-51/manifest-markdown-verification-gate.md", "artifact row is missing"),
+            ),
+            tuple((finding.path, finding.message) for finding in broken.findings),
+        )
 
 
 if __name__ == "__main__":
