@@ -2,6 +2,8 @@ from dataclasses import replace
 import unittest
 
 from evoagent.retrospective import (
+    FinalVerificationArtifactManifestMarkdown,
+    FinalVerificationArtifactManifestMarkdownVerifier,
     ResearchCycleRetrospective,
     ResearchCyclePlanningHandoffBundleBuilder,
     ResearchCyclePlanningHandoffBundleMarkdown,
@@ -20,7 +22,6 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder,
-    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier,
@@ -2896,7 +2897,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertTrue(all(entry.content_sha256.startswith("sha256:") for entry in manifest.entries))
 
     # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-renders-table
-    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_renders_table(
+    def test_final_verification_artifact_manifest_markdown_renders_table(
         self,
     ) -> None:
         verification = ResearchCyclePlanningPacketManifestVerification(findings=())
@@ -2910,7 +2911,7 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             source_cycles=("cycle-57",),
         )
 
-        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown().render(
+        markdown = FinalVerificationArtifactManifestMarkdown().render(
             manifest,
             title="Cycle 57 Artifact Manifest",
         )
@@ -2922,6 +2923,39 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("| Path | SHA-256 | Bytes |", markdown)
         self.assertIn("| `cycle-57/manifest-markdown-verification.md` | `sha256:", markdown)
         self.assertIn("| `cycle-57/manifest-markdown-verification-gate.md` | `sha256:", markdown)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verifier-detects-drift
+    def test_final_verification_artifact_manifest_markdown_verifier_detects_drift(
+        self,
+    ) -> None:
+        verification = ResearchCyclePlanningPacketManifestVerification(findings=())
+        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+            verification,
+            verification_path="cycle-58/manifest-markdown-verification.md",
+            gate_path="cycle-58/manifest-markdown-verification-gate.md",
+        )
+        manifest = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder().build(
+            packaged,
+            source_cycles=("cycle-58",),
+        )
+        markdown = FinalVerificationArtifactManifestMarkdown().render(
+            manifest,
+            title="Cycle 58 Artifact Manifest",
+        )
+
+        clean = FinalVerificationArtifactManifestMarkdownVerifier().verify(
+            manifest,
+            markdown,
+        )
+        broken = FinalVerificationArtifactManifestMarkdownVerifier().verify(
+            manifest,
+            markdown.replace("- Artifact count: 2", "- Artifact count: 1"),
+        )
+
+        self.assertTrue(clean.ok)
+        self.assertFalse(broken.ok)
+        self.assertEqual("manifest.md", broken.findings[0].path)
+        self.assertEqual("artifact count line is missing", broken.findings[0].message)
 
 
 if __name__ == "__main__":

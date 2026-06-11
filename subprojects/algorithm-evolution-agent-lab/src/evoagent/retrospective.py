@@ -1980,7 +1980,7 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
 
 
 # cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown
-class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown:
+class FinalVerificationArtifactManifestMarkdown:
     def render(
         self,
         manifest: ResearchCyclePlanningPacketManifest,
@@ -1988,6 +1988,19 @@ class ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArch
         title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary Artifact Manifest Markdown Verification Markdown Artifact Manifest Markdown Verification Markdown Artifact Manifest",
     ) -> str:
         return ResearchCyclePlanningPacketManifestMarkdown().render(manifest, title=title)
+
+
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier
+class FinalVerificationArtifactManifestMarkdownVerifier:
+    def verify(
+        self,
+        manifest: ResearchCyclePlanningPacketManifest,
+        markdown: str,
+    ) -> ResearchCyclePlanningPacketManifestVerification:
+        return ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier().verify(
+            manifest,
+            markdown,
+        )
 
 
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:

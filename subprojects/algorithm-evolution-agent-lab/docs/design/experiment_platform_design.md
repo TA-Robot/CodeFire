@@ -1240,3 +1240,17 @@ The rendered document contains:
 - table rows for path, SHA-256 digest, and byte count
 
 The renderer delegates to the shared planning packet manifest Markdown renderer so table shape, digest display, and artifact ordering stay consistent across all handoff manifest surfaces. It does not rebuild manifests, verify drift, read files, write files, or mutate inputs.
+
+## DES-AUTO-076: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown artifact manifest Markdown verification Markdown artifact manifest Markdown verifier
+
+The review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown artifact manifest Markdown verification Markdown artifact manifest Markdown verifier consumes `ResearchCyclePlanningPacketManifest` and rendered Markdown.
+
+The verifier returns `ResearchCyclePlanningPacketManifestVerification` findings for:
+
+- missing source cycle line
+- missing status line
+- missing artifact count line
+- missing manifest table header
+- missing per-artifact table row
+
+The verifier delegates to the shared final audit index manifest Markdown verifier so finding vocabulary and path attribution stay consistent with earlier handoff manifest surfaces. It does not recompute artifact hashes, read files, write files, or mutate inputs.
