@@ -1153,3 +1153,16 @@ The verifier returns `ResearchCyclePlanningPacketManifestVerification` findings 
 - missing per-artifact table row
 
 The verifier delegates to the shared final audit index manifest Markdown verifier so finding vocabulary and path attribution stay consistent with earlier handoff manifest surfaces. It does not recompute artifact hashes, read files, write files, or mutate inputs.
+
+## DES-AUTO-070: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown artifact manifest Markdown verification Markdown
+
+The review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown artifact manifest Markdown verification Markdown renderer consumes `ResearchCyclePlanningPacketManifestVerification`.
+
+The rendered document contains:
+
+- title
+- verification status
+- finding count
+- path-specific finding list, or `none` when clean
+
+The renderer delegates to the shared planning packet manifest verification Markdown renderer so status vocabulary and finding list shape stay consistent across all handoff manifest verification surfaces. It does not rerun verification, inspect manifests, read files, write files, or mutate inputs.

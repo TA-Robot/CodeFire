@@ -708,6 +708,15 @@ links:
   - from: REQ-AUTO-087
     to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verifier-detects-drift
     type: verified_by
+  - from: REQ-AUTO-088
+    to: DES-AUTO-070
+    type: refined_by
+  - from: DES-AUTO-070
+    to: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown
+    type: implemented_by
+  - from: REQ-AUTO-088
+    to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-renders-findings
+    type: verified_by
   - from: REQ-AUTO-001
     to: DES-AUTO-001
     type: refined_by

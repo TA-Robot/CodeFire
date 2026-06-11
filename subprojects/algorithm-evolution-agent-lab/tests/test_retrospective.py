@@ -17,6 +17,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownGate,
@@ -2693,6 +2694,39 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
             ),
             tuple((finding.path, finding.message) for finding in broken.findings),
         )
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-renders-findings
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verification_markdown_renders_findings(
+        self,
+    ) -> None:
+        verification = ResearchCyclePlanningPacketManifestVerification(
+            findings=(
+                ResearchCyclePlanningPacketManifestVerificationFinding(
+                    path="cycle-52/manifest-markdown-verification-gate.md",
+                    message="artifact row is missing",
+                ),
+            )
+        )
+
+        markdown = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown().render(
+            verification,
+            title="Cycle 52 Verification Markdown Artifact Manifest Markdown Verification",
+        )
+        clean = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown().render(
+            ResearchCyclePlanningPacketManifestVerification(findings=()),
+            title="Cycle 52 Verification Markdown Artifact Manifest Markdown Verification",
+        )
+
+        self.assertIn("# Cycle 52 Verification Markdown Artifact Manifest Markdown Verification", markdown)
+        self.assertIn("- Status: blocked", markdown)
+        self.assertIn("- Finding count: 1", markdown)
+        self.assertIn(
+            "- `cycle-52/manifest-markdown-verification-gate.md`: artifact row is missing",
+            markdown,
+        )
+        self.assertIn("- Status: ok", clean)
+        self.assertIn("- Finding count: 0", clean)
+        self.assertIn("- none", clean)
 
 
 if __name__ == "__main__":
