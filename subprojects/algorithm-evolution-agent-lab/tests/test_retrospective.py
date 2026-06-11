@@ -18,6 +18,7 @@ from evoagent.retrospective import (
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdown,
+    ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown,
     ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerifier,
@@ -2823,6 +2824,43 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Status: ready", clean)
         self.assertIn("- Verification status: ok", clean)
         self.assertIn("- none", clean)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-artifact-builder-packages-gate-audit
+    def test_research_cycle_planning_handoff_review_packet_artifact_archive_summary_artifact_archive_summary_artifact_manifest_markdown_verification_markdown_artifact_manifest_markdown_verification_markdown_artifact_builder_packages_gate_audit(
+        self,
+    ) -> None:
+        verification = ResearchCyclePlanningPacketManifestVerification(
+            findings=(
+                ResearchCyclePlanningPacketManifestVerificationFinding(
+                    path="cycle-55/manifest-markdown-verification-gate.md",
+                    message="artifact row is missing",
+                ),
+            )
+        )
+
+        packaged = ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactBuilder().build(
+            verification,
+            verification_path="cycle-55/manifest-markdown-verification.md",
+            gate_path="cycle-55/manifest-markdown-verification-gate.md",
+            verification_title="Cycle 55 Artifact Manifest Markdown Verification",
+            gate_title="Cycle 55 Artifact Manifest Markdown Verification Gate",
+        )
+
+        self.assertEqual(
+            (
+                "cycle-55/manifest-markdown-verification.md",
+                "cycle-55/manifest-markdown-verification-gate.md",
+            ),
+            tuple(artifact.path for artifact in packaged.artifacts),
+        )
+        self.assertIs(packaged.verification, verification)
+        self.assertIn("# Cycle 55 Artifact Manifest Markdown Verification", packaged.verification_markdown)
+        self.assertIn("- Finding count: 1", packaged.verification_markdown)
+        self.assertIn("# Cycle 55 Artifact Manifest Markdown Verification Gate", packaged.gate_markdown)
+        self.assertTrue(packaged.gate_result["ready"])
+        self.assertEqual("ready", packaged.gate_result["status"])
+        self.assertEqual(packaged.verification_markdown, packaged.artifacts[0].content)
+        self.assertEqual(packaged.gate_markdown, packaged.artifacts[1].content)
 
 
 if __name__ == "__main__":

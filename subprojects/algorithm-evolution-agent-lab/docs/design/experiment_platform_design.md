@@ -1197,3 +1197,17 @@ The rendered document contains:
 - blocker messages, or `none` when clean
 
 The renderer delegates to the shared manifest Markdown verification Markdown gate Markdown renderer so audit document shape stays consistent across all handoff verification readiness surfaces. It does not rerun the gate, inspect manifests, parse files, write files, or mutate inputs.
+
+## DES-AUTO-073: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown artifact manifest Markdown verification Markdown artifacts
+
+The review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown artifact manifest Markdown verification Markdown artifact builder consumes `ResearchCyclePlanningPacketManifestVerification`.
+
+The builder returns `ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifacts` containing:
+
+- the machine-readable verification result
+- verification Markdown
+- verification Markdown gate result
+- verification Markdown gate audit document
+- two packaged artifacts at caller-provided relative POSIX paths
+
+The builder composes the verification Markdown renderer, verification Markdown gate, and gate Markdown renderer. It validates output paths with the shared manifest path validator. It does not rebuild manifests, rerun manifest Markdown verification, read files, write files, or mutate inputs.
