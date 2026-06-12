@@ -2,6 +2,8 @@ from dataclasses import replace
 import unittest
 
 from evoagent.retrospective import (
+    FinalManifestGate,
+    FinalManifestGateMd,
     FinalManifestMd,
     FinalManifestCheckMd,
     FinalManifestMdCheck,
@@ -2987,6 +2989,56 @@ class ResearchCycleRetrospectiveTests(unittest.TestCase):
         self.assertIn("- Status: ok", clean)
         self.assertIn("- Finding count: 0", clean)
         self.assertIn("- none", clean)
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-gate-blocks-drift
+    def test_final_manifest_gate_blocks_drift(self) -> None:
+        verification = ResearchCyclePlanningPacketManifestVerification(
+            findings=(
+                ResearchCyclePlanningPacketManifestVerificationFinding(
+                    path="cycle-60/manifest.md",
+                    message="artifact count line is missing",
+                ),
+            )
+        )
+        markdown = FinalManifestCheckMd().render(
+            verification,
+            title="Cycle 60 Artifact Manifest Verification",
+        )
+
+        clean = FinalManifestGate().evaluate(verification, markdown)
+        drifted = FinalManifestGate().evaluate(
+            verification,
+            markdown.replace("- Finding count: 1", "- Finding count: 0"),
+        )
+
+        self.assertTrue(clean["ready"])
+        self.assertEqual("ready", clean["status"])
+        self.assertFalse(drifted["ready"])
+        self.assertIn("finding count line is missing", drifted["blockers"])
+
+    # cf-atom: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-gate-markdown-renders-blockers
+    def test_final_manifest_gate_markdown_renders_blockers(self) -> None:
+        result = {
+            "ready": False,
+            "status": "blocked",
+            "verification_status": "blocked",
+            "finding_count": 1,
+            "checked_finding_count": 1,
+            "blockers": ["finding count line is missing"],
+        }
+
+        markdown = FinalManifestGateMd().render(
+            result,
+            title="Cycle 60 Artifact Manifest Verification Gate",
+        )
+
+        self.assertIn("# Cycle 60 Artifact Manifest Verification Gate", markdown)
+        self.assertIn("- Ready: no", markdown)
+        self.assertIn("- Status: blocked", markdown)
+        self.assertIn("- Verification status: blocked", markdown)
+        self.assertIn("- Finding count: 1", markdown)
+        self.assertIn("- Checked finding count: 1", markdown)
+        self.assertIn("- finding count line is missing", markdown)
 
 
 if __name__ == "__main__":

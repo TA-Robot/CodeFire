@@ -96,6 +96,8 @@ from evoagent.reproduction import ReproductionChecklist, ReproductionChecklistBu
 from evoagent.regression import RegressionDetector, RegressionFinding
 from evoagent.risk import ExperimentRisk, ExperimentRiskRegister, RiskPriority, RiskSeverity, RiskStatus
 from evoagent.retrospective import (
+    FinalManifestGate,
+    FinalManifestGateMd,
     FinalManifestMd,
     FinalManifestCheckMd,
     FinalManifestMdCheck,
@@ -194,6 +196,8 @@ from evoagent.traceability import CodeFireTraceAudit, TraceAuditFinding, TraceAu
 from evoagent.triage import ExperimentTriageBoard, ExperimentTriageItem, ExperimentTriageSignal, TriageAction
 
 __all__ = [
+    "FinalManifestGate",
+    "FinalManifestGateMd",
     "FinalManifestMd",
     "FinalManifestCheckMd",
     "FinalManifestMdCheck",

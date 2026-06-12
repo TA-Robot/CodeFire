@@ -26,12 +26,12 @@ Burn-down中に別の問題を見つけた場合の扱い:
 
 Current known open issue count:
 
-- CFB/CFR product/review issues: 0.
+- CFB/CFR product/review issues: 2 open (`CFB-096`, `CFB-097`).
 - Algorithm CodeFire open fires after the latest dogfood seal: 0.
-- Active frozen issue batch: none.
+- Active frozen issue batch: `CFB-096` and `CFB-097` discovered during cycle 60 dogfood; not yet burned down.
 - The historical 146-item global batch below is already closed. The number 146 is the old starting count, not a remaining-open count.
 - Closed issue detail files remain in `docs/development/bug-issues/` and `docs/development/code-review-issues/` as audit history. Counting files in those directories is not the open issue count; `Status: fixed` / `Status: fixed in v0.7` means closed.
-- Current detail issue status count: 255 issue files with status rows; 245 `fixed`, 10 `fixed in v0.7`, 0 `open`.
+- Current detail issue status count: 257 issue files with status rows; 245 `fixed`, 10 `fixed in v0.7`, 2 `open`.
 - If a text search still finds `146`, treat it as one of these audit artifacts: closed batch starting size, historical work-log remaining count from the burn-down day, closed issue ID `CFR-146`, or an algorithm unittest count from an older dogfood pass. None of those are current open issues.
 - Current open-state verification is the status grep for explicit `open` statuses plus CodeFire `open_fires: 0`; both must be zero before starting another discovery pass.
 

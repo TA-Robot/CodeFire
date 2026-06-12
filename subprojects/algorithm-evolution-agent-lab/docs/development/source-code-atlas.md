@@ -446,6 +446,8 @@ Current example:
 | final artifact manifest Markdown renderer | `# cf-atom: CODE-...ArtifactManifestMarkdown` and `codefire.links.yaml` | `FinalManifestMd` |
 | final artifact manifest Markdown verifier | `# cf-atom: CODE-...ArtifactManifestMarkdownVerifier` and `codefire.links.yaml` | `FinalManifestMdCheck` |
 | final artifact manifest verification Markdown renderer | `# cf-atom: CODE-...ArtifactManifestMarkdownVerificationMarkdown` and `codefire.links.yaml` | `FinalManifestCheckMd` |
+| final artifact manifest verification Markdown gate | `# cf-atom: CODE-...ArtifactManifestMarkdownVerificationMarkdownGate` and `codefire.links.yaml` | `FinalManifestGate` |
+| final artifact manifest verification Markdown gate renderer | `# cf-atom: CODE-...ArtifactManifestMarkdownVerificationMarkdownGateMarkdown` and `codefire.links.yaml` | `FinalManifestGateMd` |
 
 When adding a new surface, choose the short implementation name first, then attach the long CodeFire atom through the marker and trace links. Python class names, function names, and test method names have an 80-character hard cap and should usually stay under 40 characters. If the only available name is over that cap, the design needs a domain abstraction before more code is added.
 
@@ -493,6 +495,8 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchive
   -> FinalManifestMd.render(...)
   -> FinalManifestMdCheck.verify(...)
   -> FinalManifestCheckMd.render(...)
+  -> FinalManifestGate.evaluate(...)
+  -> FinalManifestGateMd.render(...)
 ```
 
 ### Add a new governance gate

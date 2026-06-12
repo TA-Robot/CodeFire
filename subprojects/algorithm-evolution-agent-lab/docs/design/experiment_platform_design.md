@@ -1267,3 +1267,18 @@ The rendered document contains:
 - path-specific finding list, or `none` when clean
 
 The renderer delegates to the shared planning packet manifest verification Markdown renderer so status vocabulary and finding list shape stay consistent across all handoff manifest verification surfaces. It does not rerun verification, inspect manifests, read files, write files, or mutate inputs.
+
+## DES-AUTO-078: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown artifact manifest Markdown verification Markdown artifact manifest Markdown verification Markdown gate
+
+The final verification artifact manifest verification Markdown gate consumes `ResearchCyclePlanningPacketManifestVerification` and rendered Markdown.
+
+The gate returns a deterministic readiness dictionary with:
+
+- ready flag
+- gate status
+- verification status
+- finding count
+- checked finding count
+- blocker messages
+
+The gate delegates to the shared manifest verification Markdown gate so readiness vocabulary, blocker messages, and clean-state handling stay consistent with earlier verification audit surfaces. It does not rerun verification, recompute manifests, inspect artifacts, read files, write files, or mutate inputs.

@@ -2017,6 +2017,33 @@ class FinalManifestCheckMd:
         )
 
 
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate
+class FinalManifestGate:
+    def evaluate(
+        self,
+        verification: ResearchCyclePlanningPacketManifestVerification,
+        markdown: str,
+    ) -> dict[str, object]:
+        return ManifestVerifyResultGate().evaluate(
+            verification,
+            markdown,
+        )
+
+
+# cf-atom: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown
+class FinalManifestGateMd:
+    def render(
+        self,
+        result: dict[str, object],
+        *,
+        title: str = "Research Cycle Planning Handoff Review Packet Artifact Archive Summary Artifact Archive Summary Artifact Manifest Markdown Verification Markdown Artifact Manifest Markdown Verification Markdown Artifact Manifest Markdown Verification Markdown Gate",
+    ) -> str:
+        return ManifestVerifyResultGateMd().render(
+            result,
+            title=title,
+        )
+
+
 def manifest_entry(path: str, content: str) -> ResearchCyclePlanningPacketManifestEntry:
     validate_manifest_path(path)
     payload = content.encode("utf-8")

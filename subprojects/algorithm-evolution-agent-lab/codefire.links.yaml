@@ -1260,6 +1260,21 @@ links:
   - from: REQ-AUTO-095
     to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-renders-findings
     type: verified_by
+  - from: REQ-AUTO-096
+    to: DES-AUTO-078
+    type: refined_by
+  - from: DES-AUTO-078
+    to: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGate
+    type: implemented_by
+  - from: DES-AUTO-078
+    to: CODE-ResearchCyclePlanningHandoffReviewPacketArtifactArchiveSummaryArtifactArchiveSummaryArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownArtifactManifestMarkdownVerificationMarkdownGateMarkdown
+    type: implemented_by
+  - from: REQ-AUTO-096
+    to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-gate-blocks-drift
+    type: verified_by
+  - from: REQ-AUTO-096
+    to: TEST-research-cycle-planning-handoff-review-packet-artifact-archive-summary-artifact-archive-summary-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-artifact-manifest-markdown-verification-markdown-gate-markdown-renders-blockers
+    type: verified_by
   - from: REQ-AUTO-033
     to: TEST-claim-release-gate-allows-complete-claims
     type: verified_by
