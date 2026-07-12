@@ -19,7 +19,7 @@ CodeFire should be developed with an external AI development operating system:
 - Do not add agent orchestration to CodeFire product code.
 - Do not couple CodeFire product semantics to a development model. Keep the explicit current model in a versioned runtime policy and project Codex configuration.
 - Do not optimize for patch volume over trusted integration.
-- Do not start new product development before the current dirty tree is split.
+- Do not start discretionary product development until the organization checkpoint is clean and the frozen Stage 1 correctness batch is closed.
 
 ## Decision Rationale
 
@@ -36,7 +36,7 @@ The broad exploration phase has been condensed into these operating decisions:
 | Platform boundaries | Keep AI orchestration, model routing, prompt libraries, scheduling, and marketplace behavior outside CodeFire product code. |
 | Model routing | Use Medium for deterministic work, High for bounded implementation/synthesis, and Ultra for architecture, adversarial review, security, deletion, and completion audits. |
 
-## Stage 0: Stabilize Current Worktree
+## Stage 0: Stabilize Current Worktree — Complete 2026-07-12
 
 Deliverables:
 
@@ -49,6 +49,7 @@ Exit criteria:
 
 - Management docs can be reviewed independently.
 - Unknown dirty files list is empty or explicitly assigned.
+- The mixed tree is saved as purpose-specific management, AI, strategy, cleanup, issue, product, dogfood implementation, and dogfood documentation commits.
 
 ## Stage 1: Make AI Packets Operational
 

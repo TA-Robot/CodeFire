@@ -4,13 +4,13 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 ## Current Operating Snapshot
 
-Last audited: 2026-07-11.
+Last audited: 2026-07-12.
 
 - Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
 - CFB detail ledger: 127 total; 120 `fixed`, 7 `open`.
 - CFR detail ledger: 160 total; 150 `fixed`, 10 `fixed in v0.7`.
 - `subprojects/algorithm-evolution-agent-lab/` reports CodeFire `open-clean` with 0 open fires when checked via the local Rust binary.
-- The repository has a large dirty tree that mixes CodeFire product changes, management docs, and algorithm dogfood work. Split this before further product development.
+- The mixed worktree was split into eight purpose-specific commits on 2026-07-12; the organization checkpoint is clean and no unknown paths remain.
 - The base environment does not expose `cargo` on `PATH`. The 2026-07-11 audit used an isolated Rust 1.97.0 toolchain under `/tmp` and passed fmt, locked workspace tests, and warning-denying Clippy; a durable pinned toolchain/CI identity is still release work.
 
 If any line above changes, update this snapshot and append the reason to `docs/development/history.md`.
@@ -46,13 +46,12 @@ Before starting implementation:
 
 ## Current Cleanup Priorities
 
-These are organization tasks that should happen before new feature development:
+The organization gate is complete. The next constrained work is:
 
-1. Use `docs/development/worktree-cleanup-plan.md` to split the dirty tree into reviewable groups: CodeFire product, CodeFire management docs, algorithm dogfood code, algorithm dogfood docs.
-2. Keep CFB-120..CFB-126 frozen as the first Stage 1 correctness batch; do not claim zero open product issues.
-3. Save the management, strategy/source, document-cleanup, and AI-infrastructure packages in the declared order before product implementation.
-4. Preserve the now-green Rust source gate in a durable pinned toolchain/CI environment; the local release binary is current-worktree smoke evidence but remains unbound until a clean checkpoint build.
-5. After the organizational save gate, resolve sealed-base/publish, path-containment, Trace Graph endpoint, mutable-state locking, full-digest collision, and import-idempotency invariants before discretionary feature work.
+1. Keep CFB-120..CFB-126 frozen as the first Stage 1 correctness batch; do not claim zero open product issues.
+2. Resolve sealed-base/publish, path-containment, Trace Graph endpoint, mutable-state locking, full-digest collision, and import-idempotency invariants before discretionary feature work.
+3. Preserve the green Rust source gate in a durable pinned toolchain/CI environment and produce a source-bound binary from a clean checkpoint.
+4. Investigate the recorded `branch list` timeout before treating that surface as healthy.
 
 ## Validation Matrix
 

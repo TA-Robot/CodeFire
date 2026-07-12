@@ -156,5 +156,5 @@ Until then, keep a de-facto open specification and do not enter a standards body
 
 - A later-stage prototype may run read-only to gather evidence, but it cannot bypass an earlier safety/release gate.
 - P0 security, identity, recovery, and user-work risks preempt adoption work.
-- Do not run overlapping product write lanes in the current dirty tree.
+- Do not run overlapping product write lanes; the organization checkpoint is clean, but product mutation remains serialized by lane ownership and integration order.
 - A failed experiment can narrow or stop a stage; it is not a reason to lower the threshold after seeing results.
