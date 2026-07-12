@@ -1,6 +1,6 @@
 # CodeFire Development TODO Checklist
 
-このチェックリストは、`IMPLEMENTATION_TODO.md` と `docs/12_mvp_implementation_plan.md` を、開発管理しやすい作業単位へ展開したものです。
+このチェックリストは、初期MVP計画を開発管理しやすい作業単位へ展開したhistorical completion ledgerです。元の重複計画は統合・削除済みで、回復先は `archive/deletion-manifest.md` に記録しています。
 
 ## 運用ルール
 
@@ -242,8 +242,8 @@
 
 ## Immediate Next Actions
 
-1. v0.6 Rust rewriteのcrate境界、golden compatibility tests、automation interface schema方針を先に作る。
-2. JSON output、exit code taxonomy、context、next_actionsをv0.3/v0.4から段階導入する。
-3. diff algorithm / rename detection / Atom-Trace impact diffのgolden fixture方針を決める。
-4. CFB-005/006のUX改善をRust CLI計画へ組み込み、dogfooding中の操作コストと診断ノイズを下げる。
-5. YAML parser とobject ID仕様の互換性方針をv0.6 Rust計画で確定する。
+1. `docs/development/README.md` と `project-management.md` を正本にして、古いcurrent-state記述を履歴扱いへ整理する。
+2. dirty treeを CodeFire product、management docs、algorithm dogfood code、algorithm dogfood docs に分類する。
+3. `cargo` が使える環境で Rust validation gateを再実行する。
+4. `codefire branch list --path subprojects/algorithm-evolution-agent-lab --json` のtimeout/無出力を調査する。
+5. 管理docs再構成を独立した変更単位として保存してから、新規実装に戻る。

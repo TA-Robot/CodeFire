@@ -24,16 +24,31 @@ Burn-down中に別の問題を見つけた場合の扱い:
 
 ## Current Open State
 
-Current known open issue count:
+Current known open issue count, audited 2026-07-11 after the organization/source audit:
 
-- CFB/CFR product/review issues: 2 open (`CFB-096`, `CFB-097`).
+- CFB/CFR product/review issues: 7 open.
+- CFB detail ledger: 127 total; 120 `fixed`, 7 `open` (`CFB-120`..`CFB-126`).
+- CFR detail ledger: 150 `fixed`, 10 `fixed in v0.7`.
 - Algorithm CodeFire open fires after the latest dogfood seal: 0.
-- Active frozen issue batch: `CFB-096` and `CFB-097` discovered during cycle 60 dogfood; not yet burned down.
-- The historical 146-item global batch below is already closed. The number 146 is the old starting count, not a remaining-open count.
-- Closed issue detail files remain in `docs/development/bug-issues/` and `docs/development/code-review-issues/` as audit history. Counting files in those directories is not the open issue count; `Status: fixed` / `Status: fixed in v0.7` means closed.
-- Current detail issue status count: 257 issue files with status rows; 245 `fixed`, 10 `fixed in v0.7`, 2 `open`.
-- If a text search still finds `146`, treat it as one of these audit artifacts: closed batch starting size, historical work-log remaining count from the burn-down day, closed issue ID `CFR-146`, or an algorithm unittest count from an older dogfood pass. None of those are current open issues.
-- Current open-state verification is the status grep for explicit `open` statuses plus CodeFire `open_fires: 0`; both must be zero before starting another discovery pass.
+- Active organization work: rebuild durable project-management docs and split the mixed dirty tree before new feature development.
+- Historical cycle sections in this file are retained as audit history. Do not infer current issue counts from old cycle headings or old remaining-count notes.
+- The management hub `docs/development/README.md` is the current-state entry point; update it and append `history.md` when this section changes.
+
+## Active Organization-Audit Batch
+
+Batch ID: `BATCH-2026-07-stage1-invariants`
+
+Frozen scope:
+
+- `CFB-120`: scan sealed-base validation;
+- `CFB-121`: pre-publication sealed-commit validation;
+- `CFB-122`: resolved path/symlink containment;
+- `CFB-123`: Trace Graph endpoint integrity.
+- `CFB-124`: live scan/verify repository-state locking;
+- `CFB-125`: short-ID collision full-digest comparison.
+- `CFB-126`: import idempotency request binding.
+
+This batch was discovered while correcting canonical source documents. It is the first Stage 1 correctness batch after the management/strategy/AI packages are checkpointed. Do not add discretionary feature work or claim release readiness while it is open.
 
 ## Closed Historical Batch
 
@@ -207,6 +222,22 @@ Completion rule:
 | CFR-119 | fixed | Durable write contract | commit transaction marker and docs align object/metadata durability model |
 | CFR-130 | fixed | Commit transaction diagnostics | interrupted multi-object commit leaves a doctor-visible pending marker |
 | CFR-120 | fixed | Issue root cause map | open issue mapping is enforced by machine-readable root cause map and docs consistency test |
+| CFB-096 | fixed | Status next_actions path context | `status --json --path <open-dir>` preserves explicit path in command strings and targets |
+| CFB-097 | fixed | Batch operation next_actions path context | extinguish batch result plans preserve explicit path in verify command strings and targets |
+| CFB-098 | fixed | Open next_actions path context | `open <branch> <path> --json` success preserves opened path in status next_action |
+| CFB-099 | fixed | Merge help routing | `merge --help` uses normal help routing and exits 0 |
+| CFB-100 | fixed | Merge operation plan envelope | merge dry-run returns non-null repo and executable apply next_action |
+| CFB-101 | fixed | Branch lifecycle close | feature open dirs can be closed with supported `close` / `discard` commands |
+| CFB-102 | fixed | Source branch state gate | local clone/merge reject `open-consistent` source branches |
+| CFB-103 | fixed | Branch next_action quoting | branch operation next_actions quote branch names and paths |
+| CFB-104 | fixed | Merge fire persistence | merge apply persists merge-generated fires before returning |
+| CFB-105 | fixed | Primary branch close guard | close/discard protects primary or last-open branch without explicit force |
+| CFB-106 | fixed | Self merge guard | merge rejects identical source/target branches or commits |
+| CFB-107 | fixed | Branch error envelope context | branch domain errors preserve repo/path recovery context |
+| CFB-108 | fixed | Branch open workspace boundary | open rejects or explicitly gates repo-root-external targets |
+| CFB-109 | fixed | Branch lock recovery | lock contention includes repo and retry-oriented next_actions |
+| CFB-110 | fixed | Nested open dir guard | open rejects targets inside an existing open directory |
+| CFB-111 | fixed | Clone open path guidance | clone next_actions include safe concrete open target guidance |
 
 Remaining open count for this batch:
 
@@ -214,21 +245,21 @@ Remaining open count for this batch:
 
 ## Global Issue Inventory
 
-There is no active frozen issue batch now. The closed global batch plus completed dogfood mini-batches are the whole known issue backlog.
+The active frozen batch is `BATCH-2026-07-stage1-invariants` above. `BATCH-2026-06-branch-probe-2` covering `CFB-105`..`CFB-111` is closed. The closed global batch plus completed dogfood mini-batches remain audit history.
 
-Current tracked issue inventory as of 2026-06-10:
+Current tracked issue inventory as of 2026-07-11:
 
 | Series | Total tracked | Fixed / closed | Open | Notes |
 |---|---:|---:|---:|---|
-| CFB dogfood issues | 95 | 95 | 0 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for every `CFB-001..CFB-095` issue. |
+| CFB dogfood issues | 127 | 120 | 7 | `docs/development/bug-backlog.md` is the summary source. Detail files exist for every `CFB-001`..`CFB-127` issue. CFB-127 is a fixed validation-fixture issue outside the active open batch. |
 | CFR code review issues | 160 | 160 | 0 | `docs/development/code-review-issues-2026-06-06.md` and detail files are the summary/detail source. `fixed in v0.7` is counted as fixed/closed. |
-| Total | 255 | 255 | 0 | This global batch plus cycle 4 through cycle 36 dogfood passes are the whole known issue backlog. |
+| Total | 287 | 280 | 7 | The active batch is frozen at CFB-120..CFB-126; no further discovery or discretionary feature batch starts before its gate. |
 
 Completed global batch progress:
 
 - Historical starting count for the closed global batch: 146. This is not the current open count.
 - Fixed during global burn-down so far: CFB-005, CFB-006, CFB-007, CFB-008, CFB-009, CFB-010, CFB-011, CFB-012, CFB-013, CFB-014, CFB-015, CFB-016, CFB-017, CFB-018, CFB-020, CFB-021, CFB-022, CFB-025, CFB-026, CFB-027, CFB-028, CFB-029, CFB-032, CFB-033, CFB-034, CFB-035, CFB-037, CFB-040, CFB-041, CFB-042, CFB-043, CFB-044, CFB-045, CFB-048, CFB-049, CFB-050, CFB-051, CFB-052, CFB-053, CFB-054, CFB-055, CFB-056, CFB-057, CFB-058, CFB-059, CFB-060, CFB-061, CFB-062, CFB-063, CFB-064, CFB-065, CFB-066, CFB-067, CFB-068, CFB-069, CFB-070, CFB-071, CFB-072, CFB-073, CFB-074, CFB-075, CFB-076, CFB-077, CFB-078, CFB-081, CFB-082, CFB-083, CFB-084, CFR-081, CFR-082, CFR-083, CFR-084, CFR-085, CFR-086, CFR-087, CFR-088, CFR-089, CFR-092, CFR-094, CFR-095, CFR-096, CFR-097, CFR-098, CFR-099, CFR-100, CFR-101, CFR-102, CFR-103, CFR-104, CFR-105, CFR-106, CFR-107, CFR-108, CFR-109, CFR-111, CFR-112, CFR-113, CFR-114, CFR-115, CFR-116, CFR-117, CFR-118, CFR-119, CFR-120, CFR-121, CFR-122, CFR-123, CFR-124, CFR-125, CFR-126, CFR-127, CFR-128, CFR-129, CFR-130, CFR-132, CFR-133, CFR-134, CFR-135, CFR-136, CFR-137, CFR-138, CFR-139, CFR-140, CFR-141, CFR-142, CFR-143, CFR-144, CFR-145, CFR-146, CFR-147, CFR-148, CFR-149, CFR-150, CFR-151, CFR-152, CFR-153, CFR-154, CFR-155, CFR-156, CFR-157, CFR-158, CFR-159, CFR-160.
-- Remaining open now: 0.
+- Remaining open from the historical global batch: 0.
 
 ## Cycle 4 Dogfood Mini-batch
 
@@ -1267,11 +1298,1365 @@ Cycle 59 issue status:
 - Remaining known CFB/CFR open issue count: 0.
 - Detail issue inventory remains 255 tracked / 255 fixed or fixed-in-v0.7 / 0 open.
 
+## Cycle 60 Dogfood Pass
+
+After cycle 59 and its naming cleanup follow-up reached zero open issues, cycle 60 resumed algorithm development with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `FinalManifestGate` to gate final manifest handoff before release.
+- Added the corresponding REQ/DES/CODE/TEST atoms in `algorithm-evolution-agent-lab`.
+- Algorithm work was sealed as `CF-COMMIT-6a776cece83b010259f824f8`.
+- Dogfood command review found two CodeFire automation issues where explicit `--path` context was preserved in machine targets but dropped from executable `next_actions[*].command` strings.
+
+Cycle 60 issue status:
+
+- Newly discovered CodeFire product issues: 2 (`CFB-096`, `CFB-097`).
+- Newly frozen CFB/CFR batch size: 2.
+- Fixed / closed: 2.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory is 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+Cycle 60 burn-down:
+
+| Issue | Status | Root fix group | Current decision |
+|---|---|---|---|
+| CFB-096 | fixed | Status next_actions path context | `status_next_actions_with_prediction` now threads the explicit path into command strings and target/context payloads |
+| CFB-097 | fixed | Batch operation next_actions path context | batch extinguish operation plans now render `--path <open-dir>` in verify next_action command strings |
+
+## Cycle 61 Dogfood Pass
+
+After cycle 60 reached zero open issues, cycle 61 resumed algorithm development with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameLenAudit` to scan Python source for over-limit class, function, argument, and local assignment identifiers.
+- Added `REQ-AUTO-097`, `DES-AUTO-079`, `CODE-NameLenAudit`, and `TEST-name-len-audit-flags-long-names`.
+- Algorithm unittest result: 205 tests pass.
+- Initial identifier audit with `max_len=15` found 823 existing over-limit identifiers, giving the next rename passes an explicit inventory.
+- CodeFire status/scan/batch dry-run confirmed CFB-096 and CFB-097 path preservation in real algorithm dogfooding.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-21f7d793d6f87e54a71faf57`.
+
+Cycle 61 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 62 Dogfood Pass
+
+After cycle 61 reached zero open issues, cycle 62 continued the identifier-length cleanup path with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NamePlan` to turn `NameLenAudit` findings into deterministic short-name suggestions.
+- Added `REQ-AUTO-098`, `DES-AUTO-080`, `CODE-NamePlan`, and `TEST-name-plan-suggests-short-names`.
+- Algorithm unittest result: 206 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-a29e74a136c23cc11783f287`.
+
+Cycle 62 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 63 Dogfood Pass
+
+After cycle 62 reached zero open issues, cycle 63 continued identifier-audit usability work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameReport` to render `NamePlan` results as a markdown table for review and rename planning.
+- Added `REQ-AUTO-099`, `DES-AUTO-081`, `CODE-NameReport`, and `TEST-name-report-renders-table`.
+- Algorithm unittest result: 207 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-b49b56d3882bd084a12a35a0`.
+
+Cycle 63 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 64 Dogfood Pass
+
+After cycle 63 reached zero open issues, cycle 64 continued identifier-audit usability work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameAuditRun` to compose the identifier scanner, rename planner, and Markdown reporter for an explicit Python file set.
+- Added `REQ-AUTO-100`, `DES-AUTO-082`, `CODE-NameAuditRun`, and `TEST-name-audit-run-renders-paths`.
+- Algorithm unittest result: 208 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-2238dcb89d4c693336f3e7e7`.
+
+Cycle 64 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 65 Dogfood Pass
+
+After cycle 64 reached zero open issues, cycle 65 continued identifier-audit usability work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameFiles` to discover deterministic Python audit file sets while skipping hidden/cache/virtual-environment directories.
+- Added `REQ-AUTO-101`, `DES-AUTO-083`, `CODE-NameFiles`, and `TEST-name-files-discovers-python`.
+- Algorithm unittest result: 209 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-c173315ee93da0737d47609c`.
+
+Cycle 65 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 66 Dogfood Pass
+
+After cycle 65 reached zero open issues, cycle 66 continued identifier-audit usability work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjRun` to compose Python file discovery and identifier audit reporting from explicit project roots.
+- Added `REQ-AUTO-102`, `DES-AUTO-084`, `CODE-NameProjRun`, and `TEST-name-proj-run-renders-root`.
+- Algorithm unittest result: 210 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-74ecb8cad3c2b6109e5f17f1`.
+
+Cycle 66 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 67 Dogfood Pass
+
+After cycle 66 reached zero open issues, cycle 67 continued identifier-audit usability work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameStats` to summarize identifier audit findings by total hits, affected files, maximum identifier length, and longest identifier name.
+- Added `REQ-AUTO-103`, `DES-AUTO-085`, `CODE-NameStats`, and `TEST-name-stats-summarizes-hits`.
+- Algorithm unittest result: 211 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-0d10444160ff3888f7a1afe8`.
+
+Cycle 67 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 68 Dogfood Pass
+
+After cycle 67 reached zero open issues, cycle 68 continued identifier-audit usability work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameStatMd` to render identifier audit summary values as a deterministic Markdown table.
+- Added `REQ-AUTO-104`, `DES-AUTO-086`, `CODE-NameStatMd`, and `TEST-name-stat-md-renders-summary`.
+- Algorithm unittest result: 212 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-e776c08a0f3935c7749d2c5d`.
+
+Cycle 68 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 69 Dogfood Pass
+
+After cycle 68 reached zero open issues, cycle 69 continued identifier-audit usability work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameKinds` to group identifier audit findings by Python construct kind.
+- Added `REQ-AUTO-105`, `DES-AUTO-087`, `CODE-NameKinds`, and `TEST-name-kinds-groups-hits`.
+- Algorithm unittest result: 213 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-e25b64a8d39e604514cbbeb4`.
+
+Cycle 69 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 70 Dogfood Pass
+
+After cycle 69 reached zero open issues, cycle 70 continued identifier-audit usability work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameKindMd` to render identifier audit kind summary rows as a deterministic Markdown table.
+- Added `REQ-AUTO-106`, `DES-AUTO-088`, `CODE-NameKindMd`, and `TEST-name-kind-md-renders-table`.
+- Algorithm unittest result: 214 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-be2b866e8ec90e95742b52fb`.
+
+Cycle 70 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 71 Dogfood Pass
+
+After cycle 70 reached zero open issues, cycle 71 continued identifier-audit usability work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameDash` to render the overall identifier audit summary and kind summary as one deterministic Markdown dashboard.
+- Added `REQ-AUTO-107`, `DES-AUTO-089`, `CODE-NameDash`, and `TEST-name-dash-renders-summary`.
+- Algorithm unittest result: 215 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-c5dc672bb4ad62da98bfb73b`.
+
+Cycle 71 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 72 Dogfood Pass
+
+After cycle 71 reached zero open issues, cycle 72 continued identifier-audit usability work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameDashRun` to scan explicit Python files and render the identifier audit dashboard directly.
+- Added `REQ-AUTO-108`, `DES-AUTO-090`, `CODE-NameDashRun`, and `TEST-name-dash-run-renders-paths`.
+- Algorithm unittest result: 216 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-31ead999d4fa6c55307d4d44`.
+
+Cycle 72 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 73 Dogfood Pass
+
+After cycle 72 reached zero open issues, cycle 73 continued identifier-audit usability work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjDash` to discover Python files from project roots and render the identifier audit dashboard directly.
+- Added `REQ-AUTO-109`, `DES-AUTO-091`, `CODE-NameProjDash`, and `TEST-name-proj-dash-renders-root`.
+- Algorithm unittest result: 217 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-aa919d27dcb6e324cc6fd125`.
+
+Cycle 73 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 74 Dogfood Pass
+
+After cycle 73 reached zero open issues, cycle 74 continued identifier-audit prioritization work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameTop` to rank identifier audit findings by longest identifier first.
+- Added `REQ-AUTO-110`, `DES-AUTO-092`, `CODE-NameTop`, and `TEST-name-top-ranks-hits`.
+- Algorithm unittest result: 218 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-00cca036702964f217e76ba0`.
+
+Cycle 74 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 75 Dogfood Pass
+
+After cycle 74 reached zero open issues, cycle 75 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameTopMd` to render longest-name identifier audit findings as a Markdown table.
+- Added `REQ-AUTO-111`, `DES-AUTO-093`, `CODE-NameTopMd`, and `TEST-name-top-md-renders-table`.
+- Algorithm unittest result: 219 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-b578d0cc4804b3733e1dfa3e`.
+
+Cycle 75 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 76 Dogfood Pass
+
+After cycle 75 reached zero open issues, cycle 76 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameTopRun` to scan explicit Python files and render longest-name identifier audit findings as Markdown.
+- Added `REQ-AUTO-112`, `DES-AUTO-094`, `CODE-NameTopRun`, and `TEST-name-top-run-renders-paths`.
+- Algorithm unittest result: 220 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-2e9f8ee386e0972b326bc73b`.
+
+Cycle 76 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 77 Dogfood Pass
+
+After cycle 76 reached zero open issues, cycle 77 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjTop` to discover Python files from project roots and render longest-name identifier audit findings as Markdown.
+- Added `REQ-AUTO-113`, `DES-AUTO-095`, `CODE-NameProjTop`, and `TEST-name-proj-top-renders-root`.
+- Algorithm unittest result: 221 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-10cf95fce0099572ad7a6b1c`.
+
+Cycle 77 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 78 Dogfood Pass
+
+After cycle 77 reached zero open issues, cycle 78 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameFull` to render the identifier audit dashboard and longest-name priority table in one Markdown report.
+- Added `REQ-AUTO-114`, `DES-AUTO-096`, `CODE-NameFull`, and `TEST-name-full-renders-report`.
+- Algorithm unittest result: 222 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-9c5f54a59777d57370e7d139`.
+
+Cycle 78 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 79 Dogfood Pass
+
+After cycle 78 reached zero open issues, cycle 79 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameFullRun` to scan explicit Python files and render the full identifier audit Markdown report directly.
+- Added `REQ-AUTO-115`, `DES-AUTO-097`, `CODE-NameFullRun`, and `TEST-name-full-run-renders-paths`.
+- Algorithm unittest result: 223 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-446fe035a135fc70ffe5bea4`.
+
+Cycle 79 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 80 Dogfood Pass
+
+After cycle 79 reached zero open issues, cycle 80 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjFull` to discover Python files from explicit project roots and render the full identifier audit Markdown report directly.
+- Added `REQ-AUTO-116`, `DES-AUTO-098`, `CODE-NameProjFull`, and `TEST-name-proj-full-renders-root`.
+- Algorithm unittest result: 224 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-0b229703d94e0257d5b04779`.
+
+Cycle 80 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 81 Dogfood Pass
+
+After cycle 80 reached zero open issues, cycle 81 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameJson` to render already-scanned identifier audit findings as deterministic JSON for automation consumers.
+- Added `REQ-AUTO-117`, `DES-AUTO-099`, `CODE-NameJson`, and `TEST-name-json-renders-hits`.
+- Algorithm unittest result: 225 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-41b4303b40fd3624ae3c576e`.
+
+Cycle 81 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 82 Dogfood Pass
+
+After cycle 81 reached zero open issues, cycle 82 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameJsonRun` to scan explicit Python files and render identifier audit findings as deterministic JSON directly.
+- Added `REQ-AUTO-118`, `DES-AUTO-100`, `CODE-NameJsonRun`, and `TEST-name-json-run-renders-paths`.
+- Algorithm unittest result: 226 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-83442cb02f15311c39f76625`.
+
+Cycle 82 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 83 Dogfood Pass
+
+After cycle 82 reached zero open issues, cycle 83 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjJson` to discover Python files from explicit project roots and render identifier audit findings as deterministic JSON directly.
+- Added `REQ-AUTO-119`, `DES-AUTO-101`, `CODE-NameProjJson`, and `TEST-name-proj-json-renders-root`.
+- Algorithm unittest result: 227 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-8a4d2c973b9c4c5e22e553e0`.
+
+Cycle 83 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 84 Dogfood Pass
+
+After cycle 83 reached zero open issues, cycle 84 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameStatJson` to render identifier audit summary values as deterministic JSON for automation consumers.
+- Added `REQ-AUTO-120`, `DES-AUTO-102`, `CODE-NameStatJson`, and `TEST-name-stat-json-renders-summary`.
+- Algorithm unittest result: 228 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-144c686e7673079e87741473`.
+
+Cycle 84 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 85 Dogfood Pass
+
+After cycle 84 reached zero open issues, cycle 85 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameDashJson` to render already-scanned identifier audit findings as deterministic dashboard JSON for automation consumers.
+- Added `REQ-AUTO-121`, `DES-AUTO-103`, `CODE-NameDashJson`, and `TEST-name-dash-json-renders-summary`.
+- Algorithm unittest result: 229 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-c4fd4a27ee779c7d2b96ee28`.
+
+Cycle 85 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 86 Dogfood Pass
+
+After cycle 85 reached zero open issues, cycle 86 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameDashJsonRun` to scan explicit Python file sets and render identifier audit dashboard JSON directly.
+- Added `REQ-AUTO-122`, `DES-AUTO-104`, `CODE-NameDashJsonRun`, and `TEST-name-dash-json-run-renders-paths`.
+- Algorithm unittest result: 230 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-0fb0bb5c34c8fc2c48705fb6`.
+
+Cycle 86 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 87 Dogfood Pass
+
+After cycle 86 reached zero open issues, cycle 87 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NamePjDashJson` to discover Python files from explicit project roots and render identifier audit dashboard JSON directly.
+- Added `REQ-AUTO-123`, `DES-AUTO-105`, `CODE-NamePjDashJson`, and `TEST-name-pj-dash-json-renders-root`.
+- Algorithm unittest result: 231 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-0b1240ec86865ca90d451e10`.
+
+Cycle 87 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 88 Dogfood Pass
+
+After cycle 87 reached zero open issues, cycle 88 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameTopJson` to rank identifier audit findings by longest identifier first and render the ranked subset as deterministic JSON.
+- Added `REQ-AUTO-124`, `DES-AUTO-106`, `CODE-NameTopJson`, and `TEST-name-top-json-renders-ranked-hits`.
+- Algorithm unittest result: 232 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-1d3cc4e573036fe494e314c4`.
+
+Cycle 88 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 89 Dogfood Pass
+
+After cycle 88 reached zero open issues, cycle 89 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameTopJsonRun` to scan explicit Python file sets and render longest-name priority findings as deterministic JSON.
+- Added `REQ-AUTO-125`, `DES-AUTO-107`, `CODE-NameTopJsonRun`, and `TEST-name-top-json-run-renders-paths`.
+- Algorithm unittest result: 233 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-4560df189c71f328cc9a663d`.
+
+Cycle 89 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 90 Dogfood Pass
+
+After cycle 89 reached zero open issues, cycle 90 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjTopJson` to discover Python files from explicit project roots and render longest-name priority findings as deterministic JSON.
+- Added `REQ-AUTO-126`, `DES-AUTO-108`, `CODE-NameProjTopJson`, and `TEST-name-proj-top-json-renders-root`.
+- Algorithm unittest result: 234 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-0d7846450f156d842de51419`.
+
+Cycle 90 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 91 Dogfood Pass
+
+After cycle 90 reached zero open issues, cycle 91 continued identifier-audit reporting work with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameFixJson` to render already-planned identifier rename suggestions as deterministic JSON.
+- Added `REQ-AUTO-127`, `DES-AUTO-109`, `CODE-NameFixJson`, and `TEST-name-fix-json-renders-fixes`.
+- Algorithm unittest result: 235 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 15 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-b04d370415fa7e644bf9b1ac`.
+
+Cycle 91 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 92 Dogfood Pass
+
+After cycle 91 reached zero open issues, cycle 92 continued identifier-audit automation and adjusted the naming cap from 15 to 25 characters.
+
+Algorithm work:
+
+- Added `NameFixJsonRun` to scan explicit Python file sets, plan over-limit rename suggestions, and render deterministic JSON.
+- Added `REQ-AUTO-128`, `DES-AUTO-110`, `CODE-NameFixJsonRun`, and `TEST-name-fix-json-run-renders-paths`.
+- Updated `NameLenAudit` and all identifier audit runners so their default maximum identifier length is 25 characters.
+- Updated the algorithm AGENTS naming policy to use 25 characters as the normal Python implementation identifier target.
+- Algorithm unittest result: 236 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 24 trace-change fires because the default limit update touched existing runner atoms plus the new REQ/DES/CODE/TEST atoms.
+- All 24 fires were extinguished in the same cycle and sealed as `CF-COMMIT-549886ff56550286393d2f13`.
+
+Cycle 92 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 93 Dogfood Pass
+
+After cycle 92 reached zero open issues, cycle 93 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjFixJson` to discover auditable Python files from project roots and render deterministic rename suggestion JSON.
+- Added `REQ-AUTO-129`, `DES-AUTO-111`, `CODE-NameProjFixJson`, and `TEST-name-proj-fix-json-renders-root`.
+- Algorithm unittest result: 237 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-497e4c84427bf07dad3027f3`.
+
+Cycle 93 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 94 Dogfood Pass
+
+After cycle 93 reached zero open issues, cycle 94 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameGate` to evaluate already-scanned identifier findings as a deterministic pass/fail gate.
+- Added `REQ-AUTO-130`, `DES-AUTO-112`, `CODE-NameGate`, and `TEST-name-gate-blocks-hits`.
+- Algorithm unittest result: 238 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-cc257dbb6adc9eae35f1da98`.
+
+Cycle 94 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 95 Dogfood Pass
+
+After cycle 94 reached zero open issues, cycle 95 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameGateJson` to render identifier audit gate results as deterministic JSON.
+- Added `REQ-AUTO-131`, `DES-AUTO-113`, `CODE-NameGateJson`, and `TEST-name-gate-json-renders-result`.
+- Algorithm unittest result: 239 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-0cd3190944fb0bf61ba269be`.
+
+Cycle 95 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 96 Dogfood Pass
+
+After cycle 95 reached zero open issues, cycle 96 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameGateMd` to render identifier audit gate results as deterministic Markdown.
+- Added `REQ-AUTO-132`, `DES-AUTO-114`, `CODE-NameGateMd`, and `TEST-name-gate-md-renders-result`.
+- Algorithm unittest result: 240 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-32ea54cff2ccd9a9f0d3c265`.
+
+Cycle 96 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 97 Dogfood Pass
+
+After cycle 96 reached zero open issues, cycle 97 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameGateRun` to scan explicit Python files and render the identifier audit gate result as deterministic Markdown.
+- Added `REQ-AUTO-133`, `DES-AUTO-115`, `CODE-NameGateRun`, and `TEST-name-gate-run-renders-paths`.
+- Algorithm unittest result: 241 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-9e83a210b73b798752ad977b`.
+
+Cycle 97 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 98 Dogfood Pass
+
+After cycle 97 reached zero open issues, cycle 98 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameGateJsonRun` to scan explicit Python files and render the identifier audit gate result as deterministic JSON.
+- Added `REQ-AUTO-134`, `DES-AUTO-116`, `CODE-NameGateJsonRun`, and `TEST-name-gate-json-run-renders-paths`.
+- Algorithm unittest result: 242 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-545dd0e6d54c4c27b81b23bb`.
+
+Cycle 98 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 99 Dogfood Pass
+
+After cycle 98 reached zero open issues, cycle 99 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjGate` to discover auditable Python files from project roots and render the identifier audit gate result as deterministic Markdown.
+- Added `REQ-AUTO-135`, `DES-AUTO-117`, `CODE-NameProjGate`, and `TEST-name-proj-gate-renders-root`.
+- Algorithm unittest result: 243 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-97b7b60f56d24c728dc67dac`.
+
+Cycle 99 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 100 Dogfood Pass
+
+After cycle 99 reached zero open issues, cycle 100 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjGateJson` to discover auditable Python files from project roots and render the identifier audit gate result as deterministic JSON.
+- Added `REQ-AUTO-136`, `DES-AUTO-118`, `CODE-NameProjGateJson`, and `TEST-name-proj-gate-json-renders-root`.
+- Algorithm unittest result: 244 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-c357c1ff097fd6bc8a057ce5`.
+
+Cycle 100 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 101 Dogfood Pass
+
+After cycle 100 reached zero open issues, cycle 101 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameGatePack` to render identifier audit gate status and hit details as one deterministic JSON object.
+- Added `REQ-AUTO-137`, `DES-AUTO-119`, `CODE-NameGatePack`, and `TEST-name-gate-pack-renders-hits`.
+- Algorithm unittest result: 245 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-c4786fbf2412a4c173084a39`.
+
+Cycle 101 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 102 Dogfood Pass
+
+After cycle 101 reached zero open issues, cycle 102 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameGatePackRun` to scan explicit Python file sets and render identifier audit gate status plus hit details as deterministic JSON.
+- Added `REQ-AUTO-138`, `DES-AUTO-120`, `CODE-NameGatePackRun`, and `TEST-name-gate-pack-run-renders-paths`.
+- Algorithm unittest result: 246 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-f62d877f5f4d533829d94afd`.
+
+Cycle 102 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 103 Dogfood Pass
+
+After cycle 102 reached zero open issues, cycle 103 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjGatePack` to discover auditable Python files from project roots and render identifier audit gate status plus hit details as deterministic JSON.
+- Added `REQ-AUTO-139`, `DES-AUTO-121`, `CODE-NameProjGatePack`, and `TEST-name-proj-gate-pack-renders-root`.
+- Algorithm unittest result: 247 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-a29caa6007b0e9dafa637e3e`.
+
+Cycle 103 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 104 Dogfood Pass
+
+After cycle 103 reached zero open issues, cycle 104 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameGateExit` to map identifier audit gate results to CI-oriented process exit codes.
+- Added `REQ-AUTO-140`, `DES-AUTO-122`, `CODE-NameGateExit`, and `TEST-name-gate-exit-codes-result`.
+- Algorithm unittest result: 248 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-b7cbc9526ea925945d5a4ed8`.
+
+Cycle 104 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 105 Dogfood Pass
+
+After cycle 104 reached zero open issues, cycle 105 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameGateExitRun` to scan explicit Python file sets and return CI-oriented identifier audit gate exit codes.
+- Added `REQ-AUTO-141`, `DES-AUTO-123`, `CODE-NameGateExitRun`, and `TEST-name-gate-exit-run-codes-paths`.
+- Algorithm unittest result: 249 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-dfa24340ea5b9341154d51a3`.
+
+Cycle 105 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 106 Dogfood Pass
+
+After cycle 105 reached zero open issues, cycle 106 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjGateExit` to discover auditable Python files from project roots and return CI-oriented identifier audit gate exit codes.
+- Added `REQ-AUTO-142`, `DES-AUTO-124`, `CODE-NameProjGateExit`, and `TEST-name-proj-gate-exit-codes-root`.
+- Algorithm unittest result: 250 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-6437430062f32186b24322f4`.
+
+Cycle 106 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 107 Dogfood Pass
+
+After cycle 106 reached zero open issues, cycle 107 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameGateLine` to render identifier audit gate results as deterministic CI log lines.
+- Added `REQ-AUTO-143`, `DES-AUTO-125`, `CODE-NameGateLine`, and `TEST-name-gate-line-renders-result`.
+- Algorithm unittest result: 251 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-936db6fe0e9caed3f6f07141`.
+
+Cycle 107 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 108 Dogfood Pass
+
+After cycle 107 reached zero open issues, cycle 108 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameGateLineRun` to scan explicit Python file sets and render identifier audit gate results as deterministic CI log lines.
+- Added `REQ-AUTO-144`, `DES-AUTO-126`, `CODE-NameGateLineRun`, and `TEST-name-gate-line-run-renders-paths`.
+- Algorithm unittest result: 252 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-22846208f103d6036fc44c32`.
+
+Cycle 108 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 109 Dogfood Pass
+
+After cycle 108 reached zero open issues, cycle 109 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjGateLine` to discover auditable Python files from project roots and render identifier audit gate results as deterministic CI log lines.
+- Added `REQ-AUTO-145`, `DES-AUTO-127`, `CODE-NameProjGateLine`, and `TEST-name-proj-gate-line-renders-root`.
+- Algorithm unittest result: 253 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-c63b6979dff96b45f385b65e`.
+
+Cycle 109 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 110 Dogfood Pass
+
+After cycle 109 reached zero open issues, cycle 110 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameCiRun` to scan explicit Python file sets once and return both the identifier audit gate exit code and deterministic CI log line.
+- Added `REQ-AUTO-146`, `DES-AUTO-128`, `CODE-NameCiRun`, and `TEST-name-ci-run-returns-code-line`.
+- Algorithm unittest result: 254 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-cf305db745a423891933a88f`.
+
+Cycle 110 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 111 Dogfood Pass
+
+After cycle 110 reached zero open issues, cycle 111 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjCiRun` to discover auditable Python files from project roots once and return both the identifier audit gate exit code and deterministic CI log line.
+- Added `REQ-AUTO-147`, `DES-AUTO-129`, `CODE-NameProjCiRun`, and `TEST-name-proj-ci-run-returns-code-line`.
+- Algorithm unittest result: 255 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-023f15ce4464c5274a8c02d4`.
+
+Cycle 111 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 112 Dogfood Pass
+
+After cycle 111 reached zero open issues, cycle 112 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameCiJson` to render an identifier CI gate exit code and one-line log as deterministic JSON.
+- Added `REQ-AUTO-148`, `DES-AUTO-130`, `CODE-NameCiJson`, and `TEST-name-ci-json-renders-result`.
+- Algorithm unittest result: 256 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-73e0d74fdf859a4884ce146f`.
+
+Cycle 112 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 113 Dogfood Pass
+
+After cycle 112 reached zero open issues, cycle 113 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameCiJsonRun` to scan explicit Python file sets and render the identifier CI gate result as deterministic JSON.
+- Added `REQ-AUTO-149`, `DES-AUTO-131`, `CODE-NameCiJsonRun`, and `TEST-name-ci-json-run-renders-paths`.
+- Algorithm unittest result: 257 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-8f57fad47dbe53612eeef0c2`.
+
+Cycle 113 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 114 Dogfood Pass
+
+After cycle 113 reached zero open issues, cycle 114 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjCiJsonRun` to discover auditable Python files from project roots and render the identifier CI gate result as deterministic JSON.
+- Added `REQ-AUTO-150`, `DES-AUTO-132`, `CODE-NameProjCiJsonRun`, and `TEST-name-proj-ci-json-run-renders-root`.
+- Algorithm unittest result: 258 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-bd5a4bd3bfd5d961653b618a`.
+
+Cycle 114 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 115 Dogfood Pass
+
+After cycle 114 reached zero open issues, cycle 115 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameCiStatusJson` to render an identifier CI gate exit code, one-line log, and explicit `ok` boolean as deterministic JSON.
+- Added `REQ-AUTO-151`, `DES-AUTO-133`, `CODE-NameCiStatusJson`, and `TEST-name-ci-status-json-renders-ok`.
+- Algorithm unittest result: 259 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-18c95b2ce439043de89da5fd`.
+
+Cycle 115 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 116 Dogfood Pass
+
+After cycle 115 reached zero open issues, cycle 116 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameCiStatusRun` to scan explicit Python file sets and render the identifier CI gate result as deterministic JSON with an explicit `ok` boolean.
+- Added `REQ-AUTO-152`, `DES-AUTO-134`, `CODE-NameCiStatusRun`, and `TEST-name-ci-status-run-renders-paths`.
+- Algorithm unittest result: 260 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-caa07ade2da3a2b6840f61ea`.
+
+Cycle 116 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 117 Dogfood Pass
+
+After cycle 116 reached zero open issues, cycle 117 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjCiStatusRun` to discover auditable Python files from project roots and render the CI gate result as deterministic JSON with an explicit `ok` boolean.
+- Added `REQ-AUTO-153`, `DES-AUTO-135`, `CODE-NameProjCiStatusRun`, and `TEST-name-proj-ci-status-run-renders-root`.
+- Algorithm unittest result: 261 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-15b0f208a1ae517287e6a26c`.
+
+Cycle 117 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 118 Dogfood Pass
+
+After cycle 117 reached zero open issues, cycle 118 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameCiPack` and `NameCiPackRun` to render CI gate status and identifier finding details as deterministic JSON for explicit Python file sets.
+- Added `REQ-AUTO-154`, `DES-AUTO-136`, `CODE-NameCiPack`, `CODE-NameCiPackRun`, `TEST-name-ci-pack-renders-hits`, and `TEST-name-ci-pack-run-renders-paths`.
+- Algorithm unittest result: 263 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 10 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 10 fires were extinguished in the same cycle and sealed as `CF-COMMIT-3e84694d41b74591508a56b4`.
+
+Cycle 118 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 119 Dogfood Pass
+
+After cycle 118 reached zero open issues, cycle 119 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjCiPackRun` to render CI gate status and identifier finding details as deterministic JSON from explicit project roots.
+- Added `REQ-AUTO-155`, `DES-AUTO-137`, `CODE-NameProjCiPackRun`, and `TEST-name-proj-ci-pack-run-renders-root`.
+- Algorithm unittest result: 264 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-4348505cd05b05bfe575d62e`.
+
+Cycle 119 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 120 Dogfood Pass
+
+After cycle 119 reached zero open issues, cycle 120 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameCiNote` and `NameCiNoteRun` to render identifier audit findings as deterministic one-line CI notes for explicit Python file sets.
+- Added `REQ-AUTO-156`, `DES-AUTO-138`, `CODE-NameCiNote`, `CODE-NameCiNoteRun`, `TEST-name-ci-note-renders-hits`, and `TEST-name-ci-note-run-renders-paths`.
+- Algorithm unittest result: 266 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 10 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 10 fires were extinguished in the same cycle and sealed as `CF-COMMIT-71c59b245113866761c76dac`.
+
+Cycle 120 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 121 Dogfood Pass
+
+After cycle 120 reached zero open issues, cycle 121 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameProjCiNoteRun` to render identifier audit findings as deterministic one-line CI notes from explicit project roots.
+- Added `REQ-AUTO-157`, `DES-AUTO-139`, `CODE-NameProjCiNoteRun`, and `TEST-name-proj-ci-note-run-renders-root`.
+- Algorithm unittest result: 267 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-2ca4622e8ea81457b1dc64a4`.
+
+Cycle 121 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 122 Dogfood Pass
+
+After cycle 121 reached zero open issues, cycle 122 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameCiNoteTop` to render a bounded top-N set of identifier audit findings as deterministic one-line CI notes with an omitted-count marker.
+- Added `REQ-AUTO-158`, `DES-AUTO-140`, `CODE-NameCiNoteTop`, and `TEST-name-ci-note-top-limits-hits`.
+- Algorithm unittest result: 268 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-7750e642251ba565170bec57`.
+
+Cycle 122 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 123 Dogfood Pass
+
+After cycle 122 reached zero open issues, cycle 123 continued identifier-audit automation with the installed CodeFire binary.
+
+Algorithm work:
+
+- Added `NameCiNoteTopRun` to scan explicit Python file sets and render bounded top-N identifier audit findings as deterministic one-line CI notes.
+- Added `REQ-AUTO-159`, `DES-AUTO-141`, `CODE-NameCiNoteTopRun`, and `TEST-name-ci-note-top-run-renders-paths`.
+- Algorithm unittest result: 269 tests pass.
+- A focused audit confirmed the newly edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- CodeFire scan opened 6 trace-change fires for the new REQ/DES/CODE/TEST atoms.
+- All 6 fires were extinguished in the same cycle and sealed as `CF-COMMIT-c53732d13ee923293204aa76`.
+
+Cycle 123 issue status:
+
+- Newly discovered CodeFire product issues: 0.
+- Newly frozen CFB/CFR batch size: 0.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory remains 257 tracked / 257 fixed or fixed-in-v0.7 / 0 open.
+
+## Cycle 124 Branch Workflow Dogfood Pass
+
+After cycle 123 reached zero open issues, cycle 124 exercised the intended branch-per-feature workflow with the installed CodeFire binary.
+
+Algorithm work:
+
+- Created `feature/nameaudit-summary-line` from `main` and opened it into a separate open directory.
+- Added `NameProjCiNoteTopRun` to discover project Python files and render bounded top-N identifier audit findings as deterministic one-line CI notes.
+- Added `REQ-AUTO-160`, `DES-AUTO-142`, `CODE-NameProjCiNoteTopRun`, and `TEST-name-proj-ci-note-top-run-renders-root`.
+- Algorithm unittest result: 270 tests pass on both the feature open dir and merged main open dir.
+- A focused audit confirmed the edited `nameaudit.py` and `test_nameaudit.py` add no Python identifiers longer than 25 characters.
+- Feature branch scan opened 6 trace-change fires; all 6 were extinguished and sealed as `CF-COMMIT-24531d7129f7746431c427d7`.
+- Merging the feature branch into `main` opened 6 merge-change fires; all 6 were extinguished and sealed on `main` as `CF-COMMIT-75de1d23b6ded7f50555e011`.
+
+Cycle 124 issue status:
+
+- Newly discovered CodeFire product issues: 7 (`CFB-098`..`CFB-104`), all fixed in branch workflow burn-down.
+- Newly frozen CFB/CFR batch size: 7.
+- Remaining known CFB/CFR open issue count: 0.
+- Detail issue inventory is now 264 tracked / 264 fixed or fixed-in-v0.7 / 0 open.
+
+| Issue | Status | Root fix group | Current decision |
+|---|---|---|---|
+| CFB-098 | fixed | Open next_actions path context | `open` success next_actions include the opened path in executable command strings |
+| CFB-099 | fixed | Merge help routing | `merge --help` uses normal help routing and exits 0 |
+| CFB-100 | fixed | Merge operation plan envelope | merge dry-run next_actions are executable shared-schema actions with non-null repo |
+| CFB-101 | fixed | Branch lifecycle close | branch-per-feature workflow has supported close/discard commands |
+| CFB-102 | fixed | Source branch state gate | local clone/merge reject open-consistent sources before using sealed heads |
+| CFB-103 | fixed | Branch next_action quoting | branch next_action command strings quote branch names and paths |
+| CFB-104 | fixed | Merge fire persistence | merge apply persists merge fires during apply |
+
 Burn-down interpretation:
 
-- The current cycle is no longer scoped to only CFB-086..CFB-092.
-- All open CFB/CFR are part of this single global burn-down batch.
-- Root-cause grouping is allowed only to reduce duplicate implementation work; it must not exclude issues from the batch.
+- The branch workflow batch `CFB-098`..`CFB-104` is closed.
+- The historical global batch remains closed.
+- Root-cause grouping is allowed only to reduce duplicate implementation work; it must not exclude issues from the active branch workflow batch.
+
+## Cycle 125 Branch Boundary Probe
+
+After installing the branch workflow burn-down fixes, cycle 125 exercised branch lifecycle boundary cases from the algorithm repo.
+
+Probe commands:
+
+- `codefire close main --dry-run --json`
+- `codefire discard main --dry-run --json`
+- `codefire open main /workspace/project/subprojects/algorithm-evolution-agent-lab-main-second --dry-run --json`
+- `codefire open feature/name-ci-note-md /workspace/project/subprojects/algorithm-evolution-agent-lab --dry-run --json`
+- `codefire close feature/name-ci-note-md --dry-run --json`
+- `codefire merge main --into main --dry-run --json`
+- `codefire open feature/name-ci-note-md /workspace/project/algorithm-outside-subprojects --dry-run --json`
+- `codefire open feature/name-ci-note-section /workspace/project/subprojects/algorithm-evolution-agent-lab/tmp-nested-feature --dry-run --json`
+- `codefire clone main feature/probe-nested-open --dry-run --json`
+- parallel branch dry-run probes that triggered repo lock contention
+
+Cycle 125 historical discovery status:
+
+- Newly discovered CodeFire product issues at discovery time: 7 (`CFB-105`..`CFB-111`), all initially open.
+- Newly frozen CFB/CFR batch size: 7.
+- Remaining known CFB/CFR open issue count at discovery time: 7.
+- Detail issue inventory at discovery time: 271 tracked / 264 fixed or fixed-in-v0.7 / 7 initially open.
+
+| Issue | Status | Root fix group | Current decision |
+|---|---|---|---|
+| CFB-105 | open | Primary branch close guard | close/discard should reject main by default or require explicit force |
+| CFB-106 | open | Self merge guard | self merge should be a structured error without apply next_action |
+| CFB-107 | open | Branch error envelope context | branch domain errors should include repo and recovery next_actions |
+| CFB-108 | open | Branch open workspace boundary | repo-root-external open targets should be rejected or explicitly gated |
+| CFB-109 | open | Branch lock recovery | lock contention should include repo and retry guidance |
+| CFB-110 | open | Nested open dir guard | targets under an existing open directory should be rejected |
+| CFB-111 | open | Clone open path guidance | clone next_actions should include safe concrete target path guidance |
 
 ## Root Fix Groups
 

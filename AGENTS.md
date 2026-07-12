@@ -4,17 +4,20 @@
 
 ## まず読む
 
+- `docs/development/README.md`: 開発管理ハブ、現在状態、正本ドキュメント対応表。
+- `docs/development/project-management.md`: 長期開発に耐えるproject管理モデル、issue/cycle/dirty tree運用。
+- `docs/development/ai/README.md`: 外部AIで開発を加速するためのcontext pack、task packet、role routing、review、parallel lane、local tool運用。
 - `docs/development/agent-code-quality.md`: AtCoder red レベルのコード品質、計算量、メモリ、アルゴリズム、不変条件。
 - `docs/development/module-boundaries.md`: module/file分割、責務境界、`main.rs` 肥大化防止。
 - `docs/development/agent-workflow.md`: 作業運用、Rust v0.6方針、diff/merge方針、テスト、禁止事項。
 - `docs/development/codefire-improvement-cycle.md`: CodeFire実装、install、algorithm dogfooding、issue創出、次version計画を反復するcodefire改善サイクル。
-- `docs/development/source-code-map.md`: Rust実装のfile/module/type/function責務対応表。
-- `docs/development/source-code-blueprint.md`: 要求、設計、Rust実装、永続化file、テスト配置の対応表。
-- `docs/development/source-code-mental-model.md`: ソースを開かなくても実装形状とデータ流を想像するための詳細地図。
-- `docs/development/source-code-anatomy.md`: 主要fileの内部にある型、関数群、状態、永続化境界、変更時の触り方まで分かるsource anatomy。
-- `docs/development/command-source-trace.md`: CLI commandごとのparse/run/render/persistent state実装経路。
-- `docs/development/v0.6-readiness.md`: v0.6を完成と判断するための残ゲート。
-- `docs/development/todo-checklist.md`: 実装タスクと依存関係。
+- `docs/development/source-architecture.md`: crate/module責務、domain/store/workspace/commit transaction、永続化・security境界。
+- `docs/development/command-source-trace.md`: public commandごとのparse/validate/plan/apply/render/write/test経路。
+- `docs/development/source-data-model-catalog.md`: Rust domain型、object kind、persisted JSON、version/compatibility境界。
+- `docs/development/change-playbook.md`: 変更種別ごとのreading route、recipe、invariant review、validation順序。
+- `docs/development/strategy/README.md`: 採用済み原則、product戦略、active roadmap、release/format方針、decision register。
+- `docs/development/strategy/release-and-format-roadmap.md`: 独立version軸、historical milestone、次release gate。
+- `docs/development/todo-checklist.md`: 完了済み実装taskのhistorical ledger。新規戦略作業のactive roadmapには使わない。
 - `docs/development/bug-backlog.md`: CodeFire自身のバグ、改善点、UX違和感。
 - `docs/development/history.md`: 開発履歴。
 
@@ -34,7 +37,7 @@
 - 計算オーダとメモリ利用オーダを軽く扱わない。
 - `main.rs` や単一ファイルへ機能を詰め込まない。責務単位でmodule/fileを分割する。
 - 新規機能で責務境界が増える場合は、実装前に `docs/development/module-boundaries.md` の分割判断を確認する。
-- 主要command、module、永続化境界を変える場合は、実装と同じ変更で `source-code-map.md` / `source-code-mental-model.md` / `source-code-anatomy.md` / `command-source-trace.md` の該当箇所を更新する。
+- 主要command、module、型、永続化境界を変える場合は、実装と同じ変更でcanonical source docs 4文書の該当箇所を更新し、`python3 docs/development/tools/check_source_docs.py` を実行する。
 - parse、validate、plan、apply、renderを混ぜない。
 - object identity、sealed commit、branch head atomicity、remote mutation policyの不変条件を壊さない。
 - AI agent運用機能、agent marketplace、prompt orchestrationはCodeFire本体へ入れない。
@@ -42,11 +45,11 @@
 - ユーザーの未コミット変更を勝手に戻さない。
 - `git reset --hard` や `git checkout --` で破壊的に戻さない。
 
-## v0.6開発方針
+## 現行実装・release方針
 
-v0.6ではRust実装をdefault CLIへ移行する。Python版はreference implementation / fallbackとして残す。
+Rust実装をdefault CLIとし、Python版はreference implementation / fallbackとして残す。
 
-現時点の完成判定は `docs/development/v0.6-readiness.md` を正とする。TODOや履歴を更新する場合は、関連する `todo-checklist.md` / `history.md` / `known-limitations.md` / `runbook.md` も合わせて整合させる。
+現時点ではpublic product release identityは未確定であり、旧v0.6–v1.0 plan名をrelease完成の根拠にしない。開発順序は `docs/development/strategy/modernization-roadmap.md`、release/format判定は `docs/development/strategy/release-and-format-roadmap.md` を正とする。TODOや履歴を更新する場合は、関連する `history.md` / `known-limitations.md` / `runbook.md` も合わせて整合させる。
 
 ## 確認コマンド
 

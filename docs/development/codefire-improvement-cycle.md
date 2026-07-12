@@ -6,7 +6,7 @@
 
 ## Purpose
 
-codefire改善サイクルの目的は、CodeFireを机上の設計だけで強化するのではなく、実際の開発管理で使い、使いづらさ、バグ、automation contractの弱さ、設計不足を継続的に検出して次versionの計画へ戻すことである。
+codefire改善サイクルの目的は、CodeFireを机上の設計だけで強化するのではなく、実際の開発管理で使い、使いづらさ、バグ、automation contractの弱さ、設計不足を継続的に検出してactive roadmap stageとissue batchへ戻すことである。
 
 CodeFire本体にAI agent運用機能は入れない。ただし、外部自動化ツールや人間がCodeFireを安全に使えるよう、CLI、JSON、exit code、next_actions、dry-run、evidence、batch、diagnosticsを強くする。
 
@@ -18,7 +18,7 @@ CodeFire本体にAI agent運用機能は入れない。ただし、外部自動�
 | Algorithm dogfood project | `subprojects/algorithm-evolution-agent-lab/` | CodeFire管理対象として実開発を進め、UX/bugを検出する |
 | CFB issue management | `docs/development/bug-backlog.md`, `docs/development/bug-issues/` | dogfoodingで見つけたCodeFire issueを管理する |
 | Code review issue management | `docs/development/code-review-issues/` | ソースコードレビューで見つけた改善issueを管理する |
-| Version planning | `docs/development/v*-*.md` | 次versionでissueを消すための計画と設計を残す |
+| Strategy and stage planning | `docs/development/strategy/modernization-roadmap.md`, current cycle plan | evidence gateとfrozen issue batchで順序を管理する |
 
 ## Cycle Overview
 
@@ -29,7 +29,7 @@ CodeFire本体にAI agent運用機能は入れない。ただし、外部自動�
 5. CodeFire development: 計画に沿ってbatch内issueを全部fixedまたは明示wontfixにする。
 6. Install: 開発したCodeFireをinstallし、実際の `codefire` commandとして使える状態にする。
 7. Confirmation dogfood: Algorithm projectでbatch内issueの再現コマンドを再実行し、修正を確認する。
-8. Close audit: backlog、detail issue、history、version plan、cycle planが一致していることを確認する。
+8. Close audit: backlog、detail issue、history、active roadmap stage、cycle planが一致していることを確認する。
 9. Next discovery: batch内issueが全部消えてから、次のalgorithm計画と次のissue出しへ進む。
 
 今後の基本形は **issueを出す -> 全部消す -> issueを出す** である。issueを出したまま次のissue discoveryへ進まない。
@@ -44,7 +44,7 @@ Burn-down中に新しい問題を見つけた場合:
 
 Input:
 
-- 最新のversion plan。
+- active modernization stageとfrozen issue batch。
 - open CFB/CFR issue。
 - `docs/development/module-boundaries.md`。
 - `docs/development/agent-code-quality.md`。
@@ -58,7 +58,7 @@ Work:
 
 Exit criteria:
 
-- version planで対象にしたissueがfixedまたは明示的なwontfixになっている。
+- frozen batchで対象にしたissueがfixedまたは明示的なwontfixになっている。
 - `cargo fmt --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace` が通る。
 - docs-onlyではない変更は、該当するtargeted testと全体testの両方を原則実行する。
 - `docs/development/history.md` に結果と証跡を残す。
@@ -181,7 +181,7 @@ Exit criteria:
 - issue templateが使われている。
 - 追加したCFRは現在batchに入れるか、次batch候補として明示的に分けている。
 
-## Phase F: Next Version Planning and Design
+## Phase F: Roadmap Stage and Batch Planning
 
 Input:
 
@@ -192,13 +192,13 @@ Work:
 
 - issueをroot causeごとに束ねる。
 - 1つの修正で複数issueを閉じる設計を優先する。
-- 次versionのscope、非scope、root fix map、phase plan、acceptance tests、dogfood verificationを文書化する。
+- 次stage/batchのscope、非scope、root fix map、phase plan、acceptance tests、dogfood verificationを文書化する。
 - 実装前にmodule/file変更方針を決める。
 
 Exit criteria:
 
-- 次version planが `docs/development/v*-*.md` にある。
-- 現在batch内の全issueが次version planまたはcycle burn-down plan内のどこかにmappingされている。
+- active orderingは `docs/development/strategy/modernization-roadmap.md` にあり、frozen scopeはcurrent cycle planにある。
+- 現在batch内の全issueがroadmap stageまたはcycle burn-down plan内のどこかにmappingされている。
 - 実装順序が、共通基盤、state/contract、command個別修正、docs/issue closeの順に整理されている。
 
 ## Issue Recording Rules
@@ -226,32 +226,31 @@ Common rules:
 
 Current named cycle:
 
-- CodeFire次version系統: v1.0 Contract ValidationのPhase 1a以降を継続する。
-- Current plan: `docs/development/v1.0-contract-validation-plan.md`。
-- Current burn-down plan: `docs/development/current-cycle-burn-down-plan.md`。
-- Current phase: cycle 59 dogfood pass完了。今回のalgorithm開発ではCodeFire本体の新規CFBは発見されず、既知CFB/CFR open issueは0件。
-- Installed CodeFire: `/home/devuser/.local/bin/codefire`。
-- Installed version output: `codefire foundation 1`。
+- Current management entry: `docs/development/README.md`。
+- Current governance model: `docs/development/project-management.md`。
+- Active strategic line: repository/development control, then invariant-backed correctness and recovery.
+- Current roadmap: `docs/development/strategy/modernization-roadmap.md`。
+- Release/format identity: `docs/development/strategy/release-and-format-roadmap.md`; old v0.6–v1.0 labels are internal milestones/plans, not current public release claims.
+- Current phase: project-management document rebuild and dirty-tree classification before new product development.
+- Local Rust binary observed during the 2026-07-11 audit: `./target/release/codefire-rs`, version output `codefire foundation 1`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
-- Latest local Git commits: current global burn-down commits through cycle 59 dogfood pass。Push is pending.
-- Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` は `open-clean`、open fires 0。
-- Latest algorithm CodeFire base: `CF-COMMIT-7c72d44916ff7a6f00fb5853`。
+- Algorithm CodeFire state: `subprojects/algorithm-evolution-agent-lab/` is `open-clean`, open fires 0 when checked through the local Rust binary.
+- Rust validation: an isolated Rust 1.97.0 toolchain passed fmt, 231 locked workspace tests, and warning-denying Clippy on 2026-07-11. Durable toolchain pinning remains release work.
 
 Current global issue inventory:
 
 | Series | Total tracked | Fixed / closed | Open |
 |---|---:|---:|---:|
-| CFB dogfood issues | 95 | 95 | 0 |
+| CFB dogfood issues | 127 | 120 | 7 |
 | CFR code review issues | 160 | 160 | 0 |
-| Total | 255 | 255 | 0 |
+| Total | 287 | 280 | 7 |
 
 Close audit note:
 
 - 2026-06-10時点で残っていた146件は、過去の `BATCH-2026-06-global-open-backlog` の初期open数であり、現在のopen数ではない。同batchは同cycle内で全件fixedにした。
-- 現在のCFB/CFR open issueは0件。`146` は履歴ログに出る開始件数であって、現残数ではない。
-- `docs/development/bug-issues/` と `docs/development/code-review-issues/` のファイル数は監査履歴を含む総数であり、open数ではない。open判定は各issueの `Status` とこのinventory表を正とする。
-- detail issue files with a status row: 255。内訳は `fixed` 245件、`fixed in v0.7` 10件、`open` 0件。
-- `146` が検索で見える場合も、closed batch starting size、過去のburn-down履歴、`CFR-146` のissue ID、またはalgorithm側の古いunittest countであり、open issue残数ではない。
+- Current open issue判定は `docs/development/README.md`、detail issue files、summary ledgersの一致で行う。古いcycle headingやhistorical countは現状態として扱わない。
+- 2026-07-11 auditでは CFB detail 127件のうち120件が `fixed`、`CFB-120`..`CFB-126` の7件が `open`。CFR detailは150件 `fixed` + 10件 `fixed in v0.7`、open 0件である。
+- 次の優先作業は、管理docsの正本化とdirty treeのcheckpoint後、Rust validation環境を復旧し、`BATCH-2026-07-stage1-invariants` の6件をburn downすることである。
 - 最後に残っていた `CFR-120` は、`docs/development/issue-root-cause-map.json` と `issue_root_cause_map_covers_open_issues` で、今後のopen issueをroot cause計画へ機械的に接続する形でcloseした。
 - Cycle 4 dogfoodingでは `ResearchCyclePlanSynthesizer` を追加し、`CFB-093` を発見、同cycle内でfixedにした。
 - Cycle 5 dogfoodingでは `ResearchCyclePlanMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-476c73ed58ac5e64be166e38` でsealした。CodeFire本体issueは新規発見なし。
@@ -474,8 +473,8 @@ Important already-fixed issues from the latest two-cycle run:
 
 Next expected action:
 
-- Known CFB/CFR open issueは0件のため、次は新しいalgorithm dogfood discoveryを開始できる。
-- 新issueを見つけた場合はそのcycle batchへfreezeし、全件burn downしてから次のissue discoveryへ進む。
+- Known CFB/CFR open issueは `CFB-120`..`CFB-126` の7件であり、`BATCH-2026-07-stage1-invariants` にfreeze済みである。
+- 同batchを全件burn downするまで、新しいalgorithm dogfood discoveryやdiscretionary feature batchを開始しない。
 
 ## Cycle Invariants
 
