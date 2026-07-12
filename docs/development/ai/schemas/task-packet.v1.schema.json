@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codefire.dev/schemas/ai/task-packet.v1.schema.json",
+  "title": "CodeFire AI Task Packet v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "packet_id",
+    "status",
+    "objective",
+    "base_revision",
+    "role",
+    "risk",
+    "context",
+    "scope",
+    "non_goals",
+    "invariants",
+    "validation",
+    "handoff"
+  ],
+  "properties": {
+    "schema": {"const": "codefire.ai_task_packet.v1"},
+    "packet_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"},
+    "status": {"enum": ["draft", "ready", "in_progress", "blocked", "completed", "cancelled"]},
+    "objective": {"type": "string", "minLength": 1, "maxLength": 2000},
+    "base_revision": {"type": "string", "minLength": 1, "maxLength": 128},
+    "role": {
+      "enum": [
+        "manager",
+        "architect",
+        "implementer",
+        "reviewer",
+        "researcher",
+        "docs_synchronizer",
+        "validation_runner",
+        "dogfood_runner",
+        "classifier"
+      ]
+    },
+    "risk": {"$ref": "#/$defs/riskDecision"},
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pack_ids", "additional_files", "evidence_refs"],
+      "properties": {
+        "pack_ids": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/identifier"}, "uniqueItems": true},
+        "additional_files": {"type": "array", "items": {"$ref": "#/$defs/repositoryPath"}, "uniqueItems": true},
+        "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "resolved_manifest": {"$ref": "#/$defs/repositoryPath"}
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read_set", "write_set", "disallowed_paths", "disallowed_actions"],
+      "properties": {
+        "read_set": {"type": "array", "items": {"$ref": "#/$defs/repositoryPath"}, "uniqueItems": true},
+        "write_set": {"type": "array", "items": {"$ref": "#/$defs/repositoryPath"}, "uniqueItems": true},
+        "disallowed_paths": {"type": "array", "items": {"$ref": "#/$defs/repositoryPath"}, "uniqueItems": true},
+        "disallowed_actions": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      }
+    },
+    "non_goals": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "statement", "falsification_test"],
+        "properties": {
+          "id": {"$ref": "#/$defs/identifier"},
+          "statement": {"type": "string", "minLength": 1},
+          "falsification_test": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "validation": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "command", "purpose", "required"],
+        "properties": {
+          "id": {"$ref": "#/$defs/identifier"},
+          "command": {"type": "string", "minLength": 1},
+          "purpose": {"type": "string", "minLength": 1},
+          "required": {"type": "boolean"},
+          "requires_capability": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_outputs", "evidence_digest_required"],
+      "properties": {
+        "required_outputs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "evidence_digest_required": {"type": "boolean"}
+      }
+    },
+    "packet_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,127}$"},
+    "repositoryPath": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "riskDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimensions", "mandatory_ultra", "score", "selected_tier", "rationale"],
+      "properties": {
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["blast_radius", "reversibility", "ambiguity", "invariant_density", "verification_cost", "downstream_multiplier"],
+          "properties": {
+            "blast_radius": {"type": "integer", "minimum": 0, "maximum": 2},
+            "reversibility": {"type": "integer", "minimum": 0, "maximum": 2},
+            "ambiguity": {"type": "integer", "minimum": 0, "maximum": 2},
+            "invariant_density": {"type": "integer", "minimum": 0, "maximum": 2},
+            "verification_cost": {"type": "integer", "minimum": 0, "maximum": 2},
+            "downstream_multiplier": {"type": "integer", "minimum": 0, "maximum": 2}
+          }
+        },
+        "mandatory_ultra": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/mandatoryUltraReason"}
+        },
+        "score": {"type": "integer", "minimum": 0, "maximum": 12},
+        "selected_tier": {"enum": ["medium", "high", "ultra"]},
+        "rationale": {"type": "string", "minLength": 1}
+      }
+    },
+    "mandatoryUltraReason": {
+      "enum": [
+        "object_identity_or_format",
+        "sealed_commit_or_branch_atomicity",
+        "security_auth_signature_or_remote_mutation",
+        "migration_or_user_data_recovery",
+        "cross_subsystem_architecture",
+        "canonical_document_family_deletion",
+        "release_completion_audit",
+        "conflicting_sources_or_reviewers"
+      ]
+    }
+  }
+}

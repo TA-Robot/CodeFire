@@ -1,0 +1,66 @@
+{
+  "schema": "codefire.ai_live_routing_smoke.v1",
+  "observed_on": "2026-07-11",
+  "model": "gpt-5.6-sol",
+  "codex_cli_version": "0.144.1",
+  "auth_surface": "existing_chatgpt_login",
+  "network_scope": "outside_managed_network_sandbox",
+  "sandbox": "read-only",
+  "runs": [
+    {
+      "policy_tier": "medium",
+      "cli_reasoning_effort": "medium",
+      "expected_response": "medium-live-ok",
+      "observed_response": "medium-live-ok",
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 12914,
+        "cached_input_tokens": 8960,
+        "output_tokens": 7,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "policy_tier": "high",
+      "cli_reasoning_effort": "high",
+      "expected_response": "high-live-ok",
+      "observed_response": "high-live-ok",
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 12914,
+        "cached_input_tokens": 8960,
+        "output_tokens": 7,
+        "reasoning_output_tokens": 0
+      }
+    },
+    {
+      "policy_tier": "ultra",
+      "cli_reasoning_effort": "ultra",
+      "expected_response": "ultra-live-ok",
+      "observed_response": "ultra-live-ok",
+      "exit_code": 0,
+      "usage": {
+        "input_tokens": 12937,
+        "cached_input_tokens": 8960,
+        "output_tokens": 8,
+        "reasoning_output_tokens": 0
+      }
+    }
+  ],
+  "proves": [
+    "The installed Codex CLI can reach GPT-5.6 Sol with the existing ChatGPT login.",
+    "The installed CLI accepts and completes minimal read-only runs at Medium, High, and Ultra policy tiers.",
+    "Strict project configuration parses during a real model-backed invocation."
+  ],
+  "does_not_prove": [
+    "Relative model quality or defect-escape rate across the three tiers.",
+    "That Ultra will delegate on a task where parallel work is not useful.",
+    "Stable latency, token cost, account entitlement, or service availability after the observation date.",
+    "A scored live cohort over the historical defect corpus."
+  ],
+  "official_sources": [
+    "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+    "https://developers.openai.com/codex/config-reference",
+    "https://developers.openai.com/codex/subagents"
+  ]
+}

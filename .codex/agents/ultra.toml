@@ -1,0 +1,7 @@
+# Highest-assurance tier for architecture, adversarial review, and completion audit.
+# Codex CLI 0.144.1 exposes `ultra` in its bundled GPT-5.6 Sol catalog.
+# Portable API integrations must map this policy tier to the strongest supported
+# reasoning value (currently `max` for GPT-5.6 Sol, with `xhigh` as fallback).
+model = "gpt-5.6-sol"
+model_reasoning_effort = "ultra"
+model_reasoning_summary = "detailed"

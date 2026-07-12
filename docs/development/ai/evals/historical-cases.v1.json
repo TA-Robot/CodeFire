@@ -1,0 +1,254 @@
+{
+  "schema": "codefire.ai_historical_eval.v1",
+  "purpose": "Replay real CodeFire defect and completion-claim reasoning without exposing evaluator oracles to the candidate model.",
+  "cases": [
+    {
+      "id": "cfb-029-next-action-path",
+      "source_ids": ["CFB-029"],
+      "task_class": "defect_diagnosis",
+      "prompt": "Diagnose a verify JSON response whose suggested follow-up commands omit the explicitly supplied repository path. Propose the smallest safe contract change and the regression evidence needed for execution from a different working directory.",
+      "candidate_context": {
+        "observations": [
+          "The user ran verify with an explicit path.",
+          "Suggested scan and context commands contain no path argument.",
+          "An automation client may execute the suggestion from another working directory."
+        ],
+        "context_files": ["docs/04_cli_spec.md", "crates/codefire-cli/src/automation.rs"]
+      },
+      "risk": {
+        "dimensions": {"blast_radius": 1, "reversibility": 1, "ambiguity": 1, "invariant_density": 1, "verification_cost": 1, "downstream_multiplier": 1},
+        "mandatory_ultra": [],
+        "expected_score": 6,
+        "expected_tier": "high"
+      },
+      "oracle": {
+        "source_files": ["docs/development/bug-issues/cfb-029.md"],
+        "must_identify": [
+          "The command text must preserve the caller's explicit path.",
+          "The structured target must carry the same path so clients need not parse shell text.",
+          "Regression coverage must execute or inspect next actions independently of the original working directory."
+        ],
+        "must_preserve": ["Path-free behavior remains valid when no explicit path was supplied."],
+        "disallowed_claims": ["Changing only human-readable text makes the machine contract safe."],
+        "validation_refs": ["verification_next_actions_preserve_explicit_path_context"]
+      }
+    },
+    {
+      "id": "cfb-037-failed-command-evidence",
+      "source_ids": ["CFB-037"],
+      "task_class": "trust_boundary_review",
+      "prompt": "Review an evidence-capture flow that creates an ok result and evidence identifier when the captured command exits non-zero. Define safe default behavior, the explicit exception path, and validation evidence.",
+      "candidate_context": {
+        "observations": [
+          "A captured command exited with status 1.",
+          "The JSON response reported ok true and returned an evidence identifier.",
+          "Evidence can later be used in resolution decisions."
+        ],
+        "context_files": ["docs/04_cli_spec.md", "crates/codefire-cli/src/evidence.rs"]
+      },
+      "risk": {
+        "dimensions": {"blast_radius": 2, "reversibility": 1, "ambiguity": 1, "invariant_density": 2, "verification_cost": 1, "downstream_multiplier": 1},
+        "mandatory_ultra": [],
+        "expected_score": 8,
+        "expected_tier": "ultra"
+      },
+      "oracle": {
+        "source_files": ["docs/development/bug-issues/cfb-037.md"],
+        "must_identify": [
+          "Non-zero exit and timeout must fail closed by default and must not create successful-looking evidence.",
+          "Intentional failed-command capture requires an explicit opt-in and a distinct failed proof status.",
+          "JSON diagnostics must let automation distinguish rejection from intentionally retained negative evidence."
+        ],
+        "must_preserve": ["Successful command capture remains evidence-producing."],
+        "disallowed_claims": ["A warning beside ok true is sufficient for the default path."],
+        "validation_refs": ["codefire evidence add --path . --from-command \"exit 7\" --json"]
+      }
+    },
+    {
+      "id": "cfb-119-open-state-recovery",
+      "source_ids": ["CFB-119"],
+      "task_class": "state_recovery_review",
+      "prompt": "Analyze branch open behavior when the opened-registry record is missing but the branch record still says open-consistent or open-burning. Specify the safe state gate and recovery-oriented result contract.",
+      "candidate_context": {
+        "observations": [
+          "The open path validates the sealed head and checks registry-file existence.",
+          "The branch lifecycle state is not consulted before materialization.",
+          "The missing registry can coexist with unsealed user work in an earlier open directory."
+        ],
+        "context_files": ["docs/03_workflow_spec.md", "crates/codefire-cli/src/main.rs"]
+      },
+      "risk": {
+        "dimensions": {"blast_radius": 2, "reversibility": 2, "ambiguity": 1, "invariant_density": 2, "verification_cost": 1, "downstream_multiplier": 1},
+        "mandatory_ultra": ["migration_or_user_data_recovery"],
+        "expected_score": 9,
+        "expected_tier": "ultra"
+      },
+      "oracle": {
+        "source_files": ["docs/development/bug-issues/cfb-119.md"],
+        "must_identify": [
+          "The branch record and opened registry jointly define lifecycle state; absence of one record is not permission to reopen.",
+          "Open-consistent and open-burning must produce a structured recovery error when registry state is missing or inconsistent.",
+          "The response must include branch state, expected registry location, and safe next actions."
+        ],
+        "must_preserve": ["Normal closed-branch open remains available."],
+        "disallowed_claims": ["Recreating a new open directory from the sealed head safely recovers unsealed work."],
+        "validation_refs": ["branch lifecycle recovery regression"]
+      }
+    },
+    {
+      "id": "cfr-128-http-body-bound",
+      "source_ids": ["CFR-128"],
+      "task_class": "security_review",
+      "prompt": "Review an HTTP client that reads a response body without an explicit upper bound. Define rejection points for declared and streaming sizes, error behavior, and focused tests.",
+      "candidate_context": {
+        "observations": [
+          "A remote endpoint controls the response body.",
+          "The client has no enforced maximum body size.",
+          "The response may include or omit Content-Length."
+        ],
+        "context_files": ["docs/10_merge_remote_server.md", "crates/codefire-cli/src/http.rs"]
+      },
+      "risk": {
+        "dimensions": {"blast_radius": 2, "reversibility": 1, "ambiguity": 1, "invariant_density": 1, "verification_cost": 1, "downstream_multiplier": 2},
+        "mandatory_ultra": ["security_auth_signature_or_remote_mutation"],
+        "expected_score": 8,
+        "expected_tier": "ultra"
+      },
+      "oracle": {
+        "source_files": ["docs/development/code-review-issues/cfr-128.md"],
+        "must_identify": [
+          "Reject an oversized declared Content-Length before reading the body.",
+          "Bound actual bytes read so missing or dishonest Content-Length cannot bypass the limit.",
+          "Return a structured bounded error without buffering an attacker-controlled body."
+        ],
+        "must_preserve": ["Normal bounded responses remain readable."],
+        "disallowed_claims": ["Checking Content-Length alone bounds every response."],
+        "validation_refs": ["cargo test -p codefire-cli oversized_body"]
+      }
+    },
+    {
+      "id": "cfr-130-commit-transaction",
+      "source_ids": ["CFR-130"],
+      "task_class": "durability_review",
+      "prompt": "Assess a commit flow that writes several content-addressed objects and then updates branch visibility without a transaction marker. Design crash diagnostics and retry behavior while preserving immutable objects.",
+      "candidate_context": {
+        "observations": [
+          "One logical commit persists multiple immutable objects.",
+          "The process can stop after only a subset of object writes.",
+          "Operators need to distinguish harmless unreachable objects from an interrupted publish."
+        ],
+        "context_files": ["docs/08_object_store.md", "crates/codefire-cli/src/main.rs", "crates/codefire-cli/src/doctor"]
+      },
+      "risk": {
+        "dimensions": {"blast_radius": 2, "reversibility": 2, "ambiguity": 1, "invariant_density": 2, "verification_cost": 2, "downstream_multiplier": 1},
+        "mandatory_ultra": ["sealed_commit_or_branch_atomicity"],
+        "expected_score": 10,
+        "expected_tier": "ultra"
+      },
+      "oracle": {
+        "source_files": ["docs/development/code-review-issues/cfr-130.md"],
+        "must_identify": [
+          "A pending transaction marker must describe phase and written objects before branch visibility changes.",
+          "Successful completion removes or marks the transaction clean; interrupted work remains doctor-visible.",
+          "Retry and cleanup must be idempotent and must not mutate immutable content-addressed objects."
+        ],
+        "must_preserve": ["The branch-head update remains the visibility boundary."],
+        "disallowed_claims": ["Filesystem object writes are collectively atomic without an explicit protocol."],
+        "validation_refs": ["commit_transaction_marker_is_clean_after_success_and_doctor_reports_pending"]
+      }
+    },
+    {
+      "id": "cfr-140-diagnostic-filter",
+      "source_ids": ["CFR-140"],
+      "task_class": "contract_review",
+      "prompt": "Diagnose a verification JSON option that records a diagnostic filter but leaves the diagnostic payload and summary unfiltered. Define an unambiguous backward-compatible result contract and tests.",
+      "candidate_context": {
+        "observations": [
+          "The response echoes the requested filter.",
+          "The diagnostics array and summary still describe all severities.",
+          "Automation currently has to filter again downstream."
+        ],
+        "context_files": ["docs/04_cli_spec.md", "crates/codefire-cli/src/automation.rs"]
+      },
+      "risk": {
+        "dimensions": {"blast_radius": 1, "reversibility": 1, "ambiguity": 1, "invariant_density": 1, "verification_cost": 1, "downstream_multiplier": 1},
+        "mandatory_ultra": [],
+        "expected_score": 6,
+        "expected_tier": "high"
+      },
+      "oracle": {
+        "source_files": ["docs/development/code-review-issues/cfr-140.md"],
+        "must_identify": [
+          "Apply the filter to the actionable payload rather than merely echoing filter metadata.",
+          "Expose filtered and unfiltered counts under explicitly named fields.",
+          "The no-filter path must preserve the complete legacy view."
+        ],
+        "must_preserve": ["Consumers can still obtain the full diagnostic set."],
+        "disallowed_claims": ["Filter metadata alone satisfies the filtering contract."],
+        "validation_refs": ["mixed diagnostic fixture by filter mode"]
+      }
+    },
+    {
+      "id": "cfr-143-next-action-schema",
+      "source_ids": ["CFR-143"],
+      "task_class": "schema_drift_review",
+      "prompt": "Review multiple commands that emit incompatible next-action JSON shapes. Propose a shared serializer, compatibility treatment, and representative drift tests without forcing clients to maintain command-specific adapters.",
+      "candidate_context": {
+        "observations": [
+          "One family emits kind, reason, and target.",
+          "Other modules emit id, description, and context.",
+          "Automation clients need one predictable executable action shape."
+        ],
+        "context_files": ["docs/04_cli_spec.md", "crates/codefire-cli/src/automation.rs", "crates/codefire-cli/src/storage.rs", "crates/codefire-cli/src/migration.rs"]
+      },
+      "risk": {
+        "dimensions": {"blast_radius": 1, "reversibility": 1, "ambiguity": 1, "invariant_density": 1, "verification_cost": 1, "downstream_multiplier": 2},
+        "mandatory_ultra": [],
+        "expected_score": 7,
+        "expected_tier": "high"
+      },
+      "oracle": {
+        "source_files": ["docs/development/code-review-issues/cfr-143.md"],
+        "must_identify": [
+          "A shared serializer must define canonical kind, command, reason, and target fields.",
+          "Legacy aliases may be retained deliberately but cannot remain competing module-owned schemas.",
+          "Representative commands must be covered by common schema assertions."
+        ],
+        "must_preserve": ["Existing consumers receive an explicit compatibility path."],
+        "disallowed_claims": ["Per-command adapters are the preferred stable contract."],
+        "validation_refs": ["representative next action schema tests"]
+      }
+    },
+    {
+      "id": "historical-completion-claim",
+      "source_ids": ["CFB-001..CFB-127", "CFR-001..CFR-160"],
+      "task_class": "completion_audit",
+      "prompt": "Audit the claim that all recorded CFB and CFR issues are closed. Reconcile the summary ledgers, distinguish historical status labels, and state what this evidence does and does not prove about the current source worktree.",
+      "candidate_context": {
+        "observations": [
+          "The CFB summary covers IDs 001 through 127 and includes both fixed and open statuses.",
+          "The CFR index covers IDs 001 through 160 and uses more than one fixed status label.",
+          "Historical validation logs are not the same as validation of the current dirty tree."
+        ],
+        "context_files": ["docs/development/bug-backlog.md", "docs/development/code-review-issues-2026-06-06.md", "docs/development/project-management.md"]
+      },
+      "risk": {
+        "dimensions": {"blast_radius": 1, "reversibility": 0, "ambiguity": 2, "invariant_density": 1, "verification_cost": 2, "downstream_multiplier": 2},
+        "mandatory_ultra": ["release_completion_audit"],
+        "expected_score": 8,
+        "expected_tier": "ultra"
+      },
+      "oracle": {
+        "source_files": ["docs/development/bug-backlog.md", "docs/development/code-review-issues-2026-06-06.md"],
+        "must_identify": [
+          "The CFB ledger contains 127 issues: 120 fixed and 7 open, so the all-closed claim is false.",
+          "The CFR ledger contains 160 closed issues: 150 fixed and 10 fixed in v0.7.",
+          "Ledger closure proves recorded issue status consistency, not that the current dirty source passes Rust gates or is publicly release-ready."
+        ],
+        "must_preserve": ["Unknown or unavailable current validation remains explicitly unknown."],
+        "disallowed_claims": ["Historical green commands prove the current worktree passes Rust validation.", "Closed ledgers alone prove public release readiness."],
+        "validation_refs": ["python3 docs/development/tools/check_project_docs.py"]
+      }
+    }
+  ]
+}

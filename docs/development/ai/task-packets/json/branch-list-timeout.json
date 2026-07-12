@@ -1,0 +1,115 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "aia-004-branch-list-timeout",
+  "status": "ready",
+  "objective": "Find and fix the root cause of branch list timing out on the algorithm dogfood repository without weakening sealed-commit validation.",
+  "base_revision": "12ad19d9a0e4d1a1b2977c4c811dd748cbff44d8",
+  "role": "implementer",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 1,
+      "reversibility": 1,
+      "ambiguity": 2,
+      "invariant_density": 1,
+      "verification_cost": 1,
+      "downstream_multiplier": 1
+    },
+    "mandatory_ultra": [],
+    "score": 7,
+    "selected_tier": "high",
+    "rationale": "The task is a bounded read-path performance fix, but the root cause is ambiguous and branch validation is invariant-dense."
+  },
+  "context": {
+    "pack_ids": ["pack-0-universal-orientation", "pack-1-rust-cli-command-work", "pack-3-store-object-commit-integrity"],
+    "additional_files": ["docs/development/ai/task-packets/branch-list-timeout.md"],
+    "evidence_refs": ["2026-07-11 audit: timeout 10s returned 124 with no stdout or stderr"]
+  },
+  "scope": {
+    "read_set": [
+      "crates/codefire-cli/src/main.rs",
+      "crates/codefire-cli/src/tests.rs",
+      "crates/codefire-store/src/lib.rs",
+      "subprojects/algorithm-evolution-agent-lab/.codefire/**"
+    ],
+    "write_set": [
+      "crates/codefire-cli/src/main.rs",
+      "crates/codefire-cli/src/cli_model.rs",
+      "crates/codefire-cli/src/tests.rs",
+      "crates/codefire-cli/src/tests/docs.rs",
+      "target/codefire-ai/rust-build-provenance.json"
+    ],
+    "disallowed_paths": [
+      "subprojects/algorithm-evolution-agent-lab/src/**",
+      "subprojects/algorithm-evolution-agent-lab/docs/**"
+    ],
+    "disallowed_actions": [
+      "Change an object format",
+      "Weaken sealed-commit validation",
+      "Add an async runtime or dependency",
+      "Discard user changes"
+    ]
+  },
+  "non_goals": [
+    "Redesign the branch lifecycle",
+    "Change remote or security behavior",
+    "Add AI orchestration to the CodeFire product"
+  ],
+  "invariants": [
+    {
+      "id": "sealed-branch-head",
+      "statement": "Every listed branch head is still validated as a sealed commit.",
+      "falsification_test": "A corrupt or non-sealed branch head must produce a structured failure instead of a successful list."
+    },
+    {
+      "id": "read-only-list",
+      "statement": "branch list does not mutate repository state.",
+      "falsification_test": "Hash the .codefire tree before and after a successful and failing branch list invocation."
+    },
+    {
+      "id": "json-envelope",
+      "statement": "JSON output retains the codefire.command_result.v1 envelope.",
+      "falsification_test": "Parse the result and assert the schema and structured diagnostics on both success and corruption."
+    }
+  ],
+  "validation": [
+    {
+      "id": "rust-format",
+      "command": "cargo fmt --check",
+      "purpose": "Keep the Rust workspace formatted.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "focused-test",
+      "command": "cargo test -p codefire-cli --bin codefire-rs branch_list",
+      "purpose": "Run the focused branch-list regression tests.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "rust-clippy",
+      "command": "cargo clippy -p codefire-cli --all-targets -- -D warnings",
+      "purpose": "Reject Rust warnings in the changed crate.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "source-bound-build",
+      "command": "python3 docs/development/tools/build_source_bound_rust.py --output target/codefire-ai/rust-build-provenance.json",
+      "purpose": "Build the release CLI while binding unchanged Cargo/crates inputs, toolchain, build log, and binary digest.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "dogfood-timeout",
+      "command": "timeout 10s target/release/codefire-rs branch list --path subprojects/algorithm-evolution-agent-lab --json",
+      "purpose": "Prove the observed dogfood command completes within the explicit bound.",
+      "required": true,
+      "requires_capability": "rust-source-bound-binary"
+    }
+  ],
+  "handoff": {
+    "required_outputs": ["root_cause", "files_changed", "regression_test", "validation_table", "residual_risk"],
+    "evidence_digest_required": true
+  }
+}

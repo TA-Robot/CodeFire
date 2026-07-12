@@ -1,0 +1,181 @@
+{
+  "schema": "codefire.ai_routing_eval.v1",
+  "cases": [
+    {
+      "id": "docs-link-sync",
+      "dimensions": {"blast_radius": 0, "reversibility": 0, "ambiguity": 1, "invariant_density": 0, "verification_cost": 0, "downstream_multiplier": 1},
+      "mandatory_ultra": [],
+      "expected_score": 2,
+      "expected_tier": "medium",
+      "rationale": "Deterministic source-backed documentation synchronization."
+    },
+    {
+      "id": "validation-rerun",
+      "dimensions": {"blast_radius": 0, "reversibility": 0, "ambiguity": 0, "invariant_density": 1, "verification_cost": 1, "downstream_multiplier": 0},
+      "mandatory_ultra": [],
+      "expected_score": 2,
+      "expected_tier": "medium",
+      "rationale": "Commands and reporting are predetermined."
+    },
+    {
+      "id": "dirty-tree-classification",
+      "dimensions": {"blast_radius": 0, "reversibility": 0, "ambiguity": 1, "invariant_density": 0, "verification_cost": 0, "downstream_multiplier": 2},
+      "mandatory_ultra": [],
+      "expected_score": 3,
+      "expected_tier": "medium",
+      "rationale": "Read-only classification with a downstream packaging effect."
+    },
+    {
+      "id": "bounded-cli-fix",
+      "dimensions": {"blast_radius": 1, "reversibility": 1, "ambiguity": 1, "invariant_density": 1, "verification_cost": 1, "downstream_multiplier": 1},
+      "mandatory_ultra": [],
+      "expected_score": 6,
+      "expected_tier": "high",
+      "rationale": "Focused implementation with normal regression risk."
+    },
+    {
+      "id": "branch-list-performance",
+      "dimensions": {"blast_radius": 1, "reversibility": 1, "ambiguity": 2, "invariant_density": 1, "verification_cost": 1, "downstream_multiplier": 1},
+      "mandatory_ultra": [],
+      "expected_score": 7,
+      "expected_tier": "high",
+      "rationale": "Ambiguous read-path performance issue with bounded surface."
+    },
+    {
+      "id": "cross-cutting-high-score",
+      "dimensions": {"blast_radius": 2, "reversibility": 1, "ambiguity": 2, "invariant_density": 2, "verification_cost": 2, "downstream_multiplier": 1},
+      "mandatory_ultra": [],
+      "expected_score": 10,
+      "expected_tier": "ultra",
+      "rationale": "The numeric score alone requires Ultra."
+    },
+    {
+      "id": "object-id-format-change",
+      "dimensions": {"blast_radius": 1, "reversibility": 1, "ambiguity": 1, "invariant_density": 1, "verification_cost": 1, "downstream_multiplier": 1},
+      "mandatory_ultra": ["object_identity_or_format"],
+      "expected_score": 6,
+      "expected_tier": "ultra",
+      "rationale": "Object identity and format work is always Ultra."
+    },
+    {
+      "id": "branch-atomicity-change",
+      "dimensions": {"blast_radius": 1, "reversibility": 1, "ambiguity": 1, "invariant_density": 2, "verification_cost": 1, "downstream_multiplier": 1},
+      "mandatory_ultra": ["sealed_commit_or_branch_atomicity"],
+      "expected_score": 7,
+      "expected_tier": "ultra",
+      "rationale": "Branch atomicity cannot be routed as an ordinary implementation task."
+    },
+    {
+      "id": "remote-auth-change",
+      "dimensions": {"blast_radius": 1, "reversibility": 1, "ambiguity": 1, "invariant_density": 1, "verification_cost": 1, "downstream_multiplier": 1},
+      "mandatory_ultra": ["security_auth_signature_or_remote_mutation"],
+      "expected_score": 6,
+      "expected_tier": "ultra",
+      "rationale": "Security and remote mutation are mandatory Ultra."
+    },
+    {
+      "id": "migration-recovery",
+      "dimensions": {"blast_radius": 1, "reversibility": 1, "ambiguity": 1, "invariant_density": 1, "verification_cost": 1, "downstream_multiplier": 1},
+      "mandatory_ultra": ["migration_or_user_data_recovery"],
+      "expected_score": 6,
+      "expected_tier": "ultra",
+      "rationale": "User data recovery requires the strongest reasoning and review."
+    },
+    {
+      "id": "architecture-boundary",
+      "dimensions": {"blast_radius": 1, "reversibility": 1, "ambiguity": 2, "invariant_density": 1, "verification_cost": 1, "downstream_multiplier": 1},
+      "mandatory_ultra": ["cross_subsystem_architecture"],
+      "expected_score": 7,
+      "expected_tier": "ultra",
+      "rationale": "Cross-subsystem boundaries are mandatory Ultra."
+    },
+    {
+      "id": "canonical-doc-deletion",
+      "dimensions": {"blast_radius": 1, "reversibility": 0, "ambiguity": 1, "invariant_density": 0, "verification_cost": 1, "downstream_multiplier": 2},
+      "mandatory_ultra": ["canonical_document_family_deletion"],
+      "expected_score": 5,
+      "expected_tier": "ultra",
+      "rationale": "Canonical deletion requires promotion and inbound-link audit."
+    },
+    {
+      "id": "release-completion-audit",
+      "dimensions": {"blast_radius": 1, "reversibility": 0, "ambiguity": 1, "invariant_density": 1, "verification_cost": 2, "downstream_multiplier": 2},
+      "mandatory_ultra": ["release_completion_audit"],
+      "expected_score": 7,
+      "expected_tier": "ultra",
+      "rationale": "A release completion claim has wide downstream consequences."
+    },
+    {
+      "id": "conflicting-evidence",
+      "dimensions": {"blast_radius": 0, "reversibility": 0, "ambiguity": 2, "invariant_density": 1, "verification_cost": 1, "downstream_multiplier": 1},
+      "mandatory_ultra": ["conflicting_sources_or_reviewers"],
+      "expected_score": 5,
+      "expected_tier": "ultra",
+      "rationale": "Conflicting evidence must be resolved rather than averaged."
+    },
+    {
+      "id": "numeric-score-0",
+      "dimensions": {"blast_radius": 0, "reversibility": 0, "ambiguity": 0, "invariant_density": 0, "verification_cost": 0, "downstream_multiplier": 0},
+      "mandatory_ultra": [],
+      "expected_score": 0,
+      "expected_tier": "medium",
+      "rationale": "Pins the lower routing bound."
+    },
+    {
+      "id": "numeric-score-1",
+      "dimensions": {"blast_radius": 0, "reversibility": 0, "ambiguity": 1, "invariant_density": 0, "verification_cost": 0, "downstream_multiplier": 0},
+      "mandatory_ultra": [],
+      "expected_score": 1,
+      "expected_tier": "medium",
+      "rationale": "Covers the remaining low Medium score."
+    },
+    {
+      "id": "numeric-score-4",
+      "dimensions": {"blast_radius": 0, "reversibility": 0, "ambiguity": 2, "invariant_density": 0, "verification_cost": 0, "downstream_multiplier": 2},
+      "mandatory_ultra": [],
+      "expected_score": 4,
+      "expected_tier": "high",
+      "rationale": "Pins the Medium-to-High boundary."
+    },
+    {
+      "id": "numeric-score-5",
+      "dimensions": {"blast_radius": 1, "reversibility": 0, "ambiguity": 2, "invariant_density": 0, "verification_cost": 0, "downstream_multiplier": 2},
+      "mandatory_ultra": [],
+      "expected_score": 5,
+      "expected_tier": "high",
+      "rationale": "Covers the interior High score not represented without an override."
+    },
+    {
+      "id": "numeric-score-8",
+      "dimensions": {"blast_radius": 2, "reversibility": 0, "ambiguity": 2, "invariant_density": 2, "verification_cost": 0, "downstream_multiplier": 2},
+      "mandatory_ultra": [],
+      "expected_score": 8,
+      "expected_tier": "ultra",
+      "rationale": "Pins the High-to-Ultra boundary."
+    },
+    {
+      "id": "numeric-score-9",
+      "dimensions": {"blast_radius": 2, "reversibility": 1, "ambiguity": 2, "invariant_density": 2, "verification_cost": 0, "downstream_multiplier": 2},
+      "mandatory_ultra": [],
+      "expected_score": 9,
+      "expected_tier": "ultra",
+      "rationale": "Covers the first interior Ultra score."
+    },
+    {
+      "id": "numeric-score-11",
+      "dimensions": {"blast_radius": 2, "reversibility": 1, "ambiguity": 2, "invariant_density": 2, "verification_cost": 2, "downstream_multiplier": 2},
+      "mandatory_ultra": [],
+      "expected_score": 11,
+      "expected_tier": "ultra",
+      "rationale": "Covers the penultimate numeric score."
+    },
+    {
+      "id": "numeric-score-12",
+      "dimensions": {"blast_radius": 2, "reversibility": 2, "ambiguity": 2, "invariant_density": 2, "verification_cost": 2, "downstream_multiplier": 2},
+      "mandatory_ultra": [],
+      "expected_score": 12,
+      "expected_tier": "ultra",
+      "rationale": "Pins the upper routing bound."
+    }
+  ]
+}

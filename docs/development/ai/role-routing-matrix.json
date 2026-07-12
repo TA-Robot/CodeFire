@@ -1,0 +1,149 @@
+{
+  "schema": "codefire.ai_role_routing.v2",
+  "runtime_policy": {
+    "primary_model": "gpt-5.6-sol",
+    "policy_tiers": ["medium", "high", "ultra"],
+    "adapters": {
+      "codex_cli_0_144": {
+        "medium": {
+          "reasoning_effort": "medium",
+          "delegation": "explicit_or_instruction_driven"
+        },
+        "high": {
+          "reasoning_effort": "high",
+          "delegation": "explicit_or_instruction_driven"
+        },
+        "ultra": {
+          "reasoning_effort": "ultra",
+          "delegation": "proactive_when_parallelism_materially_helps"
+        }
+      },
+      "openai_responses_api": {
+        "medium": {
+          "reasoning_effort": "medium",
+          "delegation": "external_orchestrator_required"
+        },
+        "high": {
+          "reasoning_effort": "high",
+          "delegation": "external_orchestrator_required"
+        },
+        "ultra": {
+          "reasoning_effort": "max",
+          "delegation": "external_orchestrator_required",
+          "semantic_equivalence": false
+        }
+      },
+      "portable_codex_fallback": {
+        "medium": {
+          "reasoning_effort": "medium",
+          "delegation": "explicit_or_instruction_driven"
+        },
+        "high": {
+          "reasoning_effort": "high",
+          "delegation": "explicit_or_instruction_driven"
+        },
+        "ultra": {
+          "reasoning_effort": "xhigh",
+          "delegation": "explicit_or_instruction_driven",
+          "semantic_equivalence": false
+        }
+      }
+    },
+    "unavailable_model_policy": "stop_without_silent_model_substitution",
+    "unavailable_ultra_policy": "record_runtime_fallback_and_use_xhigh_only_when_explicitly_allowed"
+  },
+  "risk_routing": {
+    "dimensions": [
+      "blast_radius",
+      "reversibility",
+      "ambiguity",
+      "invariant_density",
+      "verification_cost",
+      "downstream_multiplier"
+    ],
+    "thresholds": {
+      "medium": {"min": 0, "max": 3},
+      "high": {"min": 4, "max": 7},
+      "ultra": {"min": 8, "max": 12}
+    },
+    "mandatory_ultra": [
+      "object_identity_or_format",
+      "sealed_commit_or_branch_atomicity",
+      "security_auth_signature_or_remote_mutation",
+      "migration_or_user_data_recovery",
+      "cross_subsystem_architecture",
+      "canonical_document_family_deletion",
+      "release_completion_audit",
+      "conflicting_sources_or_reviewers"
+    ]
+  },
+  "roles": [
+    {
+      "role": "manager",
+      "model": "gpt-5.6-sol",
+      "reasoning_tier": "ultra",
+      "config_file": ".codex/agents/ultra.toml",
+      "outputs": ["task_packets", "lane_plan", "integration_order", "completion_audit"]
+    },
+    {
+      "role": "architect",
+      "model": "gpt-5.6-sol",
+      "reasoning_tier": "ultra",
+      "config_file": ".codex/agents/ultra.toml",
+      "outputs": ["design_note", "alternatives", "risk_list", "boundary_decision", "falsification_plan"]
+    },
+    {
+      "role": "implementer",
+      "model": "gpt-5.6-sol",
+      "reasoning_tier": "high",
+      "escalate_to": "ultra",
+      "config_file": ".codex/agents/high.toml",
+      "outputs": ["patch", "focused_tests", "scope_statement", "handoff"]
+    },
+    {
+      "role": "reviewer",
+      "model": "gpt-5.6-sol",
+      "reasoning_tier": "ultra",
+      "config_file": ".codex/agents/ultra.toml",
+      "outputs": ["approve_request_changes_or_block", "correctness_concern", "maintainability_concern", "validation_assessment"]
+    },
+    {
+      "role": "researcher",
+      "model": "gpt-5.6-sol",
+      "reasoning_tier": "high",
+      "escalate_to": "ultra",
+      "config_file": ".codex/agents/high.toml",
+      "outputs": ["evidence", "alternatives", "hypotheses", "falsification_tests", "decision_candidates"]
+    },
+    {
+      "role": "docs_synchronizer",
+      "model": "gpt-5.6-sol",
+      "reasoning_tier": "medium",
+      "escalate_to": "high",
+      "config_file": ".codex/agents/medium.toml",
+      "outputs": ["docs_diff", "source_evidence", "inbound_link_updates", "consistency_check"]
+    },
+    {
+      "role": "validation_runner",
+      "model": "gpt-5.6-sol",
+      "reasoning_tier": "medium",
+      "config_file": ".codex/agents/medium.toml",
+      "outputs": ["validation_table", "duration", "environment_limitations", "reproduction_command"]
+    },
+    {
+      "role": "dogfood_runner",
+      "model": "gpt-5.6-sol",
+      "reasoning_tier": "high",
+      "escalate_to": "ultra",
+      "config_file": ".codex/agents/high.toml",
+      "outputs": ["dogfood_evidence", "reproduction", "cfb_candidates", "negative_results"]
+    },
+    {
+      "role": "classifier",
+      "model": "gpt-5.6-sol",
+      "reasoning_tier": "medium",
+      "config_file": ".codex/agents/medium.toml",
+      "outputs": ["classification_table", "unknowns", "ownership_conflicts"]
+    }
+  ]
+}
