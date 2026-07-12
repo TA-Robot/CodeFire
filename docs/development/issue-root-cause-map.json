@@ -1,7 +1,7 @@
 {
   "type": "codefire.issue_root_cause_map.v1",
   "version": 1,
-  "updated_at": "2026-06-10",
+  "updated_at": "2026-07-11",
   "sources": [
     "docs/development/bug-backlog.md",
     "docs/development/bug-issues/",
@@ -86,6 +86,438 @@
         "docs/development/bug-issues/cfb-095.md",
         "crates/codefire-cli/src/automation.rs::tests::clean_status_with_open_fire_prediction_suggests_scan_and_verify",
         "subprojects/algorithm-evolution-agent-lab cycle 10 test atom formatting update"
+      ]
+    },
+    {
+      "id": "CFB-096",
+      "status": "fixed",
+      "root_cause": "status_next_action_path_context_gap",
+      "fix_group": "next-actions-path-context",
+      "target_version": "cycle-60-burn-down",
+      "owner_module": "crates/codefire-cli/src/automation.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 60 dogfood burn-down",
+        "decision": "Thread the explicit status path through status next_actions so command strings and target/context payloads preserve the invoked open directory."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-096.md",
+        "crates/codefire-cli/src/automation.rs::tests::status_prediction_next_actions_preserve_explicit_path_context",
+        "cargo test -p codefire-cli status_prediction_next_actions_preserve_explicit_path_context"
+      ]
+    },
+    {
+      "id": "CFB-097",
+      "status": "fixed",
+      "root_cause": "batch_operation_next_action_path_context_gap",
+      "fix_group": "next-actions-path-context",
+      "target_version": "cycle-60-burn-down",
+      "owner_module": "crates/codefire-cli/src/batch.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 60 dogfood burn-down",
+        "decision": "Render batch operation verify next_action command strings with the same explicit path already present in the machine-readable target."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-097.md",
+        "crates/codefire-cli/src/tests.rs::extinguish_batch_validates_all_items_before_writing_ledgers",
+        "cargo test -p codefire-cli extinguish_batch_validates_all_items_before_writing_ledgers"
+      ]
+    },
+    {
+      "id": "CFB-098",
+      "status": "fixed",
+      "root_cause": "open_success_next_action_path_context_gap",
+      "fix_group": "branch-workflow-json",
+      "target_version": "branch-workflow-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 124 branch workflow burn-down",
+        "decision": "Render open success next_actions with the newly opened path in executable command strings and shared target/context fields."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-098.md",
+        "crates/codefire-cli/src/tests.rs::open_materializes_manifest_and_updates_registry",
+        "cargo test -p codefire-cli open_materializes_manifest_and_updates_registry"
+      ]
+    },
+    {
+      "id": "CFB-099",
+      "status": "fixed",
+      "root_cause": "merge_help_routing_gap",
+      "fix_group": "branch-workflow-help",
+      "target_version": "branch-workflow-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 124 branch workflow burn-down",
+        "decision": "Route merge --help through normal command help so branch workflow users can discover merge usage without error handling."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-099.md",
+        "crates/codefire-cli/src/tests.rs::command_help_routes_before_mutating_parsers",
+        "cargo test -p codefire-cli command_help_routes_before_mutating_parsers"
+      ]
+    },
+    {
+      "id": "CFB-100",
+      "status": "fixed",
+      "root_cause": "merge_plan_next_action_schema_gap",
+      "fix_group": "branch-workflow-json",
+      "target_version": "branch-workflow-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 124 branch workflow burn-down",
+        "decision": "Normalize merge dry-run operation-plan next_actions into executable command_result actions and preserve repo context."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-100.md",
+        "crates/codefire-cli/src/tests.rs::merge_branch_writes_source_changes_and_marks_target_burning",
+        "cargo test -p codefire-cli merge_branch"
+      ]
+    },
+    {
+      "id": "CFB-101",
+      "status": "fixed",
+      "root_cause": "branch_open_lifecycle_close_gap",
+      "fix_group": "branch-workflow-lifecycle",
+      "target_version": "branch-workflow-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 124 branch workflow burn-down",
+        "decision": "Provide a supported close command so feature open directories can be safely removed from the open registry after branch work is sealed or merged."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-101.md",
+        "crates/codefire-cli/src/tests.rs::close_branch_closes_clean_open_dir_and_discard_allows_dirty_state",
+        "cargo test -p codefire-cli close_branch_closes_clean_open_dir_and_discard_allows_dirty_state"
+      ]
+    },
+    {
+      "id": "CFB-102",
+      "status": "fixed",
+      "root_cause": "branch_source_state_gate_gap",
+      "fix_group": "branch-workflow-source-state",
+      "target_version": "branch-workflow-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 124 branch workflow burn-down",
+        "decision": "Reject local clone/merge from source branches with unsealed open-consistent changes so branch workflow commands cannot silently use stale sealed heads."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-102.md",
+        "crates/codefire-cli/src/tests.rs::clone_branch_creates_closed_branch_and_rejects_unsealed_source",
+        "crates/codefire-cli/src/tests.rs::merge_branch_rejects_open_consistent_source",
+        "cargo test -p codefire-cli merge_branch"
+      ]
+    },
+    {
+      "id": "CFB-103",
+      "status": "fixed",
+      "root_cause": "branch_next_action_command_quoting_gap",
+      "fix_group": "branch-workflow-json",
+      "target_version": "branch-workflow-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 124 branch workflow burn-down",
+        "decision": "Render branch operation next_action command strings with shell-safe quoting or an argv-capable schema."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-103.md",
+        "crates/codefire-cli/src/tests.rs::clone_branch_creates_closed_branch_and_rejects_unsealed_source",
+        "crates/codefire-cli/src/tests.rs::merge_branch_writes_source_changes_and_marks_target_burning",
+        "cargo test -p codefire-cli clone_branch_creates_closed_branch_and_rejects_unsealed_source"
+      ]
+    },
+    {
+      "id": "CFB-104",
+      "status": "fixed",
+      "root_cause": "merge_apply_fire_persistence_gap",
+      "fix_group": "branch-workflow-merge-state",
+      "target_version": "branch-workflow-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 124 branch workflow burn-down",
+        "decision": "Make merge apply and merge fire persistence match the documented local merge contract, or document and surface the required scan step explicitly."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-104.md",
+        "crates/codefire-cli/src/tests.rs::merge_branch_persists_merge_fires_during_apply",
+        "cargo test -p codefire-cli merge_branch"
+      ]
+    },
+    {
+      "id": "CFB-105",
+      "status": "fixed",
+      "root_cause": "primary_branch_close_guard_gap",
+      "fix_group": "branch-workflow-primary-safety",
+      "target_version": "next-branch-probe-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 125 branch boundary probe",
+        "decision": "Reject close/discard of the primary main open directory by default or require explicit force."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-105.md",
+        "codefire close main --dry-run --json",
+        "codefire discard main --dry-run --json"
+      ]
+    },
+    {
+      "id": "CFB-106",
+      "status": "fixed",
+      "root_cause": "self_merge_guard_gap",
+      "fix_group": "branch-workflow-merge-validation",
+      "target_version": "next-branch-probe-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 125 branch boundary probe",
+        "decision": "Reject local self-merge and no-op same-commit merge plans without apply next_actions."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-106.md",
+        "codefire merge main --into main --dry-run --json"
+      ]
+    },
+    {
+      "id": "CFB-107",
+      "status": "fixed",
+      "root_cause": "branch_error_envelope_context_gap",
+      "fix_group": "branch-workflow-error-json",
+      "target_version": "next-branch-probe-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 125 branch boundary probe",
+        "decision": "Preserve repo/path recovery context in branch command domain errors."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-107.md",
+        "codefire open main <new-path> --dry-run --json",
+        "codefire close feature/name-ci-note-md --dry-run --json",
+        "codefire clone main main --dry-run --json"
+      ]
+    },
+    {
+      "id": "CFB-108",
+      "status": "fixed",
+      "root_cause": "branch_open_outside_root_guard_gap",
+      "fix_group": "branch-workflow-open-boundary",
+      "target_version": "next-branch-probe-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 125 branch boundary probe",
+        "decision": "Reject or explicitly gate branch open targets outside the CodeFire repo root."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-108.md",
+        "codefire open feature/name-ci-note-md /workspace/project/algorithm-outside-subprojects --dry-run --json"
+      ]
+    },
+    {
+      "id": "CFB-109",
+      "status": "fixed",
+      "root_cause": "branch_lock_recovery_guidance_gap",
+      "fix_group": "branch-workflow-lock-recovery",
+      "target_version": "next-branch-probe-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 125 branch boundary probe",
+        "decision": "Return repo-aware retry guidance for lock contention from branch workflow commands."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-109.md",
+        "parallel branch dry-run probe returned lock_contention with repo:null and no next_actions"
+      ]
+    },
+    {
+      "id": "CFB-110",
+      "status": "fixed",
+      "root_cause": "branch_open_nested_target_guard_gap",
+      "fix_group": "branch-workflow-open-boundary",
+      "target_version": "next-branch-probe-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 125 branch boundary probe",
+        "decision": "Reject branch open targets nested under existing open directories and return safe sibling path guidance."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-110.md",
+        "codefire open feature/name-ci-note-section /workspace/project/subprojects/algorithm-evolution-agent-lab/tmp-nested-feature --dry-run --json"
+      ]
+    },
+    {
+      "id": "CFB-111",
+      "status": "fixed",
+      "root_cause": "clone_next_action_path_guidance_gap",
+      "fix_group": "branch-workflow-next-actions",
+      "target_version": "next-branch-probe-burn-down",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "Cycle 125 branch boundary probe",
+        "decision": "Return repo-aware safe open target guidance from clone success and dry-run next_actions."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-111.md",
+        "codefire clone main feature/probe-nested-open --dry-run --json"
+      ]
+    },
+    {
+      "id": "CFB-120",
+      "status": "open",
+      "root_cause": "scan_sealed_base_validation_gap",
+      "fix_group": "stage1-sealed-subject-integrity",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-stage1-invariants",
+        "decision": "Validate and reuse the current sealed base before scan, Fire, verification, or commit derivation."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-120.md",
+        "crates/codefire-cli/src/main.rs::compute_scan",
+        "planned cargo regression: invalid current base across status/scan/verify"
+      ]
+    },
+    {
+      "id": "CFB-121",
+      "status": "open",
+      "root_cause": "commit_prepublication_sealed_validation_gap",
+      "fix_group": "stage1-sealed-subject-integrity",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-stage1-invariants",
+        "decision": "Validate the newly stored commit before branch/opened visibility changes and preserve diagnosable pending state on failure."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-121.md",
+        "crates/codefire-cli/src/main.rs::run_commit",
+        "planned failpoint regression: invalid new commit leaves branch head unchanged"
+      ]
+    },
+    {
+      "id": "CFB-122",
+      "status": "open",
+      "root_cause": "lexical_path_containment_gap",
+      "fix_group": "stage1-path-trust-boundary",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-stage1-invariants",
+        "decision": "Introduce one use-boundary resolver for dot-dot, symlink, repository, workspace, and existing-open containment."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-122.md",
+        "crates/codefire-cli/src/main.rs::absolute_path",
+        "planned path red-team fixture"
+      ]
+    },
+    {
+      "id": "CFB-123",
+      "status": "open",
+      "root_cause": "trace_graph_atom_endpoint_validation_gap",
+      "fix_group": "stage1-trace-integrity",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-core/src/lib.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-stage1-invariants",
+        "decision": "Use one domain predicate for Trace Link endpoint validity in direct scan and batch mutation paths."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-123.md",
+        "crates/codefire-core/src/lib.rs::current_trace_graph",
+        "planned dangling source/target endpoint regression"
+      ]
+    },
+    {
+      "id": "CFB-124",
+      "status": "open",
+      "root_cause": "live_scan_verify_repository_lock_gap",
+      "fix_group": "stage1-open-state-concurrency",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-stage1-invariants",
+        "decision": "Give every live scan/verify state mutation one explicit repository-lock owner while preserving a read-only compute path."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-124.md",
+        "crates/codefire-cli/src/main.rs::run_scan_command",
+        "crates/codefire-cli/src/main.rs::run_verify_command",
+        "planned failpoint/concurrency regression across live state files"
+      ]
+    },
+    {
+      "id": "CFB-125",
+      "status": "open",
+      "root_cause": "store_reuse_full_digest_comparison_gap",
+      "fix_group": "stage1-object-identity-collision",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-store/src/lib.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-stage1-invariants",
+        "decision": "Reject same-public-ID reuse unless existing and requested records agree on type, full digest, and canonical payload."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-125.md",
+        "crates/codefire-store/src/lib.rs::store_object",
+        "planned deterministic artificial-collision regression for both reuse branches"
+      ]
+    },
+    {
+      "id": "CFB-126",
+      "status": "open",
+      "root_cause": "import_idempotency_request_binding_gap",
+      "fix_group": "stage1-idempotency-integrity",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-cli/src/import_workflow.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-stage1-invariants",
+        "decision": "Bind import replay to a canonical operation/scope/request hash and reject semantic key reuse."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-126.md",
+        "crates/codefire-cli/src/import_workflow.rs::load_import_idempotency_marker",
+        "planned exact-replay and different-branch conflict regressions"
+      ]
+    },
+    {
+      "id": "CFB-127",
+      "status": "fixed",
+      "root_cause": "signature_rotation_test_wall_clock_dependency",
+      "fix_group": "organization-audit-rust-source-gate",
+      "target_version": "stage-0-repository-control",
+      "owner_module": "crates/codefire-cli/src/signatures.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/worktree-cleanup-plan.md",
+        "phase": "Validation Record",
+        "decision": "Keep production signing on current time while supplying a deterministic signed_at in rotation tests."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-127.md",
+        "crates/codefire-cli/src/signatures.rs::sign_commit_payload_at",
+        "cargo test --workspace --locked",
+        "cargo clippy --workspace --all-targets --locked -- -D warnings"
       ]
     }
   ]
