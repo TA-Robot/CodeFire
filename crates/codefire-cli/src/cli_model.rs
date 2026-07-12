@@ -144,6 +144,23 @@ pub(crate) struct CloneResult {
 }
 
 #[derive(Debug)]
+pub(crate) struct CloseOptions {
+    pub(crate) branch: String,
+    pub(crate) discard: bool,
+    pub(crate) keep_dir: bool,
+    pub(crate) dry_run: bool,
+    pub(crate) json_output: bool,
+    pub(crate) lock: LockOptions,
+}
+
+#[derive(Debug)]
+pub(crate) struct CloseResult {
+    pub(crate) branch: String,
+    pub(crate) open_dir: PathBuf,
+    pub(crate) plan: Value,
+}
+
+#[derive(Debug)]
 pub(crate) struct DiffArgs {
     pub(crate) left: String,
     pub(crate) right: String,
@@ -201,6 +218,7 @@ pub(crate) struct LockOptions {
 
 #[derive(Debug)]
 pub(crate) struct MergeResult {
+    pub(crate) repo_root: PathBuf,
     pub(crate) source_branch: String,
     pub(crate) target_branch: String,
     pub(crate) source_head: String,

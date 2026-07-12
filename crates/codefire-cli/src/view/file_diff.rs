@@ -454,16 +454,12 @@ fn hunk_header(ops: &[DiffOp<'_>], hunk: DiffHunk) -> String {
             DiffOp::Equal(_) => {
                 left_count += 1;
                 right_count += 1;
-                left_line += 1;
-                right_line += 1;
             }
             DiffOp::Delete(_) => {
                 left_count += 1;
-                left_line += 1;
             }
             DiffOp::Insert(_) => {
                 right_count += 1;
-                right_line += 1;
             }
         }
     }

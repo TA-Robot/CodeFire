@@ -355,6 +355,38 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             }
             Ok(())
         }
+        Some("close") => {
+            let options = parse_close_args(&args[1..], false)?;
+            let result = close_branch(&env::current_dir()?, &options)?;
+            if options.json_output {
+                print_plan_result_json("close", &result.plan)?;
+            } else if options.dry_run {
+                println!(
+                    "close dry-run: {} would close {}",
+                    result.branch,
+                    result.open_dir.display()
+                );
+            } else {
+                println!("closed {}: {}", result.branch, result.open_dir.display());
+            }
+            Ok(())
+        }
+        Some("discard") => {
+            let options = parse_close_args(&args[1..], true)?;
+            let result = close_branch(&env::current_dir()?, &options)?;
+            if options.json_output {
+                print_plan_result_json("discard", &result.plan)?;
+            } else if options.dry_run {
+                println!(
+                    "discard dry-run: {} would close {}",
+                    result.branch,
+                    result.open_dir.display()
+                );
+            } else {
+                println!("discarded {}: {}", result.branch, result.open_dir.display());
+            }
+            Ok(())
+        }
         Some("upload") => {
             let options = parse_upload_args(&args[1..])?;
             let result = match upload_branch(&env::current_dir()?, &options) {
@@ -905,7 +937,8 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     status_data_json_with_prediction(&status, &options.path),
                     metrics.as_ref(),
                 );
-                let next_actions = status_next_actions_with_prediction(&status, &data);
+                let next_actions =
+                    status_next_actions_with_prediction(&status, &data, Some(&options.path));
                 println!(
                     "{}",
                     serde_json::to_string_pretty(&command_result_envelope(
@@ -1266,10 +1299,12 @@ fn command_help_for_args(args: &[String]) -> Option<&'static str> {
     }
     match command {
         "status" | "scan" | "verify" | "fire" | "extinguish" | "commit" | "init" | "import"
-        | "open" | "clone" | "upload" | "list" | "request-merge" | "request-list"
-        | "request-review" | "request-apply" | "review-pack" | "storage" | "doctor" | "show"
-        | "diff" | "context" | "explain" | "atom-index" | "trace-graph" | "missing-links"
-        | "link" | "capabilities" => Some(subcommand_help(command)),
+        | "open" | "clone" | "close" | "discard" | "merge" | "upload" | "list"
+        | "request-merge" | "request-list" | "request-review" | "request-apply" | "review-pack"
+        | "storage" | "doctor" | "show" | "diff" | "context" | "explain" | "atom-index"
+        | "trace-graph" | "missing-links" | "link" | "capabilities" => {
+            Some(subcommand_help(command))
+        }
         "migrate" => match args.get(1).map(String::as_str) {
             Some("check") | Some("dry-run") | Some("apply") => {
                 Some(subcommand_help("migrate check"))
@@ -1307,6 +1342,15 @@ fn subcommand_help(command: &str) -> &'static str {
         }
         "clone" => {
             "usage: codefire clone <source-branch> <new-branch> [--dry-run] [--json] [--idempotency-key <key>]\n\nCreate a new sealed branch from an existing branch.\n"
+        }
+        "close" => {
+            "usage: codefire close <branch> [--discard] [--keep-dir] [--dry-run] [--json]\n\nClose an open-clean branch and remove its open directory. Use --discard to explicitly discard unsealed open work.\n"
+        }
+        "discard" => {
+            "usage: codefire discard <branch> [--keep-dir] [--dry-run] [--json]\n\nDiscard an open branch worktree and close its open registry entry.\n"
+        }
+        "merge" => {
+            "usage: codefire merge <source-branch> --into <target-branch> [--dry-run] [--json] [--idempotency-key <key>]\n\nMerge a sealed source branch head into an open-clean target branch.\n"
         }
         "upload" => {
             "usage: codefire upload <branch> <remote-url> [--dry-run] [--json] [--idempotency-key <key>] [--request-key-id <key>]\n\nUpload a sealed branch to a remote project.\n"
@@ -1452,6 +1496,17 @@ enum CliError {
     InvalidMarker(String),
     InvalidRepository(String),
     LockContention(String),
+    RepositoryLockContention {
+        message: String,
+        repo_root: PathBuf,
+        lock_path: PathBuf,
+    },
+    BranchOperation {
+        message: String,
+        repo_root: PathBuf,
+        branch: Option<String>,
+        path: Option<PathBuf>,
+    },
     BatchFileRead {
         operation: &'static str,
         path: PathBuf,
@@ -1489,7 +1544,10 @@ impl CliError {
             CliError::InvalidMarker(_) | CliError::InvalidRepository(_) => {
                 ExitCode::RepositoryCorruption
             }
-            CliError::LockContention(_) => ExitCode::LockContention,
+            CliError::LockContention(_) | CliError::RepositoryLockContention { .. } => {
+                ExitCode::LockContention
+            }
+            CliError::BranchOperation { message, .. } => usage_exit_code(message),
             CliError::BatchFileRead { .. } => ExitCode::InvalidUsageOrConfig,
             CliError::EvidenceCommandFailed { .. } => ExitCode::InvalidUsageOrConfig,
             CliError::MissingEvidenceRef { .. } => ExitCode::ObjectReferenceInvalid,
@@ -1622,6 +1680,36 @@ impl CliError {
             CliError::InvalidMarker(_) => self.simple_diagnostic("invalid_marker", true),
             CliError::InvalidRepository(_) => self.simple_diagnostic("invalid_repository", true),
             CliError::LockContention(_) => self.simple_diagnostic("lock_contention", true),
+            CliError::RepositoryLockContention {
+                repo_root,
+                lock_path,
+                ..
+            } => json!({
+                "kind": "lock_contention",
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "repo": repo_root,
+                "lock_path": lock_path,
+                "exit_code": self.exit_code(),
+                "message": self.to_string(),
+            }),
+            CliError::BranchOperation {
+                message,
+                repo_root,
+                branch,
+                path,
+            } => json!({
+                "kind": usage_diagnostic_kind(message),
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "repo": repo_root,
+                "branch": branch,
+                "path": path,
+                "exit_code": self.exit_code(),
+                "message": self.to_string(),
+            }),
         }
     }
 
@@ -1664,6 +1752,8 @@ impl fmt::Display for CliError {
                 write!(f, "invalid CodeFire repository: {message}")
             }
             CliError::LockContention(message) => write!(f, "{message}"),
+            CliError::RepositoryLockContention { message, .. } => write!(f, "{message}"),
+            CliError::BranchOperation { message, .. } => write!(f, "{message}"),
             CliError::BatchFileRead {
                 operation,
                 path,
@@ -2593,8 +2683,8 @@ fn review_pack_result_data(
         "version": 1,
         "output_path": output_path,
         "bytes": payload.len(),
-        "base": value.get("base").cloned().unwrap_or_else(|| json!(null)),
-        "source": value.get("source").cloned().unwrap_or_else(|| json!(null)),
+        "base": value.get("base").cloned().unwrap_or(Value::Null),
+        "source": value.get("source").cloned().unwrap_or(Value::Null),
         "options": value.get("options").cloned().unwrap_or_else(|| json!({})),
         "included_sections": [
             "base",
@@ -2619,8 +2709,8 @@ fn patch_export_result_data(
         "version": 1,
         "output_path": output_path,
         "bytes": payload.len(),
-        "base": value.get("base").cloned().unwrap_or_else(|| json!(null)),
-        "source": value.get("source").cloned().unwrap_or_else(|| json!(null)),
+        "base": value.get("base").cloned().unwrap_or(Value::Null),
+        "source": value.get("source").cloned().unwrap_or(Value::Null),
         "summary": value.get("summary").cloned().unwrap_or_else(|| json!({})),
         "omissions": value.get("omissions").cloned().unwrap_or_else(|| json!([])),
         "entries": value
@@ -2665,6 +2755,8 @@ fn print_cli_error_json(command: &str, error: &CliError) -> Result<(), CliError>
 fn cli_error_envelope(command: &str, error: &CliError) -> Value {
     let repo_root = match error {
         CliError::MissingEvidenceRef { repo_root, .. } => Some(repo_root.as_path()),
+        CliError::RepositoryLockContention { repo_root, .. } => Some(repo_root.as_path()),
+        CliError::BranchOperation { repo_root, .. } => Some(repo_root.as_path()),
         _ => None,
     };
     command_result_envelope(
@@ -2674,7 +2766,7 @@ fn cli_error_envelope(command: &str, error: &CliError) -> Value {
         repo_root,
         json!({ "type": "codefire_command_error" }),
         vec![cli_error_diagnostic(error)],
-        cli_error_next_actions(error),
+        cli_error_next_actions(command, error),
     )
 }
 
@@ -2682,7 +2774,7 @@ fn cli_error_diagnostic(error: &CliError) -> Value {
     error.diagnostic()
 }
 
-fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
+fn cli_error_next_actions(command: &str, error: &CliError) -> Vec<Value> {
     match error {
         CliError::Usage(message) if message.starts_with("unsupported command:") => vec![json!({
             "kind": "show_help",
@@ -2696,6 +2788,12 @@ fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
             "reason": "inspect available branch names before retrying the command",
             "target": {"error": message},
         })],
+        CliError::BranchOperation {
+            message,
+            repo_root,
+            branch,
+            path,
+        } => branch_error_next_actions(message, repo_root, branch.as_deref(), path.as_deref()),
         CliError::Usage(message) if unknown_target_parts(message).is_some() => vec![json!({
             "kind": "refresh_scan",
             "command": cli_command("scan --json"),
@@ -2796,8 +2894,64 @@ fn cli_error_next_actions(error: &CliError) -> Vec<Value> {
                 "target": {"missing_evidence_id": evidence_id},
             }),
         ],
+        CliError::RepositoryLockContention {
+            repo_root,
+            lock_path,
+            ..
+        } => vec![json!({
+            "kind": "retry_with_wait_lock",
+            "command": cli_command(format!("{command} ... --wait-lock --lock-timeout 2s")),
+            "reason": "retry after the repository lock is released or wait up to a bounded timeout",
+            "target": {
+                "repo": repo_root,
+                "lock_path": lock_path,
+            },
+        })],
+        CliError::LockContention(_) => vec![json!({
+            "kind": "retry_with_wait_lock",
+            "command": cli_command(format!("{command} ... --wait-lock --lock-timeout 2s")),
+            "reason": "retry after the resource lock is released or wait up to a bounded timeout",
+            "target": {"error": error.to_string()},
+        })],
         _ => Vec::new(),
     }
+}
+
+fn branch_error_next_actions(
+    message: &str,
+    repo_root: &Path,
+    branch: Option<&str>,
+    path: Option<&Path>,
+) -> Vec<Value> {
+    let mut actions = vec![json!({
+        "kind": "list_branches",
+        "command": cli_command(format!(
+            "branch list --path {} --json",
+            command_arg(&repo_root.to_string_lossy())
+        )),
+        "reason": "inspect branch state in the repository before retrying the branch operation",
+        "target": {
+            "repo": repo_root,
+            "branch": branch,
+            "error": message,
+        },
+    })];
+    if let Some(path) = path {
+        actions.push(json!({
+            "kind": "status",
+            "command": cli_command(format!(
+                "status --path {} --json",
+                command_arg(&path.to_string_lossy())
+            )),
+            "reason": "refresh the open directory state before retrying the branch operation",
+            "target": {
+                "repo": repo_root,
+                "path": path,
+                "branch": branch,
+            },
+        }));
+    }
+    actions
 }
 
 fn batch_file_diagnostic_kind(kind: ErrorKind) -> &'static str {
@@ -3481,6 +3635,72 @@ fn parse_clone_args(args: &[String]) -> Result<CloneOptions, CliError> {
                 .to_string(),
         )),
     }
+}
+
+fn parse_close_args(args: &[String], discard_command: bool) -> Result<CloseOptions, CliError> {
+    let mut branch = None;
+    let mut discard = discard_command;
+    let mut keep_dir = false;
+    let mut dry_run = false;
+    let mut json_output = false;
+    let mut lock = LockOptions::default();
+    let mut idempotency_key = None;
+    let mut index = 0usize;
+    while index < args.len() {
+        if parse_common_mutation_option(
+            args,
+            &mut index,
+            &mut dry_run,
+            &mut json_output,
+            &mut lock,
+            &mut idempotency_key,
+        )? {
+            index += 1;
+            continue;
+        }
+        match args[index].as_str() {
+            "--discard" if !discard_command => discard = true,
+            "--discard" => {
+                return Err(CliError::Usage(
+                    "discard command does not accept --discard".to_string(),
+                ));
+            }
+            "--keep-dir" => keep_dir = true,
+            option if option.starts_with("--") => {
+                let command = if discard_command { "discard" } else { "close" };
+                return Err(CliError::Usage(format!(
+                    "unsupported {command} option: {option}"
+                )));
+            }
+            value if branch.is_none() => branch = Some(value.to_string()),
+            value => {
+                let command = if discard_command { "discard" } else { "close" };
+                return Err(CliError::Usage(format!(
+                    "unexpected {command} argument: {value}"
+                )));
+            }
+        }
+        index += 1;
+    }
+    if idempotency_key.is_some() {
+        let command = if discard_command { "discard" } else { "close" };
+        return Err(CliError::Usage(format!(
+            "{command} does not support --idempotency-key"
+        )));
+    }
+    let usage = if discard_command {
+        "usage: codefire discard <branch> [--keep-dir] [--dry-run] [--json]"
+    } else {
+        "usage: codefire close <branch> [--discard] [--keep-dir] [--dry-run] [--json]"
+    };
+    Ok(CloseOptions {
+        branch: branch.ok_or_else(|| CliError::Usage(usage.to_string()))?,
+        discard,
+        keep_dir,
+        dry_run,
+        json_output,
+        lock,
+    })
 }
 
 fn parse_diff_args(args: &[String]) -> Result<DiffArgs, CliError> {
@@ -4332,6 +4552,17 @@ fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
 fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, CliError> {
     let repo_root = find_repo_root(start)?;
     let _lock = RepoLock::acquire_with_options(&repo_root, &options.lock)?;
+    if options.source_branch == options.target_branch {
+        return Err(branch_operation_error(
+            &repo_root,
+            Some(&options.source_branch),
+            None,
+            format!(
+                "cannot merge branch '{}' into itself",
+                options.source_branch
+            ),
+        ));
+    }
     let idempotency_payload = merge_idempotency_payload(&repo_root, options)?;
     if !options.dry_run {
         if let Some(key) = options.idempotency_key.as_deref() {
@@ -4352,40 +4583,55 @@ fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, Cli
 }
 
 fn build_merge_result(repo_root: &Path, options: &MergeOptions) -> Result<MergeResult, CliError> {
-    let objects = repo_root.join(".codefire").join("objects");
-    let source = load_branch_record(repo_root, &options.source_branch)?;
-    let source_head = required_string(&source, &["head"])?;
-    let source_state = source
-        .get("state")
-        .and_then(Value::as_str)
-        .unwrap_or("closed");
-    if source_state == "open-burning" {
-        return Err(CliError::Usage(format!(
-            "cannot merge from branch '{}' while it is open-burning",
-            options.source_branch
-        )));
+    if options.source_branch == options.target_branch {
+        return Err(branch_operation_error(
+            repo_root,
+            Some(&options.source_branch),
+            None,
+            format!(
+                "cannot merge branch '{}' into itself",
+                options.source_branch
+            ),
+        ));
     }
-    let target = load_branch_record(repo_root, &options.target_branch)?;
+    let objects = repo_root.join(".codefire").join("objects");
+    let source = load_branch_record(repo_root, &options.source_branch).map_err(|error| {
+        with_branch_operation_context(error, repo_root, Some(&options.source_branch), None)
+    })?;
+    let source_head = required_string(&source, &["head"])?;
+    ensure_sealed_source_state("merge", &options.source_branch, branch_state(&source)).map_err(
+        |error| with_branch_operation_context(error, repo_root, Some(&options.source_branch), None),
+    )?;
+    let target = load_branch_record(repo_root, &options.target_branch).map_err(|error| {
+        with_branch_operation_context(error, repo_root, Some(&options.target_branch), None)
+    })?;
     let target_head = required_string(&target, &["head"])?;
     codefire_store::validate_sealed_commit(&objects, &source_head)?;
     codefire_store::validate_sealed_commit(&objects, &target_head)?;
 
     let registry_path = opened_registry_path(repo_root, &options.target_branch);
     if !registry_path.exists() {
-        return Err(CliError::Usage(format!(
-            "target branch must be open: {}",
-            options.target_branch
-        )));
+        return Err(branch_operation_error(
+            repo_root,
+            Some(&options.target_branch),
+            None,
+            format!("target branch must be open: {}", options.target_branch),
+        ));
     }
     let registry = read_json(&registry_path)?;
+    let target_dir = PathBuf::from(required_string(&registry, &["open", "path"])?);
+    refresh_open_clean_for_branch_operation(repo_root, &options.target_branch, &target_dir)?;
+    let registry = read_json(&registry_path)?;
     if required_string(&registry, &["state", "last_known"])? != "open-clean" {
-        return Err(CliError::Usage(
-            "target branch must be open-clean before merge".to_string(),
+        return Err(branch_operation_error(
+            repo_root,
+            Some(&options.target_branch),
+            Some(&target_dir),
+            "target branch must be open-clean before merge",
         ));
     }
     let base = common_ancestor(&objects, &source_head, &target_head)?
         .ok_or_else(|| CliError::Usage("no common ancestor found".to_string()))?;
-    let target_dir = PathBuf::from(required_string(&registry, &["open", "path"])?);
     let base_files = manifest_contents(&objects, &base)?;
     let source_files = manifest_contents(&objects, &source_head)?;
     let target_files = manifest_contents(&objects, &target_head)?;
@@ -4454,6 +4700,7 @@ fn build_merge_result(repo_root: &Path, options: &MergeOptions) -> Result<MergeR
     let semantic_conflicts =
         semantic_conflict_candidates(&objects, &base, &source_head, &target_head)?;
     Ok(MergeResult {
+        repo_root: repo_root.to_path_buf(),
         source_branch: options.source_branch.clone(),
         target_branch: options.target_branch.clone(),
         source_head,
@@ -4508,6 +4755,7 @@ fn apply_merge_result(repo_root: &Path, result: &mut MergeResult) -> Result<(), 
             .collect(),
     );
     write_json_atomic(&state_path, &state)?;
+    compute_scan(&result.target_dir, true)?;
     let context = OpenContext {
         repo_root: repo_root.to_path_buf(),
         open_dir: result.target_dir.clone(),
@@ -4570,6 +4818,54 @@ fn atom_by_id(index: &codefire_core::AtomIndex) -> BTreeMap<&str, &codefire_core
         .collect()
 }
 
+fn ensure_sealed_source_state(command: &str, branch: &str, state: &str) -> Result<(), CliError> {
+    match state {
+        "closed" | "open-clean" => Ok(()),
+        "open-burning" => Err(CliError::Usage(format!(
+            "cannot {command} from branch '{branch}' while it is open-burning"
+        ))),
+        "open-consistent" => Err(CliError::Usage(format!(
+            "cannot {command} from branch '{branch}' while it is open-consistent; commit or close the source branch first"
+        ))),
+        other => Err(CliError::Usage(format!(
+            "cannot {command} from branch '{branch}' while it is in unsupported state '{other}'"
+        ))),
+    }
+}
+
+fn branch_operation_error(
+    repo_root: &Path,
+    branch: Option<&str>,
+    path: Option<&Path>,
+    message: impl Into<String>,
+) -> CliError {
+    CliError::BranchOperation {
+        message: message.into(),
+        repo_root: repo_root.to_path_buf(),
+        branch: branch.map(str::to_string),
+        path: path.map(Path::to_path_buf),
+    }
+}
+
+fn with_branch_operation_context(
+    error: CliError,
+    repo_root: &Path,
+    branch: Option<&str>,
+    path: Option<&Path>,
+) -> CliError {
+    match error {
+        CliError::Usage(message) => branch_operation_error(repo_root, branch, path, message),
+        other => other,
+    }
+}
+
+fn branch_state(value: &Value) -> &str {
+    value
+        .get("state")
+        .and_then(Value::as_str)
+        .unwrap_or("closed")
+}
+
 fn render_merge_dry_run(result: &MergeResult) -> String {
     let mut output = String::new();
     output.push_str(&format!(
@@ -4630,6 +4926,7 @@ fn merge_result_json_value(result: &MergeResult) -> Value {
     json!({
         "type": "codefire_merge_plan",
         "version": 1,
+        "repo": &result.repo_root,
         "dry_run": result.dry_run,
         "applied": result.applied,
         "source": {
@@ -4681,12 +4978,29 @@ fn semantic_conflict_json(candidate: &SemanticConflictCandidate) -> Value {
 
 fn merge_next_actions(result: &MergeResult) -> Vec<Value> {
     let mut actions = Vec::new();
-    if result.dry_run && result.conflicts.is_empty() {
+    if result.dry_run && result.conflicts.is_empty() && result.semantic_conflicts.is_empty() {
         actions.push(json!({
             "kind": "apply_merge",
+            "command": format!(
+                "codefire merge {} --into {}",
+                command_arg(&result.source_branch),
+                command_arg(&result.target_branch)
+            ),
+            "reason": "apply the predicted merge to the open-clean target branch",
             "source_branch": &result.source_branch,
             "target_branch": &result.target_branch,
-            "hint": format!("run codefire merge {} --into {}", result.source_branch, result.target_branch),
+            "target": {
+                "source_branch": &result.source_branch,
+                "target_branch": &result.target_branch,
+                "source_commit": &result.source_head,
+                "target_commit": &result.target_head,
+                "target_open_dir": &result.target_dir,
+            },
+            "hint": format!(
+                "run codefire merge {} --into {}",
+                command_arg(&result.source_branch),
+                command_arg(&result.target_branch)
+            ),
         }));
     }
     for conflict in &result.conflicts {
@@ -4782,7 +5096,7 @@ fn import_patch(start: &Path, options: &PatchImportOptions) -> Result<Value, Cli
             .get("source")
             .and_then(|source| source.get("commit"))
             .cloned()
-            .unwrap_or_else(|| json!(null));
+            .unwrap_or(Value::Null);
         state["patch_paths"] = Value::Array(paths.iter().cloned().map(Value::String).collect());
         write_json_atomic(&state_path, &state)?;
         set_open_state(&context, &active_state_path, "open-burning")?;
@@ -4839,10 +5153,12 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, Cli
         }
     }
     if branch_record_path(&repo_root, &options.new_branch).exists() {
-        return Err(CliError::Usage(format!(
-            "branch already exists: {}",
-            options.new_branch
-        )));
+        return Err(branch_operation_error(
+            &repo_root,
+            Some(&options.new_branch),
+            None,
+            format!("branch already exists: {}", options.new_branch),
+        ));
     }
     if is_cf_http_url(&options.source) {
         let remote = parse_cf_http_url(&options.source)?;
@@ -4872,20 +5188,24 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, Cli
                     "HTTP remote returned an invalid branch bundle".to_string(),
                 )
             })?;
-        write_object_records(
-            &repo_root.join(".codefire").join("objects"),
-            records.iter().cloned(),
-        )?;
         let source_head = required_string(&branch_record, &["head"])?;
-        codefire_store::validate_sealed_commit(
-            &repo_root.join(".codefire").join("objects"),
-            &source_head,
+        ensure_sealed_source_state("clone", &remote.branch, branch_state(&branch_record)).map_err(
+            |error| with_branch_operation_context(error, &repo_root, Some(&remote.branch), None),
         )?;
+        validate_http_bundle_commit(records, &source_head)?;
         let plan =
             clone_operation_plan(options, &repo_root, &source_head, remote.endpoint_scheme());
         if options.dry_run {
             return Ok(CloneResult { plan });
         }
+        write_object_records(
+            &repo_root.join(".codefire").join("objects"),
+            records.iter().cloned(),
+        )?;
+        codefire_store::validate_sealed_commit(
+            &repo_root.join(".codefire").join("objects"),
+            &source_head,
+        )?;
         let branch = json!({
             "type": "branch",
             "version": 1,
@@ -4906,6 +5226,9 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, Cli
         let remote = parse_cf_url(&options.source)?;
         let source = load_remote_branch(&remote)?;
         let source_head = required_string(&source, &["head"])?;
+        ensure_sealed_source_state("clone", &remote.branch, branch_state(&source)).map_err(
+            |error| with_branch_operation_context(error, &repo_root, Some(&remote.branch), None),
+        )?;
         let remote_objects = remote_dirs(&remote.project_root).objects;
         codefire_store::validate_sealed_commit(&remote_objects, &source_head)?;
         let plan = clone_operation_plan(options, &repo_root, &source_head, "cf");
@@ -4933,18 +5256,13 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, Cli
         }
         return Ok(result);
     }
-    let source = load_branch_record(&repo_root, &options.source)?;
+    let source = load_branch_record(&repo_root, &options.source).map_err(|error| {
+        with_branch_operation_context(error, &repo_root, Some(&options.source), None)
+    })?;
     let source_head = required_string(&source, &["head"])?;
-    let source_state = source
-        .get("state")
-        .and_then(Value::as_str)
-        .unwrap_or("closed");
-    if source_state == "open-burning" {
-        return Err(CliError::Usage(format!(
-            "cannot clone from branch '{}' while it is open-burning",
-            options.source
-        )));
-    }
+    ensure_sealed_source_state("clone", &options.source, branch_state(&source)).map_err(
+        |error| with_branch_operation_context(error, &repo_root, Some(&options.source), None),
+    )?;
     codefire_store::validate_sealed_commit(
         &repo_root.join(".codefire").join("objects"),
         &source_head,
@@ -4970,6 +5288,160 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, Cli
     Ok(result)
 }
 
+fn close_branch(start: &Path, options: &CloseOptions) -> Result<CloseResult, CliError> {
+    let repo_root = find_repo_root(start)?;
+    let _lock = RepoLock::acquire_with_options(&repo_root, &options.lock)?;
+    if is_primary_branch(&options.branch) {
+        return Err(branch_operation_error(
+            &repo_root,
+            Some(&options.branch),
+            None,
+            format!(
+                "refusing to close primary branch {}; use feature branches for close/discard",
+                options.branch
+            ),
+        ));
+    }
+    let registry_path = opened_registry_path(&repo_root, &options.branch);
+    if !registry_path.exists() {
+        return Err(branch_operation_error(
+            &repo_root,
+            Some(&options.branch),
+            None,
+            format!("branch is not open: {}", options.branch),
+        ));
+    }
+    let registry = read_json(&registry_path)?;
+    let open_dir = PathBuf::from(required_string(&registry, &["open", "path"])?);
+    if !options.discard {
+        refresh_open_clean_for_branch_operation(&repo_root, &options.branch, &open_dir)?;
+    }
+    let registry = read_json(&registry_path)?;
+    let state = required_string(&registry, &["state", "last_known"])?;
+    if state != "open-clean" && !options.discard {
+        return Err(branch_operation_error(
+            &repo_root,
+            Some(&options.branch),
+            Some(&open_dir),
+            format!(
+                "branch {} is {state}; use --discard to close and discard unsealed open work",
+                options.branch
+            ),
+        ));
+    }
+    let active_state_path =
+        PathBuf::from(required_string(&registry, &["open", "active_state_path"])?);
+    let plan = close_operation_plan(
+        options,
+        &repo_root,
+        &open_dir,
+        &registry_path,
+        &active_state_path,
+        &state,
+    );
+    if options.dry_run {
+        return Ok(CloseResult {
+            branch: options.branch.clone(),
+            open_dir,
+            plan,
+        });
+    }
+
+    remove_open_dir_marker_or_tree(&repo_root, &open_dir, &options.branch, options.keep_dir)?;
+    if active_state_path.exists() {
+        fs::remove_dir_all(&active_state_path)?;
+    }
+    fs::remove_file(&registry_path)?;
+    if let Some(parent) = registry_path.parent() {
+        sync_directory_best_effort(parent)?;
+    }
+    let mut branch = load_branch_record(&repo_root, &options.branch)?;
+    branch["state"] = Value::String("closed".to_string());
+    save_branch_record(&repo_root, &branch)?;
+
+    Ok(CloseResult {
+        branch: options.branch.clone(),
+        open_dir,
+        plan,
+    })
+}
+
+fn remove_open_dir_marker_or_tree(
+    repo_root: &Path,
+    open_dir: &Path,
+    branch: &str,
+    keep_dir: bool,
+) -> Result<(), CliError> {
+    let marker_path = open_dir.join(".codefire-open");
+    let marker = read_json(&marker_path)?;
+    let marker_branch = required_string(&marker, &["branch", "name"])?;
+    if marker_branch != branch {
+        return Err(CliError::InvalidRepository(format!(
+            "open marker branch mismatch: expected {branch}, found {marker_branch}"
+        )));
+    }
+    let marker_repo_path = PathBuf::from(required_string(&marker, &["repository", "path"])?);
+    if marker_repo_path != repo_root.join(".codefire") {
+        return Err(CliError::InvalidRepository(format!(
+            "open marker repository mismatch for {}",
+            open_dir.display()
+        )));
+    }
+    if keep_dir {
+        fs::remove_file(marker_path)?;
+        sync_directory_best_effort(open_dir)?;
+        return Ok(());
+    }
+    if open_dir == repo_root || open_dir.join(".codefire").exists() {
+        return Err(CliError::Usage(format!(
+            "refusing to remove repository root {}; rerun with --keep-dir",
+            open_dir.display()
+        )));
+    }
+    fs::remove_dir_all(open_dir)?;
+    if let Some(parent) = open_dir.parent() {
+        sync_directory_best_effort(parent)?;
+    }
+    Ok(())
+}
+
+fn close_operation_plan(
+    options: &CloseOptions,
+    repo_root: &Path,
+    open_dir: &Path,
+    registry_path: &Path,
+    active_state_path: &Path,
+    state: &str,
+) -> Value {
+    json!({
+        "type": "codefire_operation_plan",
+        "version": 1,
+        "command": if options.discard { "discard" } else { "close" },
+        "dry_run": options.dry_run,
+        "would_apply": !options.dry_run,
+        "repo": repo_root,
+        "branch": &options.branch,
+        "open_dir": open_dir,
+        "discard": options.discard,
+        "keep_dir": options.keep_dir,
+        "initial_state": state,
+        "operations": [
+            {"kind": if options.keep_dir { "remove_open_marker" } else { "remove_open_directory" }, "path": open_dir},
+            {"kind": "remove_active_state", "path": active_state_path},
+            {"kind": "remove_open_registry", "path": registry_path},
+            {"kind": "update_branch_state", "branch": &options.branch, "state": "closed"},
+        ],
+        "next_actions": [
+            {
+                "kind": "branch_show",
+                "command": format!("codefire branch show {} --json", command_arg(&options.branch)),
+                "reason": "confirm the branch is closed",
+                "target": {"branch": &options.branch, "path": repo_root},
+            },
+        ],
+    })
+}
+
 fn open_branch(options: &OpenOptions) -> Result<OpenResult, CliError> {
     open_branch_from(&env::current_dir()?, options)
 }
@@ -4979,11 +5451,16 @@ fn open_branch_from(start: &Path, options: &OpenOptions) -> Result<OpenResult, C
     let _lock = RepoLock::acquire_with_options(&repo_root, &options.lock)?;
     let cf = repo_root.join(".codefire");
     let objects = cf.join("objects");
-    let mut branch = load_branch_record(&repo_root, &options.branch)?;
+    let mut branch = load_branch_record(&repo_root, &options.branch).map_err(|error| {
+        with_branch_operation_context(error, &repo_root, Some(&options.branch), None)
+    })?;
     let branch_head = required_string(&branch, &["head"])?;
     codefire_store::validate_sealed_commit(&objects, &branch_head)?;
 
     let target = absolute_path(&options.path)?;
+    ensure_open_target_allowed(&repo_root, &target).map_err(|error| {
+        with_branch_operation_context(error, &repo_root, Some(&options.branch), Some(&target))
+    })?;
     let idempotency_payload = open_idempotency_payload(options, &repo_root, &target, &branch_head);
     if !options.dry_run {
         if let Some(key) = options.idempotency_key.as_deref() {
@@ -4993,17 +5470,36 @@ fn open_branch_from(start: &Path, options: &OpenOptions) -> Result<OpenResult, C
         }
     }
     if target.exists() && !is_empty_dir(&target)? {
-        return Err(CliError::Usage(format!(
-            "target path must not exist or must be empty: {}",
-            target.display()
-        )));
+        return Err(branch_operation_error(
+            &repo_root,
+            Some(&options.branch),
+            Some(&target),
+            format!(
+                "target path must not exist or must be empty: {}",
+                target.display()
+            ),
+        ));
     }
     let registry_path = opened_registry_path(&repo_root, &options.branch);
     if registry_path.exists() {
-        return Err(CliError::Usage(format!(
-            "branch is already open: {}",
-            options.branch
-        )));
+        return Err(branch_operation_error(
+            &repo_root,
+            Some(&options.branch),
+            Some(&target),
+            format!("branch is already open: {}", options.branch),
+        ));
+    }
+    let state = branch_state(&branch);
+    if state != "closed" {
+        return Err(branch_operation_error(
+            &repo_root,
+            Some(&options.branch),
+            Some(&target),
+            format!(
+                "branch {} is {state}; recover or close the existing open branch state before opening it again",
+                options.branch
+            ),
+        ));
     }
     let opened_at = now_iso_utc();
     let open_instance_id = format!(
@@ -5100,7 +5596,12 @@ fn open_operation_plan(
             {"kind": "update_branch_state", "branch": &options.branch, "state": "open-clean"},
         ],
         "next_actions": [
-            {"kind": "status", "command": "codefire status --json", "target": {"path": target}},
+            {
+                "kind": "status",
+                "command": format!("codefire status --path {} --json", command_arg(&target.to_string_lossy())),
+                "reason": "inspect the newly opened branch state",
+                "target": {"path": target, "branch": &options.branch},
+            },
         ],
     })
 }
@@ -5111,6 +5612,7 @@ fn clone_operation_plan(
     source_head: &str,
     source_kind: &str,
 ) -> Value {
+    let suggested_open_path = suggested_branch_open_path(repo_root, &options.new_branch);
     json!({
         "type": "codefire_operation_plan",
         "version": 1,
@@ -5129,9 +5631,150 @@ fn clone_operation_plan(
             {"kind": "write_branch_record", "branch": &options.new_branch, "head": source_head, "state": "closed"},
         ],
         "next_actions": [
-            {"kind": "open", "command": format!("codefire open {} <path>", options.new_branch), "target": {"branch": &options.new_branch}},
+            {
+                "kind": "open",
+                "command": format!(
+                    "codefire open {} {}",
+                    command_arg(&options.new_branch),
+                    command_arg(&suggested_open_path.to_string_lossy())
+                ),
+                "reason": "open the newly cloned branch into a working directory",
+                "target": {
+                    "branch": &options.new_branch,
+                    "repo": repo_root,
+                    "recommended_path": suggested_open_path,
+                    "path_policy": "use a sibling of the CodeFire repo root and never nest inside an existing open directory",
+                },
+            },
         ],
     })
+}
+
+fn suggested_branch_open_path(repo_root: &Path, branch: &str) -> PathBuf {
+    let parent = repo_root.parent().unwrap_or(repo_root);
+    let repo_name = repo_root
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("codefire-worktree");
+    parent.join(format!(
+        "{}-{}",
+        repo_name,
+        filesystem_safe_branch_suffix(branch)
+    ))
+}
+
+fn filesystem_safe_branch_suffix(branch: &str) -> String {
+    let suffix = branch
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.') {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    if suffix.is_empty() {
+        "branch".to_string()
+    } else {
+        suffix
+    }
+}
+
+fn is_primary_branch(branch: &str) -> bool {
+    branch == "main"
+}
+
+fn ensure_open_target_allowed(repo_root: &Path, target: &Path) -> Result<(), CliError> {
+    let boundary = repo_root.parent().unwrap_or(repo_root);
+    if !target.starts_with(boundary) {
+        return Err(CliError::Usage(format!(
+            "open target must stay under workspace boundary {}: {}",
+            boundary.display(),
+            target.display()
+        )));
+    }
+    let opened_dir = repo_root.join(".codefire").join("opened");
+    if opened_dir.is_dir() {
+        for entry in fs::read_dir(opened_dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_file() {
+                let registry = read_json(&entry.path())?;
+                let open_path = PathBuf::from(required_string(&registry, &["open", "path"])?);
+                if target != open_path && target.starts_with(&open_path) {
+                    return Err(CliError::Usage(format!(
+                        "open target must not be nested inside existing open directory {}: {}",
+                        open_path.display(),
+                        target.display()
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn refresh_open_clean_for_branch_operation(
+    repo_root: &Path,
+    branch: &str,
+    open_dir: &Path,
+) -> Result<(), CliError> {
+    let registry_path = opened_registry_path(repo_root, branch);
+    let registry = read_json(&registry_path)?;
+    let base_commit = required_string(&registry, &["open", "current_base_commit"])?;
+    let objects = repo_root.join(".codefire").join("objects");
+    if source_manifest_unchanged(&objects, &base_commit, open_dir)? {
+        let state = required_string(&registry, &["state", "last_known"])?;
+        if state == "open-clean" {
+            return Ok(());
+        }
+        return Err(branch_operation_error(
+            repo_root,
+            Some(branch),
+            Some(open_dir),
+            format!("branch {branch} is {state}; commit, verify, or discard before continuing"),
+        ));
+    }
+    let scan = compute_scan(open_dir, true).map_err(|error| {
+        with_branch_operation_context(error, repo_root, Some(branch), Some(open_dir))
+    })?;
+    let state = scan_branch_state(scan_change_count(&scan.scan), scan.scan.open_fires.len());
+    if state == "open-clean" {
+        Ok(())
+    } else {
+        Err(branch_operation_error(
+            repo_root,
+            Some(branch),
+            Some(open_dir),
+            format!(
+                "branch {branch} has unsealed open work after refresh ({state}); commit, verify, or discard before continuing"
+            ),
+        ))
+    }
+}
+
+fn validate_http_bundle_commit(records: &[Value], source_head: &str) -> Result<(), CliError> {
+    let temp_objects = env::temp_dir().join(format!(
+        "codefire-http-bundle-{}-{:012x}",
+        std::process::id(),
+        stable_hash_48(format!("{}:{}", source_head, now_iso_utc()).as_bytes())
+    ));
+    if temp_objects.exists() {
+        fs::remove_dir_all(&temp_objects)?;
+    }
+    let result = (|| {
+        write_object_records(&temp_objects, records.iter().cloned())?;
+        codefire_store::validate_sealed_commit(&temp_objects, source_head)?;
+        Ok(())
+    })();
+    let cleanup = fs::remove_dir_all(&temp_objects);
+    match (result, cleanup) {
+        (Err(error), _) => Err(error),
+        (Ok(()), Err(error)) if error.kind() != ErrorKind::NotFound => Err(CliError::Io(error)),
+        (Ok(()), _) => Ok(()),
+    }
 }
 
 fn run_scan(start: &Path) -> Result<codefire_core::ScanResult, CliError> {
@@ -6842,7 +7485,7 @@ fn source_manifest_unchanged(
     let manifest_id = required_string(&commit, &["roots", "content_manifest"])?;
     let base_manifest = codefire_store::read_object(objects, &manifest_id)?;
     let current_manifest = build_manifest_fingerprint(open_dir)?;
-    Ok(base_manifest == current_manifest)
+    Ok(manifest_blob_map(&base_manifest)? == manifest_blob_map(&current_manifest)?)
 }
 
 fn non_atom_changed_files_since_base(
@@ -6858,10 +7501,13 @@ fn non_atom_changed_files_since_base(
     let current_manifest = build_manifest_fingerprint(open_dir)?;
     let base_files = manifest_blob_map(&base_manifest)?;
     let current_files = manifest_blob_map(&current_manifest)?;
-    let atom_paths = current
+    let changed_atom_ids = codefire_core::changed_atoms(current, base_index)
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    let changed_atom_paths = current
         .atoms
         .iter()
-        .chain(base_index.atoms.iter())
+        .filter(|atom| changed_atom_ids.contains(&atom.atom_id))
         .map(|atom| atom.artifact_path.clone())
         .collect::<BTreeSet<_>>();
     let paths = base_files
@@ -6871,7 +7517,7 @@ fn non_atom_changed_files_since_base(
         .collect::<BTreeSet<_>>();
     let mut changes = Vec::new();
     for path in paths {
-        if atom_paths.contains(&path) {
+        if changed_atom_paths.contains(&path) {
             continue;
         }
         let base_blob = base_files.get(&path).cloned();
@@ -7133,10 +7779,10 @@ impl RepoLock {
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
                     if !options.wait {
-                        return Err(repo_lock_contention(&path, options));
+                        return Err(repo_lock_contention(repo_root, &path, options));
                     }
                     if timeout.is_some_and(|timeout| start.elapsed() >= timeout) {
-                        return Err(repo_lock_contention(&path, options));
+                        return Err(repo_lock_contention(repo_root, &path, options));
                     }
                     std::thread::sleep(Duration::from_millis(50));
                 }
@@ -7146,7 +7792,7 @@ impl RepoLock {
     }
 }
 
-fn repo_lock_contention(path: &Path, options: &LockOptions) -> CliError {
+fn repo_lock_contention(repo_root: &Path, path: &Path, options: &LockOptions) -> CliError {
     let owner = read_json(path).ok();
     let mut message = format!("CodeFire repository is locked: {}", path.display());
     if let Some(timeout_ms) = options.timeout_ms {
@@ -7160,7 +7806,11 @@ fn repo_lock_contention(path: &Path, options: &LockOptions) -> CliError {
             message.push_str(&format!("; locked at {created_at}"));
         }
     }
-    CliError::LockContention(message)
+    CliError::RepositoryLockContention {
+        message,
+        repo_root: repo_root.to_path_buf(),
+        lock_path: path.to_path_buf(),
+    }
 }
 
 impl Drop for RepoLock {

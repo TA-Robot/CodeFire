@@ -41,10 +41,20 @@ pub(crate) fn maybe_sign_commit(
 }
 
 pub(crate) fn sign_commit_payload(
+    commit: Value,
+    signer: &str,
+    key: &str,
+    key_id: &str,
+) -> Result<Value, CliError> {
+    sign_commit_payload_at(commit, signer, key, key_id, &now_iso_utc())
+}
+
+fn sign_commit_payload_at(
     mut commit: Value,
     signer: &str,
     key: &str,
     key_id: &str,
+    signed_at: &str,
 ) -> Result<Value, CliError> {
     let mut signature = json!({
         "type": "commit_signature",
@@ -52,7 +62,7 @@ pub(crate) fn sign_commit_payload(
         "algorithm": "hmac-sha256",
         "signer": signer,
         "key_id": key_id,
-        "signed_at": now_iso_utc(),
+        "signed_at": signed_at,
     });
     let digest = commit_signature_digest(&commit, &signature, key)?;
     signature["signature"] = Value::String(digest);
@@ -800,8 +810,14 @@ mod tests {
             "extinguished_fires": [],
             "created_at": "2026-06-05T00:00:00Z",
         });
-        let signed =
-            sign_commit_payload(commit, "alice", "alice-signing-key", "alice-2026-06").unwrap();
+        let signed = sign_commit_payload_at(
+            commit,
+            "alice",
+            "alice-signing-key",
+            "alice-2026-06",
+            "2026-06-05T00:00:00Z",
+        )
+        .unwrap();
         let keys = json!({
             "alice-2026-06": {
                 "secret": "alice-signing-key",

@@ -84,14 +84,12 @@ Python fallback freeze policy:
 - Python fallback must not gain a new user-facing command, flag, output schema, remote behavior, or repository format unless the Rust CLI already owns that behavior and the temporary fallback delta is documented here.
 - Golden compatibility tests should cover only repository/object/remote formats that Python-created projects still need for migration or incident response.
 
-The Python fallback still owns Python-only maintenance commands that are not part of the Rust v0.6 default CLI surface yet:
+The Python fallback still owns Python-only maintenance commands that are not part of the Rust default CLI surface yet:
 
-- `close`
-- `discard`
 - `gc`
 - `token-hash`
 
-Rust v0.6 covers the release-critical local workflow, file-backed/HTTP/HTTPS remote upload/list/clone/show/diff/MR operations, diagnostics, migration checks, signatures, automation JSON, storage/evidence, diff/merge intelligence, completion, and installer default behavior. Use Python fallback for remote GC and token hash generation until those maintenance commands are explicitly ported.
+Rust covers the release-critical local workflow including branch close/discard, file-backed/HTTP/HTTPS remote upload/list/clone/show/diff/MR operations, diagnostics, migration checks, signatures, automation JSON, storage/evidence, diff/merge intelligence, completion, and installer default behavior. Use Python fallback for remote GC and token hash generation until those maintenance commands are explicitly ported.
 
 Fallback削除条件:
 

@@ -175,12 +175,15 @@ codefire close feature-login
 ```text
 open-cleanの場合のみ実ディレクトリを削除する
 open-burningまたはopen-consistentの場合は拒否する
+repository root自体は削除しない
+--keep-dirは実ディレクトリを残し、.codefire-open markerだけを外す
 ```
 
 破棄して閉じる場合：
 
 ```bash
 codefire close feature-login --discard
+codefire discard feature-login
 ```
 
 ## 4.6 `clone`
@@ -195,7 +198,8 @@ codefire clone main feature-login --idempotency-key request-clone-001
 
 ```text
 source branchのsealed headをtarget branchのheadとして設定する
-sourceがopen-burningの場合は拒否する
+local sourceがopen-burningまたはopen-consistentの場合は拒否する
+local sourceがclosedまたはopen-cleanの場合のみsealed headを利用する
 target branchはclosed状態で作成される
 --dry-runはbranch recordやremote object graphを書き換えず、codefire_operation_planを返す
 --idempotency-keyは成功したclone resultを.codefire/idempotency/clone/へ記録する
@@ -479,11 +483,12 @@ codefire merge feature-login --into main --idempotency-key request-merge-local-0
 
 ```text
 source sealed headをtarget open directoryへ統合する
+source branchはclosedまたはopen-cleanでなければならない
 targetはopen-cleanでなければならない
 merge実行時点ではcommitを作らない
-merge fireを生成し、targetをopen-burningにする
+merge fireを生成してactive stateへpersistし、targetをopen-burningにする
 --dry-runは共通祖先、file action、file conflict、semantic conflict candidateを予測し、target file / active state / branch stateを変更しない
---jsonはcodefire_merge_plan envelopeを出力し、file_actions、conflicts、binary_conflicts、semantic_conflicts、next_actionsを含める
+--jsonはcodefire_merge_plan envelopeを出力し、repo、file_actions、conflicts、binary_conflicts、semantic_conflicts、next_actionsを含める
 --idempotency-keyは成功したmerge resultを.codefire/idempotency/merge/へ記録する
 同じ--idempotency-keyかつ同じmerge request payloadは保存済みmerge resultを返し、target open-burning checkより先にreplayする
 同じ--idempotency-keyでsource/target/source_head/target_head/base/target_dir/repoが異なるpayloadはexit code 33で拒否する

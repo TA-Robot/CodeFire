@@ -3,10 +3,10 @@ use super::idempotency::{
     verify_idempotency_record,
 };
 use super::{
-    absolute_path, common_ancestor, load_branch_record, opened_registry_path, read_json,
-    read_optional_json, required_string, write_json_atomic, BinaryMergeConflict, CliError,
-    MergeAction, MergeFileAction, MergeOptions, MergeResult, OpenContext, PatchImportOptions,
-    SemanticConflictCandidate,
+    absolute_path, common_ancestor, ensure_sealed_source_state, load_branch_record,
+    opened_registry_path, read_json, read_optional_json, required_string, write_json_atomic,
+    BinaryMergeConflict, CliError, MergeAction, MergeFileAction, MergeOptions, MergeResult,
+    OpenContext, PatchImportOptions, SemanticConflictCandidate,
 };
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -22,12 +22,7 @@ pub(super) fn merge_idempotency_payload(
         .get("state")
         .and_then(Value::as_str)
         .unwrap_or("closed");
-    if source_state == "open-burning" {
-        return Err(CliError::Usage(format!(
-            "cannot merge from branch '{}' while it is open-burning",
-            options.source_branch
-        )));
-    }
+    ensure_sealed_source_state("merge", &options.source_branch, source_state)?;
     let target = load_branch_record(repo_root, &options.target_branch)?;
     let target_head = required_string(&target, &["head"])?;
     codefire_store::validate_sealed_commit(&objects, &source_head)?;
@@ -66,7 +61,7 @@ pub(super) fn load_merge_idempotency(
         return Ok(None);
     };
     verify_idempotency_record(&record, &path, "merge", key, payload)?;
-    Ok(Some(merge_result_from_record(&record, &path)?))
+    Ok(Some(merge_result_from_record(repo_root, &record, &path)?))
 }
 
 pub(super) fn save_merge_idempotency(
@@ -104,7 +99,7 @@ pub(super) fn patch_import_idempotency_payload(
         "patch_file": absolute_path(&options.path)?,
         "patch_base": patch_base,
         "current_base": required_string(&context.registry, &["open", "current_base_commit"])?,
-        "patch_source": patch.get("source").cloned().unwrap_or_else(|| json!(null)),
+        "patch_source": patch.get("source").cloned().unwrap_or(Value::Null),
         "patch": patch,
         "paths": paths,
     }))
@@ -146,6 +141,7 @@ pub(super) fn save_patch_import_idempotency(
 
 fn merge_result_json(result: &MergeResult) -> Value {
     json!({
+        "repo_root": &result.repo_root,
         "source_branch": &result.source_branch,
         "target_branch": &result.target_branch,
         "source_head": &result.source_head,
@@ -161,9 +157,18 @@ fn merge_result_json(result: &MergeResult) -> Value {
     })
 }
 
-fn merge_result_from_record(record: &Value, path: &Path) -> Result<MergeResult, CliError> {
+fn merge_result_from_record(
+    repo_root: &Path,
+    record: &Value,
+    path: &Path,
+) -> Result<MergeResult, CliError> {
     let result = record_result(record, path)?;
     Ok(MergeResult {
+        repo_root: result
+            .get("repo_root")
+            .and_then(Value::as_str)
+            .map(PathBuf::from)
+            .unwrap_or_else(|| repo_root.to_path_buf()),
         source_branch: required_string(&result, &["source_branch"])?,
         target_branch: required_string(&result, &["target_branch"])?,
         source_head: required_string(&result, &["source_head"])?,

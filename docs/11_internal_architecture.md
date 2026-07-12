@@ -2,7 +2,7 @@
 
 この文書は、Code Fireの内部設計である。実装時のmodule境界、データフロー、不変条件、エラー処理、テスト設計の正本として扱う。
 
-実際のsource file、主要関数、commandごとの実装経路は、補助文書として `docs/development/source-code-map.md`、`docs/development/source-code-implementation-atlas.md`、`docs/development/source-code-blueprint.md`、`docs/development/source-code-mental-model.md`、`docs/development/source-code-reconstruction-guide.md`、`docs/development/source-data-model-catalog.md`、`docs/development/source-code-anatomy.md`、`docs/development/command-source-trace.md` に展開する。この文書は設計の正本、補助文書はsource navigationの正本である。
+実際のsource責務と実装経路は `docs/development/source-architecture.md`、`command-source-trace.md`、`source-data-model-catalog.md`、`change-playbook.md` に分離する。この文書はproduct内部設計、4文書はsource navigationと変更手順の正本である。
 
 ## 11.1 Architecture Principles
 
@@ -132,15 +132,11 @@ When a change adds a responsibility not listed here, update this document or `do
 
 Source documentation requirements:
 
-- `docs/development/source-code-map.md` はfile/module/type/function責務の索引である。
-- `docs/development/source-code-implementation-atlas.md` はcrate、module、関数帯、主要型、永続化先、command ownership、変更recipeを一枚で把握する実装地図である。
-- `docs/development/source-code-mental-model.md` は関数内のdata flowと永続化境界を説明する。
-- `docs/development/source-code-reconstruction-guide.md` はsourceを開く前にworkspace tree、command skeleton、`main.rs` の帯、永続化境界、変更recipeを再構成するための実装復元ガイドである。
-- `docs/development/source-data-model-catalog.md` はRust型、JSON payload、active state、object record、remote/storage/evidence dataの辞書である。
-- `docs/development/source-code-anatomy.md` は主要fileの内部にある型、関数群、状態、永続化境界、変更時の触り方を説明する。
-- `docs/development/source-code-blueprint.md` は要求、設計、source、persistence、testの対応表である。
-- `docs/development/command-source-trace.md` はCLI commandからparse/run/render/writeまでのtraceである。
-- 主要commandの実装経路を変えたcommitは、上記文書の少なくとも1つを更新する。
+- `docs/development/source-architecture.md` はcrate/module ownership、data flow、transaction、persistence/security境界を説明する。
+- `docs/development/source-data-model-catalog.md` はRust型、persisted JSON、object、remote、evidence dataの対応を説明する。
+- `docs/development/command-source-trace.md` はcommandごとのparse/validate/plan/apply/render/write/test経路を説明する。
+- `docs/development/change-playbook.md` はreading route、変更recipe、invariant review、validation選択を説明する。
+- 主要command、module、object kind、version定数を変えたchangeは、該当文書を更新してsource-doc checkerを通す。
 
 この規則により、ドキュメントだけを読んでも「どのcrateに何があり、どの関数を起点に変更するか」を想像できる状態を維持する。
 

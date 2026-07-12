@@ -48,7 +48,7 @@ fn known_limitations_python_fallback_commands_stay_out_of_rust_cli() {
     let documented_fallback = documented_python_fallback_commands();
     assert_eq!(
         documented_fallback,
-        ["close", "discard", "gc", "token-hash"]
+        ["gc", "token-hash"]
             .into_iter()
             .map(str::to_string)
             .collect::<std::collections::BTreeSet<_>>()

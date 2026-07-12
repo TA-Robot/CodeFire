@@ -1773,12 +1773,28 @@ fn markdown_atom_heading(line: &str) -> Option<(usize, String)> {
     if !is_valid_atom_id(&atom_id) {
         return None;
     }
+    if !is_auto_markdown_atom_id(&atom_id) {
+        return None;
+    }
     let next = rest.chars().nth(atom_id.len());
     if matches!(next, None | Some(':') | Some(' ') | Some('\t')) {
         Some((level, atom_id))
     } else {
         None
     }
+}
+
+fn is_auto_markdown_atom_id(atom_id: &str) -> bool {
+    if atom_id.starts_with("PROC-") || atom_id.contains("-PROC-") {
+        return false;
+    }
+    let Some((prefix, _)) = atom_id.split_once('-') else {
+        return atom_id.starts_with("CODE:");
+    };
+    matches!(
+        prefix,
+        "REQ" | "DES" | "TEST" | "ADR" | "OPS" | "API" | "DB"
+    )
 }
 
 fn is_atom_id_char(ch: char) -> bool {
@@ -2127,6 +2143,35 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(ids, vec!["REQ-REAL-001", "REQ-REAL-002"]);
+    }
+
+    #[test]
+    fn markdown_atoms_ignore_process_style_headings_without_explicit_marker() {
+        let temp = tempdir().unwrap();
+        let path = temp.path().join("process.md");
+        fs::write(
+            &path,
+            "## REQ-PROC-001: Process note\n\nNot a CodeFire atom.\n\n## PROC-REQ-001: Local process id\n\nAlso not an atom.\n\n## REQ-REAL-001: Real requirement\n\nBody\n",
+        )
+        .unwrap();
+
+        let atoms = extract_markdown_atoms(&path, "docs/process.md", "requirement").unwrap();
+        let ids = atoms
+            .iter()
+            .map(|atom| atom.atom_id.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(ids, vec!["REQ-REAL-001"]);
+
+        let explicit_path = temp.path().join("explicit.md");
+        fs::write(
+            &explicit_path,
+            "<!-- cf-atom: REQ-PROC-001 -->\n## REQ-PROC-001: Explicit process requirement\n",
+        )
+        .unwrap();
+        let explicit =
+            extract_explicit_cf_atoms(&explicit_path, "docs/explicit.md", "requirement").unwrap();
+        assert_eq!(explicit[0].atom_id, "REQ-PROC-001");
     }
 
     #[test]

@@ -511,7 +511,7 @@ fn commit_review_summary(resolved: &ResolvedCommitish) -> Result<Value, CliError
         "commit": &resolved.commit_id,
         "message": commit.get("message").and_then(Value::as_str).unwrap_or(""),
         "parents": commit.get("parents").cloned().unwrap_or_else(|| json!([])),
-        "certificate": commit.get("certificate").cloned().unwrap_or_else(|| json!(null)),
+        "certificate": commit.get("certificate").cloned().unwrap_or(Value::Null),
         "files": manifest.get("entries").and_then(Value::as_array).map_or(0, Vec::len),
         "atoms": atom_index.get("atoms").and_then(Value::as_array).map_or(0, Vec::len),
         "duplicate_atom_ids": atom_index.get("duplicate_atom_ids").cloned().unwrap_or_else(|| json!([])),
@@ -529,7 +529,7 @@ fn verification_summary(resolved: &ResolvedCommitish) -> Result<Value, CliError>
         "missing_required_links": verification.get("missing_required_links").and_then(Value::as_array).map_or(0, Vec::len),
         "stale_resolutions": verification.get("stale_resolutions").and_then(Value::as_array).map_or(0, Vec::len),
         "duplicate_atom_ids": verification.get("duplicate_atom_ids").and_then(Value::as_array).map_or(0, Vec::len),
-        "verified_at": verification.get("verified_at").cloned().unwrap_or_else(|| json!(null)),
+        "verified_at": verification.get("verified_at").cloned().unwrap_or(Value::Null),
     }))
 }
 

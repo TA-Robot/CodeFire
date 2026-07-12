@@ -1,152 +1,101 @@
-# CodeFire Source Data Model Catalog
+# CodeFire Source and Persisted Data Model Catalog
 
-この文書は、CodeFireの実装を構成する主要なRust型、JSON payload、永続化ファイルをカタログ化する。目的は、ソースコードを開く前に「どのデータがどこから来て、どこへ保存され、どの関数が触るか」を想像できる状態にすることである。
+Status: canonical
 
-## 1. Naming Rule
+Owner: Core and Store Maintainers
 
-CodeFireのデータは概ね次の命名で読む。
+Update trigger: a Rust domain/CLI type, object kind, persisted JSON shape, version/default, or compatibility rule changes.
 
-| Name shape | Meaning | Example |
+This catalog records current shapes at the level required for safe changes. Unless a row says otherwise, “current writer” means the Rust-first/default CLI, not the Python fallback. Exact serde/constructor behavior in source and golden tests remains authoritative; examples are not promises that every legacy record or fallback writer contains every field.
+
+## Version Axes
+
+| Axis | Rust-first/default writer | Compatibility note |
 |---|---|---|
-| `*Options` | parserが返すcommand input | `CommitOptions`, `EvidenceAddOptions` |
-| `*Result` | runnerが返すcommand result | `CommitResult`, `UploadResult` |
-| `*Execution` | domain resultとcontextを束ねた内部実行結果 | `ScanExecution`, `VerifyExecution` |
-| domain noun | core semantic record | `Atom`, `Fire`, `Verification` |
-| store noun | immutable object identity record | `ObjectRecord` |
-| JSON helper | automation/text boundary | `scan_data_json`, `storage_report_data_json` |
+| Core model `VERSION` | `1` | Most core serialized structs carry `version: 1`. <!-- constant: VERSION=1 --> |
+| Atom hash schema | scan/commit `AtomIndex` emits `2` | Rust init's empty Atom index and Python fallback currently omit it; missing value follows the explicit legacy/default path. <!-- constant: ATOM_HASH_SCHEMA_VERSION=2 --> |
+| Repository layout | `repo.json.version = 1` | Migration validates unsupported values explicitly. |
+| Commit root schema | Rust init/commit payloads emit `2` | Python fallback and legacy records may omit it; absent/default schema has fewer required roots. |
+| Public object digest prefix | 24 hex | Legacy 12-hex IDs remain readable when full record hash agrees. <!-- constant: OBJECT_ID_DIGEST_HEX_LENGTH=24 --> |
+| Automation envelope | Rust declared JSON commands use `codefire.command_result.v1` | Python fallback is primarily a human-text CLI and does not provide a shared `--json` surface or common envelope; isolated JSON-producing commands are separate contracts. Payload types are independently versioned inside Rust `data`. |
 
-Raw `serde_json::Value` は最後のrenderingまたはobject payloadのために使う。business logicの主語が長期間 `Value` のままなら、型が足りていない。
+Product/package/SemVer is independent; see `strategy/release-and-format-roadmap.md`.
 
-## 2. CLI Shared Types
+### Rust/Python Writer Boundary
 
-Primary file: `crates/codefire-cli/src/cli_model.rs`
-
-| Type | Fields to picture | Role |
+| Surface | Rust-first/default CLI | Python fallback |
 |---|---|---|
-| `Status` | `branch`, `state`, `base`, `open_fires` | `status` and automation summary |
-| `Branch` | `name`, `head`, `state` | branch list row |
-| `InitOptions` | `path`, `force` | init parser output |
-| `InitResult` | `repo_root`, `main_commit` | init runner output |
-| `OpenOptions` | `branch`, `path`, `dry_run`, `json_output`, `lock`, `idempotency_key` | open parser output |
-| `OpenResult` | `branch`, `open_dir`, `plan` | open result/plan |
-| `PathJsonOptions` | `path`, `json_output`, `metrics` | common read/workflow command options |
-| `ExtinguishOptions` | `path`, `fire_id`, `resolution`, `rationale`, `evidence`, `evidence_refs`, dry-run/JSON/lock/idempotency/editor flags | single extinguish command input |
-| `ExtinguishResult` | `display_id`, `fire_uid`, `plan` | extinguish result/plan |
-| `CommitOptions` | `path`, `message`, dry-run/JSON/lock/idempotency/signature fields | commit command input |
-| `CommitResult` | `commit_id`, `branch`, `plan` | commit result |
-| `CloneOptions` / `CloneResult` | source/new branch plus dry-run/lock/idempotency, plan | branch clone |
-| `MergeOptions` / `MergeResult` | source/target branch, heads, base, file actions, conflicts, applied/dry-run | local merge |
-| `OpenContext` | `repo_root`, `open_dir`, `branch`, `registry_path`, `registry` | open-directory identity and active-state gateway |
-| `ScanExecution` | `OpenContext`, `active_state_path`, `ScanResult`, fires | scan result plus writable state path |
-| `VerifyExecution` | `ScanResult`, `Verification` | verification result bundle |
+| New public Object ID | 24-hex digest prefix | 12-hex digest prefix |
+| Atom hash schema | normal scan/commit emits 2; initial empty roots currently omit | omitted |
+| Commit root schema | emits 2 | omitted |
+| JSON command envelope | `codefire.command_result.v1` for declared JSON support | No shared `--json`/envelope surface; output is primarily human text, with isolated command-specific JSON outputs treated separately |
 
-### Options/Result Placement Rule
+This is an observed compatibility gap, not a promise that either writer can safely rewrite every repository produced by the other. The release/format fixture matrix owns that decision.
 
-Use `cli_model.rs` for shapes shared by several command paths or currently rooted in `main.rs`. Use command modules for vertical surfaces:
+## Core Domain Types
 
-| Module | Local shapes |
+| Type | Essential fields / meaning |
 |---|---|
-| `fire.rs` | `FireOptions`, `FireResult` |
-| `fire/batch.rs` | `FireBatchOptions` |
-| `batch.rs` | `BatchExtinguishOptions`, `BatchExtinguishResult` |
-| `evidence.rs` | `EvidenceAddOptions`, `EvidenceAddResult` |
-| `storage.rs` | `StorageReportOptions`, `StorageReport`, stats structs |
-| `doctor.rs` | `DoctorOptions`, `DoctorReport`, `DoctorIssue` |
-| `migration.rs` | `MigrateOptions`, migration report structs |
-| `remote.rs` | upload and merge request options/results |
-| `view.rs` | `DiffOptions`, `ReviewPackOptions`, `PatchExportOptions` |
-| `context.rs` | `ContextOptions`, context pack records |
-| `explain.rs` | `ExplainOptions`, `ExplainResult` |
+| `Atom` | stable `atom_id`, kind/source location, content hash and metadata used for identity/trace. |
+| `AtomIndex` | `version`, `hash_schema_version`, Atom collection, duplicate IDs; identity-producing snapshot. |
+| `TraceLink` / `TraceGraph` | typed source/target relation; direct `current_trace_graph` validates syntax/shape but does not receive an Atom index, while batch mutation paths perform their own Atom-reference checks. |
+| `TracePolicy` / `RequiredLinkRule` | link completeness rules and blocking behavior. |
+| `VerificationPolicy` | commit policy and constrained verification commands. |
+| `VerificationCommand` | `id`, command, cwd, timeout, output limit, environment/inheritance controls, and `allow_failure`; there is no `required` field on this type. |
+| `Fire` | stable UID/display ID, source/target Atom refs, reason/status, trace path, creator/time, key, and optional resolution/obsolete fields. |
+| `Resolution` / `ResolutionBasis` | decision/rationale/evidence refs plus source/target content, Trace Link, and policy basis. |
+| `ScanResult` | current index/graph, changed Atoms, non-Atom changed files, tool migration, open Fires. |
+| `Verification` | result plus open required Fires, failed checks, missing links, stale resolutions, missing evidence refs, duplicates. |
 
-## 3. Core Domain Types
+Commit eligibility must derive from one `Verification`, not independent recounts in renderers.
 
-Primary file: `crates/codefire-core/src/lib.rs`
+## CLI Boundary Types
 
-| Type | Shape | Meaning |
-|---|---|---|
-| `Selector` | `type`, `value` | how an Atom is located inside an artifact |
-| `Atom` | `atom_id`, `kind`, `artifact_path`, `selector`, `content_hash` | smallest tracked semantic unit |
-| `AtomIndex` | `type`, `version`, `atoms`, `duplicate_atom_ids` | current or sealed set of Atoms |
-| `TraceLink` | `from`, `to`, `type`, `link_id`, `link_hash` | edge between two Atoms |
-| `TraceGraph` | `type`, `version`, `links` | graph of responsibility links |
-| `RequiredLinkRule` | `type`, `target_kind`, `min` | policy requirement from one Atom kind to another |
-| `TracePolicy` | `required_links` | scan-time missing-link policy |
-| `VerificationPolicy` | booleans, `required_links`, `verification` commands | commit-gate policy |
-| `VerificationCommand` | `id`, `command`, `cwd` | external check invoked during verify |
-| `MissingRequiredLink` | `atom_id`, `required_type`, `target_kind`, `min`, `found` | policy gap |
-| `FireAtomRef` | `atom_id`, optional `content_hash_at_fire` | fire endpoint with basis hash |
-| `Fire` | IDs, status, severity, source, target, reason, trace path, creation metadata | unresolved responsibility |
-| `ScanResult` | base commit, atom index, trace graph, changed atoms, open fires | complete scan output |
-| `FailedCheck` | `id`, `command`, `output` | external verification failure |
-| `StaleResolution` | `resolution_uid`, `reason` | resolution invalidated by changed basis |
-| `MissingEvidenceRef` | `resolution_uid`, `evidence_id` | evidence reference that cannot be loaded |
-| `Verification` | result, gate counters, missing links, stale resolutions, duplicate IDs, timestamp | commit gate result |
-| `ResolutionBasis` | source atom basis, target atom basis, trace link bases, policy hash | immutable reason a resolution was valid |
-| `Resolution` | resolution UID, fire UID, type, rationale, evidence, refs, basis, timestamp, status | active or sealed resolution record |
+`cli_model` owns shared options/results for init/import/open/status/branch/extinguish/commit/clone/close/diff/review/patch/serve/merge/lock. Focused modules own their specialized types, including context, doctor, evidence, explain, fire/link batch, migration, remote, storage, and view algorithms.
 
-Core output types are serialized directly into active state and sealed object payloads. Field changes are contract changes.
+Options carry explicit path/JSON/dry-run/lock/idempotency fields where supported. Result types return domain identity plus an operation plan or data payload; rendering is separate.
 
-## 4. Core Function Inputs And Outputs
+## Object Record and Identity
 
-| Function | Inputs | Output | Filesystem behavior |
-|---|---|---|---|
-| `build_atom_index(open_dir)` | open directory and `codefire.yaml` | `AtomIndex` | reads files only |
-| `current_trace_graph(open_dir)` | `codefire.links.yaml` | `TraceGraph` | reads files only |
-| `parse_links(path)` | link YAML path | `TraceLinkInput` list | reads one file |
-| `parse_trace_policy(open_dir)` | `codefire.policy.yaml` | `TracePolicy` | reads policy file if present |
-| `parse_verification_policy(open_dir)` | `codefire.policy.yaml` | `VerificationPolicy` | reads policy file if present |
-| `changed_atoms(current, base)` | two `AtomIndex` values | atom ID list | pure |
-| `required_link_missing(...)` | index, graph, policy | missing-link list | pure |
-| `build_scan_result(...)` | current/base index, graph, policy, existing state | `ScanResult` | pure after inputs |
-| `stale_resolutions(...)` | resolutions, current basis inputs | stale list | pure after inputs |
-| `build_resolution(...)` | fire, atom index, graph, request | `Resolution` | pure after inputs |
-| `build_verification(...)` | scan, resolutions, failed checks, policy | `Verification` | pure after inputs |
-| `policy_hash(policy)` | verification policy | hash string | pure |
-
-The CLI layer decides when to persist these outputs.
-
-## 5. Object Store Types
-
-Primary file: `crates/codefire-store/src/lib.rs`
-
-| Type/Function | Shape | Meaning |
-|---|---|---|
-| `ObjectRecord` | `object_id`, `type`, `hash`, `payload` | immutable stored record |
-| `canonical_json` | `Value -> bytes` | deterministic compact JSON |
-| `object_digest` | `type_tag + payload -> sha256` | identity hash |
-| `object_id` | type-specific prefix plus digest | public object reference |
-| `object_prefix` | type tag to prefix | ID family |
-| `object_subdir` | type tag to object subdir | storage location |
-| `store_object` | write and validate record | immutable publish |
-| `read_object` | load validated payload | trusted object read |
-| `read_object_record` | load validated record | trusted object read with metadata |
-| `validate_sealed_commit` | commit graph validation | branch/remote trust gate |
-| `commit_payload` | roots/certificate to commit object payload | commit object builder |
-
-Object record mental shape:
+Current object record:
 
 ```json
 {
-  "object_id": "CF-COMMIT-...",
-  "type": "commit",
-  "hash": "64 lowercase hex sha256",
-  "payload": {
-    "type": "commit",
-    "version": 1
-  }
+  "object_id": "CF-...-<24 hex>",
+  "type": "<type tag>",
+  "hash": "<full 64-hex SHA-256>",
+  "payload": {}
 }
 ```
 
-Known object families are centralized in the store crate. A new object type must be visible to object path resolution, doctor, storage, remote copy, and commit validation if commits can reference it.
+Digest input is `type_tag`, one NUL byte, then the canonical JSON bytes of `payload`. `read_object_record` recomputes the full hash and current/legacy ID and validates the filename/record identity. `validate_sealed_commit` is the stronger consuming boundary that validates commit/root shapes and traverses allowed references.
 
-## 6. Sealed Commit Payload
+## Object Kinds
 
-A commit payload should be pictured as:
+| Type tag | Prefix | Subdirectory | Role |
+|---|---|---|---|
+| `blob` | `CF-BLOB` | `blobs` | file content. <!-- object-kind: blob --> |
+| `content_manifest` | `CF-MANIFEST` | `content_manifests` | path → blob/metadata sealed snapshot. <!-- object-kind: content_manifest --> |
+| `atom_index` | `CF-ATOMINDEX` | `atom_indexes` | serialized Atom index. <!-- object-kind: atom_index --> |
+| `trace_graph` | `CF-TRACE` | `trace_graphs` | serialized Trace Graph. <!-- object-kind: trace_graph --> |
+| `fire_ledger` | `CF-FIRELEDGER` | `fire_ledgers` | sealed Fire set/delta. <!-- object-kind: fire_ledger --> |
+| `resolution_ledger` | `CF-RESOLUTION` | `resolution_ledgers` | sealed resolutions and evidence refs. <!-- object-kind: resolution_ledger --> |
+| `verification` | `CF-VERIFY` | `verifications` | core verification result. <!-- object-kind: verification --> |
+| `policy` | `CF-POLICY` | `policies` | policy used for the seal. <!-- object-kind: policy --> |
+| `artifact_ref` | `CF-ARTIFACT` | `artifact_refs` | external/local artifact identity and metadata. <!-- object-kind: artifact_ref --> |
+| `evidence` | `CF-EVIDENCE` | `evidence` | captured/referenced evidence subject. <!-- object-kind: evidence --> |
+| `commit` | `CF-COMMIT` | `commits` | parent/root/certificate/history object. <!-- object-kind: commit --> |
+| `branch` | `CF-BRANCH` | `branches` | object-store branch payload kind; repository branch heads also have active metadata records. <!-- object-kind: branch --> |
+
+## Current Commit Payload
+
+Current production `run_commit` writes:
 
 ```json
 {
   "type": "commit",
   "version": 1,
+  "root_schema_version": 2,
   "parents": ["CF-COMMIT-..."],
   "message": "...",
   "roots": {
@@ -163,326 +112,111 @@ A commit payload should be pictured as:
     "open_required_fires": 0,
     "failed_checks": 0,
     "missing_required_links": 0,
-    "stale_resolutions": 0
+    "stale_resolutions": 0,
+    "missing_evidence_refs": 0,
+    "duplicate_atom_ids": 0
+  },
+  "changed_atoms": [],
+  "extinguished_fires": [],
+  "created_at": "...",
+  "signature": {
+    "type": "commit_signature",
+    "version": 1,
+    "algorithm": "hmac-sha256",
+    "signer": "...",
+    "key_id": "...",
+    "signed_at": "...",
+    "signature": "..."
   }
 }
 ```
 
-The exact certificate can evolve, but validation must keep the invariant that branch heads point only at structurally valid sealed commit graphs.
+The store's sealed-commit validator checks required roots, root object types/shapes, certificate-versus-verification agreement, and parent references. Commit/request signature policy is enforced separately by the CLI `signatures` module at remote/security boundaries. The `signature` member is optional and, when present, is an object rather than a string.
 
-## 7. Repository Files
-
-### `.codefire/branches/<branch>.json`
-
-Typical shape:
-
-```json
-{
-  "type": "branch",
-  "version": 1,
-  "name": "main",
-  "head": "CF-COMMIT-...",
-  "state": "open-clean"
-}
-```
-
-Writers:
-
-- init;
-- commit;
-- clone/open state updates;
-- merge apply;
-- remote sync.
-
-Readers:
-
-- status;
-- branch list;
-- open;
-- merge;
-- diff/show;
-- upload;
-- doctor.
-
-### `.codefire/opened/<branch>.json`
-
-Typical shape:
-
-```json
-{
-  "type": "opened",
-  "version": 1,
-  "branch": {
-    "name": "main",
-    "opened_from_commit": "CF-COMMIT-..."
-  },
-  "open": {
-    "open_instance_id": "open-...",
-    "opened_path": "/abs/path/to/open",
-    "opened_at": "2026-06-07T00:00:00Z",
-    "active_state_path": "/abs/path/to/repo/.codefire/active/open-...",
-    "current_base_commit": "CF-COMMIT-..."
-  },
-  "state": {
-    "last_known": "open-clean"
-  }
-}
-```
-
-This record ties the branch to one open directory and one active state directory.
-
-### `<open-dir>/.codefire-open`
-
-Typical shape:
-
-```json
-{
-  "type": "codefire_open",
-  "version": 1,
-  "repo": {
-    "root": "/abs/path/to/repo"
-  },
-  "branch": {
-    "name": "main",
-    "opened_from_commit": "CF-COMMIT-..."
-  },
-  "open": {
-    "open_instance_id": "open-...",
-    "opened_path": "/abs/path/to/open"
-  }
-}
-```
-
-`open_context(start)` cross-checks this marker with the opened registry and branch state.
-
-## 8. Active State Files
-
-Active state is mutable, derived, and per open directory.
-
-### `state.json`
-
-```json
-{
-  "type": "active_state",
-  "version": 1,
-  "state": "open-clean"
-}
-```
-
-Writers:
-
-- open initialization;
-- scan;
-- verify;
-- extinguish;
-- merge/patch import;
-- commit reset.
-
-### `scan.json`
-
-Usually stores serialized `ScanResult`.
-
-Important fields:
-
-- `base_commit`;
-- `atom_index`;
-- `trace_graph`;
-- `changed_atoms`;
-- `open_fires`.
-
-Writers:
-
-- scan;
-- verify;
-- commit preview through verification path.
-
-### `fires.json`
-
-Usually stores `Vec<Fire>`.
-
-Important fields:
-
-- `fire_uid`;
-- `display_id`;
-- `status`;
-- source/target atom refs;
-- `reason`;
-- `key`;
-- optional resolution linkage.
-
-Writers:
-
-- scan;
-- manual fire;
-- extinguish;
-- merge/patch when marking state burning.
-
-### `resolutions.json`
-
-Usually stores `Vec<Resolution>`.
-
-Important fields:
-
-- `resolution_uid`;
-- `fire_uid`;
-- `resolution_type`;
-- `rationale`;
-- `evidence`;
-- `evidence_refs`;
-- `basis`;
-- `status`.
-
-Writers:
-
-- extinguish;
-- batch extinguish;
-- interactive/all-matching extinguish.
-
-### `verification.json`
-
-Usually stores serialized `Verification`.
-
-Important fields:
-
-- `result`;
-- `open_required_fires`;
-- `failed_checks`;
-- `missing_required_links`;
-- `stale_resolutions`;
-- `missing_evidence_refs`;
-- `duplicate_atom_ids`;
-- `verified_at`.
-
-Writers:
-
-- verify;
-- commit verification path.
-
-## 9. Automation Envelope
-
-Machine output should look like:
-
-```json
-{
-  "type": "codefire.command_result.v1",
-  "ok": true,
-  "command": "verify",
-  "exit_code": 0,
-  "schema": "codefire.verify.v1",
-  "data": {},
-  "diagnostics": [],
-  "next_actions": [],
-  "metrics": {}
-}
-```
-
-Field rules:
-
-| Field | Rule |
-|---|---|
-| `ok` | success/failure of the command contract, not necessarily "no blockers" |
-| `command` | canonical label from `cli_command` or equivalent |
-| `exit_code` | must align with `exit_code.rs` |
-| `schema` | stable payload identifier |
-| `data` | command-specific structured result |
-| `diagnostics` | ordered warnings/errors/blockers |
-| `next_actions` | executable suggestions, preferably with target path/repo |
-| `metrics` | optional, must not change command semantics |
-
-## 10. Evidence Data
-
-Evidence command data has two layers:
-
-| Layer | Object | Meaning |
-|---|---|---|
-| artifact ref | `artifact_ref` object | points to file path or URI and records hashes/sizes where possible |
-| evidence | `evidence` object | records label, command/artifact source, summaries, and artifact ref |
-
-`EvidenceAddResult` includes:
-
-- repo root;
-- dry-run flag;
-- evidence ID;
-- optional artifact ref ID;
-- optional object path;
-- command exit status;
-- timeout/truncation flags;
-- diagnostics;
-- optional plan.
-
-The command stores bounded summaries, not unbounded stdout/stderr.
-
-## 11. Storage Data
-
-`StorageReport` summarizes:
-
-- repo root;
-- object area files/bytes;
-- active state files/bytes;
-- idempotency files/bytes;
-- object types by count/bytes;
-- largest objects;
-- external artifact refs and referenced bytes;
-- remote storage stats;
-- warnings;
-- quick/full mode.
-
-Storage report structs are read models. They must not become repair or migration state.
-
-## 12. Remote Data
-
-Remote operations use:
-
-| Shape | Purpose |
-|---|---|
-| `UploadOptions` / `UploadResult` | copy local sealed branch head and object graph to remote |
-| `RemoteProjectOptions` | list/read remote project |
-| `RequestMergeOptions` / `RequestMergeResult` | create merge request record |
-| `RequestReviewOptions` / `RequestReviewResult` | record reviewer decision |
-| `RequestApplyOptions` / `RequestApplyResult` | apply accepted merge request to remote target branch |
-
-Remote project files are a separate trust boundary. Always picture remote mutation as:
+## Repository Layout
 
 ```text
-parse URL
-  -> load local/remote branch heads
-  -> validate object graph
-  -> verify signature/nonce if configured
-  -> lock remote project
-  -> write remote objects/branches/MR/idempotency
+.codefire/
+  repo.json
+  objects/<object-kind-subdir>/<object-id>.json
+  branches/<encoded-branch>.json
+  opened/<encoded-branch>.json
+  active/<open-instance>/
+    state.json
+    scan.json
+    fires.json
+    resolutions.json
+    verification.json
+    commit_transaction.json   # only while interrupted/in progress
+  cache/
+  locks/
+  remotes/
+  idempotency/
 ```
 
-## 13. Test Data Map
+`repo_layout::REPO_DIRS` distinguishes required from auto-created directories. Object subdirectory requirements come from the store registry.
 
-Primary file: `crates/codefire-cli/src/tests.rs`
+## Open Marker and Registry
 
-The test file is broad, but test names reveal source behavior:
+Current `.codefire-open` writer shape:
 
-| Test name pattern | Behavior covered |
-|---|---|
-| `parse_*_args_*` | parser contract |
-| `*_dry_run_*without_writing*` | dry-run side-effect guard |
-| `*_idempotency_*` | replay/conflict behavior |
-| `doctor_*` | layout/object/open/active health |
-| `storage_*` | capacity and remote/object counting |
-| `evidence_*` | evidence object and command capture |
-| `remote_*` / `http_*` | remote project, HTTP, TLS, signatures |
-| `merge_*` | branch merge, conflicts, ancestors |
-| `verify_*` | verification diagnostics and state behavior |
+```json
+{
+  "version": 1,
+  "repository": {"path": "/repo/.codefire", "repository_id": "..."},
+  "branch": {"name": "feature", "opened_from_commit": "CF-COMMIT-..."},
+  "open": {"open_instance_id": "open_...", "opened_path": "/work", "opened_at": "..."}
+}
+```
 
-When adding a feature, tests should exist at the smallest layer that owns the invariant and at the CLI JSON layer if automation behavior changes.
+Current repository-side opened record:
 
-## 14. Quick Debugging Matrix
+```json
+{
+  "version": 1,
+  "branch": {"name": "feature"},
+  "open": {
+    "open_instance_id": "open_...",
+    "path": "/work",
+    "opened_from_commit": "CF-COMMIT-...",
+    "current_base_commit": "CF-COMMIT-...",
+    "active_state_path": "/repo/.codefire/active/open_..."
+  },
+  "state": {"last_known": "open-clean"}
+}
+```
 
-| Symptom | First data to inspect | Likely source |
-|---|---|---|
-| wrong state label | branch record, opened registry, `active/state.json` | `status_state`, `scan_branch_state`, state writers |
-| scan misses change | current/base `AtomIndex`, `codefire.yaml`, extractor output | `codefire-core::build_atom_index`, `changed_atoms` |
-| missing link not reported | `TraceGraph`, `TracePolicy`, atom kinds | `required_link_missing`, policy parser |
-| verify permits bad commit | `Verification`, `VerificationPolicy`, failed checks | `build_verification`, `compute_verify`, `run_commit` |
-| commit object invalid | commit roots, object records | `codefire-store`, `run_commit` root storage |
-| JSON missing field | command data helper, envelope helper | `automation.rs` or module `*_data_json` |
-| dry-run wrote files | operation plan path vs write path | command runner and idempotency helpers |
-| remote accepts bad graph | remote copied objects, branch head validation | `remote.rs`, `http.rs`, `validate_sealed_commit` |
+`active/.../state.json` is currently `{"state":"open-clean|open-burning|open-consistent"}` with no `type` or `version`. Consumers must not invent fields from old documentation.
 
-This matrix should be kept current as modules are extracted from `main.rs`.
+## Commit Transaction Marker
+
+While committing, `active/.../commit_transaction.json` contains version, transaction ID, `pending` status, current phase, branch/open directory, parents, message, object IDs written so far, and timestamps. Success removes it. Doctor treats a surviving marker as interrupted work requiring diagnosis; it is not a sealed object.
+
+## Automation Envelope
+
+Every Rust command with declared JSON support uses this top-level shape:
+
+```json
+{
+  "schema": "codefire.command_result.v1",
+  "command": "scan",
+  "ok": true,
+  "exit_code": 0,
+  "repo": "/repo-or-null",
+  "data": {"type": "payload-specific", "metrics": "optional under data"},
+  "diagnostics": [],
+  "next_actions": []
+}
+```
+
+There is no top-level payload `type`. `next_actions` are normalized and bounded; command-specific payloads/plans live under `data`.
+
+## Compatibility Rules
+
+- Missing/legacy Atom hash schema defaults only where source explicitly defines it. Rust scan/commit emits 2; Rust init and Python fallback currently omit it.
+- Legacy 12-hex object IDs are accepted only when the record's full hash and payload recompute correctly.
+- Rust current commits emit root schema 2; Python fallback and legacy root-schema behavior remain explicit compatibility work.
+- Stage 2 required rule: an unknown required schema or capability must fail explicitly and must never downgrade a blocker to success.
+- Current gap: version/schema rejection is not yet uniform, so some future version values can pass deserialization or default paths. That behavior is not a compatibility guarantee and must be closed and fixture-tested before claiming the Stage 2 rule.
+- Rust/Python behavior and writable/readable combinations require real fixtures; see release/format roadmap.
+- A source change to any marker in this file requires source-doc checker and focused product tests.

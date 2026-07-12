@@ -1,625 +1,93 @@
-# Command Source Trace
+# CodeFire Command Source Trace
 
-この文書は、主要CLI commandがどのsource file、主要関数、domain model、persistent stateを通るかを示す。ソースコードを読む前に、commandの実装経路を頭に描くための索引である。
+Status: canonical
 
-file内部の型・関数群・永続化境界まで見たい場合は、`docs/development/source-code-anatomy.md` を併読する。
+Owner: CLI Maintainer
 
-## Trace Notation
+Update trigger: `COMMAND_CAPABILITIES`, dispatch, parser, plan/apply boundary, JSON rendering, persistent writes, or command tests change.
 
-```text
-CLI command
-  -> parse function
-  -> run function
-  -> domain/core/store calls
-  -> render function
-  -> persistent state
-```
+This is a symbol-level routing map. It intentionally omits fixed line numbers. The source-doc checker requires one marker for every registered top-level command and detects registry drift.
 
-関数名は現在のRust実装に合わせる。v0.8で関数が移動した場合、この文書も同じcommitで更新する。
+## Execution Contract
 
-## init
+Every command follows as much of this path as its mode needs:
 
 ```text
-codefire init [path]
-  -> main.rs::parse_init_args
-  -> main.rs command match arm
-  -> repository/object initialization helpers in main.rs and store
-  -> optional JSON plan/result rendering in main.rs
-  -> writes .codefire/, initial objects, branches/main
+argv
+  -> help/capability routing before mutation
+  -> typed parse
+  -> repository/open/remote context resolution
+  -> validation and lock/idempotency checks
+  -> operation plan
+  -> apply (skipped for read-only or dry-run)
+  -> domain/result value
+  -> text renderer or codefire.command_result.v1 envelope
 ```
 
-Primary files:
-
-- `crates/codefire-cli/src/main.rs`
-- `crates/codefire-cli/src/cli_model.rs`
-- `crates/codefire-store/src/lib.rs`
-
-Design risk:
-
-- layout definitions must not diverge from doctor/migrate/storage.
-
-## open
-
-```text
-codefire open <branch> <path>
-  -> main.rs::parse_open_args
-  -> main.rs open match arm
-  -> open materialization and marker/registry write helpers
-  -> optional plan/result JSON
-  -> writes .codefire-open, .codefire/opened/*, .codefire/active/*
-```
-
-Primary files:
-
-- `main.rs`
-- `cli_model.rs` (`OpenOptions`, `OpenResult`, `OpenContext`)
-- `open_clone_idempotency.rs`
-- `idempotency.rs`
-
-Design risk:
-
-- open must reject copied directories and same-branch multiple open.
-
-## branch list
-
-```text
-codefire branch list [--json] [--path <repo>]
-  -> main.rs branch/list match arm
-  -> main.rs::parse_path_json_args(command="branch list")
-  -> branch loading and sealed head validation
-  -> if --json:
-       automation.rs::command_result_envelope(data={type: codefire_branch_list, branches: [...]})
-     else:
-       text rendering in main.rs::print_branches
-  -> reads .codefire/branches/*
-```
-
-Primary files:
-
-- `main.rs`
-- `codefire-store/src/lib.rs`
-
-Remaining v0.8 gap:
-
-- `branch show --json` is still not implemented.
-- unsupported branch subcommands with `--json` still need a structured failure envelope.
-
-## status
-
-```text
-codefire status [path|--path <path>] [--json] [--metrics]
-  -> main.rs::parse_path_json_args(command="status")
-  -> status loading in main.rs
-  -> automation.rs::status_data_json
-  -> automation.rs::status_next_actions
-  -> metrics.rs::status_metrics
-  -> reads .codefire-open, opened registry, active state, branch head
-```
-
-Primary files:
-
-- `main.rs`
-- `cli_model.rs` (`Status`, `PathJsonOptions`)
-- `automation.rs`
-- `metrics.rs`
-
-Current behavior:
-
-- `--path <path>` and `--path=<path>` are accepted by the shared path/json parser for commands that use `parse_path_json_args`.
-
-Remaining v0.8 gap:
-
-- status state must be derived by a shared reducer.
-
-## scan
-
-```text
-codefire scan [path|--path <path>] [--json] [--metrics]
-  -> main.rs::local_workflow_handler("scan")
-  -> main.rs::run_scan_command
-  -> main.rs::parse_path_json_args(command="scan")
-  -> main.rs::run_scan
-  -> codefire_core scan functions
-  -> automation.rs::scan_data_json
-  -> automation.rs::scan_diagnostics_json
-  -> automation.rs::scan_next_actions
-  -> metrics.rs::scan_metrics
-  -> writes active scan.json and fires.json
-```
-
-Primary files:
-
-- `main.rs`
-- `codefire-core/src/lib.rs`
-- `automation.rs`
-- `metrics.rs`
-
-Persistent state:
-
-- `.codefire/active/<open>/scan.json`
-- `.codefire/active/<open>/fires.json`
-- active state marker/status files
-
-v0.8 gap:
-
-- non-Atom changed files need first-class output.
-- batch extinguish next_actions should be generated when multiple fires exist.
-
-## context
-
-```text
-codefire context --changed|--atom|--fire|--branch --json
-  -> context.rs::parse_context_args
-  -> context.rs::build_context_pack
-  -> context.rs::print_context_summary or automation envelope in main.rs
-  -> reads active scan/fires, Atom index, Trace Graph
-```
-
-Primary files:
-
-- `context.rs`
-- `automation.rs`
-- `main.rs`
-
-v0.8 gap:
-
-- `context --changed --json` top-level data should mirror scan summary fields.
-
-## verify
-
-```text
-codefire verify [path] [--details] [--blocking-only] [--json] [--metrics]
-  -> main.rs::local_workflow_handler("verify")
-  -> main.rs::run_verify_command
-  -> verification.rs::parse_verify_args
-  -> main.rs::run_verify
-  -> codefire_core verification model
-  -> main.rs::run_verification_commands for external checks
-  -> verification.rs::print_verification or automation JSON
-  -> metrics.rs::verification_metrics
-  -> writes active verification.json and may update active state
-```
-
-Primary files:
-
-- `main.rs`
-- `verification.rs`
-- `codefire-core/src/lib.rs`
-- `automation.rs`
-- `exit_code.rs`
-- `metrics.rs`
-
-Persistent state:
-
-- `.codefire/active/<open>/verification.json`
-- active state file.
-
-v0.8 gap:
-
-- blocking-only data and diagnostics must agree.
-- verify must not degrade clean state.
-
-## fire
-
-```text
-codefire fire <source> --to <target> ...
-  -> main.rs::local_workflow_handler("fire")
-  -> main.rs::run_fire_command
-  -> fire.rs::parse_fire_args
-  -> fire.rs::run_fire
-  -> fire.rs::run_manual_fire_specs
-  -> fire.rs::fire_data_json or print_fire_result
-  -> writes active fires.json
-```
-
-Batch:
-
-```text
-codefire fire --batch <file>
-  -> fire/batch.rs::parse_fire_batch_args
-  -> fire/batch.rs::run_fire_batch
-  -> fire.rs::run_manual_fire_specs
-```
-
-Primary files:
-
-- `fire.rs`
-- `fire/batch.rs`
-- `limited_yaml.rs`
-- `main.rs`
-
-Design invariant:
-
-- all batch items validate before any write.
-
-## extinguish
-
-```text
-codefire extinguish <fire-id> --resolution <type> ...
-  -> main.rs::local_workflow_handler("extinguish")
-  -> main.rs::run_extinguish_command
-  -> main.rs::parse_extinguish_args
-  -> extinguish_ux.rs::prepare_extinguish_options
-  -> main.rs::run_extinguish
-  -> writes active resolutions.json and updates fire status
-```
-
-Batch:
-
-```text
-codefire extinguish --batch <file>
-  -> batch.rs::parse_extinguish_batch_args
-  -> batch.rs::run_extinguish_batch
-  -> main.rs::run_extinguish per validated item
-```
-
-Interactive/all-matching:
-
-```text
-codefire extinguish --interactive
-  -> extinguish_ux.rs::parse_interactive_extinguish_args
-  -> extinguish_ux.rs::run_interactive_extinguish
-
-codefire extinguish --all-matching ...
-  -> extinguish_ux.rs::parse_all_matching_extinguish_args
-  -> extinguish_ux.rs::run_all_matching_extinguish
-```
-
-Primary files:
-
-- `main.rs`
-- `batch.rs`
-- `extinguish_ux.rs`
-- `cli_model.rs`
-
-v0.8 gap:
-
-- success output should include atom/link/evidence summary.
-- batch template generation should avoid manual YAML construction.
-
-## evidence add
-
-```text
-codefire evidence add ...
-  -> main.rs evidence/add match arm
-  -> evidence.rs::parse_evidence_add_args
-  -> evidence.rs::run_evidence_add
-       -> dry-run returns evidence_add_operation_plan without writes
-       -> apply stores optional artifact_ref and evidence object
-  -> evidence.rs::evidence_add_data_json
-  -> evidence.rs::print_evidence_add_result
-  -> writes evidence object and optional artifact_ref object unless dry-run
-```
-
-Batch:
-
-```text
-codefire evidence add --batch <file>
-  -> evidence.rs::parse_evidence_add_args
-  -> evidence/batch.rs::run_evidence_batch
-  -> evidence/batch.rs::evidence_batch_data_json
-```
-
-Primary files:
-
-- `evidence.rs`
-- `evidence/batch.rs`
-- `storage.rs`
-- `remote.rs` for artifact/evidence graph copy.
-
-Current behavior:
-
-- single-item `--dry-run` returns a validated operation plan and does not write an evidence object.
-- JSON result includes evidence object path and bounded stdout/stderr summaries with truncation flags.
-
-Remaining v0.8 gap:
-
-- failed command capture should require explicit allowance.
-
-## link --batch
-
-```text
-codefire link --batch <file> [--path <open-dir>] [--dry-run] [--json]
-  -> link_batch.rs::parse_link_batch_args
-  -> link_batch.rs::run_link_batch
-       -> validate limited YAML/JSON-like input
-       -> validate all link mutations before write
-       -> dry-run returns plan
-       -> apply updates codefire.links.yaml
-  -> link batch JSON/text rendering through module/main routing
-```
-
-Primary files:
-
-- `link_batch.rs`
-- `limited_yaml.rs`
-- `codefire-core/src/lib.rs` for Trace Link parsing/validation semantics
-
-Design invariant:
-
-- batch Trace Link mutation must be all-or-nothing and should not silently drop unsupported fields.
-
-## commit
-
-```text
-codefire commit -m <message>
-  -> main.rs::local_workflow_handler("commit")
-  -> main.rs::run_commit_command
-  -> main.rs::parse_commit_args
-  -> main.rs::run_commit
-  -> run scan/verify or use fresh active state
-  -> codefire-store object writes
-  -> branch head atomic update
-  -> active state reset
-  -> CommitResult rendering
-```
-
-Primary files:
-
-- `main.rs`
-- `cli_model.rs` (`CommitOptions`, `CommitResult`)
-- `codefire-store/src/lib.rs`
-- `idempotency.rs`
-- `signatures.rs`
-
-Persistent state:
-
-- `.codefire/objects/*`
-- `.codefire/branches/<branch>.json`
-- active state reset under `.codefire/active/<open>/`
-
-v0.8 gap:
-
-- blocked `commit --dry-run --json` must return JSON envelope.
-- success output should summarize changed atoms, resolved fires, evidence, non-Atom files.
-
-## show / diff / review-pack / patch
-
-```text
-codefire show <branch-or-url>
-  -> view.rs::show_commitish
-
-codefire diff [options] <left> <right>
-  -> main.rs::parse_diff_args
-  -> view.rs::diff_commitish_with_options
-  -> view/file_diff.rs
-  -> view/semantic_diff.rs
-
-codefire review-pack ...
-  -> main.rs::parse_review_pack_args
-  -> view.rs::review_pack_with_options
-
-codefire patch export ...
-  -> main.rs::parse_patch_export_args
-  -> view.rs::patch_export_with_options
-
-codefire patch import ...
-  -> main.rs::parse_patch_import_args
-  -> patch import implementation in main.rs
-  -> merge_patch_idempotency.rs
-```
-
-Primary files:
-
-- `view.rs`
-- `view/file_diff.rs`
-- `view/semantic_diff.rs`
-- `merge_patch_idempotency.rs`
-- golden fixtures under `crates/codefire-cli/tests/fixtures/`
-
-v0.8 gap:
-
-- `show --json` and `diff --json` should return command result envelope.
-- diff options must match emitted sections.
-
-## doctor / migrate / storage / explain
-
-```text
-codefire doctor [path] [--quick|--full] [--json]
-  -> doctor.rs::parse_doctor_args
-  -> doctor.rs::run_doctor
-  -> doctor/checks.rs::run_checks
-  -> doctor/report.rs render helpers
-
-codefire migrate check|dry-run [path] [--json]
-  -> migration.rs::parse_migrate_args
-  -> migration.rs::run_migrate
-  -> migration report render helpers
-
-codefire storage [path] [--json]
-codefire storage report [path] [--json]
-codefire storage --path <path> --json
-  -> main.rs::run_storage_report_command
-  -> storage.rs::parse_storage_report_args
-  -> storage.rs::run_storage_report
-  -> storage report render helpers
-
-codefire explain fire|atom|verify-failure|storage-warning ...
-  -> explain.rs::parse_explain_args
-  -> explain.rs::run_explain
-  -> explain.rs::print_explain_result
-```
-
-Primary files:
-
-- `doctor.rs`, `doctor/checks.rs`, `doctor/report.rs`
-- `migration.rs`
-- `storage.rs`
-- `explain.rs`
-
-Current behavior:
-
-- `storage`, `storage [path]`, `storage --json`, and `storage report ...` all route to the same storage report runner.
-
-Remaining v0.8 gap:
-
-- doctor/migrate must share layout definitions and repair vocabulary.
-
-## remote and HTTP
-
-```text
-codefire upload <branch> <remote-url>
-  -> main.rs::parse_upload_args
-  -> remote.rs::upload_branch
-  -> remote/plans.rs
-  -> remote/idempotency.rs
-  -> signatures.rs
-
-codefire list <remote-project-url>
-  -> main.rs::parse_remote_project_args
-  -> remote.rs::list_remote_branches
-
-codefire request-merge ...
-  -> main.rs::parse_request_merge_args
-  -> remote.rs::request_merge
-
-codefire request-list ...
-  -> main.rs::parse_remote_project_args
-  -> remote.rs::list_merge_requests
-
-codefire request-review ...
-  -> main.rs::parse_request_review_args
-  -> remote.rs::review_merge_request
-
-codefire request-apply ...
-  -> main.rs::parse_request_apply_args
-  -> remote.rs::apply_merge_request
-```
-
-HTTP path:
-
-```text
-http.rs::http_json
-http.rs::serve_http
-http.rs::dispatch_http
-http.rs::handle_http_upload
-http.rs::handle_http_request_merge
-http.rs::handle_http_request_list
-http.rs::handle_http_request_review
-http.rs::handle_http_request_apply
-```
-
-Primary files:
-
-- `remote.rs`
-- `remote/plans.rs`
-- `remote/idempotency.rs`
-- `http.rs`
-- `http_tls.rs`
-- `signatures.rs`
-
-Security-sensitive code:
-
-- HTTP path normalization.
-- request body size/read timeout.
-- TLS key/cert parsing.
-- client CA configuration.
-- request signature verification.
-- nonce replay checks.
-
-## serve
-
-```text
-codefire serve <storage-root> ...
-  -> main.rs::parse_serve_args
-  -> http.rs::serve_http
-  -> http_tls.rs when TLS is enabled
-  -> http.rs request parser and dispatch handlers
-```
-
-Primary files:
-
-- `http.rs`
-- `http_tls.rs`
-- `signatures.rs`
-- `remote.rs`
-
-## completion and version/help
-
-```text
-codefire completion bash|zsh
-  -> completion.rs::completion_script
-
-codefire --help / help
-  -> completion.rs::help_text
-
-codefire --version / version
-  -> main.rs version arm
-```
-
-Primary files:
-
-- `completion.rs`
-- `main.rs`
-- `docs/04_cli_spec.md`
-- `crates/codefire-cli/src/tests/docs.rs`
-
-## Cross-Cutting Flows
-
-### JSON rendering flow
-
-```text
-command run result
-  -> command-specific data_json helper
-  -> diagnostics helper
-  -> next_actions helper
-  -> automation.rs::command_result_envelope
-  -> serde_json::to_string_pretty
-```
-
-If a command prints raw JSON directly, it is a candidate for v0.8 contract cleanup.
-
-### Lock and idempotency flow
-
-```text
-parse --wait-lock / --lock-timeout / --idempotency-key
-  -> build payload hash
-  -> check replay or conflict
-  -> acquire lock
-  -> revalidate
-  -> write
-  -> save idempotency record
-```
-
-Primary files:
-
-- `idempotency.rs`
-- `open_clone_idempotency.rs`
-- `merge_patch_idempotency.rs`
-- `remote/idempotency.rs`
-
-### Remote request signing flow
-
-```text
-client request payload
-  -> signatures.rs remote request signature
-  -> remote/http transport
-  -> server verifies key, timestamp skew, nonce replay
-  -> handler applies mutation
-```
-
-Primary files:
-
-- `signatures.rs`
-- `remote.rs`
-- `http.rs`
-
-## How To Add A New Command
-
-Implementation checklist:
-
-1. Add option/result structs to `cli_model.rs` or a command module.
-2. Add parse function.
-3. Add run function that returns a typed result.
-4. Add JSON data helper and diagnostics/next_actions if `--json` is supported.
-5. Route from `main.rs` with minimal orchestration.
-6. Add help/completion entry.
-7. Add CLI spec and automation docs.
-8. Add tests for text behavior, JSON envelope, errors, and docs/help consistency.
-
-Avoid:
-
-- embedding JSON strings by hand.
-- writing files before full validation.
-- adding domain logic directly inside a large `match` arm.
-- adding command help without parser support.
+`main.rs::run` is the top-level router. `local_workflow_handler` handles the compact local command family; the remaining arms call focused modules or still-local orchestration functions. `command_registry::COMMAND_CAPABILITIES` is the declared top-level surface, not a complete parser registry.
+
+## Registered Commands
+
+| Command | Capability | Parse / execute / render ownership | Persistent effect and principal evidence |
+|---|---|---|---|
+| `init` | text | `main` init parser/initializer, store/core initial roots | creates `.codefire`, initial sealed commit and main branch; init/layout/store tests. <!-- command: init --> |
+| `import` | JSON | `import_workflow::{parse_import_args, import_existing_project, import_result_data_json}` | creates a native repo/open branch from existing files; its current result-only idempotency marker does not reject a different request under the same key (CFB-126); dry-run, path, idempotency tests. <!-- command: import --> |
+| `open` | JSON | `main::{parse_open_args, open_branch_from}` | validates sealed closed head, materializes files, writes marker/opened/active/branch state; open/idempotency/corruption tests. <!-- command: open --> |
+| `branch` | JSON, metrics for list | `main` branch list/show routing and branch record helpers | read-only list/show of encoded branch records; there is no branch-create subcommand. Sealed-head and branch-show envelope tests cover the surface. <!-- command: branch --> |
+| `status` | JSON + metrics | `main::read_status`, `automation::status_*`, `metrics::status_metrics` | read-only derived state and scan prediction; state/JSON/next-action tests. <!-- command: status --> |
+| `scan` | JSON + metrics | `main::{parse_path_json_args, run_scan_command, run_scan}`, core scan builders, automation/metrics | writes active scan/fire/state on live scan; direct production routing currently lacks `RepoLock` (CFB-124); read-only preview remains separate; freshness/non-Atom/bounded JSON tests. <!-- command: scan --> |
+| `fire` | JSON | `fire` module plus `main::run_fire_command` | validates all manual/batch Fires before active ledger writes; dry-run/batch/identity tests. <!-- command: fire --> |
+| `extinguish` | JSON | `main::{parse_extinguish_args, run_extinguish}`, `batch`, `extinguish_ux` | updates Fire status and appends resolution basis/evidence refs under lock/idempotency; refresh/batch/dry-run tests. <!-- command: extinguish --> |
+| `verify` | JSON + metrics | `verification::{parse_verify_args, render_verification}`, `main::{run_verify_command, compute_verify}`, core verification, automation/metrics | writes active scan/verification/state and executes constrained commands; direct production routing currently lacks `RepoLock` (CFB-124); `run_verify` is a test-only helper. Blocker/filter/exit tests cover production routing. <!-- command: verify --> |
+| `commit` | JSON | `main::{parse_commit_args, run_commit, commit_operation_plan}`, store/signatures/automation | pending transaction, root objects, commit/certificate, branch publish, opened/active reset, idempotency; failpoint/sealed/certificate tests. <!-- command: commit --> |
+| `clone` | JSON | `main::{parse_clone_args, clone_branch}`, open/clone idempotency | validates the source sealed head and creates a new closed branch record; it does not create an opened directory/state. Dry-run/idempotency tests cover it. <!-- command: clone --> |
+| `close` | JSON | `main::{parse_close_args, close_branch}` | removes active/opened state and closes the branch; normally removes the open directory, while `--keep-dir` preserves the directory and removes its marker. Dirty-work rejection/dry-run tests cover it. <!-- command: close --> |
+| `discard` | JSON | same close path with explicit discard flag | intentionally removes open work after validation/plan; discard safety tests. <!-- command: discard --> |
+| `merge` | JSON | `main::{parse_merge_args, merge_branch}`, `view` merge/diff, merge idempotency | plans/applies target open-directory changes and state; conflict/binary/semantic/dry-run tests. <!-- command: merge --> |
+| `upload` | JSON | `main::parse_upload_args`, `remote`, `http`, `signatures` | transfers validated object graph and conditionally updates remote branch under resource lock/idempotency; file/HTTP/auth tests. <!-- command: upload --> |
+| `list` | JSON | `main::{parse_list_args, list_branches/list_remote_branches}` | read-only local opened/branch or remote branch view; bounded/sealed/JSON tests. <!-- command: list --> |
+| `request-merge` | JSON | `main::parse_request_merge_args`, `remote`/`http`/`signatures` | creates a merge request after resolving and validating sealed source/target heads; request signing is a separate transport/auth concern. Dry-run/idempotency tests cover it. <!-- command: request-merge --> |
+| `request-list` | JSON | `main::parse_remote_project_args`, remote list | read-only merge-request list; file/HTTP envelope tests. <!-- command: request-list --> |
+| `request-review` | JSON | `main::parse_request_review_args`, remote review/signature path | appends review decision under lock/idempotency; signed request and dry-run tests. <!-- command: request-review --> |
+| `request-apply` | JSON | `main::parse_request_apply_args`, remote apply/signature path | validates approved/current heads and publishes target remote head; replay/fast-forward/dry-run tests. <!-- command: request-apply --> |
+| `show` | JSON | `main::parse_show_args`, `view::{show_commitish, show_commitish_data}` | read-only commit/object/branch resolution; text/envelope/error tests. <!-- command: show --> |
+| `diff` | JSON | `main::parse_diff_args`, `view::diff_commitish_with_options` and algorithm modules | read-only bounded file/Atom/Trace/impact diff; golden/Git comparison/large-file tests. <!-- command: diff --> |
+| `review-pack` | JSON metadata | `main::parse_review_pack_args`, `view::review_pack_with_options` | writes explicit output artifact when requested; bounded review-pack metadata/content tests. <!-- command: review-pack --> |
+| `patch` | JSON | `main` export/import parsers, `view` export, patch import/idempotency | export writes artifact; import validates then mutates open directory under lock/idempotency; round-trip/dry-run/bounds tests. <!-- command: patch --> |
+| `doctor` | JSON | `doctor::{parse_doctor_args, run_doctor, report renderers}` plus store/layout validators | read-only diagnosis by default; reports pending transaction/layout/object/open corruption; doctor fixtures. <!-- command: doctor --> |
+| `storage` | JSON | `storage::{parse_storage_report_args, run_storage_report, *_json}` | read-only bounded local/remote inventory and artifact warnings; quick/full/limit tests. <!-- command: storage --> |
+| `evidence` | JSON | `evidence::{parse_evidence_add_args, run_evidence_add/run_evidence_batch}` | validates command/artifact/batch then stores artifact_ref/evidence objects; failure/timeout/redaction-boundary tests. <!-- command: evidence --> |
+| `explain` | JSON | `explain::{parse_explain_args, run_explain}` | read-only Fire/Atom/verify/storage explanation and next action; target/error tests. <!-- command: explain --> |
+| `context` | JSON | `context::{parse_context_args, build_context_pack}` | read-only bounded selection over active/repository objects; truncation/freshness/path tests. <!-- command: context --> |
+| `migrate` | JSON | `migration` parser/check/dry-run and `repo_layout` | currently inspects/plans compatibility/layout action; version/limit/doctor agreement tests. <!-- command: migrate --> |
+| `serve` | text process | `main::parse_serve_args`, `http::serve_http`, `http_tls` | serves remote state and mutating routes under configured auth/signature/resource policy; route/TLS/body/timeout tests. <!-- command: serve --> |
+| `completion` | text | `completion::{completion_script, bash_completion_script, zsh_completion_script}` | read-only generated shell script; registry/completion consistency tests. <!-- command: completion --> |
+| `capabilities` | JSON | `command_registry::capabilities_data_json`, automation envelope | read-only declared command feature surface; registry/help/completion/metrics consistency tests. <!-- command: capabilities --> |
+| `version` | text | `main` version arm | reports internal `codefire foundation 1`; release policy must not treat it as SemVer. <!-- command: version --> |
+
+## Internal Debug Surface
+
+`atom-index`, `trace-graph`, and `missing-links` are read-only debug commands handled by `parse_read_only_debug_args`. They return structured envelopes with `--json` but are intentionally not entries in `COMMAND_CAPABILITIES`; changing that classification requires a registry/CLI-contract decision.
+
+## Cross-Cutting Paths
+
+### JSON
+
+- `automation::command_result_envelope` owns the top-level shape.
+- operation-plan commands put their plan under `data.plan` with a result type.
+- payload-specific `type` stays in `data`; metrics are attached under `data.metrics`.
+- `print_cli_error_json` maps `CliError` to the same envelope and stable exit class.
+
+### Lock and idempotency
+
+- mutable repository metadata/open-state mutations normally acquire `RepoLock` with optional wait/timeout diagnostics; direct live scan/verify are the documented CFB-124 exception to fix, while immutable content-addressed writes such as `run_evidence_add` can publish through the object store without that repository-wide lock;
+- remote mutations acquire project/branch/request resource locks;
+- idempotency records are required to bind operation, scope/key, and payload hash so replay returns the recorded result and mismatch is a conflict; import is the current CFB-126 exception because its marker stores key/result without the request hash.
+
+### Paths
+
+Repository discovery, open-marker validation, explicit `--path`, remote URLs, output paths, and symlink policy are separate inputs. Preserve the originating repo/open path in diagnostics and `next_actions`.
+
+### Docs and test synchronization
+
+When a command changes, update the registry, help/completion, CLI spec, this table, JSON/text tests, and the focused validation map together. `check_source_docs.py` detects command set drift, but semantic routing still needs review.

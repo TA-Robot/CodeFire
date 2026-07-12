@@ -2,6 +2,7 @@ use super::{
     compute_scan, now_iso_utc, open_context, parse_lock_option, read_json, required_string,
     stable_hash_48, validate_evidence_refs, write_json_atomic, CliError, LockOptions, RepoLock,
 };
+use crate::automation::{cli_command, path_command};
 use crate::{limited_yaml, read_batch_file};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
@@ -676,7 +677,11 @@ fn batch_extinguish_operation_plan(
             {"kind": "append_resolutions", "count": fires.len()},
         ],
         "next_actions": [
-            {"kind": "verify", "command": "codefire verify --details --json", "target": {"path": &options.path}},
+            {
+                "kind": "verify",
+                "command": cli_command(path_command("verify --details --json", Some(&options.path))),
+                "target": {"path": &options.path},
+            },
         ],
     })
 }

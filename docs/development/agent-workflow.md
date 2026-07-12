@@ -45,9 +45,9 @@ CodeFireはAI agent運用機能を持たない。agentの起動、編成、分�
 
 実装時は、human outputよりmachine-readable contractの安定性を重視する。
 
-## Rust v0.6方針
+## Rust default / compatibility方針
 
-v0.6ではRust実装をdefault CLIへ移行する計画である。
+Rust実装をdefault CLIとし、Python reference/fallbackとの互換境界を明示する。
 
 守ること:
 
@@ -62,8 +62,9 @@ v0.6ではRust実装をdefault CLIへ移行する計画である。
 
 参照:
 
-- `v0.6-rust-rewrite-plan.md`
-- `v0.6-readiness.md`
+- `strategy/engineering-principles.md`
+- `strategy/modernization-roadmap.md`
+- `strategy/release-and-format-roadmap.md`
 - `todo-checklist.md`
 - `bug-backlog.md`
 

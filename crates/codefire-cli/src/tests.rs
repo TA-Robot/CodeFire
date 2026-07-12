@@ -16,6 +16,9 @@ fn command_help_routes_before_mutating_parsers() {
         (vec!["import", "--help"], "usage: codefire import"),
         (vec!["open", "--help"], "usage: codefire open"),
         (vec!["clone", "--help"], "usage: codefire clone"),
+        (vec!["close", "--help"], "usage: codefire close"),
+        (vec!["discard", "--help"], "usage: codefire discard"),
+        (vec!["merge", "--help"], "usage: codefire merge"),
         (vec!["upload", "--help"], "usage: codefire upload"),
         (
             vec!["request-merge", "--help"],
@@ -754,6 +757,10 @@ fn open_materializes_manifest_and_updates_registry() {
 
     assert_eq!(result.open_dir, open_dir);
     assert_eq!(
+        result.plan["next_actions"][0]["command"],
+        format!("codefire status --path {} --json", open_dir.display())
+    );
+    assert_eq!(
         fs::read_to_string(result.open_dir.join("docs").join("readme.md")).unwrap(),
         "hello\n"
     );
@@ -770,7 +777,367 @@ fn open_materializes_manifest_and_updates_registry() {
 }
 
 #[test]
-fn clone_branch_creates_closed_branch_and_rejects_burning_source() {
+fn open_rejects_outside_workspace_nested_open_and_stale_open_state() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("workspace").join("repo");
+    let sibling_open = temp.path().join("workspace").join("main-open");
+    let outside = temp.path().join("outside-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: sibling_open.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    clone_branch(
+        &repo_root,
+        &CloneOptions {
+            source: "main".to_string(),
+            new_branch: "feature/bounds".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let outside_error = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "feature/bounds".to_string(),
+            path: outside,
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err();
+    assert!(outside_error
+        .to_string()
+        .contains("open target must stay under workspace boundary"));
+
+    let nested_error = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "feature/bounds".to_string(),
+            path: sibling_open.join("nested-feature"),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err();
+    assert!(nested_error
+        .to_string()
+        .contains("must not be nested inside existing open directory"));
+
+    let mut branch = load_branch_record(&repo_root, "feature/bounds").unwrap();
+    branch["state"] = Value::String("open-burning".to_string());
+    save_branch_record(&repo_root, &branch).unwrap();
+    let stale_error = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "feature/bounds".to_string(),
+            path: temp.path().join("workspace").join("feature-bounds"),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err();
+    let envelope = cli_error_envelope("open", &stale_error);
+    assert_eq!(envelope["repo"], repo_root.to_string_lossy().as_ref());
+    assert!(stale_error
+        .to_string()
+        .contains("recover or close the existing open branch state"));
+}
+
+#[test]
+fn close_branch_closes_clean_open_dir_and_discard_allows_dirty_state() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("feature-open");
+    init_repo(&repo_root, false).unwrap();
+    clone_branch(
+        &repo_root,
+        &CloneOptions {
+            source: "main".to_string(),
+            new_branch: "feature/close".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "feature/close".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let dry_run = close_branch(
+        &repo_root,
+        &CloseOptions {
+            branch: "feature/close".to_string(),
+            discard: false,
+            keep_dir: false,
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap();
+    assert_eq!(dry_run.plan["repo"], repo_root.to_string_lossy().as_ref());
+    assert!(open_dir.exists());
+
+    close_branch(
+        &repo_root,
+        &CloseOptions {
+            branch: "feature/close".to_string(),
+            discard: false,
+            keep_dir: false,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap();
+    assert!(!open_dir.exists());
+    assert!(!opened_registry_path(&repo_root, "feature/close").exists());
+    assert_eq!(
+        load_branch_record(&repo_root, "feature/close").unwrap()["state"],
+        "closed"
+    );
+
+    let dirty_dir = temp.path().join("dirty-open");
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "feature/close".to_string(),
+            path: dirty_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let registry_path = opened_registry_path(&repo_root, "feature/close");
+    let registry = read_json(&registry_path).unwrap();
+    let active_state_path =
+        PathBuf::from(required_string(&registry, &["open", "active_state_path"]).unwrap());
+    set_open_state(
+        &OpenContext {
+            repo_root: repo_root.clone(),
+            open_dir: dirty_dir.clone(),
+            branch: "feature/close".to_string(),
+            registry_path,
+            registry,
+        },
+        &active_state_path,
+        "open-consistent",
+    )
+    .unwrap();
+
+    let error = close_branch(
+        &repo_root,
+        &CloseOptions {
+            branch: "feature/close".to_string(),
+            discard: false,
+            keep_dir: true,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(error.contains("commit, verify, or discard"));
+
+    close_branch(
+        &repo_root,
+        &CloseOptions {
+            branch: "feature/close".to_string(),
+            discard: true,
+            keep_dir: true,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap();
+    assert!(dirty_dir.exists());
+    assert!(!dirty_dir.join(".codefire-open").exists());
+    assert!(!opened_registry_path(&repo_root, "feature/close").exists());
+}
+
+#[test]
+fn close_branch_rejects_primary_branch() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let error = close_branch(
+        &repo_root,
+        &CloseOptions {
+            branch: "main".to_string(),
+            discard: true,
+            keep_dir: false,
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap_err();
+    let envelope = cli_error_envelope("close", &error);
+    assert_eq!(envelope["repo"], repo_root.to_string_lossy().as_ref());
+    assert!(error
+        .to_string()
+        .contains("refusing to close primary branch"));
+}
+
+#[test]
+fn close_branch_refreshes_state_before_removing_open_dir() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("feature-open");
+    init_repo(&repo_root, false).unwrap();
+    clone_branch(
+        &repo_root,
+        &CloneOptions {
+            source: "main".to_string(),
+            new_branch: "feature/stale-close".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "feature/stale-close".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::write(open_dir.join("notes.md"), "unsealed work\n").unwrap();
+
+    let error = close_branch(
+        &repo_root,
+        &CloseOptions {
+            branch: "feature/stale-close".to_string(),
+            discard: false,
+            keep_dir: false,
+            dry_run: false,
+            json_output: true,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap_err();
+
+    assert!(open_dir.exists());
+    assert!(error.to_string().contains("unsealed open work"));
+    assert_eq!(read_status(&open_dir).unwrap().state, "open-burning");
+}
+
+#[test]
+fn scan_reports_out_of_atom_changes_inside_atom_bearing_files() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit_with_atoms(
+        &objects,
+        &[(
+            "docs/spec/session.md",
+            "Intro v1\n\n## REQ-session: Requirement\nTTL 30\n",
+        )],
+        &[(
+            "REQ-session",
+            "requirement",
+            "docs/spec/session.md",
+            "sha256:d9476f762715a87d3ed61151d32b60293c308cd878f9153d9a76b08a1afc2e7a",
+        )],
+        vec![],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": base_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs/spec/session.md"),
+        "Intro v2\n\n## REQ-session: Requirement\nTTL 30\n",
+    )
+    .unwrap();
+
+    let scan = run_scan(&open_dir).unwrap();
+
+    assert!(scan.changed_atoms.is_empty());
+    assert_eq!(scan.non_atom_changed_files.len(), 1);
+    assert_eq!(scan.non_atom_changed_files[0].path, "docs/spec/session.md");
+    assert_eq!(scan.non_atom_changed_files[0].status, "modified");
+}
+
+#[test]
+fn clone_branch_creates_closed_branch_and_rejects_unsealed_source() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
     init_repo(&repo_root, false).unwrap();
@@ -826,6 +1193,50 @@ fn clone_branch_creates_closed_branch_and_rejects_burning_source() {
     .unwrap_err()
     .to_string();
     assert!(error.contains("cannot clone from branch 'burning' while it is open-burning"));
+
+    let mut consistent = load_branch_record(&repo_root, "feature/session").unwrap();
+    consistent["name"] = Value::String("consistent".to_string());
+    consistent["state"] = Value::String("open-consistent".to_string());
+    save_branch_record(&repo_root, &consistent).unwrap();
+    let error = clone_branch(
+        &repo_root,
+        &CloneOptions {
+            source: "consistent".to_string(),
+            new_branch: "copy-consistent".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(error.contains("commit or close the source branch first"));
+
+    let quoted = clone_branch(
+        &repo_root,
+        &CloneOptions {
+            source: "main".to_string(),
+            new_branch: "feature/a b".to_string(),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let expected_path = suggested_branch_open_path(&repo_root, "feature/a b");
+    assert_eq!(
+        quoted.plan["next_actions"][0]["command"],
+        format!(
+            "codefire open 'feature/a b' {}",
+            command_arg(&expected_path.to_string_lossy())
+        )
+    );
+    assert_eq!(
+        quoted.plan["next_actions"][0]["target"]["recommended_path"],
+        expected_path.to_string_lossy().as_ref()
+    );
 }
 
 #[test]
@@ -1381,6 +1792,10 @@ fn repo_lock_wait_timeout_returns_lock_contention_with_owner_metadata() {
     assert!(message.contains("timed out after 0ms"));
     assert!(message.contains("owner pid 4242"));
     assert!(message.contains("locked at 2026-06-04T00:00:00Z"));
+    let envelope = cli_error_envelope("open", &error);
+    assert_eq!(envelope["repo"], repo_root.to_string_lossy().as_ref());
+    assert_eq!(envelope["diagnostics"][0]["kind"], "lock_contention");
+    assert_eq!(envelope["next_actions"][0]["kind"], "retry_with_wait_lock");
 }
 
 #[test]
@@ -1650,10 +2065,6 @@ fn context_pack_returns_atom_changed_and_fire_views() {
     .unwrap();
     assert_eq!(branch_pack.data["selector"]["kind"], "branch");
     assert!(branch_pack.data["atoms"].as_array().unwrap().len() >= 2);
-    let status = read_status(&open_dir).unwrap();
-    let status_json = status_data_json_with_prediction(&status, &open_dir);
-    assert_eq!(status_json["scan_prediction"]["changed_count"], 2);
-    assert_eq!(status_json["scan_prediction"]["open_fire_count"], 2);
     let bounded_changed_pack = context::build_context_pack(&context::ContextOptions {
         path: open_dir.clone(),
         selector: context::ContextSelector::Changed,
@@ -1686,13 +2097,10 @@ fn context_pack_returns_atom_changed_and_fire_views() {
         .any(|endpoint| endpoint["from"]["presence"] == "omitted"
             || endpoint["to"]["presence"] == "omitted"));
 
-    let persisted_scan = run_scan(&open_dir).unwrap();
-    let fire_id = persisted_scan
-        .open_fires
-        .first()
+    let fire_id = changed_pack.data["open_fires"][0]["display_id"]
+        .as_str()
         .unwrap()
-        .display_id
-        .clone();
+        .to_string();
     let fire_pack = context::build_context_pack(&context::ContextOptions {
         path: open_dir.clone(),
         selector: context::ContextSelector::Fire(fire_id.clone()),
@@ -1702,9 +2110,12 @@ fn context_pack_returns_atom_changed_and_fire_views() {
     })
     .unwrap();
     assert_eq!(fire_pack.data["selector"]["kind"], "fire");
-    assert_eq!(fire_pack.data["scan"]["snapshot_source"], "active_scan");
-    assert_eq!(fire_pack.data["scan"]["preview_recomputed"], false);
-    assert_eq!(fire_pack.data["scan"]["fire_source"], "active");
+    assert_eq!(
+        fire_pack.data["scan"]["snapshot_source"],
+        "preview_recomputed"
+    );
+    assert_eq!(fire_pack.data["scan"]["preview_recomputed"], true);
+    assert_eq!(fire_pack.data["scan"]["fire_source"], "preview");
     assert_eq!(
         fire_pack.data["scan"]["open_fires"][0]["display_id"],
         fire_id
@@ -1729,7 +2140,7 @@ fn context_pack_returns_atom_changed_and_fire_views() {
     .unwrap();
     assert_eq!(
         stale_pack.data["scan"]["snapshot_source"],
-        "stale_active_scan_preview"
+        "preview_recomputed"
     );
     assert_eq!(stale_pack.data["scan"]["active_scan_fresh"], false);
     assert_eq!(stale_pack.data["scan"]["preview_recomputed"], true);
@@ -3548,6 +3959,17 @@ fires:
     assert_eq!(dry_run.plan["type"], "codefire_operation_plan");
     assert_eq!(dry_run.plan["command"], "extinguish-batch");
     assert_eq!(dry_run.plan["dry_run"], true);
+    assert_eq!(
+        dry_run.plan["next_actions"][0]["command"],
+        format!(
+            "codefire verify --details --json --path {}",
+            open_dir.display()
+        )
+    );
+    assert_eq!(
+        dry_run.plan["next_actions"][0]["target"]["path"],
+        open_dir.to_string_lossy().as_ref()
+    );
     assert_eq!(dry_run.applied_count, 0);
     assert_eq!(dry_run.remaining_open_fire_count, scan.open_fires.len());
     assert!(!active.join("fires.json").exists());
@@ -3571,6 +3993,17 @@ fires:
     assert_eq!(applied_data["type"], "codefire_extinguish_batch_result");
     assert_eq!(applied_data["applied_count"], 2);
     assert_eq!(applied_data["plan"]["items_omitted"], 0);
+    assert_eq!(
+        applied_data["plan"]["next_actions"][0]["command"],
+        format!(
+            "codefire verify --details --json --path {}",
+            open_dir.display()
+        )
+    );
+    assert_eq!(
+        applied_data["plan"]["next_actions"][0]["target"]["path"],
+        open_dir.to_string_lossy().as_ref()
+    );
     let fires: Vec<codefire_core::Fire> =
         serde_json::from_value(read_json(&active.join("fires.json")).unwrap()).unwrap();
     let resolutions: Vec<codefire_core::Resolution> =
@@ -5644,6 +6077,28 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
     assert_eq!(remote_list["project_url"], project_url);
     assert_eq!(remote_list["branches"][0]["name"], "main");
 
+    let remote_main_path = remote::remote_branch_path(&remote_project_root, "main");
+    let mut remote_main = read_json(&remote_main_path).unwrap();
+    remote_main["state"] = Value::String("open-consistent".to_string());
+    write_json_atomic(&remote_main_path, &remote_main).unwrap();
+    let remote_state_error = clone_branch(
+        &clone_repo,
+        &CloneOptions {
+            source: main_url.clone(),
+            new_branch: "main-open-remote".to_string(),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err();
+    assert!(remote_state_error
+        .to_string()
+        .contains("commit or close the source branch first"));
+    remote_main["state"] = Value::String("closed".to_string());
+    write_json_atomic(&remote_main_path, &remote_main).unwrap();
+
     clone_branch(
         &clone_repo,
         &CloneOptions {
@@ -5893,6 +6348,68 @@ fn http_request_merge_dry_run_validates_branch_heads() {
     assert_eq!(dry_run.plan["target_head"], "CF-COMMIT-main-head");
     assert_eq!(dry_run.plan["merge_request_id"], "pending");
     server.join().unwrap();
+}
+
+#[test]
+fn http_clone_dry_run_validates_bundle_without_writing_local_objects() {
+    let temp = tempdir().unwrap();
+    let source_repo = temp.path().join("source-repo");
+    let clone_repo = temp.path().join("clone-repo");
+    init_repo(&source_repo, false).unwrap();
+    init_repo(&clone_repo, false).unwrap();
+    let source_objects = source_repo.join(".codefire").join("objects");
+    let main_commit = write_file_commit(&source_objects, "docs/readme.md", "hello\n");
+    save_branch_record(
+        &source_repo,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": main_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    let branch = load_branch_record(&source_repo, "main").unwrap();
+    let bundle = json!({
+        "branch": branch,
+        "objects": collect_object_record_values(&source_objects),
+    });
+    let body = serde_json::to_string(&bundle).unwrap();
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut request = [0u8; 2048];
+        let _ = stream.read(&mut request).unwrap();
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        stream.write_all(response.as_bytes()).unwrap();
+    });
+    let before = object_store_file_set(&clone_repo.join(".codefire").join("objects"));
+
+    let result = clone_branch(
+        &clone_repo,
+        &CloneOptions {
+            source: format!("cf+http://{address}/org/app/main"),
+            new_branch: "main-from-http".to_string(),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    server.join().unwrap();
+    let after = object_store_file_set(&clone_repo.join(".codefire").join("objects"));
+
+    assert_eq!(result.plan["dry_run"], true);
+    assert_eq!(before, after);
+    assert!(!branch_record_path(&clone_repo, "main-from-http").exists());
 }
 
 #[test]
@@ -6202,6 +6719,31 @@ fn merge_branch_writes_source_changes_and_marks_target_burning() {
     )
     .unwrap();
 
+    let dry_run = merge_branch(
+        &repo_root,
+        &MergeOptions {
+            source_branch: "feature-session".to_string(),
+            target_branch: "main".to_string(),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let dry_run_plan = merge_result_json_value(&dry_run);
+    assert_eq!(dry_run_plan["repo"], repo_root.to_string_lossy().as_ref());
+    assert_eq!(
+        dry_run_plan["next_actions"][0]["command"],
+        "codefire merge feature-session --into main"
+    );
+    let envelope = plan_result_envelope("merge", &dry_run_plan);
+    assert_eq!(envelope["repo"], repo_root.to_string_lossy().as_ref());
+    assert_eq!(
+        envelope["next_actions"][0]["command"],
+        "codefire merge feature-session --into main"
+    );
+
     let result = merge_branch(
         &repo_root,
         &MergeOptions {
@@ -6249,6 +6791,194 @@ fn merge_branch_writes_source_changes_and_marks_target_burning() {
         state.get("pending_merge_parent").and_then(Value::as_str),
         Some(expected_parent.as_str())
     );
+}
+
+#[test]
+fn merge_branch_rejects_open_consistent_source() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit(&objects, "docs/spec/session.md", "TTL 30\n");
+    let feature_commit = write_file_commit_with_parents(
+        &objects,
+        "docs/spec/session.md",
+        "TTL 15\n",
+        vec![base_commit.clone()],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": base_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-session",
+            "head": feature_commit,
+            "state": "open-consistent",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let error = merge_branch(
+        &repo_root,
+        &MergeOptions {
+            source_branch: "feature-session".to_string(),
+            target_branch: "main".to_string(),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err()
+    .to_string();
+
+    assert!(error.contains("commit or close the source branch first"));
+}
+
+#[test]
+fn merge_branch_persists_merge_fires_during_apply() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit_with_atoms(
+        &objects,
+        &[
+            (
+                "docs/spec/session.md",
+                "## REQ-session: Requirement\nTTL 30\n\n## DES-session: Design\nClock policy\n",
+            ),
+            (
+                "codefire.links.yaml",
+                "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
+            ),
+        ],
+        &[
+            (
+                "REQ-session",
+                "requirement",
+                "docs/spec/session.md",
+                "sha256:req-base",
+            ),
+            (
+                "DES-session",
+                "design",
+                "docs/spec/session.md",
+                "sha256:des-base",
+            ),
+        ],
+        vec![],
+    );
+    let feature_commit = write_file_commit_with_atoms(
+        &objects,
+        &[
+            (
+                "docs/spec/session.md",
+                "## REQ-session: Requirement\nTTL 15\n\n## DES-session: Design\nClock policy\n",
+            ),
+            (
+                "codefire.links.yaml",
+                "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
+            ),
+        ],
+        &[
+            (
+                "REQ-session",
+                "requirement",
+                "docs/spec/session.md",
+                "sha256:req-source",
+            ),
+            (
+                "DES-session",
+                "design",
+                "docs/spec/session.md",
+                "sha256:des-base",
+            ),
+        ],
+        vec![base_commit.clone()],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": base_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-session",
+            "head": feature_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    merge_branch(
+        &repo_root,
+        &MergeOptions {
+            source_branch: "feature-session".to_string(),
+            target_branch: "main".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let fires = read_active_fires(&open_dir);
+    assert!(fires.iter().any(|fire| fire.reason == "merge_changed"));
+    let status = read_status(&open_dir).unwrap();
+    assert_eq!(status.state, "open-burning");
+    assert!(status.open_fires > 0);
 }
 
 #[test]
@@ -6707,6 +7437,194 @@ fn merge_dry_run_reports_plan_without_writing_target() {
         normalize_merge_dry_run(&render_merge_dry_run(&result)).trim_end(),
         include_str!("../tests/fixtures/merge_dry_run.golden").trim_end()
     );
+}
+
+#[test]
+fn merge_rejects_self_merge_and_stale_target_worktree() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let base_commit = write_file_commit(&objects, "docs/spec/session.md", "TTL 30\n");
+    let feature_commit = write_file_commit_with_parents(
+        &objects,
+        "docs/spec/session.md",
+        "TTL 15\n",
+        vec![base_commit.clone()],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": base_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-session",
+            "head": feature_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+
+    let self_error = merge_branch(
+        &repo_root,
+        &MergeOptions {
+            source_branch: "main".to_string(),
+            target_branch: "main".to_string(),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err();
+    assert!(self_error
+        .to_string()
+        .contains("cannot merge branch 'main' into itself"));
+
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::write(open_dir.join("docs/spec/session.md"), "TTL 45\n").unwrap();
+
+    let stale_error = merge_branch(
+        &repo_root,
+        &MergeOptions {
+            source_branch: "feature-session".to_string(),
+            target_branch: "main".to_string(),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err();
+    assert!(stale_error.to_string().contains("unsealed open work"));
+    assert_eq!(read_status(&open_dir).unwrap().state, "open-burning");
+}
+
+#[test]
+fn merge_dry_run_blocks_apply_next_action_for_semantic_only_conflicts() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let files = &[(
+        "docs/spec/session.md",
+        "## REQ-session: Requirement\nTTL 30\n",
+    )];
+    let base_commit = write_file_commit_with_atoms(
+        &objects,
+        files,
+        &[(
+            "REQ-session",
+            "requirement",
+            "docs/spec/session.md",
+            "sha256:req-base",
+        )],
+        vec![],
+    );
+    let target_commit = write_file_commit_with_atoms(
+        &objects,
+        files,
+        &[(
+            "REQ-session",
+            "requirement",
+            "docs/spec/session.md",
+            "sha256:req-target",
+        )],
+        vec![base_commit.clone()],
+    );
+    let source_commit = write_file_commit_with_atoms(
+        &objects,
+        files,
+        &[(
+            "REQ-session",
+            "requirement",
+            "docs/spec/session.md",
+            "sha256:req-source",
+        )],
+        vec![base_commit],
+    );
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": target_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "feature-session",
+            "head": source_commit,
+            "state": "closed",
+            "created_at": "2026-06-04T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir,
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let result = merge_branch(
+        &repo_root,
+        &MergeOptions {
+            source_branch: "feature-session".to_string(),
+            target_branch: "main".to_string(),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let actions = merge_next_actions(&result);
+
+    assert!(result.conflicts.is_empty());
+    assert_eq!(result.semantic_conflicts[0].atom_id, "REQ-session");
+    assert!(actions.iter().all(|action| action["kind"] != "apply_merge"));
+    assert!(actions
+        .iter()
+        .any(|action| action["kind"] == "review_semantic_conflict"));
 }
 
 #[test]
@@ -7260,6 +8178,22 @@ fn write_generation_commit_with_label(
 
 fn write_file_commit(objects: &Path, path: &str, contents: &str) -> String {
     write_file_commit_with_parents(objects, path, contents, vec![])
+}
+
+fn collect_object_record_values(objects: &Path) -> Vec<Value> {
+    rel_files(objects)
+        .unwrap()
+        .into_iter()
+        .map(|relative| read_json(&objects.join(relative)).unwrap())
+        .collect()
+}
+
+fn object_store_file_set(objects: &Path) -> BTreeSet<String> {
+    rel_files(objects)
+        .unwrap()
+        .into_iter()
+        .map(|relative| to_posix(&relative))
+        .collect()
 }
 
 fn write_file_commit_with_parents(
