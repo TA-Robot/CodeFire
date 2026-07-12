@@ -9,6 +9,13 @@ import shutil
 import sys
 from pathlib import Path
 
+from build_source_bound_rust import (
+    BINARY_PATH,
+    DEFAULT_OUTPUT,
+    git_head,
+    validate_provenance_payload,
+)
+
 
 CAPABILITY_IDS = {
     "bash",
@@ -36,7 +43,24 @@ def rust_binary_state(root: Path) -> dict[str, object]:
     sources = list((root / "crates").rglob("*.rs"))
     sources.extend([root / "Cargo.toml", root / "Cargo.lock"])
     source_mtime = newest_mtime(sources)
-    candidates = [root / "target/release/codefire-rs", root / "target/debug/codefire-rs"]
+    provenance_path = root / DEFAULT_OUTPUT
+    provenance_errors: list[str] = []
+    provenance: dict[str, object] | None = None
+    if provenance_path.is_file():
+        try:
+            loaded = json.loads(provenance_path.read_text(encoding="utf-8"))
+            if not isinstance(loaded, dict):
+                raise ValueError("provenance root must be an object")
+            provenance = loaded
+            provenance_errors = validate_provenance_payload(
+                root,
+                provenance,
+                expected_revision=git_head(root),
+            )
+        except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+            provenance_errors = [str(exc)]
+    source_revision_bound = provenance is not None and not provenance_errors
+    candidates = [root / BINARY_PATH, root / "target/debug/codefire-rs"]
     binaries: list[dict[str, object]] = []
     for path in candidates:
         if not path.is_file():
@@ -47,13 +71,20 @@ def rust_binary_state(root: Path) -> dict[str, object]:
                 "path": path.relative_to(root).as_posix(),
                 "bytes": path.stat().st_size,
                 "newer_than_sources": source_mtime is not None and mtime >= source_mtime,
-                "source_revision_bound": False,
+                "source_revision_bound": source_revision_bound and path == root / BINARY_PATH,
             }
         )
     return {
         "available": bool(binaries),
-        "source_revision_bound": False,
-        "note": "mtime ordering is informational and never proves that a binary was built from this worktree",
+        "source_revision_bound": source_revision_bound,
+        "note": "source binding requires a valid clean-HEAD provenance artifact; mtime ordering is informational only",
+        "provenance": {
+            "path": DEFAULT_OUTPUT.as_posix(),
+            "present": provenance_path.is_file(),
+            "valid": source_revision_bound,
+            "base_revision": provenance.get("base_revision") if provenance else None,
+            "errors": provenance_errors,
+        },
         "binaries": binaries,
     }
 

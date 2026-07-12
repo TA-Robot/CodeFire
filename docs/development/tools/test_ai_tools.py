@@ -39,8 +39,10 @@ from build_source_bound_rust import (  # noqa: E402
     validate_source_inputs_against_head,
 )
 from prepare_historical_eval import build_candidate_input  # noqa: E402
+from probe_validation_capabilities import rust_binary_state  # noqa: E402
 from resolve_context_pack import build_manifest, expand_reference  # noqa: E402
 from run_ai_role import preflight_task_execution, resolve_packet_manifest  # noqa: E402
+from run_dogfood_smoke import smoke_commands, validate_result  # noqa: E402
 from suggest_validation import parse_porcelain_paths, suggestions  # noqa: E402
 from validate_ai_runtime import strict_config_probe  # noqa: E402
 
@@ -601,6 +603,55 @@ class FocusedTestMapTests(unittest.TestCase):
         self.assertIn("python3 docs/development/tools/check_ai_development.py", commands)
         self.assertEqual(len(commands), len(set(commands)))
         self.assertEqual(result["uncovered_paths"], [])
+
+
+class DogfoodSmokeTests(unittest.TestCase):
+    def test_read_only_mode_runs_only_status(self) -> None:
+        commands = smoke_commands(Path("/repo/codefire"), Path("/repo/dogfood"), False)
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(commands[0][1], "status")
+
+    def test_mutating_mode_orders_status_scan_verify(self) -> None:
+        commands = smoke_commands(Path("/repo/codefire"), Path("/repo/dogfood"), True)
+        self.assertEqual([command[1] for command in commands], ["status", "scan", "verify"])
+
+    def test_result_validation_rejects_process_payload_mismatch(self) -> None:
+        payload = {
+            "schema": "codefire.command_result.v1",
+            "command": "status",
+            "ok": True,
+            "exit_code": 0,
+        }
+        result = validate_result("status", 2, json.dumps(payload), "")
+        self.assertFalse(result["ok"])
+        self.assertIn("payload exit_code differs from process return code", result["errors"])
+
+
+class CapabilityProvenanceTests(unittest.TestCase):
+    def test_valid_release_provenance_marks_only_release_binary_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            release = root / BINARY_PATH
+            release.parent.mkdir(parents=True)
+            release.write_bytes(b"release")
+            debug = root / "target/debug/codefire-rs"
+            debug.parent.mkdir(parents=True)
+            debug.write_bytes(b"debug")
+            provenance = root / "target/codefire-ai/rust-build-provenance.json"
+            provenance.parent.mkdir(parents=True)
+            provenance.write_text(
+                json.dumps({"base_revision": "a" * 40}), encoding="utf-8"
+            )
+            with mock.patch(
+                "probe_validation_capabilities.git_head", return_value="a" * 40
+            ), mock.patch(
+                "probe_validation_capabilities.validate_provenance_payload", return_value=[]
+            ):
+                state = rust_binary_state(root)
+        self.assertTrue(state["source_revision_bound"])
+        by_path = {item["path"]: item for item in state["binaries"]}
+        self.assertTrue(by_path[BINARY_PATH.as_posix()]["source_revision_bound"])
+        self.assertFalse(by_path["target/debug/codefire-rs"]["source_revision_bound"])
 
 
 class WorktreeClassifierTests(unittest.TestCase):

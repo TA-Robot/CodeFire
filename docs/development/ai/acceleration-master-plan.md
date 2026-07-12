@@ -51,7 +51,7 @@ Exit criteria:
 - Unknown dirty files list is empty or explicitly assigned.
 - The mixed tree is saved as purpose-specific management, AI, strategy, cleanup, issue, product, dogfood implementation, and dogfood documentation commits.
 
-## Stage 1: Make AI Packets Operational
+## Stage 1: Make AI Packets Operational — Complete 2026-07-12
 
 Deliverables:
 
@@ -67,7 +67,7 @@ Exit criteria:
 - A reviewer can review the result with a standard checklist.
 - The local runtime checker proves repository routing/config consistency and detects a missing GPT-5.6 Sol Ultra catalog.
 
-## Stage 2: Add Checkers and Generators
+## Stage 2: Add Checkers and Generators — Complete 2026-07-12
 
 Deliverables:
 
@@ -82,7 +82,7 @@ Exit criteria:
 - A validation runner can report readiness without knowing project history.
 - stale current-state contradictions are detected automatically.
 
-## Stage 3: Parallel Lane Execution
+## Stage 3: Parallel Lane Execution — Complete 2026-07-12
 
 Deliverables:
 
@@ -94,31 +94,32 @@ Exit criteria:
 
 - At least two lanes can run without overlapping write sets.
 - global state files are manager-owned.
+- The organization checkpoint demonstrates separate management, AI, strategy, cleanup, issue, product, dogfood implementation, and dogfood documentation commits.
 
-## Stage 4: Dogfood and Learning Loop
+## Stage 4: Dogfood and Learning Loop — Complete 2026-07-12
 
 Deliverables:
 
 - dogfood smoke runner;
-- CFB creation packet;
+- CFB intake/promotion packet;
 - failure cookbook;
-- validation report template.
+- validation report template backed by the typed review schema.
 
 Exit criteria:
 
 - Dogfood friction can be converted into a task packet within minutes.
 - negative results are captured instead of lost.
 
-## Initial Execution Order
+## Completed Bootstrap Order
 
-1. Run dirty-tree split packet.
-2. Save management docs and AI acceleration docs together.
-3. Restore Rust validation environment.
-4. Run branch-list timeout packet.
-5. Add broader issue/count consistency checker.
-6. Add validation availability probe.
-7. Add focused test map.
-8. Split historical burn-down archive if still needed.
+1. Ran the dirty-tree classifier and saved eight purpose-specific packages.
+2. Restored the Rust source gate and produced clean-HEAD build provenance.
+3. Added issue/count/source/document consistency checks and a capability probe.
+4. Added focused validation routing, typed packets/reviews, and live tier-routing evidence.
+5. Split the historical burn-down archive from the active plan.
+6. Added bounded dogfood smoke, CFB intake, failure handling, and validation-report assets.
+
+The branch-list timeout packet remains a bounded product investigation, not an unmet bootstrap dependency.
 
 ## Execution Backlog
 
@@ -127,13 +128,13 @@ Only keep items that remove repeated human/AI overhead, can be checked cheaply, 
 | ID | Item | Status / output |
 |---|---|---|
 | AIA-001 | Dirty tree package splitter | Seeded as `../tools/classify_worktree.py`. |
-| AIA-002 | Current-state and issue-count consistency checker | Initial AI-doc stale phrase checks exist in `../tools/check_ai_acceleration_docs.py`; broader issue-count checker remains next. |
-| AIA-003 | Validation availability probe | Implemented in `../tools/probe_validation_capabilities.py`; presence, source-bound evidence, and runnable source gates are separate. |
+| AIA-002 | Current-state and issue-count consistency checker | Implemented across `../tools/check_ai_acceleration_docs.py` and `../tools/check_project_docs.py`, including active-state phrases and CFB/CFR detail-ledger reconciliation. |
+| AIA-003 | Validation availability probe | Implemented in `../tools/probe_validation_capabilities.py`; presence, revalidated clean-HEAD provenance, and runnable source gates are separate. |
 | AIA-004 | Branch-list timeout investigation | Packet exists at `task-packets/branch-list-timeout.md`. |
 | AIA-020 | Focused test map | Implemented in `focused-test-map.v1.json` and `../tools/suggest_validation.py`. |
 | AIA-021 | Rust validation/provenance wrapper | Source-bound release build wrapper implemented in `../tools/build_source_bound_rust.py`; it requires tracked and untracked Cargo/crates/`.cargo`/toolchain inputs to match HEAD, rejects changes across the build, and emits source/toolchain/build-log/binary digests. A higher-level fmt/focused/clippy/workspace orchestrator remains optional after repeated need. |
 | AIA-022 | Broader docs consistency runner | Implemented for local links, CFB/CFR ledgers, removed-plan references, strategy metadata, inventory, and source-symbol freshness in `../tools/check_project_docs.py` and `../tools/check_source_docs.py`. |
-| AIA-023 | Dogfood smoke runner | Pending; should run status/scan/verify with explicit target path and no mutation by default. |
+| AIA-023 | Dogfood smoke runner | Implemented in `../tools/run_dogfood_smoke.py`; default mode runs only read-only `status`, while `scan`/`verify` require explicit `--allow-mutation`. JSON schema, command identity, exit-code agreement, containment, timeout, and fail-fast behavior are checked. |
 | AIA-024 | GPT-5.6 Sol role routing | Implemented in `.codex/`, `model-routing-policy.md`, `role-routing-matrix.json`, and `validate_ai_runtime.py`. A dated account-level Medium/High/Ultra minimal smoke passed and is recorded in `evals/live-routing-smoke-2026-07-11.v1.json`; scored quality comparison remains AIA-026. |
 | AIA-025 | Typed task/context/review schemas | Implemented in `schemas/`, with schema/semantic checks, recomputed context digests, task-bound review validation, dirty/base execution preflight, typed branch-list packet, and digest-aware runner. Markdown generation/round-trip lint remains. |
 | AIA-026 | AI development eval corpus | Routing cases cover all tiers and mandatory-Ultra reasons. Eight historical CFB/CFR defect/completion cases, withheld evaluator oracles, deterministic input preparation, and corpus checks are implemented; scored live model cohorts remain Stage 2. |

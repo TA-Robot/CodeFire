@@ -134,6 +134,8 @@ If the agent cannot state these, the work is not ready.
 | `evals/` | Deterministic routing cases, redacted historical defect inputs, evaluator oracles, the dated live routing smoke, and future scored live-eval records. |
 | `../exploration/` | Phase 1-3 non-authoritative research notes and experiment candidates. |
 | `operating-protocol.md` | Task packet shape, review packet shape, parallel-lane rules, and handoff format. |
+| `failure-cookbook.md` | Maps recurring environment, provenance, packet, timeout, JSON, and review failures to safe next actions. |
+| `validation-report-template.md` | Human handoff shape corresponding to the typed review contract; placeholders are never evidence. |
 
 ## Local Tools and Evidence
 
@@ -147,10 +149,13 @@ If the agent cannot state these, the work is not ready.
 | `../tools/validate_ai_runtime.py` | Strict-parses project routing, checks every role layer and CLI-version adapter, and validates GPT-5.6 Sol Medium/High/Ultra from the bundled model JSON. |
 | `../tools/resolve_context_pack.py` | Resolves pack inheritance and hashes every selected context file. |
 | `../tools/suggest_validation.py` | Maps changed paths to deduplicated focused validation commands. |
-| `../tools/probe_validation_capabilities.py` | Reports available validators and distinguishes binary presence from current-source provenance. |
+| `../tools/probe_validation_capabilities.py` | Reports available validators and distinguishes binary presence from a revalidated clean-HEAD provenance artifact. |
 | `../tools/build_source_bound_rust.py` | Builds the release Rust CLI and writes canonical provenance only when Cargo/crates/`.cargo`/toolchain inputs are clean against HEAD and unchanged across the build. |
+| `../tools/run_dogfood_smoke.py` | Runs bounded dogfood status checks read-only by default; `scan` and `verify` require explicit `--allow-mutation`. |
 | `../tools/run_ai_role.py` | Validates a typed packet, binds context/base/dirty-state preflight, and builds or explicitly executes a routed Codex run; dry-run/read-only is the default. |
 | `../tools/prepare_historical_eval.py` | Materializes one deterministic historical CFB/CFR candidate input while withholding the evaluator oracle. |
+
+Dogfood findings start with `task-packets/cfb-intake.md`; only the manager may promote them into the authoritative issue ledgers or amend the frozen batch.
 | `evals/live-routing-smoke-2026-07-11.v1.json` | Records successful live GPT-5.6 Sol Medium/High/Ultra minimal invocations and explicitly bounds what the smoke proves. |
 
 The Rust provenance wrapper binds one local clean-HEAD build to its source inputs, toolchain report, build-log digest, and current binary digest. It is not a trusted or reproducible builder and does not provide dependency supply-chain attestation.
