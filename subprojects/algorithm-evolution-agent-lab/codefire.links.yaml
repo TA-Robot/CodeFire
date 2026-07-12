@@ -1278,3 +1278,690 @@ links:
   - from: REQ-AUTO-033
     to: TEST-claim-release-gate-allows-complete-claims
     type: verified_by
+  - from: REQ-AUTO-097
+    to: DES-AUTO-079
+    type: refined_by
+  - from: DES-AUTO-079
+    to: CODE-NameLenAudit
+    type: implemented_by
+  - from: REQ-AUTO-097
+    to: TEST-name-len-audit-flags-long-names
+    type: verified_by
+  - from: REQ-AUTO-098
+    to: DES-AUTO-080
+    type: refined_by
+  - from: DES-AUTO-080
+    to: CODE-NamePlan
+    type: implemented_by
+  - from: REQ-AUTO-098
+    to: TEST-name-plan-suggests-short-names
+    type: verified_by
+  - from: REQ-AUTO-099
+    to: DES-AUTO-081
+    type: refined_by
+  - from: DES-AUTO-081
+    to: CODE-NameReport
+    type: implemented_by
+  - from: REQ-AUTO-099
+    to: TEST-name-report-renders-table
+    type: verified_by
+  - from: REQ-AUTO-100
+    to: DES-AUTO-082
+    type: refined_by
+  - from: DES-AUTO-082
+    to: CODE-NameAuditRun
+    type: implemented_by
+  - from: REQ-AUTO-100
+    to: TEST-name-audit-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-101
+    to: DES-AUTO-083
+    type: refined_by
+  - from: DES-AUTO-083
+    to: CODE-NameFiles
+    type: implemented_by
+  - from: REQ-AUTO-101
+    to: TEST-name-files-discovers-python
+    type: verified_by
+  - from: REQ-AUTO-102
+    to: DES-AUTO-084
+    type: refined_by
+  - from: DES-AUTO-084
+    to: CODE-NameProjRun
+    type: implemented_by
+  - from: REQ-AUTO-102
+    to: TEST-name-proj-run-renders-root
+    type: verified_by
+  - from: REQ-AUTO-103
+    to: DES-AUTO-085
+    type: refined_by
+  - from: DES-AUTO-085
+    to: CODE-NameStats
+    type: implemented_by
+  - from: REQ-AUTO-103
+    to: TEST-name-stats-summarizes-hits
+    type: verified_by
+  - from: REQ-AUTO-104
+    to: DES-AUTO-086
+    type: refined_by
+  - from: DES-AUTO-086
+    to: CODE-NameStatMd
+    type: implemented_by
+  - from: REQ-AUTO-104
+    to: TEST-name-stat-md-renders-summary
+    type: verified_by
+  - from: REQ-AUTO-105
+    to: DES-AUTO-087
+    type: refined_by
+  - from: DES-AUTO-087
+    to: CODE-NameKinds
+    type: implemented_by
+  - from: REQ-AUTO-105
+    to: TEST-name-kinds-groups-hits
+    type: verified_by
+  - from: REQ-AUTO-106
+    to: DES-AUTO-088
+    type: refined_by
+  - from: DES-AUTO-088
+    to: CODE-NameKindMd
+    type: implemented_by
+  - from: REQ-AUTO-106
+    to: TEST-name-kind-md-renders-table
+    type: verified_by
+  - from: REQ-AUTO-107
+    to: DES-AUTO-089
+    type: refined_by
+  - from: DES-AUTO-089
+    to: CODE-NameDash
+    type: implemented_by
+  - from: REQ-AUTO-107
+    to: TEST-name-dash-renders-summary
+    type: verified_by
+  - from: REQ-AUTO-108
+    to: DES-AUTO-090
+    type: refined_by
+  - from: DES-AUTO-090
+    to: CODE-NameDashRun
+    type: implemented_by
+  - from: REQ-AUTO-108
+    to: TEST-name-dash-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-109
+    to: DES-AUTO-091
+    type: refined_by
+  - from: DES-AUTO-091
+    to: CODE-NameProjDash
+    type: implemented_by
+  - from: REQ-AUTO-109
+    to: TEST-name-proj-dash-renders-root
+    type: verified_by
+  - from: REQ-AUTO-110
+    to: DES-AUTO-092
+    type: refined_by
+  - from: DES-AUTO-092
+    to: CODE-NameTop
+    type: implemented_by
+  - from: REQ-AUTO-110
+    to: TEST-name-top-ranks-hits
+    type: verified_by
+  - from: REQ-AUTO-111
+    to: DES-AUTO-093
+    type: refined_by
+  - from: DES-AUTO-093
+    to: CODE-NameTopMd
+    type: implemented_by
+  - from: REQ-AUTO-111
+    to: TEST-name-top-md-renders-table
+    type: verified_by
+  - from: REQ-AUTO-112
+    to: DES-AUTO-094
+    type: refined_by
+  - from: DES-AUTO-094
+    to: CODE-NameTopRun
+    type: implemented_by
+  - from: REQ-AUTO-112
+    to: TEST-name-top-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-113
+    to: DES-AUTO-095
+    type: refined_by
+  - from: DES-AUTO-095
+    to: CODE-NameProjTop
+    type: implemented_by
+  - from: REQ-AUTO-113
+    to: TEST-name-proj-top-renders-root
+    type: verified_by
+  - from: REQ-AUTO-114
+    to: DES-AUTO-096
+    type: refined_by
+  - from: DES-AUTO-096
+    to: CODE-NameFull
+    type: implemented_by
+  - from: REQ-AUTO-114
+    to: TEST-name-full-renders-report
+    type: verified_by
+  - from: REQ-AUTO-115
+    to: DES-AUTO-097
+    type: refined_by
+  - from: DES-AUTO-097
+    to: CODE-NameFullRun
+    type: implemented_by
+  - from: REQ-AUTO-115
+    to: TEST-name-full-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-116
+    to: DES-AUTO-098
+    type: refined_by
+  - from: DES-AUTO-098
+    to: CODE-NameProjFull
+    type: implemented_by
+  - from: REQ-AUTO-116
+    to: TEST-name-proj-full-renders-root
+    type: verified_by
+  - from: REQ-AUTO-117
+    to: DES-AUTO-099
+    type: refined_by
+  - from: DES-AUTO-099
+    to: CODE-NameJson
+    type: implemented_by
+  - from: REQ-AUTO-117
+    to: TEST-name-json-renders-hits
+    type: verified_by
+  - from: REQ-AUTO-118
+    to: DES-AUTO-100
+    type: refined_by
+  - from: DES-AUTO-100
+    to: CODE-NameJsonRun
+    type: implemented_by
+  - from: REQ-AUTO-118
+    to: TEST-name-json-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-119
+    to: DES-AUTO-101
+    type: refined_by
+  - from: DES-AUTO-101
+    to: CODE-NameProjJson
+    type: implemented_by
+  - from: REQ-AUTO-119
+    to: TEST-name-proj-json-renders-root
+    type: verified_by
+  - from: REQ-AUTO-120
+    to: DES-AUTO-102
+    type: refined_by
+  - from: DES-AUTO-102
+    to: CODE-NameStatJson
+    type: implemented_by
+  - from: REQ-AUTO-120
+    to: TEST-name-stat-json-renders-summary
+    type: verified_by
+  - from: REQ-AUTO-121
+    to: DES-AUTO-103
+    type: refined_by
+  - from: DES-AUTO-103
+    to: CODE-NameDashJson
+    type: implemented_by
+  - from: REQ-AUTO-121
+    to: TEST-name-dash-json-renders-summary
+    type: verified_by
+  - from: REQ-AUTO-122
+    to: DES-AUTO-104
+    type: refined_by
+  - from: DES-AUTO-104
+    to: CODE-NameDashJsonRun
+    type: implemented_by
+  - from: REQ-AUTO-122
+    to: TEST-name-dash-json-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-123
+    to: DES-AUTO-105
+    type: refined_by
+  - from: DES-AUTO-105
+    to: CODE-NamePjDashJson
+    type: implemented_by
+  - from: REQ-AUTO-123
+    to: TEST-name-pj-dash-json-renders-root
+    type: verified_by
+  - from: REQ-AUTO-124
+    to: DES-AUTO-106
+    type: refined_by
+  - from: DES-AUTO-106
+    to: CODE-NameTopJson
+    type: implemented_by
+  - from: REQ-AUTO-124
+    to: TEST-name-top-json-renders-ranked-hits
+    type: verified_by
+  - from: REQ-AUTO-125
+    to: DES-AUTO-107
+    type: refined_by
+  - from: DES-AUTO-107
+    to: CODE-NameTopJsonRun
+    type: implemented_by
+  - from: REQ-AUTO-125
+    to: TEST-name-top-json-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-126
+    to: DES-AUTO-108
+    type: refined_by
+  - from: DES-AUTO-108
+    to: CODE-NameProjTopJson
+    type: implemented_by
+  - from: REQ-AUTO-126
+    to: TEST-name-proj-top-json-renders-root
+    type: verified_by
+  - from: REQ-AUTO-127
+    to: DES-AUTO-109
+    type: refined_by
+  - from: DES-AUTO-109
+    to: CODE-NameFixJson
+    type: implemented_by
+  - from: REQ-AUTO-127
+    to: TEST-name-fix-json-renders-fixes
+    type: verified_by
+  - from: REQ-AUTO-128
+    to: DES-AUTO-110
+    type: refined_by
+  - from: DES-AUTO-110
+    to: CODE-NameFixJsonRun
+    type: implemented_by
+  - from: REQ-AUTO-128
+    to: TEST-name-fix-json-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-129
+    to: DES-AUTO-111
+    type: refined_by
+  - from: DES-AUTO-111
+    to: CODE-NameProjFixJson
+    type: implemented_by
+  - from: REQ-AUTO-129
+    to: TEST-name-proj-fix-json-renders-root
+    type: verified_by
+  - from: REQ-AUTO-130
+    to: DES-AUTO-112
+    type: refined_by
+  - from: DES-AUTO-112
+    to: CODE-NameGate
+    type: implemented_by
+  - from: REQ-AUTO-130
+    to: TEST-name-gate-blocks-hits
+    type: verified_by
+  - from: REQ-AUTO-131
+    to: DES-AUTO-113
+    type: refined_by
+  - from: DES-AUTO-113
+    to: CODE-NameGateJson
+    type: implemented_by
+  - from: REQ-AUTO-131
+    to: TEST-name-gate-json-renders-result
+    type: verified_by
+  - from: REQ-AUTO-132
+    to: DES-AUTO-114
+    type: refined_by
+  - from: DES-AUTO-114
+    to: CODE-NameGateMd
+    type: implemented_by
+  - from: REQ-AUTO-132
+    to: TEST-name-gate-md-renders-result
+    type: verified_by
+  - from: REQ-AUTO-133
+    to: DES-AUTO-115
+    type: refined_by
+  - from: DES-AUTO-115
+    to: CODE-NameGateRun
+    type: implemented_by
+  - from: REQ-AUTO-133
+    to: TEST-name-gate-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-134
+    to: DES-AUTO-116
+    type: refined_by
+  - from: DES-AUTO-116
+    to: CODE-NameGateJsonRun
+    type: implemented_by
+  - from: REQ-AUTO-134
+    to: TEST-name-gate-json-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-135
+    to: DES-AUTO-117
+    type: refined_by
+  - from: DES-AUTO-117
+    to: CODE-NameProjGate
+    type: implemented_by
+  - from: REQ-AUTO-135
+    to: TEST-name-proj-gate-renders-root
+    type: verified_by
+  - from: REQ-AUTO-136
+    to: DES-AUTO-118
+    type: refined_by
+  - from: DES-AUTO-118
+    to: CODE-NameProjGateJson
+    type: implemented_by
+  - from: REQ-AUTO-136
+    to: TEST-name-proj-gate-json-renders-root
+    type: verified_by
+  - from: REQ-AUTO-137
+    to: DES-AUTO-119
+    type: refined_by
+  - from: DES-AUTO-119
+    to: CODE-NameGatePack
+    type: implemented_by
+  - from: REQ-AUTO-137
+    to: TEST-name-gate-pack-renders-hits
+    type: verified_by
+  - from: REQ-AUTO-138
+    to: DES-AUTO-120
+    type: refined_by
+  - from: DES-AUTO-120
+    to: CODE-NameGatePackRun
+    type: implemented_by
+  - from: REQ-AUTO-138
+    to: TEST-name-gate-pack-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-139
+    to: DES-AUTO-121
+    type: refined_by
+  - from: DES-AUTO-121
+    to: CODE-NameProjGatePack
+    type: implemented_by
+  - from: REQ-AUTO-139
+    to: TEST-name-proj-gate-pack-renders-root
+    type: verified_by
+  - from: REQ-AUTO-140
+    to: DES-AUTO-122
+    type: refined_by
+  - from: DES-AUTO-122
+    to: CODE-NameGateExit
+    type: implemented_by
+  - from: REQ-AUTO-140
+    to: TEST-name-gate-exit-codes-result
+    type: verified_by
+  - from: REQ-AUTO-141
+    to: DES-AUTO-123
+    type: refined_by
+  - from: DES-AUTO-123
+    to: CODE-NameGateExitRun
+    type: implemented_by
+  - from: REQ-AUTO-141
+    to: TEST-name-gate-exit-run-codes-paths
+    type: verified_by
+  - from: REQ-AUTO-142
+    to: DES-AUTO-124
+    type: refined_by
+  - from: DES-AUTO-124
+    to: CODE-NameProjGateExit
+    type: implemented_by
+  - from: REQ-AUTO-142
+    to: TEST-name-proj-gate-exit-codes-root
+    type: verified_by
+  - from: REQ-AUTO-143
+    to: DES-AUTO-125
+    type: refined_by
+  - from: DES-AUTO-125
+    to: CODE-NameGateLine
+    type: implemented_by
+  - from: REQ-AUTO-143
+    to: TEST-name-gate-line-renders-result
+    type: verified_by
+  - from: REQ-AUTO-144
+    to: DES-AUTO-126
+    type: refined_by
+  - from: DES-AUTO-126
+    to: CODE-NameGateLineRun
+    type: implemented_by
+  - from: REQ-AUTO-144
+    to: TEST-name-gate-line-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-145
+    to: DES-AUTO-127
+    type: refined_by
+  - from: DES-AUTO-127
+    to: CODE-NameProjGateLine
+    type: implemented_by
+  - from: REQ-AUTO-145
+    to: TEST-name-proj-gate-line-renders-root
+    type: verified_by
+  - from: REQ-AUTO-146
+    to: DES-AUTO-128
+    type: refined_by
+  - from: DES-AUTO-128
+    to: CODE-NameCiRun
+    type: implemented_by
+  - from: REQ-AUTO-146
+    to: TEST-name-ci-run-returns-code-line
+    type: verified_by
+  - from: REQ-AUTO-147
+    to: DES-AUTO-129
+    type: refined_by
+  - from: DES-AUTO-129
+    to: CODE-NameProjCiRun
+    type: implemented_by
+  - from: REQ-AUTO-147
+    to: TEST-name-proj-ci-run-returns-code-line
+    type: verified_by
+  - from: REQ-AUTO-148
+    to: DES-AUTO-130
+    type: refined_by
+  - from: DES-AUTO-130
+    to: CODE-NameCiJson
+    type: implemented_by
+  - from: REQ-AUTO-148
+    to: TEST-name-ci-json-renders-result
+    type: verified_by
+  - from: REQ-AUTO-149
+    to: DES-AUTO-131
+    type: refined_by
+  - from: DES-AUTO-131
+    to: CODE-NameCiJsonRun
+    type: implemented_by
+  - from: REQ-AUTO-149
+    to: TEST-name-ci-json-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-150
+    to: DES-AUTO-132
+    type: refined_by
+  - from: DES-AUTO-132
+    to: CODE-NameProjCiJsonRun
+    type: implemented_by
+  - from: REQ-AUTO-150
+    to: TEST-name-proj-ci-json-run-renders-root
+    type: verified_by
+  - from: REQ-AUTO-151
+    to: DES-AUTO-133
+    type: refined_by
+  - from: DES-AUTO-133
+    to: CODE-NameCiStatusJson
+    type: implemented_by
+  - from: REQ-AUTO-151
+    to: TEST-name-ci-status-json-renders-ok
+    type: verified_by
+  - from: REQ-AUTO-152
+    to: DES-AUTO-134
+    type: refined_by
+  - from: DES-AUTO-134
+    to: CODE-NameCiStatusRun
+    type: implemented_by
+  - from: REQ-AUTO-152
+    to: TEST-name-ci-status-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-153
+    to: DES-AUTO-135
+    type: refined_by
+  - from: DES-AUTO-135
+    to: CODE-NameProjCiStatusRun
+    type: implemented_by
+  - from: REQ-AUTO-153
+    to: TEST-name-proj-ci-status-run-renders-root
+    type: verified_by
+  - from: REQ-AUTO-154
+    to: DES-AUTO-136
+    type: refined_by
+  - from: DES-AUTO-136
+    to: CODE-NameCiPack
+    type: implemented_by
+  - from: DES-AUTO-136
+    to: CODE-NameCiPackRun
+    type: implemented_by
+  - from: REQ-AUTO-154
+    to: TEST-name-ci-pack-renders-hits
+    type: verified_by
+  - from: REQ-AUTO-154
+    to: TEST-name-ci-pack-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-155
+    to: DES-AUTO-137
+    type: refined_by
+  - from: DES-AUTO-137
+    to: CODE-NameProjCiPackRun
+    type: implemented_by
+  - from: REQ-AUTO-155
+    to: TEST-name-proj-ci-pack-run-renders-root
+    type: verified_by
+  - from: REQ-AUTO-156
+    to: DES-AUTO-138
+    type: refined_by
+  - from: DES-AUTO-138
+    to: CODE-NameCiNote
+    type: implemented_by
+  - from: DES-AUTO-138
+    to: CODE-NameCiNoteRun
+    type: implemented_by
+  - from: REQ-AUTO-156
+    to: TEST-name-ci-note-renders-hits
+    type: verified_by
+  - from: REQ-AUTO-156
+    to: TEST-name-ci-note-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-157
+    to: DES-AUTO-139
+    type: refined_by
+  - from: DES-AUTO-139
+    to: CODE-NameProjCiNoteRun
+    type: implemented_by
+  - from: REQ-AUTO-157
+    to: TEST-name-proj-ci-note-run-renders-root
+    type: verified_by
+  - from: REQ-AUTO-158
+    to: DES-AUTO-140
+    type: refined_by
+  - from: DES-AUTO-140
+    to: CODE-NameCiNoteTop
+    type: implemented_by
+  - from: REQ-AUTO-158
+    to: TEST-name-ci-note-top-limits-hits
+    type: verified_by
+  - from: REQ-AUTO-159
+    to: DES-AUTO-141
+    type: refined_by
+  - from: DES-AUTO-141
+    to: CODE-NameCiNoteTopRun
+    type: implemented_by
+  - from: REQ-AUTO-159
+    to: TEST-name-ci-note-top-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-160
+    to: DES-AUTO-142
+    type: refined_by
+  - from: DES-AUTO-142
+    to: CODE-NameProjCiNoteTopRun
+    type: implemented_by
+  - from: REQ-AUTO-160
+    to: TEST-name-proj-ci-note-top-run-renders-root
+    type: verified_by
+  - from: REQ-AUTO-161
+    to: DES-AUTO-143
+    type: refined_by
+  - from: DES-AUTO-143
+    to: CODE-NameCiNoteMd
+    type: implemented_by
+  - from: REQ-AUTO-161
+    to: TEST-name-ci-note-md-renders-fence
+    type: verified_by
+  - from: REQ-AUTO-162
+    to: DES-AUTO-144
+    type: refined_by
+  - from: DES-AUTO-144
+    to: CODE-NameCiNoteMdRun
+    type: implemented_by
+  - from: REQ-AUTO-162
+    to: TEST-name-ci-note-md-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-163
+    to: DES-AUTO-145
+    type: refined_by
+  - from: DES-AUTO-145
+    to: CODE-NameProjCiNoteMdRun
+    type: implemented_by
+  - from: REQ-AUTO-163
+    to: TEST-name-proj-ci-note-md-run-renders-root
+    type: verified_by
+  - from: REQ-AUTO-164
+    to: DES-AUTO-146
+    type: refined_by
+  - from: DES-AUTO-146
+    to: CODE-NameCiNoteSec
+    type: implemented_by
+  - from: REQ-AUTO-164
+    to: TEST-name-ci-note-sec-renders-section
+    type: verified_by
+  - from: REQ-AUTO-165
+    to: DES-AUTO-147
+    type: refined_by
+  - from: DES-AUTO-147
+    to: CODE-NameCiNoteSecRun
+    type: implemented_by
+  - from: REQ-AUTO-165
+    to: TEST-name-ci-note-sec-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-166
+    to: DES-AUTO-148
+    type: refined_by
+  - from: DES-AUTO-148
+    to: CODE-NameProjCiNoteSecRun
+    type: implemented_by
+  - from: REQ-AUTO-166
+    to: TEST-name-proj-ci-note-sec-run-renders-root
+    type: verified_by
+  - from: REQ-AUTO-167
+    to: DES-AUTO-149
+    type: refined_by
+  - from: DES-AUTO-149
+    to: CODE-NameOpsGuide
+    type: implemented_by
+  - from: REQ-AUTO-167
+    to: TEST-name-ops-guide-renders-workflow
+    type: verified_by
+  - from: REQ-AUTO-168
+    to: DES-AUTO-150
+    type: refined_by
+  - from: DES-AUTO-150
+    to: CODE-NameProjOpsDoc
+    type: implemented_by
+  - from: REQ-AUTO-168
+    to: TEST-name-proj-ops-doc-renders-current-section
+    type: verified_by
+  - from: REQ-AUTO-169
+    to: DES-AUTO-151
+    type: refined_by
+  - from: DES-AUTO-151
+    to: CODE-NameCiSummary
+    type: implemented_by
+  - from: REQ-AUTO-169
+    to: TEST-name-ci-summary-renders-aggregate-json
+    type: verified_by
+  - from: REQ-AUTO-170
+    to: DES-AUTO-152
+    type: refined_by
+  - from: DES-AUTO-152
+    to: CODE-NameCiSummaryRun
+    type: implemented_by
+  - from: REQ-AUTO-170
+    to: TEST-name-ci-summary-run-renders-paths
+    type: verified_by
+  - from: REQ-AUTO-171
+    to: DES-AUTO-153
+    type: refined_by
+  - from: DES-AUTO-153
+    to: CODE-NameProjCiSummaryRun
+    type: implemented_by
+  - from: REQ-AUTO-171
+    to: TEST-name-proj-ci-summary-run-renders-root
+    type: verified_by

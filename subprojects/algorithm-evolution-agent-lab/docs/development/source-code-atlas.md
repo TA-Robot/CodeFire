@@ -109,6 +109,28 @@ CandidateAlgorithm
 | remember | `memory.py`, `negative_results.py`, `evidence.py`, `run_identity.py`, `program.py` | events and records | searchable durable context |
 | explain | `reporting.py`, `report_bundle.py`, `limitations.py`, `progress.py` | program state | markdown/report artifacts |
 
+## 2.1 Documentation Spine
+
+The documentation set mirrors the runtime spine.
+
+| Documentation Area | Files | Purpose |
+|---|---|---|
+| requirements | `docs/spec/*.md` | state what the research automation system must do |
+| design | `docs/design/*.md` | describe module responsibilities and boundaries |
+| operations | `docs/operations/*.md` | guide humans and agents through repeatable workflows |
+| experiments | `docs/experiments/*.md` | preserve run outcomes, failures, and next actions |
+| development | `docs/development/*.md` | track implementation decisions, roadmap, history, and source map |
+
+When adding a workflow capability, update the operations guide if a future contributor would otherwise need to infer the workflow from tests or source code.
+
+The current documentation expansion plan is tracked in `docs/development/documentation-doubling-plan.md`. It records the 2026-06-14 baseline, the 2x line and word targets, batch allocation, and acceptance checks for the docs growth stream.
+
+The module-level ownership companion is `docs/development/module_ownership_guide.md`. Use it with this atlas when deciding which source module, test family, and documentation surface should own a change.
+
+The design-boundary companion is `docs/design/experiment_automation_boundaries.md`. Use it when a proposed change could collapse planning, execution, ingestion, analysis, review, or release responsibilities.
+
+The process-requirements companion is `docs/spec/documentation_evidence_requirements.md`. Use it for documentation, evidence, branch workflow, and auditability acceptance requirements.
+
 ## 3. Main Orchestration
 
 `EvolutionAgent` is intentionally small.
@@ -451,7 +473,26 @@ Current example:
 
 When adding a new surface, choose the short implementation name first, then attach the long CodeFire atom through the marker and trace links. Python class names, function names, and test method names have an 80-character hard cap and should usually stay under 40 characters. If the only available name is over that cap, the design needs a domain abstraction before more code is added.
 
-## 10. Change Recipes
+## 10. Operational Modules To Documentation
+
+| Module Family | Operational Guide |
+|---|---|
+| planner / scheduler / frontier / retrospective | `docs/operations/research_cycle_planning.md` |
+| runner / ingestion / analysis / failures | `docs/operations/experiment_lifecycle.md` |
+| evidence / claim review / safety / reproduction | `docs/operations/evidence_and_claim_review.md` |
+| nameaudit | `docs/operations/identifier_naming_audit.md` |
+| CodeFire workflow | `docs/operations/codefire_branch_workflow.md` |
+| agent task execution | `docs/operations/agent_execution_playbook.md` |
+| documentation upkeep | `docs/operations/documentation_maintenance.md` |
+| cross-cutting operations | `docs/operations/runbook_catalog.md` |
+| module ownership | `docs/development/module_ownership_guide.md` |
+| architecture boundaries | `docs/design/experiment_automation_boundaries.md` |
+| process requirements | `docs/spec/documentation_evidence_requirements.md` |
+| experiment record patterns | `docs/experiments/experiment_record_patterns.md` |
+
+This mapping should remain current enough that a new contributor can find the right operating guide before modifying a module.
+
+## 11. Change Recipes
 
 ### Add a new planning primitive
 
@@ -511,7 +552,7 @@ ResearchCyclePlanningHandoffReviewPacketArtifactArchive
 
 Do not hide it inside the planner. Add a runner abstraction or policy-gated adapter, then make the execution boundary explicit in docs and tests.
 
-## 11. What The Source Should Feel Like
+## 12. What The Source Should Feel Like
 
 Before opening code, a reader should expect:
 

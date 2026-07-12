@@ -1282,3 +1282,976 @@ The gate returns a deterministic readiness dictionary with:
 - blocker messages
 
 The gate delegates to the shared manifest verification Markdown gate so readiness vocabulary, blocker messages, and clean-state handling stay consistent with earlier verification audit surfaces. It does not rerun verification, recompute manifests, inspect artifacts, read files, write files, or mutate inputs.
+
+## DES-AUTO-079: Identifier length audit
+
+`NameLenAudit` parses Python source with the standard `ast` module and returns deterministic findings for over-limit class, function, argument, and assigned local names.
+
+Each finding records:
+
+- path
+- line
+- kind
+- name
+- length
+
+The scanner is read-only and accepts either raw text, one file, or an explicit tuple of files. It does not rename code; it provides a complete list for the next controlled rename pass.
+
+## DES-AUTO-080: Identifier rename planning
+
+`NamePlan` consumes `NameHit` findings and returns deterministic `NameFix` suggestions.
+
+The planner:
+
+- derives short names from snake_case or CamelCase parts
+- caps every suggestion at the configured limit
+- adds numeric suffixes when multiple findings would produce the same suggestion
+- records a reason in `original_length>limit` form
+
+The planner remains read-only. Rename application is left to a later reviewed pass so tests, imports, and CodeFire Atom IDs can be updated deliberately.
+
+## DES-AUTO-081: Identifier audit report
+
+`NameReport` renders `NameFix` suggestions as a Markdown table with path, line, kind, original name, suggestion, and reason columns.
+
+The report is deterministic, read-only, and emits an explicit clean row when there are no fixes. It is intended for review artifacts and manual rename planning before any source rewrite is attempted.
+
+## DES-AUTO-082: Identifier audit run report
+
+`NameAuditRun` composes `NameLenAudit`, `NamePlan`, and `NameReport` for an explicit tuple of Python files.
+
+The runner:
+
+- scans each requested file
+- builds deterministic short-name suggestions
+- renders the complete Markdown report
+
+The runner remains read-only and does not discover files recursively, rewrite source, or mutate CodeFire Atom IDs. Callers control the file set so review passes can decide whether to audit only touched files or a whole project snapshot.
+
+## DES-AUTO-083: Identifier audit file discovery
+
+`NameFiles` converts explicit roots into a deterministic tuple of Python files for identifier audit runs.
+
+The finder:
+
+- accepts individual `.py` files
+- recursively includes `.py` files under directory roots
+- skips hidden, cache, and virtual-environment directories
+- sorts paths by POSIX display form
+
+The finder does not read file contents, parse Python, or apply rename suggestions. It only defines the reproducible file set that `NameAuditRun` can consume.
+
+## DES-AUTO-084: Identifier project audit report
+
+`NameProjRun` composes `NameFiles` and `NameAuditRun` for project-root naming reviews.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans and plans identifier rename suggestions with the configured limit
+- renders the complete Markdown report
+
+The runner remains read-only. It does not rewrite source, infer repository roots, or mutate trace metadata; callers decide which roots represent the review scope.
+
+## DES-AUTO-085: Identifier audit summary
+
+`NameStats` consumes `NameHit` findings and returns a `NameStat` value.
+
+The summary records:
+
+- total finding count
+- affected file count
+- maximum identifier length
+- longest identifier name
+
+The summarizer is read-only and does not sort, rewrite, or plan rename suggestions. Empty findings produce a zero summary with an empty longest-name field.
+
+## DES-AUTO-086: Identifier audit summary Markdown
+
+`NameStatMd` renders a `NameStat` value as a deterministic Markdown table.
+
+The renderer includes rows for:
+
+- total finding count
+- affected file count
+- maximum identifier length
+- longest identifier name
+
+The renderer is read-only and does not recompute findings. Empty longest-name values render as `none` so clean summaries remain explicit.
+
+## DES-AUTO-087: Identifier audit kind summary
+
+`NameKinds` consumes `NameHit` findings and returns deterministic `(kind, count)` rows.
+
+The grouper:
+
+- counts findings for each Python identifier kind
+- sorts rows by descending count
+- uses kind name as a stable tie-breaker
+
+The grouper is read-only and does not recompute findings, render Markdown, or mutate rename suggestions. It provides a compact workload breakdown for reviewers who need to decide whether class, function, argument, or local-name cleanup should be prioritized first.
+
+## DES-AUTO-088: Identifier audit kind summary Markdown
+
+`NameKindMd` renders `(kind, count)` rows as a deterministic Markdown table.
+
+The renderer includes:
+
+- a stable `Kind` / `Count` table header
+- one row per supplied kind summary row
+- an explicit `none` row when there are no findings
+
+The renderer is read-only and does not regroup findings. It formats already-reviewed summary rows for reports and handoff documents.
+
+## DES-AUTO-089: Identifier audit dashboard Markdown
+
+`NameDash` renders a compact identifier audit dashboard from `NameHit` findings.
+
+The dashboard:
+
+- summarizes overall finding totals with `NameStats` and `NameStatMd`
+- summarizes construct kinds with `NameKinds` and `NameKindMd`
+- joins the two Markdown sections in a deterministic order
+
+The dashboard is read-only. It does not scan files, plan renames, or mutate source; callers provide already-reviewed findings.
+
+## DES-AUTO-090: Identifier audit dashboard run
+
+`NameDashRun` composes `NameLenAudit` and `NameDash` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- summarizes the resulting findings with the dashboard renderer
+- returns deterministic Markdown for review
+
+The runner remains read-only. It does not discover roots, plan renames, or apply edits; callers decide the file scope.
+
+## DES-AUTO-091: Identifier project dashboard report
+
+`NameProjDash` composes `NameFiles` and `NameDashRun` for project-root naming dashboards.
+
+The project dashboard:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- renders the compact dashboard Markdown
+
+The runner remains read-only. It does not apply rename suggestions, infer repository roots, or mutate trace metadata.
+
+## DES-AUTO-092: Identifier longest-name ranking
+
+`NameTop` ranks `NameHit` findings by descending identifier length.
+
+The ranker:
+
+- accepts already-scanned findings
+- applies a positive row limit
+- breaks ties by path, line, and name for deterministic output
+- returns the original finding records without mutation
+
+The ranker is read-only. It does not scan files, render Markdown, plan renames, or apply edits.
+
+## DES-AUTO-093: Identifier longest-name Markdown
+
+`NameTopMd` renders ranked `NameHit` findings as a deterministic Markdown table.
+
+The renderer includes:
+
+- path, line, kind, name, and length columns
+- one row per ranked finding in caller-provided order
+- an explicit empty row when no findings are supplied
+
+The renderer is read-only. It does not rank findings, scan files, plan renames, or mutate source.
+
+## DES-AUTO-094: Identifier longest-name run report
+
+`NameTopRun` composes `NameLenAudit`, `NameTop`, and `NameTopMd` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- ranks the longest findings with the configured row limit
+- renders the ranked findings as Markdown
+
+The runner remains read-only. It does not discover project roots, plan renames, or mutate source.
+
+## DES-AUTO-095: Identifier project longest-name report
+
+`NameProjTop` composes `NameFiles` and `NameTopRun` for project-root longest-name reports.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- ranks the longest findings with the configured row limit
+- renders the ranked findings as Markdown
+
+The runner remains read-only. It does not apply rename suggestions, infer repository roots, or mutate trace metadata.
+
+## DES-AUTO-096: Identifier full audit Markdown
+
+`NameFull` composes `NameDash`, `NameTop`, and `NameTopMd` for already-scanned identifier findings.
+
+The renderer:
+
+- renders the compact dashboard from all supplied findings
+- ranks the longest findings with the configured row limit
+- renders the ranked findings as Markdown
+- joins the sections in deterministic order
+
+The renderer is read-only. It does not scan files, discover roots, plan renames, or mutate source.
+
+## DES-AUTO-097: Identifier full audit run report
+
+`NameFullRun` composes `NameLenAudit` and `NameFull` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- renders the compact dashboard from all findings
+- renders the longest-name priority table with the configured row limit
+- returns deterministic Markdown for review
+
+The runner remains read-only. It does not discover project roots, plan renames, or mutate source.
+
+## DES-AUTO-098: Identifier project full audit report
+
+`NameProjFull` composes `NameFiles` and `NameFullRun` for project-root full identifier audit reports.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- renders the compact dashboard from all findings
+- renders the longest-name priority table with the configured row limit
+
+The runner remains read-only. It does not apply rename suggestions, infer repository roots, or mutate trace metadata.
+
+## DES-AUTO-099: Identifier audit JSON
+
+`NameJson` renders already-scanned `NameHit` findings as deterministic JSON.
+
+The renderer:
+
+- preserves path, line, kind, name, and length fields
+- emits one object per finding in caller-provided order
+- sorts object keys for stable output
+
+The renderer is read-only. It does not scan files, rank findings, plan renames, or mutate source.
+
+## DES-AUTO-100: Identifier audit JSON run
+
+`NameJsonRun` composes `NameLenAudit` and `NameJson` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- renders the resulting findings as deterministic JSON
+- preserves path, line, kind, name, and length fields
+
+The runner remains read-only. It does not discover project roots, plan renames, or mutate source.
+
+## DES-AUTO-101: Identifier project JSON audit
+
+`NameProjJson` composes `NameFiles` and `NameJsonRun` for project-root JSON audit reports.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- renders the resulting findings as deterministic JSON
+- preserves path, line, kind, name, and length fields
+
+The runner remains read-only. It does not apply rename suggestions, infer repository roots, or mutate trace metadata.
+
+## DES-AUTO-102: Identifier audit summary JSON
+
+`NameStatJson` renders a `NameStat` summary as deterministic JSON.
+
+The renderer includes:
+
+- total finding count
+- affected file count
+- maximum identifier length
+- longest identifier name
+
+The renderer is read-only. It does not scan files, group findings, render Markdown, or mutate source.
+
+## DES-AUTO-103: Identifier dashboard JSON
+
+`NameDashJson` renders identifier audit findings as a deterministic dashboard JSON object.
+
+The renderer includes:
+
+- summary values from all supplied findings
+- finding-kind count rows from all supplied findings
+- stable object keys for automation consumers
+
+The renderer is read-only. It does not scan files, plan renames, render Markdown, or mutate source.
+
+## DES-AUTO-104: Identifier dashboard JSON run
+
+`NameDashJsonRun` composes `NameLenAudit` and `NameDashJson` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- renders summary values and finding-kind counts as deterministic JSON
+- preserves stable object keys for automation consumers
+
+The runner remains read-only. It does not discover project roots, apply rename suggestions, render Markdown, or mutate source.
+
+## DES-AUTO-105: Identifier project dashboard JSON
+
+`NamePjDashJson` composes `NameFiles` and `NameDashJsonRun` for project-root dashboard JSON reports.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- renders summary values and finding-kind counts as deterministic JSON
+- preserves stable object keys for automation consumers
+
+The runner remains read-only. It does not apply rename suggestions, infer repository roots, render Markdown, or mutate source.
+
+## DES-AUTO-106: Identifier longest-name JSON
+
+`NameTopJson` composes `NameTop` and `NameJson` for ranked identifier cleanup priorities.
+
+The renderer:
+
+- ranks supplied findings by longest identifier first
+- applies the configured row limit
+- renders the ranked subset as deterministic JSON
+- preserves path, line, kind, name, and length fields
+
+The renderer is read-only. It does not scan files, discover project roots, plan renames, render Markdown, or mutate source.
+
+## DES-AUTO-107: Identifier longest-name JSON run
+
+`NameTopJsonRun` composes `NameLenAudit` and `NameTopJson` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- ranks the resulting findings by longest identifier first
+- applies the configured row limit
+- renders the ranked subset as deterministic JSON
+
+The runner remains read-only. It does not discover project roots, apply rename suggestions, render Markdown, or mutate source.
+
+## DES-AUTO-108: Identifier project longest-name JSON
+
+`NameProjTopJson` composes `NameFiles` and `NameTopJsonRun` for project-root longest-name JSON reports.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- ranks the resulting findings by longest identifier first
+- applies the configured row limit
+- renders the ranked subset as deterministic JSON
+
+The runner remains read-only. It does not apply rename suggestions, infer repository roots, render Markdown, or mutate source.
+
+## DES-AUTO-109: Identifier rename suggestion JSON
+
+`NameFixJson` renders already-planned identifier rename suggestions as deterministic JSON.
+
+The renderer includes:
+
+- finding path, line, kind, and original name
+- suggested replacement name
+- planning reason
+- stable object keys for automation consumers
+
+The renderer is read-only. It does not scan files, generate rename plans, rank findings, render Markdown, or mutate source.
+
+## DES-AUTO-110: Identifier rename suggestion JSON run
+
+`NameFixJsonRun` composes `NameLenAudit`, `NamePlan`, and `NameFixJson` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- plans deterministic rename suggestions for over-limit identifiers
+- renders the suggestions as deterministic JSON
+- preserves stable object keys for automation consumers
+
+The runner remains read-only. It does not discover project roots, apply rename suggestions, rank findings, render Markdown, or mutate source.
+
+## DES-AUTO-111: Identifier project rename suggestion JSON
+
+`NameProjFixJson` composes `NameFiles` and `NameFixJsonRun` for project-root rename suggestion JSON reports.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- plans deterministic rename suggestions for over-limit identifiers
+- renders the suggestions as deterministic JSON
+- preserves stable object keys for automation consumers
+
+The runner remains read-only. It does not apply rename suggestions, infer repository roots, rank findings, render Markdown, or mutate source.
+
+## DES-AUTO-112: Identifier audit gate
+
+`NameGate` evaluates already-scanned identifier findings as a pass/fail gate.
+
+The gate:
+
+- summarizes the supplied findings with `NameStats`
+- returns `ok=true` only when the finding count is zero
+- preserves the summary values for failure explanation
+
+The gate is read-only. It does not scan files, discover project roots, render reports, apply rename suggestions, or mutate source.
+
+## DES-AUTO-113: Identifier audit gate JSON
+
+`NameGateJson` renders `NameGateRes` as deterministic JSON.
+
+The renderer includes:
+
+- the boolean gate result
+- total finding count
+- affected file count
+- maximum identifier length
+- longest identifier name
+
+The renderer is read-only. It does not scan files, discover project roots, evaluate findings, render Markdown, or mutate source.
+
+## DES-AUTO-114: Identifier audit gate Markdown
+
+`NameGateMd` renders `NameGateRes` as deterministic Markdown.
+
+The renderer includes:
+
+- the pass/fail gate status
+- total finding count
+- affected file count
+- maximum identifier length
+- longest identifier name
+
+The renderer is read-only. It does not scan files, discover project roots, evaluate findings, render JSON, or mutate source.
+
+## DES-AUTO-115: Identifier audit gate run
+
+`NameGateRun` composes `NameLenAudit`, `NameGate`, and `NameGateMd` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- evaluates the resulting findings as a pass/fail naming gate
+- renders the gate result as deterministic Markdown
+- preserves summary values for failure explanation
+
+The runner remains read-only. It does not discover project roots, apply rename suggestions, render JSON, or mutate source.
+
+## DES-AUTO-116: Identifier audit gate JSON run
+
+`NameGateJsonRun` composes `NameLenAudit`, `NameGate`, and `NameGateJson` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- evaluates the resulting findings as a pass/fail naming gate
+- renders the gate result as deterministic JSON
+- preserves summary values for automation consumers
+
+The runner remains read-only. It does not discover project roots, apply rename suggestions, render Markdown, or mutate source.
+
+## DES-AUTO-117: Identifier project gate
+
+`NameProjGate` composes `NameFiles` and `NameGateRun` for project-root naming gate reports.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- evaluates the resulting findings as a pass/fail naming gate
+- renders the gate result as deterministic Markdown
+
+The runner remains read-only. It does not apply rename suggestions, infer repository roots, render JSON, or mutate source.
+
+## DES-AUTO-118: Identifier project gate JSON
+
+`NameProjGateJson` composes `NameFiles` and `NameGateJsonRun` for project-root naming gate JSON reports.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- evaluates the resulting findings as a pass/fail naming gate
+- renders the gate result as deterministic JSON
+
+The runner remains read-only. It does not apply rename suggestions, infer repository roots, render Markdown, or mutate source.
+
+## DES-AUTO-119: Identifier gate detail JSON
+
+`NameGatePack` renders already-scanned identifier findings as one gate detail JSON report.
+
+The renderer:
+
+- evaluates the supplied findings with `NameGate`
+- preserves the pass/fail gate result
+- preserves summary values for automation consumers
+- includes every finding path, line, kind, name, and length
+
+The renderer is read-only. It does not scan files, discover project roots, plan rename suggestions, render Markdown, or mutate source.
+
+## DES-AUTO-120: Identifier gate detail JSON run
+
+`NameGatePackRun` composes `NameLenAudit` and `NameGatePack` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- evaluates the resulting findings as a pass/fail naming gate
+- renders the gate status and finding details as deterministic JSON
+- preserves summary values and every finding path, line, kind, name, and length
+
+The runner remains read-only. It does not discover project roots, plan rename suggestions, render Markdown, or mutate source.
+
+## DES-AUTO-121: Identifier project gate detail JSON
+
+`NameProjGatePack` composes `NameFiles` and `NameGatePackRun` for project-root gate detail JSON reports.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- evaluates pass/fail naming gate status
+- renders the gate status and finding details as deterministic JSON
+- preserves summary values and every finding path, line, kind, name, and length
+
+The runner remains read-only. It does not infer repository roots, plan rename suggestions, render Markdown, or mutate source.
+
+## DES-AUTO-122: Identifier gate exit code
+
+`NameGateExit` converts `NameGateRes` into a process exit code.
+
+The mapper:
+
+- returns `0` for passing gate results
+- returns `1` for failing gate results
+- avoids reading files or parsing rendered reports
+
+The mapper is read-only. It does not scan files, discover project roots, render reports, or mutate source.
+
+## DES-AUTO-123: Identifier gate exit code run
+
+`NameGateExitRun` composes `NameLenAudit`, `NameGate`, and `NameGateExit` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- evaluates the resulting findings as a pass/fail naming gate
+- returns `0` for clean scans
+- returns `1` when any over-limit identifiers are found
+
+The runner remains read-only. It does not discover project roots, render reports, apply rename suggestions, or mutate source.
+
+## DES-AUTO-124: Identifier project gate exit code
+
+`NameProjGateExit` composes `NameFiles` and `NameGateExitRun` for project-root naming gate exit codes.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- returns `0` for clean project scans
+- returns `1` when any over-limit identifiers are found
+
+The runner remains read-only. It does not infer repository roots, render reports, apply rename suggestions, or mutate source.
+
+## DES-AUTO-125: Identifier gate log line
+
+`NameGateLine` renders `NameGateRes` as one deterministic log line.
+
+The renderer:
+
+- emits pass/fail status
+- emits hit and file counts
+- emits the maximum identifier length
+- emits the maximum identifier name, or `none` for clean results
+
+The renderer is read-only. It does not scan files, discover project roots, render Markdown, render JSON, or mutate source.
+
+## DES-AUTO-126: Identifier gate log line run
+
+`NameGateLineRun` composes `NameLenAudit`, `NameGate`, and `NameGateLine` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- evaluates the resulting findings as a pass/fail naming gate
+- renders a one-line log summary
+- preserves status, hit count, file count, maximum identifier length, and maximum identifier name
+
+The runner remains read-only. It does not discover project roots, render Markdown tables, render JSON, apply rename suggestions, or mutate source.
+
+## DES-AUTO-127: Identifier project gate log line
+
+`NameProjGateLine` composes `NameFiles` and `NameGateLineRun` for project-root naming gate log lines.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- evaluates the resulting findings as a pass/fail naming gate
+- renders a one-line log summary
+- preserves status, hit count, file count, maximum identifier length, and maximum identifier name
+
+The runner remains read-only. It does not infer repository roots, render Markdown tables, render JSON, apply rename suggestions, or mutate source.
+
+## DES-AUTO-128: Identifier CI gate run
+
+`NameCiRun` composes `NameLenAudit`, `NameGate`, `NameGateExit`, and `NameGateLine` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- evaluates the resulting findings once as a pass/fail naming gate
+- returns the CI-oriented exit code from the gate result
+- returns a one-line log summary from the same gate result
+- avoids duplicate scans when CI wrappers need both status and printable output
+
+The runner remains read-only. It does not discover project roots, render Markdown tables, render JSON, apply rename suggestions, or mutate source.
+
+## DES-AUTO-129: Identifier project CI gate run
+
+`NameProjCiRun` composes `NameFiles` and `NameCiRun` for project-root CI naming gate results.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- evaluates the resulting findings once as a pass/fail naming gate
+- returns the CI-oriented exit code from the gate result
+- returns a one-line log summary from the same gate result
+- avoids duplicate scans when CI wrappers need both status and printable output
+
+The runner remains read-only. It does not infer repository roots, render Markdown tables, render JSON, apply rename suggestions, or mutate source.
+
+## DES-AUTO-130: Identifier CI gate JSON
+
+`NameCiJson` renders an identifier CI gate exit code and log line as deterministic JSON.
+
+The renderer:
+
+- preserves the numeric exit code
+- preserves the printable one-line gate summary
+- emits stable key ordering for downstream automation
+
+The renderer is read-only. It does not scan files, discover project roots, evaluate gates, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-131: Identifier CI gate JSON run
+
+`NameCiJsonRun` composes `NameCiRun` and `NameCiJson` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- evaluates the resulting findings once as a pass/fail naming gate
+- renders the CI-oriented exit code and one-line log summary as deterministic JSON
+- avoids duplicate scans when CI wrappers need both machine-readable status and printable output
+
+The runner remains read-only. It does not discover project roots, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-133: Identifier CI status JSON
+
+`NameCiStatusJson` renders an identifier CI gate exit code, log line, and explicit boolean status as deterministic JSON.
+
+The renderer:
+
+- preserves the numeric exit code
+- preserves the printable one-line gate summary
+- sets `ok` to true only when the exit code is 0
+- emits stable key ordering for downstream automation
+
+The renderer is read-only. It does not scan files, discover project roots, evaluate gates, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-134: Identifier CI status JSON run
+
+`NameCiStatusRun` composes `NameCiRun` and `NameCiStatusJson` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- evaluates the resulting findings once as a pass/fail naming gate
+- renders the CI-oriented exit code, one-line log summary, and explicit `ok` boolean as deterministic JSON
+- avoids duplicate scans when CI wrappers need both machine-readable status and printable output
+
+The runner remains read-only. It does not discover project roots, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-135: Identifier project CI status JSON run
+
+`NameProjCiStatusRun` composes `NameFiles` and `NameCiStatusRun` for project-root CI naming gate payloads.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- evaluates the resulting findings once as a pass/fail naming gate
+- renders the CI-oriented exit code, one-line log summary, and explicit `ok` boolean as deterministic JSON
+- avoids duplicate scans when CI wrappers need both machine-readable status and printable output
+
+The runner remains read-only. It does not infer repository roots, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-136: Identifier CI detail JSON run
+
+`NameCiPack` renders an identifier CI gate exit code, one-line summary, explicit boolean status, and finding details as deterministic JSON. `NameCiPackRun` composes `NameLenAudit`, `NameGate`, `NameGateExit`, `NameGateLine`, and `NameCiPack` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- evaluates the resulting findings once as a pass/fail naming gate
+- renders the CI-oriented exit code, one-line log summary, explicit `ok` boolean, and finding detail list as deterministic JSON
+- preserves each finding path, line, kind, name, and length for CI annotations
+- avoids duplicate scans when CI wrappers need both gate status and finding details
+
+The runner remains read-only. It does not discover project roots, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-137: Identifier project CI detail JSON run
+
+`NameProjCiPackRun` composes `NameFiles` and `NameCiPackRun` for project-root CI naming gate detail payloads.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- evaluates the resulting findings once as a pass/fail naming gate
+- renders the CI-oriented exit code, one-line log summary, explicit `ok` boolean, and finding detail list as deterministic JSON
+- preserves each finding path, line, kind, name, and length for whole-project CI annotations
+- avoids duplicate scans when CI wrappers need both gate status and finding details
+
+The runner remains read-only. It does not infer repository roots, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-138: Identifier CI note run
+
+`NameCiNote` renders identifier audit findings as deterministic one-line notes. `NameCiNoteRun` composes `NameLenAudit` and `NameCiNote` for explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- renders each finding as `path:line: kind name length=N`
+- returns a stable `clean` marker when no findings exist
+- preserves finding path, line, kind, name, and length without requiring JSON parsing
+
+The runner remains read-only. It does not discover project roots, evaluate exit codes, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-139: Identifier project CI note run
+
+`NameProjCiNoteRun` composes `NameFiles` and `NameCiNoteRun` for project-root CI naming notes.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- renders each finding as `path:line: kind name length=N`
+- returns a stable `clean` marker when no findings exist
+- preserves finding path, line, kind, name, and length without requiring JSON parsing
+
+The runner remains read-only. It does not infer repository roots, evaluate exit codes, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-140: Identifier bounded CI notes
+
+`NameCiNoteTop` renders the top identifier audit findings as deterministic one-line CI notes.
+
+The renderer:
+
+- accepts already-scanned identifier findings and a positive note limit
+- ranks findings with `NameTop`
+- renders each emitted finding as `path:line: kind name length=N`
+- appends `omitted=N` when additional findings are hidden
+- returns the stable `clean` marker when no findings exist
+
+The renderer remains read-only. It does not scan files, discover project roots, evaluate exit codes, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-141: Identifier bounded CI note run
+
+`NameCiNoteTopRun` composes `NameLenAudit` and `NameCiNoteTop` for bounded CI naming notes from explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- ranks findings with `NameTop` through `NameCiNoteTop`
+- renders at most the configured number of findings as `path:line: kind name length=N`
+- appends `omitted=N` when additional findings are hidden
+- returns the stable `clean` marker when no findings exist
+
+The runner remains read-only. It does not discover project roots, evaluate exit codes, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-142: Identifier project bounded CI note run
+
+`NameProjCiNoteTopRun` composes `NameFiles` and `NameCiNoteTopRun` for bounded CI naming notes from project roots.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- renders at most the configured number of findings as `path:line: kind name length=N`
+- appends `omitted=N` when additional findings are hidden
+- returns the stable `clean` marker when no findings exist
+
+The runner remains read-only. It does not infer repository roots, evaluate exit codes, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-143: Identifier CI note Markdown
+
+`NameCiNoteMd` wraps already-rendered identifier CI notes in a deterministic text code fence.
+
+The renderer:
+
+- accepts note text from `NameCiNote`, `NameCiNoteTop`, or their runners
+- trims trailing newline noise from the supplied note
+- renders the body as a Markdown `text` code fence
+- preserves the `clean`, finding, and `omitted=N` lines without parsing them
+
+The renderer remains read-only. It does not scan files, discover project roots, evaluate exit codes, apply rename suggestions, or mutate source.
+
+## DES-AUTO-144: Identifier bounded CI note Markdown run
+
+`NameCiNoteMdRun` composes `NameCiNoteTopRun` and `NameCiNoteMd` for bounded Markdown CI naming notes from explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- ranks findings with `NameCiNoteTopRun`
+- renders at most the configured number of findings plus any omitted-count marker
+- wraps the resulting note text in a stable Markdown `text` code fence
+
+The runner remains read-only. It does not discover project roots, evaluate exit codes, apply rename suggestions, or mutate source.
+
+## DES-AUTO-145: Identifier project bounded CI note Markdown run
+
+`NameProjCiNoteMdRun` composes `NameFiles` and `NameCiNoteMdRun` for bounded Markdown CI naming notes from project roots.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- renders bounded note details through `NameCiNoteMdRun`
+- returns a Markdown `text` code fence suitable for review comments
+
+The runner remains read-only. It does not infer repository roots, evaluate exit codes, apply rename suggestions, or mutate source.
+
+## DES-AUTO-146: Identifier CI note Markdown section
+
+`NameCiNoteSec` wraps already-rendered identifier CI notes in a titled Markdown section.
+
+The renderer:
+
+- accepts a caller-provided title and note text
+- falls back to a stable heading when the title is blank
+- delegates the fenced note body to `NameCiNoteMd`
+- preserves the note lines without parsing them
+
+The renderer remains read-only. It does not scan files, discover project roots, evaluate exit codes, apply rename suggestions, or mutate source.
+
+## DES-AUTO-147: Identifier bounded CI note Markdown section run
+
+`NameCiNoteSecRun` composes `NameCiNoteTopRun` and `NameCiNoteSec` for titled bounded Markdown CI naming notes from explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- ranks findings with `NameCiNoteTopRun`
+- renders at most the configured number of findings plus any omitted-count marker
+- wraps the resulting note text in a titled Markdown section
+
+The runner remains read-only. It does not discover project roots, evaluate exit codes, apply rename suggestions, or mutate source.
+
+## DES-AUTO-148: Identifier project bounded CI note Markdown section run
+
+`NameProjCiNoteSecRun` composes `NameFiles` and `NameCiNoteSecRun` for titled bounded Markdown CI naming notes from project roots.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- renders bounded note details through `NameCiNoteSecRun`
+- returns a titled Markdown section suitable for review comments
+
+The runner remains read-only. It does not infer repository roots, evaluate exit codes, apply rename suggestions, or mutate source.
+
+## DES-AUTO-149: Identifier naming audit operations guide
+
+`NameOpsGuide` renders the identifier naming audit's operator-facing Markdown guide from explicit display settings.
+
+The renderer:
+
+- documents the audit purpose in review-oriented language
+- records the maximum identifier length and bounded review note limit that will be used
+- states which Python syntax forms are audited
+- lists the review workflow that contributors should follow
+- names the CI payload renderers for status, annotation, and review-comment use cases
+
+The renderer remains deterministic and read-only. It does not scan files, infer project roots, evaluate exit codes, apply rename suggestions, or mutate source.
+
+## DES-AUTO-150: Identifier project operations document
+
+`NameProjOpsDoc` composes `NameOpsGuide` and `NameProjCiNoteSecRun` for project-root naming audit operations documents.
+
+The project document:
+
+- renders the shared operations guide with the configured identifier length and note limit
+- discovers auditable Python files from explicit project roots
+- appends a titled Markdown section containing current bounded naming findings
+- keeps guidance and live findings in one publishable review artifact
+
+The renderer remains read-only. It does not infer repository roots, evaluate exit codes separately from the naming note runner, apply rename suggestions, or mutate source.
+
+## DES-AUTO-151: Identifier CI aggregate summary JSON
+
+`NameCiSummary` renders identifier audit findings as compact deterministic JSON for CI dashboard and telemetry surfaces.
+
+The renderer:
+
+- summarizes total findings, affected files, maximum identifier length, and maximum identifier name
+- emits the longest finding with path, line, kind, name, and length
+- groups findings by Python syntax kind using deterministic count/name ordering
+- groups findings by file using deterministic count/path ordering
+- returns schema-stable empty arrays and `null` longest finding for clean scans
+
+The renderer remains read-only. It does not scan files, discover project roots, evaluate exit codes, render Markdown, apply rename suggestions, or mutate source.
+
+## DES-AUTO-152: Identifier CI aggregate summary run
+
+`NameCiSummaryRun` composes `NameLenAudit` and `NameCiSummary` for aggregate summary JSON from explicit Python file sets.
+
+The runner:
+
+- scans each supplied file with the configured identifier length limit
+- passes all findings to the aggregate summary renderer
+- preserves deterministic ordering from the scanner and renderer
+- returns compact JSON suitable for dashboard ingestion
+
+The runner remains read-only. It does not discover project roots, evaluate exit codes, apply rename suggestions, or mutate source.
+
+## DES-AUTO-153: Identifier project CI aggregate summary run
+
+`NameProjCiSummaryRun` composes `NameFiles` and `NameCiSummaryRun` for project-root aggregate summary JSON.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- renders aggregate file/kind/longest summary JSON
+- keeps whole-project naming telemetry compact enough for CI dashboards
+
+The runner remains read-only. It does not infer repository roots, evaluate exit codes, apply rename suggestions, or mutate source.
+
+## DES-AUTO-132: Identifier project CI gate JSON run
+
+`NameProjCiJsonRun` composes `NameFiles` and `NameCiJsonRun` for project-root CI naming gate payloads.
+
+The project runner:
+
+- discovers auditable Python files from explicit roots
+- scans discovered files with the configured identifier length limit
+- evaluates the resulting findings once as a pass/fail naming gate
+- renders the CI-oriented exit code and one-line log summary as deterministic JSON
+- avoids duplicate scans when CI wrappers need both machine-readable status and printable output
+
+The runner remains read-only. It does not infer repository roots, render Markdown tables, apply rename suggestions, or mutate source.

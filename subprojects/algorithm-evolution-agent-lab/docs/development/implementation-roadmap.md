@@ -91,3 +91,7 @@
 
 - Keep `docs/development/source-code-atlas.md` current enough that a reader can infer module layout, major dataclasses, control flow, test mapping, and CodeFire trace responsibilities without opening source first. (done)
 - When a new module is added, update the atlas in the same change if the module introduces a new layer, data lifetime, external I/O boundary, or planning/governance decision path.
+- Maintain `docs/operations/` as the human-facing workflow handbook for experiment lifecycle, research cycle planning, evidence review, CodeFire branch operation, and naming audit. (active)
+- Keep `docs/experiments/README.md` as the required structure for experiment notes and negative-result capture. (active)
+- Execute the documentation doubling plan in `docs/development/documentation-doubling-plan.md`: baseline is 4,826 Markdown lines / 38,303 words, target is at least 9,652 lines / 76,606 words, with the first batch covering the plan, agent execution, documentation maintenance, and example experiment records. (active)
+- Close the documentation doubling initiative with the D2-D8 expansion set: operations runbook catalog, module ownership guide, design boundary guide, documentation/evidence requirements, and experiment record patterns. The current measured docs count is above both the 9,652-line and 76,606-word targets. (done)

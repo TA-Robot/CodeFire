@@ -33,6 +33,6 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 - `REQ-*` / `DES-*` / `CODE-*` / `TEST-*` のAtom IDはtraceability用であり、長くなってもよい。
 - Pythonのclass名、function名、test method名には、長いAtom IDをそのまま使わない。
 - 実装識別子は短いdomain名にする。例: `FinalManifestMdCheck`。
-- Pythonのclass名、function名、test method名は80文字をhard capとし、通常は40文字以内を目安にする。
+- Pythonのclass名、function名、test method名は25文字以内を目安にする。
 - traceabilityは `# cf-atom:` と `codefire.links.yaml` で担保し、読みやすさは実装名で担保する。
 - 同じ概念語が何度も連結された名前は、次の変更前に短名へ置き換える。

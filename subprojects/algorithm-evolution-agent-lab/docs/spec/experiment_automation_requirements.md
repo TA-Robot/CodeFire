@@ -383,3 +383,303 @@ The system shall render final archive summary artifact archive summary artifact 
 ## REQ-AUTO-096: Research cycle planning handoff review packet artifact archive summary artifact archive summary artifact manifest Markdown verification Markdown artifact manifest Markdown verification Markdown artifact manifest Markdown verification Markdown gate
 
 The system shall evaluate final verification artifact manifest verification Markdown for reviewer handoff readiness. The gate shall compare the supplied verification result and rendered Markdown for verification status, finding count, and each path-scoped finding line, or the clean `none` line when no findings exist, so storage adapters can block stale or incomplete final verification audit artifact manifest readiness documents before final handoff.
+
+## REQ-AUTO-097: Identifier length audit
+
+The system shall scan Python source for class, function, argument, and assigned local names that exceed a configurable maximum identifier length. The default limit shall be 25 characters so review cycles can expose long names while still allowing readable domain terms.
+
+## REQ-AUTO-098: Identifier rename planning
+
+The system shall convert identifier length audit findings into deterministic short-name suggestions. Each suggestion shall stay within the configured maximum length and preserve a reason that records the original length violation.
+
+## REQ-AUTO-099: Identifier audit report
+
+The system shall render identifier rename suggestions into a reviewer-readable table. The report shall include path, line, kind, original name, suggested name, and reason so rename work can be reviewed before code is changed.
+
+## REQ-AUTO-100: Identifier audit run report
+
+The system shall scan an explicit set of Python files, build deterministic rename suggestions for every over-limit identifier, and render the complete result as a reviewer-readable report. The run report shall reuse the configured maximum identifier length so review cycles can list all current naming problems without manually wiring scanner, planner, and renderer calls.
+
+## REQ-AUTO-101: Identifier audit file discovery
+
+The system shall discover Python source files under explicit roots for identifier audit runs. Discovery shall include `.py` files, skip hidden/cache/virtual-environment directories, accept individual Python files, and return a deterministic path order so whole-project naming reviews can be reproduced.
+
+## REQ-AUTO-102: Identifier project audit report
+
+The system shall render an identifier audit report from explicit project roots. The report workflow shall discover auditable Python files, scan every discovered file for over-limit identifiers, build deterministic rename suggestions, and render the complete reviewer-readable table so whole-project naming reviews can be run from root paths.
+
+## REQ-AUTO-103: Identifier audit summary
+
+The system shall summarize identifier audit findings with total finding count, affected file count, maximum identifier length, and the longest identifier name. The summary shall be deterministic so review cycles can quickly understand the rename workload before reading the full table.
+
+## REQ-AUTO-104: Identifier audit summary Markdown
+
+The system shall render identifier audit summary values into deterministic Markdown. The rendered summary shall include total findings, affected file count, maximum identifier length, and longest identifier name so reviewers can inspect naming workload at a glance.
+
+## REQ-AUTO-105: Identifier audit kind summary
+
+The system shall group identifier audit findings by finding kind. The grouped summary shall include each kind and its finding count, sorted by descending count and then kind name, so reviewers can see which Python construct categories create the naming workload.
+
+## REQ-AUTO-106: Identifier audit kind summary Markdown
+
+The system shall render identifier audit kind summary rows into deterministic Markdown. The rendered table shall include kind and count columns, and shall emit an explicit empty row when there are no findings, so reviewers can inspect construct-category naming workload without reading machine-only tuples.
+
+## REQ-AUTO-107: Identifier audit dashboard Markdown
+
+The system shall render a compact identifier audit dashboard from audit findings. The dashboard shall include the overall summary Markdown and the kind summary Markdown in a deterministic order so reviewers can inspect naming workload totals and construct-category distribution from one report section.
+
+## REQ-AUTO-108: Identifier audit dashboard run
+
+The system shall scan an explicit set of Python files and render the compact identifier audit dashboard for the resulting findings. The run shall reuse the configured maximum identifier length and shall preserve deterministic dashboard output so reviewers can inspect touched-file naming workload without manually wiring scanner and dashboard calls.
+
+## REQ-AUTO-109: Identifier project dashboard report
+
+The system shall render an identifier audit dashboard from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file for over-limit identifiers, and render deterministic dashboard Markdown so whole-project naming reviews can inspect totals and construct-kind distribution from root paths.
+
+## REQ-AUTO-110: Identifier longest-name ranking
+
+The system shall rank identifier audit findings by longest identifier first. The ranking shall be deterministic, configurable by maximum row count, and preserve original finding metadata so reviewers can prioritize the most severe rename work before reading every finding.
+
+## REQ-AUTO-111: Identifier longest-name Markdown
+
+The system shall render ranked identifier audit findings into deterministic Markdown. The table shall include path, line, kind, name, and length columns, and shall emit an explicit empty row when no ranked findings are present so reviewers can paste longest-name priorities into cleanup notes.
+
+## REQ-AUTO-112: Identifier longest-name run report
+
+The system shall scan an explicit set of Python files, rank the longest identifier findings with a configurable row limit, and render the ranked findings as deterministic Markdown. The run report shall reuse the configured maximum identifier length so reviewers can generate cleanup priority notes without manually wiring scanner, ranker, and renderer calls.
+
+## REQ-AUTO-113: Identifier project longest-name report
+
+The system shall render a longest-name identifier audit report from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, rank the longest findings with a configurable row limit, and render deterministic Markdown so whole-project naming cleanup can start from root paths.
+
+## REQ-AUTO-114: Identifier full audit Markdown
+
+The system shall render a full identifier audit Markdown report from already-scanned findings. The report shall include the compact dashboard summary and a longest-name priority table in deterministic order so reviewers can inspect both workload size and first cleanup targets in one report.
+
+## REQ-AUTO-115: Identifier full audit run report
+
+The system shall scan an explicit set of Python files and render the full identifier audit Markdown report for the resulting findings. The run report shall reuse the configured maximum identifier length and longest-name row limit so reviewers can inspect workload size, construct-kind distribution, and first cleanup targets from a file list.
+
+## REQ-AUTO-116: Identifier project full audit report
+
+The system shall render a full identifier audit Markdown report from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, and render the dashboard plus longest-name priority sections so whole-project naming reviews can start from root paths.
+
+## REQ-AUTO-117: Identifier audit JSON
+
+The system shall render identifier audit findings as deterministic JSON. The JSON output shall preserve each finding path, line, kind, name, and length so automation can consume the same audit data without parsing Markdown reports.
+
+## REQ-AUTO-118: Identifier audit JSON run
+
+The system shall scan an explicit set of Python files and render identifier audit findings as deterministic JSON. The run shall reuse the configured maximum identifier length and preserve each finding path, line, kind, name, and length so automation can consume touched-file audit data directly.
+
+## REQ-AUTO-119: Identifier project JSON audit
+
+The system shall render identifier audit findings as deterministic JSON from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, and preserve each finding path, line, kind, name, and length so automation can consume whole-project audit data directly.
+
+## REQ-AUTO-120: Identifier audit summary JSON
+
+The system shall render identifier audit summary values as deterministic JSON. The output shall preserve total finding count, affected file count, maximum identifier length, and longest identifier name so automation can consume naming workload summaries without parsing Markdown.
+
+## REQ-AUTO-121: Identifier dashboard JSON
+
+The system shall render a compact identifier audit dashboard as deterministic JSON from already-scanned findings. The output shall include the summary values and finding-kind counts so automation can consume naming workload totals and construct-category distribution without parsing Markdown.
+
+## REQ-AUTO-122: Identifier dashboard JSON run
+
+The system shall scan an explicit set of Python files and render a compact identifier audit dashboard as deterministic JSON. The run shall reuse the configured maximum identifier length and include summary values plus finding-kind counts so automation can consume touched-file dashboard totals directly.
+
+## REQ-AUTO-123: Identifier project dashboard JSON
+
+The system shall render a compact identifier audit dashboard as deterministic JSON from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, and include summary values plus finding-kind counts so automation can consume whole-project dashboard totals directly.
+
+## REQ-AUTO-124: Identifier longest-name JSON
+
+The system shall rank identifier audit findings by longest identifier first and render the ranked subset as deterministic JSON. The JSON output shall preserve path, line, kind, name, and length fields so automation can consume cleanup priorities without parsing Markdown.
+
+## REQ-AUTO-125: Identifier longest-name JSON run
+
+The system shall scan an explicit set of Python files, rank the longest identifier findings with a configurable row limit, and render the ranked subset as deterministic JSON. The run shall reuse the configured maximum identifier length so automation can consume touched-file cleanup priorities without parsing Markdown.
+
+## REQ-AUTO-126: Identifier project longest-name JSON
+
+The system shall render longest-name identifier audit priorities as deterministic JSON from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, rank findings with a configurable row limit, and preserve finding metadata so automation can consume whole-project cleanup priorities without parsing Markdown.
+
+## REQ-AUTO-127: Identifier rename suggestion JSON
+
+The system shall render identifier rename suggestions as deterministic JSON from already-planned fixes. The JSON output shall preserve path, line, kind, original name, suggestion, and reason fields so automation can consume rename plans without parsing Markdown reports.
+
+## REQ-AUTO-128: Identifier rename suggestion JSON run
+
+The system shall scan an explicit set of Python files, plan over-limit identifier rename suggestions, and render the suggestions as deterministic JSON. The run shall reuse the configured maximum identifier length and preserve path, line, kind, original name, suggestion, and reason fields so automation can consume touched-file rename plans directly.
+
+## REQ-AUTO-129: Identifier project rename suggestion JSON
+
+The system shall render identifier rename suggestions as deterministic JSON from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, plan over-limit rename suggestions, and preserve path, line, kind, original name, suggestion, and reason fields so automation can consume whole-project rename plans directly.
+
+## REQ-AUTO-130: Identifier audit gate
+
+The system shall evaluate identifier audit findings as a deterministic pass/fail gate. The gate shall pass only when no over-limit identifiers are present, and it shall preserve the finding summary so CI or review automation can explain why the naming check failed.
+
+## REQ-AUTO-131: Identifier audit gate JSON
+
+The system shall render identifier audit gate results as deterministic JSON. The output shall preserve the pass/fail result plus the summary values so CI or review automation can consume gate status without parsing Markdown or Python objects.
+
+## REQ-AUTO-132: Identifier audit gate Markdown
+
+The system shall render identifier audit gate results as deterministic Markdown. The output shall preserve the pass/fail status plus the summary values so CI or review automation can publish a human-readable naming gate result without parsing JSON or Python objects.
+
+## REQ-AUTO-133: Identifier audit gate run
+
+The system shall scan an explicit set of Python files and render the identifier audit gate result as deterministic Markdown. The run shall reuse the configured maximum identifier length so CI or review automation can evaluate touched-file naming status without manually wiring scanner, gate, and renderer calls.
+
+## REQ-AUTO-134: Identifier audit gate JSON run
+
+The system shall scan an explicit set of Python files and render the identifier audit gate result as deterministic JSON. The run shall reuse the configured maximum identifier length so CI or review automation can consume touched-file naming gate status without manually wiring scanner, gate, and JSON renderer calls.
+
+## REQ-AUTO-135: Identifier project gate
+
+The system shall render an identifier audit gate result from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, evaluate the pass/fail naming gate, and render deterministic Markdown so whole-project naming status can be reviewed from root paths.
+
+## REQ-AUTO-136: Identifier project gate JSON
+
+The system shall render an identifier audit gate result as deterministic JSON from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, evaluate the pass/fail naming gate, and preserve summary values so whole-project naming status can be consumed by automation.
+
+## REQ-AUTO-137: Identifier gate detail JSON
+
+The system shall render identifier audit gate status and finding details as one deterministic JSON object from already-scanned findings. The output shall preserve the pass/fail result, summary values, and every finding path, line, kind, name, and length so CI or review automation can consume both gate status and failure details without joining separate reports.
+
+## REQ-AUTO-138: Identifier gate detail JSON run
+
+The system shall scan an explicit set of Python files and render identifier audit gate status and finding details as one deterministic JSON object. The run shall reuse the configured maximum identifier length and preserve both summary values and each finding path, line, kind, name, and length so CI or review automation can consume touched-file gate details directly.
+
+## REQ-AUTO-139: Identifier project gate detail JSON
+
+The system shall render identifier audit gate status and finding details as one deterministic JSON object from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, evaluate pass/fail gate status, and preserve summary values plus each finding path, line, kind, name, and length so automation can consume whole-project gate details directly.
+
+## REQ-AUTO-140: Identifier gate exit code
+
+The system shall convert an identifier audit gate result into a deterministic process exit code. Passing gate results shall map to exit code 0, and failing gate results shall map to exit code 1 so CI wrappers can use gate status without parsing report text.
+
+## REQ-AUTO-141: Identifier gate exit code run
+
+The system shall scan an explicit set of Python files and return a deterministic identifier audit gate exit code. The runner shall reuse the configured maximum identifier length, map clean scans to exit code 0, and map scans with over-limit identifiers to exit code 1 so CI wrappers can evaluate touched-file naming status without parsing report text.
+
+## REQ-AUTO-142: Identifier project gate exit code
+
+The system shall return an identifier audit gate exit code from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, map clean projects to exit code 0, and map projects with over-limit identifiers to exit code 1 so CI wrappers can evaluate whole-project naming status from root paths.
+
+## REQ-AUTO-143: Identifier gate log line
+
+The system shall render identifier audit gate results as one deterministic log line. The output shall preserve the pass/fail status, hit count, file count, maximum identifier length, and maximum identifier name so CI logs can show naming gate status without multi-line Markdown or JSON parsing.
+
+## REQ-AUTO-144: Identifier gate log line run
+
+The system shall scan an explicit set of Python files and render the identifier audit gate result as one deterministic log line. The runner shall reuse the configured maximum identifier length and preserve pass/fail status plus summary values so CI logs can show touched-file naming status without multi-line Markdown or JSON parsing.
+
+## REQ-AUTO-145: Identifier project gate log line
+
+The system shall render an identifier audit gate result as one deterministic log line from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, evaluate the pass/fail naming gate, and preserve summary values so CI logs can show whole-project naming status without multi-line Markdown or JSON parsing.
+
+## REQ-AUTO-146: Identifier CI gate run
+
+The system shall scan an explicit set of Python files and return both an identifier audit gate exit code and one deterministic log line from the same gate result. The runner shall reuse the configured maximum identifier length, map clean scans to exit code 0, map scans with over-limit identifiers to exit code 1, and preserve the log summary so CI wrappers can evaluate and print touched-file naming status without duplicate scans.
+
+## REQ-AUTO-147: Identifier project CI gate run
+
+The system shall return both an identifier audit gate exit code and one deterministic log line from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, evaluate the pass/fail naming gate once, map clean projects to exit code 0, map projects with over-limit identifiers to exit code 1, and preserve the log summary so CI wrappers can evaluate and print whole-project naming status without duplicate scans.
+
+## REQ-AUTO-148: Identifier CI gate JSON
+
+The system shall render an identifier CI gate exit code and log line as deterministic JSON. The output shall preserve the numeric exit code and the printable one-line summary so CI wrappers can pass both machine-readable status and human-readable output to downstream automation without parsing shell text.
+
+## REQ-AUTO-149: Identifier CI gate JSON run
+
+The system shall scan an explicit set of Python files and render the identifier audit CI gate result as deterministic JSON. The runner shall reuse the configured maximum identifier length, evaluate pass/fail status once, map clean scans to exit code 0, map scans with over-limit identifiers to exit code 1, and preserve the one-line summary so CI wrappers can consume touched-file naming status as one machine-readable payload.
+
+## REQ-AUTO-150: Identifier project CI gate JSON run
+
+The system shall render an identifier audit CI gate result as deterministic JSON from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, evaluate pass/fail status once, map clean projects to exit code 0, map projects with over-limit identifiers to exit code 1, and preserve the one-line summary so CI wrappers can consume whole-project naming status as one machine-readable payload.
+
+## REQ-AUTO-151: Identifier CI status JSON
+
+The system shall render an identifier CI gate exit code and log line as deterministic JSON with an explicit boolean status. The output shall preserve the numeric exit code, preserve the printable one-line summary, and expose `ok` as true only when the exit code is 0 so CI wrappers can branch without decoding process conventions.
+
+## REQ-AUTO-152: Identifier CI status JSON run
+
+The system shall scan an explicit set of Python files and render the identifier audit CI gate result as deterministic JSON with an explicit boolean status. The runner shall reuse the configured maximum identifier length, evaluate pass/fail status once, map clean scans to exit code 0, map scans with over-limit identifiers to exit code 1, preserve the one-line summary, and expose `ok` as true only when the exit code is 0.
+
+## REQ-AUTO-153: Identifier project CI status JSON run
+
+The system shall render an identifier audit CI gate result as deterministic JSON with an explicit boolean status from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, evaluate pass/fail status once, map clean projects to exit code 0, map projects with over-limit identifiers to exit code 1, preserve the one-line summary, and expose `ok` as true only when the exit code is 0.
+
+## REQ-AUTO-154: Identifier CI detail JSON run
+
+The system shall scan an explicit set of Python files and render the identifier audit CI gate result plus finding details as deterministic JSON. The runner shall reuse the configured maximum identifier length, evaluate pass/fail status once, map clean scans to exit code 0, map scans with over-limit identifiers to exit code 1, preserve the one-line summary, expose `ok` as true only when the exit code is 0, and include every finding path, line, kind, name, and length for CI annotations.
+
+## REQ-AUTO-155: Identifier project CI detail JSON run
+
+The system shall render the identifier audit CI gate result plus finding details as deterministic JSON from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, evaluate pass/fail status once, map clean projects to exit code 0, map projects with over-limit identifiers to exit code 1, preserve the one-line summary, expose `ok` as true only when the exit code is 0, and include every finding path, line, kind, name, and length for whole-project CI annotations.
+
+## REQ-AUTO-156: Identifier CI note run
+
+The system shall scan an explicit set of Python files and render over-limit identifier findings as deterministic one-line notes for CI logs or annotation adapters. Each finding note shall preserve path, line, kind, name, and length. Clean scans shall render a stable clean marker so CI wrappers can emit readable output without parsing JSON.
+
+## REQ-AUTO-157: Identifier project CI note run
+
+The system shall render over-limit identifier findings as deterministic one-line notes from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, preserve path, line, kind, name, and length in each finding note, and render a stable clean marker when no findings exist so CI wrappers can emit whole-project naming notes without parsing JSON.
+
+## REQ-AUTO-158: Identifier bounded CI notes
+
+The system shall render identifier audit findings as deterministic one-line CI notes with a configurable positive maximum number of findings. The renderer shall preserve path, line, kind, name, and length for each emitted finding, append a stable omitted-count marker when findings are hidden, and render the same clean marker as the unbounded note renderer when no findings exist so CI logs can remain bounded without losing overflow visibility.
+
+## REQ-AUTO-159: Identifier bounded CI note run
+
+The system shall scan an explicit set of Python files and render a bounded top-N set of identifier audit findings as deterministic one-line CI notes. The runner shall reuse the configured maximum identifier length, preserve path, line, kind, name, and length for each emitted finding, append a stable omitted-count marker when findings are hidden, and render the clean marker when no findings exist so touched-file CI logs can stay bounded without losing overflow visibility.
+
+## REQ-AUTO-160: Identifier project bounded CI note run
+
+The system shall render a bounded top-N set of identifier audit findings as deterministic one-line CI notes from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, preserve path, line, kind, name, and length for each emitted finding, append a stable omitted-count marker when findings are hidden, and render the clean marker when no findings exist so whole-project CI logs can stay bounded without losing overflow visibility.
+
+## REQ-AUTO-161: Identifier CI note Markdown
+
+The system shall render already-produced identifier CI notes as deterministic Markdown. The renderer shall wrap the note text in a stable text code fence so review systems can publish naming audit notes without interpreting paths, colons, or omitted-count markers as Markdown syntax.
+
+## REQ-AUTO-162: Identifier bounded CI note Markdown run
+
+The system shall scan an explicit set of Python files, render a bounded top-N set of identifier audit findings as deterministic one-line CI notes, and wrap those notes in deterministic Markdown. The runner shall reuse the configured maximum identifier length and note limit so touched-file CI logs can publish bounded naming findings directly into Markdown-capable review surfaces.
+
+## REQ-AUTO-163: Identifier project bounded CI note Markdown run
+
+The system shall render a bounded top-N set of identifier audit findings as deterministic Markdown from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, preserve bounded note details, and wrap the result in a stable text code fence for whole-project review comments.
+
+## REQ-AUTO-164: Identifier CI note Markdown section
+
+The system shall render already-produced identifier CI notes as a deterministic Markdown section. The renderer shall add a stable heading above the fenced note body so review systems can publish multiple naming audit outputs with clear labels.
+
+## REQ-AUTO-165: Identifier bounded CI note Markdown section run
+
+The system shall scan an explicit set of Python files, render a bounded top-N set of identifier audit findings, and wrap the result in a titled Markdown section. The runner shall reuse the configured maximum identifier length, note limit, and caller-provided title so touched-file review comments can group naming findings.
+
+## REQ-AUTO-166: Identifier project bounded CI note Markdown section run
+
+The system shall render a bounded top-N set of identifier audit findings as a titled Markdown section from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, preserve bounded note details, and publish the result under a caller-provided heading for whole-project review comments.
+
+## REQ-AUTO-167: Identifier naming audit operations guide
+
+The system shall render a deterministic Markdown operations guide for the identifier naming audit. The guide shall document the audit purpose, default maximum identifier length, bounded review note limit, audited Python syntax, review workflow, and CI payload choices so contributors can use the naming audit without reading implementation code.
+
+## REQ-AUTO-168: Identifier project operations document
+
+The system shall render a deterministic project-level identifier naming audit operations document. The document shall combine the operations guide with the current bounded project naming findings section so reviewers can publish both usage guidance and live findings from the same project-root scan.
+
+## REQ-AUTO-169: Identifier CI aggregate summary JSON
+
+The system shall render identifier audit findings as deterministic aggregate JSON for CI dashboards. The output shall include total finding count, affected file count, maximum identifier length, longest identifier details, finding counts by Python syntax kind, and finding counts by file so CI systems can publish compact naming telemetry without embedding every finding.
+
+## REQ-AUTO-170: Identifier CI aggregate summary run
+
+The system shall scan an explicit set of Python files and render the identifier audit aggregate summary as deterministic JSON. The runner shall reuse the configured maximum identifier length, preserve deterministic file and kind ordering, and return an empty but schema-stable summary when no findings exist.
+
+## REQ-AUTO-171: Identifier project CI aggregate summary run
+
+The system shall render the identifier audit aggregate summary as deterministic JSON from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, preserve deterministic file and kind ordering, and return a compact whole-project summary for CI dashboards.
