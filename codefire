@@ -4705,6 +4705,9 @@ class _BoundedCanonicalJSONFreezer:
         if amount:
             self.ledger.release(dimension, amount)
 
+    def _new_fragment_list(self) -> list[bytes]:
+        return []
+
     def _push(self, kind: str, value: Any) -> None:
         self._acquire("temporary_bytes", self.TOKEN_BYTES)
         self.stack_bytes += self.TOKEN_BYTES
@@ -4790,7 +4793,10 @@ class _BoundedCanonicalJSONFreezer:
             self._emit_string(value)
             return
         if isinstance(value, int):
-            upper = max(1, (abs(value).bit_length() * 30103) // 100000 + 3)
+            if type(value) is not int:
+                raise CFError("HTTP JSON response integer subclasses are unsupported")
+            bits = int.bit_length(value)
+            upper = max(1, (bits * 30103) // 100000 + 3)
             remaining = self.limit + 1 - self.size
             if upper > remaining + 2:
                 self.size = self.limit + 1
@@ -4801,7 +4807,7 @@ class _BoundedCanonicalJSONFreezer:
             encoded: bytes | None = None
             text_value: str | None = None
             try:
-                text_value = str(value)
+                text_value = int.__str__(value)
                 encoded = text_value.encode("ascii")
                 self._emit_ascii(encoded)
             finally:
@@ -4875,6 +4881,7 @@ class _BoundedCanonicalJSONFreezer:
             assert self.fragments is not None
             self.fragments.append(frozen)
         except Exception:
+            frozen = None
             self._release("retained_bytes", ownership)
             raise
         self.fragment_bytes += amount
@@ -4905,7 +4912,7 @@ class _BoundedCanonicalJSONFreezer:
             self.stack = []
             self._acquire("retained_bytes", self.FRAGMENT_BASE)
             self.fragment_base = self.FRAGMENT_BASE
-            self.fragments = []
+            self.fragments = self._new_fragment_list()
             chunk_capacity = min(self.CHUNK_BYTES, self.limit + 1)
             chunk_capacity = max(1, chunk_capacity)
             self._acquire(
@@ -4925,6 +4932,8 @@ class _BoundedCanonicalJSONFreezer:
                     else:
                         self._expand(value)
                 finally:
+                    kind = None
+                    value = None
                     self.stack_bytes -= self.TOKEN_BYTES
                     self._release("temporary_bytes", self.TOKEN_BYTES)
             if self.overflow:

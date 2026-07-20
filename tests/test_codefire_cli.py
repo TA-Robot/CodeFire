@@ -1423,6 +1423,105 @@ class CodeFireCliTests(unittest.TestCase):
         self.assertTrue(all(value == 0 for value in ledger.current.values()))
         self.assertFalse(ledger.has_open_permits())
 
+    def test_python_bounded_json_freezer_skips_huge_negative_int_copy(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        profile = namespace["DecisionWorkProfile"].http_v1(
+            {
+                "response_bytes": 1,
+                "temporary_bytes": ("concurrent", 1024),
+            }
+        )
+        ledger = namespace["DecisionWorkLedger"](
+            profile, "http request", command_kind="http_request"
+        )
+
+        def budget_error(dimension, observed, phase):
+            return namespace["ResourceBudgetExceeded"](
+                profile=profile.profile_id,
+                dimension=dimension,
+                observed=observed,
+                limit=profile.limit(dimension),
+                phase=phase,
+                command="http request",
+                continuation_supported=False,
+            )
+
+        value = -(1 << (8 * 1024 * 1024))
+        freezer = namespace["_BoundedCanonicalJSONFreezer"](
+            ledger, profile, budget_error, 1
+        )
+        with self.assertRaises(namespace["ResourceBudgetExceeded"]) as raised:
+            freezer.freeze(value)
+        self.assertEqual(raised.exception.diagnostic()["observed"], 2)
+        self.assertLessEqual(ledger.snapshot()["peak"]["temporary_bytes"], 1024)
+        self.assertTrue(all(value == 0 for value in ledger.current.values()))
+        self.assertFalse(ledger.has_open_permits())
+
+    def test_python_bounded_json_freezer_rejects_int_subclasses(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        profile = namespace["DecisionWorkProfile"].http_v1()
+        ledger = namespace["DecisionWorkLedger"](
+            profile, "http request", command_kind="http_request"
+        )
+
+        def budget_error(dimension, observed, phase):
+            return namespace["ResourceBudgetExceeded"](
+                profile=profile.profile_id,
+                dimension=dimension,
+                observed=observed,
+                limit=profile.limit(dimension),
+                phase=phase,
+                command="http request",
+                continuation_supported=False,
+            )
+
+        class CustomInt(int):
+            pass
+
+        freezer = namespace["_BoundedCanonicalJSONFreezer"](
+            ledger, profile, budget_error, 64
+        )
+        with self.assertRaisesRegex(
+            namespace["CFError"], "integer subclasses"
+        ):
+            freezer.freeze(CustomInt(7))
+        self.assertTrue(all(value == 0 for value in ledger.current.values()))
+        self.assertFalse(ledger.has_open_permits())
+
+    def test_python_bounded_json_freezer_drops_failed_fragment(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        profile = namespace["DecisionWorkProfile"].http_v1()
+        ledger = namespace["DecisionWorkLedger"](
+            profile, "http request", command_kind="http_request"
+        )
+
+        def budget_error(dimension, observed, phase):
+            return namespace["ResourceBudgetExceeded"](
+                profile=profile.profile_id,
+                dimension=dimension,
+                observed=observed,
+                limit=profile.limit(dimension),
+                phase=phase,
+                command="http request",
+                continuation_supported=False,
+            )
+
+        class FailingFragments(list):
+            def append(self, value):
+                raise namespace["CFError"]("injected fragment append failure")
+
+        base = namespace["_BoundedCanonicalJSONFreezer"]
+
+        class FailingFreezer(base):
+            def _new_fragment_list(self):
+                return FailingFragments()
+
+        freezer = FailingFreezer(ledger, profile, budget_error, 64)
+        with self.assertRaisesRegex(namespace["CFError"], "fragment append"):
+            freezer.freeze({"ok": True})
+        self.assertTrue(all(value == 0 for value in ledger.current.values()))
+        self.assertFalse(ledger.has_open_permits())
+
     def test_python_http_physical_body_ownership_is_bounded(self):
         namespace = runpy.run_path(str(CODEFIRE))
         body = b'"' + (b"x" * 1_200) + b'"'
