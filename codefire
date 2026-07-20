@@ -4813,6 +4813,8 @@ class _BoundedCanonicalJSONFreezer:
                 text_value = None
                 self._release("temporary_bytes", scratch)
             return
+        if isinstance(value, int):
+            raise CFError("HTTP JSON response rejects integer subclasses")
         if type(value) is float:
             scratch = 128
             self._acquire("temporary_bytes", scratch)
