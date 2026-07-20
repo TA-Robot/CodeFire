@@ -42,30 +42,6 @@ pub(super) fn load_open_idempotency(
     }))
 }
 
-pub(super) fn save_open_idempotency(
-    repo_root: &Path,
-    key: &str,
-    payload: &Value,
-    result: &OpenResult,
-) -> Result<(), CliError> {
-    require_idempotency_key(key)?;
-    let path = idempotency_record_path(repo_root, "open", key);
-    let record = json!({
-        "version": 1,
-        "command": "open",
-        "key": key,
-        "payload_hash": idempotency_payload_hash(payload)?,
-        "payload": payload,
-        "result": {
-            "branch": &result.branch,
-            "open_dir": &result.open_dir,
-            "plan": &result.plan,
-        },
-        "created_at": now_iso_utc(),
-    });
-    write_json_atomic(&path, &record)
-}
-
 pub(super) fn clone_idempotency_payload(options: &CloneOptions, repo_root: &Path) -> Value {
     json!({
         "command": "clone",

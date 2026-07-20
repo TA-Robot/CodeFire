@@ -14,8 +14,8 @@ common:
   codefire init [path]
   codefire import [path] [--branch main] [--dry-run] [--json]
   codefire open <branch> <path> [--dry-run] [--json]
-  codefire scan [path] [--json] [--metrics]
-  codefire verify [path] [--details] [--blocking-only] [--json] [--metrics]
+  codefire scan [path] [--json] [--metrics] [--wait-lock] [--lock-timeout <duration>]
+  codefire verify [path] [--details] [--blocking-only] [--json] [--metrics] [--wait-lock] [--lock-timeout <duration>]
   codefire doctor [path] [--quick] [--json]
   codefire commit -m <message> [--signer <name>] [--key-id <id>]
   codefire completion <bash|zsh>
@@ -54,17 +54,23 @@ _codefire_complete()
     branch)
       if [[ $COMP_CWORD -eq 2 ]]; then COMPREPLY=( $(compgen -W "list" -- "$cur") ); fi
       ;;
-    import|open|clone|merge|commit|extinguish|patch)
+    import|open|clone|commit|extinguish|patch)
       COMPREPLY=( $(compgen -W "--branch --dry-run --json --idempotency-key --wait-lock --lock-timeout --into --message -m --signer --key-id --resolution --rationale --evidence --evidence-ref --interactive --all-matching --batch --batch-template --full --output" -- "$cur") )
+      ;;
+    merge)
+      COMPREPLY=( $(compgen -W "--into --continue --path --accept-semantic-conflicts --dry-run --json --idempotency-key --wait-lock --lock-timeout" -- "$cur") )
       ;;
     upload|request-merge|request-review|request-apply)
       COMPREPLY=( $(compgen -W "--dry-run --json --idempotency-key --wait-lock --lock-timeout --actor --token --request-key-id --reviewer --decision --comment" -- "$cur") )
       ;;
-    scan|status)
+    scan)
+      COMPREPLY=( $(compgen -W "--json --metrics --wait-lock --lock-timeout" -- "$cur") )
+      ;;
+    status)
       COMPREPLY=( $(compgen -W "--json --metrics" -- "$cur") )
       ;;
     verify)
-      COMPREPLY=( $(compgen -W "--details --blocking-only --json --metrics" -- "$cur") )
+      COMPREPLY=( $(compgen -W "--details --blocking-only --json --metrics --wait-lock --lock-timeout" -- "$cur") )
       ;;
     doctor)
       COMPREPLY=( $(compgen -W "--quick --full --json" -- "$cur") )
@@ -97,9 +103,9 @@ _codefire_complete()
       ;;
     migrate)
       if [[ $COMP_CWORD -eq 2 ]]; then
-        COMPREPLY=( $(compgen -W "check dry-run" -- "$cur") )
+        COMPREPLY=( $(compgen -W "check dry-run apply" -- "$cur") )
       else
-        COMPREPLY=( $(compgen -W "--json --target-format" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--path --json --target-format --quick --full --wait-lock --lock-timeout" -- "$cur") )
       fi
       ;;
     serve)
@@ -139,17 +145,23 @@ _codefire()
     branch)
       _arguments '1:branch command:(list)'
       ;;
-    import|open|clone|merge|commit|extinguish|patch)
+    import|open|clone|commit|extinguish|patch)
       _arguments '--branch[branch name]' '--dry-run[dry run]' '--json[emit JSON]' '--idempotency-key[idempotency key]' '--wait-lock[wait for locks]' '--lock-timeout[lock timeout]' '--into[target branch]' '--message[commit message]' '-m[commit message]' '--signer[commit signer]' '--key-id[commit signing key id]' '--resolution[resolution]' '--rationale[rationale]' '--evidence[evidence text]' '--evidence-ref[evidence object id]' '--interactive[interactive resolution]' '--all-matching[extinguish matching source-target fires]' '--batch[batch file]' '--batch-template[generate extinguish batch template]' '--full[include full output]' '--output[output file]'
+      ;;
+    merge)
+      _arguments '--into[target branch]' '--continue[continue after resolving merge conflicts]' '--path[open directory]' '--accept-semantic-conflicts[acknowledge semantic conflict candidates]' '--dry-run[dry run]' '--json[emit JSON]' '--idempotency-key[idempotency key for merge apply]' '--wait-lock[wait for locks]' '--lock-timeout[lock timeout]'
       ;;
     upload|request-merge|request-review|request-apply)
       _arguments '--dry-run[dry run]' '--json[emit JSON]' '--idempotency-key[idempotency key]' '--wait-lock[wait for locks]' '--lock-timeout[lock timeout]' '--actor[remote actor]' '--token[remote token]' '--request-key-id[remote request signing key id]' '--reviewer[reviewer]' '--decision[decision]:decision:(approve reject)' '--comment[comment]'
       ;;
-    scan|status)
+    scan)
+      _arguments '--json[emit JSON]' '--metrics[show metrics]' '--wait-lock[wait for repository lock]' '--lock-timeout[repository lock timeout]'
+      ;;
+    status)
       _arguments '--json[emit JSON]' '--metrics[show metrics]'
       ;;
     verify)
-      _arguments '--details[show failed verification diagnostic details]' '--blocking-only[show only blocking diagnostics]' '--json[emit JSON]' '--metrics[show metrics]'
+      _arguments '--details[show failed verification diagnostic details]' '--blocking-only[show only blocking diagnostics]' '--json[emit JSON]' '--metrics[show metrics]' '--wait-lock[wait for repository lock]' '--lock-timeout[repository lock timeout]'
       ;;
     doctor)
       _arguments '--quick[skip full object store integrity scan]' '--full[run full object store integrity scan]' '--json[emit JSON]'
@@ -173,7 +185,7 @@ _codefire()
       _arguments '--path[repo or open path]' '--branch[branch]' '--changed[changed context]' '--atom[Atom id]' '--fire[fire id]' '--json[emit JSON]'
       ;;
     migrate)
-      _arguments '1:migrate command:(check dry-run)' '--json[emit JSON]' '--target-format[target format]'
+      _arguments '1:migrate command:(check dry-run apply)' '--path[repository path]' '--json[emit JSON]' '--target-format[target compatibility profile]:format:(current v0.6)' '--quick[skip object integrity for check/dry-run]' '--full[run full compatibility scan]' '--wait-lock[wait for repository lock during apply]' '--lock-timeout[repository lock timeout during apply]'
       ;;
     serve)
       _arguments '--host[host]' '--port[port]' '--tls-cert[TLS certificate]' '--tls-key[TLS private key]' '--tls-client-ca[required client CA PEM]'

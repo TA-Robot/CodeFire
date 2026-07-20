@@ -1,13 +1,31 @@
 use super::*;
 use crate::doctor::DoctorOptions;
-use crate::remote::{next_remote_generation, remote_idempotency_key, RemoteGenerationLock};
+use crate::remote::remote_idempotency_key;
 use serde_json::{json, Map};
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::sync::{Arc, Barrier};
+use std::process::Command;
 use tempfile::tempdir;
 
+mod commit_recovery_identity;
+mod committable_decision;
+mod conformance;
 mod docs;
+mod doctor_capability;
+mod doctor_pending_contract;
+mod import_idempotency;
+mod legacy_remote_identity;
+mod local;
+mod merge_resolution;
+mod migration_apply;
+mod open_snapshot;
+mod open_transaction_boundary;
+mod policy_coverage;
+mod remote_doctor;
+mod sealed_token_boundary;
+mod signature_boundary;
+mod state_transaction;
+mod subject_trust;
 
 #[test]
 fn command_help_routes_before_mutating_parsers() {
@@ -146,6 +164,8 @@ fn import_existing_project_dry_run_and_apply_adopt_non_empty_directory() {
 #[test]
 fn command_capabilities_are_shared_by_help_completion_and_metrics_parser() {
     let capabilities = command_registry::capabilities_data_json();
+    assert_eq!(capabilities["schema"], "codefire.capabilities.v1");
+    assert_eq!(capabilities["support"]["profile"], "codefire.support.v1");
     let commands = capabilities["commands"].as_array().unwrap();
     assert_eq!(commands.len(), command_registry::COMMAND_NAMES.len());
     assert!(commands.iter().any(|command| {
@@ -156,6 +176,19 @@ fn command_capabilities_are_shared_by_help_completion_and_metrics_parser() {
     assert!(commands
         .iter()
         .any(|command| { command["name"] == "capabilities" && command["supports_json"] == true }));
+    let doctor = commands
+        .iter()
+        .find(|command| command["name"] == "doctor")
+        .unwrap();
+    assert_eq!(
+        doctor["targets"],
+        json!(["local", "cf", "cf+http", "cf+https"])
+    );
+    let remote_list = commands
+        .iter()
+        .find(|command| command["name"] == "list")
+        .unwrap();
+    assert_eq!(remote_list["pagination"]["mode"], "snapshot_cursor");
     assert!(help_text().contains("capabilities"));
 
     let branch_list = parse_path_json_args(&["--metrics".to_string()], "branch list").unwrap();
@@ -200,6 +233,67 @@ fn cli_error_diagnostics_cover_representative_error_classes() {
     );
     assert_eq!(unsupported["diagnostics"][0]["kind"], "unsupported_command");
     assert_eq!(unsupported["next_actions"][0]["command"], "codefire --help");
+}
+
+#[test]
+fn integrity_errors_use_typed_bounded_json_diagnostics_with_subject_context() {
+    let repo_root = PathBuf::from("/repo");
+    let links_path = repo_root.join("open").join("codefire.links.yaml");
+    let trace_error = CliError::CoreContext {
+        error: codefire_core::CoreError::TraceGraphEndpointIntegrity(
+            codefire_core::TraceGraphEndpointError {
+                issues: vec![codefire_core::TraceGraphEndpointIssue {
+                    link_index: 7,
+                    link_id: "LINK-007".to_string(),
+                    link_id_truncated: false,
+                    link_id_omitted_bytes: 0,
+                    endpoint: codefire_core::TraceGraphEndpointRole::To,
+                    atom_id: "DES-missing".to_string(),
+                    atom_id_truncated: false,
+                    atom_id_omitted_bytes: 0,
+                    kind: codefire_core::TraceGraphEndpointIssueKind::MissingAtom,
+                    atom_occurrences: 0,
+                }],
+                total_issues: 3,
+                omitted_issues: 2,
+            },
+        ),
+        repo_root: repo_root.clone(),
+        path: links_path.clone(),
+    };
+    let trace_envelope = cli_error_envelope("scan", &trace_error);
+    let trace_diagnostic = &trace_envelope["diagnostics"][0];
+    assert_eq!(trace_envelope["repo"], repo_root.to_string_lossy().as_ref());
+    assert_eq!(trace_diagnostic["kind"], "trace_graph_endpoint_integrity");
+    assert_eq!(
+        trace_diagnostic["path"],
+        links_path.to_string_lossy().as_ref()
+    );
+    assert_eq!(trace_diagnostic["total_issues"], 3);
+    assert_eq!(trace_diagnostic["issues_omitted"], 2);
+    assert_eq!(trace_diagnostic["issues"].as_array().unwrap().len(), 1);
+    assert_eq!(trace_diagnostic["issues"][0]["kind"], "missing_atom");
+
+    let collision_error = CliError::Store(Box::new(codefire_store::StoreError::ObjectCollision {
+        object_id: "CF-BLOB-deadbeef".to_string(),
+        requested_type: "blob".to_string(),
+        existing_type: "policy".to_string(),
+        requested_hash: "a".repeat(64),
+        existing_hash: "b".repeat(64),
+        canonical_payload_matches: false,
+    }));
+    let collision_diagnostic = collision_error.diagnostic();
+    assert_eq!(collision_diagnostic["kind"], "object_id_collision");
+    assert_eq!(collision_diagnostic["object_id"], "CF-BLOB-deadbeef");
+    assert_eq!(collision_diagnostic["requested_type"], "blob");
+    assert_eq!(collision_diagnostic["existing_type"], "policy");
+    assert_eq!(collision_diagnostic["requested_hash"], "a".repeat(64));
+    assert_eq!(collision_diagnostic["existing_hash"], "b".repeat(64));
+    assert_eq!(collision_diagnostic["canonical_payload_matches"], false);
+    assert_eq!(
+        collision_error.exit_code(),
+        ExitCode::ObjectReferenceInvalid.code()
+    );
 }
 
 #[test]
@@ -400,7 +494,8 @@ fn init_creates_python_compatible_repo_layout() {
     let repo_root = temp.path().join("repo");
 
     let result = init_repo(&repo_root, false).unwrap();
-    let branches = list_branches(&repo_root).unwrap();
+    let listed = list_branches(&repo_root).unwrap();
+    let branches = &listed.branches;
 
     assert_eq!(result.repo_root, repo_root);
     assert_eq!(branches.len(), 1);
@@ -431,8 +526,940 @@ fn init_creates_python_compatible_repo_layout() {
         &result.main_commit,
     )
     .unwrap();
+    listed.finish_complete().unwrap();
     assert!(init_repo(&repo_root, false).is_err());
     init_repo(&repo_root, true).unwrap();
+}
+
+#[test]
+fn branch_list_uses_one_session_for_many_head_shared_dag_and_reports_aggregate_work() {
+    const EXTRA_HEADS: usize = 24;
+
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let initialized = init_repo(&repo_root, false).unwrap();
+    for index in 0..EXTRA_HEADS {
+        add_child_branch(
+            &repo_root,
+            &format!("feature-{index:02}"),
+            &initialized.main_commit,
+        );
+    }
+
+    let result = list_branches(&repo_root).unwrap();
+    let decision_work = result.decision_work_snapshot().clone();
+
+    assert_eq!(result.branches.len(), EXTRA_HEADS + 1);
+    assert_eq!(
+        result.store_work.semantic_commit_validations,
+        (EXTRA_HEADS + 1) as u64
+    );
+    assert_eq!(result.store_work.validated_commit_hits, EXTRA_HEADS as u64);
+    assert_eq!(
+        result.store_work.document_reads,
+        (EXTRA_HEADS + 1 + 7) as u64
+    );
+    assert_eq!(
+        result.store_work.revalidated_documents,
+        result.store_work.document_reads
+    );
+    assert_eq!(decision_work.terminal_reason, None);
+    assert!(decision_work.current[&codefire_core::DecisionWorkDimension::RetainedBytes] > 0);
+    assert_eq!(
+        decision_work.current[&codefire_core::DecisionWorkDimension::TemporaryBytes],
+        0
+    );
+    assert_eq!(
+        decision_work.cumulative[&codefire_core::DecisionWorkDimension::ObjectRecords],
+        result.store_work.document_reads + (EXTRA_HEADS + 1) as u64
+    );
+    assert_eq!(
+        decision_work.cumulative[&codefire_core::DecisionWorkDimension::GraphEdges],
+        ((EXTRA_HEADS + 1) * 7 + EXTRA_HEADS) as u64
+    );
+    assert_eq!(
+        decision_work.maximum[&codefire_core::DecisionWorkDimension::LogicalDepth],
+        1
+    );
+    assert_eq!(
+        decision_work.maximum[&codefire_core::DecisionWorkDimension::MaximumFrontier],
+        2
+    );
+    assert_eq!(
+        decision_work.cumulative
+            [&codefire_core::DecisionWorkDimension::SnapshotRevalidationRecords],
+        result.store_work.revalidated_documents
+            + result.ref_work.revalidated_records
+            + (EXTRA_HEADS + 1) as u64
+    );
+    assert_eq!(
+        decision_work.counters[&codefire_core::DecisionWorkCounter::FilesRead],
+        result.store_work.document_reads
+            + result.store_work.revalidated_documents
+            + result.ref_work.records
+            + result.ref_work.revalidated_records
+    );
+    assert_eq!(
+        decision_work.counters[&codefire_core::DecisionWorkCounter::BytesHashed],
+        result.store_work.document_read_bytes
+            + result.store_work.revalidated_bytes
+            + result.ref_work.bytes
+            + result.ref_work.revalidated_bytes
+    );
+    assert_eq!(result.ref_work.records, (EXTRA_HEADS + 1) as u64);
+    assert_eq!(result.ref_work.revalidated_records, result.ref_work.records);
+    assert_eq!(result.ref_work.revalidated_bytes, result.ref_work.bytes);
+
+    let repeated = list_branches(&repo_root).unwrap();
+    assert_eq!(repeated.branches, result.branches);
+    let without_metrics = json!({
+        "type": "codefire_branch_list",
+        "version": 1,
+        "branches": result.branches.iter().map(branch_json).collect::<Vec<_>>(),
+    });
+    let metrics = branch_list_metrics(
+        Duration::from_millis(1),
+        &repeated.branches,
+        repeated.store_work,
+        repeated.ref_work,
+        repeated.decision_work_snapshot(),
+    );
+    let with_metrics = attach_metrics(without_metrics.clone(), Some(&metrics));
+    let wire_value = serde_json::to_value(BranchListDataWire {
+        type_tag: "codefire_branch_list",
+        version: 1,
+        branches: BranchesWire(&repeated.branches),
+        metrics: Some(metrics_wire(&metrics)),
+    })
+    .unwrap();
+    assert_eq!(wire_value, with_metrics);
+    assert_eq!(with_metrics["branches"], without_metrics["branches"]);
+    assert_eq!(with_metrics["metrics"]["cache"]["status"], "aggregate");
+    assert_eq!(
+        with_metrics["metrics"]["cache"]["implementation"],
+        "sealed_validation_session_v1"
+    );
+    assert!(with_metrics["metrics"]["counters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|counter| counter["name"] == "branch_ref_records"
+            && counter["value"] == (EXTRA_HEADS + 1) as u64));
+    let result_finished = result.finish_complete().unwrap();
+    let repeated_finished = repeated.finish_complete().unwrap();
+    for finished in [result_finished, repeated_finished] {
+        assert_eq!(
+            finished.terminal_reason,
+            Some(codefire_core::DecisionWorkTerminalReason::Complete)
+        );
+        assert_eq!(
+            finished.current[&codefire_core::DecisionWorkDimension::RetainedBytes],
+            0
+        );
+    }
+}
+
+#[test]
+fn branch_ref_snapshot_transfers_raw_temporary_to_compact_retained_and_releases_it() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let branches = repo_root.join(".codefire/branches");
+    let branch_path = branches.join("main.json");
+    let physical_bytes = fs::read(&branch_path).unwrap();
+    let value: Value = serde_json::from_slice(&physical_bytes).unwrap();
+    let compact_bytes = serde_json::to_vec(&value).unwrap();
+    let head = value["head"].as_str().unwrap();
+    let expected_retained = codefire_core::LOGICAL_FRAME_BASE_BYTES
+        + "main.json".len() as u64
+        + compact_bytes.len() as u64
+        + codefire_core::logical_retained_frame_bytes(head).unwrap();
+    let expected_temporary_peak =
+        DIRECTORY_ITERATION_SCRATCH_BYTES.max(2 * physical_bytes.len() as u64);
+    let mut ledger = branch_list_test_ledger();
+
+    let snapshot =
+        BranchRefSnapshot::capture(&branches, REPOSITORY_JSON_BYTE_LIMIT, &mut ledger).unwrap();
+
+    assert_eq!(
+        ledger.snapshot().current[&codefire_core::DecisionWorkDimension::RetainedBytes],
+        expected_retained
+    );
+    assert_eq!(
+        ledger.snapshot().peak[&codefire_core::DecisionWorkDimension::TemporaryBytes],
+        expected_temporary_peak
+    );
+    snapshot
+        .revalidate(REPOSITORY_JSON_BYTE_LIMIT, &mut ledger)
+        .unwrap();
+    assert_eq!(
+        ledger.snapshot().current[&codefire_core::DecisionWorkDimension::RetainedBytes],
+        0
+    );
+    assert_eq!(
+        ledger.snapshot().current[&codefire_core::DecisionWorkDimension::TemporaryBytes],
+        0
+    );
+}
+
+#[test]
+fn branch_ref_snapshot_capture_failure_releases_all_concurrent_accounting() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let branches = repo_root.join(".codefire/branches");
+    fs::write(branches.join("broken.json"), b"{").unwrap();
+    let mut ledger = branch_list_test_ledger();
+
+    let error =
+        BranchRefSnapshot::capture(&branches, REPOSITORY_JSON_BYTE_LIMIT, &mut ledger).unwrap_err();
+
+    assert!(matches!(error, BranchRefSnapshotError::Json(_)));
+    assert_eq!(
+        ledger.snapshot().current[&codefire_core::DecisionWorkDimension::RetainedBytes],
+        0
+    );
+    assert_eq!(
+        ledger.snapshot().current[&codefire_core::DecisionWorkDimension::TemporaryBytes],
+        0
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn opened_registry_snapshot_rejects_same_metadata_rewrite_and_releases_memory() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let opened_root = repo_root.join(".codefire/opened");
+    let registry_path = opened_root.join("main.json");
+    fs::write(
+        &registry_path,
+        serde_json::to_vec(&json!({
+            "type": "opened",
+            "version": 1,
+            "branch": "main",
+            "open": {"path": "/tmp/main"}
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    install_top_level_marker(&registry_path, "aaaa");
+    let mut ledger = branch_list_test_ledger();
+    let snapshot =
+        OpenedRegistrySnapshot::capture(&opened_root, REPOSITORY_JSON_BYTE_LIMIT, &mut ledger)
+            .unwrap();
+
+    rewrite_marker_with_same_metadata(&registry_path, b"aaaa", b"bbbb");
+    let error = snapshot
+        .revalidate(REPOSITORY_JSON_BYTE_LIMIT, &mut ledger)
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        BranchRefSnapshotError::SubjectChanged { subject, .. }
+            if subject == registry_path
+    ));
+    for dimension in [
+        codefire_core::DecisionWorkDimension::RetainedBytes,
+        codefire_core::DecisionWorkDimension::TemporaryBytes,
+    ] {
+        assert_eq!(
+            ledger
+                .snapshot()
+                .current
+                .get(&dimension)
+                .copied()
+                .unwrap_or_default(),
+            0
+        );
+    }
+}
+
+#[test]
+fn opened_registry_snapshot_rejects_membership_and_presence_drift() {
+    for operation in ["add", "delete", "rename", "replace-directory"] {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+        init_repo(&repo_root, false).unwrap();
+        let opened_root = repo_root.join(".codefire/opened");
+        let main = opened_root.join("main.json");
+        fs::write(&main, br#"{"branch":"main","open":{"path":"/tmp/main"}}"#).unwrap();
+        let mut ledger = branch_list_test_ledger();
+        let snapshot =
+            OpenedRegistrySnapshot::capture(&opened_root, REPOSITORY_JSON_BYTE_LIMIT, &mut ledger)
+                .unwrap();
+
+        match operation {
+            "add" => fs::write(opened_root.join("added.txt"), b"added").unwrap(),
+            "delete" => fs::remove_file(&main).unwrap(),
+            "rename" => fs::rename(&main, opened_root.join("renamed.json")).unwrap(),
+            "replace-directory" => {
+                let original = repo_root.join(".codefire/opened-original");
+                fs::rename(&opened_root, &original).unwrap();
+                fs::create_dir(&opened_root).unwrap();
+                fs::copy(original.join("main.json"), &main).unwrap();
+            }
+            _ => unreachable!(),
+        }
+
+        let error = snapshot
+            .revalidate(REPOSITORY_JSON_BYTE_LIMIT, &mut ledger)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            BranchRefSnapshotError::SubjectChanged { .. }
+        ));
+        assert_eq!(
+            ledger
+                .snapshot()
+                .current
+                .get(&codefire_core::DecisionWorkDimension::RetainedBytes)
+                .copied()
+                .unwrap_or_default(),
+            0,
+            "operation {operation}"
+        );
+    }
+
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let opened_root = repo_root.join(".codefire/opened");
+    fs::remove_dir(&opened_root).unwrap();
+    let mut ledger = branch_list_test_ledger();
+    let snapshot =
+        OpenedRegistrySnapshot::capture(&opened_root, REPOSITORY_JSON_BYTE_LIMIT, &mut ledger)
+            .unwrap();
+    fs::create_dir(&opened_root).unwrap();
+
+    assert!(matches!(
+        snapshot.revalidate(REPOSITORY_JSON_BYTE_LIMIT, &mut ledger),
+        Err(BranchRefSnapshotError::SubjectChanged { .. })
+    ));
+}
+
+#[test]
+fn branch_and_opened_capture_rejects_repository_metadata_root_replacement() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let listed = list_branches(&repo_root).unwrap();
+    let metadata_root = repo_root.join(".codefire");
+    let original = repo_root.join(".codefire-original");
+    fs::rename(&metadata_root, &original).unwrap();
+    fs::create_dir(&metadata_root).unwrap();
+    fs::create_dir(metadata_root.join("opened")).unwrap();
+
+    let error = listed.prepare_opened_registries().unwrap_err();
+
+    assert!(matches!(
+        error,
+        CliError::BranchReferenceSubjectChanged { subject, .. }
+            if subject == metadata_root
+    ));
+}
+
+#[test]
+fn branch_capture_is_bound_to_pinned_metadata_during_swap_back_attempt() {
+    let temp = tempdir().unwrap();
+    let first_repo = temp.path().join("first");
+    let second_repo = temp.path().join("second");
+    init_repo(&first_repo, false).unwrap();
+    init_repo(&second_repo, false).unwrap();
+    let metadata_root = first_repo.join(".codefire");
+    let original = temp.path().join("first-codefire-original");
+    let replacement = second_repo.join(".codefire");
+    let metadata = RepositoryMetadataSnapshot::capture(&metadata_root).unwrap();
+    fs::rename(&metadata_root, &original).unwrap();
+    fs::rename(&replacement, &metadata_root).unwrap();
+    let mut ledger = branch_list_test_ledger();
+
+    let error = metadata
+        .capture_branch_refs(
+            &metadata_root.join("branches"),
+            REPOSITORY_JSON_BYTE_LIMIT,
+            &mut ledger,
+        )
+        .unwrap_err();
+
+    fs::rename(&metadata_root, &replacement).unwrap();
+    fs::rename(&original, &metadata_root).unwrap();
+    assert!(matches!(
+        error,
+        BranchRefSnapshotError::SubjectChanged { subject, .. }
+            if subject == metadata_root
+    ));
+    metadata.ensure_current().unwrap();
+    assert_eq!(
+        ledger
+            .snapshot()
+            .current
+            .get(&codefire_core::DecisionWorkDimension::RetainedBytes)
+            .copied()
+            .unwrap_or_default(),
+        0
+    );
+}
+
+#[test]
+fn branch_capture_closing_fence_releases_snapshot_after_metadata_replacement() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let metadata_root = repo_root.join(".codefire");
+    let original = repo_root.join(".codefire-original");
+    let metadata = RepositoryMetadataSnapshot::capture(&metadata_root).unwrap();
+    let mut ledger = branch_list_test_ledger();
+
+    let error = metadata
+        .capture_branch_refs_with_hook(
+            &metadata_root.join("branches"),
+            REPOSITORY_JSON_BYTE_LIMIT,
+            &mut ledger,
+            || {
+                fs::rename(&metadata_root, &original).unwrap();
+                fs::create_dir(&metadata_root).unwrap();
+            },
+        )
+        .unwrap_err();
+    finish_branch_list_failure(&mut ledger, &error);
+
+    assert!(matches!(
+        error,
+        BranchRefSnapshotError::SubjectChanged { subject, .. }
+            if subject == metadata_root
+    ));
+    let snapshot = ledger.snapshot();
+    assert_eq!(
+        snapshot.terminal_reason,
+        Some(codefire_core::DecisionWorkTerminalReason::SubjectChanged)
+    );
+    assert_eq!(
+        snapshot
+            .current
+            .get(&codefire_core::DecisionWorkDimension::RetainedBytes)
+            .copied()
+            .unwrap_or_default(),
+        0
+    );
+    assert_eq!(
+        snapshot
+            .current
+            .get(&codefire_core::DecisionWorkDimension::TemporaryBytes)
+            .copied()
+            .unwrap_or_default(),
+        0
+    );
+}
+
+#[test]
+fn absent_opened_snapshot_closing_fence_rejects_parent_replacement() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let metadata_root = repo_root.join(".codefire");
+    let opened_root = metadata_root.join("opened");
+    fs::remove_dir(&opened_root).unwrap();
+    let mut ledger = branch_list_test_ledger();
+    let snapshot =
+        OpenedRegistrySnapshot::capture(&opened_root, REPOSITORY_JSON_BYTE_LIMIT, &mut ledger)
+            .unwrap();
+    let original = repo_root.join(".codefire-original");
+
+    let error = snapshot
+        .revalidate_with_hook(REPOSITORY_JSON_BYTE_LIMIT, &mut ledger, || {
+            fs::rename(&metadata_root, &original).unwrap();
+            fs::create_dir(&metadata_root).unwrap();
+            Ok(())
+        })
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        BranchRefSnapshotError::SubjectChanged { subject, .. }
+            if subject == metadata_root
+    ));
+    assert_eq!(
+        ledger
+            .snapshot()
+            .current
+            .get(&codefire_core::DecisionWorkDimension::RetainedBytes)
+            .copied()
+            .unwrap_or_default(),
+        0
+    );
+}
+
+#[test]
+fn opened_subject_change_cleanup_preserves_subject_changed_terminal() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let mut listed = list_branches(&repo_root)
+        .unwrap()
+        .prepare_opened_registries()
+        .unwrap();
+    let opened_root = repo_root.join(".codefire/opened");
+    let original = repo_root.join(".codefire/opened-original");
+    fs::rename(&opened_root, &original).unwrap();
+    fs::create_dir(&opened_root).unwrap();
+
+    let error = listed.revalidate_opened_registries().unwrap_err();
+
+    assert!(matches!(
+        error,
+        CliError::OpenedRegistrySubjectChanged { .. }
+    ));
+    assert_eq!(
+        listed.decision_work_snapshot().terminal_reason,
+        Some(codefire_core::DecisionWorkTerminalReason::SubjectChanged)
+    );
+    for dimension in [
+        codefire_core::DecisionWorkDimension::RetainedBytes,
+        codefire_core::DecisionWorkDimension::TemporaryBytes,
+    ] {
+        assert_eq!(
+            listed
+                .decision_work_snapshot()
+                .current
+                .get(&dimension)
+                .copied()
+                .unwrap_or_default(),
+            0
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn branch_list_finalization_rejects_same_inode_extension_only_tamper() {
+    use std::os::unix::fs::MetadataExt;
+
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let initialized = init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire/objects");
+    let commit_path =
+        codefire_store::object_record_path(&objects, &initialized.main_commit).unwrap();
+    install_top_level_marker(&commit_path, "aaaa");
+    let before = fs::metadata(&commit_path).unwrap();
+    let ledger = branch_list_test_ledger();
+
+    let error = list_branches_with_ledger_and_hook(&repo_root, ledger, |_| {
+        rewrite_marker_with_same_metadata(&commit_path, b"aaaa", b"bbbb");
+        Ok(())
+    })
+    .unwrap_err();
+    let after = fs::metadata(&commit_path).unwrap();
+
+    assert_eq!(before.dev(), after.dev());
+    assert_eq!(before.ino(), after.ino());
+    assert_eq!(before.len(), after.len());
+    assert_eq!(before.modified().unwrap(), after.modified().unwrap());
+    assert_eq!(error.exit_status(), ExitCode::SealedCommitInvalid);
+    assert!(matches!(
+        error,
+        CliError::Store(error)
+            if matches!(
+                error.as_ref(),
+                codefire_store::StoreError::SealedValidationSubjectChanged {
+                    object_id,
+                    kind: codefire_store::SealedValidationSubjectChangeKind::DigestChanged,
+                    ..
+                } if object_id == &initialized.main_commit
+            )
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn branch_list_revalidation_rejects_same_metadata_branch_ref_rewrite() {
+    use std::os::unix::fs::MetadataExt;
+
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let branch_path = branch_record_path(&repo_root, "main");
+    install_top_level_marker(&branch_path, "aaaa");
+    let before = fs::metadata(&branch_path).unwrap();
+
+    let error = list_branches_with_ledger_and_hook(&repo_root, branch_list_test_ledger(), |_| {
+        rewrite_marker_with_same_metadata(&branch_path, b"aaaa", b"bbbb");
+        Ok(())
+    })
+    .unwrap_err();
+    let after = fs::metadata(&branch_path).unwrap();
+
+    assert_eq!(before.dev(), after.dev());
+    assert_eq!(before.ino(), after.ino());
+    assert_eq!(before.len(), after.len());
+    assert_eq!(before.modified().unwrap(), after.modified().unwrap());
+    assert_eq!(error.exit_status(), ExitCode::RepositoryCorruption);
+    assert_eq!(
+        error.diagnostic()["kind"],
+        "branch_reference_subject_changed"
+    );
+    assert!(matches!(
+        error,
+        CliError::BranchReferenceSubjectChanged { subject, .. } if subject == branch_path
+    ));
+}
+
+#[test]
+fn branch_list_revalidation_rejects_branch_directory_add_delete_and_rename() {
+    for operation in ["add", "delete", "rename"] {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+        init_repo(&repo_root, false).unwrap();
+        let branches = repo_root.join(".codefire/branches");
+        let main = branches.join("main.json");
+
+        let error =
+            list_branches_with_ledger_and_hook(&repo_root, branch_list_test_ledger(), |_| {
+                match operation {
+                    "add" => {
+                        fs::copy(&main, branches.join("added.json")).unwrap();
+                    }
+                    "delete" => fs::remove_file(&main).unwrap(),
+                    "rename" => fs::rename(&main, branches.join("renamed.json")).unwrap(),
+                    _ => unreachable!(),
+                }
+                Ok(())
+            })
+            .unwrap_err();
+
+        assert_eq!(error.exit_status(), ExitCode::RepositoryCorruption);
+        assert!(matches!(
+            error,
+            CliError::BranchReferenceSubjectChanged { .. }
+        ));
+    }
+}
+
+#[test]
+fn branch_list_object_record_budget_accepts_exact_and_rejects_plus_one_with_exit_60() {
+    const COLD_MAIN_RECORDS: u64 = 9;
+
+    let exact_temp = tempdir().unwrap();
+    let exact_repo = exact_temp.path().join("repo");
+    init_repo(&exact_repo, false).unwrap();
+    let exact_ledger = precharged_branch_list_ledger(COLD_MAIN_RECORDS);
+    let exact = list_branches_with_ledger_and_hook(&exact_repo, exact_ledger, |_| Ok(())).unwrap();
+    assert_eq!(
+        exact.decision_work_snapshot().cumulative
+            [&codefire_core::DecisionWorkDimension::ObjectRecords],
+        100_000
+    );
+    assert_eq!(exact.decision_work_snapshot().terminal_reason, None);
+    exact.finish_complete().unwrap();
+
+    let exceeded_temp = tempdir().unwrap();
+    let exceeded_repo = exceeded_temp.path().join("repo");
+    let initialized = init_repo(&exceeded_repo, false).unwrap();
+    add_child_branch(&exceeded_repo, "feature", &initialized.main_commit);
+    let exceeded_ledger = precharged_branch_list_ledger(COLD_MAIN_RECORDS);
+    let error = list_branches_with_ledger_and_hook(&exceeded_repo, exceeded_ledger, |_| Ok(()))
+        .unwrap_err();
+
+    assert_eq!(error.exit_status(), ExitCode::ResourceBudgetExceeded);
+    let CliError::ResourceBudget(exhaustion) = error else {
+        panic!("expected typed resource budget exhaustion");
+    };
+    assert_eq!(
+        exhaustion.dimension,
+        codefire_core::DecisionWorkDimension::ObjectRecords
+    );
+    assert_eq!(exhaustion.observed, 100_001);
+    assert_eq!(exhaustion.limit, 100_000);
+    assert_eq!(
+        exhaustion.phase,
+        codefire_core::DecisionWorkPhase::RecordRead
+    );
+    assert_eq!(exhaustion.exit_code, 60);
+}
+
+#[test]
+fn branch_list_aggregate_budget_accepts_exact_and_rejects_plus_one() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let probe = list_branches(&repo_root).unwrap();
+    let aggregate = probe.decision_work_snapshot().cumulative
+        [&codefire_core::DecisionWorkDimension::AggregateBytes];
+    probe.finish_complete().unwrap();
+
+    let exact = list_branches_with_ledger_and_hook(
+        &repo_root,
+        precharged_branch_list_dimension(
+            codefire_core::DecisionWorkDimension::AggregateBytes,
+            aggregate,
+        ),
+        |_| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(
+        exact.decision_work_snapshot().cumulative
+            [&codefire_core::DecisionWorkDimension::AggregateBytes],
+        1024 * 1024 * 1024
+    );
+    exact.finish_complete().unwrap();
+
+    let error = list_branches_with_ledger_and_hook(
+        &repo_root,
+        precharged_branch_list_dimension(
+            codefire_core::DecisionWorkDimension::AggregateBytes,
+            aggregate - 1,
+        ),
+        |_| Ok(()),
+    )
+    .unwrap_err();
+    let CliError::ResourceBudget(exhaustion) = error else {
+        panic!("expected typed resource budget exhaustion");
+    };
+    assert_eq!(
+        exhaustion.dimension,
+        codefire_core::DecisionWorkDimension::AggregateBytes
+    );
+    assert_eq!(exhaustion.observed, 1024 * 1024 * 1024 + 1);
+    assert_eq!(exhaustion.limit, 1024 * 1024 * 1024);
+}
+
+#[test]
+fn branch_output_preflight_accepts_exact_retained_limit_and_rejects_plus_one() {
+    let value = json!({
+        "schema": "codefire.command_result.v1",
+        "command": "branch-list",
+        "ok": true,
+        "exit_code": 0,
+        "repo": "/repo",
+        "data": {"type": "codefire_branch_list", "version": 1, "branches": []},
+        "diagnostics": [],
+        "next_actions": [],
+    });
+    let mut counter = JsonSizeWriter::default();
+    serde_json::to_writer_pretty(&mut counter, &value).unwrap();
+    let output_bytes = counter.0 + 1;
+    let retained_limit = codefire_core::DecisionWorkProfile::local_v1()
+        .limit(codefire_core::DecisionWorkDimension::RetainedBytes)
+        .unwrap()
+        .limit;
+
+    let mut exact = branch_list_test_ledger();
+    exact
+        .apply(
+            codefire_core::DecisionWorkReservation::new(
+                codefire_core::DecisionWorkPhase::PublicationPreflight,
+                codefire_core::DecisionWorkSurface::Atomic,
+            )
+            .acquire(
+                codefire_core::DecisionWorkDimension::RetainedBytes,
+                retained_limit - output_bytes,
+            ),
+        )
+        .unwrap();
+    let (encoded, reserved) = encode_pretty_json_output(&mut exact, &value).unwrap();
+    assert_eq!(reserved, output_bytes);
+    assert_eq!(encoded.len() as u64, output_bytes);
+    assert_eq!(encoded.last(), Some(&b'\n'));
+    assert_eq!(
+        exact.snapshot().current[&codefire_core::DecisionWorkDimension::RetainedBytes],
+        retained_limit
+    );
+    assert_eq!(
+        exact.snapshot().counters[&codefire_core::DecisionWorkCounter::ResponseBytesEncoded],
+        output_bytes
+    );
+
+    let mut exceeded = branch_list_test_ledger();
+    exceeded
+        .apply(
+            codefire_core::DecisionWorkReservation::new(
+                codefire_core::DecisionWorkPhase::PublicationPreflight,
+                codefire_core::DecisionWorkSurface::Atomic,
+            )
+            .acquire(
+                codefire_core::DecisionWorkDimension::RetainedBytes,
+                retained_limit - output_bytes + 1,
+            ),
+        )
+        .unwrap();
+    let error = encode_pretty_json_output(&mut exceeded, &value).unwrap_err();
+    let CliError::ResourceBudget(exhaustion) = error else {
+        panic!("expected typed retained output exhaustion");
+    };
+    assert_eq!(
+        exhaustion.dimension,
+        codefire_core::DecisionWorkDimension::RetainedBytes
+    );
+    assert_eq!(exhaustion.observed, retained_limit + 1);
+    assert_eq!(exhaustion.limit, retained_limit);
+    assert_eq!(
+        exceeded
+            .snapshot()
+            .counters
+            .get(&codefire_core::DecisionWorkCounter::ResponseBytesEncoded)
+            .copied()
+            .unwrap_or_default(),
+        0
+    );
+}
+
+#[test]
+fn branch_text_output_preflight_accepts_exact_and_rejects_plus_one() {
+    let render = |writer: &mut dyn Write| {
+        writeln!(writer, "main\tCF-COMMIT-123\tclosed")?;
+        Ok(())
+    };
+    let mut counter = JsonSizeWriter::default();
+    render(&mut counter).unwrap();
+    let output_bytes = counter.0;
+    let retained_limit = codefire_core::DecisionWorkProfile::local_v1()
+        .limit(codefire_core::DecisionWorkDimension::RetainedBytes)
+        .unwrap()
+        .limit;
+
+    let mut exact = branch_list_test_ledger();
+    exact
+        .apply(
+            codefire_core::DecisionWorkReservation::new(
+                codefire_core::DecisionWorkPhase::PublicationPreflight,
+                codefire_core::DecisionWorkSurface::Atomic,
+            )
+            .acquire(
+                codefire_core::DecisionWorkDimension::RetainedBytes,
+                retained_limit - output_bytes,
+            ),
+        )
+        .unwrap();
+    let (encoded, reserved) = encode_text_output(&mut exact, render).unwrap();
+    assert_eq!(reserved, output_bytes);
+    assert_eq!(encoded, b"main\tCF-COMMIT-123\tclosed\n");
+    assert_eq!(
+        exact.snapshot().current[&codefire_core::DecisionWorkDimension::RetainedBytes],
+        retained_limit
+    );
+
+    let mut exceeded = branch_list_test_ledger();
+    exceeded
+        .apply(
+            codefire_core::DecisionWorkReservation::new(
+                codefire_core::DecisionWorkPhase::PublicationPreflight,
+                codefire_core::DecisionWorkSurface::Atomic,
+            )
+            .acquire(
+                codefire_core::DecisionWorkDimension::RetainedBytes,
+                retained_limit - output_bytes + 1,
+            ),
+        )
+        .unwrap();
+    assert!(matches!(
+        encode_text_output(&mut exceeded, render),
+        Err(CliError::ResourceBudget(_))
+    ));
+    assert_eq!(
+        exceeded
+            .snapshot()
+            .counters
+            .get(&codefire_core::DecisionWorkCounter::ResponseBytesEncoded)
+            .copied()
+            .unwrap_or_default(),
+        0
+    );
+}
+
+#[test]
+fn local_list_output_budget_counts_branch_opened_and_output_concurrently() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    fs::write(
+        repo_root.join(".codefire/opened/main.json"),
+        br#"{"branch":"main","open":{"path":"/tmp/main"}}"#,
+    )
+    .unwrap();
+    let mut listed = list_branches(&repo_root)
+        .unwrap()
+        .prepare_opened_registries()
+        .unwrap();
+    let baseline = listed.decision_work_snapshot().current
+        [&codefire_core::DecisionWorkDimension::RetainedBytes];
+    let render = |writer: &mut dyn Write| {
+        writeln!(writer, "Branches:")?;
+        write_branches(writer, &listed.branches)?;
+        writeln!(writer, "Opened:")?;
+        for item in &listed.opened {
+            writeln!(
+                writer,
+                "{}\t{}",
+                item["branch"].as_str().unwrap(),
+                item["path"].as_str().unwrap()
+            )?;
+        }
+        Ok(())
+    };
+    let mut counter = JsonSizeWriter::default();
+    render(&mut counter).unwrap();
+    let output_bytes = counter.0;
+
+    let (encoded, reserved) = encode_text_output(&mut listed.ledger, render).unwrap();
+
+    assert_eq!(reserved, output_bytes);
+    assert!(String::from_utf8(encoded)
+        .unwrap()
+        .contains("main\t/tmp/main"));
+    assert_eq!(
+        listed.decision_work_snapshot().current
+            [&codefire_core::DecisionWorkDimension::RetainedBytes],
+        baseline + output_bytes
+    );
+    listed
+        .ledger
+        .release(
+            codefire_core::DecisionWorkDimension::RetainedBytes,
+            output_bytes,
+        )
+        .unwrap();
+    listed.revalidate_opened_registries().unwrap();
+    listed.finish_complete().unwrap();
+}
+
+#[test]
+fn opened_projection_failure_releases_prior_projection_bytes() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let opened_root = repo_root.join(".codefire/opened");
+    fs::write(
+        opened_root.join("a-valid.json"),
+        br#"{"branch":"main","open":{"path":"/tmp/main"}}"#,
+    )
+    .unwrap();
+    fs::write(
+        opened_root.join("z-invalid.json"),
+        br#"{"open":{"path":"/tmp/invalid"}}"#,
+    )
+    .unwrap();
+    let mut ledger = branch_list_test_ledger();
+    let snapshot =
+        OpenedRegistrySnapshot::capture(&opened_root, REPOSITORY_JSON_BYTE_LIMIT, &mut ledger)
+            .unwrap();
+    let snapshot_retained =
+        ledger.snapshot().current[&codefire_core::DecisionWorkDimension::RetainedBytes];
+
+    assert!(matches!(
+        project_opened_registries(&snapshot, &mut ledger),
+        Err(CliError::InvalidRepository(message)) if message.contains("has no branch name")
+    ));
+    assert_eq!(
+        ledger.snapshot().current[&codefire_core::DecisionWorkDimension::RetainedBytes],
+        snapshot_retained
+    );
+    snapshot.release(&mut ledger).unwrap();
+    assert_eq!(
+        ledger.snapshot().current[&codefire_core::DecisionWorkDimension::RetainedBytes],
+        0
+    );
 }
 
 #[test]
@@ -527,6 +1554,85 @@ fn doctor_quick_mode_skips_full_object_record_scan() {
         .issues
         .iter()
         .all(|issue| issue.kind != "invalid_object_record"));
+}
+
+#[test]
+fn full_object_scans_reject_oversized_sparse_records() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let object_path = repo_root
+        .join(".codefire")
+        .join("objects")
+        .join("blobs")
+        .join("CF-BLOB-oversized.json");
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&object_path)
+        .unwrap();
+    file.set_len(codefire_store::MAX_OBJECT_RECORD_BYTES + 1)
+        .unwrap();
+    drop(file);
+
+    let doctor = run_doctor(&DoctorOptions {
+        start: repo_root.clone(),
+        json_output: false,
+        quick: false,
+    })
+    .unwrap();
+    let doctor_issue = doctor
+        .issues
+        .iter()
+        .find(|issue| {
+            issue.kind == "invalid_object_record" && issue.path.as_ref() == Some(&object_path)
+        })
+        .expect("doctor must diagnose an oversized object record");
+    assert!(doctor_issue.message.contains("object record exceeds"));
+    assert!(doctor_issue
+        .message
+        .contains(&codefire_store::MAX_OBJECT_RECORD_BYTES.to_string()));
+
+    let migration = run_migrate(
+        &parse_migrate_args(&[
+            "check".to_string(),
+            repo_root.to_string_lossy().into_owned(),
+            "--json".to_string(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    assert!(!migration.compatible);
+    let migration_issue = migration
+        .blockers
+        .iter()
+        .find(|issue| {
+            issue.kind == "invalid_object_record" && issue.path.as_ref() == Some(&object_path)
+        })
+        .expect("migration check must reject an oversized object record");
+    assert!(migration_issue.message.contains("object record exceeds"));
+
+    let storage = run_storage_report(
+        &parse_storage_report_args(&[
+            repo_root.to_string_lossy().into_owned(),
+            "--json".to_string(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    let storage_warning = storage
+        .warnings
+        .iter()
+        .find(|warning| {
+            warning.kind == "invalid_object_record" && warning.path.as_ref() == Some(&object_path)
+        })
+        .expect("storage report must reject an oversized object record");
+    assert!(storage_warning.message.contains("object record exceeds"));
+    assert_eq!(
+        storage_warning.bytes,
+        Some(codefire_store::MAX_OBJECT_RECORD_BYTES + 1)
+    );
+    assert_eq!(storage.object_scan.invalid_records, 1);
 }
 
 #[test]
@@ -671,7 +1777,8 @@ fn doctor_detects_invalid_branch_head_and_open_registry() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
     let open_dir = temp.path().join("main-open");
-    init_repo(&repo_root, false).unwrap();
+    let initialized = init_repo(&repo_root, false).unwrap();
+    add_child_branch(&repo_root, "valid-after-corrupt", &initialized.main_commit);
     open_branch_from(
         &repo_root,
         &OpenOptions {
@@ -704,6 +1811,7 @@ fn doctor_detects_invalid_branch_head_and_open_registry() {
     })
     .unwrap();
     assert!(!report.ok);
+    assert_eq!(report.checked_branches, 1);
     for expected in [
         "invalid_branch_head",
         "invalid_open_base_commit",
@@ -714,6 +1822,21 @@ fn doctor_detects_invalid_branch_head_and_open_registry() {
             "missing doctor issue: {expected}"
         );
     }
+    let sealed_issue_kinds = report
+        .issues
+        .iter()
+        .filter_map(|issue| {
+            matches!(
+                issue.kind.as_str(),
+                "invalid_branch_head" | "invalid_open_base_commit"
+            )
+            .then_some(issue.kind.as_str())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        sealed_issue_kinds,
+        ["invalid_branch_head", "invalid_open_base_commit"]
+    );
     assert!(doctor_report_next_actions(&report)
         .iter()
         .any(|action| action["id"] == "repair_branch_head"));
@@ -753,7 +1876,8 @@ fn open_materializes_manifest_and_updates_registry() {
     )
     .unwrap();
     let status = read_status(&open_dir).unwrap();
-    let branches = list_branches(&open_dir).unwrap();
+    let listed = list_branches(&open_dir).unwrap();
+    let branches = &listed.branches;
 
     assert_eq!(result.open_dir, open_dir);
     assert_eq!(
@@ -774,6 +1898,7 @@ fn open_materializes_manifest_and_updates_registry() {
         }
     );
     assert_eq!(branches[0].state, "open-clean");
+    listed.finish_complete().unwrap();
 }
 
 #[test]
@@ -812,7 +1937,7 @@ fn open_rejects_outside_workspace_nested_open_and_stale_open_state() {
         &repo_root,
         &OpenOptions {
             branch: "feature/bounds".to_string(),
-            path: outside,
+            path: outside.clone(),
             dry_run: true,
             json_output: true,
             lock: LockOptions::default(),
@@ -822,7 +1947,31 @@ fn open_rejects_outside_workspace_nested_open_and_stale_open_state() {
     .unwrap_err();
     assert!(outside_error
         .to_string()
-        .contains("open target must stay under workspace boundary"));
+        .contains("open target must stay under resolved workspace boundary"));
+    let outside_envelope = cli_error_envelope("open", &outside_error);
+    assert_eq!(
+        outside_envelope["diagnostics"][0]["kind"],
+        "open_target_resolution_failed"
+    );
+    assert_eq!(
+        outside_envelope["diagnostics"][0]["reason"],
+        "outside_workspace_boundary"
+    );
+    assert_eq!(
+        outside_envelope["diagnostics"][0]["requested_path"],
+        outside.to_string_lossy().as_ref()
+    );
+    assert_eq!(
+        outside_envelope["diagnostics"][0]["workspace_boundary"],
+        fs::canonicalize(repo_root.parent().unwrap())
+            .unwrap()
+            .to_string_lossy()
+            .as_ref()
+    );
+    assert!(outside_envelope["next_actions"][0]["command"]
+        .as_str()
+        .unwrap()
+        .contains("--dry-run --json"));
 
     let nested_error = open_branch_from(
         &repo_root,
@@ -839,6 +1988,139 @@ fn open_rejects_outside_workspace_nested_open_and_stale_open_state() {
     assert!(nested_error
         .to_string()
         .contains("must not be nested inside existing open directory"));
+
+    let traversal_path = temp
+        .path()
+        .join("workspace")
+        .join("safe")
+        .join("..")
+        .join("escaped");
+    let traversal_error = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "feature/bounds".to_string(),
+            path: traversal_path.clone(),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err();
+    assert!(traversal_error
+        .to_string()
+        .contains("path traversal with '..' is not allowed"));
+    let traversal_envelope = cli_error_envelope("open", &traversal_error);
+    assert_eq!(
+        traversal_envelope["diagnostics"][0]["reason"],
+        "unsafe_path_component"
+    );
+    assert_eq!(
+        traversal_envelope["diagnostics"][0]["requested_path"],
+        traversal_path.to_string_lossy().as_ref()
+    );
+    assert!(traversal_envelope["diagnostics"][0]["resolved_path"].is_null());
+
+    let branch_before_apply_rejection = load_branch_record(&repo_root, "feature/bounds").unwrap();
+    let apply_traversal_error = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "feature/bounds".to_string(),
+            path: traversal_path,
+            dry_run: false,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err();
+    assert!(matches!(
+        apply_traversal_error,
+        CliError::OpenTargetResolution(_)
+    ));
+    assert_eq!(
+        load_branch_record(&repo_root, "feature/bounds").unwrap(),
+        branch_before_apply_rejection
+    );
+    assert!(!opened_registry_path(&repo_root, "feature/bounds").exists());
+
+    let prefix_collision_error = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "feature/bounds".to_string(),
+            path: temp.path().join("workspace-escape").join("feature"),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err();
+    assert!(prefix_collision_error
+        .to_string()
+        .contains("must stay under resolved workspace boundary"));
+    let prefix_envelope = cli_error_envelope("open", &prefix_collision_error);
+    assert_eq!(
+        prefix_envelope["diagnostics"][0]["reason"],
+        "outside_workspace_boundary"
+    );
+    assert_eq!(
+        prefix_envelope["diagnostics"][0]["resolved_path"],
+        temp.path()
+            .join("workspace-escape")
+            .join("feature")
+            .to_string_lossy()
+            .as_ref()
+    );
+
+    #[cfg(unix)]
+    {
+        fs::create_dir_all(&outside).unwrap();
+        let outside_link = temp.path().join("workspace").join("outside-link");
+        std::os::unix::fs::symlink(&outside, &outside_link).unwrap();
+        let symlink_outside_error = open_branch_from(
+            &repo_root,
+            &OpenOptions {
+                branch: "feature/bounds".to_string(),
+                path: outside_link.join("feature"),
+                dry_run: true,
+                json_output: true,
+                lock: LockOptions::default(),
+                idempotency_key: None,
+            },
+        )
+        .unwrap_err();
+        assert!(symlink_outside_error
+            .to_string()
+            .contains("symlink components are not allowed"));
+        let symlink_envelope = cli_error_envelope("open", &symlink_outside_error);
+        assert_eq!(
+            symlink_envelope["diagnostics"][0]["reason"],
+            "unsafe_path_component"
+        );
+        assert_eq!(
+            symlink_envelope["diagnostics"][0]["requested_path"],
+            outside_link.join("feature").to_string_lossy().as_ref()
+        );
+
+        let open_link = temp.path().join("workspace").join("open-link");
+        std::os::unix::fs::symlink(&sibling_open, &open_link).unwrap();
+        let symlink_open_error = open_branch_from(
+            &repo_root,
+            &OpenOptions {
+                branch: "feature/bounds".to_string(),
+                path: open_link.join("nested-feature"),
+                dry_run: true,
+                json_output: true,
+                lock: LockOptions::default(),
+                idempotency_key: None,
+            },
+        )
+        .unwrap_err();
+        assert!(symlink_open_error
+            .to_string()
+            .contains("symlink components are not allowed"));
+    }
 
     let mut branch = load_branch_record(&repo_root, "feature/bounds").unwrap();
     branch["state"] = Value::String("open-burning".to_string());
@@ -860,6 +2142,158 @@ fn open_rejects_outside_workspace_nested_open_and_stale_open_state() {
     assert!(stale_error
         .to_string()
         .contains("recover or close the existing open branch state"));
+}
+
+#[test]
+fn open_target_change_before_materialization_has_structured_non_destructive_recovery() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("workspace").join("repo");
+    let target = temp.path().join("workspace").join("feature-open");
+    init_repo(&repo_root, false).unwrap();
+    clone_branch(
+        &repo_root,
+        &CloneOptions {
+            source: "main".to_string(),
+            new_branch: "feature/race".to_string(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let branch_before = load_branch_record(&repo_root, "feature/race").unwrap();
+    set_open_target_pre_use_mutation_for_test(&target);
+
+    let error = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "feature/race".to_string(),
+            path: target.clone(),
+            dry_run: false,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err();
+    assert!(matches!(
+        &error,
+        CliError::OpenTargetResolution(details)
+            if details.reason == "target_changed_before_use"
+    ));
+    let envelope = cli_error_envelope("open", &error);
+    let diagnostic = &envelope["diagnostics"][0];
+    assert_eq!(diagnostic["kind"], "open_target_resolution_failed");
+    assert_eq!(diagnostic["reason"], "target_changed_before_use");
+    assert_eq!(
+        diagnostic["requested_path"],
+        target.to_string_lossy().as_ref()
+    );
+    assert_eq!(
+        diagnostic["resolved_path"],
+        target.to_string_lossy().as_ref()
+    );
+    assert_eq!(
+        diagnostic["workspace_boundary"],
+        fs::canonicalize(repo_root.parent().unwrap())
+            .unwrap()
+            .to_string_lossy()
+            .as_ref()
+    );
+    assert_eq!(
+        envelope["next_actions"][0]["kind"],
+        "choose_safe_open_target"
+    );
+    assert!(envelope["next_actions"][0]["command"]
+        .as_str()
+        .unwrap()
+        .contains("--dry-run --json"));
+    assert_eq!(
+        fs::read_to_string(target.join("concurrent-owner.txt")).unwrap(),
+        "occupied\n"
+    );
+    assert!(!opened_registry_path(&repo_root, "feature/race").exists());
+    assert_eq!(
+        load_branch_record(&repo_root, "feature/race").unwrap(),
+        branch_before
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn open_nested_symlink_race_has_structured_non_destructive_recovery() {
+    let temp = tempdir().unwrap();
+    let workspace = temp.path().join("workspace");
+    let repo_root = workspace.join("repo");
+    let target = workspace.join("main-open");
+    let outside = temp.path().join("outside");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let commit_id = write_file_commit(&objects, "docs/readme.md", "safe content\n");
+    let mut branch = load_branch_record(&repo_root, "main").unwrap();
+    branch["head"] = Value::String(commit_id);
+    save_branch_record(&repo_root, &branch).unwrap();
+    let branch_before = load_branch_record(&repo_root, "main").unwrap();
+
+    set_open_target_nested_symlink_injection_for_test(
+        &target,
+        &target,
+        Path::new("docs"),
+        &outside,
+    );
+    let error = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: target.clone(),
+            dry_run: false,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        &error,
+        CliError::OpenTargetResolution(details)
+            if details.reason == "identity_changed_during_use"
+    ));
+    let envelope = cli_error_envelope("open", &error);
+    let diagnostic = &envelope["diagnostics"][0];
+    assert_eq!(envelope["repo"], repo_root.to_string_lossy().as_ref());
+    assert_eq!(diagnostic["kind"], "open_target_resolution_failed");
+    assert_eq!(diagnostic["reason"], "identity_changed_during_use");
+    assert_eq!(diagnostic["repo"], repo_root.to_string_lossy().as_ref());
+    assert_eq!(diagnostic["branch"], "main");
+    assert_eq!(
+        diagnostic["requested_path"],
+        target.to_string_lossy().as_ref()
+    );
+    assert_eq!(
+        diagnostic["resolved_path"],
+        target.to_string_lossy().as_ref()
+    );
+    assert_eq!(
+        diagnostic["workspace_boundary"],
+        fs::canonicalize(&workspace)
+            .unwrap()
+            .to_string_lossy()
+            .as_ref()
+    );
+    assert_eq!(
+        envelope["next_actions"][0]["kind"],
+        "choose_safe_open_target"
+    );
+    assert!(!outside.join("readme.md").exists());
+    assert!(!target.join(".codefire-open").exists());
+    assert!(!opened_registry_path(&repo_root, "main").exists());
+    assert_eq!(
+        load_branch_record(&repo_root, "main").unwrap(),
+        branch_before
+    );
+    assert!(!target.exists());
 }
 
 #[test]
@@ -940,22 +2374,8 @@ fn close_branch_closes_clean_open_dir_and_discard_allows_dirty_state() {
         },
     )
     .unwrap();
-    let registry_path = opened_registry_path(&repo_root, "feature/close");
-    let registry = read_json(&registry_path).unwrap();
-    let active_state_path =
-        PathBuf::from(required_string(&registry, &["open", "active_state_path"]).unwrap());
-    set_open_state(
-        &OpenContext {
-            repo_root: repo_root.clone(),
-            open_dir: dirty_dir.clone(),
-            branch: "feature/close".to_string(),
-            registry_path,
-            registry,
-        },
-        &active_state_path,
-        "open-consistent",
-    )
-    .unwrap();
+    let context = open_context(&dirty_dir).unwrap();
+    set_open_state(&context, "open-consistent").unwrap();
 
     let error = close_branch(
         &repo_root,
@@ -1134,6 +2554,973 @@ fn scan_reports_out_of_atom_changes_inside_atom_bearing_files() {
     assert_eq!(scan.non_atom_changed_files.len(), 1);
     assert_eq!(scan.non_atom_changed_files[0].path, "docs/spec/session.md");
     assert_eq!(scan.non_atom_changed_files[0].status, "modified");
+}
+
+#[test]
+fn scan_status_and_verify_reject_an_unsealed_current_base_before_writing_state() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let objects = repo_root.join(".codefire").join("objects");
+    let registry_path = opened_registry_path(&repo_root, "main");
+    let active = active_state_path(&open_dir);
+    let state_before = read_json(&active.join("state.json")).unwrap();
+
+    for case in [
+        "malformed_certificate",
+        "wrong_root_type",
+        "missing_root",
+        "invalid_parent",
+    ] {
+        let mut roots = write_required_roots(&objects);
+        let mut certificate = consistent_certificate();
+        let mut parents = Vec::new();
+        match case {
+            "malformed_certificate" => {
+                certificate.insert("result".to_string(), Value::String("failed".to_string()));
+            }
+            "wrong_root_type" => {
+                let atom_index = roots.get("atom_index").cloned().unwrap();
+                roots.insert("policy".to_string(), atom_index);
+            }
+            "missing_root" => {
+                roots.remove("policy");
+            }
+            "invalid_parent" => parents.push("CF-BLOB-not-a-commit-parent".to_string()),
+            _ => unreachable!(),
+        }
+        let invalid_base = codefire_store::store_object(
+            &objects,
+            "commit",
+            codefire_store::commit_payload(parents, roots, certificate),
+        )
+        .unwrap();
+        let invalid_base_path =
+            codefire_store::object_record_path(&objects, &invalid_base).unwrap();
+        let mut registry = read_json(&registry_path).unwrap();
+        registry["open"]["current_base_commit"] = Value::String(invalid_base);
+        write_json_atomic(&registry_path, &registry).unwrap();
+
+        for (command, error) in [
+            ("status", read_status(&open_dir).unwrap_err()),
+            ("scan", run_scan(&open_dir).unwrap_err()),
+            ("verify", run_verify(&open_dir).unwrap_err()),
+        ] {
+            assert!(matches!(
+                &error,
+                CliError::StoreContext { error, .. }
+                    if matches!(error.as_ref(), codefire_store::StoreError::InvalidSealedCommit(_))
+            ));
+            let envelope = cli_error_envelope(command, &error);
+            assert_eq!(
+                envelope["repo"],
+                repo_root.to_string_lossy().as_ref(),
+                "{case}/{command}"
+            );
+            assert_eq!(
+                envelope["diagnostics"][0]["path"],
+                invalid_base_path.to_string_lossy().as_ref(),
+                "{case}/{command}"
+            );
+            assert_eq!(
+                envelope["diagnostics"][0]["kind"], "sealed_commit_invalid",
+                "{case}/{command}"
+            );
+            assert_eq!(envelope["next_actions"][0]["kind"], "doctor");
+        }
+        let context_error = match context::build_context_pack(&context::ContextOptions {
+            path: open_dir.clone(),
+            selector: context::ContextSelector::Branch,
+            depth: 1,
+            limit: context::DEFAULT_CONTEXT_LIMIT,
+            json_output: true,
+        }) {
+            Ok(_) => panic!("{case}: context must reject an unsealed current base"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            context_error,
+            CliError::StoreContext { error, .. }
+                if matches!(error.as_ref(), codefire_store::StoreError::InvalidSealedCommit(_))
+        ));
+        let fire_error = fire::run_manual_fire_specs(
+            &open_dir,
+            &[fire::ManualFireSpec {
+                source_atom: "REQ-placeholder".to_string(),
+                target_atom: "DES-placeholder".to_string(),
+                reason: "sealed base gate".to_string(),
+                severity: "required".to_string(),
+            }],
+            true,
+            false,
+            &LockOptions::default(),
+            "fire",
+        )
+        .unwrap_err();
+        assert!(matches!(
+            fire_error,
+            CliError::StoreContext { error, .. }
+                if matches!(error.as_ref(), codefire_store::StoreError::InvalidSealedCommit(_))
+        ));
+        assert!(!active.join("fires.json").exists(), "{case}");
+        assert!(!active.join("scan.json").exists(), "{case}");
+        assert!(!active.join("verification.json").exists(), "{case}");
+        assert_eq!(
+            read_json(&active.join("state.json")).unwrap(),
+            state_before,
+            "{case}"
+        );
+    }
+}
+
+#[test]
+fn live_open_state_consumers_reject_an_active_path_outside_the_open_instance() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    let outside = temp.path().join("outside-active");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let expected_active = active_state_path(&open_dir);
+    fs::create_dir_all(&outside).unwrap();
+    let sentinel = outside.join("verification.json");
+    fs::write(&sentinel, b"outside sentinel\n").unwrap();
+    let registry_path = opened_registry_path(&repo_root, "main");
+    let mut registry = read_json(&registry_path).unwrap();
+    registry["open"]["active_state_path"] = Value::String(outside.to_string_lossy().into_owned());
+    write_json_atomic(&registry_path, &registry).unwrap();
+
+    for error in [
+        run_scan(&open_dir).unwrap_err(),
+        run_verify(&open_dir).unwrap_err(),
+    ] {
+        match error {
+            CliError::OpenSnapshotDivergence(divergence) => {
+                assert_eq!(divergence.authority, "active_state_path");
+                assert_eq!(divergence.expected, expected_active.to_string_lossy());
+                assert_eq!(divergence.actual, outside.to_string_lossy());
+            }
+            other => panic!("expected active-state snapshot divergence, found {other:?}"),
+        }
+    }
+    assert_eq!(fs::read(&sentinel).unwrap(), b"outside sentinel\n");
+    assert_eq!(fs::read_dir(&outside).unwrap().count(), 1);
+}
+
+#[cfg(unix)]
+#[test]
+fn live_scan_and_verify_fail_closed_after_validated_active_instance_swap() {
+    for command in ["scan", "verify"] {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+        let open_dir = temp.path().join(format!("{command}-open"));
+        init_repo(&repo_root, false).unwrap();
+        open_branch_from(
+            &repo_root,
+            &OpenOptions {
+                branch: "main".to_string(),
+                path: open_dir.clone(),
+                dry_run: false,
+                json_output: false,
+                lock: LockOptions::default(),
+                idempotency_key: None,
+            },
+        )
+        .unwrap();
+
+        let registry_path = opened_registry_path(&repo_root, "main");
+        let registry_before = fs::read(&registry_path).unwrap();
+        let branch_before = load_branch_record(&repo_root, "main").unwrap();
+        let active = active_state_path(&open_dir);
+        let moved = active
+            .parent()
+            .unwrap()
+            .join(format!("moved-{command}-active"));
+        let active_state_before = fs::read(active.join("state.json")).unwrap();
+        let mut active_files_before = fs::read_dir(&active)
+            .unwrap()
+            .map(|entry| {
+                let entry = entry.unwrap();
+                (entry.file_name(), fs::read(entry.path()).unwrap())
+            })
+            .collect::<Vec<_>>();
+        active_files_before.sort_by(|left, right| left.0.cmp(&right.0));
+        let outside = temp.path().join(format!("outside-{command}"));
+        fs::create_dir(&outside).unwrap();
+        fs::write(
+            outside.join("state.json"),
+            b"{\"state\":\"open-clean\",\"sentinel\":\"outside\"}\n",
+        )
+        .unwrap();
+        fs::write(outside.join("sentinel.txt"), b"outside sentinel\n").unwrap();
+        let outside_state_before = fs::read(outside.join("state.json")).unwrap();
+
+        set_active_state_swap_after_validation_for_test(&open_dir, &active, &moved, &outside);
+        let error = match command {
+            "scan" => run_scan(&open_dir).map(|_| ()).unwrap_err(),
+            "verify" => run_verify(&open_dir).map(|_| ()).unwrap_err(),
+            _ => unreachable!(),
+        };
+
+        let capability_error = match &error {
+            CliError::ActiveStateCapability(error) => error,
+            other => panic!("{command} returned the wrong error: {other}"),
+        };
+        assert_eq!(capability_error.operation(), "read", "{command}");
+        assert_eq!(capability_error.path(), active, "{command}");
+        let envelope = cli_error_envelope(command, &error);
+        assert_eq!(
+            envelope["diagnostics"][0]["kind"], "active_state_capability_invalid",
+            "{command}"
+        );
+        assert_eq!(envelope["diagnostics"][0]["repairable"], false);
+        assert_eq!(
+            fs::read(&registry_path).unwrap(),
+            registry_before,
+            "{command}"
+        );
+        assert_eq!(
+            load_branch_record(&repo_root, "main").unwrap(),
+            branch_before,
+            "{command}"
+        );
+        assert_eq!(
+            fs::read(moved.join("state.json")).unwrap(),
+            active_state_before,
+            "{command}"
+        );
+        let mut active_files_after = fs::read_dir(&moved)
+            .unwrap()
+            .map(|entry| {
+                let entry = entry.unwrap();
+                (entry.file_name(), fs::read(entry.path()).unwrap())
+            })
+            .collect::<Vec<_>>();
+        active_files_after.sort_by(|left, right| left.0.cmp(&right.0));
+        assert_eq!(active_files_after, active_files_before, "{command}");
+        assert_eq!(
+            fs::read(outside.join("state.json")).unwrap(),
+            outside_state_before,
+            "{command}"
+        );
+        assert_eq!(
+            fs::read(outside.join("sentinel.txt")).unwrap(),
+            b"outside sentinel\n",
+            "{command}"
+        );
+        assert_eq!(fs::read_dir(&outside).unwrap().count(), 2, "{command}");
+
+        fs::remove_file(&active).unwrap();
+        fs::rename(&moved, &active).unwrap();
+    }
+}
+
+#[test]
+fn live_scan_verify_commit_and_extinguish_share_one_repo_lock() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+
+    let active = active_state_path(&open_dir);
+    let registry_path = opened_registry_path(&repo_root, "main");
+    let registry_before = read_json(&registry_path).unwrap();
+    let branch_before = load_branch_record(&repo_root, "main").unwrap();
+    let state_before = read_json(&active.join("state.json")).unwrap();
+    let lock = RepoLock::acquire_with_options(&repo_root, &LockOptions::default()).unwrap();
+
+    // A held shared lock is a deterministic stand-in for any live command
+    // owner. Every production entry must contend before command-specific
+    // validation or state mutation, which proves the pairwise matrix through
+    // one stable lock subject.
+    let live_contention = [
+        ("scan-vs-verify", "scan", run_scan(&open_dir).unwrap_err()),
+        (
+            "verify-vs-scan",
+            "verify",
+            run_verify(&open_dir).unwrap_err(),
+        ),
+        (
+            "scan/verify-vs-commit",
+            "commit",
+            run_commit(&CommitOptions {
+                path: open_dir.clone(),
+                message: "must serialize".to_string(),
+                dry_run: false,
+                full_output: false,
+                json_output: true,
+                lock: LockOptions::default(),
+                idempotency_key: None,
+                signer: None,
+                key_id: None,
+            })
+            .unwrap_err(),
+        ),
+        (
+            "scan/verify-vs-extinguish",
+            "extinguish",
+            run_extinguish(&ExtinguishOptions {
+                path: open_dir.clone(),
+                fire_id: "FIRE-lock-boundary".to_string(),
+                resolution: "addressed".to_string(),
+                rationale: "must serialize".to_string(),
+                evidence: String::new(),
+                evidence_refs: Vec::new(),
+                refresh: false,
+                dry_run: false,
+                json_output: true,
+                lock: LockOptions::default(),
+                idempotency_key: None,
+                edit_rationale: false,
+            })
+            .unwrap_err(),
+        ),
+    ];
+    for (pair, command, error) in live_contention {
+        assert!(
+            matches!(&error, CliError::RepositoryLockContention { .. }),
+            "{pair} did not contend: {error}"
+        );
+        let envelope = cli_error_envelope(command, &error);
+        assert_eq!(envelope["repo"], repo_root.to_string_lossy().as_ref());
+        assert_eq!(envelope["diagnostics"][0]["kind"], "lock_contention");
+    }
+
+    let wait_options = LockOptions {
+        wait: true,
+        timeout_ms: Some(0),
+    };
+    let timed_scan_error = match run_scan_with_lock_options(&open_dir, &wait_options) {
+        Err(error) => error,
+        Ok(_) => panic!("scan must time out while repository lock is held"),
+    };
+    let timed_verify_error = match run_verify_with_lock_options(&open_dir, &wait_options) {
+        Err(error) => error,
+        Ok(_) => panic!("verify must time out while repository lock is held"),
+    };
+    for (command, error) in [("scan", timed_scan_error), ("verify", timed_verify_error)] {
+        let envelope = cli_error_envelope(command, &error);
+        assert!(matches!(error, CliError::RepositoryLockContention { .. }));
+        assert_eq!(envelope["repo"], repo_root.to_string_lossy().as_ref());
+        assert_eq!(envelope["diagnostics"][0]["kind"], "lock_contention");
+        assert_eq!(envelope["next_actions"][0]["kind"], "retry_with_wait_lock");
+        assert_eq!(
+            envelope["next_actions"][0]["command"],
+            format!("codefire {command} ... --wait-lock --lock-timeout 2s")
+        );
+    }
+
+    let scan_preview = compute_scan(&open_dir).unwrap();
+    let verify_preview = compute_verify(&open_dir).unwrap();
+    assert!(scan_preview.scan.changed_atoms.is_empty());
+    assert_eq!(verify_preview.verification.result, "passed");
+    assert!(!active.join("fires.json").exists());
+    assert!(!active.join("resolutions.json").exists());
+    assert!(!active.join("scan.json").exists());
+    assert!(!active.join("verification.json").exists());
+    assert!(!active.join("state_transaction.json").exists());
+    assert!(!active.join("commit_transaction.json").exists());
+    assert_eq!(read_json(&registry_path).unwrap(), registry_before);
+    assert_eq!(
+        load_branch_record(&repo_root, "main").unwrap(),
+        branch_before
+    );
+    assert_eq!(read_json(&active.join("state.json")).unwrap(), state_before);
+    drop(lock);
+
+    let scan = run_scan_with_lock_options(&open_dir, &wait_options).unwrap();
+    let verification = run_verify_with_lock_options(&open_dir, &wait_options).unwrap();
+    assert!(scan.open_fires.is_empty());
+    assert_eq!(verification.verification.result, "passed");
+    assert!(active.join("fires.json").exists());
+    assert!(active.join("scan.json").exists());
+    assert!(active.join("verification.json").exists());
+    assert_eq!(
+        read_json(&active.join("state.json")).unwrap()["state"],
+        "open-clean"
+    );
+}
+
+#[test]
+fn scan_and_verify_state_transactions_are_diagnosable_and_heal_on_retry() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let active = active_state_path(&open_dir);
+    let transaction_path = active.join("state_transaction.json");
+
+    set_state_transaction_failure_for_test(&active, "scan", "fires_written");
+    let scan_error = run_scan(&open_dir).unwrap_err();
+    assert!(scan_error
+        .to_string()
+        .contains("scan state transaction failure at fires_written"));
+    let scan_transaction = read_json(&transaction_path).unwrap();
+    assert_eq!(scan_transaction["status"], "pending");
+    assert_eq!(scan_transaction["operation"], "scan");
+    assert_eq!(scan_transaction["phase"], "fires_written");
+    assert!(active.join("fires.json").exists());
+    assert!(!active.join("scan.json").exists());
+    let doctor = run_doctor(&DoctorOptions {
+        start: repo_root.clone(),
+        quick: false,
+        json_output: true,
+    })
+    .unwrap();
+    assert!(doctor
+        .issues
+        .iter()
+        .any(|issue| issue.kind == "pending_state_transaction"));
+
+    run_scan(&open_dir).unwrap();
+    assert!(!transaction_path.exists());
+    assert!(active.join("scan.json").exists());
+    assert_open_state_subjects_agree(&repo_root, &open_dir, "main", "open-clean");
+
+    set_state_transaction_failure_for_test(&active, "verify", "verification_written");
+    let verify_error = run_verify(&open_dir).unwrap_err();
+    assert!(verify_error
+        .to_string()
+        .contains("verify state transaction failure at verification_written"));
+    let verify_transaction = read_json(&transaction_path).unwrap();
+    assert_eq!(verify_transaction["operation"], "verify");
+    assert_eq!(verify_transaction["phase"], "verification_written");
+    assert!(active.join("verification.json").exists());
+
+    assert_eq!(run_verify(&open_dir).unwrap().result, "passed");
+    assert!(!transaction_path.exists());
+    assert_open_state_subjects_agree(&repo_root, &open_dir, "main", "open-clean");
+}
+
+#[test]
+fn scan_recovers_pending_verify_transaction_without_stale_verification() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let active = active_state_path(&open_dir);
+    let transaction_path = active.join("state_transaction.json");
+    let verification_path = active.join("verification.json");
+
+    set_state_transaction_failure_for_test(&active, "verify", "verification_written");
+    let verify_error = run_verify(&open_dir).unwrap_err();
+    assert!(verify_error
+        .to_string()
+        .contains("verify state transaction failure at verification_written"));
+    assert_eq!(read_json(&transaction_path).unwrap()["operation"], "verify");
+    assert!(verification_path.exists());
+
+    set_state_transaction_failure_for_test(&active, "scan", "fires_written");
+    let unrelated_scan = run_scan(&open_dir).unwrap_err();
+    assert!(matches!(
+        unrelated_scan,
+        CliError::OpenRecoveryPending(pending)
+            if pending.operation == "verify" && pending.phase == "verification_written"
+    ));
+    assert_eq!(read_json(&transaction_path).unwrap()["operation"], "verify");
+    assert!(verification_path.exists());
+
+    assert_eq!(run_verify(&open_dir).unwrap().result, "passed");
+    assert!(!transaction_path.exists());
+    let scan_error = run_scan(&open_dir).unwrap_err();
+    assert!(scan_error
+        .to_string()
+        .contains("scan state transaction failure at fires_written"));
+    let recovery_transaction = read_json(&transaction_path).unwrap();
+    assert_eq!(recovery_transaction["operation"], "scan");
+    assert_eq!(recovery_transaction["phase"], "fires_written");
+    assert!(!verification_path.exists());
+
+    run_scan(&open_dir).unwrap();
+    assert!(!transaction_path.exists());
+    assert!(!verification_path.exists());
+    assert!(active.join("fires.json").exists());
+    assert!(active.join("scan.json").exists());
+    assert_open_state_subjects_agree(&repo_root, &open_dir, "main", "open-clean");
+}
+
+#[test]
+fn state_transaction_takeover_rejects_unknown_or_mismatched_phase() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(run_verify(&open_dir).unwrap().result, "passed");
+
+    let active = active_state_path(&open_dir);
+    let transaction_path = active.join("state_transaction.json");
+    let protected_subjects = [
+        opened_registry_path(&repo_root, "main"),
+        branch_record_path(&repo_root, "main"),
+        open_dir.join(".codefire-open"),
+        active.join("state.json"),
+        active.join("fires.json"),
+        active.join("scan.json"),
+        active.join("verification.json"),
+    ]
+    .map(|path| {
+        let bytes = fs::read(&path).unwrap();
+        (path, bytes)
+    });
+
+    for (label, operation, phase) in [
+        ("unknown", "scan", "future_phase"),
+        ("cross-operation", "verify", "fires_written"),
+    ] {
+        write_json_atomic(
+            &transaction_path,
+            &json!({
+                "version": 1,
+                "status": "pending",
+                "operation": operation,
+                "phase": phase,
+                "intended_state": "open-clean",
+                "started_at": "2026-07-12T00:00:00Z",
+                "updated_at": "2026-07-12T00:00:00Z",
+            }),
+        )
+        .unwrap();
+        let marker_before = fs::read(&transaction_path).unwrap();
+
+        let error = run_scan(&open_dir).unwrap_err();
+        assert!(matches!(
+            &error,
+            CliError::InvalidRepository(message)
+                if message.contains(&format!(
+                    "phase {phase} is unsupported for operation {operation}"
+                ))
+        ));
+        assert_eq!(
+            fs::read(&transaction_path).unwrap(),
+            marker_before,
+            "{label}"
+        );
+        for (path, expected) in &protected_subjects {
+            let actual = fs::read(path).unwrap();
+            assert_eq!(&actual, expected, "{label}: {}", path.display());
+        }
+
+        let doctor = run_doctor(&DoctorOptions {
+            start: repo_root.clone(),
+            quick: false,
+            json_output: true,
+        })
+        .unwrap();
+        assert!(doctor.issues.iter().any(|issue| {
+            issue.kind == "invalid_active_state_shape"
+                && issue.message.contains(&format!(
+                    "phase {phase} is unsupported for operation {operation}"
+                ))
+        }));
+        assert!(!doctor
+            .issues
+            .iter()
+            .any(|issue| issue.kind == "pending_state_transaction"));
+        assert_eq!(
+            fs::read(&transaction_path).unwrap(),
+            marker_before,
+            "{label}"
+        );
+        fs::remove_file(&transaction_path).unwrap();
+    }
+}
+
+#[test]
+fn state_transaction_writer_rejects_invalid_phase_transition() {
+    let temp = tempdir().unwrap();
+    for (operation, phase) in [
+        ("scan", "verification_written"),
+        ("verify", "fires_written"),
+        ("scan", "future_phase"),
+    ] {
+        let active_path = temp.path().join(format!("{operation}-{phase}"));
+        fs::create_dir_all(&active_path).unwrap();
+        let active = active_state::ActiveStateDir::bind(&active_path).unwrap();
+        write_active_json_atomic_bounded(
+            &active,
+            Path::new("state_transaction.json"),
+            &json!({
+                "version": 2,
+                "status": "pending",
+                "operation": operation,
+                "phase": "started",
+                "intended_state": "open-clean",
+                "subject": {
+                    "branch": "main",
+                    "open_instance_id": "open-test",
+                    "current_base_commit": "CF-COMMIT-test",
+                },
+                "pre_state": {
+                    "branch": "open-clean",
+                    "registry": "open-clean",
+                    "active": "open-clean",
+                },
+                "started_at": "2026-07-12T00:00:00Z",
+                "updated_at": "2026-07-12T00:00:00Z",
+            }),
+            STATE_TRANSACTION_BYTE_LIMIT,
+            "test state transaction marker",
+        )
+        .unwrap();
+        let transaction_path = state_transaction_path(&active);
+        let marker_before = fs::read(&transaction_path).unwrap();
+
+        let error = update_state_transaction_phase(&active, phase).unwrap_err();
+        assert!(matches!(
+            &error,
+            CliError::InvalidRepository(message)
+                if message.contains(&format!(
+                    "operation {operation} cannot advance from started to {phase}"
+                ))
+        ));
+        assert_eq!(fs::read(&transaction_path).unwrap(), marker_before);
+    }
+}
+
+fn assert_open_state_subjects_agree(
+    repo_root: &Path,
+    open_dir: &Path,
+    branch: &str,
+    expected: &str,
+) {
+    let registry = read_json(&opened_registry_path(repo_root, branch)).unwrap();
+    let active = read_json(&active_state_path(open_dir).join("state.json")).unwrap();
+    let branch_record = load_branch_record(repo_root, branch).unwrap();
+    assert_eq!(registry["state"]["last_known"], expected);
+    assert_eq!(active["state"], expected);
+    assert_eq!(branch_record["state"], expected);
+}
+
+#[test]
+fn scan_rejects_a_lock_owned_by_another_repository_before_writing_state() {
+    let temp = tempdir().unwrap();
+    let repo_a = temp.path().join("repo-a");
+    let repo_b = temp.path().join("repo-b");
+    let open_a = temp.path().join("open-a");
+    let open_b = temp.path().join("open-b");
+    for (repo, open) in [(&repo_a, &open_a), (&repo_b, &open_b)] {
+        init_repo(repo, false).unwrap();
+        open_branch_from(
+            repo,
+            &OpenOptions {
+                branch: "main".to_string(),
+                path: open.clone(),
+                dry_run: false,
+                json_output: false,
+                lock: LockOptions::default(),
+                idempotency_key: None,
+            },
+        )
+        .unwrap();
+    }
+
+    let active_b = active_state_path(&open_b);
+    let registry_b = opened_registry_path(&repo_b, "main");
+    let state_before = read_json(&active_b.join("state.json")).unwrap();
+    let registry_before = read_json(&registry_b).unwrap();
+    let lock_a = RepoLock::acquire_with_options(&repo_a, &LockOptions::default()).unwrap();
+
+    let error = match compute_scan_locked(&open_b, &lock_a) {
+        Err(error) => error,
+        Ok(_) => panic!("scan must reject a lock from another repository"),
+    };
+    assert!(matches!(error, CliError::InvalidMarker(_)));
+    assert!(!active_b.join("fires.json").exists());
+    assert!(!active_b.join("scan.json").exists());
+    assert!(!active_b.join("verification.json").exists());
+    assert_eq!(
+        read_json(&active_b.join("state.json")).unwrap(),
+        state_before
+    );
+    assert_eq!(read_json(&registry_b).unwrap(), registry_before);
+    drop(lock_a);
+
+    assert!(compute_scan_locked(
+        &open_b,
+        &RepoLock::acquire_with_options(&repo_b, &LockOptions::default()).unwrap()
+    )
+    .is_ok());
+}
+
+#[test]
+fn open_close_and_commit_dry_runs_remain_read_only_while_repo_lock_is_held() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let close_open_dir = temp.path().join("close-open");
+    let preview_open_dir = temp.path().join("preview-open");
+    init_repo(&repo_root, false).unwrap();
+    for branch in ["feature/close-preview", "feature/open-preview"] {
+        clone_branch(
+            &repo_root,
+            &CloneOptions {
+                source: "main".to_string(),
+                new_branch: branch.to_string(),
+                dry_run: false,
+                json_output: false,
+                lock: LockOptions::default(),
+                idempotency_key: None,
+            },
+        )
+        .unwrap();
+    }
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "feature/close-preview".to_string(),
+            path: close_open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let registry_path = opened_registry_path(&repo_root, "feature/close-preview");
+    let registry_before = read_json(&registry_path).unwrap();
+    let branch_before = load_branch_record(&repo_root, "feature/close-preview").unwrap();
+    let active = active_state_path(&close_open_dir);
+    let state_before = read_json(&active.join("state.json")).unwrap();
+    let lock = RepoLock::acquire_with_options(&repo_root, &LockOptions::default()).unwrap();
+
+    let open_preview = open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "feature/open-preview".to_string(),
+            path: preview_open_dir.clone(),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(open_preview.open_dir, preview_open_dir);
+    assert!(!preview_open_dir.exists());
+
+    let close_preview = close_branch(
+        &repo_root,
+        &CloseOptions {
+            branch: "feature/close-preview".to_string(),
+            discard: false,
+            keep_dir: false,
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap();
+    assert_eq!(close_preview.open_dir, close_open_dir);
+    let commit_preview = run_commit(&CommitOptions {
+        path: close_open_dir.clone(),
+        message: "preview".to_string(),
+        dry_run: true,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap();
+    assert!(commit_preview.dry_run);
+
+    assert_eq!(read_json(&registry_path).unwrap(), registry_before);
+    assert_eq!(
+        load_branch_record(&repo_root, "feature/close-preview").unwrap(),
+        branch_before
+    );
+    assert_eq!(read_json(&active.join("state.json")).unwrap(), state_before);
+    assert!(!active.join("scan.json").exists());
+    assert!(!active.join("verification.json").exists());
+    assert!(close_open_dir.join(".codefire-open").exists());
+    drop(lock);
+}
+
+#[test]
+fn scan_rejects_a_directly_edited_trace_graph_with_a_dangling_endpoint() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs")).unwrap();
+    fs::write(
+        open_dir.join("docs").join("requirements.md"),
+        "## REQ-session: Requirement\nSession handling\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs").join("design.md"),
+        "## DES-session: Design\nSession implementation\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("codefire.links.yaml"),
+        "links:\n  - from: REQ-session\n    to: DES-missing\n    type: refined_by\n",
+    )
+    .unwrap();
+
+    let error = match compute_scan(&open_dir) {
+        Ok(_) => panic!("dangling Trace Graph endpoint must be rejected"),
+        Err(error) => error,
+    };
+    assert_eq!(error.exit_code(), ExitCode::ObjectReferenceInvalid.code());
+    assert!(matches!(
+        &error,
+        CliError::CoreContext {
+            error: codefire_core::CoreError::TraceGraphEndpointIntegrity(_),
+            ..
+        }
+    ));
+    let envelope = cli_error_envelope("scan", &error);
+    assert_eq!(envelope["repo"], repo_root.to_string_lossy().as_ref());
+    assert_eq!(
+        envelope["diagnostics"][0]["kind"],
+        "trace_graph_endpoint_integrity"
+    );
+    assert_eq!(
+        envelope["diagnostics"][0]["path"],
+        open_dir
+            .join("codefire.links.yaml")
+            .to_string_lossy()
+            .as_ref()
+    );
+    assert!(envelope["diagnostics"][0]["total_issues"]
+        .as_u64()
+        .is_some_and(|total| total >= 1));
+    assert_eq!(envelope["diagnostics"][0]["issues_omitted"], 0);
+    assert!(envelope["diagnostics"][0]["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|issue| issue["endpoint"] == "to" && issue["atom_id"] == "DES-missing"));
+
+    let context_error = match context::build_context_pack(&context::ContextOptions {
+        path: open_dir.clone(),
+        selector: context::ContextSelector::Branch,
+        depth: 1,
+        limit: context::DEFAULT_CONTEXT_LIMIT,
+        json_output: true,
+    }) {
+        Ok(_) => panic!("context must reject the dangling Trace Graph endpoint"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        context_error,
+        CliError::CoreContext {
+            error: codefire_core::CoreError::TraceGraphEndpointIntegrity(_),
+            ..
+        }
+    ));
+    assert!(matches!(
+        codefire_core::current_required_link_missing(&open_dir).unwrap_err(),
+        codefire_core::CoreError::TraceGraphEndpointIntegrity(_)
+    ));
+    let fire_error = fire::run_manual_fire_specs(
+        &open_dir,
+        &[fire::ManualFireSpec {
+            source_atom: "REQ-session".to_string(),
+            target_atom: "DES-session".to_string(),
+            reason: "must reject a pre-existing dangling graph".to_string(),
+            severity: "required".to_string(),
+        }],
+        true,
+        false,
+        &LockOptions::default(),
+        "fire",
+    )
+    .unwrap_err();
+    assert!(matches!(
+        fire_error,
+        CliError::CoreContext {
+            error: codefire_core::CoreError::TraceGraphEndpointIntegrity(_),
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -1658,12 +4045,29 @@ fn parse_state_diagnostic_json_args() {
     assert!(status.json_output);
     assert!(status.metrics);
 
+    let scan = parse_path_json_args(
+        &[
+            "--path=/tmp/example".to_string(),
+            "--wait-lock".to_string(),
+            "--lock-timeout=250ms".to_string(),
+            "--json".to_string(),
+        ],
+        "scan",
+    )
+    .unwrap();
+    assert_eq!(scan.path, PathBuf::from("/tmp/example"));
+    assert!(scan.json_output);
+    assert!(scan.lock.wait);
+    assert_eq!(scan.lock.timeout_ms, Some(250));
+
     let verify = parse_verify_args(&[
         "--details".to_string(),
         "--blocking-only".to_string(),
         "--path=/tmp/example".to_string(),
         "--json".to_string(),
         "--metrics".to_string(),
+        "--wait-lock".to_string(),
+        "--lock-timeout=750ms".to_string(),
     ])
     .unwrap();
     assert_eq!(verify.path, PathBuf::from("/tmp/example"));
@@ -1672,6 +4076,13 @@ fn parse_state_diagnostic_json_args() {
     assert_eq!(verify.diagnostic_filter(), "blocking_only");
     assert!(verify.json_output);
     assert!(verify.metrics);
+    assert!(verify.lock.wait);
+    assert_eq!(verify.lock.timeout_ms, Some(750));
+
+    assert!(matches!(
+        parse_path_json_args(&["--wait-lock".to_string()], "status"),
+        Err(CliError::Usage(message)) if message.contains("unsupported status option")
+    ));
 }
 
 #[test]
@@ -1721,6 +4132,38 @@ fn parse_health_recovery_commands_accept_common_path_option() {
 }
 
 #[test]
+fn remote_collection_parsers_accept_bounded_snapshot_pagination() {
+    let list = parse_list_args(&[
+        "cf:///tmp/server/org/app".to_string(),
+        "--json".to_string(),
+        "--limit=25".to_string(),
+        "--cursor".to_string(),
+        "cfcur1.00".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(list.page.limit, Some(25));
+    assert_eq!(list.page.cursor.as_deref(), Some("cfcur1.00"));
+
+    let requests = parse_remote_project_args(
+        &[
+            "cf:///tmp/server/org/app".to_string(),
+            "--limit".to_string(),
+            "50".to_string(),
+        ],
+        "request-list",
+    )
+    .unwrap();
+    assert_eq!(requests.page.limit, Some(50));
+    assert!(matches!(
+        parse_list_args(&[
+            "cf:///tmp/server/org/app".to_string(),
+            "--limit=1001".to_string(),
+        ]),
+        Err(CliError::Usage(message)) if message.contains("between 1 and 1000")
+    ));
+}
+
+#[test]
 fn cli_error_exit_codes_follow_stable_taxonomy() {
     assert_eq!(
         CliError::Usage("bad args".to_string()).exit_code(),
@@ -1743,16 +4186,16 @@ fn cli_error_exit_codes_follow_stable_taxonomy() {
         ExitCode::RepositoryCorruption.code()
     );
     assert_eq!(
-        CliError::Store(codefire_store::StoreError::ObjectNotFound(
+        CliError::Store(Box::new(codefire_store::StoreError::ObjectNotFound(
             "CF-BLOB-missing".to_string()
-        ))
+        )))
         .exit_code(),
         ExitCode::ObjectReferenceInvalid.code()
     );
     assert_eq!(
-        CliError::Store(codefire_store::StoreError::InvalidSealedCommit(
+        CliError::Store(Box::new(codefire_store::StoreError::InvalidSealedCommit(
             "missing root".to_string()
-        ))
+        )))
         .exit_code(),
         ExitCode::SealedCommitInvalid.code()
     );
@@ -1768,14 +4211,22 @@ fn repo_lock_wait_timeout_returns_lock_contention_with_owner_metadata() {
     let repo_root = temp.path().join("repo");
     init_repo(&repo_root, false).unwrap();
     let lock_path = repo_root.join(".codefire").join("locks").join("repo.lock");
-    fs::write(
-        lock_path,
-        serde_json::to_string_pretty(&json!({
+    let owner_path = repo_lock_owner_path(&lock_path);
+    let owner_file = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&lock_path)
+        .unwrap();
+    Fs2FileExt::lock_exclusive(&owner_file).unwrap();
+    write_json_atomic(
+        &owner_path,
+        &json!({
             "version": 1,
             "pid": 4242,
             "created_at": "2026-06-04T00:00:00Z",
-        }))
-        .unwrap(),
+        }),
     )
     .unwrap();
 
@@ -1796,6 +4247,161 @@ fn repo_lock_wait_timeout_returns_lock_contention_with_owner_metadata() {
     assert_eq!(envelope["repo"], repo_root.to_string_lossy().as_ref());
     assert_eq!(envelope["diagnostics"][0]["kind"], "lock_contention");
     assert_eq!(envelope["next_actions"][0]["kind"], "retry_with_wait_lock");
+    Fs2FileExt::unlock(&owner_file).unwrap();
+}
+
+#[test]
+fn repo_lock_recovers_from_a_stale_file_and_persists_across_drop_and_reacquire() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let lock_path = repo_root.join(".codefire").join("locks").join("repo.lock");
+    let owner_path = repo_lock_owner_path(&lock_path);
+    let lock_contents = b"persistent lock inode contents\n";
+    fs::write(&lock_path, lock_contents).unwrap();
+    write_json_atomic(
+        &owner_path,
+        &json!({
+            "version": 1,
+            "pid": 999_999,
+            "created_at": "1970-01-01T00:00:00Z",
+        }),
+    )
+    .unwrap();
+
+    let first = RepoLock::acquire_with_options(&repo_root, &LockOptions::default()).unwrap();
+    assert_eq!(fs::read(&lock_path).unwrap(), lock_contents);
+    let owner = read_json(&owner_path).unwrap();
+    assert_eq!(owner["pid"], std::process::id());
+    drop(first);
+    assert!(lock_path.exists());
+    assert!(owner_path.exists());
+    assert_eq!(fs::read(&lock_path).unwrap(), lock_contents);
+
+    let second = RepoLock::acquire_with_options(&repo_root, &LockOptions::default()).unwrap();
+    let contention = match RepoLock::acquire_with_options(&repo_root, &LockOptions::default()) {
+        Err(error) => error,
+        Ok(_) => panic!("a held advisory lock must contend"),
+    };
+    assert!(matches!(
+        contention,
+        CliError::RepositoryLockContention { .. }
+    ));
+    drop(second);
+    assert!(RepoLock::acquire_with_options(&repo_root, &LockOptions::default()).is_ok());
+    assert_eq!(fs::read(&lock_path).unwrap(), lock_contents);
+}
+
+#[cfg(unix)]
+#[test]
+fn repo_lock_rejects_a_pathname_inode_swap_at_the_use_boundary() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    init_repo(&repo_root, false).unwrap();
+    let lock_path = repo_root.join(".codefire").join("locks").join("repo.lock");
+    let moved_path = lock_path.with_file_name("repo.lock.moved");
+    let lock = RepoLock::acquire_with_options(&repo_root, &LockOptions::default()).unwrap();
+
+    fs::rename(&lock_path, &moved_path).unwrap();
+    fs::write(&lock_path, b"replacement inode\n").unwrap();
+
+    let error = lock.ensure_repo_root(&repo_root).unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("repository lock identity changed"));
+    assert!(RepoLock::acquire_with_options(&repo_root, &LockOptions::default()).is_ok());
+    assert!(moved_path.exists());
+    drop(lock);
+}
+
+#[cfg(unix)]
+#[test]
+fn repo_lock_rejects_a_symlink_without_modifying_its_outside_target() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let outside = temp.path().join("outside-owner.json");
+    init_repo(&repo_root, false).unwrap();
+    fs::write(&outside, b"outside must remain unchanged\n").unwrap();
+    let lock_path = repo_root.join(".codefire").join("locks").join("repo.lock");
+    std::os::unix::fs::symlink(&outside, &lock_path).unwrap();
+
+    assert!(RepoLock::acquire_with_options(&repo_root, &LockOptions::default()).is_err());
+    assert_eq!(
+        fs::read(&outside).unwrap(),
+        b"outside must remain unchanged\n"
+    );
+    assert!(fs::symlink_metadata(lock_path)
+        .unwrap()
+        .file_type()
+        .is_symlink());
+}
+
+#[cfg(unix)]
+#[test]
+fn repo_lock_rejects_a_hardlink_without_modifying_its_outside_target() {
+    use std::os::unix::fs::MetadataExt;
+
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let outside = temp.path().join("outside-lock-inode");
+    init_repo(&repo_root, false).unwrap();
+    fs::write(&outside, b"outside hardlink target must remain unchanged\n").unwrap();
+    let lock_path = repo_root.join(".codefire").join("locks").join("repo.lock");
+    if lock_path.exists() {
+        fs::remove_file(&lock_path).unwrap();
+    }
+    fs::hard_link(&outside, &lock_path).unwrap();
+    let outside_before = fs::read(&outside).unwrap();
+
+    assert!(RepoLock::acquire_with_options(&repo_root, &LockOptions::default()).is_err());
+
+    assert_eq!(fs::read(&outside).unwrap(), outside_before);
+    assert_eq!(fs::metadata(&outside).unwrap().nlink(), 2);
+    assert!(!repo_lock_owner_path(&lock_path).exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn repo_lock_contention_ignores_symlinked_or_oversized_owner_sidecars() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let outside = temp.path().join("outside-owner.json");
+    init_repo(&repo_root, false).unwrap();
+    let lock_path = repo_root.join(".codefire").join("locks").join("repo.lock");
+    let owner_path = repo_lock_owner_path(&lock_path);
+    let owner_file = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&lock_path)
+        .unwrap();
+    Fs2FileExt::lock_exclusive(&owner_file).unwrap();
+    fs::write(
+        &outside,
+        b"{\"version\":1,\"pid\":7331,\"created_at\":\"outside\"}\n",
+    )
+    .unwrap();
+    std::os::unix::fs::symlink(&outside, &owner_path).unwrap();
+
+    let symlink_error =
+        RepoLock::acquire_with_options(&repo_root, &LockOptions::default()).unwrap_err();
+    assert!(!symlink_error.to_string().contains("owner pid 7331"));
+    assert_eq!(
+        fs::read(&outside).unwrap(),
+        b"{\"version\":1,\"pid\":7331,\"created_at\":\"outside\"}\n"
+    );
+
+    fs::remove_file(&owner_path).unwrap();
+    fs::write(
+        &owner_path,
+        vec![b'x'; REPO_LOCK_OWNER_BYTE_LIMIT as usize + 1],
+    )
+    .unwrap();
+    let oversized_error =
+        RepoLock::acquire_with_options(&repo_root, &LockOptions::default()).unwrap_err();
+    assert!(!oversized_error.to_string().contains("owner pid"));
+    Fs2FileExt::unlock(&owner_file).unwrap();
 }
 
 #[test]
@@ -1810,16 +4416,20 @@ fn remote_resource_lock_wait_timeout_returns_owner_metadata_and_json_diagnostics
     let lock_path = remote_dirs(&remote_project_root)
         .locks
         .join("branch-main.lock");
+    let owner_path = lock_path.with_file_name("branch-main.lock.owner.json");
     fs::write(
-        lock_path,
+        &owner_path,
         serde_json::to_string_pretty(&json!({
             "version": 1,
             "pid": 7777,
+            "mode": "exclusive",
             "created_at": "2026-06-05T00:00:00Z",
         }))
         .unwrap(),
     )
     .unwrap();
+    let (owner_file, _) = secure_worktree::open_lock_file_nofollow(&lock_path).unwrap();
+    Fs2FileExt::lock_exclusive(&owner_file).unwrap();
 
     let error = upload_branch(
         &repo_root,
@@ -1851,6 +4461,7 @@ fn remote_resource_lock_wait_timeout_returns_owner_metadata_and_json_diagnostics
     assert_eq!(envelope["exit_code"], ExitCode::LockContention.code());
     assert_eq!(envelope["diagnostics"][0]["kind"], "lock_contention");
     assert_eq!(envelope["next_actions"][0]["kind"], "retry_with_wait_lock");
+    Fs2FileExt::unlock(&owner_file).unwrap();
 }
 
 #[test]
@@ -1886,39 +4497,6 @@ fn local_workflow_commands_are_registered_through_dispatch_table() {
         );
     }
     assert!(local_workflow_handler("clone").is_none());
-}
-
-#[test]
-fn remote_generation_allocation_is_locked_across_threads() {
-    let temp = tempdir().unwrap();
-    let project_root = temp.path().join("remote").join("org").join("app");
-    remote::ensure_remote_layout(&project_root).unwrap();
-    let workers = 16;
-    let barrier = Arc::new(Barrier::new(workers));
-    let options = LockOptions {
-        wait: true,
-        timeout_ms: Some(5_000),
-    };
-    let handles = (0..workers)
-        .map(|_| {
-            let project_root = project_root.clone();
-            let barrier = Arc::clone(&barrier);
-            std::thread::spawn(move || {
-                barrier.wait();
-                let lock = RemoteGenerationLock::acquire(&project_root, &options).unwrap();
-                next_remote_generation(&lock).unwrap()
-            })
-        })
-        .collect::<Vec<_>>();
-    let mut generations = handles
-        .into_iter()
-        .map(|handle| handle.join().unwrap())
-        .collect::<Vec<_>>();
-
-    generations.sort_unstable();
-    assert_eq!(generations, (1..=workers as u64).collect::<Vec<_>>());
-    let state = read_json(&project_root.join("gc_state.json")).unwrap();
-    assert_eq!(state["current_generation"], workers);
 }
 
 #[test]
@@ -1995,12 +4573,12 @@ fn context_pack_returns_atom_changed_and_fire_views() {
             .join("docs")
             .join("requirements")
             .join("session.md"),
-        "## REQ-session: Requirement\nTTL 30\n",
+        "## REQ-session: Requirement\nTTL 31\n",
     )
     .unwrap();
     fs::write(
         open_dir.join("docs").join("design").join("session.md"),
-        "## DES-session: Design\nClock policy\n",
+        "## DES-session: Design\nClock policy v2\n",
     )
     .unwrap();
     fs::write(
@@ -2382,13 +4960,12 @@ fn link_batch_validates_all_items_before_writing_links() {
         .diagnostics
         .iter()
         .any(|diagnostic| diagnostic["kind"] == "self_link" && diagnostic["item_index"] == 1));
-    assert!(
-        invalid_dry_run
-            .diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic["kind"] == "unknown_to_atom"
-                && diagnostic["item_index"] == 2)
-    );
+    assert!(invalid_dry_run
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic["kind"] == "missing_atom"
+            && diagnostic["endpoint"] == "to"
+            && diagnostic["item_index"] == 2));
     assert!(invalid_dry_run
         .diagnostics
         .iter()
@@ -2428,6 +5005,23 @@ fn link_batch_validates_all_items_before_writing_links() {
     .unwrap_err();
     assert!(error.to_string().contains("TEST-missing"));
     assert!(error.to_string().contains("issue(s)"));
+    let error_envelope = cli_error_envelope("link", &error);
+    assert_eq!(
+        error_envelope["diagnostics"][0]["kind"],
+        "trace_graph_endpoint_integrity"
+    );
+    assert!(error_envelope["diagnostics"][0]["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|issue| issue["kind"] == "missing_atom" && issue["atom_id"] == "TEST-missing"));
+    assert_eq!(
+        error_envelope["diagnostics"][0]["path"],
+        open_dir
+            .join("codefire.links.yaml")
+            .to_string_lossy()
+            .as_ref()
+    );
     let graph_after_error = codefire_core::current_trace_graph(&open_dir).unwrap();
     assert_eq!(graph_after_error.links.len(), 1);
 }
@@ -2519,6 +5113,195 @@ fn link_batch_appends_inside_existing_links_section_and_rejects_unsupported_yaml
     assert!(error
         .to_string()
         .contains("unsupported codefire.links.yaml"));
+}
+
+#[test]
+fn link_batch_reports_ambiguous_atom_ids_and_rejects_a_dangling_existing_graph() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("design")).unwrap();
+    fs::write(
+        open_dir.join("docs/requirements/one.md"),
+        "## REQ-duplicate: First\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs/requirements/two.md"),
+        "## REQ-duplicate: Second\n",
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("docs/design/design.md"),
+        "## DES-target: Design\n",
+    )
+    .unwrap();
+    let batch_path = temp.path().join("ambiguous-links.json");
+    fs::write(
+        &batch_path,
+        serde_json::to_string(&json!({
+            "version": 1,
+            "links": [{"from": "REQ-duplicate", "to": "DES-target", "type": "refined_by"}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let ambiguous = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
+        path: open_dir.clone(),
+        batch_path: batch_path.clone(),
+        dry_run: true,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert!(!ambiguous.valid);
+    assert!(ambiguous.diagnostics.iter().any(|diagnostic| {
+        diagnostic["kind"] == "ambiguous_atom_id"
+            && diagnostic["endpoint"] == "from"
+            && diagnostic["atom_id"] == "REQ-duplicate"
+            && diagnostic["atom_occurrences"] == 2
+    }));
+
+    let dangling =
+        "version: 1\nlinks:\n  - from: REQ-duplicate\n    to: DES-missing\n    type: refined_by\n";
+    fs::write(open_dir.join("codefire.links.yaml"), dangling).unwrap();
+    let error = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
+        path: open_dir.clone(),
+        batch_path,
+        dry_run: false,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap_err();
+    assert!(matches!(
+        &error,
+        CliError::CoreContext {
+            error: codefire_core::CoreError::TraceGraphEndpointIntegrity(_),
+            ..
+        }
+    ));
+    let envelope = cli_error_envelope("link", &error);
+    assert_eq!(envelope["repo"], repo_root.to_string_lossy().as_ref());
+    assert_eq!(
+        envelope["diagnostics"][0]["kind"],
+        "trace_graph_endpoint_integrity"
+    );
+    assert_eq!(
+        envelope["diagnostics"][0]["path"],
+        open_dir
+            .join("codefire.links.yaml")
+            .to_string_lossy()
+            .as_ref()
+    );
+    assert_eq!(
+        fs::read_to_string(open_dir.join("codefire.links.yaml")).unwrap(),
+        dangling
+    );
+}
+
+#[test]
+fn link_batch_bounds_oversized_diagnostics_without_losing_total_counts() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::create_dir_all(open_dir.join("docs").join("requirements")).unwrap();
+    fs::write(
+        open_dir.join("docs/requirements/source.md"),
+        "## REQ-source: Source\n",
+    )
+    .unwrap();
+    let link_count = codefire_core::TRACE_GRAPH_ENDPOINT_ISSUE_LIMIT + 37;
+    let links = (0..link_count)
+        .map(|index| {
+            json!({
+                "from": "REQ-source",
+                "to": format!("DES-missing-{index:03}"),
+                "type": "refined_by",
+            })
+        })
+        .collect::<Vec<_>>();
+    let batch_path = temp.path().join("oversized-links.json");
+    fs::write(
+        &batch_path,
+        serde_json::to_string(&json!({"version": 1, "links": links})).unwrap(),
+    )
+    .unwrap();
+
+    let result = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
+        path: open_dir.clone(),
+        batch_path: batch_path.clone(),
+        dry_run: true,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    let data = link_batch::link_batch_data_json(&result);
+    assert!(!result.valid);
+    assert_eq!(data["diagnostic_total"], link_count);
+    assert_eq!(data["diagnostics_omitted"], 37);
+    assert_eq!(data["plan"]["item_count"], link_count);
+    assert_eq!(
+        data["plan"]["items"].as_array().unwrap().len(),
+        codefire_core::TRACE_GRAPH_ENDPOINT_ISSUE_LIMIT
+    );
+    assert_eq!(data["plan"]["items_omitted"], 37);
+    assert_eq!(
+        result.diagnostics.len(),
+        codefire_core::TRACE_GRAPH_ENDPOINT_ISSUE_LIMIT + 1
+    );
+    assert_eq!(
+        result.diagnostics.last().unwrap()["kind"],
+        "diagnostics_omitted"
+    );
+
+    let error = link_batch::run_link_batch(&link_batch::LinkBatchOptions {
+        path: open_dir.clone(),
+        batch_path,
+        dry_run: false,
+        json_output: true,
+        lock: LockOptions::default(),
+    })
+    .unwrap_err();
+    let message = error.to_string();
+    assert!(message.contains(&format!("{link_count} issue(s)")));
+    assert!(message.contains("additional issue(s) omitted"));
+    assert!(message.len() < 30_000);
+    let envelope = cli_error_envelope("link", &error);
+    assert_eq!(
+        envelope["diagnostics"][0]["kind"],
+        "trace_graph_endpoint_integrity"
+    );
+    assert_eq!(envelope["diagnostics"][0]["total_issues"], link_count);
+    assert_eq!(envelope["diagnostics"][0]["issues_omitted"], 37);
+    assert!(!open_dir.join("codefire.links.yaml").exists());
 }
 
 #[test]
@@ -3155,6 +5938,7 @@ fn scan_and_verify_text_outputs_include_empty_summaries() {
         },
         changed_atoms: Vec::new(),
         non_atom_changed_files: Vec::new(),
+        change_coverage: None,
         open_fires: Vec::new(),
         tool_migration: None,
     };
@@ -3172,8 +5956,13 @@ fn scan_and_verify_text_outputs_include_empty_summaries() {
         missing_required_links: Vec::new(),
         stale_resolutions: Vec::new(),
         missing_evidence_refs: Vec::new(),
+        unresolved_merge_conflicts: Vec::new(),
         duplicate_atom_ids: Vec::new(),
         verified_at: "2026-06-06T00:00:00Z".to_string(),
+        subject: None,
+        execution: Vec::new(),
+        effective_policy: None,
+        change_coverage: None,
     };
     let verify_text = verification::render_verification(&verification, false, false);
     assert!(verify_text.contains("Verification passed."));
@@ -3202,11 +5991,18 @@ fn non_atom_file_changes_are_reported_in_scan_context_and_commit() {
     .unwrap();
 
     fs::write(open_dir.join("README.md"), "plain project notes\n").unwrap();
-    let scan = compute_scan(&open_dir, true).unwrap().scan;
+    let scan = run_scan(&open_dir).unwrap();
     assert!(scan.changed_atoms.is_empty());
     assert_eq!(scan.non_atom_changed_files.len(), 1);
     assert_eq!(scan.non_atom_changed_files[0].path, "README.md");
     assert_eq!(scan.non_atom_changed_files[0].status, "added");
+    let coverage = scan
+        .change_coverage
+        .as_ref()
+        .expect("typed change coverage");
+    assert_eq!(coverage.summary.changed_files, 1);
+    assert_eq!(coverage.summary.non_atom_files, 1);
+    assert_eq!(coverage.span_precision, "file_only_no_span_claim");
 
     let scan_text = render_scan(&scan);
     assert!(scan_text.contains("Changed atoms: none"));
@@ -3217,6 +6013,7 @@ fn non_atom_file_changes_are_reported_in_scan_context_and_commit() {
     assert_eq!(scan_json["changed_atom_count"], 0);
     assert_eq!(scan_json["non_atom_changed_file_count"], 1);
     assert_eq!(scan_json["non_atom_changed_files"][0]["path"], "README.md");
+    assert_eq!(scan_json["change_coverage"]["summary"]["non_atom_files"], 1);
 
     let context = build_context_pack(&context::ContextOptions {
         path: open_dir.clone(),
@@ -3234,8 +6031,17 @@ fn non_atom_file_changes_are_reported_in_scan_context_and_commit() {
         "README.md"
     );
 
-    let verification = compute_verify(&open_dir, true).unwrap();
-    assert_eq!(verification.verification.result, "passed");
+    let verification = run_verify(&open_dir).unwrap();
+    assert_eq!(verification.result, "passed");
+    assert!(verification.effective_policy.is_some());
+    assert_eq!(
+        verification
+            .change_coverage
+            .as_ref()
+            .expect("verification coverage")
+            .digest,
+        coverage.digest
+    );
     assert_eq!(read_status(&open_dir).unwrap().state, "open-consistent");
 
     let commit = run_commit(&CommitOptions {
@@ -3256,6 +6062,10 @@ fn non_atom_file_changes_are_reported_in_scan_context_and_commit() {
     assert_eq!(
         commit_data["non_atom_changed_files"][0]["path"],
         "README.md"
+    );
+    assert_eq!(
+        commit_data["change_coverage"]["summary"]["non_atom_files"],
+        1
     );
 }
 
@@ -3460,6 +6270,71 @@ fn commit_dry_run_returns_plan_without_updating_branch() {
         .exists());
 }
 
+fn commit_transaction_object_entry<'a>(
+    transaction: &'a Value,
+    role: &str,
+    path: Option<&str>,
+) -> &'a Value {
+    transaction["objects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["role"] == role && entry.get("path").and_then(Value::as_str).eq(&path))
+        .unwrap_or_else(|| panic!("missing transaction object role {role} path {path:?}"))
+}
+
+fn commit_transaction_state_counts(transaction: &Value) -> (usize, usize) {
+    transaction["objects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .fold((0, 0), |(stored, planned), entry| {
+            match entry["state"].as_str() {
+                Some("stored") => (stored + 1, planned),
+                Some("planned") => (stored, planned + 1),
+                state => panic!("unexpected transaction object state: {state:?}"),
+            }
+        })
+}
+
+#[test]
+fn manifest_commit_plan_is_pure_and_keeps_duplicate_blob_roles_explicit() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::write(open_dir.join("a.txt"), "same payload\n").unwrap();
+    fs::write(open_dir.join("b.txt"), "same payload\n").unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let objects_before = object_store_file_set(&objects);
+
+    let plan = build_manifest_plan(&open_dir).unwrap();
+
+    assert_eq!(object_store_file_set(&objects), objects_before);
+    assert_eq!(plan.blobs.len(), 2);
+    assert_eq!(plan.blobs[0].path.as_deref(), Some("a.txt"));
+    assert_eq!(plan.blobs[1].path.as_deref(), Some("b.txt"));
+    assert_eq!(plan.blobs[0].object_id, plan.blobs[1].object_id);
+    assert_eq!(
+        plan.manifest.object_id,
+        codefire_store::object_id("content_manifest", plan.manifest.payload.as_ref().unwrap())
+            .unwrap()
+    );
+    assert!(plan.blobs.iter().all(|blob| blob.payload.is_none()));
+}
+
 #[test]
 fn commit_transaction_marker_is_clean_after_success_and_doctor_reports_pending() {
     let temp = tempdir().unwrap();
@@ -3502,7 +6377,7 @@ fn commit_transaction_marker_is_clean_after_success_and_doctor_reports_pending()
     let marker = read_json(&marker_path).unwrap();
     assert_eq!(marker["status"], "pending");
     assert_eq!(marker["phase"], "stored_content_manifest");
-    assert_eq!(marker["objects"].as_array().unwrap().len(), 1);
+    assert_eq!(commit_transaction_state_counts(&marker), (2, 8));
 
     let doctor = run_doctor(&DoctorOptions {
         start: repo_root.clone(),
@@ -3510,10 +6385,59 @@ fn commit_transaction_marker_is_clean_after_success_and_doctor_reports_pending()
         json_output: true,
     })
     .unwrap();
-    assert!(doctor
+    let pending = doctor
         .issues
         .iter()
-        .any(|issue| issue.kind == "pending_commit_transaction"));
+        .find(|issue| issue.kind == "pending_commit_transaction")
+        .unwrap();
+    assert!(pending
+        .message
+        .contains("2 stored object(s) and 8 planned object(s)"));
+
+    fs::remove_file(&marker_path).unwrap();
+    let head_before_validation =
+        required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap();
+    let base_before_validation = required_string(
+        &read_json(&opened_registry_path(&repo_root, "main")).unwrap(),
+        &["open", "current_base_commit"],
+    )
+    .unwrap();
+    set_commit_transaction_failure_for_test(&failed_active, "before_candidate_validation");
+    let prepublication_failure = run_commit(&CommitOptions {
+        path: open_dir.clone(),
+        message: "Pre-publication failure".to_string(),
+        dry_run: false,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap_err();
+    assert!(prepublication_failure
+        .to_string()
+        .contains("injected commit transaction failure at before_candidate_validation"));
+    let validation_marker = read_json(&marker_path).unwrap();
+    assert_eq!(validation_marker["status"], "pending");
+    assert_eq!(validation_marker["phase"], "validating_candidate_commit");
+    assert_eq!(commit_transaction_state_counts(&validation_marker), (9, 1));
+    assert_eq!(
+        commit_transaction_object_entry(&validation_marker, "branch_snapshot", None)["state"],
+        "planned"
+    );
+    assert_eq!(
+        required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap(),
+        head_before_validation
+    );
+    assert_eq!(
+        required_string(
+            &read_json(&opened_registry_path(&repo_root, "main")).unwrap(),
+            &["open", "current_base_commit"]
+        )
+        .unwrap(),
+        base_before_validation
+    );
 
     fs::remove_file(&marker_path).unwrap();
     let committed = run_commit(&CommitOptions {
@@ -3533,6 +6457,918 @@ fn commit_transaction_marker_is_clean_after_success_and_doctor_reports_pending()
     assert!(!active_state_path(&open_dir)
         .join("commit_transaction.json")
         .exists());
+}
+
+#[test]
+fn commit_transaction_survives_active_reset_and_recovers_without_a_duplicate_commit() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::write(
+        open_dir.join("README.md"),
+        "publication recovery evidence\n",
+    )
+    .unwrap();
+
+    let active = active_state_path(&open_dir);
+    let marker_path = active.join("commit_transaction.json");
+    set_commit_transaction_failure_for_test(&active, "after_active_reset_before_marker_clear");
+    let options = CommitOptions {
+        path: open_dir,
+        message: "Interrupted after active reset".to_string(),
+        dry_run: false,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    };
+
+    let interrupted = run_commit(&options).unwrap_err();
+    assert!(interrupted
+        .to_string()
+        .contains("after_active_reset_before_marker_clear"));
+    let marker = read_json(&marker_path).unwrap();
+    assert_eq!(marker["status"], "pending");
+    assert_eq!(marker["phase"], "resetting_active_state");
+    assert_eq!(commit_transaction_state_counts(&marker), (10, 0));
+    let candidate_id = marker["candidate_commit"]["object_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(
+        required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap(),
+        candidate_id
+    );
+    assert_eq!(
+        required_string(
+            &read_json(&opened_registry_path(&repo_root, "main")).unwrap(),
+            &["open", "current_base_commit"]
+        )
+        .unwrap(),
+        candidate_id
+    );
+
+    let recovered = run_commit(&options).unwrap();
+    assert_eq!(recovered.commit_id, candidate_id);
+    assert!(!marker_path.exists());
+    let transaction_id = marker["transaction_id"].as_str().unwrap();
+    let archive = read_json(&active.join(format!(
+        "commit_transaction.recovered.{transaction_id}.json"
+    )))
+    .unwrap();
+    assert_eq!(archive["status"], "recovered");
+    assert_eq!(archive["recovery"]["action"], "completed_published_commit");
+}
+
+#[test]
+fn commit_transaction_recovers_the_idempotency_publication_gap_exactly_once() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::write(open_dir.join("README.md"), "idempotency recovery\n").unwrap();
+
+    let active = active_state_path(&open_dir);
+    let marker_path = active.join("commit_transaction.json");
+    set_commit_transaction_failure_for_test(
+        &active,
+        "after_idempotency_store_before_marker_update",
+    );
+    let options = CommitOptions {
+        path: open_dir,
+        message: "Recover idempotent publication".to_string(),
+        dry_run: false,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: Some("commit-recovery-once".to_string()),
+        signer: None,
+        key_id: None,
+    };
+
+    let interrupted = run_commit(&options).unwrap_err();
+    assert!(interrupted
+        .to_string()
+        .contains("after_idempotency_store_before_marker_update"));
+    let marker = read_json(&marker_path).unwrap();
+    assert_eq!(marker["phase"], "publishing_idempotency");
+    let candidate_id = marker["candidate_commit"]["object_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(idempotency_record_path(&repo_root, "commit", "commit-recovery-once").exists());
+
+    let recovered = run_commit(&options).unwrap();
+    assert_eq!(recovered.commit_id, candidate_id);
+    assert!(!marker_path.exists());
+    let replayed = run_commit(&options).unwrap();
+    assert_eq!(replayed.commit_id, candidate_id);
+    assert_eq!(
+        required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap(),
+        candidate_id
+    );
+}
+
+#[test]
+fn commit_transaction_recovers_each_branch_registry_publication_window() {
+    for failpoint in [
+        "after_branch_publish_before_registry",
+        "after_registry_publish_before_phase",
+    ] {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+        let open_dir = temp.path().join("main-open");
+        init_repo(&repo_root, false).unwrap();
+        open_branch_from(
+            &repo_root,
+            &OpenOptions {
+                branch: "main".to_string(),
+                path: open_dir.clone(),
+                dry_run: false,
+                json_output: false,
+                lock: LockOptions::default(),
+                idempotency_key: None,
+            },
+        )
+        .unwrap();
+        fs::write(
+            open_dir.join("README.md"),
+            format!("publication window {failpoint}\n"),
+        )
+        .unwrap();
+
+        let active = active_state_path(&open_dir);
+        let marker_path = active.join("commit_transaction.json");
+        set_commit_transaction_failure_for_test(&active, failpoint);
+        let options = CommitOptions {
+            path: open_dir,
+            message: format!("Recover {failpoint}"),
+            dry_run: false,
+            full_output: false,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+            signer: None,
+            key_id: None,
+        };
+
+        let error = run_commit(&options).unwrap_err();
+        assert!(error.to_string().contains(failpoint));
+        let marker = read_json(&marker_path).unwrap();
+        assert_eq!(marker["phase"], "publishing_branch");
+        let candidate = marker["candidate_commit"]["object_id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let recovered = run_commit(&options).unwrap();
+        assert_eq!(recovered.commit_id, candidate, "{failpoint}");
+        assert!(!marker_path.exists(), "{failpoint}");
+        assert_eq!(
+            required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap(),
+            candidate,
+            "{failpoint}"
+        );
+        assert_eq!(
+            required_string(
+                &read_json(&opened_registry_path(&repo_root, "main")).unwrap(),
+                &["open", "current_base_commit"]
+            )
+            .unwrap(),
+            candidate,
+            "{failpoint}"
+        );
+        assert_eq!(
+            read_json(&active.join("state.json")).unwrap()["state"],
+            "open-clean",
+            "{failpoint}"
+        );
+    }
+}
+
+#[test]
+fn doctor_accepts_legacy_commit_transaction_object_id_lists() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let marker_path = active_state_path(&open_dir).join("commit_transaction.json");
+    write_json_atomic(
+        &marker_path,
+        &json!({
+            "version": 1,
+            "transaction_id": "legacy-transaction",
+            "status": "pending",
+            "phase": "stored_content_manifest",
+            "branch": "main",
+            "open_dir": open_dir,
+            "parents": [],
+            "message": "legacy marker",
+            "objects": ["CF-MANIFEST-legacy"],
+            "started_at": "2026-07-12T00:00:00Z",
+            "updated_at": "2026-07-12T00:00:00Z"
+        }),
+    )
+    .unwrap();
+
+    let doctor = run_doctor(&DoctorOptions {
+        start: repo_root,
+        quick: false,
+        json_output: true,
+    })
+    .unwrap();
+
+    let pending = doctor
+        .issues
+        .iter()
+        .find(|issue| issue.kind == "pending_commit_transaction")
+        .expect("legacy object-id lists must remain diagnosable");
+    assert_eq!(pending.path.as_deref(), Some(marker_path.as_path()));
+    assert!(pending
+        .message
+        .contains("1 stored object(s) and 0 planned object(s)"));
+    assert!(!doctor
+        .issues
+        .iter()
+        .any(|issue| issue.kind == "invalid_active_state_shape"));
+}
+
+#[test]
+fn doctor_rejects_a_stale_complete_commit_transaction_as_invalid_shape() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let marker_path = active_state_path(&open_dir).join("commit_transaction.json");
+    write_json_atomic(
+        &marker_path,
+        &json!({
+            "version": 1,
+            "transaction_id": "commit_tx_0123456789abcdef0123456789abcdef",
+            "status": "complete",
+            "phase": "started",
+            "branch": "main",
+            "open_dir": open_dir,
+            "parents": [],
+            "message": "stale complete marker",
+            "objects": [],
+            "started_at": "2026-07-12T00:00:00Z",
+            "updated_at": "2026-07-12T00:00:00Z"
+        }),
+    )
+    .unwrap();
+
+    let doctor = run_doctor(&DoctorOptions {
+        start: repo_root,
+        quick: false,
+        json_output: true,
+    })
+    .unwrap();
+    assert!(doctor.issues.iter().any(|issue| {
+        issue.kind == "invalid_active_state_shape"
+            && issue.path.as_deref() == Some(marker_path.as_path())
+            && issue.message.contains("status must be pending")
+    }));
+    assert!(!doctor
+        .issues
+        .iter()
+        .any(|issue| issue.kind == "pending_commit_transaction"));
+}
+
+#[cfg(unix)]
+#[test]
+fn doctor_bounded_transaction_readers_reject_fifo_and_oversize_without_blocking() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let active = active_state_path(&open_dir);
+    let commit_marker = active.join("commit_transaction.json");
+    let status = std::process::Command::new("mkfifo")
+        .arg(&commit_marker)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let started = Instant::now();
+    let doctor = run_doctor(&DoctorOptions {
+        start: repo_root.clone(),
+        quick: false,
+        json_output: true,
+    })
+    .unwrap();
+    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(doctor.issues.iter().any(|issue| {
+        issue.kind == "invalid_active_state_json"
+            && issue.path.as_deref() == Some(commit_marker.as_path())
+    }));
+
+    fs::remove_file(&commit_marker).unwrap();
+    let state_marker = active.join("state_transaction.json");
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&state_marker)
+        .unwrap();
+    file.set_len(STATE_TRANSACTION_BYTE_LIMIT + 1).unwrap();
+    drop(file);
+    let doctor = run_doctor(&DoctorOptions {
+        start: repo_root,
+        quick: false,
+        json_output: true,
+    })
+    .unwrap();
+    assert!(doctor.issues.iter().any(|issue| {
+        issue.kind == "invalid_active_state_json"
+            && issue.path.as_deref() == Some(state_marker.as_path())
+    }));
+}
+
+#[cfg(unix)]
+#[test]
+fn repository_json_reader_rejects_fifo_symlink_and_oversize_without_blocking() {
+    use std::os::unix::fs::symlink;
+
+    let temp = tempdir().unwrap();
+    let fifo = temp.path().join("control.fifo");
+    let status = std::process::Command::new("mkfifo")
+        .arg(&fifo)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let started = Instant::now();
+    assert!(matches!(read_json(&fifo), Err(CliError::Io(_))));
+    assert!(started.elapsed() < Duration::from_secs(1));
+
+    let outside = temp.path().join("outside.json");
+    fs::write(&outside, b"{}\n").unwrap();
+    let link = temp.path().join("control-link.json");
+    symlink(&outside, &link).unwrap();
+    assert!(matches!(read_json(&link), Err(CliError::Io(_))));
+    assert_eq!(fs::read(&outside).unwrap(), b"{}\n");
+
+    let oversized = temp.path().join("oversized.json");
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&oversized)
+        .unwrap();
+    file.set_len(REPOSITORY_JSON_BYTE_LIMIT + 1).unwrap();
+    drop(file);
+    assert!(matches!(read_json(&oversized), Err(CliError::Io(_))));
+    assert!(matches!(
+        read_optional_json(&oversized),
+        Err(CliError::Io(_))
+    ));
+}
+
+#[test]
+fn bounded_transaction_writer_rejects_before_publishing_a_final_marker() {
+    let temp = tempdir().unwrap();
+    let path = temp.path().join("commit_transaction.json");
+    let error = write_json_atomic_bounded(
+        &path,
+        &json!({"payload": "x".repeat(512)}),
+        128,
+        "commit transaction marker",
+    )
+    .unwrap_err();
+
+    assert!(matches!(error, CliError::InvalidRepository(_)));
+    assert!(error.to_string().contains("128-byte limit"));
+    assert!(!path.exists());
+    assert!(fs::read_dir(temp.path()).unwrap().next().is_none());
+}
+
+#[test]
+fn commit_transaction_predeclares_blob_root_and_branch_snapshot_store_gaps() {
+    for (label, failpoint, role, role_path, expected_phase) in [
+        (
+            "blob",
+            "after_manifest_blob_store_before_marker",
+            "manifest_blob",
+            Some("README.md"),
+            "storing_manifest_blobs",
+        ),
+        (
+            "root",
+            "after_root_store_before_marker",
+            "content_manifest",
+            None,
+            "storing_commit_roots",
+        ),
+        (
+            "branch-snapshot",
+            "after_branch_snapshot_store_before_marker",
+            "branch_snapshot",
+            None,
+            "storing_branch_snapshot",
+        ),
+    ] {
+        let temp = tempdir().unwrap();
+        let repo_root = temp.path().join("repo");
+        let open_dir = temp.path().join("main-open");
+        init_repo(&repo_root, false).unwrap();
+        open_branch_from(
+            &repo_root,
+            &OpenOptions {
+                branch: "main".to_string(),
+                path: open_dir.clone(),
+                dry_run: false,
+                json_output: false,
+                lock: LockOptions::default(),
+                idempotency_key: None,
+            },
+        )
+        .unwrap();
+        fs::write(open_dir.join("README.md"), format!("{label} gap\n")).unwrap();
+        let active = active_state_path(&open_dir);
+        let registry_path = opened_registry_path(&repo_root, "main");
+        let branch_head_before =
+            required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap();
+        let registry_base_before = required_string(
+            &read_json(&registry_path).unwrap(),
+            &["open", "current_base_commit"],
+        )
+        .unwrap();
+
+        set_commit_transaction_failure_for_test(&active, failpoint);
+        let error = run_commit(&CommitOptions {
+            path: open_dir,
+            message: format!("Exercise {label} store gap"),
+            dry_run: false,
+            full_output: false,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+            signer: None,
+            key_id: None,
+        })
+        .unwrap_err();
+        assert!(error.to_string().contains(failpoint), "{label}: {error}");
+
+        let transaction = read_json(&active.join("commit_transaction.json")).unwrap();
+        assert_eq!(transaction["phase"], expected_phase, "{label}");
+        let entry = commit_transaction_object_entry(&transaction, role, role_path);
+        assert_eq!(entry["state"], "planned", "{label}");
+        let object_id = entry["object_id"].as_str().unwrap();
+        assert!(
+            codefire_store::object_record_path(
+                &repo_root.join(".codefire").join("objects"),
+                object_id
+            )
+            .unwrap()
+            .exists(),
+            "{label} stored object must be discoverable from its planned marker id"
+        );
+        assert_eq!(
+            required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap(),
+            branch_head_before,
+            "{label}"
+        );
+        assert_eq!(
+            required_string(
+                &read_json(&registry_path).unwrap(),
+                &["open", "current_base_commit"]
+            )
+            .unwrap(),
+            registry_base_before,
+            "{label}"
+        );
+    }
+}
+
+#[test]
+fn commit_transaction_predeclares_candidate_before_object_storage_publication() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::write(open_dir.join("README.md"), "candidate store window\n").unwrap();
+
+    let active = active_state_path(&open_dir);
+    let registry_path = opened_registry_path(&repo_root, "main");
+    let branch_head_before =
+        required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap();
+    let registry_base_before = required_string(
+        &read_json(&registry_path).unwrap(),
+        &["open", "current_base_commit"],
+    )
+    .unwrap();
+    set_commit_transaction_failure_for_test(&active, "after_candidate_store_before_marker");
+    let error = run_commit(&CommitOptions {
+        path: open_dir,
+        message: "Candidate store window".to_string(),
+        dry_run: false,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("after_candidate_store_before_marker"));
+
+    let transaction = read_json(&active.join("commit_transaction.json")).unwrap();
+    assert_eq!(transaction["phase"], "storing_candidate_commit");
+    assert_eq!(transaction["candidate_commit"]["state"], "planned");
+    let candidate_id = transaction["candidate_commit"]["object_id"]
+        .as_str()
+        .unwrap();
+    assert!(candidate_id.starts_with("CF-COMMIT-"));
+    assert_eq!(commit_transaction_state_counts(&transaction), (8, 2));
+    let candidate_entry = commit_transaction_object_entry(&transaction, "candidate_commit", None);
+    assert_eq!(candidate_entry["object_id"], candidate_id);
+    assert_eq!(candidate_entry["state"], "planned");
+    let objects = repo_root.join(".codefire").join("objects");
+    assert!(codefire_store::object_record_path(&objects, candidate_id)
+        .unwrap()
+        .exists());
+    assert_eq!(
+        required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap(),
+        branch_head_before
+    );
+    assert_eq!(
+        required_string(
+            &read_json(&registry_path).unwrap(),
+            &["open", "current_base_commit"]
+        )
+        .unwrap(),
+        registry_base_before
+    );
+}
+
+#[test]
+fn commit_candidate_validation_rejects_corruption_before_publishing_branch_state() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::write(open_dir.join("README.md"), "candidate validation\n").unwrap();
+
+    let active = active_state_path(&open_dir);
+    let branch_head_before =
+        required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap();
+    let registry_path = opened_registry_path(&repo_root, "main");
+    let registry_base_before = required_string(
+        &read_json(&registry_path).unwrap(),
+        &["open", "current_base_commit"],
+    )
+    .unwrap();
+
+    for (label, corruption) in [
+        (
+            "invalid-certificate",
+            CommitCandidateCorruptionKind::InvalidCertificate,
+        ),
+        ("missing-root", CommitCandidateCorruptionKind::MissingRoot),
+        (
+            "wrong-root-type",
+            CommitCandidateCorruptionKind::WrongRootType,
+        ),
+        (
+            "invalid-parent",
+            CommitCandidateCorruptionKind::InvalidParent,
+        ),
+    ] {
+        let transaction_path = active.join("commit_transaction.json");
+        if transaction_path.exists() {
+            fs::remove_file(&transaction_path).unwrap();
+        }
+        set_commit_candidate_corruption_for_test(&active, corruption);
+        let error = run_commit(&CommitOptions {
+            path: open_dir.clone(),
+            message: format!("Corrupted candidate {label}"),
+            dry_run: false,
+            full_output: false,
+            json_output: true,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+            signer: None,
+            key_id: None,
+        })
+        .unwrap_err();
+
+        assert!(matches!(
+            &error,
+            CliError::StoreContext { error, .. }
+                if matches!(error.as_ref(), codefire_store::StoreError::InvalidSealedCommit(_))
+        ));
+        let transaction = read_json(&transaction_path).unwrap();
+        assert_eq!(transaction["status"], "pending", "{label}");
+        assert_eq!(
+            transaction["phase"], "validating_candidate_commit",
+            "{label}"
+        );
+        assert_eq!(commit_transaction_state_counts(&transaction), (9, 1));
+        let candidate_entry =
+            commit_transaction_object_entry(&transaction, "candidate_commit", None);
+        assert_eq!(candidate_entry["state"], "stored");
+        let candidate_commit_id = candidate_entry["object_id"].as_str().unwrap();
+        assert!(candidate_commit_id.starts_with("CF-COMMIT-"));
+        assert!(codefire_store::object_record_path(
+            &repo_root.join(".codefire").join("objects"),
+            candidate_commit_id
+        )
+        .unwrap()
+        .exists());
+        assert_eq!(
+            required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap(),
+            branch_head_before,
+            "{label}"
+        );
+        assert_eq!(
+            required_string(
+                &read_json(&registry_path).unwrap(),
+                &["open", "current_base_commit"]
+            )
+            .unwrap(),
+            registry_base_before,
+            "{label}"
+        );
+        let envelope = cli_error_envelope("commit", &error);
+        assert_eq!(envelope["repo"], repo_root.to_string_lossy().as_ref());
+        assert!(envelope["diagnostics"][0]["path"].is_string());
+        assert_eq!(envelope["diagnostics"][0]["kind"], "sealed_commit_invalid");
+        assert_eq!(envelope["next_actions"][0]["kind"], "doctor");
+        assert_eq!(
+            envelope["next_actions"][1]["kind"],
+            "inspect_pending_commit_transaction"
+        );
+    }
+}
+
+#[test]
+fn required_commit_signature_without_key_is_prepublication_and_diagnosable() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::write(open_dir.join("README.md"), "signature boundary\n").unwrap();
+    fs::write(
+        open_dir.join("codefire.policy.yaml"),
+        "commit_policy:\n  require_commit_signature: true\n",
+    )
+    .unwrap();
+
+    let active = active_state_path(&open_dir);
+    let registry_path = opened_registry_path(&repo_root, "main");
+    let branch_head_before =
+        required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap();
+    let registry_base_before = required_string(
+        &read_json(&registry_path).unwrap(),
+        &["open", "current_base_commit"],
+    )
+    .unwrap();
+    let commit_objects_path = repo_root.join(".codefire").join("objects").join("commits");
+    let commit_objects_before = fs::read_dir(&commit_objects_path)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect::<BTreeSet<_>>();
+
+    let commit_options = CommitOptions {
+        path: open_dir,
+        message: "Unsigned candidate must not publish".to_string(),
+        dry_run: false,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    };
+    let signing_key_override = signatures::override_commit_signing_key_for_test(None);
+    let error = run_commit(&commit_options).unwrap_err();
+
+    assert!(matches!(
+        &error,
+        CliError::Usage(message)
+            if message == "commit blocked: commit signature is required but CODEFIRE_SIGNING_KEY is not set"
+    ));
+    let transaction_path = active.join("commit_transaction.json");
+    let transaction = read_json(&transaction_path).unwrap();
+    assert_eq!(transaction["status"], "pending");
+    assert_eq!(transaction["phase"], "started");
+    assert!(transaction["objects"].as_array().unwrap().is_empty());
+    assert!(transaction.get("candidate_commit").is_none());
+    assert_eq!(
+        fs::read_dir(&commit_objects_path)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect::<BTreeSet<_>>(),
+        commit_objects_before
+    );
+    assert_eq!(
+        required_string(&load_branch_record(&repo_root, "main").unwrap(), &["head"]).unwrap(),
+        branch_head_before
+    );
+    assert_eq!(
+        required_string(
+            &read_json(&registry_path).unwrap(),
+            &["open", "current_base_commit"]
+        )
+        .unwrap(),
+        registry_base_before
+    );
+
+    let preview_error = run_commit(&CommitOptions {
+        path: commit_options.path.clone(),
+        message: commit_options.message.clone(),
+        dry_run: true,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap_err();
+    assert!(matches!(
+        preview_error,
+        CliError::OpenRecoveryPending(pending)
+            if pending.operation == "commit" && pending.phase == "started"
+    ));
+    assert_eq!(read_json(&transaction_path).unwrap(), transaction);
+
+    let doctor = run_doctor(&DoctorOptions {
+        start: repo_root.clone(),
+        quick: false,
+        json_output: true,
+    })
+    .unwrap();
+    let pending = doctor
+        .issues
+        .iter()
+        .find(|issue| issue.kind == "pending_commit_transaction")
+        .expect("missing required signature must leave a diagnosable transaction");
+    assert_eq!(pending.path.as_deref(), Some(transaction_path.as_path()));
+    assert!(pending
+        .message
+        .contains("pending at phase started with 0 stored object(s)"));
+
+    let transaction_id = transaction["transaction_id"].as_str().unwrap();
+    drop(signing_key_override);
+    let _signing_key_override =
+        signatures::override_commit_signing_key_for_test(Some("recovered-signing-key"));
+    let committed = run_commit(&commit_options).unwrap();
+    assert!(!committed.commit_id.is_empty());
+    assert!(!transaction_path.exists());
+    let archive_path = active.join(format!("commit_transaction.aborted.{transaction_id}.json"));
+    let archive = read_json(&archive_path).unwrap();
+    assert_eq!(archive["status"], "aborted");
+    assert_eq!(archive["recovery"]["action"], "aborted_before_publication");
+    assert_eq!(archive["recovery"]["phase"], "started");
+}
+
+#[test]
+fn commit_loads_open_registry_after_lock_acquisition_and_uses_the_locked_base() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let open_dir = temp.path().join("main-open");
+    init_repo(&repo_root, false).unwrap();
+    open_branch_from(
+        &repo_root,
+        &OpenOptions {
+            branch: "main".to_string(),
+            path: open_dir.clone(),
+            dry_run: false,
+            json_output: false,
+            lock: LockOptions::default(),
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    fs::write(open_dir.join("README.md"), "locked snapshot\n").unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let locked_base = write_file_commit(&objects, "LOCKED_BASE.md", "locked base\n");
+    let registry_path = opened_registry_path(&repo_root, "main");
+    set_locked_open_context_mutation_for_test(&open_dir, &registry_path, &locked_base);
+
+    let committed = run_commit(&CommitOptions {
+        path: open_dir,
+        message: "Use locked snapshot".to_string(),
+        dry_run: false,
+        full_output: false,
+        json_output: true,
+        lock: LockOptions::default(),
+        idempotency_key: None,
+        signer: None,
+        key_id: None,
+    })
+    .unwrap();
+
+    let candidate = codefire_store::read_object(&objects, &committed.commit_id).unwrap();
+    assert_eq!(candidate["parents"], json!([locked_base]));
+    assert_eq!(
+        required_string(
+            &read_json(&registry_path).unwrap(),
+            &["open", "current_base_commit"]
+        )
+        .unwrap(),
+        committed.commit_id
+    );
 }
 
 #[test]
@@ -3744,7 +7580,7 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
     )
     .unwrap();
 
-    let fire = compute_scan(&open_dir, false)
+    let fire = compute_scan(&open_dir)
         .unwrap()
         .scan
         .open_fires
@@ -3817,7 +7653,7 @@ fn extinguish_idempotency_key_replays_same_payload_and_rejects_conflict() {
     )
     .unwrap();
 
-    let fire = compute_scan(&open_dir, false)
+    let fire = compute_scan(&open_dir)
         .unwrap()
         .scan
         .open_fires
@@ -3918,7 +7754,7 @@ fn extinguish_batch_validates_all_items_before_writing_ledgers() {
         "links:\n  - from: REQ-session\n    to: DES-session\n    type: refined_by\n",
     )
     .unwrap();
-    let scan = compute_scan(&open_dir, false).unwrap().scan;
+    let scan = compute_scan(&open_dir).unwrap().scan;
     let first_fire = scan.open_fires.first().unwrap().display_id.clone();
     let second_fire = scan.open_fires.get(1).unwrap().display_id.clone();
     fs::write(
@@ -4248,7 +8084,7 @@ fn extinguish_batch_template_generates_batch_wrapper_from_open_fires() {
         .contains("extinguish --batch"));
     assert!(output.exists());
 
-    let scan = compute_scan(&open_dir, false).unwrap().scan;
+    let scan = compute_scan(&open_dir).unwrap().scan;
     let actions = scan_next_actions(&scan, Some(&open_dir));
     assert!(actions
         .iter()
@@ -4384,15 +8220,12 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
     let blob_id = codefire_store::store_object(
         &repo_root.join(".codefire").join("objects"),
         "blob",
-        json!({"path": "large.bin", "content": "x".repeat(512)}),
+        json!({"type": "payload_blob", "path": "large.bin", "content": "x".repeat(512)}),
     )
     .unwrap();
     let blob_path =
         codefire_store::object_record_path(&repo_root.join(".codefire").join("objects"), &blob_id)
             .unwrap();
-    let mut blob_record = read_json(&blob_path).unwrap();
-    blob_record["payload"]["type"] = Value::String("payload_blob".to_string());
-    write_json_atomic(&blob_path, &blob_record).unwrap();
 
     let parsed = parse_storage_report_args(&[
         repo_root.to_string_lossy().into_owned(),
@@ -4487,6 +8320,17 @@ fn storage_report_counts_objects_by_type_and_warns_large_objects() {
         .warnings
         .iter()
         .all(|warning| warning.kind != "payload_type_mismatch"));
+
+    let mut corrupted_blob = read_json(&blob_path).unwrap();
+    corrupted_blob["hash"] = Value::String("f".repeat(64));
+    write_json_atomic(&blob_path, &corrupted_blob).unwrap();
+    let corrupted = run_storage_report(&parsed).unwrap();
+    assert!(corrupted
+        .warnings
+        .iter()
+        .any(|warning| warning.kind == "object_integrity_error"
+            && warning.path.as_ref() == Some(&blob_path)));
+    assert_eq!(corrupted.object_scan.invalid_records, 1);
 }
 
 #[test]
@@ -4518,14 +8362,20 @@ fn storage_report_counts_file_remote_project_storage() {
         &json!({"current_generation": 7}),
     )
     .unwrap();
-    fs::write(
-        dirs.objects.join("object.json"),
-        serde_json::to_string_pretty(&json!({
-            "remote": {"last_seen_generation": 7}
-        }))
-        .unwrap(),
+    let generated_object = codefire_store::store_object(
+        &dirs.objects,
+        "blob",
+        json!({"path": "generated.bin", "content": "generated"}),
     )
     .unwrap();
+    let generated_object_path =
+        codefire_store::object_record_path(&dirs.objects, &generated_object).unwrap();
+    let mut generated_record = read_json(&generated_object_path).unwrap();
+    generated_record["remote"] = json!({
+        "first_seen_generation": 7,
+        "last_seen_generation": 7,
+    });
+    write_json_atomic(&generated_object_path, &generated_record).unwrap();
     fs::write(dirs.branches.join("main.json"), "{}\n").unwrap();
     fs::write(dirs.merge_requests.join("mr_1.json"), "{}\n").unwrap();
     write_json_atomic(
@@ -4633,6 +8483,30 @@ fn storage_report_counts_file_remote_project_storage() {
         data["remotes"][0]["objects_by_generation"][0]["generation"],
         7
     );
+
+    let oversized_remote_object = dirs.objects.join("blobs").join("CF-BLOB-oversized.json");
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&oversized_remote_object)
+        .unwrap();
+    file.set_len(codefire_store::MAX_OBJECT_RECORD_BYTES + 1)
+        .unwrap();
+    drop(file);
+    let oversized = run_storage_report(&parsed).unwrap();
+    let warning = oversized
+        .warnings
+        .iter()
+        .find(|warning| {
+            warning.kind == "invalid_remote_object_record"
+                && warning.path.as_ref() == Some(&oversized_remote_object)
+        })
+        .expect("remote generation scan must diagnose oversized object records");
+    assert!(warning.message.contains("object record exceeds"));
+    assert_eq!(
+        warning.bytes,
+        Some(codefire_store::MAX_OBJECT_RECORD_BYTES + 1)
+    );
 }
 
 #[test]
@@ -4665,10 +8539,7 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
     assert_eq!(result.command_exit_code, Some(0));
     assert!(!result.command_timed_out);
     assert_eq!(data["command_cwd_source"], "caller_cwd");
-    assert_eq!(
-        data["command_cwd"].as_str(),
-        Some(std::env::current_dir().unwrap().to_string_lossy().as_ref())
-    );
+    assert_eq!(data["command_cwd"].as_str(), Some("<redacted>"));
     assert_eq!(data["type"], "codefire_evidence_add_result");
     assert_eq!(data["dry_run"], false);
     assert_eq!(data["created"], true);
@@ -4718,10 +8589,18 @@ fn evidence_add_records_artifact_ref_and_command_capture() {
     assert_eq!(evidence["command"]["shell"], true);
     assert_eq!(evidence["command"]["timed_out"], false);
     assert_eq!(evidence["command"]["timeout_ms"], 300000);
+    assert_eq!(evidence["command"]["cwd"].as_str(), Some("<redacted>"));
+    assert_eq!(evidence["command"]["cwd_kind"], "external_redacted");
+    assert_eq!(evidence["command"]["profile"], "local_evidence_command_v1");
+    assert_eq!(evidence["command"]["trust_kind"], "local_unisolated");
     assert_eq!(
-        evidence["command"]["cwd"].as_str(),
-        Some(std::env::current_dir().unwrap().to_string_lossy().as_ref())
+        evidence["command"]["environment_policy"],
+        "minimal_allowlist"
     );
+    assert!(evidence["command"]["subject"]["subject_digest"]
+        .as_str()
+        .unwrap()
+        .starts_with("sha256:"));
     assert_eq!(evidence["command"]["stdout"], "ok");
     assert_eq!(evidence["command"]["stdout_truncated"], true);
     assert!(!objects
@@ -4954,8 +8833,8 @@ fn evidence_batch_validates_all_items_before_writing_objects() {
             "version": 1,
             "defaults": {"label": "batch-smoke", "max_output_bytes": 2},
             "items": [
-                {"artifact": artifact_path, "artifact_uri": "artifact://model.bin"},
-                {"from_command": "printf okay", "label": "command-smoke"},
+                {"artifact": artifact_path, "artifact_uri": "https://user:uri-password@example.test/model?token=uri-query-secret"},
+                {"from_command": "printf API_TOKEN=batch-secret", "label": "command-smoke"},
                 {"from_argv": ["printf", "%s", "argv-okay"], "label": "argv-smoke"}
             ]
         }))
@@ -4994,6 +8873,11 @@ fn evidence_batch_validates_all_items_before_writing_objects() {
     assert_eq!(dry_run_data["type"], "codefire_evidence_batch_result");
     assert_eq!(dry_run_data["dry_run"], true);
     assert_eq!(dry_run_data["plan"]["command"], "evidence-add-batch");
+    let dry_run_serialized = serde_json::to_string(&dry_run_data).unwrap();
+    assert!(!dry_run_serialized.contains("uri-password"));
+    assert!(!dry_run_serialized.contains("uri-query-secret"));
+    assert!(!dry_run_serialized.contains("batch-secret"));
+    assert!(!dry_run_serialized.contains(&temp.path().to_string_lossy().to_string()));
     let objects = repo_root.join(".codefire").join("objects");
     assert_eq!(fs::read_dir(objects.join("evidence")).unwrap().count(), 0);
     assert_eq!(
@@ -5027,6 +8911,15 @@ fn evidence_batch_validates_all_items_before_writing_objects() {
         fs::read_dir(objects.join("artifact_refs")).unwrap().count(),
         1
     );
+    let artifact_ref = codefire_store::read_object(
+        &objects,
+        applied.results[0].artifact_ref_id.as_ref().unwrap(),
+    )
+    .unwrap();
+    let artifact_serialized = serde_json::to_string(&artifact_ref).unwrap();
+    assert!(!artifact_serialized.contains("uri-password"));
+    assert!(!artifact_serialized.contains("uri-query-secret"));
+    assert_eq!(artifact_ref["uri_secret_redacted"], true);
 
     let before_invalid_evidence_count = fs::read_dir(objects.join("evidence")).unwrap().count();
     let invalid = run_evidence_batch(&evidence::EvidenceAddOptions {
@@ -5288,6 +9181,119 @@ fn remote_object_graph_copies_resolution_evidence_refs() {
 }
 
 #[test]
+fn remote_object_record_import_rejects_a_corrupt_existing_same_public_id_record() {
+    let temp = tempdir().unwrap();
+    let source_objects = temp.path().join("source-objects");
+    let destination_objects = temp.path().join("destination-objects");
+    let object_id = codefire_store::store_object(
+        &source_objects,
+        "blob",
+        json!({
+            "type": "blob",
+            "version": 1,
+            "encoding": "base64",
+            "content": "c2FmZQ==",
+        }),
+    )
+    .unwrap();
+    let requested = codefire_store::read_object_record(&source_objects, &object_id).unwrap();
+    let destination_path = destination_objects
+        .join("blobs")
+        .join(format!("{object_id}.json"));
+    fs::create_dir_all(destination_path.parent().unwrap()).unwrap();
+    let conflicting = codefire_store::ObjectRecord {
+        object_id: object_id.clone(),
+        type_tag: requested.type_tag.clone(),
+        hash: format!("sha256:{}", "f".repeat(64)),
+        payload: json!({
+            "type": "blob",
+            "version": 1,
+            "encoding": "base64",
+            "content": "Y29uZmxpY3Q=",
+        }),
+    };
+    let conflicting_bytes = serde_json::to_vec_pretty(&conflicting).unwrap();
+    fs::write(&destination_path, &conflicting_bytes).unwrap();
+
+    let error = crate::remote::write_object_records(
+        &destination_objects,
+        [serde_json::to_value(requested).unwrap()],
+    )
+    .unwrap_err();
+    assert!(matches!(error, CliError::Store(_)));
+    assert_eq!(fs::read(&destination_path).unwrap(), conflicting_bytes);
+}
+
+#[test]
+fn remote_object_transfer_preserves_noncritical_extension_document() {
+    let temp = tempdir().unwrap();
+    let source_objects = temp.path().join("source-objects");
+    let destination_objects = temp.path().join("destination-objects");
+    let record = codefire_store::object_record(
+        "policy",
+        json!({"type": "policy", "version": 1, "policy": {"portable": true}}),
+    )
+    .unwrap();
+    let mut value = serde_json::to_value(&record).unwrap();
+    value["extensions"] = json!([{
+        "namespace": "example.test",
+        "name": "annotation",
+        "version": 1,
+        "critical": false,
+        "references": [],
+        "payload": {"label": "preserved"}
+    }]);
+    crate::remote::write_object_records(&source_objects, [value]).unwrap();
+    let source_path =
+        codefire_store::object_record_path(&source_objects, &record.object_id).unwrap();
+    let transferred = codefire_store::object_record_document_value(
+        &codefire_store::read_object_record_document_path(&source_path).unwrap(),
+    )
+    .unwrap();
+
+    crate::remote::write_object_records(&destination_objects, [transferred.clone()]).unwrap();
+
+    let destination_path =
+        codefire_store::object_record_path(&destination_objects, &record.object_id).unwrap();
+    let stored = codefire_store::object_record_document_value(
+        &codefire_store::read_object_record_document_path(&destination_path).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(stored, transferred);
+}
+
+#[test]
+fn remote_object_graph_traverses_noncritical_extension_references() {
+    let temp = tempdir().unwrap();
+    let objects = temp.path().join("objects");
+    let blob_id = codefire_store::store_object(
+        &objects,
+        "blob",
+        json!({"type": "blob", "version": 1, "encoding": "base64", "content": "eA=="}),
+    )
+    .unwrap();
+    let policy = codefire_store::object_record(
+        "policy",
+        json!({"type": "policy", "version": 1, "policy": {"portable": true}}),
+    )
+    .unwrap();
+    let mut value = serde_json::to_value(&policy).unwrap();
+    value["extensions"] = json!([{
+        "namespace": "example.test",
+        "name": "attachment",
+        "version": 1,
+        "critical": false,
+        "references": [&blob_id]
+    }]);
+    crate::remote::write_object_records(&objects, [value]).unwrap();
+
+    let records = crate::remote::collect_object_records(&objects, &policy.object_id).unwrap();
+
+    assert_eq!(records.len(), 2);
+    assert!(records.iter().any(|record| record["object_id"] == blob_id));
+}
+
+#[test]
 fn explain_fire_atom_verify_and_storage_targets_return_actions() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
@@ -5326,7 +9332,7 @@ fn explain_fire_atom_verify_and_storage_targets_return_actions() {
     )
     .unwrap();
 
-    let fire_id = compute_scan(&open_dir, false)
+    let fire_id = compute_scan(&open_dir)
         .unwrap()
         .scan
         .open_fires
@@ -5630,6 +9636,13 @@ fn review_pack_exports_file_atom_verification_and_next_actions() {
     );
     assert!(json["semantic_diff"]["trace"].is_object());
     assert!(json["verification"]["source"].is_object());
+    assert_eq!(json["subject"]["kind"], "sealed_commit_pair");
+    assert_eq!(json["subject"]["trust_kind"], "sealed_validated");
+    assert_eq!(json["subject"]["immutable"], true);
+    assert!(json["subject"]["subject_digest"]
+        .as_str()
+        .unwrap()
+        .starts_with("sha256:"));
     assert!(json["next_actions"].is_array());
 
     let result = review_pack_result_data(Some(&PathBuf::from("review-pack.json")), &pack).unwrap();
@@ -5867,6 +9880,70 @@ fn patch_export_import_applies_manifest_delta_to_open_directory() {
     assert_eq!(read_status(&open_dir).unwrap().state, "open-burning");
 }
 
+#[cfg(unix)]
+#[test]
+fn merge_and_patch_apply_do_not_follow_worktree_symlinks_outside() {
+    let temp = tempdir().unwrap();
+    let open_dir = temp.path().join("open");
+    let outside = temp.path().join("outside");
+    fs::create_dir_all(&open_dir).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(outside.join("victim.txt"), b"outside\n").unwrap();
+
+    let worktree = ExistingWorktree::bind(&open_dir).unwrap();
+    std::os::unix::fs::symlink(&outside, open_dir.join("escape")).unwrap();
+
+    let patch_write = json!({
+        "path": "escape/patch.txt",
+        "action": "write",
+        "encoding": "base64",
+        "content": "cGF0Y2gK"
+    });
+    assert!(apply_patch_entry(&worktree, &patch_write).is_err());
+    assert!(!outside.join("patch.txt").exists());
+
+    let patch_delete = json!({
+        "path": "escape/victim.txt",
+        "action": "delete"
+    });
+    assert!(apply_patch_entry(&worktree, &patch_delete).is_err());
+    assert_eq!(
+        fs::read_to_string(outside.join("victim.txt")).unwrap(),
+        "outside\n"
+    );
+
+    assert!(write_merged_file(&worktree, "escape/merge.txt", Some(b"merge\n")).is_err());
+    assert!(!outside.join("merge.txt").exists());
+    assert!(write_merged_file(&worktree, "escape/victim.txt", None).is_err());
+    assert_eq!(
+        fs::read_to_string(outside.join("victim.txt")).unwrap(),
+        "outside\n"
+    );
+
+    std::os::unix::fs::symlink(outside.join("victim.txt"), open_dir.join("replace-link")).unwrap();
+    write_merged_file(&worktree, "replace-link", Some(b"inside\n")).unwrap();
+    assert!(!fs::symlink_metadata(open_dir.join("replace-link"))
+        .unwrap()
+        .file_type()
+        .is_symlink());
+    assert_eq!(
+        fs::read_to_string(open_dir.join("replace-link")).unwrap(),
+        "inside\n"
+    );
+    assert_eq!(
+        fs::read_to_string(outside.join("victim.txt")).unwrap(),
+        "outside\n"
+    );
+
+    std::os::unix::fs::symlink(outside.join("victim.txt"), open_dir.join("delete-link")).unwrap();
+    write_merged_file(&worktree, "delete-link", None).unwrap();
+    assert!(!open_dir.join("delete-link").exists());
+    assert_eq!(
+        fs::read_to_string(outside.join("victim.txt")).unwrap(),
+        "outside\n"
+    );
+}
+
 #[test]
 fn patch_import_idempotency_replays_same_payload_and_rejects_conflict() {
     let temp = tempdir().unwrap();
@@ -6072,7 +10149,16 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         branches[0].head,
         load_branch_record(&repo_root, "main").unwrap()["head"]
     );
-    let remote_list = remote_branch_list_data_json(&project_url, &branches);
+    let remote_page = paginate(
+        &format!("remote-branches:{project_url}"),
+        branches
+            .iter()
+            .map(|branch| json!({"name": branch.name, "head": branch.head}))
+            .collect(),
+        &PageRequest::default(),
+    )
+    .unwrap();
+    let remote_list = remote_branch_list_data_json(&project_url, &remote_page);
     assert_eq!(remote_list["type"], "codefire_remote_branch_list");
     assert_eq!(remote_list["project_url"], project_url);
     assert_eq!(remote_list["branches"][0]["name"], "main");
@@ -6080,7 +10166,11 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
     let remote_main_path = remote::remote_branch_path(&remote_project_root, "main");
     let mut remote_main = read_json(&remote_main_path).unwrap();
     remote_main["state"] = Value::String("open-consistent".to_string());
-    write_json_atomic(&remote_main_path, &remote_main).unwrap();
+    fs::write(
+        &remote_main_path,
+        codefire_store::canonical_json(&remote_main).unwrap(),
+    )
+    .unwrap();
     let remote_state_error = clone_branch(
         &clone_repo,
         &CloneOptions {
@@ -6097,7 +10187,11 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
         .to_string()
         .contains("commit or close the source branch first"));
     remote_main["state"] = Value::String("closed".to_string());
-    write_json_atomic(&remote_main_path, &remote_main).unwrap();
+    fs::write(
+        &remote_main_path,
+        codefire_store::canonical_json(&remote_main).unwrap(),
+    )
+    .unwrap();
 
     clone_branch(
         &clone_repo,
@@ -6168,7 +10262,23 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
     assert!(mr.id.starts_with("MR-"));
     let listed = list_merge_requests(&project_url).unwrap();
     assert_eq!(listed[0].status, "open");
-    let request_list = merge_request_list_data_json(&project_url, &listed);
+    let request_page = paginate(
+        &format!("merge-requests:{project_url}"),
+        listed
+            .iter()
+            .map(|request| {
+                json!({
+                    "id": request.id,
+                    "status": request.status,
+                    "source_url": request.source_url,
+                    "target_url": request.target_url,
+                })
+            })
+            .collect(),
+        &PageRequest::default(),
+    )
+    .unwrap();
+    let request_list = merge_request_list_data_json(&project_url, &request_page);
     assert_eq!(request_list["type"], "codefire_merge_request_list");
     assert_eq!(request_list["project_url"], project_url);
     assert_eq!(request_list["merge_requests"][0]["status"], "open");
@@ -6262,6 +10372,226 @@ fn file_remote_upload_clone_show_diff_and_merge_request_flow() {
 }
 
 #[test]
+fn merge_request_target_escrow_survives_source_project_removal() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let server = temp.path().join("server");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let main_commit = write_file_commit(&objects, "docs/readme.md", "base\n");
+    let feature_commit = write_file_commit_with_parents(
+        &objects,
+        "docs/readme.md",
+        "feature\n",
+        vec![main_commit.clone()],
+    );
+    for (name, head) in [("main", &main_commit), ("feature", &feature_commit)] {
+        save_branch_record(
+            &repo_root,
+            &json!({
+                "type": "branch",
+                "version": 1,
+                "name": name,
+                "head": head,
+                "state": "closed",
+                "created_at": "2026-07-19T00:00:00Z"
+            }),
+        )
+        .unwrap();
+    }
+    let target_project_url = format!("cf://{}/org/target", server.display());
+    let source_project_url = format!("cf://{}/org/source", server.display());
+    let target_url = format!("{target_project_url}/main");
+    let source_url = format!("{source_project_url}/feature");
+    for (branch, remote_url) in [("main", &target_url), ("feature", &source_url)] {
+        upload_branch(
+            &repo_root,
+            &UploadOptions {
+                branch: branch.to_string(),
+                remote_url: remote_url.clone(),
+                dry_run: false,
+                json_output: false,
+                idempotency_key: None,
+                request_key_id: None,
+                lock: LockOptions::default(),
+            },
+        )
+        .unwrap();
+    }
+    let source_project_root = parse_cf_url(&source_url).unwrap().project_root;
+    let merge = request_merge(&RequestMergeOptions {
+        source_url: source_url.clone(),
+        target_url: target_url.clone(),
+        dry_run: false,
+        json_output: false,
+        idempotency_key: None,
+        request_key_id: None,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    let target_project_root = parse_cf_url(&format!("{target_project_url}/main"))
+        .unwrap()
+        .project_root;
+    let mr_path = remote::remote_merge_request_path(&target_project_root, &merge.id);
+    let mut legacy_mr = read_json(&mr_path).unwrap();
+    legacy_mr.as_object_mut().unwrap().remove("subject");
+    legacy_mr.as_object_mut().unwrap().remove("subject_digest");
+    legacy_mr["status"] = json!("approved");
+    legacy_mr["reviews"] = json!([{
+        "reviewer": "legacy",
+        "decision": "approve",
+        "comment": "unbound legacy approval",
+        "reviewed_at": "2026-07-18T00:00:00Z",
+    }]);
+    fs::write(
+        &mr_path,
+        codefire_store::canonical_json(&legacy_mr).unwrap(),
+    )
+    .unwrap();
+    let list_error = list_merge_requests(&target_project_url).unwrap_err();
+    assert!(list_error
+        .to_string()
+        .contains("legacy cross-project merge request"));
+    review_merge_request(&RequestReviewOptions {
+        project_url: target_project_url.clone(),
+        mr_id: merge.id.clone(),
+        reviewer: "alice".to_string(),
+        decision: "approve".to_string(),
+        comment: "target-local escrow".to_string(),
+        dry_run: false,
+        json_output: false,
+        idempotency_key: None,
+        request_key_id: None,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    let materialized = read_json(&mr_path).unwrap();
+    assert!(materialized.get("subject").is_some());
+    assert!(materialized.get("legacy_review_history").is_some());
+    for malformed_subject in [Value::Null, json!("not-an-object")] {
+        let mut malformed = materialized.clone();
+        malformed["subject"] = malformed_subject;
+        fs::write(
+            &mr_path,
+            codefire_store::canonical_json(&malformed).unwrap(),
+        )
+        .unwrap();
+        let before = fs::read(&mr_path).unwrap();
+        let error = review_merge_request(&RequestReviewOptions {
+            project_url: target_project_url.clone(),
+            mr_id: merge.id.clone(),
+            reviewer: "mallory".to_string(),
+            decision: "approve".to_string(),
+            comment: String::new(),
+            dry_run: false,
+            json_output: false,
+            idempotency_key: None,
+            request_key_id: None,
+            lock: LockOptions::default(),
+        })
+        .unwrap_err();
+        assert!(error.to_string().contains("merge request subject"));
+        assert_eq!(fs::read(&mr_path).unwrap(), before);
+    }
+    fs::write(
+        &mr_path,
+        codefire_store::canonical_json(&materialized).unwrap(),
+    )
+    .unwrap();
+    let escrow_target_url = format!("{target_project_url}/escrow-main");
+    upload_branch(
+        &repo_root,
+        &UploadOptions {
+            branch: "main".to_string(),
+            remote_url: escrow_target_url.clone(),
+            dry_run: false,
+            json_output: false,
+            idempotency_key: None,
+            request_key_id: None,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap();
+    let escrow_merge = request_merge(&RequestMergeOptions {
+        source_url,
+        target_url: escrow_target_url,
+        dry_run: false,
+        json_output: false,
+        idempotency_key: None,
+        request_key_id: None,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    fs::remove_dir_all(source_project_root).unwrap();
+    review_merge_request(&RequestReviewOptions {
+        project_url: target_project_url.clone(),
+        mr_id: escrow_merge.id.clone(),
+        reviewer: "alice".to_string(),
+        decision: "approve".to_string(),
+        comment: "source project already removed".to_string(),
+        dry_run: false,
+        json_output: false,
+        idempotency_key: None,
+        request_key_id: None,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    apply_merge_request(&RequestApplyOptions {
+        project_url: target_project_url.clone(),
+        mr_id: escrow_merge.id,
+        dry_run: false,
+        json_output: false,
+        idempotency_key: None,
+        request_key_id: None,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    let applied = apply_merge_request(&RequestApplyOptions {
+        project_url: target_project_url,
+        mr_id: merge.id,
+        dry_run: false,
+        json_output: false,
+        idempotency_key: None,
+        request_key_id: None,
+        lock: LockOptions::default(),
+    })
+    .unwrap();
+    assert_eq!(applied.head, feature_commit);
+}
+
+#[test]
+fn merge_request_subject_matches_cross_runtime_golden_vector() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../../schemas/fixtures/remote-merge-subject-v1.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        remote::merge_request_subject_digest(&fixture["subject"]).unwrap(),
+        fixture["expected"]["subject_digest"]
+    );
+    assert_eq!(
+        remote::source_object_set_digest(fixture["source_object_records"].as_array().unwrap())
+            .unwrap(),
+        fixture["expected"]["source_object_set_digest"]
+    );
+    assert_eq!(
+        fixture["subject"]["source_object_set_digest"],
+        fixture["expected"]["source_object_set_digest"]
+    );
+    let mut reversed = fixture["source_object_records"].as_array().unwrap().clone();
+    reversed.reverse();
+    assert_eq!(
+        remote::source_object_set_digest(&reversed).unwrap(),
+        fixture["expected"]["source_object_set_digest"]
+    );
+    reversed.push(reversed[0].clone());
+    assert!(remote::source_object_set_digest(&reversed)
+        .unwrap_err()
+        .to_string()
+        .contains("duplicate object ID"));
+}
+
+#[test]
 fn file_remote_upload_dry_run_rejects_existing_invalid_layout() {
     let temp = tempdir().unwrap();
     let repo_root = temp.path().join("repo");
@@ -6294,8 +10624,8 @@ fn http_request_merge_dry_run_validates_branch_heads() {
     let address = listener.local_addr().unwrap();
     let body = json!({
         "branches": [
-            {"name": "main", "head": "CF-COMMIT-main-head"},
-            {"name": "feature", "head": "CF-COMMIT-feature-head"}
+            {"version": 1, "name": "main", "head": "CF-COMMIT-main-head"},
+            {"version": 1, "name": "feature", "head": "CF-COMMIT-feature-head"}
         ]
     })
     .to_string();
@@ -6482,16 +10812,21 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
     )
     .unwrap();
     assert_eq!(replay_upload.head, first_upload.head);
-    assert_eq!(replay_upload.plan["replayed"], true);
-    let upload_record = read_json(
-        &remote_dirs(&remote_project_root)
-            .idempotency
-            .join("remote_upload")
-            .join("upload-main-once.json"),
-    )
-    .unwrap();
-    assert_eq!(upload_record["payload_mode"], "hash_only");
-    assert!(upload_record.get("payload").is_none());
+    assert_eq!(replay_upload.plan, first_upload.plan);
+    let upload_receipts = remote_dirs(&remote_project_root)
+        .idempotency
+        .join("v2")
+        .join("remote_upload");
+    let upload_record_path = fs::read_dir(upload_receipts)
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let upload_record = read_json(&upload_record_path).unwrap();
+    assert_eq!(upload_record["type"], "remote_idempotency_receipt");
+    assert_eq!(upload_record["version"], 2);
+    assert_eq!(upload_record["status"], "completed");
     assert!(upload_record["result"].get("plan").is_none());
     let upload_conflict = upload_branch(
         &repo_root,
@@ -6661,6 +10996,114 @@ fn remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts() {
     assert_eq!(
         apply_conflict.exit_code(),
         ExitCode::IdempotencyConflict.code()
+    );
+}
+
+#[test]
+fn upload_receipts_replay_across_rust_and_python_runtimes() {
+    let temp = tempdir().unwrap();
+    let repo_root = temp.path().join("repo");
+    let server = temp.path().join("server");
+    init_repo(&repo_root, false).unwrap();
+    let objects = repo_root.join(".codefire").join("objects");
+    let main_commit = write_file_commit(&objects, "docs/readme.md", "runtime parity\n");
+    save_branch_record(
+        &repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": "main",
+            "head": main_commit,
+            "state": "closed",
+            "created_at": "2026-07-19T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    let main_url = format!("cf://{}/org/app/main", server.display());
+    let remote_project_root = parse_cf_url(&main_url).unwrap().project_root;
+
+    upload_branch(
+        &repo_root,
+        &UploadOptions {
+            branch: "main".to_string(),
+            remote_url: main_url.clone(),
+            dry_run: false,
+            json_output: false,
+            idempotency_key: Some("rust-python-replay".to_string()),
+            request_key_id: None,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap();
+    let branch_path = remote::remote_branch_path(&remote_project_root, "main");
+    let generation_path = remote_project_root.join("gc_state.json");
+    let branch_before = fs::read(&branch_path).unwrap();
+    let generation_before = fs::read(&generation_path).unwrap();
+    let python_cli = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../codefire");
+    let replay = Command::new("python3")
+        .arg(&python_cli)
+        .args([
+            "upload",
+            "main",
+            &main_url,
+            "--idempotency-key",
+            "rust-python-replay",
+            "--actor",
+            "local",
+        ])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+    assert!(
+        replay.status.success(),
+        "python replay failed: {}",
+        String::from_utf8_lossy(&replay.stderr)
+    );
+    assert_eq!(fs::read(&branch_path).unwrap(), branch_before);
+    assert_eq!(fs::read(&generation_path).unwrap(), generation_before);
+
+    let python_first_url = format!("cf://{}/org/python/main", server.display());
+    let python_first = Command::new("python3")
+        .arg(&python_cli)
+        .args([
+            "upload",
+            "main",
+            &python_first_url,
+            "--idempotency-key",
+            "python-rust-replay",
+            "--actor",
+            "local",
+        ])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+    assert!(
+        python_first.status.success(),
+        "python first upload failed: {}",
+        String::from_utf8_lossy(&python_first.stderr)
+    );
+    let python_project_root = parse_cf_url(&python_first_url).unwrap().project_root;
+    let python_branch_path = remote::remote_branch_path(&python_project_root, "main");
+    let python_generation_path = python_project_root.join("gc_state.json");
+    let python_branch_before = fs::read(&python_branch_path).unwrap();
+    let python_generation_before = fs::read(&python_generation_path).unwrap();
+    upload_branch(
+        &repo_root,
+        &UploadOptions {
+            branch: "main".to_string(),
+            remote_url: python_first_url,
+            dry_run: false,
+            json_output: false,
+            idempotency_key: Some("python-rust-replay".to_string()),
+            request_key_id: None,
+            lock: LockOptions::default(),
+        },
+    )
+    .unwrap();
+    assert_eq!(fs::read(&python_branch_path).unwrap(), python_branch_before);
+    assert_eq!(
+        fs::read(&python_generation_path).unwrap(),
+        python_generation_before
     );
 }
 
@@ -7521,7 +11964,10 @@ fn merge_rejects_self_merge_and_stale_target_worktree() {
     )
     .unwrap_err();
     assert!(stale_error.to_string().contains("unsealed open work"));
-    assert_eq!(read_status(&open_dir).unwrap().state, "open-burning");
+    assert_eq!(read_status(&open_dir).unwrap().state, "open-clean");
+    let active = active_state_path(&open_dir);
+    assert!(!active.join("scan.json").exists());
+    assert!(!active.join("fires.json").exists());
 }
 
 #[test]
@@ -7907,6 +12353,9 @@ fn metrics_attach_to_status_scan_and_verify_data() {
                     state: "open-clean".to_string(),
                 },
             ],
+            codefire_store::SealedValidationWork::default(),
+            BranchRefWork::default(),
+            &codefire_core::DecisionWorkSnapshot::default(),
         )),
     );
     assert_eq!(branch_data["metrics"]["command"], "branch-list");
@@ -7956,6 +12405,13 @@ fn branch_list_reads_repo_from_open_marker_and_validates_heads() {
     fs::create_dir_all(cf.join("branches")).unwrap();
     fs::create_dir_all(cf.join("opened")).unwrap();
     fs::create_dir_all(&open_dir).unwrap();
+    let active_path = cf.join("active").join("open_123");
+    fs::create_dir_all(&active_path).unwrap();
+    fs::write(
+        active_path.join("state.json"),
+        b"{\"state\":\"open-clean\"}\n",
+    )
+    .unwrap();
 
     let commit_id = write_valid_commit(&cf.join("objects"));
     let branch_name = "feature/a b%雪";
@@ -7991,16 +12447,27 @@ fn branch_list_reads_repo_from_open_marker_and_validates_heads() {
             "type": "opened",
             "version": 1,
             "branch": {"name": branch_name, "opened_from_commit": commit_id},
-            "open": {"open_instance_id": "open_123", "opened_at": "2026-06-04T00:00:00Z", "path": open_dir}
+            "open": {
+                "open_instance_id": "open_123",
+                "opened_at": "2026-06-04T00:00:00Z",
+                "path": open_dir,
+                "current_base_commit": commit_id,
+                "active_state_path": active_path
+            },
+            "state": {"last_known": "open-clean"}
         }))
         .unwrap(),
     )
     .unwrap();
 
-    let branches = list_branches(&open_dir).unwrap();
+    let mut listed = list_branches(&open_dir)
+        .unwrap()
+        .prepare_opened_registries()
+        .unwrap();
+    listed.revalidate_opened_registries().unwrap();
 
     assert_eq!(
-        branches,
+        listed.branches,
         vec![Branch {
             name: branch_name.to_string(),
             head: commit_id.clone(),
@@ -8008,8 +12475,7 @@ fn branch_list_reads_repo_from_open_marker_and_validates_heads() {
         }]
     );
 
-    let opened = list_opened_registries(&repo_root).unwrap();
-    let local_list = local_list_data_json(&branches, opened);
+    let local_list = local_list_data_json(&listed.branches, listed.opened.clone());
     assert_eq!(local_list["type"], "codefire_local_list");
     assert_eq!(local_list["branches"][0]["name"], branch_name);
     assert_eq!(local_list["opened"][0]["branch"], branch_name);
@@ -8017,6 +12483,7 @@ fn branch_list_reads_repo_from_open_marker_and_validates_heads() {
         local_list["opened"][0]["path"],
         open_dir.to_string_lossy().as_ref()
     );
+    listed.finish_complete().unwrap();
 
     let (detail_repo, detail) = branch_show_data(&open_dir, None).unwrap();
     assert_eq!(detail_repo, repo_root);
@@ -8174,6 +12641,113 @@ fn write_generation_commit_with_label(
     commit["generation"] = json!(generation);
     commit["generation_test_label"] = json!(label);
     codefire_store::store_object(objects, "commit", commit).unwrap()
+}
+
+fn add_child_branch(repo_root: &Path, name: &str, parent: &str) -> String {
+    let objects = repo_root.join(".codefire/objects");
+    let parent_payload = codefire_store::read_object(&objects, parent).unwrap();
+    let roots = parent_payload["roots"].as_object().unwrap().clone();
+    let certificate = parent_payload["certificate"].as_object().unwrap().clone();
+    let mut payload = codefire_store::commit_payload(vec![parent.to_string()], roots, certificate);
+    payload["message"] = json!(format!("branch {name}"));
+    let head = codefire_store::store_object(&objects, "commit", payload).unwrap();
+    save_branch_record(
+        repo_root,
+        &json!({
+            "type": "branch",
+            "version": 1,
+            "name": name,
+            "head": head,
+            "state": "closed",
+            "created_at": "2026-07-19T00:00:00Z"
+        }),
+    )
+    .unwrap();
+    head
+}
+
+fn branch_list_test_ledger() -> codefire_core::DecisionWorkLedger {
+    codefire_core::DecisionWorkLedger::new(
+        codefire_core::DecisionWorkProfile::local_v1(),
+        codefire_core::DecisionWorkCommandKind::LocalGraph,
+        "branch-list",
+    )
+    .unwrap()
+}
+
+fn precharged_branch_list_ledger(
+    remaining_object_records: u64,
+) -> codefire_core::DecisionWorkLedger {
+    let mut ledger = branch_list_test_ledger();
+    let limit = ledger
+        .profile()
+        .limit(codefire_core::DecisionWorkDimension::ObjectRecords)
+        .unwrap()
+        .limit;
+    ledger
+        .apply(
+            codefire_core::DecisionWorkReservation::new(
+                codefire_core::DecisionWorkPhase::RecordRead,
+                codefire_core::DecisionWorkSurface::Atomic,
+            )
+            .charge(
+                codefire_core::DecisionWorkDimension::ObjectRecords,
+                limit - remaining_object_records,
+            ),
+        )
+        .unwrap();
+    ledger
+}
+
+fn precharged_branch_list_dimension(
+    dimension: codefire_core::DecisionWorkDimension,
+    remaining: u64,
+) -> codefire_core::DecisionWorkLedger {
+    let mut ledger = branch_list_test_ledger();
+    let limit = ledger.profile().limit(dimension).unwrap().limit;
+    ledger
+        .apply(
+            codefire_core::DecisionWorkReservation::new(
+                codefire_core::DecisionWorkPhase::RecordRead,
+                codefire_core::DecisionWorkSurface::Atomic,
+            )
+            .charge(dimension, limit - remaining),
+        )
+        .unwrap();
+    ledger
+}
+
+fn install_top_level_marker(path: &Path, marker: &str) {
+    let mut document: Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+    document
+        .as_object_mut()
+        .unwrap()
+        .insert("remote".to_string(), json!({"generation": marker}));
+    let mut bytes = serde_json::to_vec_pretty(&document).unwrap();
+    bytes.push(b'\n');
+    fs::write(path, bytes).unwrap();
+}
+
+fn rewrite_marker_with_same_metadata(path: &Path, from: &[u8], to: &[u8]) {
+    assert_eq!(from.len(), to.len());
+    let before = fs::metadata(path).unwrap();
+    let mut bytes = fs::read(path).unwrap();
+    let offset = bytes
+        .windows(from.len())
+        .position(|window| window == from)
+        .unwrap();
+    bytes[offset..offset + from.len()].copy_from_slice(to);
+    fs::write(path, bytes).unwrap();
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_times(
+            std::fs::FileTimes::new()
+                .set_accessed(before.accessed().unwrap())
+                .set_modified(before.modified().unwrap()),
+        )
+        .unwrap();
 }
 
 fn write_file_commit(objects: &Path, path: &str, contents: &str) -> String {
@@ -8394,13 +12968,38 @@ fn write_required_roots(objects: &Path) -> Map<String, Value> {
     let verification = codefire_store::store_object(
         objects,
         "verification",
-        json!({"type": "verification", "version": 1, "checks": []}),
+        json!({
+            "type": "verification",
+            "version": 1,
+            "result": "passed",
+            "trace_completeness_required": false,
+            "open_required_fires": 0,
+            "failed_checks": [],
+            "missing_required_links": [],
+            "stale_resolutions": [],
+            "missing_evidence_refs": [],
+            "duplicate_atom_ids": [],
+            "verified_at": "2026-07-12T00:00:00Z"
+        }),
     )
     .unwrap();
     let policy = codefire_store::store_object(
         objects,
         "policy",
-        json!({"type": "policy", "version": 1, "policy": {}}),
+        json!({
+            "type": "policy",
+            "version": 1,
+            "policy": {
+                "require_no_required_fires": true,
+                "require_no_stale_resolutions": true,
+                "require_trace_completeness": false,
+                "require_verification_success": true,
+                "reject_duplicate_atom_ids": true,
+                "no_change_required_requires_rationale": true,
+                "required_links": {},
+                "verification": []
+            }
+        }),
     )
     .unwrap();
 
@@ -8434,6 +13033,7 @@ fn consistent_certificate() -> Map<String, Value> {
         Value::Number(0.into()),
     );
     certificate.insert("stale_resolutions".to_string(), Value::Number(0.into()));
+    certificate.insert("missing_evidence_refs".to_string(), Value::Number(0.into()));
     certificate.insert("duplicate_atom_ids".to_string(), Value::Number(0.into()));
     certificate
 }

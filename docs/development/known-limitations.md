@@ -7,6 +7,7 @@
 - local repository
 - local branch
 - `init`, `branch list`, `open`, `close`, `clone`
+- existing-directory `import` with durable provenance/retry
 - `discard`
 - Markdown requirement/design/ADR/ops / OpenAPI JSON/YAML / DB schema / Python / JavaScript / TypeScript / Go / Java / C# / Rust / Kotlin / PHP / Ruby / Swift / C/C++ / pytest Atom extraction
 - Trace Link parsing
@@ -35,6 +36,10 @@
 - recursive sealed commit parent history validation
 - sealed commit parents / roots / certificate shape validation
 - sealed commit root object type validation
+- sealed Trace Graph endpoint validation with bounded typed diagnostics
+- schema-2 cross-root sealed snapshot validation through the authoritative core predicate
+- explicit schema-1 sealed-read compatibility and fail-closed future commit/root versions
+- descriptor-relative sealed-object traversal and root/subdirectory-bound command cache
 - server-side verification command execution
 - merge request review record
 - merge request application on server
@@ -64,7 +69,8 @@
 - sealed commit reference validation before request-list / request-review / request-apply
 - remote GC health preflight before deleting unreachable objects
 - object record hash / id / filename mismatch diagnosis
-- repo / branch / object-store lock の最小実装
+- persistent kernel-backed local repository/import bootstrap locks
+- capability-relative no-follow `open` materialization
 - installer active PATH reporting
 
 ## 既知制約
@@ -91,6 +97,12 @@ The Python fallback still owns Python-only maintenance commands that are not par
 
 Rust covers the release-critical local workflow including branch close/discard, file-backed/HTTP/HTTPS remote upload/list/clone/show/diff/MR operations, diagnostics, migration checks, signatures, automation JSON, storage/evidence, diff/merge intelligence, completion, and installer default behavior. Use Python fallback for remote GC and token hash generation until those maintenance commands are explicitly ported.
 
+ADR-013's typed committable decision and non-relaxable safety-floor policy are Rust-default
+contracts. The frozen Python fallback retains its historical boolean-policy behavior for legacy
+fixtures and is not a current-profile consistency writer; do not use `codefire-py` to create a new
+seal with any safety-floor field set to `false`. A cross-runtime policy corpus and fallback
+retirement/write restriction belong to RVC-053/RVC-055 rather than silently extending the fallback.
+
 Fallback削除条件:
 
 - Rust CLIの `COMPLETION_COMMANDS` / help / shell completionに対象commandが追加される。
@@ -101,7 +113,7 @@ Fallback削除条件:
 ### Config YAML subset
 
 現在は標準ライブラリのみで動かすため、`codefire.yaml`, `codefire.links.yaml`, `codefire.policy.yaml` はMVPに必要な形だけを読む限定YAML subsetとして処理している。
-`commit_policy` のboolean項目は verify/commit と sealed commit validation に反映される。
+`commit_policy.require_trace_completeness`、`require_commit_signature`はRust verify/commitへ反映される。`require_no_required_fires`、`require_no_stale_resolutions`、`require_verification_success`、`reject_duplicate_atom_ids`は互換fieldだがRustのsafety floorとして`true`固定で、working configの`false`は明示的に拒否する。
 `extinguish_policy.no-change-required.requires_rationale` は `extinguish` 判定に反映される。
 `codefire.policy.yaml` の `verification.required` は複数commandに対応しているが、一般的なYAML機能全体を実装しているわけではない。
 `required_links` はAtom kindごとの `type`, `target_kind`, `min` を読める。
@@ -153,20 +165,68 @@ server-side verificationは `server_policy.json` に書いたcommandをremote pr
 
 merge request applyはfast-forwardのみを許可する。serverはsemantic mergeを行わない。
 
+全remote mutationとGCはpersistent project reader/writer gateを共有し、upload / request-merge /
+request-review / request-applyはkey有無にかかわらずdurable publication transactionを使う。
+compound readerはshared gate取得後にfixed pending authorityを確認する。MR reviewはversioned subjectへ
+束縛され、cross-project source graphはtargetへescrowされるため、applyはcurrent source branchではなく
+review済みheadだけを使う。これはlocal filesystem上のcooperating CodeFire writer contractであり、同じ
+filesystem credentialを持つ非協調processに対するOS isolationやdistributed consensusではない。
+
 permissionは `server_policy.json` の `permissions` で操作ごとにactor名を許可するfile-backed実装である。
 branch protectionは `server_policy.json` の `branch_protection` でbranch patternごとに `upload` / `apply` のactorを制御するfile-backed実装である。
 `auth.required` と `auth.tokens` を設定すると、mutating operationは `--token` または `CODEFIRE_TOKEN` の一致も要求する。
 tokenは既存互換の平文文字列に加えて、`sha256:<hex>` 文字列またはsalt付きhash objectとして保存できる。これはremote policy内の平文token保存を避けるためのMVP機能である。
 Python v0.2とRust v0.6ではcommitは `CODEFIRE_SIGNING_KEY` と `--signer` / `--key-id` でHMAC-SHA256署名を付与でき、remote policyの `commit_signatures.required` / `commit_signatures.keys` でupload/applyされるbranch headへの署名を要求できる。key objectの `not_before` / `not_after` / `status` / `signers` と `require_history` により、MVP範囲のkey rotationと失効検査を扱える。これは共有鍵署名であり、公開鍵署名と外部KMS連携はまだ持たない。
-Python v0.2とRust v0.6ではremote mutating operationは `CODEFIRE_REQUEST_SIGNING_KEY` と `--request-key-id` でHMAC-SHA256 request署名を付与でき、remote policyの `request_signatures.required` / `request_signatures.keys` / `max_skew_seconds` / `nonce_ttl_seconds` で署名、timestampずれ、nonce replayを検証できる。これは共有鍵request署名であり、公開鍵署名、外部KMS連携、分散remote向けの共有nonce storeはまだ持たない。
+Python v0.2とRust v0.6ではremote mutating operationは `CODEFIRE_REQUEST_SIGNING_KEY` と `--request-key-id` でversion 2 HMAC-SHA256 request署名を付与でき、remote policyの `request_signatures.required` / `request_signatures.keys` / `max_skew_seconds` / `nonce_ttl_seconds` / `max_nonce_cache_entries` で完全payload subject、key window、timestampずれ、nonce replayを検証できる。cache容量到達時はlive nonceをevictせず新規requestをfail closedする。これは共有鍵request署名とproject-local file cacheであり、公開鍵署名、外部KMS連携、複数server node向けの分散nonce storeはまだ持たない。
+
+local verification/evidence commandはstreaming cap、minimal environment、digest/redaction、cwd classification、Unix process-group cleanupを持つが、OS-level sandboxではない。`local_unisolated` resultは実行subjectを説明するだけで、host filesystem/networkから隔離されたproofへ昇格しない。live subjectのcanonical worktree digestはverification開始、各command、commit planning、branch publication境界で再照合するが、外部processによる変更をfilesystem snapshotとして原子的に禁止するものではない。verificationで生成物をopen worktree内へ書くcommandはsubject mutationとしてblockingになるため、tool cache/outputは明示的にworktree外へredirectする必要がある。非Unixではtimeout cleanupの記録scopeは`direct_child`であり、子孫全体のterminationをclaimしない。
 
 GCは削除前にobject hash、missing object reference、sealed commit参照を検査する。健全なremoteでは到達不能objectを削除し、`gc.retention_seconds` と `gc.retention_generations` により新しい到達不能objectを保護できる。
-remote projectは `gc_state.json` に現在世代を保存し、branch head更新ごとに世代を進める。remote object recordには `remote.first_seen_generation` / `remote.last_seen_generation` を付与する。
-dry-runと実削除の結果は `audit/gc.jsonl` にJSONL形式で記録される。
+remote projectは `gc_state.json` に現在世代を保存し、branch head更新ごとに世代を進める。世代保持metadataはcontent-addressed object recordを変更せず、bounded/versioned `retention_index.json` に保存する。
+GCはpolicy/root/inventory/retention/plan fingerprint、plan-owned quarantine、delete progressを持つdurable transactionである。exact `gc/GC-*.json` がaudit authorityで、`audit/gc.jsonl` はそこから決定的に再構築されるderived viewである。
+
+### Local Filesystem and Recovery Boundary
+
+Rust CLIのlocal `RepoLock`、import bootstrap lock、import中のrepository lock、remote project gate、request nonce lockは、persistent regular file上のadvisory kernel lockである。repository `repo.lock`はno-followかつexactly one filesystem linkを証明できる場合だけ使い、contentをtruncate/writeせず、取得前後とmutation use boundaryでidentity/link provenanceを再検証する。process終了でownershipは解放されるが、lock inodeは残り、best-effort owner情報の`.owner.json` sidecarも残る。sidecarはownershipのauthorityではなく、contention時にno-follow/16 KiB上限で安全に読めた場合だけdiagnosticへ使う。advisory lockを無視する別processのwriteをOSが強制的に防ぐものではなく、validation、transaction recovery、atomic publicationは依然必要である。
+
+`open`のworktree write、import subject/repository-lock identity、sealed-object cacheのstable identityはUnixでdevice/inode、Windowsでvolume/file indexを使う。これらを証明できないplatformでは、open/import identity-sensitive operationはfail closedし、sealed validationはpinned handleによる1 traversal内reuseのみを行ってcacheをcall間で再利用しない。
+
+sealed-validation cacheはobject-rootと各object subdirectoryのidentity/absenceを主体に含める。built-in 12 subdirectoryに加えてbindできるextension subdirectoryは128までで、129個目は`InvalidSealedCommit`にする。cacheが保持するはcurrent store subject 1つだけで、別root/identity setへ移ると旧pin/resultをevictするため、後で戻れば再検証になる。一方、公開済みobject fileを同一inode上で不正に書き換える行為をcache hit時に再検知するものではない。object file immutabilityは依然cooperative store contractである。
+
+serialized object recordはwriter/readerとも64 MiB上限である。readerはsymlinkをfollowせずnon-blocking regular-file openとbounded readを使うため、FIFO/device/socketや上限超過recordは正当なobjectとしては読めない。これは信頼境界の意図的なproduct limitである。
+
+object writer/reader、sealed traversal、full object scanはabsolute object root/subdirectoryをcomponent-wise no-followで開く。writerはpublication/reuse後、sealed/full scanはsnapshot末尾にroot/subdirectory identityを再検査するため、symlink rootや差し替えsubjectを成功として継続しない。ただし同一inode上の公開済みrecord書換えをcache hitごとに検知するものではない。
+
+現行Rust sealはcommit/root object version 1、root schema 2、semantic profile `sealed-snapshot-v1`を書き、schema 2のcore predicateとcurrent profileのAtom/Trace endpoint closureを必須とする。root schema欠落はlegacy schema 1、semantic profile欠落は独立した`legacy-unversioned` cross-root claimとして読めるが、unknown profile、schema 1/2以外、future commit/root versionはfail closedする。legacy profileでもobject/root/reference/schema-2 certificate semanticsは省略しない。`missing_evidence_refs`の省略互換は空list/countだけである。remote branch/MR、object extension、公開base schema familyは`codefire.support.v1`とchecksum conformance corpusへ登録したが、全command固有payloadのpublic schema化は未完了でありincrementalに行う。
+
+object recordの未知noncritical extensionはexact transferし、宣言されたobject referenceをreachabilityへ含める。未知critical extensionはfail closedする。ただし現行descriptor registryが意味を理解するcritical extensionはまだなく、extension payloadのdomain validationと全既存top-level metadataのnamespace移行は将来作業である。
+
+remote `list` / `request-list`のcursorは最大1000件/page、最大4096文字で、完全ordered resultのdigestを毎回計算してsnapshot driftを拒否する。これは結果混在を防ぐcontractであり、巨大collectionでのserver-side streaming/index cursorではない。remote Doctorはissue sampleと報告record数をboundするが、CFR-168で予定する完全なI/O work budget/streaming inventoryを置き換えない。
+
+effective policyはstable rule/source/value/applicability/safety classを保持し、ChangeCoverageは全manifest差分を`non_atom_file`、`deleted_atom`、`out_of_atom_change`、`atom_change_with_unclassified_spans`へ分類する。ただし現行Atom indexはline/byte ownership spanを保持しないため、coverage precisionは`file_only_no_span_claim`であり、mixed fileのどのbyteがAtom内外かを証明しない。現行coverage ruleは`allow_with_disclosure`で、分類自体は新しいcommit blockerではない。path/class別review必須化やdenyは、span/evidence workflowと明示的なpolicy/schema profile evolutionを伴う将来作業である。
+
+generic repository JSONはread/writeとも64 MiB上限である。readerはabsolute parentとfinal fileをno-followで開き、finalをnon-blocking regular fileとしてmetadataとlimit-plus-oneの両方で制限する。各transaction/import/owner recordのより小さい上限は別途優先される。
+
+Rust CLIのopened active stateはparent/instance directory capabilityへbindし、active file名を1個のnormal relative componentに制限する。read/write/removeはこのhandleに相対で、operation境界にambient identityを再検証するため、validation後のinstance renameとoutside symlink差替えは`active_state_capability_invalid`としてfail closedする。これは同じdirectory/file inodeへadvisory lockを無視して直接書き込む別processをOSが禁止する保証ではない。また、active stateをnested directory schemaへ拡張する場合は現在のflat-file capability APIを先に明示的に拡張する必要がある。
+
+close/discardはpending marker、5 phase、worktree/active/openedのtransaction固有deterministic quarantine、object-first branch publish、fixed completed archiveでmulti-record deletionをretry可能にする。atomic no-replace renameまたはstable target/parent identityを証明できないplatformではfail closedする。削除開始後に失敗したquarantineは自動で元nameへ戻さず、exact request retryが同じidentity/nameから再開するため保持する。pending/completed markerやerrorが示すquarantineを一般的な一時fileとして手動削除してはならない。これはcooperative repository lockを無視したprocessによる同一inodeへの直接書換えをOSが禁止する保証ではなく、background recovery daemonも持たない。
+
+importはparsed operational/control JSONを1 MiB、repository byte copyを64 MiB、通常のuser fileを49,545,216 bytes（47.25 MiB）に制限する。user file上限はbase64 expansionと1 MiBのrecord overhead reserveを含めてobject recordの64 MiB上限内へ収めるためのproduct limitであり、巨大file importをstreamingで扱う機能はまだない。
+
+scan/verifyのstate transactionはpartial multi-file writeをrollbackせず、pending markerとretry再計算でhealする。現行fixtureはscan/verifyの全phase直後、cross-operation takeover、最終authority divergenceを固定し、成功時はfires/scan/verificationとregistry/active/branchのauthority整合を再検証してからmarkerを削除する。ただしadvisory lockを無視して同じinodeへ直接書く外部processをOSが禁止するものではない。commitはmanifest-blob/root/candidate/branch-snapshotのstore-to-marker gap、pre-validation、主要candidate corruptionを固定しているが、全entry/全phaseのfailpointではない。doctorはpending commitのrole/path/type/ID/stateを独立fieldで返さず、marker pathとphaseおよびstored/planned role-entry countのmessageを返す。still-planned entryのIDがstore-to-marker gapで既に存在する可能性は意図したrecovery contractである。
+
+importのroot `.codefire-import.lock.bootstrap-*.part` は未公開scratchであり、authorityとしてparseせずscanから除外し、canonical lockとのidentityが証明できない限り保存する。crashed contenderの`.part`が残ることは安全性優先の意図的な制約である。fully-written bootstrap `.tmp`とtransaction-bound write `.tmp`は別のrecovery ruleを持つため、一括して手動削除してはならない。
 
 ### Parser Coverage
 
 Atom抽出はMVP対象に限定している。
+
+下記はCodeFire全体（Rust defaultとPython fallbackの和）のcoverageである。Rust defaultの
+hash schema 4はMarkdown、明示marker、Python derived class/top-level def/class-owned methodを
+実装する。その他言語のderived Atomは現在Python fallbackのみであり、Rust defaultでは
+明示`cf-atom`を要求する。fallback coverageをRustのcurrent writer claimへ読み替えない。
+Python経路はstring/comment-awareな線形lexical viewを使い、fixture/docstring内の宣言風textや
+`cf-atom` textをAtomとして扱わない。
 
 - Markdown heading Atom
 - Markdown ADR Atom
@@ -204,7 +264,7 @@ Python extractorはclass methodの派生IDにclass ownerを含める。より複
 
 mergeはfile-level 3-way mergeである。
 
-semantic merge、Atom-level自動解決、AI提案は未実装。競合時はconflict markerを生成し、verify/commit blockerにする。
+semantic merge、Atom-level自動解決、AI提案は未実装。Rust defaultではtext/binary/semantic競合はtyped verify/commit blockerとなり、text markerとbinary sidecarを手動解消し、semantic candidateを明示確認した後に`merge --continue`でresolution transitionを記録する。CodeFireは競合内容そのものを自動選択しない。Python fallbackは既存text-conflict blockerを維持するが、Rustのcontinue writerは持たない。
 
 ### Packaging
 

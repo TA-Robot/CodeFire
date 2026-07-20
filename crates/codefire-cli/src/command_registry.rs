@@ -1,5 +1,7 @@
 use serde_json::{json, Value};
 
+use crate::compatibility::{support_manifest_json, CAPABILITIES_SCHEMA, COMMAND_RESULT_SCHEMA};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct CommandCapability {
     pub(crate) name: &'static str,
@@ -112,13 +114,44 @@ pub(crate) fn capabilities_data_json() -> Value {
     json!({
         "type": "codefire_command_capabilities",
         "version": 1,
+        "schema": CAPABILITIES_SCHEMA,
+        "command_result_schema": COMMAND_RESULT_SCHEMA,
+        "support": support_manifest_json(),
         "commands": COMMAND_CAPABILITIES.iter().map(|capability| {
             json!({
                 "name": capability.name,
                 "supports_json": capability.supports_json,
                 "supports_metrics": capability.supports_metrics,
                 "help_key": capability.help_key,
+                "targets": command_targets(capability.name),
+                "output_schema": capability.supports_json.then_some(COMMAND_RESULT_SCHEMA),
+                "pagination": command_pagination(capability.name),
             })
         }).collect::<Vec<_>>(),
     })
+}
+
+fn command_pagination(name: &str) -> Value {
+    if matches!(name, "list" | "request-list") {
+        json!({
+            "mode": "snapshot_cursor",
+            "cursor_schema": "codefire.page_cursor.v1",
+            "page_schema": "codefire.page.v1",
+            "legacy_unpaged_limit": null,
+            "recommended_limit": crate::pagination::DEFAULT_PAGE_LIMIT,
+            "max_limit": crate::pagination::MAX_PAGE_LIMIT,
+        })
+    } else {
+        json!({"mode": "none"})
+    }
+}
+
+fn command_targets(name: &str) -> &'static [&'static str] {
+    match name {
+        "clone" | "upload" | "request-merge" | "request-list" | "request-review"
+        | "request-apply" => &["cf", "cf+http", "cf+https"],
+        "list" | "show" | "diff" => &["local", "cf", "cf+http", "cf+https"],
+        "doctor" => &["local", "cf", "cf+http", "cf+https"],
+        _ => &["local"],
+    }
 }

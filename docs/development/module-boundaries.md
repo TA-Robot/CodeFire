@@ -33,12 +33,20 @@ Rust CLIでは、以下の責務分離を標準形とする。
 | CLI dispatch / argument routing | `main.rs` | 薄く保つ。command固有ロジックを置かない |
 | CLI option/result/context model | `crates/codefire-cli/src/cli_model.rs` | command modulesが共有する型を集約し、fieldsは`pub(crate)`に限定する |
 | command-specific planning | `crates/codefire-cli/src/<command>.rs` | parse済み入力からplanを作る |
-| repository/object invariants | `codefire-core` or dedicated CLI module | object ID、canonical JSON、sealed commitを集中管理する |
-| remote mutation policy | `remote/` | file-backed/HTTPで共通policyを共有する |
-| request/commit signatures | `signatures.rs` | signing、verification、policy evaluationを集約する |
+| domain/Trace invariants | `codefire-core` | Atom/Trace endpoint、Fire、resolution、verification predicateを集中管理する。effective policyは`effective_policy.rs`、manifest/Atom relationは`change_coverage.rs`、indexed direct Trace evaluationは`trace_evaluation.rs`をownerとする |
+| deterministic work contract | `codefire-core/work_budget.rs` | profile/dimension/counter/phase/terminalとatomic reservation ledgerを所有する。HTTP/Store/CLIは独自limit語彙やfork可能なper-head ledgerを作らない |
+| object/sealed invariants | `codefire-store` | canonical JSON、full digest/object ID、collision、descriptor-relative sealed validation/cache subjectを集中管理する |
+| open/close/import filesystem capability | `secure_worktree.rs`, `close_worktree.rs`, `active_state.rs`, `import_workflow.rs` | stable identity/no-replace primitiveは共有し、open staging、close subject、active instance、import recoveryのpolicyは各ownerへ分ける |
+| close/discard publication | `crates/codefire-cli/src/close_transaction.rs` | request/evidence/phase/archiveとordered applyを所有し、`main.rs`はdispatchだけにする |
+| remote project authority | `remote/project.rs` | percent-decode後component、stable project descriptor、ledger-bound hidden bootstrap、bounded recovery/quarantine、legacy-adoption境界を所有する |
+| remote project locking | `remote/locks.rs`, `stable_lock.rs` | persistent inode、shared/exclusive gate、stable-ID順の複数project取得、単一deadline、pending read guardを所有する |
+| remote mutation policy | `remote/` | file-backed/HTTPで共通policyを共有し、任意pathをpublication APIへ渡さない |
+| request/commit signatures | `signatures.rs` | signing、verification、policy evaluation、iterative history walk、nonce validation/publication境界を集約する |
 | rendering / view | `view/` | human outputとstructured outputを分ける |
 | diagnostics | feature module or `doctor/` | exit codeとmachine-readable detailsを明確にする |
-| idempotency / lock handling | dedicated module | mutation commandから共通利用する |
+| idempotency / lock handling | dedicated module | mutation commandから共通利用する。persistent kernel lockはcontent-immutable inode、exactly-one-link identity、atomic owner sidecarを一契約にし、legacy create-new lockと同じ型に見せかけない |
+
+Stage 1の現行所有では、`secure_worktree` がstable filesystem identity、atomic no-replace rename、open targetとrepository-lock pathのno-follow primitiveを所有する。`close_worktree` はmarker/worktree removal、`active_state` はactive-instance relative I/O/removal、`close_transaction` はmulti-record publication/recoveryを所有する。`import_workflow` はbootstrap provenance/recoveryとpinned import subject、`codefire-store` はsealed traversalのobject-root/subdirectory capabilityを所有する。同じcapability crateを使っても、open staging、close policy、active state、import transaction、immutable-object read/cacheを一つの巨大filesystem moduleへ統合しない。
 
 Python reference implementationは歴史的に単一ファイルだが、Rust v0.6 default化後は互換性確認用referenceとして扱う。新規の本流機能はRust側でmodule分割して実装する。
 

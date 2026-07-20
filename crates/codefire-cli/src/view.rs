@@ -1,6 +1,8 @@
+use super::assessment_subject::{sealed_pair_subject, subject_json};
 use super::http::{http_json, http_remote_path, parse_cf_http_url};
 use super::remote::{
-    ensure_object_dirs, load_remote_branch, parse_cf_url, remote_dirs, write_object_records,
+    collect_object_records, ensure_object_dirs, load_remote_branch, parse_cf_url,
+    write_object_records, RemoteProjectGate,
 };
 use super::*;
 use file_diff::render_manifest_diff;
@@ -346,9 +348,15 @@ pub(crate) fn review_pack_with_options(
         .unwrap_or_else(|| json!([]));
     let base_summary = commit_review_summary(&base)?;
     let source_summary = commit_review_summary(&source)?;
+    let subject = subject_json(&sealed_pair_subject(
+        repo_root,
+        &base.commit_id,
+        &source.commit_id,
+    )?)?;
     let value = json!({
         "type": "codefire_review_pack",
         "version": 1,
+        "subject": subject,
         "base": base_summary,
         "source": source_summary,
         "options": {
@@ -589,15 +597,29 @@ fn resolve_commitish_any(
     }
     if value.starts_with("cf://") {
         let remote = parse_cf_url(value)?;
-        let branch = load_remote_branch(&remote)?;
-        let head = required_string(&branch, &["head"])?;
-        let objects = remote_dirs(&remote.project_root).objects;
-        codefire_store::validate_sealed_commit(&objects, &head)?;
+        let records;
+        let head;
+        {
+            let _gate =
+                RemoteProjectGate::acquire_shared(&remote.project_root, &LockOptions::default())?;
+            let branch = load_remote_branch(&remote)?;
+            head = required_string(&branch, &["head"])?;
+            let objects = super::remote::remote_dirs(&remote.project_root).objects;
+            codefire_store::validate_sealed_commit(&objects, &head)?;
+            records = collect_object_records(&objects, &head)?;
+        }
+        let temp_objects = unique_http_bundle_objects_dir(value)?;
+        ensure_object_dirs(&temp_objects)?;
+        write_object_records(&temp_objects, records)?;
+        codefire_store::validate_sealed_commit(&temp_objects, &head)?;
+        let temp_guard = Arc::new(TempObjectDir {
+            path: temp_objects.clone(),
+        });
         return Ok(ResolvedCommitish {
-            objects,
+            objects: temp_objects,
             commit_id: head.clone(),
             label: format!("{value}@{head}"),
-            _temp_objects: None,
+            _temp_objects: Some(temp_guard),
         });
     }
     let repo_root = repo_root.ok_or_else(|| {

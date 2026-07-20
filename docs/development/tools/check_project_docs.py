@@ -34,6 +34,7 @@ LINK_PATTERN = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
 STATUS_PATTERN = re.compile(r"^\|\s*Status\s*\|\s*([^|]+?)\s*\|\s*$", re.MULTILINE)
 INDEX_ROW_PATTERN = re.compile(r"^\|\s*((?:CFB|CFR)-\d{3})\s*\|\s*([^|]+?)\s*\|", re.MULTILINE)
 CLOSED_ISSUE_STATUSES = {"fixed", "fixed in v0.7", "wontfix"}
+TERMINAL_REVIEW_DISPOSITIONS = {"implemented", "falsified", "accepted_non_goal", "promoted"}
 
 
 @dataclass(frozen=True)
@@ -373,6 +374,179 @@ def check_issue_root_cause_map(
             findings.append(Finding("error", "incomplete-open-root-cause-entry", issue_id, "close_evidence"))
 
 
+def check_closed_issue_checklists(
+    root: Path,
+    issue_statuses: dict[str, str],
+    findings: list[Finding],
+) -> None:
+    for issue_id, status in sorted(issue_statuses.items()):
+        if status not in CLOSED_ISSUE_STATUSES:
+            continue
+        series = "bug-issues" if issue_id.startswith("CFB-") else "code-review-issues"
+        relative = f"docs/development/{series}/{issue_id.lower()}.md"
+        text = (root / relative).read_text(encoding="utf-8")
+        if re.search(r"^- \[ \] ", text, re.MULTILINE):
+            findings.append(
+                Finding(
+                    "error",
+                    "closed-issue-has-unchecked-checklist",
+                    relative,
+                    f"{issue_id} is {status} but retains unchecked closure metadata",
+                )
+            )
+
+
+def check_review_dispositions(
+    root: Path,
+    issue_statuses: dict[str, str],
+    findings: list[Finding],
+) -> dict[str, int]:
+    relative = "docs/development/codefire-review-portfolio/review-dispositions.json"
+    path = root / relative
+    if not path.is_file():
+        findings.append(Finding("error", "missing-review-disposition-ledger", relative, "file is missing"))
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, UnicodeError) as exc:
+        findings.append(Finding("error", "invalid-review-disposition-ledger", relative, str(exc)))
+        return {}
+    if not isinstance(payload, dict) or payload.get("type") != "codefire.review_disposition_ledger.v1":
+        findings.append(
+            Finding(
+                "error",
+                "invalid-review-disposition-ledger-type",
+                relative,
+                "expected type codefire.review_disposition_ledger.v1",
+            )
+        )
+        return {}
+    raw_reviews = payload.get("reviews")
+    if not isinstance(raw_reviews, list):
+        findings.append(Finding("error", "invalid-review-disposition-reviews", relative, "reviews must be an array"))
+        return {}
+
+    portfolio = root / "docs/development/codefire-review-portfolio"
+    expected: dict[str, Path] = {}
+    for review_path in sorted((portfolio / "reviews").glob("[0-9][0-9][0-9]-*.md")):
+        match = re.match(r"(\d{3})-", review_path.name)
+        if match:
+            expected[f"RVC-{match.group(1)}"] = review_path
+
+    entries: dict[str, dict[str, Any]] = {}
+    counts: Counter[str] = Counter()
+    for offset, raw_entry in enumerate(raw_reviews):
+        entry_path = f"{relative}:reviews[{offset}]"
+        if not isinstance(raw_entry, dict):
+            findings.append(Finding("error", "invalid-review-disposition-entry", entry_path, "entry must be an object"))
+            continue
+        review_id = raw_entry.get("id")
+        if not isinstance(review_id, str) or not re.fullmatch(r"RVC-\d{3}", review_id):
+            findings.append(Finding("error", "invalid-review-disposition-id", entry_path, repr(review_id)))
+            continue
+        if review_id in entries:
+            findings.append(Finding("error", "duplicate-review-disposition", relative, review_id))
+            continue
+        entries[review_id] = raw_entry
+
+        disposition = raw_entry.get("disposition")
+        if disposition not in TERMINAL_REVIEW_DISPOSITIONS:
+            findings.append(Finding("error", "nonterminal-review-disposition", review_id, repr(disposition)))
+            continue
+        counts[disposition] += 1
+        for field in ("root_group", "rationale"):
+            value = raw_entry.get(field)
+            if not isinstance(value, str) or not value.strip():
+                findings.append(Finding("error", "incomplete-review-disposition", review_id, field))
+
+        declared_review = raw_entry.get("review")
+        expected_path = expected.get(review_id)
+        if expected_path is None:
+            findings.append(Finding("error", "review-disposition-without-review", review_id, repr(declared_review)))
+        else:
+            expected_relative = expected_path.relative_to(portfolio).as_posix()
+            if declared_review != expected_relative:
+                findings.append(
+                    Finding(
+                        "error",
+                        "review-disposition-path-mismatch",
+                        review_id,
+                        f"expected {expected_relative!r}, got {declared_review!r}",
+                    )
+                )
+            review_text = expected_path.read_text(encoding="utf-8")
+            status_match = STATUS_PATTERN.search(review_text)
+            review_status = status_match.group(1).strip() if status_match else None
+            if review_status != disposition:
+                findings.append(
+                    Finding(
+                        "error",
+                        "review-status-disposition-mismatch",
+                        expected_path.relative_to(root).as_posix(),
+                        f"file={review_status!r}, ledger={disposition!r}",
+                    )
+                )
+            if re.search(r"^- \[ \] ", review_text, re.MULTILINE):
+                findings.append(
+                    Finding(
+                        "error",
+                        "terminal-review-has-unchecked-checklist",
+                        expected_path.relative_to(root).as_posix(),
+                        review_id,
+                    )
+                )
+
+        evidence_paths = raw_entry.get("evidence_paths")
+        if not isinstance(evidence_paths, list) or not evidence_paths:
+            findings.append(Finding("error", "incomplete-review-disposition", review_id, "evidence_paths"))
+        else:
+            for evidence in evidence_paths:
+                if not isinstance(evidence, str) or not evidence.strip():
+                    findings.append(Finding("error", "invalid-review-evidence-path", review_id, repr(evidence)))
+                    continue
+                resolved = (root / evidence).resolve()
+                try:
+                    resolved.relative_to(root)
+                except ValueError:
+                    findings.append(Finding("error", "review-evidence-outside-repository", review_id, evidence))
+                else:
+                    if not resolved.exists():
+                        findings.append(Finding("error", "missing-review-evidence", review_id, evidence))
+
+        artifacts = raw_entry.get("formal_artifacts")
+        if not isinstance(artifacts, list) or not artifacts:
+            findings.append(Finding("error", "incomplete-review-disposition", review_id, "formal_artifacts"))
+        else:
+            issue_artifacts = 0
+            for artifact in artifacts:
+                if not isinstance(artifact, str) or not artifact.strip():
+                    findings.append(Finding("error", "invalid-review-formal-artifact", review_id, repr(artifact)))
+                    continue
+                if re.fullmatch(r"(?:CFB|CFR)-\d{3}", artifact):
+                    issue_artifacts += 1
+                    if artifact not in issue_statuses:
+                        findings.append(Finding("error", "missing-review-formal-issue", review_id, artifact))
+                else:
+                    resolved = (root / artifact).resolve()
+                    try:
+                        resolved.relative_to(root)
+                    except ValueError:
+                        findings.append(Finding("error", "review-artifact-outside-repository", review_id, artifact))
+                    else:
+                        if not resolved.exists():
+                            findings.append(Finding("error", "missing-review-formal-artifact", review_id, artifact))
+            if disposition == "promoted" and issue_artifacts == 0:
+                findings.append(Finding("error", "promoted-review-without-formal-issue", review_id, repr(artifacts)))
+
+    for review_id in sorted(set(expected) - set(entries)):
+        findings.append(Finding("error", "review-missing-disposition", relative, review_id))
+    for review_id in sorted(set(entries) - set(expected)):
+        findings.append(Finding("error", "disposition-missing-review", relative, review_id))
+    if len(expected) != 60:
+        findings.append(Finding("error", "unexpected-review-portfolio-size", relative, f"expected 60, found {len(expected)}"))
+    return dict(sorted(counts.items()))
+
+
 def check_current_claims(root: Path, ledgers: dict[str, Any], findings: list[Finding]) -> None:
     hub_path = "docs/development/README.md"
     hub = (root / hub_path).read_text(encoding="utf-8")
@@ -492,6 +666,8 @@ def run(root: Path) -> tuple[list[Finding], dict[str, Any]]:
         for issue_id, status in ledger["_issue_statuses"].items()
     }
     check_issue_root_cause_map(root, issue_statuses, findings)
+    check_closed_issue_checklists(root, issue_statuses, findings)
+    review_dispositions = check_review_dispositions(root, issue_statuses, findings)
     check_current_claims(root, ledgers, findings)
     check_removed_plans(root, markdown_paths, findings)
     check_strategy_metadata(root, findings)
@@ -511,6 +687,7 @@ def run(root: Path) -> tuple[list[Finding], dict[str, Any]]:
     }
     payload = {
         "ledgers": public_ledgers,
+        "review_dispositions": review_dispositions,
         "inventory": build_inventory(root, markdown_paths, inbound),
     }
     return findings, payload
@@ -534,6 +711,7 @@ def main() -> int:
         "ok": not errors,
         "findings": [asdict(finding) for finding in findings],
         "ledgers": details["ledgers"],
+        "review_dispositions": details["review_dispositions"],
         "document_count": len(details["inventory"]),
     }
     if args.inventory:

@@ -35,6 +35,108 @@ pub(crate) struct DoctorIssue {
     pub(crate) kind: String,
     pub(crate) message: String,
     pub(crate) path: Option<PathBuf>,
+    pub(crate) open_snapshot: Option<crate::open_snapshot::OpenSnapshotDivergence>,
+    pub(crate) pending_authority: Option<DoctorPendingAuthority>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DoctorPendingAuthorityKind {
+    Commit,
+    State,
+    ActiveLedger,
+}
+
+impl DoctorPendingAuthorityKind {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Commit => "commit_transaction",
+            Self::State => "state_transaction",
+            Self::ActiveLedger => "active_ledger_transaction",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DoctorPendingOperation {
+    Commit,
+    Scan,
+    Verify,
+    Fire,
+    FireBatch,
+    Extinguish,
+    ExtinguishBatch,
+}
+
+impl DoctorPendingOperation {
+    pub(crate) fn from_validated(value: &str) -> Option<Self> {
+        match value {
+            "commit" => Some(Self::Commit),
+            "scan" => Some(Self::Scan),
+            "verify" => Some(Self::Verify),
+            "fire" => Some(Self::Fire),
+            "fire-batch" => Some(Self::FireBatch),
+            "extinguish" => Some(Self::Extinguish),
+            "extinguish-batch" => Some(Self::ExtinguishBatch),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Commit => "commit",
+            Self::Scan => "scan",
+            Self::Verify => "verify",
+            Self::Fire => "fire",
+            Self::FireBatch => "fire-batch",
+            Self::Extinguish => "extinguish",
+            Self::ExtinguishBatch => "extinguish-batch",
+        }
+    }
+
+    pub(crate) fn owner_command(self) -> &'static str {
+        match self {
+            Self::Commit => "commit",
+            Self::Scan => "scan",
+            Self::Verify => "verify",
+            Self::Fire | Self::FireBatch => "fire",
+            Self::Extinguish | Self::ExtinguishBatch => "extinguish",
+        }
+    }
+
+    pub(crate) fn owner_mode(self) -> &'static str {
+        match self {
+            Self::FireBatch | Self::ExtinguishBatch => "batch",
+            _ => "single",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum DoctorPendingRequestIdentity {
+    TransactionId {
+        transaction_id: String,
+    },
+    RequestHash {
+        request_hash: String,
+    },
+    StateSubject {
+        branch: String,
+        open_instance_id: String,
+        current_base_commit: String,
+    },
+    LegacyUnbound,
+    Withheld {
+        reason: &'static str,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DoctorPendingAuthority {
+    pub(crate) authority: DoctorPendingAuthorityKind,
+    pub(crate) operation: DoctorPendingOperation,
+    pub(crate) phase: String,
+    pub(crate) request_identity: DoctorPendingRequestIdentity,
+    pub(crate) intended_state: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,6 +152,8 @@ impl DoctorIssue {
             kind: kind.to_string(),
             message: message.into(),
             path,
+            open_snapshot: None,
+            pending_authority: None,
         }
     }
 
@@ -59,6 +163,35 @@ impl DoctorIssue {
             kind: kind.to_string(),
             message: message.into(),
             path,
+            open_snapshot: None,
+            pending_authority: None,
+        }
+    }
+
+    fn open_snapshot_divergence(divergence: crate::open_snapshot::OpenSnapshotDivergence) -> Self {
+        Self {
+            severity: DoctorSeverity::Error,
+            kind: crate::open_snapshot::OPEN_SNAPSHOT_DIVERGENCE_KIND.to_string(),
+            message: divergence.to_string(),
+            path: Some(divergence.actual_record.clone()),
+            open_snapshot: Some(divergence),
+            pending_authority: None,
+        }
+    }
+
+    fn pending_authority(
+        kind: &str,
+        message: impl Into<String>,
+        path: PathBuf,
+        pending_authority: DoctorPendingAuthority,
+    ) -> Self {
+        Self {
+            severity: DoctorSeverity::Error,
+            kind: kind.to_string(),
+            message: message.into(),
+            path: Some(path),
+            open_snapshot: None,
+            pending_authority: Some(pending_authority),
         }
     }
 }

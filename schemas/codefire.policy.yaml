@@ -1,6 +1,7 @@
 version: 1
 
 commit_policy:
+  # Rust safety floor: these four fields are compatibility fields and must remain true.
   require_no_required_fires: true
   require_no_stale_resolutions: true
   require_trace_completeness: true
@@ -30,4 +31,6 @@ verification:
     - id: unit-tests
       command: "python -m pytest"
       cwd: "."
-
+      timeout_ms: 300000
+      max_output_bytes: 65536
+      inherit_env: false

@@ -1,0 +1,38 @@
+{
+  "actor": "alice",
+  "algorithm": "hmac-sha256",
+  "expected": {
+    "payload_digest": "sha256:dec675d682fef2c92638c0333ac6bcf06b4d508194aa7ba8b3e05c65a1db8961",
+    "signature": "3b19bcafb26cb22cbae46795e6972a87df1df8aa67402b79909073d7ef4b4422",
+    "subject_digest": "sha256:ea563432a7a634665bc21397fbcaaa7bb973790ec398c5b6d6089db2fea5dcd8"
+  },
+  "idempotency_key": "idem-001",
+  "key": "fixture-request-key",
+  "key_id": "alice-request",
+  "nonce": "nonce-001",
+  "operation": "upload",
+  "payload": {
+    "actor": "alice",
+    "branch": "main",
+    "head": "CF-COMMIT-0123456789abcdef01234567",
+    "idempotency_key": "idem-001",
+    "lock": {
+      "timeout_ms": 1000,
+      "wait": true
+    },
+    "objects": [
+      {
+        "id": "CF-BLOB-0123456789abcdef01234567",
+        "payload": {
+          "content": "eA==",
+          "encoding": "base64",
+          "type": "blob",
+          "version": 1
+        }
+      }
+    ]
+  },
+  "schema": "codefire.remote_mutation_subject_fixture.v1",
+  "target": "org/app/branches/main/upload",
+  "timestamp": "2026-07-12T00:00:00Z"
+}

@@ -1,5 +1,10 @@
 # 09. Index / Trace / Policy設計
 
+Trace evaluationはsource Link列を一回compileしたadjacency/required-count indexを使う。direct-onlyの
+双方向Fire候補、directed required-link count、source順、duplicate Link、self-loop一件の既存意味論を保ち、
+changed Atomごとの全Link再走査は行わない。indexのwork counterは観測値であり、domain resultを制御しない。
+resource enforcementは別のcommand-scoped `codefire.decision-work.v1` ledgerがeffect前に行う。
+
 ## 9.1 versioned project files
 
 open directory内には以下を置く。
@@ -273,7 +278,7 @@ public:
 };
 ```
 
-明示IDがない場合、Python class/function、JavaScript/TypeScript class/function/arrow function、Go type/function/method、Java type/method、C# type/method、Rust type/function/method、Kotlin type/function/method、PHP type/function/method、Ruby type/function/method、Swift type/function/method、C/C++ type/function/method から派生IDを生成する。
+明示IDがない場合、Python reference implementationはPython class/function、JavaScript/TypeScript class/function/arrow function、Go type/function/method、Java type/method、C# type/method、Rust type/function/method、Kotlin type/function/method、PHP type/function/method、Ruby type/function/method、Swift type/function/method、C/C++ type/function/method から派生IDを生成する。Rust defaultのhash schema 4はstring/comment-aware lexical view上でPython class/top-level def/class-owned methodの派生IDを生成し、fixture/docstring内の宣言風textは除外する。その他言語のRust経路は、versioned conformance fixtureが揃うまでは明示`cf-atom`を正とし、Python fallbackの派生Atom coverageをcurrent Rust claimへ読み替えない。
 
 ```text
 CODE:src/auth.py::class:SessionPolicy
@@ -329,6 +334,17 @@ G = (V, E)
 - \( V \)：Artifact Atom集合
 - \( E \)：Trace Link集合
 
+Trace Linkの各`from` / `to`は、対象`AtomIndex.atoms`にexactly 1回現れなければならない。shared `validate_trace_graph_endpoints`は次のtyped issueを返す。
+
+| kind | condition | `atom_occurrences` |
+|---|---|---:|
+| `missing_atom` | endpoint IDがAtom indexに存在しない | 0 |
+| `ambiguous_atom_id` | endpoint IDが複数Atomに一致する | 2以上 |
+
+validatorは`AtomIndex.duplicate_atom_ids`をauthorityとせず、実際のAtom列からoccurrence mapを作る。direct-editされた`codefire.links.yaml`を消費するscan/verifyと`link --batch`はこのshared core predicateに接続する。sealed commit validatorもstore境界で同じ「exactly one Atom」条件を独立に強制するが、その破損はcoreのbatch diagnosticではなく`InvalidSealedCommit`である。
+
+diagnosticは全件数`total_issues`と`omitted_issues`を保ち、安定ソートしたdetailを最大100件まで保持する。各`link_id` / `atom_id` sampleはUTF-8 boundaryを保って最大256 bytesとし、`*_truncated` / `*_omitted_bytes`で省略を明示する。`link --batch` もself-link、batch duplicate、existing-linkとendpoint issueを最大100 detailへ制限し、超過分を`diagnostics_omitted`とtotal/omitted countで返す。さらにoperation planの`items`とlive resultの`added_links`はそれぞれ最大100件のfrom/to/type projectionとし、`item_count` / `items_omitted`および`added_link_count` / `added_links_omitted`で全件数を保つ。projection fieldも同じ256-byte UTF-8-safe sampleと省略metadataを使う。
+
 ## 9.10 required link policy
 
 policyでは、Atom種別ごとに必須リンクを定義する。
@@ -350,9 +366,23 @@ required_links:
 
 `codefire.policy.yaml` もCodeFire schema向けの限定YAML subsetとして読む。対応root sectionは `version`、`required_links`、`commit_policy`、`extinguish_policy`、`verification` で、各section内のunsupported fieldやunsupported indentationはline number付きconfig errorにする。
 
-`verification` itemは `id`、`command`、`cwd` に加えて、実行契約として `timeout_ms`、`max_output_bytes`、`inherit_env`、`env`、`allow_failure` を持てる。未指定時は300秒timeout、64KiB output cap、環境変数継承、失敗blockingで実行する。
+Rust defaultの`commit_policy`では、`require_no_required_fires`、
+`require_no_stale_resolutions`、`require_verification_success`、
+`reject_duplicate_atom_ids`はversion 1 object互換のfieldだが、working configで`false`にはできない。
+これらはADR-013のsafety floorで、明示`false`は最初のverify/commit state writeより前にfield名付き
+configuration errorとなる。`require_trace_completeness`だけは`false`を許し、missing required linkを
+raw factとして保持したnon-blocking warningへ変える。
 
-必須linkが欠落している場合、commit不可である。
+parserは最終値と同時に`effective-verification-policy-v1`を作る。各ruleはstable ID、built-in default/repository config/CLI override source、effective JSON value、applicability、safety classを持ち、ID順に正規化したdigestへ束縛する。required-link宣言順はdigestを変えず、verification command ID重複はstable identityを持てないため拒否する。safety-floorの明示`false`はrule ID/source/adoption rejectedを含むerrorとなる。一般的なCLI policy override flagはまだ提供しない。
+
+coverageは`coverage.unclassified_changes=allow_with_disclosure`をbuilt-in effective ruleとして持つ。これは`ChangeCoverage`をdecision/certificateへ開示・束縛する規則であり、non-Atom bytesを検証済みと呼ぶ規則でも、新しいblockerでもない。path/class別require-review/denyは対応workflowと別ADRなしに追加しない。
+
+`commit_policy.require_commit_signature` は既定で `false` である。`true` の場合、live commitはtransaction markerを作成した後、immutable objectやcandidate commitを保存する前に署名鍵の存在を確認し、鍵がなければbranch headを公開せず診断可能なpending transactionを残す。
+
+`verification` itemは `id`、`command`、`cwd` に加えて、実行契約として `timeout_ms`、`max_output_bytes`、`inherit_env`、`env`、`allow_failure` を持てる。未指定時は300秒timeout、各stream 64KiB保存cap、`inherit_env=false`の固定PATH/LANG/LC_ALL/TZ allowlist＋明示`env`、失敗blockingで実行する。cwdはopen directory配下に制限し、live subjectのcanonical worktree manifest digestを実行前に照合したうえで、実行subject/input/environment/worktree digestとresource resultをversioned execution recordへ保存する。`inherit_env=true`は明示的なweaker profileで、実行時Unicode environment snapshotを固定してdigestへ束縛する（ADR-016）。
+policy自体はsealed `policy` rootへ保存されるため、verification commandまたは明示`env`にsecret-like inline metadataを置くことは禁止する。preflightはcheck IDだけを示してactive publication前に拒否し、値をdiagnosticへ反射しない。secret-dependent checkはsecret-free helperと明示的なenvironment inheritanceで構成する。
+
+`require_trace_completeness=true`で必須linkが欠落している場合、commit不可である。
 
 ## 9.11 propagation policy
 
