@@ -1173,6 +1173,77 @@ class CodeFireCliTests(unittest.TestCase):
             self.assertEqual(response, b"")
             self.assert_http_work_closed(observation)
 
+    def test_python_http_reserves_response_limit_before_freeze(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        entries = []
+
+        def configure(handler):
+            original = handler.freeze_response_body
+
+            def checked(self, payload):
+                entries.append(
+                    (
+                        any(
+                            reservation["charges"].get("response_bytes")
+                            == self.decision_work.profile.limit("response_bytes")
+                            for reservation in self.decision_work._reserved.values()
+                        ),
+                        self.decision_work.current.get("retained_bytes", 0),
+                        self._request_header_retained,
+                    )
+                )
+                return original(self, payload)
+
+            handler.freeze_response_body = checked
+
+        response, observation = self.exchange_http_handler(
+            namespace,
+            namespace["DecisionWorkProfile"].http_v1(),
+            b"GET /v1/projects/org/app/nope HTTP/1.0\r\n\r\n",
+            configure_handler=configure,
+        )
+        self.assertTrue(response.startswith(b"HTTP/1.0 404 Not Found\r\n"))
+        self.assertEqual(entries, [(True, entries[0][2], entries[0][2])])
+        self.assert_http_work_closed(observation)
+
+    def test_python_http_payload_close_failure_cancels_prepared_owner(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        globals_ = namespace["make_http_handler"].__globals__
+        original = globals_["handle_http_list"]
+        request = b"GET /v1/projects/org/app/branches HTTP/1.0\r\n\r\n"
+
+        class ClosingPayload(dict):
+            def close(self):
+                raise namespace["CFError"]("injected payload close failure")
+
+        try:
+            for limit, value, expected_diagnostic in [
+                (1024, "ok", None),
+                (64, "x" * 1_000_000, "response_bytes"),
+            ]:
+                globals_["handle_http_list"] = lambda *args, item=value: (
+                    200,
+                    ClosingPayload({"data": item}),
+                )
+                profile = namespace["DecisionWorkProfile"].http_v1(
+                    {"response_bytes": limit}
+                )
+                response, observation = self.exchange_http_handler(
+                    namespace, profile, request
+                )
+                self.assertEqual(response, b"")
+                diagnostic = observation["budget_diagnostic"]
+                if expected_diagnostic is None:
+                    self.assertIsNone(diagnostic)
+                else:
+                    self.assertEqual(
+                        diagnostic["dimension"], expected_diagnostic
+                    )
+                    self.assertEqual(diagnostic["observed"], limit + 1)
+                self.assert_http_work_closed(observation)
+        finally:
+            globals_["handle_http_list"] = original
+
     def test_python_http_cycle_payload_fails_with_bounded_work(self):
         namespace = runpy.run_path(str(CODEFIRE))
         globals_ = namespace["make_http_handler"].__globals__
@@ -1226,8 +1297,8 @@ class CodeFireCliTests(unittest.TestCase):
                 if prepared is not None:
                     published_headers.append(
                         (
-                            isinstance(prepared[0], bytes),
-                            prepared[1],
+                            isinstance(prepared.header, bytes),
+                            prepared.header_retained,
                             self.decision_work.current.get(
                                 "retained_bytes", 0
                             ),

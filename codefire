@@ -4963,6 +4963,52 @@ class _BoundedCanonicalJSONFreezer:
             raise
 
 
+class _PreparedHTTPResponseOwner:
+    """Own frozen response bytes until publication or explicit cancellation."""
+
+    def __init__(
+        self,
+        ledger: DecisionWorkLedger,
+        header: bytes,
+        header_retained: int,
+        body: bytes,
+        body_retained: int,
+    ) -> None:
+        self.ledger = ledger
+        self.header: bytes | None = header
+        self.body: bytes | None = body
+        self.header_retained = header_retained
+        self.body_retained = body_retained
+
+    @property
+    def retained_bytes(self) -> int:
+        return self.header_retained + self.body_retained
+
+    def close(self) -> None:
+        retained = self.retained_bytes
+        self.header = None
+        self.body = None
+        self.header_retained = 0
+        self.body_retained = 0
+        if retained:
+            self.ledger.release("retained_bytes", retained)
+
+    def publish(self, destination: Any) -> None:
+        if self.header is None or self.body is None:
+            raise CFError("prepared HTTP response owner is already closed")
+        try:
+            destination.write(self.header)
+            destination.write(self.body)
+        finally:
+            self.close()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
+
+
 def http_resource_budget_error(
     error: ResourceBudgetExceeded,
 ) -> tuple[int, dict[str, Any]]:
@@ -5320,95 +5366,118 @@ def make_http_handler(
                     self.decision_work.release("retained_bytes", retained)
                 raise
 
+        def prepare_json_owned(
+            self, status: int, payload: Any
+        ) -> _PreparedHTTPResponseOwner | None:
+            if self._response_owner_observation is None:
+                self._response_owner_observation = {
+                    "request_header_retained": self._request_header_retained,
+                    "request_ast_retained": self._request_ast_retained,
+                    "raw_requestline_live": bool(
+                        getattr(self, "raw_requestline", b"")
+                    ),
+                    "headers_live": getattr(self, "headers", None) is not None,
+                }
+            for attempt in range(2):
+                body: bytes | None = None
+                header: bytes | None = None
+                body_retained = 0
+                header_retained = 0
+                response_permit = None
+                try:
+                    response_permit = self.decision_work.reserve(
+                        "response_body",
+                        charges={
+                            "response_bytes": profile.limit("response_bytes")
+                        },
+                    )
+                    body, body_retained = self.freeze_response_body(payload)
+                    header, header_retained = self.freeze_response_header(
+                        status, len(body)
+                    )
+                    self.finish_permit(
+                        response_permit,
+                        phase="response_body",
+                        charges={"response_bytes": len(body)},
+                    )
+                    response_permit = None
+                    prepared = _PreparedHTTPResponseOwner(
+                        self.decision_work,
+                        header,
+                        header_retained,
+                        body,
+                        body_retained,
+                    )
+                    header = None
+                    body = None
+                    header_retained = 0
+                    body_retained = 0
+                    return prepared
+                except ResourceBudgetExceeded as error:
+                    self.cancel_if_open(response_permit)
+                    header = None
+                    body = None
+                    if header_retained:
+                        self.decision_work.release(
+                            "retained_bytes", header_retained
+                        )
+                    if body_retained:
+                        self.decision_work.release(
+                            "retained_bytes", body_retained
+                        )
+                    if attempt or self._budget_error is not None:
+                        self.close_connection = True
+                        return None
+                    self._budget_error = error
+                    status, payload = http_resource_budget_error(error)
+                except Exception:
+                    self.cancel_if_open(response_permit)
+                    header = None
+                    body = None
+                    if header_retained:
+                        self.decision_work.release(
+                            "retained_bytes", header_retained
+                        )
+                    if body_retained:
+                        self.decision_work.release(
+                            "retained_bytes", body_retained
+                        )
+                    raise
+            return None
+
         def prepare_json(
             self, status: int, payload: Any
-        ) -> tuple[bytes, int, bytes, int] | None:
+        ) -> _PreparedHTTPResponseOwner | None:
             payload_owner = payload
             try:
-                if self._response_owner_observation is None:
-                    self._response_owner_observation = {
-                        "request_header_retained": self._request_header_retained,
-                        "request_ast_retained": self._request_ast_retained,
-                        "raw_requestline_live": bool(
-                            getattr(self, "raw_requestline", b"")
-                        ),
-                        "headers_live": getattr(self, "headers", None) is not None,
-                    }
-                for attempt in range(2):
-                    body: bytes | None = None
-                    header: bytes | None = None
-                    body_retained = 0
-                    header_retained = 0
-                    body_permit = None
-                    try:
-                        body, body_retained = self.freeze_response_body(payload)
-                        header, header_retained = self.freeze_response_header(
-                            status, len(body)
-                        )
-                        body_permit = self.decision_work.reserve(
-                            "response_body",
-                            charges={"response_bytes": len(body)},
-                        )
-                        self.finish_permit(
-                            body_permit,
-                            phase="response_body",
-                            charges={"response_bytes": len(body)},
-                        )
-                        body_permit = None
-                        return header, header_retained, body, body_retained
-                    except ResourceBudgetExceeded as error:
-                        self.cancel_if_open(body_permit)
-                        header = None
-                        body = None
-                        if header_retained:
-                            self.decision_work.release(
-                                "retained_bytes", header_retained
-                            )
-                        if body_retained:
-                            self.decision_work.release(
-                                "retained_bytes", body_retained
-                            )
-                        if attempt or self._budget_error is not None:
-                            self.close_connection = True
-                            return None
-                        self._budget_error = error
-                        status, payload = http_resource_budget_error(error)
-                    except Exception:
-                        self.cancel_if_open(body_permit)
-                        header = None
-                        body = None
-                        if header_retained:
-                            self.decision_work.release(
-                                "retained_bytes", header_retained
-                            )
-                        if body_retained:
-                            self.decision_work.release(
-                                "retained_bytes", body_retained
-                            )
-                        raise
-                return None
-            finally:
+                prepared = self.prepare_json_owned(status, payload)
+            except Exception:
                 close = getattr(payload_owner, "close", None)
                 if close is not None:
+                    try:
+                        close()
+                    except Exception:
+                        pass
+                raise
+            close = getattr(payload_owner, "close", None)
+            if close is not None:
+                try:
                     close()
+                except Exception:
+                    if prepared is not None:
+                        prepared.close()
+                    raise
+            return prepared
 
         def publish_prepared(
-            self, prepared: tuple[bytes, int, bytes, int] | None
+            self, prepared: _PreparedHTTPResponseOwner | None
         ) -> None:
             if prepared is None:
                 return
-            header, header_retained, body, body_retained = prepared
-            prepared = None
             try:
-                self.wfile.write(header)
-                self.wfile.write(body)
+                prepared.publish(self.wfile)
             finally:
-                header = None
-                body = None
                 self._response_body_dropped_before_release = True
-                self.decision_work.release(
-                    "retained_bytes", header_retained + body_retained
-                )
 
         def send_json(self, status: int, payload: Any) -> None:
             self.publish_prepared(self.prepare_json(status, payload))
