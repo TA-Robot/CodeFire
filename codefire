@@ -4880,9 +4880,12 @@ class _BoundedCanonicalJSONFreezer:
             frozen = bytes(self.chunk)
             assert self.fragments is not None
             self.fragments.append(frozen)
-        except Exception:
+        except BaseException:
             frozen = None
-            self._release("retained_bytes", ownership)
+            try:
+                self._release("retained_bytes", ownership)
+            except BaseException:
+                pass
             raise
         self.fragment_bytes += amount
         self.fragment_slots += self.FRAGMENT_SLOT_BYTES
@@ -4955,8 +4958,12 @@ class _BoundedCanonicalJSONFreezer:
             try:
                 assert self.fragments is not None
                 body = b"".join(self.fragments)
-            except Exception:
-                self._release("retained_bytes", final_size)
+            except BaseException:
+                body = None
+                try:
+                    self._release("retained_bytes", final_size)
+                except BaseException:
+                    pass
                 raise
             self.fragments = None
             intermediate = (
@@ -4967,8 +4974,11 @@ class _BoundedCanonicalJSONFreezer:
             self.fragment_slots = 0
             self.fragment_bytes = 0
             return body, final_size
-        except Exception:
-            self._cleanup()
+        except BaseException:
+            try:
+                self._cleanup()
+            except BaseException:
+                pass
             raise
 
 
@@ -5014,7 +5024,7 @@ class _PreparedHTTPResponseOwner:
     def __del__(self) -> None:
         try:
             self.close()
-        except Exception:
+        except BaseException:
             pass
 
 
@@ -5364,15 +5374,24 @@ def make_http_handler(
                 self.decision_work.release("temporary_bytes", temporary)
                 temporary = 0
                 return header, retained
-            except Exception:
+            except BaseException:
                 header = None
                 header_text = None
                 date_value = None
-                self.cancel_if_open(permit)
-                if temporary:
-                    self.decision_work.release("temporary_bytes", temporary)
-                if retained:
-                    self.decision_work.release("retained_bytes", retained)
+                try:
+                    self.cancel_if_open(permit)
+                except BaseException:
+                    pass
+                try:
+                    if temporary:
+                        self.decision_work.release("temporary_bytes", temporary)
+                except BaseException:
+                    pass
+                try:
+                    if retained:
+                        self.decision_work.release("retained_bytes", retained)
+                except BaseException:
+                    pass
                 raise
 
         def prepare_json_owned(
@@ -5423,34 +5442,52 @@ def make_http_handler(
                     body_retained = 0
                     return prepared
                 except ResourceBudgetExceeded as error:
-                    self.cancel_if_open(response_permit)
                     header = None
                     body = None
-                    if header_retained:
-                        self.decision_work.release(
-                            "retained_bytes", header_retained
-                        )
-                    if body_retained:
-                        self.decision_work.release(
-                            "retained_bytes", body_retained
-                        )
+                    try:
+                        self.cancel_if_open(response_permit)
+                    except BaseException:
+                        pass
+                    try:
+                        if header_retained:
+                            self.decision_work.release(
+                                "retained_bytes", header_retained
+                            )
+                    except BaseException:
+                        pass
+                    try:
+                        if body_retained:
+                            self.decision_work.release(
+                                "retained_bytes", body_retained
+                            )
+                    except BaseException:
+                        pass
                     if attempt or self._budget_error is not None:
                         self.close_connection = True
                         return None
                     self._budget_error = error
                     status, payload = http_resource_budget_error(error)
-                except Exception:
-                    self.cancel_if_open(response_permit)
+                except BaseException:
                     header = None
                     body = None
-                    if header_retained:
-                        self.decision_work.release(
-                            "retained_bytes", header_retained
-                        )
-                    if body_retained:
-                        self.decision_work.release(
-                            "retained_bytes", body_retained
-                        )
+                    try:
+                        self.cancel_if_open(response_permit)
+                    except BaseException:
+                        pass
+                    try:
+                        if header_retained:
+                            self.decision_work.release(
+                                "retained_bytes", header_retained
+                            )
+                    except BaseException:
+                        pass
+                    try:
+                        if body_retained:
+                            self.decision_work.release(
+                                "retained_bytes", body_retained
+                            )
+                    except BaseException:
+                        pass
                     raise
             return None
 
@@ -5758,19 +5795,33 @@ def make_http_handler(
                     ast_retained = canonical_size
                     request_retained = canonical_size
                     self._request_ast_retained = canonical_size
-                except Exception:
-                    self.cancel_if_open(body_permit)
-                    self.cancel_if_open(ast_permit)
+                except BaseException:
                     body = None
                     body_bytes = None
+                    request = None
+                    try:
+                        self.cancel_if_open(body_permit)
+                    except BaseException:
+                        pass
+                    try:
+                        self.cancel_if_open(ast_permit)
+                    except BaseException:
+                        pass
                     if raw_temporary:
                         self._request_raw_dropped_before_temp_release = True
-                        self.decision_work.release(
-                            "temporary_bytes", raw_temporary
-                        )
-                    request = None
+                        try:
+                            self.decision_work.release(
+                                "temporary_bytes", raw_temporary
+                            )
+                        except BaseException:
+                            pass
                     if ast_retained:
-                        self.decision_work.release("retained_bytes", ast_retained)
+                        try:
+                            self.decision_work.release(
+                                "retained_bytes", ast_retained
+                            )
+                        except BaseException:
+                            pass
                     raise
                 self.cancel_if_open(body_permit)
                 self.cancel_if_open(ast_permit)
@@ -5793,14 +5844,17 @@ def make_http_handler(
                 status, payload = http_resource_budget_error(exc)
             except CFError as exc:
                 status, payload = http_error(400, str(exc))
-            except Exception:
+            except BaseException:
                 payload = None
                 request = None
                 if request_retained:
-                    self.decision_work.release(
-                        "retained_bytes", request_retained
-                    )
                     self._request_ast_retained = 0
+                    try:
+                        self.decision_work.release(
+                            "retained_bytes", request_retained
+                        )
+                    except BaseException:
+                        pass
                 raise
             prepared = None
             try:

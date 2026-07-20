@@ -1173,6 +1173,106 @@ class CodeFireCliTests(unittest.TestCase):
             self.assertEqual(response, b"")
             self.assert_http_work_closed(observation)
 
+    def test_python_http_base_exceptions_release_response_owners(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        request = b"GET /v1/projects/org/app/nope HTTP/1.0\r\n\r\n"
+
+        for error_type in [KeyboardInterrupt, SystemExit]:
+            for fault in ["after_body", "header"]:
+                injected = error_type(f"injected {fault} interruption")
+                captured = []
+
+                def configure(handler, selected=fault, error=injected):
+                    original_handle = handler.handle_one_request
+
+                    def capture(self):
+                        try:
+                            return original_handle(self)
+                        except BaseException as caught:
+                            captured.append(caught)
+                            return None
+
+                    handler.handle_one_request = capture
+                    if selected == "after_body":
+                        def fail_header(self, status, body_size):
+                            raise error
+
+                        handler.freeze_response_header = fail_header
+                    else:
+                        def fail_date(self):
+                            raise error
+
+                        handler.date_time_string = fail_date
+
+                response, observation = self.exchange_http_handler(
+                    namespace,
+                    namespace["DecisionWorkProfile"].http_v1(),
+                    request,
+                    configure_handler=configure,
+                )
+                self.assertEqual(response, b"")
+                self.assertEqual(captured, [injected])
+                self.assert_http_work_closed(observation)
+
+    def test_python_http_base_exceptions_release_post_request_owners(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        globals_ = namespace["make_http_handler"].__globals__
+        original_gc = globals_["handle_http_gc"]
+        original_loads = globals_["json"].loads
+        body = b'{"value":"owned"}'
+        request = (
+            b"POST /v1/projects/org/app/gc HTTP/1.0\r\n"
+            + f"Content-Length: {len(body)}\r\n\r\n".encode()
+            + body
+        )
+
+        try:
+            for error_type in [KeyboardInterrupt, SystemExit]:
+                for fault in ["request", "dispatch"]:
+                    injected = error_type(f"injected {fault} interruption")
+                    captured = []
+
+                    def configure(handler):
+                        original_handle = handler.handle_one_request
+
+                        def capture(self):
+                            try:
+                                return original_handle(self)
+                            except BaseException as caught:
+                                captured.append(caught)
+                                return None
+
+                        handler.handle_one_request = capture
+
+                    if fault == "request":
+                        def fail_loads(value, *args, error=injected, **kwargs):
+                            del value, args, kwargs
+                            raise error
+
+                        globals_["json"].loads = fail_loads
+                        globals_["handle_http_gc"] = original_gc
+                    else:
+                        globals_["json"].loads = original_loads
+
+                        def fail_dispatch(*args, error=injected):
+                            del args
+                            raise error
+
+                        globals_["handle_http_gc"] = fail_dispatch
+
+                    response, observation = self.exchange_http_handler(
+                        namespace,
+                        namespace["DecisionWorkProfile"].http_v1(),
+                        request,
+                        configure_handler=configure,
+                    )
+                    self.assertEqual(response, b"")
+                    self.assertEqual(captured, [injected])
+                    self.assert_http_work_closed(observation)
+        finally:
+            globals_["json"].loads = original_loads
+            globals_["handle_http_gc"] = original_gc
+
     def test_python_http_reserves_response_limit_before_freeze(self):
         namespace = runpy.run_path(str(CODEFIRE))
         entries = []
@@ -1577,6 +1677,55 @@ class CodeFireCliTests(unittest.TestCase):
             freezer.freeze({"ok": True})
         self.assertTrue(all(value == 0 for value in ledger.current.values()))
         self.assertFalse(ledger.has_open_permits())
+
+    def test_python_bounded_json_freezer_cleans_base_exceptions(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        profile = namespace["DecisionWorkProfile"].http_v1()
+
+        def budget_error(dimension, observed, phase):
+            return namespace["ResourceBudgetExceeded"](
+                profile=profile.profile_id,
+                dimension=dimension,
+                observed=observed,
+                limit=profile.limit(dimension),
+                phase=phase,
+                command="http request",
+                continuation_supported=False,
+            )
+
+        base = namespace["_BoundedCanonicalJSONFreezer"]
+        for error_type in [KeyboardInterrupt, SystemExit]:
+            for fault in ["fragment", "join"]:
+                injected = error_type(f"injected {fault} interruption")
+
+                class InterruptingFragments(list):
+                    def append(self, value):
+                        if fault == "fragment":
+                            raise injected
+                        return list.append(self, value)
+
+                    def __iter__(self):
+                        if fault == "join":
+                            raise injected
+                        return list.__iter__(self)
+
+                class InterruptingFreezer(base):
+                    def _new_fragment_list(self):
+                        return InterruptingFragments()
+
+                ledger = namespace["DecisionWorkLedger"](
+                    profile, "http request", command_kind="http_request"
+                )
+                freezer = InterruptingFreezer(
+                    ledger, profile, budget_error, 64
+                )
+                with self.assertRaises(error_type) as raised:
+                    freezer.freeze({"ok": True})
+                self.assertIs(raised.exception, injected)
+                self.assertTrue(
+                    all(value == 0 for value in ledger.current.values())
+                )
+                self.assertFalse(ledger.has_open_permits())
 
     def test_python_bounded_json_freezer_never_calls_container_subclass_hooks(self):
         namespace = runpy.run_path(str(CODEFIRE))
