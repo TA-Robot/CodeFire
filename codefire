@@ -4647,6 +4647,322 @@ class _BoundedHTTPHeaderReader:
         return getattr(self.source, name)
 
 
+class _BoundedCanonicalJSONFreezer:
+    """Iteratively freeze compact JSON while bounding every owned work buffer."""
+
+    STACK_BASE = 64
+    TOKEN_BYTES = 128
+    SORT_BASE = 64
+    SORT_ENTRY_BYTES = 16
+    FRAGMENT_BASE = 64
+    FRAGMENT_SLOT_BYTES = 16
+    CHUNK_BASE = 64
+    CHUNK_BYTES = 4096
+
+    def __init__(
+        self,
+        ledger: DecisionWorkLedger,
+        profile: DecisionWorkProfile,
+        budget_error: Any,
+        limit: int,
+    ) -> None:
+        self.ledger = ledger
+        self.profile = profile
+        self.budget_error = budget_error
+        self.limit = limit
+        self.stack: list[tuple[str, Any]] | None = None
+        self.fragments: list[bytes] | None = None
+        self.chunk: bytearray | None = None
+        self.stack_bytes = 0
+        self.fragment_bytes = 0
+        self.fragment_slots = 0
+        self.fragment_base = 0
+        self.chunk_bytes = 0
+        self.chunk_owner = 0
+        self.size = 0
+        self.overflow = False
+
+    def _acquire(self, dimension: str, amount: int) -> None:
+        if amount == 0:
+            return
+        observed = self.ledger.current.get(dimension, 0) + amount
+        if observed > self.profile.limit(dimension):
+            raise self.budget_error(dimension, observed, "response_body")
+        permit = self.ledger.reserve(
+            "response_body", acquires={dimension: amount}
+        )
+        try:
+            self.ledger.consume_reserved(
+                permit,
+                phase="response_body",
+                acquires={dimension: amount},
+            )
+        finally:
+            if self.ledger.permit_is_open(permit):
+                self.ledger.cancel_permit(permit)
+
+    def _release(self, dimension: str, amount: int) -> None:
+        if amount:
+            self.ledger.release(dimension, amount)
+
+    def _push(self, kind: str, value: Any) -> None:
+        self._acquire("temporary_bytes", self.TOKEN_BYTES)
+        self.stack_bytes += self.TOKEN_BYTES
+        assert self.stack is not None
+        self.stack.append((kind, value))
+
+    def _emit_byte(self, value: int) -> None:
+        if self.overflow:
+            return
+        assert self.chunk is not None
+        self.chunk.append(value)
+        self.size += 1
+        if self.size > self.limit:
+            self.size = self.limit + 1
+            self.overflow = True
+        if len(self.chunk) == self.chunk_bytes:
+            self._flush_chunk()
+
+    def _emit_ascii(self, value: bytes) -> None:
+        for byte in value:
+            self._emit_byte(byte)
+            if self.overflow:
+                return
+
+    def _emit_codepoint(self, codepoint: int) -> None:
+        if codepoint <= 0x7F:
+            self._emit_byte(codepoint)
+        elif codepoint <= 0x7FF:
+            self._emit_byte(0xC0 | (codepoint >> 6))
+            self._emit_byte(0x80 | (codepoint & 0x3F))
+        elif 0xD800 <= codepoint <= 0xDFFF:
+            raise CFError("HTTP JSON response contains an unpaired surrogate")
+        elif codepoint <= 0xFFFF:
+            self._emit_byte(0xE0 | (codepoint >> 12))
+            self._emit_byte(0x80 | ((codepoint >> 6) & 0x3F))
+            self._emit_byte(0x80 | (codepoint & 0x3F))
+        else:
+            self._emit_byte(0xF0 | (codepoint >> 18))
+            self._emit_byte(0x80 | ((codepoint >> 12) & 0x3F))
+            self._emit_byte(0x80 | ((codepoint >> 6) & 0x3F))
+            self._emit_byte(0x80 | (codepoint & 0x3F))
+
+    def _emit_string(self, value: str) -> None:
+        self._emit_byte(ord('"'))
+        for character in value:
+            if self.overflow:
+                return
+            codepoint = ord(character)
+            if character == '"':
+                self._emit_ascii(b'\\"')
+            elif character == "\\":
+                self._emit_ascii(b"\\\\")
+            elif character == "\b":
+                self._emit_ascii(b"\\b")
+            elif character == "\f":
+                self._emit_ascii(b"\\f")
+            elif character == "\n":
+                self._emit_ascii(b"\\n")
+            elif character == "\r":
+                self._emit_ascii(b"\\r")
+            elif character == "\t":
+                self._emit_ascii(b"\\t")
+            elif codepoint < 0x20:
+                self._emit_ascii(b"\\u00")
+                digits = b"0123456789abcdef"
+                self._emit_byte(digits[(codepoint >> 4) & 0xF])
+                self._emit_byte(digits[codepoint & 0xF])
+            else:
+                self._emit_codepoint(codepoint)
+        self._emit_byte(ord('"'))
+
+    def _emit_scalar_bytes(self, value: Any) -> None:
+        if value is None:
+            self._emit_ascii(b"null")
+            return
+        if value is True:
+            self._emit_ascii(b"true")
+            return
+        if value is False:
+            self._emit_ascii(b"false")
+            return
+        if isinstance(value, str):
+            self._emit_string(value)
+            return
+        if isinstance(value, int):
+            upper = max(1, (abs(value).bit_length() * 30103) // 100000 + 3)
+            remaining = self.limit + 1 - self.size
+            if upper > remaining + 2:
+                self.size = self.limit + 1
+                self.overflow = True
+                return
+            scratch = (upper * 2) + 64
+            self._acquire("temporary_bytes", scratch)
+            encoded: bytes | None = None
+            text_value: str | None = None
+            try:
+                text_value = str(value)
+                encoded = text_value.encode("ascii")
+                self._emit_ascii(encoded)
+            finally:
+                encoded = None
+                text_value = None
+                self._release("temporary_bytes", scratch)
+            return
+        if isinstance(value, float):
+            scratch = 128
+            self._acquire("temporary_bytes", scratch)
+            encoded = None
+            text_value = None
+            try:
+                text_value = json.dumps(value, separators=(",", ":"))
+                encoded = text_value.encode("ascii")
+                self._emit_ascii(encoded)
+            finally:
+                encoded = None
+                text_value = None
+                self._release("temporary_bytes", scratch)
+            return
+        raise CFError(
+            f"HTTP JSON response contains unsupported {type(value).__name__}"
+        )
+
+    def _expand(self, value: Any) -> None:
+        if isinstance(value, dict):
+            count = len(value)
+            sort_bytes = self.SORT_BASE + (self.SORT_ENTRY_BYTES * count)
+            self._acquire("temporary_bytes", sort_bytes)
+            keys: list[str] | None = None
+            try:
+                try:
+                    keys = sorted(value)
+                except TypeError as error:
+                    raise CFError("HTTP JSON response keys must be strings") from error
+                if any(not isinstance(key, str) for key in keys):
+                    raise CFError("HTTP JSON response keys must be strings")
+                self._push("raw", b"}")
+                for index in range(count - 1, -1, -1):
+                    key = keys[index]
+                    self._push("value", value[key])
+                    self._push("raw", b":")
+                    self._push("string", key)
+                    if index:
+                        self._push("raw", b",")
+                self._push("raw", b"{")
+            finally:
+                keys = None
+                self._release("temporary_bytes", sort_bytes)
+            return
+        if isinstance(value, (list, tuple)):
+            self._push("raw", b"]")
+            for index in range(len(value) - 1, -1, -1):
+                self._push("value", value[index])
+                if index:
+                    self._push("raw", b",")
+            self._push("raw", b"[")
+            return
+        self._emit_scalar_bytes(value)
+
+    def _flush_chunk(self) -> None:
+        assert self.chunk is not None
+        if not self.chunk:
+            return
+        amount = len(self.chunk)
+        ownership = amount + self.FRAGMENT_SLOT_BYTES
+        self._acquire("retained_bytes", ownership)
+        try:
+            frozen = bytes(self.chunk)
+            assert self.fragments is not None
+            self.fragments.append(frozen)
+        except Exception:
+            self._release("retained_bytes", ownership)
+            raise
+        self.fragment_bytes += amount
+        self.fragment_slots += self.FRAGMENT_SLOT_BYTES
+        self.chunk.clear()
+
+    def _cleanup(self) -> None:
+        self.stack = None
+        self.fragments = None
+        self.chunk = None
+        self._release("temporary_bytes", self.stack_bytes)
+        self._release("temporary_bytes", self.chunk_owner)
+        self._release(
+            "retained_bytes",
+            self.fragment_base + self.fragment_slots + self.fragment_bytes,
+        )
+        self.stack_bytes = 0
+        self.chunk_bytes = 0
+        self.chunk_owner = 0
+        self.fragment_base = 0
+        self.fragment_slots = 0
+        self.fragment_bytes = 0
+
+    def freeze(self, payload: Any) -> tuple[bytes, int]:
+        try:
+            self._acquire("temporary_bytes", self.STACK_BASE)
+            self.stack_bytes = self.STACK_BASE
+            self.stack = []
+            self._acquire("retained_bytes", self.FRAGMENT_BASE)
+            self.fragment_base = self.FRAGMENT_BASE
+            self.fragments = []
+            chunk_capacity = min(self.CHUNK_BYTES, self.limit + 1)
+            chunk_capacity = max(1, chunk_capacity)
+            self._acquire(
+                "temporary_bytes", self.CHUNK_BASE + chunk_capacity
+            )
+            self.chunk_bytes = chunk_capacity
+            self.chunk_owner = self.CHUNK_BASE + chunk_capacity
+            self.chunk = bytearray()
+            self._push("value", payload)
+            while self.stack and not self.overflow:
+                kind, value = self.stack.pop()
+                try:
+                    if kind == "raw":
+                        self._emit_ascii(value)
+                    elif kind == "string":
+                        self._emit_string(value)
+                    else:
+                        self._expand(value)
+                finally:
+                    self.stack_bytes -= self.TOKEN_BYTES
+                    self._release("temporary_bytes", self.TOKEN_BYTES)
+            if self.overflow:
+                raise self.budget_error(
+                    "response_bytes", self.limit + 1, "response_body"
+                )
+            self._flush_chunk()
+            self.stack = None
+            self._release("temporary_bytes", self.stack_bytes)
+            self.stack_bytes = 0
+            self.chunk = None
+            self._release(
+                "temporary_bytes", self.chunk_owner
+            )
+            self.chunk_bytes = 0
+            self.chunk_owner = 0
+            final_size = self.size
+            self._acquire("retained_bytes", final_size)
+            try:
+                assert self.fragments is not None
+                body = b"".join(self.fragments)
+            except Exception:
+                self._release("retained_bytes", final_size)
+                raise
+            self.fragments = None
+            intermediate = (
+                self.fragment_base + self.fragment_slots + self.fragment_bytes
+            )
+            self._release("retained_bytes", intermediate)
+            self.fragment_base = 0
+            self.fragment_slots = 0
+            self.fragment_bytes = 0
+            return body, final_size
+        except Exception:
+            self._cleanup()
+            raise
+
+
 def http_resource_budget_error(
     error: ResourceBudgetExceeded,
 ) -> tuple[int, dict[str, Any]]:

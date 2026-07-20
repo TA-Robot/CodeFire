@@ -1152,6 +1152,70 @@ class CodeFireCliTests(unittest.TestCase):
         self.assertEqual(len(exact_reader.readline()), limit)
         self.assertEqual(exact_source.tell(), limit)
 
+    def test_python_bounded_json_freezer_stops_at_limit_plus_one(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        profile = namespace["DecisionWorkProfile"].http_v1()
+        ledger = namespace["DecisionWorkLedger"](
+            profile, "http request", command_kind="http_request"
+        )
+
+        def budget_error(dimension, observed, phase):
+            return namespace["ResourceBudgetExceeded"](
+                profile=profile.profile_id,
+                dimension=dimension,
+                observed=observed,
+                limit=profile.limit(dimension),
+                phase=phase,
+                command="http request",
+                continuation_supported=False,
+            )
+
+        limit = 64
+        freezer = namespace["_BoundedCanonicalJSONFreezer"](
+            ledger, profile, budget_error, limit
+        )
+        with self.assertRaises(namespace["ResourceBudgetExceeded"]) as raised:
+            freezer.freeze({"data": "x" * 1_000_000})
+        diagnostic = raised.exception.diagnostic()
+        self.assertEqual(diagnostic["dimension"], "response_bytes")
+        self.assertEqual(diagnostic["observed"], limit + 1)
+        self.assertTrue(all(value == 0 for value in ledger.current.values()))
+        self.assertFalse(ledger.has_open_permits())
+
+    def test_python_bounded_json_freezer_preflights_deep_frontier(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        profile = namespace["DecisionWorkProfile"].http_v1(
+            {"temporary_bytes": ("concurrent", 1)}
+        )
+        ledger = namespace["DecisionWorkLedger"](
+            profile, "http request", command_kind="http_request"
+        )
+
+        def budget_error(dimension, observed, phase):
+            return namespace["ResourceBudgetExceeded"](
+                profile=profile.profile_id,
+                dimension=dimension,
+                observed=observed,
+                limit=profile.limit(dimension),
+                phase=phase,
+                command="http request",
+                continuation_supported=False,
+            )
+
+        payload = None
+        for _ in range(100):
+            payload = [payload]
+        freezer = namespace["_BoundedCanonicalJSONFreezer"](
+            ledger, profile, budget_error, 1024
+        )
+        with self.assertRaises(namespace["ResourceBudgetExceeded"]) as raised:
+            freezer.freeze(payload)
+        diagnostic = raised.exception.diagnostic()
+        self.assertEqual(diagnostic["dimension"], "temporary_bytes")
+        self.assertEqual(diagnostic["observed"], freezer.STACK_BASE)
+        self.assertTrue(all(value == 0 for value in ledger.current.values()))
+        self.assertFalse(ledger.has_open_permits())
+
     def test_python_http_physical_body_ownership_is_bounded(self):
         namespace = runpy.run_path(str(CODEFIRE))
         body = b'"' + (b"x" * 510) + b'"'
