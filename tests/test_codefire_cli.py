@@ -1228,8 +1228,20 @@ class CodeFireCliTests(unittest.TestCase):
                 profile = namespace["DecisionWorkProfile"].http_v1(
                     {"response_bytes": limit}
                 )
+
+                def configure(handler, item=value):
+                    original_prepare = handler.prepare_json_owned
+
+                    def prepare_exact(self, status, payload):
+                        return original_prepare(self, status, {"data": item})
+
+                    handler.prepare_json_owned = prepare_exact
+
                 response, observation = self.exchange_http_handler(
-                    namespace, profile, request
+                    namespace,
+                    profile,
+                    request,
+                    configure_handler=configure,
                 )
                 self.assertEqual(response, b"")
                 diagnostic = observation["budget_diagnostic"]
