@@ -1140,6 +1140,67 @@ class CodeFireCliTests(unittest.TestCase):
         finally:
             globals_["handle_http_gc"] = original_gc
 
+    def test_python_http_prepare_faults_release_all_response_owners(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        error_type = namespace["CFError"]
+        request = b"GET /v1/projects/org/app/nope HTTP/1.0\r\n\r\n"
+
+        for fault in ["header", "charge"]:
+            def configure(handler, selected=fault):
+                if selected == "header":
+                    def fail_header(self, status, body_size):
+                        raise error_type("injected header freeze failure")
+
+                    handler.freeze_response_header = fail_header
+                    return
+
+                original_finish = handler.finish_permit
+
+                def fail_charge(self, permit, **kwargs):
+                    charges = kwargs.get("charges") or {}
+                    if "response_bytes" in charges:
+                        raise error_type("injected body charge failure")
+                    return original_finish(self, permit, **kwargs)
+
+                handler.finish_permit = fail_charge
+
+            response, observation = self.exchange_http_handler(
+                namespace,
+                namespace["DecisionWorkProfile"].http_v1(),
+                request,
+                configure_handler=configure,
+            )
+            self.assertEqual(response, b"")
+            self.assert_http_work_closed(observation)
+
+    def test_python_http_cycle_payload_fails_with_bounded_work(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        globals_ = namespace["make_http_handler"].__globals__
+        original = globals_["handle_http_list"]
+        payload = {}
+        payload["self"] = payload
+        request = b"GET /v1/projects/org/app/branches HTTP/1.0\r\n\r\n"
+        try:
+            globals_["handle_http_list"] = lambda *args: (200, payload)
+            profile = namespace["DecisionWorkProfile"].http_v1(
+                {"temporary_bytes": ("concurrent", 4096)}
+            )
+            response, observation = self.exchange_http_handler(
+                namespace, profile, request
+            )
+        finally:
+            globals_["handle_http_list"] = original
+        self.assertTrue(
+            not response
+            or response.startswith(
+                b"HTTP/1.0 413 Request Entity Too Large\r\n"
+            )
+        )
+        diagnostic = observation["budget_diagnostic"]
+        self.assertEqual(diagnostic["dimension"], "temporary_bytes")
+        self.assertGreater(diagnostic["observed"], diagnostic["limit"])
+        self.assert_http_work_closed(observation)
+
     def test_python_http_prebuilds_one_owned_header_buffer(self):
         namespace = runpy.run_path(str(CODEFIRE))
         prepared_headers = []

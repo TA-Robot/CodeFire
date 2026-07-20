@@ -5339,6 +5339,7 @@ def make_http_handler(
                     header: bytes | None = None
                     body_retained = 0
                     header_retained = 0
+                    body_permit = None
                     try:
                         body, body_retained = self.freeze_response_body(payload)
                         header, header_retained = self.freeze_response_header(
@@ -5353,8 +5354,10 @@ def make_http_handler(
                             phase="response_body",
                             charges={"response_bytes": len(body)},
                         )
+                        body_permit = None
                         return header, header_retained, body, body_retained
                     except ResourceBudgetExceeded as error:
+                        self.cancel_if_open(body_permit)
                         header = None
                         body = None
                         if header_retained:
@@ -5370,6 +5373,19 @@ def make_http_handler(
                             return None
                         self._budget_error = error
                         status, payload = http_resource_budget_error(error)
+                    except Exception:
+                        self.cancel_if_open(body_permit)
+                        header = None
+                        body = None
+                        if header_retained:
+                            self.decision_work.release(
+                                "retained_bytes", header_retained
+                            )
+                        if body_retained:
+                            self.decision_work.release(
+                                "retained_bytes", body_retained
+                            )
+                        raise
                 return None
             finally:
                 close = getattr(payload_owner, "close", None)
