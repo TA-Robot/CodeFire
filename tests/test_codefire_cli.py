@@ -7,9 +7,11 @@ import io
 import os
 import runpy
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -57,6 +59,42 @@ class CodeFireCliTests(unittest.TestCase):
         if check and proc.returncode != 0:
             self.fail(f"codefire {' '.join(args)} failed\nstdout={proc.stdout}\nstderr={proc.stderr}")
         return proc
+
+    def exchange_http_handler(self, namespace, profile, request):
+        observations = []
+        handler = namespace["make_http_handler"](
+            self.tmp / "bounded-http",
+            profile,
+            _decision_work_observer=observations.append,
+        )
+        server = namespace["ReusableThreadingHTTPServer"](
+            ("127.0.0.1", 0), handler
+        )
+        thread = threading.Thread(target=server.handle_request, daemon=True)
+        thread.start()
+        try:
+            with socket.create_connection(server.server_address, timeout=5) as client:
+                client.settimeout(5)
+                client.sendall(request)
+                client.shutdown(socket.SHUT_WR)
+                chunks = []
+                while True:
+                    chunk = client.recv(64 * 1024)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+        finally:
+            server.server_close()
+            thread.join(timeout=5)
+        self.assertFalse(thread.is_alive(), "bounded HTTP handler did not terminate")
+        self.assertEqual(len(observations), 1)
+        return b"".join(chunks), observations[0]
+
+    def assert_http_work_closed(self, observation):
+        snapshot = observation["snapshot"]
+        self.assertIsNotNone(snapshot)
+        self.assertTrue(all(value == 0 for value in snapshot["current"].values()))
+        self.assertEqual(observation["open_permit_count"], 0)
 
     def object_digest(self, type_tag, payload):
         data = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -686,6 +724,331 @@ class CodeFireCliTests(unittest.TestCase):
         self.assertEqual(after["phases"], before["phases"])
         self.assertEqual(after["phase_counters"], before["phase_counters"])
         self.assertEqual(after["terminal_reason"], "budget_exceeded")
+
+    def test_python_http_request_header_boundaries_are_request_wide(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        limit = 256
+        profile = namespace["DecisionWorkProfile"].http_v1(
+            {"request_header_bytes": limit}
+        )
+        prefix = b"GET /v1/projects/org/app/nope HTTP/1.0\r\nX-Fill: "
+        suffix = b"\r\n\r\n"
+
+        for size in [limit - 1, limit, limit + 1]:
+            request = prefix + (b"x" * (size - len(prefix) - len(suffix))) + suffix
+            response, observation = self.exchange_http_handler(
+                namespace, profile, request
+            )
+            self.assert_http_work_closed(observation)
+            if size <= limit:
+                self.assertTrue(response.startswith(b"HTTP/1.0 404 Not Found\r\n"))
+                self.assertEqual(
+                    observation["snapshot"]["cumulative"][
+                        "request_header_bytes"
+                    ],
+                    size,
+                )
+                self.assertIsNone(observation["budget_diagnostic"])
+            else:
+                self.assertTrue(
+                    response.startswith(b"HTTP/1.0 413 Request Entity Too Large\r\n")
+                )
+                diagnostic = observation["budget_diagnostic"]
+                self.assertEqual(diagnostic["kind"], "resource_budget_exceeded")
+                self.assertEqual(diagnostic["exit_code"], 60)
+                self.assertEqual(diagnostic["dimension"], "request_header_bytes")
+                self.assertEqual(diagnostic["observed"], limit + 1)
+                self.assertEqual(diagnostic["limit"], limit)
+
+    def test_python_http_body_boundaries_reserve_before_read(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        limit = 64
+        profile = namespace["DecisionWorkProfile"].http_v1(
+            {"request_body_bytes": limit}
+        )
+        target = b"POST /v1/projects/org/app/nope HTTP/1.0\r\n"
+
+        for size in [limit - 1, limit, limit + 1]:
+            body = b'"' + (b"x" * (size - 2)) + b'"'
+            request = (
+                target
+                + f"Content-Length: {size}\r\n\r\n".encode("ascii")
+                + body
+            )
+            response, observation = self.exchange_http_handler(
+                namespace, profile, request
+            )
+            self.assert_http_work_closed(observation)
+            if size <= limit:
+                self.assertTrue(response.startswith(b"HTTP/1.0 404 Not Found\r\n"))
+                self.assertEqual(observation["request_body_bytes_read"], size)
+                self.assertEqual(
+                    observation["snapshot"]["cumulative"][
+                        "request_body_bytes"
+                    ],
+                    size,
+                )
+                self.assertGreaterEqual(
+                    observation["snapshot"]["peak"]["retained_bytes"],
+                    size * 2,
+                )
+            else:
+                self.assertTrue(
+                    response.startswith(b"HTTP/1.0 413 Request Entity Too Large\r\n")
+                )
+                self.assertEqual(observation["request_body_bytes_read"], 0)
+                diagnostic = observation["budget_diagnostic"]
+                self.assertEqual(diagnostic["dimension"], "request_body_bytes")
+                self.assertEqual(diagnostic["observed"], limit + 1)
+
+    def test_python_http_rejects_bad_content_length_before_body_read(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        profile = namespace["DecisionWorkProfile"].http_v1()
+        target = b"POST /v1/projects/org/app/nope HTTP/1.0\r\n"
+        cases = [
+            b"Content-Length: nope\r\n",
+            b"Content-Length: -1\r\n",
+            f"Content-Length: {namespace['U64_MAX'] + 1}\r\n".encode("ascii"),
+            b"Content-Length: " + (b"9" * 5000) + b"\r\n",
+            b"Content-Length: 2\r\nContent-Length: 2\r\n",
+            b"Transfer-Encoding: chunked\r\n",
+        ]
+
+        for headers in cases:
+            response, observation = self.exchange_http_handler(
+                namespace, profile, target + headers + b"\r\n{}"
+            )
+            self.assertTrue(response.startswith(b"HTTP/1.0 400 Bad Request\r\n"))
+            self.assertEqual(observation["request_body_bytes_read"], 0)
+            self.assertIsNone(observation["budget_diagnostic"])
+            self.assert_http_work_closed(observation)
+
+    def test_python_http_response_body_is_all_or_typed_budget_error(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        globals_ = namespace["make_http_handler"].__globals__
+        original = globals_["handle_http_list"]
+        limit = 1024
+        request = b"GET /v1/projects/org/app/branches HTTP/1.0\r\n\r\n"
+        try:
+            for size in [limit - 1, limit, limit + 1]:
+                payload = {"data": "x" * (size - len(b'{"data": ""}'))}
+                expected = json.dumps(
+                    payload, ensure_ascii=False, sort_keys=True
+                ).encode("utf-8")
+                self.assertEqual(len(expected), size)
+                globals_["handle_http_list"] = lambda *args, value=payload: (
+                    200,
+                    value,
+                )
+                profile = namespace["DecisionWorkProfile"].http_v1(
+                    {"response_bytes": limit}
+                )
+                response, observation = self.exchange_http_handler(
+                    namespace, profile, request
+                )
+                self.assert_http_work_closed(observation)
+                wire_body = response.split(b"\r\n\r\n", 1)[1]
+                if size <= limit:
+                    self.assertTrue(response.startswith(b"HTTP/1.0 200 OK\r\n"))
+                    self.assertEqual(wire_body, expected)
+                    self.assertEqual(
+                        observation["snapshot"]["cumulative"][
+                            "response_bytes"
+                        ],
+                        size,
+                    )
+                    self.assertGreaterEqual(
+                        observation["snapshot"]["peak"]["retained_bytes"],
+                        size,
+                    )
+                    self.assertGreaterEqual(
+                        observation["snapshot"]["peak"]["temporary_bytes"],
+                        size,
+                    )
+                else:
+                    self.assertTrue(
+                        response.startswith(
+                            b"HTTP/1.0 413 Request Entity Too Large\r\n"
+                        )
+                    )
+                    self.assertNotIn(expected, response)
+                    diagnostic = json.loads(wire_body)["diagnostics"][0]
+                    self.assertEqual(diagnostic, observation["budget_diagnostic"])
+                    self.assertEqual(diagnostic["dimension"], "response_bytes")
+                    self.assertEqual(diagnostic["exit_code"], 60)
+        finally:
+            globals_["handle_http_list"] = original
+
+    def test_python_http_physical_body_ownership_is_bounded(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        body = b'"' + (b"x" * 510) + b'"'
+        physical = len(body) * 2
+        request = (
+            b"POST /v1/projects/org/app/nope HTTP/1.0\r\n"
+            + f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
+            + body
+        )
+
+        for retained_limit in [physical - 1, physical, physical + 1]:
+            profile = namespace["DecisionWorkProfile"].http_v1(
+                {"retained_bytes": ("concurrent", retained_limit)}
+            )
+            response, observation = self.exchange_http_handler(
+                namespace, profile, request
+            )
+            self.assert_http_work_closed(observation)
+            if retained_limit < physical:
+                self.assertTrue(
+                    response.startswith(b"HTTP/1.0 413 Request Entity Too Large\r\n")
+                )
+                self.assertEqual(observation["request_body_bytes_read"], 0)
+                diagnostic = observation["budget_diagnostic"]
+                self.assertEqual(diagnostic["dimension"], "retained_bytes")
+                self.assertEqual(diagnostic["observed"], physical)
+                self.assertEqual(diagnostic["limit"], retained_limit)
+            else:
+                self.assertTrue(response.startswith(b"HTTP/1.0 404 Not Found\r\n"))
+                self.assertEqual(observation["request_body_bytes_read"], len(body))
+                self.assertEqual(
+                    observation["snapshot"]["peak"]["retained_bytes"],
+                    physical,
+                )
+
+    def test_python_http_request_ast_stays_owned_through_dispatch(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        globals_ = namespace["make_http_handler"].__globals__
+        original_ledger = globals_["DecisionWorkLedger"]
+        original_gc = globals_["handle_http_gc"]
+        ledgers = []
+        retained_during_dispatch = []
+
+        class RecordingLedger(original_ledger):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                ledgers.append(self)
+
+        body = json.dumps({"value": "owned request"}, sort_keys=True).encode()
+        request = (
+            b"POST /v1/projects/org/app/gc HTTP/1.0\r\n"
+            + f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
+            + body
+        )
+        try:
+            globals_["DecisionWorkLedger"] = RecordingLedger
+            for rejected in [False, True]:
+                def observe(*args, fail=rejected):
+                    retained_during_dispatch.append(
+                        ledgers[-1].current.get("retained_bytes", 0)
+                    )
+                    if fail:
+                        raise namespace["CFError"]("injected dispatch rejection")
+                    return 200, {"ok": True}
+
+                globals_["handle_http_gc"] = observe
+                response, observation = self.exchange_http_handler(
+                    namespace,
+                    namespace["DecisionWorkProfile"].http_v1(),
+                    request,
+                )
+                expected_status = b"400 Bad Request" if rejected else b"200 OK"
+                self.assertIn(expected_status, response.split(b"\r\n", 1)[0])
+                self.assert_http_work_closed(observation)
+        finally:
+            globals_["DecisionWorkLedger"] = original_ledger
+            globals_["handle_http_gc"] = original_gc
+        self.assertEqual(retained_during_dispatch, [len(body), len(body)])
+
+    def test_python_http_response_physical_limits_are_atomic(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        globals_ = namespace["make_http_handler"].__globals__
+        original = globals_["handle_http_list"]
+        request = b"GET /v1/projects/org/app/branches HTTP/1.0\r\n\r\n"
+        body_size = 1024
+        payload = {"data": "x" * (body_size - len(b'{"data": ""}'))}
+        expected = json.dumps(payload, sort_keys=True).encode("utf-8")
+        self.assertEqual(len(expected), body_size)
+        globals_["handle_http_list"] = lambda *args: (200, payload)
+        try:
+            encoding_upper = (len(json.dumps(payload["data"])) + 4) * 2
+            for dimension, physical in [
+                ("retained_bytes", (len(request) * 2) + body_size),
+                ("temporary_bytes", encoding_upper),
+            ]:
+                for configured in [physical - 1, physical, physical + 1]:
+                    profile = namespace["DecisionWorkProfile"].http_v1(
+                        {dimension: ("concurrent", configured)}
+                    )
+                    response, observation = self.exchange_http_handler(
+                        namespace, profile, request
+                    )
+                    self.assert_http_work_closed(observation)
+                    if configured < physical:
+                        self.assertTrue(
+                            response.startswith(
+                                b"HTTP/1.0 413 Request Entity Too Large\r\n"
+                            )
+                        )
+                        self.assertNotIn(expected, response)
+                        diagnostic = observation["budget_diagnostic"]
+                        self.assertEqual(diagnostic["dimension"], dimension)
+                        self.assertEqual(diagnostic["observed"], physical)
+                        self.assertEqual(diagnostic["limit"], configured)
+                    else:
+                        self.assertTrue(
+                            response.startswith(b"HTTP/1.0 200 OK\r\n")
+                        )
+                        self.assertEqual(
+                            response.split(b"\r\n\r\n", 1)[1], expected
+                        )
+                        self.assertLessEqual(
+                            observation["snapshot"]["peak"][dimension],
+                            configured,
+                        )
+        finally:
+            globals_["handle_http_list"] = original
+
+    def test_python_http_response_header_is_never_partially_sent(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        globals_ = namespace["make_http_handler"].__globals__
+        original = globals_["handle_http_list"]
+        globals_["handle_http_list"] = lambda *args: (200, {"ok": True})
+        request = b"GET /v1/projects/org/app/branches HTTP/1.0\r\n\r\n"
+        try:
+            baseline, baseline_observation = self.exchange_http_handler(
+                namespace,
+                namespace["DecisionWorkProfile"].http_v1(),
+                request,
+            )
+            self.assertTrue(baseline.startswith(b"HTTP/1.0 200 OK\r\n"))
+            actual = baseline_observation["snapshot"]["cumulative"][
+                "response_header_bytes"
+            ]
+            for header_limit in [actual - 1, actual, actual + 1]:
+                profile = namespace["DecisionWorkProfile"].http_v1(
+                    {"response_header_bytes": header_limit}
+                )
+                response, observation = self.exchange_http_handler(
+                    namespace, profile, request
+                )
+                self.assert_http_work_closed(observation)
+                if header_limit < actual:
+                    self.assertEqual(response, b"")
+                    diagnostic = observation["budget_diagnostic"]
+                    self.assertEqual(
+                        diagnostic["dimension"], "response_header_bytes"
+                    )
+                    self.assertEqual(diagnostic["observed"], actual)
+                    self.assertEqual(diagnostic["limit"], actual - 1)
+                else:
+                    self.assertTrue(response.startswith(b"HTTP/1.0 200 OK\r\n"))
+                    self.assertEqual(
+                        observation["snapshot"]["cumulative"][
+                            "response_header_bytes"
+                        ],
+                        actual,
+                    )
+        finally:
+            globals_["handle_http_list"] = original
 
     def test_python_verify_budget_failure_does_not_publish_scan_plan(self):
         self.run_cf("init")
