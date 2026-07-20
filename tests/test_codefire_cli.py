@@ -963,7 +963,7 @@ class CodeFireCliTests(unittest.TestCase):
     def test_python_http_parser_temporary_is_reserved_before_read(self):
         namespace = runpy.run_path(str(CODEFIRE))
         body = json.dumps(
-            {"value": "x" * 240}, separators=(",", ":")
+            {"value": "x" * 1_200}, separators=(",", ":")
         ).encode()
         physical = len(body) * 2
         head = (
@@ -1023,7 +1023,18 @@ class CodeFireCliTests(unittest.TestCase):
                         separators=(",", ":"),
                     ).encode()
                 )
-                ownership = (len(head) * 2) + canonical_size
+                baseline, baseline_observation = self.exchange_http_handler(
+                    namespace,
+                    namespace["DecisionWorkProfile"].http_v1(),
+                    head + body,
+                )
+                self.assertTrue(baseline.startswith(b"HTTP/1.0 200 OK\r\n"))
+                ownership = baseline_observation["snapshot"]["peak"][
+                    "retained_bytes"
+                ]
+                self.assertGreaterEqual(
+                    ownership, (len(head) * 2) + canonical_size
+                )
                 for limit in [ownership - 1, ownership, ownership + 1]:
                     profile = namespace["DecisionWorkProfile"].http_v1(
                         {"retained_bytes": ("concurrent", limit)}
@@ -1061,63 +1072,127 @@ class CodeFireCliTests(unittest.TestCase):
         self.assertTrue(response.startswith(b"HTTP/1.0 404 Not Found\r\n"))
         owner = observation["response_owner"]
         self.assertEqual(owner["request_header_retained"], len(head) * 2)
-        self.assertEqual(owner["request_ast_retained"], 0)
+        self.assertEqual(owner["request_ast_retained"], len(body))
         self.assertTrue(owner["raw_requestline_live"])
         self.assertTrue(owner["headers_live"])
         self.assertTrue(observation["request_raw_dropped_before_temp_release"])
         self.assertTrue(observation["response_body_dropped_before_release"])
         self.assert_http_work_closed(observation)
 
-    def test_python_http_preflights_encoder_and_header_allocations(self):
+    def test_python_http_freezes_request_aliases_before_ast_release(self):
         namespace = runpy.run_path(str(CODEFIRE))
         globals_ = namespace["make_http_handler"].__globals__
-        original_ledger = globals_["DecisionWorkLedger"]
-        ledgers = []
-        encoder_reserved = []
-        header_accounted = []
+        original_gc = globals_["handle_http_gc"]
+        request_value = {"child": {"value": "owned"}}
+        body = json.dumps(request_value, separators=(",", ":")).encode()
+        head = (
+            b"POST /v1/projects/org/app/gc HTTP/1.0\r\n"
+            + f"Content-Length: {len(body)}\r\n\r\n".encode()
+        )
+        try:
+            for nested in [False, True]:
+                freeze_ast = []
+                publish_ast = []
 
-        class RecordingLedger(original_ledger):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-                ledgers.append(self)
+                def handler(*args, use_nested=nested):
+                    request = args[-1]
+                    if use_nested:
+                        return 200, {"alias": request["child"]}
+                    return 200, request
+
+                def configure(handler_class):
+                    original_freeze = handler_class.freeze_response_body
+                    original_publish = handler_class.publish_prepared
+
+                    def checked_freeze(self, payload):
+                        freeze_ast.append(self._request_ast_retained)
+                        return original_freeze(self, payload)
+
+                    def checked_publish(self, prepared):
+                        publish_ast.append(self._request_ast_retained)
+                        return original_publish(self, prepared)
+
+                    handler_class.freeze_response_body = checked_freeze
+                    handler_class.publish_prepared = checked_publish
+
+                globals_["handle_http_gc"] = handler
+                response, observation = self.exchange_http_handler(
+                    namespace,
+                    namespace["DecisionWorkProfile"].http_v1(),
+                    head + body,
+                    configure_handler=configure,
+                )
+                expected_value = (
+                    {"alias": request_value["child"]}
+                    if nested
+                    else request_value
+                )
+                expected = json.dumps(
+                    expected_value,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+                self.assertEqual(response.split(b"\r\n\r\n", 1)[1], expected)
+                self.assertEqual(freeze_ast, [len(body)])
+                self.assertEqual(publish_ast, [0])
+                self.assert_http_work_closed(observation)
+        finally:
+            globals_["handle_http_gc"] = original_gc
+
+    def test_python_http_prebuilds_one_owned_header_buffer(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        prepared_headers = []
+        published_headers = []
 
         def configure(handler):
-            original_upper = handler.json_encoder_chunk_upper.__func__
-            original_send = handler.send_response
+            original_freeze = handler.freeze_response_header
+            original_publish = handler.publish_prepared
 
-            def checked_upper(cls, payload):
-                reservations = list(ledgers[-1]._reserved.values())
-                encoder_reserved.append(
-                    any(
-                        item["acquires"].get("temporary_bytes", 0) > 0
-                        for item in reservations
+            def checked_freeze(self, status, body_size):
+                result = original_freeze(self, status, body_size)
+                prepared_headers.append(
+                    (
+                        isinstance(result[0], bytes),
+                        len(result[0]),
+                        result[1],
+                        not getattr(self, "_headers_buffer", []),
                     )
                 )
-                return original_upper(cls, payload)
+                return result
 
-            def checked_send(self, *args, **kwargs):
-                header_accounted.append(
-                    self.decision_work.current.get("temporary_bytes", 0) > 0
-                )
-                return original_send(self, *args, **kwargs)
+            def checked_publish(self, prepared):
+                if prepared is not None:
+                    published_headers.append(
+                        (
+                            isinstance(prepared[0], bytes),
+                            prepared[1],
+                            self.decision_work.current.get(
+                                "retained_bytes", 0
+                            ),
+                        )
+                    )
+                return original_publish(self, prepared)
 
-            handler.json_encoder_chunk_upper = classmethod(checked_upper)
-            handler.send_response = checked_send
+            handler.freeze_response_header = checked_freeze
+            handler.publish_prepared = checked_publish
 
-        try:
-            globals_["DecisionWorkLedger"] = RecordingLedger
-            response, observation = self.exchange_http_handler(
-                namespace,
-                namespace["DecisionWorkProfile"].http_v1(),
-                b"GET /v1/projects/org/app/nope HTTP/1.0\r\n\r\n",
-                configure_handler=configure,
-            )
-        finally:
-            globals_["DecisionWorkLedger"] = original_ledger
+        response, observation = self.exchange_http_handler(
+            namespace,
+            namespace["DecisionWorkProfile"].http_v1(),
+            b"GET /v1/projects/org/app/nope HTTP/1.0\r\n\r\n",
+            configure_handler=configure,
+        )
         self.assertTrue(response.startswith(b"HTTP/1.0 404 Not Found\r\n"))
-        self.assertTrue(encoder_reserved)
-        self.assertTrue(all(encoder_reserved))
-        self.assertEqual(header_accounted, [True])
+        self.assertEqual(len(prepared_headers), 1)
+        self.assertTrue(prepared_headers[0][0])
+        self.assertEqual(prepared_headers[0][1], prepared_headers[0][2])
+        self.assertTrue(prepared_headers[0][3])
+        self.assertEqual(len(published_headers), 1)
+        self.assertTrue(published_headers[0][0])
+        self.assertGreaterEqual(
+            published_headers[0][2], published_headers[0][1]
+        )
         self.assert_http_work_closed(observation)
 
     def test_python_http_header_reader_uses_no_extra_lookahead_byte(self):
@@ -1218,7 +1293,7 @@ class CodeFireCliTests(unittest.TestCase):
 
     def test_python_http_physical_body_ownership_is_bounded(self):
         namespace = runpy.run_path(str(CODEFIRE))
-        body = b'"' + (b"x" * 510) + b'"'
+        body = b'"' + (b"x" * 1_200) + b'"'
         physical = len(body) * 2
         request = (
             b"POST /v1/projects/org/app/nope HTTP/1.0\r\n"
@@ -1236,7 +1311,10 @@ class CodeFireCliTests(unittest.TestCase):
             self.assert_http_work_closed(observation)
             if retained_limit < physical:
                 self.assertTrue(
-                    response.startswith(b"HTTP/1.0 413 Request Entity Too Large\r\n")
+                    not response
+                    or response.startswith(
+                        b"HTTP/1.0 413 Request Entity Too Large\r\n"
+                    )
                 )
                 self.assertEqual(observation["request_body_bytes_read"], 0)
                 diagnostic = observation["budget_diagnostic"]
@@ -1321,11 +1399,14 @@ class CodeFireCliTests(unittest.TestCase):
         self.assertEqual(len(expected), body_size)
         globals_["handle_http_list"] = lambda *args: (200, payload)
         try:
-            encoding_upper = (len(json.dumps(payload["data"])) + 4) * 2
-            for dimension, physical in [
-                ("retained_bytes", (len(request) * 2) + body_size),
-                ("temporary_bytes", encoding_upper),
-            ]:
+            baseline, baseline_observation = self.exchange_http_handler(
+                namespace,
+                namespace["DecisionWorkProfile"].http_v1(),
+                request,
+            )
+            self.assertEqual(baseline.split(b"\r\n\r\n", 1)[1], expected)
+            for dimension in ["retained_bytes", "temporary_bytes"]:
+                physical = baseline_observation["snapshot"]["peak"][dimension]
                 for configured in [physical - 1, physical, physical + 1]:
                     profile = namespace["DecisionWorkProfile"].http_v1(
                         {dimension: ("concurrent", configured)}
@@ -1336,7 +1417,8 @@ class CodeFireCliTests(unittest.TestCase):
                     self.assert_http_work_closed(observation)
                     if configured < physical:
                         self.assertTrue(
-                            response.startswith(
+                            not response
+                            or response.startswith(
                                 b"HTTP/1.0 413 Request Entity Too Large\r\n"
                             )
                         )

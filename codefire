@@ -4657,7 +4657,7 @@ class _BoundedCanonicalJSONFreezer:
     FRAGMENT_BASE = 64
     FRAGMENT_SLOT_BYTES = 16
     CHUNK_BASE = 64
-    CHUNK_BYTES = 4096
+    CHUNK_BYTES = 256
 
     def __init__(
         self,
@@ -5048,31 +5048,6 @@ def make_http_handler(
                 self._request_header_retained = 0
 
         @staticmethod
-        def json_string_bytes(value: str) -> int:
-            size = 2
-            for character in value:
-                codepoint = ord(character)
-                if character in {'"', "\\"}:
-                    size += 2
-                elif character in "\b\f\n\r\t":
-                    size += 2
-                elif codepoint <= 0x1F:
-                    size += 6
-                elif codepoint <= 0x7F:
-                    size += 1
-                elif codepoint <= 0x7FF:
-                    size += 2
-                elif 0xD800 <= codepoint <= 0xDFFF:
-                    raise CFError("HTTP JSON response contains an unpaired surrogate")
-                elif codepoint <= 0xFFFF:
-                    size += 3
-                else:
-                    size += 4
-                if size > U64_MAX:
-                    raise CFError("HTTP JSON response size overflow")
-            return size
-
-        @staticmethod
         def json_codepoint_bytes(codepoint: int) -> int:
             if codepoint in {8, 9, 10, 12, 13}:
                 return 2
@@ -5222,121 +5197,6 @@ def make_http_handler(
                     size += cls.json_codepoint_bytes(codepoint)
             return size
 
-        @classmethod
-        def json_encoder_chunk_upper(cls, payload: Any) -> int:
-            active: set[int] = set()
-
-            def scalar_upper(value: Any) -> int:
-                if isinstance(value, str):
-                    return cls.json_string_bytes(value)
-                if value is None:
-                    return 4
-                if value is True:
-                    return 4
-                if value is False:
-                    return 5
-                if isinstance(value, int):
-                    bits = abs(value).bit_length()
-                    return max(1, (bits * 30103) // 100000 + 3)
-                if isinstance(value, float):
-                    return 32
-                raise CFError(
-                    f"HTTP JSON response contains unsupported {type(value).__name__}"
-                )
-
-            def visit(value: Any) -> int:
-                if isinstance(value, dict):
-                    identity = id(value)
-                    if identity in active:
-                        raise CFError("HTTP JSON response contains a cycle")
-                    active.add(identity)
-                    try:
-                        upper = 2
-                        for key, item in value.items():
-                            upper = max(
-                                upper,
-                                scalar_upper(key) + 2,
-                                visit(item) + 2,
-                            )
-                        return upper
-                    finally:
-                        active.remove(identity)
-                if isinstance(value, (list, tuple)):
-                    identity = id(value)
-                    if identity in active:
-                        raise CFError("HTTP JSON response contains a cycle")
-                    active.add(identity)
-                    try:
-                        upper = 2
-                        for item in value:
-                            upper = max(upper, visit(item) + 2)
-                        return upper
-                    finally:
-                        active.remove(identity)
-                return scalar_upper(value) + 2
-
-            return visit(payload)
-
-        def encoded_json_size(self, payload: dict[str, Any], limit: int) -> int:
-            preflight_permit = None
-            preflight_upper = (
-                profile.limit("temporary_bytes")
-                - self.decision_work.current.get("temporary_bytes", 0)
-            )
-            if preflight_upper <= 0:
-                raise self.budget_error(
-                    "temporary_bytes",
-                    self.decision_work.current.get("temporary_bytes", 0) + 1,
-                    "response_body",
-                )
-            preflight_permit = self.decision_work.reserve(
-                "response_body",
-                acquires={"temporary_bytes": preflight_upper},
-            )
-            try:
-                chunk_upper = self.json_encoder_chunk_upper(payload)
-            except RecursionError as error:
-                raise CFError("HTTP JSON response nesting is too deep") from error
-            finally:
-                self.cancel_if_open(preflight_permit)
-            scratch_upper = chunk_upper * 2
-            self.ensure_concurrent_capacity(
-                "temporary_bytes", scratch_upper, "response_body"
-            )
-            permit = self.decision_work.reserve(
-                "response_body",
-                acquires={"temporary_bytes": scratch_upper},
-            )
-            scratch = 0
-            try:
-                encoder = json.JSONEncoder(
-                    ensure_ascii=False,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                )
-                size = 0
-                for part in encoder.iterencode(payload):
-                    part_bytes = len(part.encode("utf-8"))
-                    scratch = max(scratch, part_bytes * 2)
-                    if scratch > scratch_upper:
-                        raise CFError(
-                            "HTTP JSON encoder exceeded its preflight chunk bound"
-                        )
-                    size += part_bytes
-                    if size > limit:
-                        break
-                self.finish_permit(
-                    permit,
-                    phase="response_body",
-                    acquires={"temporary_bytes": scratch},
-                )
-                permit = None
-                return size
-            finally:
-                self.cancel_if_open(permit)
-                if scratch:
-                    self.decision_work.release("temporary_bytes", scratch)
-
         @staticmethod
         def decimal_digits(value: int) -> int:
             digits = 1
@@ -5381,9 +5241,89 @@ def make_http_handler(
                 return
             self.send_json(code, payload)
 
-        def send_json(self, status: int, payload: dict[str, Any]) -> None:
+        def freeze_response_body(self, payload: Any) -> tuple[bytes, int]:
+            freezer = _BoundedCanonicalJSONFreezer(
+                self.decision_work,
+                profile,
+                self.budget_error,
+                profile.limit("response_bytes"),
+            )
+            return freezer.freeze(payload)
+
+        def freeze_response_header(
+            self, status: int, body_size: int
+        ) -> tuple[bytes, int]:
+            header_size = self.response_header_size(status, body_size)
+            if header_size > profile.limit("response_header_bytes"):
+                raise self.budget_error(
+                    "response_header_bytes", header_size, "response_headers"
+                )
+            header_temporary = header_size * 2
+            self.ensure_concurrent_capacity(
+                "temporary_bytes", header_temporary, "response_headers"
+            )
+            self.ensure_concurrent_capacity(
+                "retained_bytes", header_size, "response_headers"
+            )
+            permit = self.decision_work.reserve(
+                "response_headers",
+                charges={"response_header_bytes": header_size},
+                acquires={
+                    "retained_bytes": header_size,
+                    "temporary_bytes": header_temporary,
+                },
+            )
+            retained = 0
+            temporary = 0
+            header: bytes | None = None
+            header_text: str | None = None
+            date_value: str | None = None
+            try:
+                self.finish_permit(
+                    permit,
+                    phase="response_headers",
+                    charges={"response_header_bytes": header_size},
+                    acquires={
+                        "retained_bytes": header_size,
+                        "temporary_bytes": header_temporary,
+                    },
+                )
+                permit = None
+                retained = header_size
+                temporary = header_temporary
+                reason = self.responses.get(status, ("",))[0]
+                date_value = self.date_time_string()
+                header_text = (
+                    f"{self.protocol_version} {status} {reason}\r\n"
+                    f"Server: {self.server_version} {self.sys_version}\r\n"
+                    f"Date: {date_value}\r\n"
+                    "Content-Type: application/json\r\n"
+                    f"Content-Length: {body_size}\r\n"
+                    "\r\n"
+                )
+                header = header_text.encode("latin-1", "strict")
+                if len(header) != header_size:
+                    raise CFError("HTTP response header size changed after preflight")
+                header_text = None
+                date_value = None
+                self.decision_work.release("temporary_bytes", temporary)
+                temporary = 0
+                return header, retained
+            except Exception:
+                header = None
+                header_text = None
+                date_value = None
+                self.cancel_if_open(permit)
+                if temporary:
+                    self.decision_work.release("temporary_bytes", temporary)
+                if retained:
+                    self.decision_work.release("retained_bytes", retained)
+                raise
+
+        def prepare_json(
+            self, status: int, payload: Any
+        ) -> tuple[bytes, int, bytes, int] | None:
             payload_owner = payload
-            body: bytes | None = None
             try:
                 if self._response_owner_observation is None:
                     self._response_owner_observation = {
@@ -5394,169 +5334,68 @@ def make_http_handler(
                         ),
                         "headers_live": getattr(self, "headers", None) is not None,
                     }
-                body_limit = profile.limit("response_bytes")
-                try:
-                    body_size = self.encoded_json_size(payload, body_limit)
-                except ResourceBudgetExceeded as error:
-                    self._budget_error = error
-                    status, payload = http_resource_budget_error(error)
+                for attempt in range(2):
+                    body: bytes | None = None
+                    header: bytes | None = None
+                    body_retained = 0
+                    header_retained = 0
                     try:
-                        body_size = self.encoded_json_size(payload, body_limit)
-                    except ResourceBudgetExceeded:
-                        self.close_connection = True
-                        return
-                if body_size > body_limit:
-                    error = self.budget_error(
-                        "response_bytes", body_size, "response_body"
-                    )
-                    self._budget_error = error
-                    status, payload = http_resource_budget_error(error)
-                    try:
-                        body_size = self.encoded_json_size(payload, body_limit)
-                    except ResourceBudgetExceeded:
-                        self.close_connection = True
-                        return
-                    if body_size > body_limit:
-                        self.close_connection = True
-                        return
-
-                for dimension in ["retained_bytes", "temporary_bytes"]:
-                    try:
-                        self.ensure_concurrent_capacity(
-                            dimension, body_size, "response_body"
+                        body, body_retained = self.freeze_response_body(payload)
+                        header, header_retained = self.freeze_response_header(
+                            status, len(body)
                         )
+                        body_permit = self.decision_work.reserve(
+                            "response_body",
+                            charges={"response_bytes": len(body)},
+                        )
+                        self.finish_permit(
+                            body_permit,
+                            phase="response_body",
+                            charges={"response_bytes": len(body)},
+                        )
+                        return header, header_retained, body, body_retained
                     except ResourceBudgetExceeded as error:
+                        header = None
+                        body = None
+                        if header_retained:
+                            self.decision_work.release(
+                                "retained_bytes", header_retained
+                            )
+                        if body_retained:
+                            self.decision_work.release(
+                                "retained_bytes", body_retained
+                            )
+                        if attempt or self._budget_error is not None:
+                            self.close_connection = True
+                            return None
                         self._budget_error = error
                         status, payload = http_resource_budget_error(error)
-                        try:
-                            body_size = self.encoded_json_size(payload, body_limit)
-                        except ResourceBudgetExceeded:
-                            self.close_connection = True
-                            return
-                        if body_size > body_limit:
-                            self.close_connection = True
-                            return
-                        for error_dimension in [
-                            "retained_bytes",
-                            "temporary_bytes",
-                        ]:
-                            if self.concurrent_observed(
-                                error_dimension, body_size
-                            ) > profile.limit(error_dimension):
-                                self.close_connection = True
-                                return
-                        break
-
-                body_permit = self.decision_work.reserve(
-                    "response_body",
-                    charges={"response_bytes": body_size},
-                    acquires={
-                        "retained_bytes": body_size,
-                        "temporary_bytes": body_size,
-                    },
-                )
-                header_permit = None
-                body_retained = 0
-                body_temporary = 0
-                header_temporary = 0
-                try:
-                    self.finish_permit(
-                        body_permit,
-                        phase="response_body",
-                        charges={"response_bytes": body_size},
-                        acquires={
-                            "retained_bytes": body_size,
-                            "temporary_bytes": body_size,
-                        },
-                    )
-                    body_permit = None
-                    body_retained = body_size
-                    body_temporary = body_size
-                    body = json.dumps(
-                        payload,
-                        ensure_ascii=False,
-                        sort_keys=True,
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    if len(body) != body_size:
-                        raise CFError("HTTP JSON response size changed during encoding")
-                    if body_temporary:
-                        self.decision_work.release(
-                            "temporary_bytes", body_temporary
-                        )
-                        body_temporary = 0
-
-                    header_size = self.response_header_size(status, len(body))
-                    header_limit = profile.limit("response_header_bytes")
-                    if header_size > header_limit:
-                        error = self.budget_error(
-                            "response_header_bytes", header_size, "response_headers"
-                        )
-                        self._budget_error = error
-                        self.close_connection = True
-                        return
-                    try:
-                        self.ensure_concurrent_capacity(
-                            "temporary_bytes", header_size, "response_headers"
-                        )
-                    except ResourceBudgetExceeded as error:
-                        self._budget_error = error
-                        self.close_connection = True
-                        return
-                    header_permit = self.decision_work.reserve(
-                        "response_headers",
-                        charges={"response_header_bytes": header_size},
-                        acquires={"temporary_bytes": header_size},
-                    )
-
-                    self.finish_permit(
-                        header_permit,
-                        phase="response_headers",
-                        charges={"response_header_bytes": header_size},
-                        acquires={"temporary_bytes": header_size},
-                    )
-                    header_permit = None
-                    header_temporary = header_size
-
-                    self.send_response(status)
-                    self.send_header("Content-Type", "application/json")
-                    self.send_header("Content-Length", str(len(body)))
-                    actual_header_size = (
-                        sum(len(part) for part in self._headers_buffer) + 2
-                    )
-                    if actual_header_size != header_size:
-                        self._headers_buffer.clear()
-                        raise CFError("HTTP response header size changed after preflight")
-                    self.end_headers()
-                    if header_temporary:
-                        self.decision_work.release(
-                            "temporary_bytes", header_temporary
-                        )
-                        header_temporary = 0
-                    self.wfile.write(body)
-                    body = None
-                    self._response_body_dropped_before_release = True
-                finally:
-                    self.cancel_if_open(header_permit)
-                    self.cancel_if_open(body_permit)
-                    if header_temporary:
-                        self.decision_work.release(
-                            "temporary_bytes", header_temporary
-                        )
-                    if body_temporary:
-                        self.decision_work.release(
-                            "temporary_bytes", body_temporary
-                        )
-                    if body_retained:
-                        body = None
-                        self._response_body_dropped_before_release = True
-                        self.decision_work.release(
-                            "retained_bytes", body_retained
-                        )
+                return None
             finally:
                 close = getattr(payload_owner, "close", None)
                 if close is not None:
                     close()
+
+        def publish_prepared(
+            self, prepared: tuple[bytes, int, bytes, int] | None
+        ) -> None:
+            if prepared is None:
+                return
+            header, header_retained, body, body_retained = prepared
+            prepared = None
+            try:
+                self.wfile.write(header)
+                self.wfile.write(body)
+            finally:
+                header = None
+                body = None
+                self._response_body_dropped_before_release = True
+                self.decision_work.release(
+                    "retained_bytes", header_retained + body_retained
+                )
+
+        def send_json(self, status: int, payload: Any) -> None:
+            self.publish_prepared(self.prepare_json(status, payload))
 
         def finish_request_headers(
             self,
@@ -5866,22 +5705,19 @@ def make_http_handler(
                     )
                     self._request_ast_retained = 0
                 raise
-            request = None
-            if request_retained:
-                self.decision_work.release(
-                    "retained_bytes", request_retained
-                )
-                request_retained = 0
-                self._request_ast_retained = 0
+            prepared = None
             try:
-                self.send_json(status, payload)
+                prepared = self.prepare_json(status, payload)
             finally:
                 payload = None
+                request = None
                 if request_retained:
                     self.decision_work.release(
                         "retained_bytes", request_retained
                     )
+                    request_retained = 0
                     self._request_ast_retained = 0
+            self.publish_prepared(prepared)
 
     return CodeFireHTTPHandler
 
