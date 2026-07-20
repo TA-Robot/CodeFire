@@ -4789,12 +4789,10 @@ class _BoundedCanonicalJSONFreezer:
         if value is False:
             self._emit_ascii(b"false")
             return
-        if isinstance(value, str):
+        if type(value) is str:
             self._emit_string(value)
             return
-        if isinstance(value, int):
-            if type(value) is not int:
-                raise CFError("HTTP JSON response integer subclasses are unsupported")
+        if type(value) is int:
             bits = int.bit_length(value)
             upper = max(1, (bits * 30103) // 100000 + 3)
             remaining = self.limit + 1 - self.size
@@ -4815,7 +4813,7 @@ class _BoundedCanonicalJSONFreezer:
                 text_value = None
                 self._release("temporary_bytes", scratch)
             return
-        if isinstance(value, float):
+        if type(value) is float:
             scratch = 128
             self._acquire("temporary_bytes", scratch)
             encoded = None
@@ -4834,22 +4832,22 @@ class _BoundedCanonicalJSONFreezer:
         )
 
     def _expand(self, value: Any) -> None:
-        if isinstance(value, dict):
-            count = len(value)
+        if type(value) is dict or type(value) is AccountedDoctorPayload:
+            count = dict.__len__(value)
             sort_bytes = self.SORT_BASE + (self.SORT_ENTRY_BYTES * count)
             self._acquire("temporary_bytes", sort_bytes)
             keys: list[str] | None = None
             try:
                 try:
-                    keys = sorted(value)
+                    keys = sorted(dict.keys(value))
                 except TypeError as error:
                     raise CFError("HTTP JSON response keys must be strings") from error
-                if any(not isinstance(key, str) for key in keys):
+                if any(type(key) is not str for key in keys):
                     raise CFError("HTTP JSON response keys must be strings")
                 self._push("raw", b"}")
                 for index in range(count - 1, -1, -1):
                     key = keys[index]
-                    self._push("value", value[key])
+                    self._push("value", dict.__getitem__(value, key))
                     self._push("raw", b":")
                     self._push("string", key)
                     if index:
@@ -4859,7 +4857,7 @@ class _BoundedCanonicalJSONFreezer:
                 keys = None
                 self._release("temporary_bytes", sort_bytes)
             return
-        if isinstance(value, (list, tuple)):
+        if type(value) is list or type(value) is tuple:
             self._push("raw", b"]")
             for index in range(len(value) - 1, -1, -1):
                 self._push("value", value[index])
@@ -5460,22 +5458,25 @@ def make_http_handler(
             payload_owner = payload
             try:
                 prepared = self.prepare_json_owned(status, payload)
-            except Exception:
+            except BaseException:
+                try:
+                    close = getattr(payload_owner, "close", None)
+                    if close is not None:
+                        close()
+                except BaseException:
+                    pass
+                raise
+            try:
                 close = getattr(payload_owner, "close", None)
                 if close is not None:
+                    close()
+            except BaseException:
+                if prepared is not None:
                     try:
-                        close()
-                    except Exception:
+                        prepared.close()
+                    except BaseException:
                         pass
                 raise
-            close = getattr(payload_owner, "close", None)
-            if close is not None:
-                try:
-                    close()
-                except Exception:
-                    if prepared is not None:
-                        prepared.close()
-                    raise
             return prepared
 
         def publish_prepared(

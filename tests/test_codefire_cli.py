@@ -1244,6 +1244,50 @@ class CodeFireCliTests(unittest.TestCase):
         finally:
             globals_["handle_http_list"] = original
 
+    def test_python_http_close_lookup_failure_explicitly_closes_owner(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        globals_ = namespace["make_http_handler"].__globals__
+        original_handler = globals_["handle_http_list"]
+        captured_owners = []
+
+        class LookupFailure(dict):
+            def __getattribute__(self, name):
+                if name == "close":
+                    raise namespace["CFError"](
+                        "injected close attribute lookup failure"
+                    )
+                return dict.__getattribute__(self, name)
+
+        def configure(handler):
+            original_prepare = handler.prepare_json_owned
+
+            def prepare_exact(self, status, payload):
+                owner = original_prepare(self, status, {"ok": True})
+                captured_owners.append(owner)
+                return owner
+
+            handler.prepare_json_owned = prepare_exact
+
+        try:
+            globals_["handle_http_list"] = lambda *args: (
+                200,
+                LookupFailure({"ignored": True}),
+            )
+            response, observation = self.exchange_http_handler(
+                namespace,
+                namespace["DecisionWorkProfile"].http_v1(),
+                b"GET /v1/projects/org/app/branches HTTP/1.0\r\n\r\n",
+                configure_handler=configure,
+            )
+        finally:
+            globals_["handle_http_list"] = original_handler
+        self.assertEqual(response, b"")
+        self.assertEqual(len(captured_owners), 1)
+        self.assertIsNone(captured_owners[0].header)
+        self.assertIsNone(captured_owners[0].body)
+        self.assertEqual(captured_owners[0].retained_bytes, 0)
+        self.assert_http_work_closed(observation)
+
     def test_python_http_cycle_payload_fails_with_bounded_work(self):
         namespace = runpy.run_path(str(CODEFIRE))
         globals_ = namespace["make_http_handler"].__globals__
@@ -1521,6 +1565,74 @@ class CodeFireCliTests(unittest.TestCase):
             freezer.freeze({"ok": True})
         self.assertTrue(all(value == 0 for value in ledger.current.values()))
         self.assertFalse(ledger.has_open_permits())
+
+    def test_python_bounded_json_freezer_never_calls_container_subclass_hooks(self):
+        namespace = runpy.run_path(str(CODEFIRE))
+        calls = []
+
+        class EvilMixin:
+            def explode(self, hook):
+                calls.append(hook)
+                self.large_allocation = bytearray(1_000_000)
+                raise AssertionError(f"unexpected subclass hook: {hook}")
+
+        class EvilDict(EvilMixin, dict):
+            def __len__(self):
+                return self.explode("dict-len")
+
+            def __iter__(self):
+                return self.explode("dict-iter")
+
+            def __getitem__(self, key):
+                return self.explode("dict-getitem")
+
+            def keys(self):
+                return self.explode("dict-keys")
+
+        class EvilList(EvilMixin, list):
+            def __len__(self):
+                return self.explode("list-len")
+
+            def __iter__(self):
+                return self.explode("list-iter")
+
+            def __getitem__(self, key):
+                return self.explode("list-getitem")
+
+        class EvilStr(EvilMixin, str):
+            def __iter__(self):
+                return self.explode("str-iter")
+
+            def encode(self, *args, **kwargs):
+                return self.explode("str-encode")
+
+        for payload in [EvilDict({"ok": True}), EvilList([1]), EvilStr("x")]:
+            profile = namespace["DecisionWorkProfile"].http_v1()
+            ledger = namespace["DecisionWorkLedger"](
+                profile, "http request", command_kind="http_request"
+            )
+
+            def budget_error(dimension, observed, phase):
+                return namespace["ResourceBudgetExceeded"](
+                    profile=profile.profile_id,
+                    dimension=dimension,
+                    observed=observed,
+                    limit=profile.limit(dimension),
+                    phase=phase,
+                    command="http request",
+                    continuation_supported=False,
+                )
+
+            freezer = namespace["_BoundedCanonicalJSONFreezer"](
+                ledger, profile, budget_error, 64
+            )
+            with self.assertRaises(namespace["CFError"]):
+                freezer.freeze(payload)
+            self.assertTrue(
+                all(value == 0 for value in ledger.current.values())
+            )
+            self.assertFalse(ledger.has_open_permits())
+        self.assertEqual(calls, [])
 
     def test_python_http_physical_body_ownership_is_bounded(self):
         namespace = runpy.run_path(str(CODEFIRE))
