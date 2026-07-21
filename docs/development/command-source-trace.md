@@ -107,7 +107,7 @@ production-unwired digest handoffは、parser pre-parse upperをcaller-owned one
 そのexact tokenを`AccountedHTTPUploadRequestSource`へmoveする。Stage closure/core/newline boundsは使わない。caller-owned二段階
 `AccountedHTTPUploadSemantic`がsourceをrelease/reacquire gapなしでadoptし、
 digestを公開せずexact semantic mapping、full-request fingerprint、元record identity、別Retainedのeffect-ready core-plus-newline bytesを保持する。
-semantic側8 source passとdigest child workを別々にaccountし、last deadline callback後にfull request fingerprint/list/ID/duplicate/full-record digest/copy parityを再検証し、mutable AST scalarをpayload-first releaseしてsemantic/copyをfield assignment
+semantic側8 source passと`4096 + 256L` canonical scratch、digest child work/scratchを別々にaccountし、deep/key-heavy combined Temporary exact-minus-oneを拒否する。last deadline callback後にfull request fingerprint/list/ID/duplicate/full-record digest/copy parityを再検証し、mutable AST scalarをpayload-first releaseしてsemantic/copyをfield assignment
 だけでread-only mapping proxy/copy tupleのprivate effect slotへdetachする。同tokenのduplicate bindは拒否する。existingのcontinuous gate、missingのbootstrap-locked private-stage gate/proof、mapping lending、
 effect consumer、handler parser release-slot移管は未接続である。
 

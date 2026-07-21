@@ -138,7 +138,8 @@ foreign/unknown authority, payload-before-release, final-fence ordering, and ret
 
 For Python upload object-set digest, do not use Stage sealed bounds: they cover closure/core/newline, not the full request object list.
 Transfer the parser-owned exact full-request canonical scalar to a destination-first same-ledger semantic owner with no digest getter.
-Reserve separate Retained bytes and construction overlap for immutable copy input. Existing projects keep a continuous gate through
+Reserve separate Retained bytes and a source-proportional canonical-encoder scratch envelope for immutable copy/fingerprint input.
+Existing projects keep a continuous gate through
 recovery/current/ancestry/preseal→terminal→effect. Missing projects hold bootstrap authority, build and gate a private stage before
 terminal, then effect-start→exact rename→durable reducer with the same gate token. Terminal detaches semantic and immutable copy
 inputs; post-terminal copy never rereads ambient records. The production-unwired Python prerequisite acquires the pre-parse upper

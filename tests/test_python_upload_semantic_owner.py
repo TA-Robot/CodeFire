@@ -379,6 +379,79 @@ class PythonUploadSemanticOwnerTests(unittest.TestCase):
         owner.close(exact)
         self.assert_closed(exact)
 
+    def test_deep_key_heavy_fingerprint_scratch_has_exact_temporary_upper(self):
+        payload = {"leaf": "owned"}
+        for _index in range(300):
+            payload = {"child": payload}
+        record = {
+            "object_id": self.namespace["object_id"]("blob", payload),
+            "type": "blob",
+            "hash": self.namespace["object_digest"]("blob", payload),
+            "payload": payload,
+            "remote": {"generation": 1},
+        }
+        request = {
+            "actor": "alice",
+            "branch": "local-main",
+            "head": "CF-COMMIT-" + "1" * 64,
+            "objects": [record],
+            "historical_extension": {
+                f"key-{index:04d}": [index, True, None]
+                for index in range(500)
+            },
+        }
+        source_bytes = self.source_bytes(request)
+        probe_ledger = self.ledger("deep scratch probe")
+        source, _amount = self.bind_source(request, probe_ledger)
+        probe = self.allocate_owner(source, probe_ledger)
+        _retained, semantic_temporary, _work = probe._allocation_upper(
+            source_bytes, 1
+        )
+        probe.close(probe_ledger)
+        self.assert_closed(probe_ledger)
+        self.assertEqual(
+            semantic_temporary,
+            self.Semantic.SEMANTIC_TEMPORARY_BASE_BYTES
+            + self.Semantic.SEMANTIC_TEMPORARY_BYTES_PER_SOURCE_BYTE
+            * source_bytes,
+        )
+        digest_temporary = (
+            self.Digest.ENCODER_BASE_BYTES
+            + self.Digest.ENCODER_BYTES_PER_SOURCE_BYTE * source_bytes
+        )
+
+        rejected = self.ledger(
+            "deep scratch exact minus one",
+            {
+                "temporary_bytes": (
+                    "concurrent",
+                    semantic_temporary + digest_temporary - 1,
+                )
+            },
+        )
+        source, _amount = self.bind_source(request, rejected)
+        owner = self.allocate_owner(source, rejected)
+        with self.assertRaises(self.namespace["ResourceBudgetExceeded"]):
+            owner.prepare(rejected)
+        owner.close(rejected)
+        self.assert_closed(rejected)
+
+        exact = self.ledger(
+            "deep scratch exact",
+            {
+                "temporary_bytes": (
+                    "concurrent",
+                    semantic_temporary + digest_temporary,
+                )
+            },
+        )
+        source, _amount = self.bind_source(request, exact)
+        owner = self.allocate_owner(source, exact)
+        owner.prepare(exact)
+        owner.terminal_detach(exact)
+        owner.close(exact)
+        self.assert_closed(exact)
+
     def test_terminal_rejects_identity_content_and_request_mutation(self):
         mutations = [
             lambda request: request.__setitem__("branch", "other-main"),

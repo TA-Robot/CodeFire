@@ -245,11 +245,13 @@ one exact reconciled token into the exact full request and objects list, and rej
 `AccountedHTTPUploadSemantic` adopts that exact source owner before
 digest work, rejects a Stage-like false bound by remeasuring the full request, publishes the exact digest child and caller-created
 permit before reservation,
-and privately transfers its digest into one stable semantic mapping. It separately preaccounts and builds effect-ready
-core-plus-newline object bytes while retaining the full record identities and full-record digest evidence, so historical `remote`
+and privately transfers its digest into one stable semantic mapping. It separately preaccounts the same conservative `4096 + 256L`
+canonical encoder Temporary envelope used by the digest owner and builds effect-ready core-plus-newline object bytes while retaining
+the full record identities and full-record digest evidence, so historical `remote`
 fields remain semantic even though they are absent from persisted copy bytes. Eight source-sized semantic work passes cover prepare
 size/fingerprint, validation/hash, serialization, and their terminal size/fingerprint/full-record/copy-parity counterparts; digest
-child work remains separately charged. The last deadline callback precedes callback-free full request fingerprint/list/ID/duplicate/
+child work and its simultaneous encoder envelope remain separately charged. Deep/key-heavy request fixtures hold the exact combined
+Temporary upper and reject exact-minus-one. The last deadline callback precedes callback-free full request fingerprint/list/ID/duplicate/
 digest/copy-parity revalidation. Mutable request refs then drop before the parser scalar, construction
 Temporary releases with post-effect reconciliation, and the preallocated read-only mapping proxy/copy tuple move into private
 effect slots by field assignment only; the owner drops its direct underlying-dict reference. There is no digest or copy getter.

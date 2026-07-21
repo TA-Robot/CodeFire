@@ -16376,8 +16376,12 @@ class AccountedHTTPUploadSemantic:
     COPY_LIST_BASE_BYTES = sys.getsizeof([])
     COPY_LIST_SLOT_BYTES = 16
     COPY_BYTES_BASE_BYTES = sys.getsizeof(b"")
-    COPY_TEMPORARY_BASE_BYTES = 4096
-    COPY_TEMPORARY_BYTES_PER_SOURCE_BYTE = 2
+    SEMANTIC_TEMPORARY_BASE_BYTES = 4096
+    # Full-request fingerprinting and terminal canonical revalidation build
+    # encoder stacks/key lists as well as output bytes.  Reuse the digest
+    # owner's conservative per-source-byte scratch envelope; these semantic
+    # walks are sequential with the separately accounted digest child.
+    SEMANTIC_TEMPORARY_BYTES_PER_SOURCE_BYTE = 256
     # Full-request size + fingerprint, object validation + core serialization,
     # then the same four source-sized walks at the terminal fence.
     SEMANTIC_WORK_PASSES = 8
@@ -16494,11 +16498,11 @@ class AccountedHTTPUploadSemantic:
             + source_bytes
         )
         temporary = (
-            self.COPY_TEMPORARY_BASE_BYTES
+            self.SEMANTIC_TEMPORARY_BASE_BYTES
             + self._checked_product(
                 source_bytes,
-                self.COPY_TEMPORARY_BYTES_PER_SOURCE_BYTE,
-                "copy overlap",
+                self.SEMANTIC_TEMPORARY_BYTES_PER_SOURCE_BYTE,
+                "canonical scratch",
             )
         )
         work = self._checked_product(
