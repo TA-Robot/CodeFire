@@ -1,0 +1,20 @@
+{
+  "schema": "codefire.remote_components_fixture.v1",
+  "valid": [
+    {"value": "org"},
+    {"value": ".hidden"},
+    {"value": "日本語"},
+    {"repeat": "a", "count": 255}
+  ],
+  "invalid": [
+    {"value": ""},
+    {"value": "."},
+    {"value": ".."},
+    {"value": "a/b"},
+    {"value": "a\\b"},
+    {"value": "C:prefix"},
+    {"value": "CF-INTERNAL-HASH-reserved"},
+    {"value": "line\nbreak"},
+    {"repeat": "a", "count": 256}
+  ]
+}

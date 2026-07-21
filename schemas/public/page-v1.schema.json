@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "codefire.page.v1",
+  "title": "CodeFire snapshot page metadata v1",
+  "type": "object",
+  "required": ["type", "version", "collection", "snapshot", "offset", "limit", "returned", "total", "next_cursor"],
+  "properties": {
+    "type": {"const": "codefire_page"},
+    "version": {"const": 1},
+    "collection": {"type": "string", "minLength": 1},
+    "snapshot": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "offset": {"type": "integer", "minimum": 0},
+    "limit": {"type": "integer", "minimum": 1},
+    "returned": {"type": "integer", "minimum": 0},
+    "total": {"type": "integer", "minimum": 0},
+    "next_cursor": {"type": ["string", "null"]}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "codefire.capabilities.v1",
+  "title": "CodeFire capability manifest v1",
+  "type": "object",
+  "required": ["type", "version", "schema", "command_result_schema", "support", "commands"],
+  "properties": {
+    "type": {"const": "codefire_command_capabilities"},
+    "version": {"const": 1},
+    "schema": {"const": "codefire.capabilities.v1"},
+    "command_result_schema": {"const": "codefire.command_result.v1"},
+    "support": {"$ref": "#/$defs/support"},
+    "commands": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/command"}
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "command": {
+      "type": "object",
+      "required": ["name", "supports_json", "supports_metrics", "help_key", "targets", "output_schema", "pagination"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "supports_json": {"type": "boolean"},
+        "supports_metrics": {"type": "boolean"},
+        "help_key": {"type": "string", "minLength": 1},
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"enum": ["local", "cf", "cf+http", "cf+https"]}
+        },
+        "output_schema": {"type": ["string", "null"]},
+        "pagination": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "support": {
+      "type": "object",
+      "required": ["type", "version", "profile", "unknown_version", "unknown_critical_extension", "unknown_noncritical_extension", "formats", "schemas", "runtimes"],
+      "properties": {
+        "type": {"const": "codefire_support_manifest"},
+        "version": {"const": 1},
+        "profile": {"const": "codefire.support.v1"},
+        "unknown_version": {"const": "deny"},
+        "unknown_critical_extension": {"const": "deny"},
+        "unknown_noncritical_extension": {"const": "preserve"},
+        "canonical_json_profile": {"type": "string"},
+        "public_object_id": {"type": "object"},
+        "semantic_validation_profile": {"type": "string"},
+        "runtimes": {"type": "array", "items": {"type": "object"}},
+        "formats": {"type": "array", "items": {"type": "object"}},
+        "schemas": {"type": "array", "items": {"type": "object"}}
+      },
+      "additionalProperties": false
+    }
+  }
+}

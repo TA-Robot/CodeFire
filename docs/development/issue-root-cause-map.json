@@ -1,7 +1,7 @@
 {
   "type": "codefire.issue_root_cause_map.v1",
   "version": 1,
-  "updated_at": "2026-07-11",
+  "updated_at": "2026-07-19",
   "sources": [
     "docs/development/bug-backlog.md",
     "docs/development/bug-issues/",
@@ -376,7 +376,7 @@
     },
     {
       "id": "CFB-120",
-      "status": "open",
+      "status": "fixed",
       "root_cause": "scan_sealed_base_validation_gap",
       "fix_group": "stage1-sealed-subject-integrity",
       "target_version": "stage-1-correctness-foundation",
@@ -389,12 +389,13 @@
       "close_evidence": [
         "docs/development/bug-issues/cfb-120.md",
         "crates/codefire-cli/src/main.rs::compute_scan",
-        "planned cargo regression: invalid current base across status/scan/verify"
+        "scan_status_and_verify_reject_an_unsealed_current_base_before_writing_state",
+        "verify_carries_validated_store_token_and_rejects_equal_root_replacement_before_persist"
       ]
     },
     {
       "id": "CFB-121",
-      "status": "open",
+      "status": "fixed",
       "root_cause": "commit_prepublication_sealed_validation_gap",
       "fix_group": "stage1-sealed-subject-integrity",
       "target_version": "stage-1-correctness-foundation",
@@ -407,12 +408,13 @@
       "close_evidence": [
         "docs/development/bug-issues/cfb-121.md",
         "crates/codefire-cli/src/main.rs::run_commit",
-        "planned failpoint regression: invalid new commit leaves branch head unchanged"
+        "commit_candidate_validation_rejects_corruption_before_publishing_branch_state",
+        "required_signed_candidate_with_tampered_digest_is_rejected_before_reference_publication"
       ]
     },
     {
       "id": "CFB-122",
-      "status": "open",
+      "status": "fixed",
       "root_cause": "lexical_path_containment_gap",
       "fix_group": "stage1-path-trust-boundary",
       "target_version": "stage-1-correctness-foundation",
@@ -424,13 +426,14 @@
       },
       "close_evidence": [
         "docs/development/bug-issues/cfb-122.md",
-        "crates/codefire-cli/src/main.rs::absolute_path",
-        "planned path red-team fixture"
+        "crates/codefire-cli/src/secure_worktree.rs::PinnedTargetResolution",
+        "open_rejects_outside_workspace_nested_open_and_stale_open_state",
+        "open_transaction_rejects_real_ancestor_replacement_before_staging"
       ]
     },
     {
       "id": "CFB-123",
-      "status": "open",
+      "status": "fixed",
       "root_cause": "trace_graph_atom_endpoint_validation_gap",
       "fix_group": "stage1-trace-integrity",
       "target_version": "stage-1-correctness-foundation",
@@ -443,12 +446,12 @@
       "close_evidence": [
         "docs/development/bug-issues/cfb-123.md",
         "crates/codefire-core/src/lib.rs::current_trace_graph",
-        "planned dangling source/target endpoint regression"
+        "scan_rejects_a_directly_edited_trace_graph_with_a_dangling_endpoint"
       ]
     },
     {
       "id": "CFB-124",
-      "status": "open",
+      "status": "fixed",
       "root_cause": "live_scan_verify_repository_lock_gap",
       "fix_group": "stage1-open-state-concurrency",
       "target_version": "stage-1-correctness-foundation",
@@ -462,12 +465,14 @@
         "docs/development/bug-issues/cfb-124.md",
         "crates/codefire-cli/src/main.rs::run_scan_command",
         "crates/codefire-cli/src/main.rs::run_verify_command",
-        "planned failpoint/concurrency regression across live state files"
+        "live_scan_verify_commit_and_extinguish_share_one_repo_lock",
+        "scan_state_transaction_recovers_every_publication_phase",
+        "verify_state_transaction_recovers_every_publication_phase"
       ]
     },
     {
       "id": "CFB-125",
-      "status": "open",
+      "status": "fixed",
       "root_cause": "store_reuse_full_digest_comparison_gap",
       "fix_group": "stage1-object-identity-collision",
       "target_version": "stage-1-correctness-foundation",
@@ -480,12 +485,13 @@
       "close_evidence": [
         "docs/development/bug-issues/cfb-125.md",
         "crates/codefire-store/src/lib.rs::store_object",
-        "planned deterministic artificial-collision regression for both reuse branches"
+        "store_object_rejects_artificial_collision_at_existing_path",
+        "store_object_rejects_artificial_collision_after_link_race"
       ]
     },
     {
       "id": "CFB-126",
-      "status": "open",
+      "status": "fixed",
       "root_cause": "import_idempotency_request_binding_gap",
       "fix_group": "stage1-idempotency-integrity",
       "target_version": "stage-1-correctness-foundation",
@@ -498,7 +504,9 @@
       "close_evidence": [
         "docs/development/bug-issues/cfb-126.md",
         "crates/codefire-cli/src/import_workflow.rs::load_import_idempotency_marker",
-        "planned exact-replay and different-branch conflict regressions"
+        "import_idempotency_exact_replay_is_payload_bound_and_hash_only",
+        "import_idempotency_rejects_branch_mismatch",
+        "exact_import_replay_preserves_domain_state_bytes"
       ]
     },
     {
@@ -518,6 +526,475 @@
         "crates/codefire-cli/src/signatures.rs::sign_commit_payload_at",
         "cargo test --workspace --locked",
         "cargo clippy --workspace --all-targets --locked -- -D warnings"
+      ]
+    },
+    {
+      "id": "CFB-128",
+      "status": "fixed",
+      "root_cause": "unversioned_sealed_trace_semantics_across_extractor_migration",
+      "fix_group": "stage1-dogfood-legacy-semantic-recovery",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-store/src/lib.rs; crates/codefire-core/src/lib.rs; crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-stage1-invariants-dogfood-blockers",
+        "decision": "Version the sealed Trace semantic profile, preserve fail-closed current writes, and provide a bounded extractor migration bridge for authenticated legacy history."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-128.md",
+        "crates/codefire-cli/tests/legacy_semantic_profile.rs",
+        "crates/codefire-store/src/lib.rs::CURRENT_SEMANTIC_VALIDATION_PROFILE",
+        "both real Algorithm status probes exit 0 with zero Fires and a versioned source-unchanged Atom migration",
+        "cargo test --workspace --locked"
+      ]
+    },
+    {
+      "id": "CFB-129",
+      "status": "fixed",
+      "root_cause": "structured_report_and_top_level_error_double_render",
+      "fix_group": "stage1-dogfood-json-single-owner",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-stage1-invariants-dogfood-blockers",
+        "decision": "Give every doctor/migrate JSON outcome one rendering owner and preserve the detailed report as the only stdout document."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-129.md",
+        "crates/codefire-cli/tests/doctor_migrate_json.rs",
+        "whole stdout parses as one JSON document for doctor and migrate check/dry-run/apply",
+        "cargo test --workspace --locked"
+      ]
+    },
+    {
+      "id": "CFB-130",
+      "status": "fixed",
+      "root_cause": "documented_migrate_apply_transition_missing",
+      "fix_group": "stage1-dogfood-migration-apply",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-cli/src/migration.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-stage1-invariants-dogfood-blockers",
+        "decision": "Execute only a freshly recomputed, locked, repository-contained migration plan and make exact replay idempotent."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-130.md",
+        "crates/codefire-cli/src/tests/migration_apply.rs",
+        "migrate apply focused lock/capability/idempotency/concurrency tests pass 12/12",
+        "cargo test --workspace --locked"
+      ]
+    },
+    {
+      "id": "CFB-131",
+      "status": "fixed",
+      "root_cause": "remote_transfer_rederives_current_id_for_valid_legacy_record",
+      "fix_group": "stage1-dogfood-exact-object-transfer",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-store/src/lib.rs; crates/codefire-cli/src/remote.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-stage1-invariants-dogfood-blockers",
+        "decision": "Publish a fully validated received record under its exact supported legacy or current public ID without rebuilding identity from payload."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-131.md",
+        "crates/codefire-store/src/lib.rs::store_object_record",
+        "crates/codefire-cli/src/tests/legacy_remote_identity.rs",
+        "original sandbox preserves CF-COMMIT-f825fc13207f through retry, remote upload, and clone",
+        "cargo test --workspace --locked"
+      ]
+    },
+    {
+      "id": "CFB-132",
+      "status": "fixed",
+      "root_cause": "python_line_scanner_does_not_mask_string_literal_content",
+      "fix_group": "stage1-dogfood-python-lexical-extraction",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-core/src/lib.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-stage1-invariants-dogfood-blockers",
+        "decision": "Run symbol and explicit-marker recognition over a bounded string/comment-aware Python lexical view and version the resulting Atom semantics."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-132.md",
+        "crates/codefire-core/src/lib.rs::python_lexical_lines",
+        "cargo test --workspace --locked (477 tests)",
+        "/tmp/codefire-cfb132-readonly.Z311yO",
+        "canonical bridge CF-COMMIT-e5ca290905c2a4b5e2c05bd4"
+      ]
+    },
+    {
+      "id": "CFR-161",
+      "status": "fixed",
+      "root_cause": "committable_policy_and_surface_projections_are_independent",
+      "fix_group": "authoritative-committable-decision",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-core/src/lib.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-authoritative-committable-decision",
+        "decision": "Build one typed committable decision with a non-relaxable safety floor and make every CLI/store projection consume it."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-161.md",
+        "adr/ADR-013-authoritative-committable-decision.md",
+        "crates/codefire-cli/src/tests/committable_decision.rs",
+        "cargo test --workspace --locked (484 tests)",
+        "/tmp/codefire-cfr161-installed-verify.json",
+        "/tmp/codefire-cfr161-readonly.Igi3yL",
+        "/tmp/codefire-cfr161-canonical-verify.json"
+      ]
+    },
+    {
+      "id": "CFR-162",
+      "status": "fixed",
+      "root_cause": "active_merge_conflict_facts_are_absent_from_committable_decision",
+      "fix_group": "authoritative-unresolved-merge-state",
+      "target_version": "stage-1-correctness-foundation",
+      "owner_module": "crates/codefire-cli/src/merge_resolution.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-unresolved-merge-sealing",
+        "decision": "Project all active merge conflict classes into the typed decision and clear them only through a validated explicit continue transition."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-162.md",
+        "adr/ADR-014-authoritative-unresolved-merge-state.md",
+        "crates/codefire-cli/src/tests/merge_resolution.rs",
+        "crates/codefire-cli/tests/merge_resolution_json.rs",
+        "cargo test --workspace --locked (495 tests)",
+        "/tmp/codefire-cfr162-closed-repro.0daNIh/evidence-manifest.json",
+        "/tmp/codefire-cfr162-closed-readonly.U9wREV/evidence-manifest.json",
+        "/tmp/codefire-cfr162-closed-canonical-manifest.json"
+      ]
+    },
+    {
+      "id": "CFB-133",
+      "status": "investigating",
+      "root_cause": "migration_actions_are_derived_from_preapply_plan_not_postcondition",
+      "fix_group": "typed-automation-outcome-actions",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-cli/src/migration.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Derive migration recovery actions from remaining postconditions through the shared typed action reducer."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-133.md",
+        "/tmp/codefire-migrate-action-audit.oSUz5T/apply.json"
+      ]
+    },
+    {
+      "id": "CFB-134",
+      "status": "fixed",
+      "root_cause": "default_doctor_capability_does_not_route_remote_urls",
+      "fix_group": "version-capability-conformance",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-cli/src/doctor/mod.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Make the Rust default capability registry and file/HTTP doctor routing match the documented remote diagnostic contract."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-134.md",
+        "crates/codefire-cli/src/remote/doctor.rs",
+        "crates/codefire-cli/tests/doctor_migrate_json.rs",
+        "/tmp/codefire-cfr166-final.zpGltd/bin/codefire",
+        "/tmp/codefire-cfr166-reversal.9AYMuY/http-doctor.json"
+      ]
+    },
+    {
+      "id": "CFB-135",
+      "status": "fixed",
+      "root_cause": "doctor_counts_extinguished_fire_ledger_entries_as_open",
+      "fix_group": "local-authority-recovery",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-cli/src/doctor/checks.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Count only status=open Fires in the Doctor invariant and report pending active-ledger authority through the shared typed descriptor before CFR-163 closes."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-135.md",
+        "/tmp/codefire-cfr163-dogfood.bTQl3y",
+        "/tmp/codefire-cfr163-final-dogfood.zm3Cgx"
+      ]
+    },
+    {
+      "id": "CFB-136",
+      "status": "investigating",
+      "root_cause": "validation_cache_identity_does_not_bind_same_inode_record_content_or_command_snapshot",
+      "fix_group": "decision-equivalent-work-budget",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-store/src/lib.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Bind command-wide validation reuse to a pinned immutable snapshot or revalidate record identity/digest before every cache hit under CFR-168."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-136.md",
+        "docs/development/code-review-issues/cfr-168.md",
+        "adr/ADR-020-decision-equivalent-work-budget.md"
+      ]
+    },
+    {
+      "id": "CFR-163",
+      "status": "fixed",
+      "root_cause": "local_authority_records_and_partial_transitions_lack_one_snapshot_reducer",
+      "fix_group": "local-authority-recovery",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-cli/src/active_state.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Introduce a verified open snapshot and durable replay reducers for commit reset and Fire/Resolution publication."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-163.md",
+        "/tmp/codefire-prepublish-audit.5ZGjwO/status-divergent.json",
+        "/tmp/codefire-audit-src.oPiaGB",
+        "/tmp/codefire-cfr163-final.cFM6i8/bin/codefire",
+        "/tmp/codefire-cfr163-final-dogfood.zm3Cgx"
+      ]
+    },
+    {
+      "id": "CFR-164",
+      "status": "fixed",
+      "root_cause": "trust_sensitive_requests_and_execution_results_are_not_subject_bound",
+      "fix_group": "subject-trust-execution",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-cli/src/signatures.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Bind complete mutation payloads and constrained execution profiles to versioned canonical subjects."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-164.md",
+        "docs/development/codefire-review-portfolio/reviews/041-remote-mutation-trust-boundary.md",
+        "/tmp/codefire-cfr164-final.ektyR2/bin/codefire",
+        "/tmp/codefire-cfr164-dogfood.wo6dghb5/results.json",
+        "/tmp/codefire-cfr164-readonly.gkmgj83e/results.json",
+        "/tmp/codefire-cfr164-canonical-verify.json"
+      ]
+    },
+    {
+      "id": "CFR-165",
+      "status": "fixed",
+      "root_cause": "remote_mutation_idempotency_locking_and_gc_use_independent_visibility_protocols",
+      "fix_group": "remote-publication-concurrency",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-cli/src/remote.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Unify remote resource locks, transaction phases, idempotency publication, and GC snapshot validation."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-165.md",
+        "adr/ADR-017-remote-publication-transaction.md",
+        "crates/codefire-cli/src/remote/publication.rs",
+        "crates/codefire-cli/src/remote/operations.rs",
+        "tests/test_codefire_cli.py",
+        "/tmp/codefire-cfr165-final.ln9Oa7/bin/codefire",
+        "/tmp/codefire-cfr165-reversal.OVDZtr/server"
+      ]
+    },
+    {
+      "id": "CFR-166",
+      "status": "fixed",
+      "root_cause": "version_support_capabilities_and_conformance_are_not_one_runtime_contract",
+      "fix_group": "version-capability-conformance",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-cli/src/compatibility.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Create one support matrix, public schema family, capability manifest, and cross-runtime corpus for every persisted/public boundary."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-166.md",
+        "adr/ADR-018-version-capability-conformance-contract.md",
+        "schemas/conformance/manifest-v1.json",
+        "schemas/conformance/minimal_consumer.py",
+        "crates/codefire-cli/src/pagination.rs",
+        "crates/codefire-cli/src/remote/doctor.rs",
+        "docs/development/strategy/release-and-format-roadmap.md",
+        "docs/development/bug-issues/cfb-134.md",
+        "/tmp/codefire-cfr166-final.zpGltd/bin/codefire",
+        "/tmp/codefire-cfr166-reversal.9AYMuY"
+      ]
+    },
+    {
+      "id": "CFR-167",
+      "status": "fixed",
+      "root_cause": "effective_policy_and_change_coverage_lack_typed_provenance",
+      "fix_group": "typed-policy-change-coverage",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-core/src/lib.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Extend the authoritative decision with stable effective-rule provenance and typed change coverage facts."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-167.md",
+        "adr/ADR-019-effective-policy-and-change-coverage-contract.md",
+        "crates/codefire-core/src/effective_policy.rs",
+        "crates/codefire-core/src/change_coverage.rs",
+        "crates/codefire-cli/src/tests/policy_coverage.rs",
+        "crates/codefire-store/src/lib.rs",
+        "/tmp/codefire-cfr167-final.KWa8TC/bin/codefire",
+        "/tmp/codefire-cfr167-reversal"
+      ]
+    },
+    {
+      "id": "CFR-168",
+      "status": "investigating",
+      "root_cause": "semantic_work_is_output_bounded_but_not_work_or_memory_budgeted",
+      "fix_group": "bounded-graph-resource-work",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-cli/src/metrics.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Define iterative evaluators, shared validation caches, streaming/page boundaries, and stable work counters."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-168.md",
+        "docs/development/codefire-review-portfolio/reviews/047-large-repository-performance-budget.md"
+      ]
+    },
+    {
+      "id": "CFR-169",
+      "status": "investigating",
+      "root_cause": "lifecycle_object_and_test_ownership_remains_in_oversized_local_modules",
+      "fix_group": "architecture-proof-seam",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-cli/src/main.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Extract only the behavior-preserving lifecycle, Store, and fixture seams required by the invariant fixes."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-169.md",
+        "docs/development/module-boundaries.md"
+      ]
+    },
+    {
+      "id": "CFR-170",
+      "status": "investigating",
+      "root_cause": "automation_actions_are_string_projections_of_plans_not_typed_postconditions",
+      "fix_group": "typed-automation-outcome-actions",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-cli/src/automation.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Make outcomes and executable actions typed, precondition-bound, and derived from current postconditions."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-170.md",
+        "docs/development/bug-issues/cfb-133.md"
+      ]
+    },
+    {
+      "id": "CFR-171",
+      "status": "investigating",
+      "root_cause": "verification_outcome_does_not_bind_a_complete_claim_and_proof_descriptor",
+      "fix_group": "assurance-claim-proof",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-core/src/lib.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Bind claim type, subject, policy, coverage, semantic profile, and proof kind into one certificate descriptor."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-171.md",
+        "docs/development/codefire-review-portfolio/reviews/001-consistency-claim-boundary.md"
+      ]
+    },
+    {
+      "id": "CFR-172",
+      "status": "investigating",
+      "root_cause": "read_only_adoption_and_workspace_comprehension_are_unfalsified",
+      "fix_group": "read-only-adoption-mental-model",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "docs/development/strategy/product-strategy.md",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Run a non-mutating minimal-consumer experiment with explicit comprehension, setup-cost, and stop criteria."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-172.md",
+        "docs/development/codefire-review-portfolio/reviews/002-git-noncompatibility-adoption-bridge.md"
+      ]
+    },
+    {
+      "id": "CFR-173",
+      "status": "investigating",
+      "root_cause": "progress_fire_value_and_product_stop_thresholds_are_unmeasured",
+      "fix_group": "product-falsification-pilot",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "docs/development/strategy/product-strategy.md",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Execute a privacy-preserving replay cohort with predeclared actionability, value, narrow, and stop thresholds."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-173.md",
+        "docs/development/codefire-review-portfolio/reviews/010-product-success-falsification-metrics.md"
+      ]
+    },
+    {
+      "id": "CFR-174",
+      "status": "fixed",
+      "root_cause": "remote_apply_does_not_bind_publication_to_the_reviewed_source_head",
+      "fix_group": "remote-publication-concurrency",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-cli/src/remote.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Apply only the immutable merge-request source head inside the shared remote publication transaction."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-174.md",
+        "adr/ADR-017-remote-publication-transaction.md",
+        "schemas/fixtures/remote-merge-subject-v1.json",
+        "crates/codefire-cli/src/tests.rs",
+        "tests/test_codefire_cli.py"
+      ]
+    },
+    {
+      "id": "CFR-175",
+      "status": "fixed",
+      "root_cause": "file_remote_authority_components_are_not_canonically_contained",
+      "fix_group": "remote-publication-concurrency",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "crates/codefire-cli/src/remote/project.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Validate every remote component and derive authority paths only from a pinned remote-project capability."
+      },
+      "close_evidence": [
+        "docs/development/code-review-issues/cfr-175.md",
+        "adr/ADR-017-remote-publication-transaction.md",
+        "schemas/fixtures/remote-component-contract-v1.json",
+        "crates/codefire-cli/src/remote/project.rs",
+        "tests/test_codefire_cli.py"
       ]
     }
   ]

@@ -9,8 +9,6 @@ pub(crate) enum ExitCode {
     StaleResolution = 12,
     DuplicateAtomId = 13,
     VerificationCommandFailed = 14,
-    #[allow(dead_code)]
-    // Reserved by the v0.6 public taxonomy; merge blocking lands in CF-222/CF-232 follow-ups.
     MergeConflict = 15,
     RepositoryCorruption = 20,
     ObjectReferenceInvalid = 21,
@@ -29,6 +27,7 @@ pub(crate) enum ExitCode {
     #[allow(dead_code)]
     // Reserved by the v0.6 public taxonomy; artifact validation lands in CF-215/CF-226.
     ExternalArtifactInvalid = 50,
+    ResourceBudgetExceeded = 60,
 }
 
 impl ExitCode {
@@ -38,28 +37,20 @@ impl ExitCode {
 }
 
 pub(crate) fn verification_exit_code(verification: &codefire_core::Verification) -> ExitCode {
-    if verification.result == "passed" {
-        return ExitCode::Success;
+    match codefire_core::committable_decision(verification).primary_reason {
+        None => ExitCode::Success,
+        Some(codefire_core::CommittableReason::UnresolvedMergeConflicts) => ExitCode::MergeConflict,
+        Some(codefire_core::CommittableReason::OpenRequiredFires) => ExitCode::OpenFires,
+        Some(codefire_core::CommittableReason::MissingRequiredLinks) => {
+            ExitCode::MissingRequiredLinks
+        }
+        Some(codefire_core::CommittableReason::StaleResolutions) => ExitCode::StaleResolution,
+        Some(codefire_core::CommittableReason::MissingEvidenceRefs) => {
+            ExitCode::ObjectReferenceInvalid
+        }
+        Some(codefire_core::CommittableReason::DuplicateAtomIds) => ExitCode::DuplicateAtomId,
+        Some(codefire_core::CommittableReason::FailedChecks) => ExitCode::VerificationCommandFailed,
     }
-    if verification.open_required_fires > 0 {
-        return ExitCode::OpenFires;
-    }
-    if verification.trace_completeness_required && !verification.missing_required_links.is_empty() {
-        return ExitCode::MissingRequiredLinks;
-    }
-    if !verification.stale_resolutions.is_empty() {
-        return ExitCode::StaleResolution;
-    }
-    if !verification.missing_evidence_refs.is_empty() {
-        return ExitCode::ObjectReferenceInvalid;
-    }
-    if !verification.duplicate_atom_ids.is_empty() {
-        return ExitCode::DuplicateAtomId;
-    }
-    if !verification.failed_checks.is_empty() {
-        return ExitCode::VerificationCommandFailed;
-    }
-    ExitCode::GenericFailure
 }
 
 pub(crate) fn core_error_exit_code(error: &codefire_core::CoreError) -> ExitCode {
@@ -67,14 +58,33 @@ pub(crate) fn core_error_exit_code(error: &codefire_core::CoreError) -> ExitCode
         codefire_core::CoreError::Config(_) => ExitCode::InvalidUsageOrConfig,
         codefire_core::CoreError::Io(_) => ExitCode::GenericFailure,
         codefire_core::CoreError::Json(_) => ExitCode::RepositoryCorruption,
+        codefire_core::CoreError::TraceGraphEndpointIntegrity(_) => {
+            ExitCode::ObjectReferenceInvalid
+        }
+        codefire_core::CoreError::SealedSnapshotSemanticIntegrity(_) => {
+            ExitCode::SealedCommitInvalid
+        }
     }
 }
 
 pub(crate) fn store_error_exit_code(error: &codefire_store::StoreError) -> ExitCode {
     match error {
-        codefire_store::StoreError::InvalidSealedCommit(_) => ExitCode::SealedCommitInvalid,
+        codefire_store::StoreError::InvalidSealedCommit(_)
+        | codefire_store::StoreError::SealedValidationSubjectChanged { .. } => {
+            ExitCode::SealedCommitInvalid
+        }
+        codefire_store::StoreError::DecisionWorkAccounting(error)
+            if error.budget_exceeded().is_some() =>
+        {
+            ExitCode::ResourceBudgetExceeded
+        }
+        codefire_store::StoreError::DecisionWorkAccounting(_) => ExitCode::GenericFailure,
+        codefire_store::StoreError::ValidationCancelled => ExitCode::ResourceBudgetExceeded,
+        codefire_store::StoreError::ObjectPublicationRetryRequired => ExitCode::GenericFailure,
         codefire_store::StoreError::ObjectIdMismatch { .. }
         | codefire_store::StoreError::ObjectHashMismatch { .. }
+        | codefire_store::StoreError::ObjectCollision { .. }
+        | codefire_store::StoreError::ObjectRecordTooLarge { .. }
         | codefire_store::StoreError::FilenameMismatch { .. }
         | codefire_store::StoreError::ObjectNotFound(_)
         | codefire_store::StoreError::UnknownObjectType(_)
@@ -124,8 +134,13 @@ mod tests {
                 resolution_uid: "resolution_1".to_string(),
                 evidence_id: "CF-EVIDENCE-missing".to_string(),
             }],
+            unresolved_merge_conflicts: Vec::new(),
             duplicate_atom_ids: vec!["REQ-session".to_string()],
             verified_at: "2026-06-04T00:00:00Z".to_string(),
+            subject: None,
+            execution: Vec::new(),
+            effective_policy: None,
+            change_coverage: None,
         };
 
         assert_eq!(
@@ -146,13 +161,42 @@ mod tests {
                 resolution_uid: "resolution_1".to_string(),
                 evidence_id: "CF-EVIDENCE-missing".to_string(),
             }],
+            unresolved_merge_conflicts: Vec::new(),
             duplicate_atom_ids: Vec::new(),
             verified_at: "2026-06-04T00:00:00Z".to_string(),
+            subject: None,
+            execution: Vec::new(),
+            effective_policy: None,
+            change_coverage: None,
         };
         assert_eq!(
             verification_exit_code(&missing_evidence_only),
             ExitCode::ObjectReferenceInvalid
         );
+    }
+
+    #[test]
+    fn verification_exit_code_uses_typed_facts_not_recorded_result() {
+        let verification = codefire_core::Verification {
+            type_tag: "verification".to_string(),
+            version: 1,
+            result: "passed".to_string(),
+            trace_completeness_required: false,
+            open_required_fires: 1,
+            failed_checks: Vec::new(),
+            missing_required_links: Vec::new(),
+            stale_resolutions: Vec::new(),
+            missing_evidence_refs: Vec::new(),
+            unresolved_merge_conflicts: Vec::new(),
+            duplicate_atom_ids: Vec::new(),
+            verified_at: "2026-07-12T00:00:00Z".to_string(),
+            subject: None,
+            execution: Vec::new(),
+            effective_policy: None,
+            change_coverage: None,
+        };
+
+        assert_eq!(verification_exit_code(&verification), ExitCode::OpenFires);
     }
 
     #[test]
@@ -168,6 +212,35 @@ mod tests {
                 "missing root".to_string()
             )),
             ExitCode::SealedCommitInvalid
+        );
+        assert_eq!(
+            store_error_exit_code(
+                &codefire_store::StoreError::SealedValidationSubjectChanged {
+                    object_id: "CF-COMMIT-changed".to_string(),
+                    path: std::path::PathBuf::from("objects/commits/CF-COMMIT-changed.json"),
+                    kind: codefire_store::SealedValidationSubjectChangeKind::DigestChanged,
+                    expected_size: 64,
+                    actual_size: Some(64),
+                }
+            ),
+            ExitCode::SealedCommitInvalid
+        );
+        assert_eq!(
+            store_error_exit_code(&codefire_store::StoreError::ObjectRecordTooLarge {
+                path: std::path::PathBuf::from("objects/blob/oversized.json"),
+                size: 65,
+                limit: 64,
+            }),
+            ExitCode::ObjectReferenceInvalid
+        );
+    }
+
+    #[test]
+    fn resource_budget_exit_code_is_stable() {
+        assert_eq!(ExitCode::ResourceBudgetExceeded.code(), 60);
+        assert_eq!(
+            ExitCode::ResourceBudgetExceeded.code(),
+            codefire_core::RESOURCE_BUDGET_EXIT_CODE as i32
         );
     }
 }

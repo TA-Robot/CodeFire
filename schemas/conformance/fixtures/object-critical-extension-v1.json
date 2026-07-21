@@ -1,0 +1,15 @@
+{
+  "extensions": [
+    {
+      "critical": true,
+      "name": "required-proof",
+      "namespace": "example.test",
+      "references": [],
+      "version": 1
+    }
+  ],
+  "hash": "70efa5ab296997f1897b6c56643e32b3701aaf89a66a501340c498a44339647e",
+  "object_id": "CF-POLICY-70efa5ab296997f1897b6c56",
+  "payload": {"policy": {"portable": true}, "type": "policy", "version": 1},
+  "type": "policy"
+}
