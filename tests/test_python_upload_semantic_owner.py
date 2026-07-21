@@ -56,12 +56,14 @@ class PythonUploadSemanticOwnerTests(unittest.TestCase):
     def source_bytes(self, request):
         return self.namespace["canonical_json_size"](request)
 
-    def bind_source(self, request, ledger, amount=None):
+    def bind_source(self, request, ledger, amount=None, upper=None):
         selected = self.source_bytes(request) if amount is None else amount
+        selected_upper = selected if upper is None else upper
         scalar = self.namespace["prepare_http_upload_parser_scalar"](
-            ledger, selected
+            ledger, selected_upper
         )
         scalar.acquire(ledger)
+        scalar.reconcile_exact(ledger, selected)
         source = self.namespace["bind_http_upload_request_source"](
             request, ledger, scalar
         )
@@ -189,6 +191,93 @@ class PythonUploadSemanticOwnerTests(unittest.TestCase):
         self.assertTrue(token._closed)
         self.assert_closed(ledger)
 
+    def test_parser_upper_reconciles_exact_with_retry_safe_shrink(self):
+        request = self.request()
+        exact = self.source_bytes(request)
+        for post_effect in (False, True):
+            with self.subTest(post_effect=post_effect):
+                ledger = self.ledger(f"parser reconcile {post_effect}")
+                upper = exact + 97
+                token = self.namespace["prepare_http_upload_parser_scalar"](
+                    ledger, upper
+                )
+                token.acquire(ledger)
+                self.assertEqual(ledger.current["retained_bytes"], upper)
+                with self.assertRaisesRegex(self.CFError, "not reconciled"):
+                    self.namespace["bind_http_upload_request_source"](
+                        request, ledger, token
+                    )
+                release = ledger.release
+                fired = False
+
+                def fail_shrink_once(dimension, amount):
+                    nonlocal fired
+                    if not fired and amount == upper - exact:
+                        fired = True
+                        if post_effect:
+                            release(dimension, amount)
+                        raise RuntimeError("parser reconcile release fault")
+                    return release(dimension, amount)
+
+                ledger.release = fail_shrink_once
+                if post_effect:
+                    token.reconcile_exact(ledger, exact)
+                else:
+                    with self.assertRaisesRegex(RuntimeError, "release fault"):
+                        token.reconcile_exact(ledger, exact)
+                    self.assertEqual(ledger.current["retained_bytes"], upper)
+                    ledger.release = release
+                    token.reconcile_exact(ledger, exact)
+                ledger.release = release
+                self.assertTrue(fired)
+                self.assertEqual(ledger.current["retained_bytes"], exact)
+                source = self.namespace["bind_http_upload_request_source"](
+                    request, ledger, token
+                )
+                with self.assertRaisesRegex(self.CFError, "adopted"):
+                    self.namespace["bind_http_upload_request_source"](
+                        request, ledger, token
+                    )
+                source.close(ledger)
+                self.assert_closed(ledger)
+
+    def test_parser_reconcile_callback_close_is_typed_and_leak_free(self):
+        request = self.request()
+        exact = self.source_bytes(request)
+        upper = exact + 31
+        ledger = self.ledger("parser reconcile callback")
+        token = self.namespace["prepare_http_upload_parser_scalar"](
+            ledger, upper
+        )
+        token.acquire(ledger)
+        release = ledger.release
+        observations = []
+        fired = False
+
+        def callback_release(dimension, amount):
+            nonlocal fired
+            if not fired and amount == upper - exact:
+                fired = True
+                try:
+                    token.reconcile_exact(ledger, exact)
+                except BaseException as error:
+                    observations.append(str(error))
+                token.close(ledger)
+            return release(dimension, amount)
+
+        ledger.release = callback_release
+        try:
+            with self.assertRaisesRegex(self.CFError, "cancelled by close"):
+                token.reconcile_exact(ledger, exact)
+        finally:
+            ledger.release = release
+        self.assertTrue(fired)
+        self.assertEqual(observations, [
+            "HTTP upload parser reconciliation is already active"
+        ])
+        self.assertTrue(token._closed)
+        self.assert_closed(ledger)
+
     def test_stage_like_record_bound_is_rejected_before_digest(self):
         request = self.request()
         record_bound = len(
@@ -292,6 +381,7 @@ class PythonUploadSemanticOwnerTests(unittest.TestCase):
 
     def test_terminal_rejects_identity_content_and_request_mutation(self):
         mutations = [
+            lambda request: request.__setitem__("branch", "other-main"),
             lambda request: request["objects"].reverse(),
             lambda request: request["objects"].__setitem__(
                 0, copy.deepcopy(request["objects"][0])
@@ -458,6 +548,60 @@ class PythonUploadSemanticOwnerTests(unittest.TestCase):
         self.assertEqual(close_calls, 2)
         self.assertTrue(exact_child._closed)
         self.assert_closed(ledger)
+
+    def test_digest_reserve_and_consume_post_effect_faults_reconcile(self):
+        for operation in ("reserve", "consume"):
+            with self.subTest(operation=operation):
+                request = self.request()
+                ledger = self.ledger(f"digest post-effect {operation}")
+                source, _amount = self.bind_source(request, ledger)
+                owner = self.allocate_owner(source, ledger)
+                fired = False
+                if operation == "reserve":
+                    original = ledger.reserve_into
+
+                    def post_effect_reserve(permit, phase, **upper):
+                        nonlocal fired
+                        result = original(permit, phase, **upper)
+                        if (
+                            not fired
+                            and upper.get("counters", {}).get(
+                                "object_records"
+                            )
+                            == len(request["objects"])
+                        ):
+                            fired = True
+                            raise RuntimeError("digest reserve post-effect fault")
+                        return result
+
+                    ledger.reserve_into = post_effect_reserve
+                else:
+                    original = ledger.consume_reserved
+
+                    def post_effect_consume(permit, **actual):
+                        nonlocal fired
+                        reservation = ledger._reserved.get(permit, {})
+                        is_digest = reservation.get("counters", {}).get(
+                            "object_records"
+                        ) == len(request["objects"])
+                        result = original(permit, **actual)
+                        if not fired and is_digest:
+                            fired = True
+                            raise RuntimeError("digest consume post-effect fault")
+                        return result
+
+                    ledger.consume_reserved = post_effect_consume
+                try:
+                    owner.prepare(ledger)
+                finally:
+                    if operation == "reserve":
+                        ledger.reserve_into = original
+                    else:
+                        ledger.consume_reserved = original
+                self.assertTrue(fired)
+                owner.terminal_detach(ledger)
+                owner.close(ledger)
+                self.assert_closed(ledger)
 
     def test_parser_scalar_release_pre_and_post_faults_are_retry_safe(self):
         for post_effect in (False, True):

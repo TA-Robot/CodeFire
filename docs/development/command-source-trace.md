@@ -102,11 +102,12 @@ aliasはdestination-first canonical fingerprintでhandle close時とfinal fence�
 なしで行い、成功したdocumentを即session authorityからdetachしてからscalar cleanupへ進む。lookup/release/finishはsingle-flightで、
 callback後かつpayload取得前にhandle/owner tokenを再確認する。
 
-production-unwired digest handoffは、parser-owned full-request scalarをcaller-owned one-shot `AccountedHTTPUploadParserScalar`で取得し、
+production-unwired digest handoffは、parser pre-parse upperをcaller-owned one-shot `AccountedHTTPUploadParserScalar`で取得し、
+同owner内でpost-parse exact full-request scalarへretry-safeにshrinkしてから、
 そのexact tokenを`AccountedHTTPUploadRequestSource`へmoveする。Stage closure/core/newline boundsは使わない。caller-owned二段階
 `AccountedHTTPUploadSemantic`がsourceをrelease/reacquire gapなしでadoptし、
-digestを公開せずexact semantic mapping、元record identity、別Retainedのeffect-ready core-plus-newline bytesを保持する。last deadline callback後に
-full request/list/ID/duplicate/full-record digest/copy parityを再検証し、mutable AST scalarをpayload-first releaseしてsemantic/copyをfield assignment
+digestを公開せずexact semantic mapping、full-request fingerprint、元record identity、別Retainedのeffect-ready core-plus-newline bytesを保持する。
+semantic側8 source passとdigest child workを別々にaccountし、last deadline callback後にfull request fingerprint/list/ID/duplicate/full-record digest/copy parityを再検証し、mutable AST scalarをpayload-first releaseしてsemantic/copyをfield assignment
 だけでread-only mapping proxy/copy tupleのprivate effect slotへdetachする。同tokenのduplicate bindは拒否する。existingのcontinuous gate、missingのbootstrap-locked private-stage gate/proof、mapping lending、
 effect consumer、handler parser release-slot移管は未接続である。
 

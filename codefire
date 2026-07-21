@@ -4363,6 +4363,49 @@ class _StablePermitTransition:
             "_retained_primary_released",
         )
 
+    def shrink_retained_primary(self, retained_primary: int) -> None:
+        """Reconcile a preflight retained upper to one exact owned scalar."""
+        if (
+            isinstance(retained_primary, bool)
+            or not isinstance(retained_primary, int)
+            or retained_primary < 0
+            or retained_primary > self._retained_primary
+        ):
+            raise CFError("decision-work retained reconciliation is invalid")
+        if self._retained_secondary:
+            raise CFError(
+                "decision-work retained reconciliation requires one scalar"
+            )
+        if self._retained_primary_released:
+            raise CFError("decision-work retained scalar is already released")
+        if not self._retained_acquired:
+            self._reconcile_acquires()
+        if not self._retained_acquired:
+            raise CFError("decision-work retained scalar was not acquired")
+        difference = self._retained_primary - retained_primary
+        if difference:
+            before = self._ledger._current.get("retained_bytes", 0)
+            expected_after = before - difference
+            failure = None
+            try:
+                self._ledger.release("retained_bytes", difference)
+            except BaseException as error:
+                failure = error
+            after = self._ledger._current.get("retained_bytes", 0)
+            committed = after == expected_after
+            if not committed:
+                if failure is not None:
+                    raise failure
+                raise CFError(
+                    "decision-work retained reconciliation did not commit"
+                )
+            if failure is not None:
+                _detach_exception_chain(failure)
+        self._retained_primary = retained_primary
+        self._retained_total = retained_primary
+        self._expected_retained = self._baseline_retained + retained_primary
+        self._retained_primary_released = retained_primary == 0
+
     def release_temporary(self) -> None:
         self._release_component(
             "temporary_bytes",
@@ -15699,26 +15742,70 @@ class AccountedRemoteObjectSetDigest:
                 "retained_bytes": retained_bytes,
                 "temporary_bytes": temporary_bytes,
             }
-            work_permit = ledger.reserve(
-                "query",
-                charges={
-                    "aggregate_bytes": source_canonical_upper,
-                    "object_records": len(records),
-                },
-                acquires=acquires,
-                counters={"object_records": len(records)},
-            )
-            # Publish the permit into the retry owner before its first
-            # fallible consumption. A cancellation fault must not strand a
-            # constructor-local reservation after this object unwinds.
+            # Publish a caller-created permit before reserve_into.  A
+            # registered-then-raise reservation therefore cannot become an
+            # unobservable constructor-local permit.
+            work_permit = DecisionWorkPermit()
             self._work_permit = work_permit
-            ledger.consume_reserved(
-                work_permit,
-                phase="query",
-                acquires=acquires,
+            reserve_failure: BaseException | None = None
+            try:
+                ledger.reserve_into(
+                    work_permit,
+                    "query",
+                    charges={
+                        "aggregate_bytes": source_canonical_upper,
+                        "object_records": len(records),
+                    },
+                    acquires=acquires,
+                    counters={"object_records": len(records)},
+                )
+            except BaseException as error:
+                reserve_failure = error
+            if work_permit not in ledger._reserved:
+                self._work_permit = None
+                work_permit = None
+                if reserve_failure is not None:
+                    raise reserve_failure
+                raise CFError(
+                    "remote object-set digest reservation was not registered"
+                )
+            if reserve_failure is not None:
+                self._detach_failure_chain(reserve_failure)
+
+            # Reconcile acquisitions even if the ledger raises after commit.
+            # The published owner can then release the exact scalars.
+            retained_before = ledger._current.get("retained_bytes", 0)
+            temporary_before = ledger._current.get("temporary_bytes", 0)
+            consume_failure: BaseException | None = None
+            try:
+                ledger.consume_reserved(
+                    work_permit,
+                    phase="query",
+                    acquires=acquires,
+                )
+            except BaseException as error:
+                consume_failure = error
+            retained_committed = (
+                ledger._current.get("retained_bytes", 0)
+                == retained_before + retained_bytes
             )
-            self._retained_bytes = retained_bytes
-            self._temporary_bytes = temporary_bytes
+            temporary_committed = (
+                ledger._current.get("temporary_bytes", 0)
+                == temporary_before + temporary_bytes
+            )
+            if retained_committed and temporary_committed:
+                self._retained_bytes = retained_bytes
+                self._temporary_bytes = temporary_bytes
+                if consume_failure is not None:
+                    self._detach_failure_chain(consume_failure)
+            elif consume_failure is not None:
+                raise consume_failure
+            else:
+                raise CFError(
+                    "remote object-set digest acquisition did not commit"
+                )
+            if work_permit not in ledger._reserved:
+                self._work_permit = None
             work_permit = None
             self._ordered = list(records)
             self._heap_sort(deadline)
@@ -15970,27 +16057,31 @@ def prepare_remote_object_set_digest(
 
 
 class AccountedHTTPUploadParserScalar:
-    """Own one parser Retained scalar before request-source adoption."""
+    """Own one parser Retained upper and reconcile it to the exact AST."""
 
     def __init__(
-        self, ledger: DecisionWorkLedger, parser_canonical_bytes: int
+        self, ledger: DecisionWorkLedger, parser_canonical_upper: int
     ) -> None:
         if (
-            isinstance(parser_canonical_bytes, bool)
-            or not isinstance(parser_canonical_bytes, int)
-            or parser_canonical_bytes < 0
+            isinstance(parser_canonical_upper, bool)
+            or not isinstance(parser_canonical_upper, int)
+            or parser_canonical_upper < 0
         ):
             raise CFError(
-                "HTTP upload parser scalar must be a non-negative integer"
+                "HTTP upload parser upper must be a non-negative integer"
             )
         self._ledger = ledger
         self._ledger_identity = id(ledger)
-        self._parser_canonical_bytes = parser_canonical_bytes
+        self._parser_canonical_upper = parser_canonical_upper
+        self._parser_canonical_bytes: int | None = None
         self._allocation = _StablePermitTransition(ledger)
         self._source: AccountedHTTPUploadRequestSource | None = None
         self._acquiring = False
+        self._reconciling = False
         self._acquired = False
         self._acquire_used = False
+        self._reconcile_target: int | None = None
+        self._reconciled = False
         self._closing = False
         self._close_requested = False
         self._closed = False
@@ -16014,7 +16105,7 @@ class AccountedHTTPUploadParserScalar:
         self._acquire_used = True
         self._acquiring = True
         failure: BaseException | None = None
-        amount = self._parser_canonical_bytes
+        amount = self._parser_canonical_upper
         try:
             self._allocation.__init__(ledger, retained_primary=amount)
             self._allocation.reserve(
@@ -16046,10 +16137,61 @@ class AccountedHTTPUploadParserScalar:
         if close_requested:
             raise CFError("HTTP upload parser scalar acquisition was cancelled by close")
 
-    def _ensure_acquired(self, ledger: DecisionWorkLedger) -> None:
+    def reconcile_exact(
+        self, ledger: DecisionWorkLedger, parser_canonical_bytes: int
+    ) -> None:
+        """Shrink the pre-parse upper to the parser's exact canonical size."""
         self._ensure_ledger(ledger)
         if self._closed or not self._acquired:
             raise CFError("HTTP upload parser scalar is not acquired")
+        if (
+            isinstance(parser_canonical_bytes, bool)
+            or not isinstance(parser_canonical_bytes, int)
+            or parser_canonical_bytes < 0
+            or parser_canonical_bytes > self._parser_canonical_upper
+        ):
+            raise CFError("HTTP upload parser exact scalar exceeds its upper")
+        if self._reconciling:
+            raise CFError("HTTP upload parser reconciliation is already active")
+        if self._reconciled:
+            raise CFError("HTTP upload parser reconciliation is single-use")
+        if self._reconcile_target is None:
+            self._reconcile_target = parser_canonical_bytes
+        elif self._reconcile_target != parser_canonical_bytes:
+            raise CFError("HTTP upload parser reconciliation target changed")
+        self._reconciling = True
+        failure: BaseException | None = None
+        try:
+            self._allocation.shrink_retained_primary(parser_canonical_bytes)
+            self._parser_canonical_bytes = parser_canonical_bytes
+            self._reconciled = True
+        except BaseException as error:
+            AccountedRemoteObjectSetDigest._detach_failure_chain(error)
+            failure = error
+        self._reconciling = False
+        close_requested = self._close_requested
+        cleanup_failure: BaseException | None = None
+        if close_requested:
+            try:
+                self.close(ledger)
+            except BaseException as error:
+                AccountedRemoteObjectSetDigest._detach_failure_chain(error)
+                cleanup_failure = error
+        if cleanup_failure is not None:
+            if failure is not None:
+                raise cleanup_failure from failure
+            raise cleanup_failure from None
+        if failure is not None:
+            raise failure from None
+        if close_requested:
+            raise CFError(
+                "HTTP upload parser reconciliation was cancelled by close"
+            )
+
+    def _ensure_reconciled(self, ledger: DecisionWorkLedger) -> None:
+        self._ensure_ledger(ledger)
+        if self._closed or not self._acquired or not self._reconciled:
+            raise CFError("HTTP upload parser scalar is not reconciled")
 
     def _close_from_source(
         self, source: "AccountedHTTPUploadRequestSource"
@@ -16067,7 +16209,7 @@ class AccountedHTTPUploadParserScalar:
             if self._source is not None:
                 raise CFError("HTTP upload parser scalar was adopted")
             raise CFError("HTTP upload parser scalar has a foreign source")
-        if self._acquiring:
+        if self._acquiring or self._reconciling:
             self._close_requested = True
             return
         if self._closing:
@@ -16077,8 +16219,10 @@ class AccountedHTTPUploadParserScalar:
         try:
             self._allocation.release_all()
             self._source = None
-            self._parser_canonical_bytes = 0
+            self._parser_canonical_upper = 0
+            self._parser_canonical_bytes = None
             self._acquired = False
+            self._reconciled = False
             self._close_requested = False
             completed = True
         finally:
@@ -16099,19 +16243,20 @@ class AccountedHTTPUploadParserScalar:
 
 
 def prepare_http_upload_parser_scalar(
-    ledger: DecisionWorkLedger, parser_canonical_bytes: int
+    ledger: DecisionWorkLedger, parser_canonical_upper: int
 ) -> AccountedHTTPUploadParserScalar:
-    """Allocate a one-shot parser scalar token before explicit acquire."""
-    return AccountedHTTPUploadParserScalar(ledger, parser_canonical_bytes)
+    """Allocate one parser token before acquiring its pre-parse upper."""
+    return AccountedHTTPUploadParserScalar(ledger, parser_canonical_upper)
 
 
 class AccountedHTTPUploadRequestSource:
-    """Bind one already-acquired parser AST scalar to its exact request.
+    """Bind one exactly reconciled parser AST scalar to its request.
 
     This production-unwired source does not acquire memory.  The HTTP parser
-    has already acquired ``parser_canonical_bytes`` for ``request``; the
-    source merely makes that existing scalar transferable without a
-    release/reacquire gap.  Only ``AccountedHTTPUploadSemantic`` may adopt it.
+    token has already acquired its pre-parse upper and shrunk it in-place to
+    ``parser_canonical_bytes`` for ``request``; the source merely makes that
+    exact scalar transferable without a release/reacquire gap.  Only
+    ``AccountedHTTPUploadSemantic`` may adopt it.
     """
 
     def __init__(
@@ -16127,7 +16272,7 @@ class AccountedHTTPUploadRequestSource:
             raise CFError("HTTP upload request source requires the exact objects list")
         if not isinstance(scalar, AccountedHTTPUploadParserScalar):
             raise CFError("HTTP upload request source requires a parser scalar token")
-        scalar._ensure_acquired(ledger)
+        scalar._ensure_reconciled(ledger)
         if scalar._source is not None:
             raise CFError("HTTP upload parser scalar is already adopted")
         self._ledger = ledger
@@ -16135,7 +16280,10 @@ class AccountedHTTPUploadRequestSource:
         self._request: dict[str, Any] | None = request
         self._records: list[dict[str, Any]] | None = records
         self._scalar: AccountedHTTPUploadParserScalar | None = scalar
-        self._parser_canonical_bytes = scalar._parser_canonical_bytes
+        parser_canonical_bytes = scalar._parser_canonical_bytes
+        if parser_canonical_bytes is None:
+            raise CFError("HTTP upload parser scalar is not reconciled")
+        self._parser_canonical_bytes = parser_canonical_bytes
         self._destination: AccountedHTTPUploadSemantic | None = None
         self._closing = False
         self._closed = False
@@ -16230,7 +16378,9 @@ class AccountedHTTPUploadSemantic:
     COPY_BYTES_BASE_BYTES = sys.getsizeof(b"")
     COPY_TEMPORARY_BASE_BYTES = 4096
     COPY_TEMPORARY_BYTES_PER_SOURCE_BYTE = 2
-    COPY_WORK_PASSES = 3
+    # Full-request size + fingerprint, object validation + core serialization,
+    # then the same four source-sized walks at the terminal fence.
+    SEMANTIC_WORK_PASSES = 8
 
     def __init__(
         self,
@@ -16250,6 +16400,7 @@ class AccountedHTTPUploadSemantic:
         self._sorted_refs: tuple[dict[str, Any], ...] | None = None
         self._copy_build: list[bytes] | None = None
         self._copy_bytes: tuple[bytes, ...] | None = None
+        self._request_digest: str | None = None
         self._semantic: dict[str, Any] | None = None
         self._semantic_view: MappingProxyType | None = None
         self._effect_copy_bytes: tuple[bytes, ...] | None = None
@@ -16351,7 +16502,7 @@ class AccountedHTTPUploadSemantic:
             )
         )
         work = self._checked_product(
-            source_bytes, self.COPY_WORK_PASSES, "copy work"
+            source_bytes, self.SEMANTIC_WORK_PASSES, "semantic work"
         )
         if retained > U64_MAX or temporary > U64_MAX:
             raise CFError("HTTP upload semantic allocation exceeds the u64 domain")
@@ -16431,6 +16582,12 @@ class AccountedHTTPUploadSemantic:
             )
             self._allocation.cancel()
             self._validate_source_exact(polling=True)
+            request_hasher = hashlib.sha256()
+            _hash_canonical_json_polling(
+                request_hasher, request, self._poll
+            )
+            self._request_digest = "sha256:" + request_hasher.hexdigest()
+            request_hasher = None
             AccountedRemoteObjectSetDigest(
                 records,
                 ledger,
@@ -16480,6 +16637,7 @@ class AccountedHTTPUploadSemantic:
         source = None
         records = None
         request = None
+        request_hasher = None
         digest_owner = None
         record = None
         digest = None
@@ -16528,15 +16686,27 @@ class AccountedHTTPUploadSemantic:
         sorted_refs = self._sorted_refs
         copy_bytes = self._copy_bytes
         semantic = self._semantic
+        expected_request_digest = self._request_digest
         if (
             record_refs is None
             or sorted_refs is None
             or copy_bytes is None
             or semantic is None
+            or expected_request_digest is None
             or len(records) != len(record_refs)
             or len(sorted_refs) != len(copy_bytes)
         ):
             raise CFError("HTTP upload semantic terminal inputs are unavailable")
+        request = source._request
+        if request is None:
+            raise CFError("HTTP upload semantic request source is unavailable")
+        actual_request_digest = "sha256:" + hashlib.sha256(
+            canonical_json(request)
+        ).hexdigest()
+        if not hmac.compare_digest(
+            actual_request_digest, expected_request_digest
+        ):
+            raise CFError("HTTP upload full request changed before terminal")
         for index, record in enumerate(records):
             if record is not record_refs[index]:
                 raise CFError("HTTP upload request record identity changed")
@@ -16629,6 +16799,7 @@ class AccountedHTTPUploadSemantic:
         self._semantic = None
         self._semantic_view = None
         self._copy_bytes = None
+        self._request_digest = None
         self._terminal_complete = True
 
     def close(self, ledger: DecisionWorkLedger) -> None:
@@ -16648,6 +16819,7 @@ class AccountedHTTPUploadSemantic:
             self._semantic = None
             self._semantic_view = None
             self._copy_bytes = None
+            self._request_digest = None
             self._copy_build = None
             self._record_refs = None
             self._sorted_refs = None

@@ -238,18 +238,23 @@ terminal -> effect-start -> exact proof-consuming rename of the already-gated st
 token.
 
 The production-unwired Python prerequisite now implements the local ownership portion of that contract. A caller-owned one-shot
-`AccountedHTTPUploadParserScalar` performs the Retained acquisition itself. Generic `ledger.current >= amount` evidence is rejected:
+`AccountedHTTPUploadParserScalar` performs the pre-parse Retained-upper acquisition and retry-safe post-parse exact shrink itself.
+Generic `ledger.current >= amount` evidence is rejected:
 it cannot prove which owner acquired the scalar and permits duplicate bind/double release. `AccountedHTTPUploadRequestSource` moves
-one exact acquired token into the exact full request and objects list, and rejects a second source. Caller-owned two-stage
+one exact reconciled token into the exact full request and objects list, and rejects a second source. Caller-owned two-stage
 `AccountedHTTPUploadSemantic` adopts that exact source owner before
-digest work, rejects a Stage-like false bound by remeasuring the full request, publishes the exact digest child before reservation,
+digest work, rejects a Stage-like false bound by remeasuring the full request, publishes the exact digest child and caller-created
+permit before reservation,
 and privately transfers its digest into one stable semantic mapping. It separately preaccounts and builds effect-ready
 core-plus-newline object bytes while retaining the full record identities and full-record digest evidence, so historical `remote`
-fields remain semantic even though they are absent from persisted copy bytes. The last deadline callback precedes callback-free
-full request/list/ID/duplicate/digest/copy-parity revalidation. Mutable request refs then drop before the parser scalar, construction
+fields remain semantic even though they are absent from persisted copy bytes. Eight source-sized semantic work passes cover prepare
+size/fingerprint, validation/hash, serialization, and their terminal size/fingerprint/full-record/copy-parity counterparts; digest
+child work remains separately charged. The last deadline callback precedes callback-free full request fingerprint/list/ID/duplicate/
+digest/copy-parity revalidation. Mutable request refs then drop before the parser scalar, construction
 Temporary releases with post-effect reconciliation, and the preallocated read-only mapping proxy/copy tuple move into private
 effect slots by field assignment only; the owner drops its direct underlying-dict reference. There is no digest or copy getter.
-The real handler must mint/adopt this token at its parser acquisition boundary rather than bind generic current. That parser-token
+The real handler must mint/adopt this token at its parser-upper acquisition boundary, reconcile exact after parse, and never bind
+generic current. That parser-token
 transfer, mapping lending through recovery and
 publication preflight, missing-project bootstrap proof, effect-start, and pinned-byte writer remain unwired; this prerequisite does
 not change production first-error or effect ordering.

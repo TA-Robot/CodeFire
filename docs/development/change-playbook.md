@@ -141,11 +141,12 @@ Transfer the parser-owned exact full-request canonical scalar to a destination-f
 Reserve separate Retained bytes and construction overlap for immutable copy input. Existing projects keep a continuous gate through
 recovery/current/ancestry/preseal→terminal→effect. Missing projects hold bootstrap authority, build and gate a private stage before
 terminal, then effect-start→exact rename→durable reducer with the same gate token. Terminal detaches semantic and immutable copy
-inputs; post-terminal copy never rereads ambient records. The production-unwired Python prerequisite acquires the scalar into a
-caller-owned one-shot `AccountedHTTPUploadParserScalar`, moves that exact token through `AccountedHTTPUploadRequestSource`, and
+inputs; post-terminal copy never rereads ambient records. The production-unwired Python prerequisite acquires the pre-parse upper
+into a caller-owned one-shot `AccountedHTTPUploadParserScalar`, reconciles it in-place to the exact post-parse scalar, moves that
+exact token through `AccountedHTTPUploadRequestSource`, and
 returns `AccountedHTTPUploadSemantic` before explicit single-use prepare,
 and keeps the digest, exact mapping, record identities, and effect-ready core-plus-newline bytes private. Its last deadline callback
-precedes callback-free full-request/record revalidation and field-only detach. A future handler wire must move the real parser release
+precedes callback-free full-request fingerprint/record revalidation and field-only detach. A future handler wire must move the real parser release
 slot into this token chain exactly once and consume the read-only mapping proxy/copy tuple without adding a digest/copy getter.
 
 ## Recipe: Synchronize Documentation
