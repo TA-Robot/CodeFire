@@ -157,8 +157,10 @@ before its borrow, verification/partial signature children before the residual s
 the exact field and stop on the first cleanup fault. After ancestry, perform callback-rich preparation policy then sealed, place the
 last deadline callback before the critical section, probe sealed then policy using only captured primitives and preowned/accounted
 destinations, and commit neither side until both probes pass. Logical-detach cleanup is policy then sealed, stop/retry, and must not
-rerun probes. Keep the successful resource-zero `PAIR_DETACHED` owner as the exact ledger capability until explicit close. This owner
-still has no semantic input, bootstrap, immutable effect input, effect, publication, or handler method.
+rerun probes. Resolve every probe/commit/helper/FD function before the first prepare callback; no mutable class lookup belongs in the
+critical interval. Keep the successful resource-zero `PAIR_DETACHED` owner and its clone-free exact immutable verified branch/head
+references as the exact ledger capability until explicit close. This owner still has no stable project ID authority, semantic input,
+bootstrap, immutable effect input, effect, publication, or handler method.
 
 For Python upload object-set digest, do not use Stage sealed bounds: they cover closure/core/newline, not the full request object list.
 Transfer the parser-owned exact full-request canonical scalar to a destination-first same-ledger semantic owner with no digest getter.

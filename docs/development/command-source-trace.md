@@ -112,7 +112,8 @@ exact signature handle→pinned verification run/close→exact ancestry handle�
 outer-frame typed cancellation、abortはchild/borrow→policy→sealedでstop/retryする。ancestry後はpolicy→sealedのcallback-rich prepare、
 最後のdeadline callback、sealed→policyのcaptured-primitive probe、両probe成功後だけのfield-only commitを行う。logical detach後の
 cleanupもpolicy→sealedでstop/retryしprobeを再実行しない。成功時はresource-zeroのlive `PAIR_DETACHED` ledger capabilityだけを保持し、
-explicit closeで破棄する。missing bootstrap、semantic detach、immutable publication input、effect/publication、handler call siteは追加していない。
+検証済みexact immutable branch/headへのprivate fixed-slot参照もcloneなしで保持する。explicit closeで両方を破棄する。stable project ID authority、
+missing bootstrap、semantic detach、immutable publication input、effect/publication、handler call siteは追加していない。
 
 Sealed ownerのproduction-unwired signature/ancestry handleは、retained validated commitだけをloaderなしで借用する。raw mutable
 aliasはdestination-first canonical fingerprintでhandle close時とfinal fence時に検査する。disk callback完了後の最終checkはcallback

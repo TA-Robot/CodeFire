@@ -79,7 +79,7 @@ class PythonExistingPairDetachTests(unittest.TestCase):
             json.dumps(policy, separators=(",", ":")).encode()
         )
 
-    def _prepare(self, label="existing pair detach"):
+    def _prepare(self, label="existing pair detach", branch="main"):
         self._write_policy()
         ledger = self.Ledger(
             self.Profile.http_v1(), label, command_kind="http_request"
@@ -99,7 +99,7 @@ class PythonExistingPairDetachTests(unittest.TestCase):
         sealed.validate(ledger)
         policy = self.Authority(self.project, ledger, deadline)
         owner = self.Owner(sealed, policy, ledger)
-        owner.verify_signature_and_server("main", self.head, ledger)
+        owner.verify_signature_and_server(branch, self.head, ledger)
         self.assertTrue(owner.contains_ancestor(self.initial, self.head, ledger))
         return ledger, deadline, sealed, policy, owner
 
@@ -124,11 +124,11 @@ class PythonExistingPairDetachTests(unittest.TestCase):
         policy_commit = policy._commit_upload_terminal_pair
         sealed_type = type(sealed)
         policy_type = type(policy)
-        sealed_type._probe_upload_terminal_pair = lambda selected, token: (
-            calls.append("sealed-probe"), sealed_probe(token)
+        sealed_type._probe_upload_terminal_pair = lambda selected, token, *args: (
+            calls.append("sealed-probe"), sealed_probe(token, *args)
         )[-1]
-        policy_type._probe_upload_terminal_pair = lambda selected, token: (
-            calls.append("policy-probe"), policy_probe(token)
+        policy_type._probe_upload_terminal_pair = lambda selected, token, *args: (
+            calls.append("policy-probe"), policy_probe(token, *args)
         )[-1]
         sealed_type._commit_upload_terminal_pair = lambda selected, token: (
             calls.append("sealed-commit"), sealed_commit(token)
@@ -150,6 +150,106 @@ class PythonExistingPairDetachTests(unittest.TestCase):
         self.assertEqual(owner._state, owner.PAIR_DETACHED)
         self._assert_pair_live(ledger, owner)
         owner.close(ledger)
+        self._assert_zero(ledger)
+
+    def test_last_callback_cannot_replace_captured_critical_functions(self):
+        ledger, deadline, sealed, policy, owner = self._prepare(
+            "pair captured critical functions"
+        )
+        object_path = self.ns["object_record_path"](self.objects, self.head)
+        original_object = object_path.read_bytes()
+        sealed_type = type(sealed)
+        policy_type = type(policy)
+        slot_type = self.ns["_CallbackFreeFD"]
+        attributes = (
+            (sealed_type, "_probe_upload_terminal_pair"),
+            (policy_type, "_probe_upload_terminal_pair"),
+            (sealed_type, "_commit_upload_terminal_pair"),
+            (policy_type, "_commit_upload_terminal_pair"),
+            (sealed_type, "_probe_pair_store"),
+            (policy_type, "_probe_pair_project"),
+            (sealed_type, "_pair_changed"),
+            (sealed_type, "_borrow_mutation_failure"),
+            (policy_type, "_fingerprint"),
+            (policy_type, "_safe_policy_metadata"),
+            (slot_type, "open"),
+            (slot_type, "close"),
+        )
+        originals = {
+            (target, name): vars(target)[name] for target, name in attributes
+        }
+        forged_commits = []
+
+        def mutate_and_replace(_phase):
+            replacement = object_path.with_suffix(".replacement")
+            replacement.write_bytes(original_object)
+            os.replace(replacement, object_path)
+            self.policy_path.write_bytes(
+                b'{"commit_signatures":{"required":false}}'
+            )
+            sealed_type._probe_upload_terminal_pair = lambda *_args: None
+            policy_type._probe_upload_terminal_pair = lambda *_args: None
+            sealed_type._commit_upload_terminal_pair = (
+                lambda *_args: forged_commits.append("sealed")
+            )
+            policy_type._commit_upload_terminal_pair = (
+                lambda *_args: forged_commits.append("policy")
+            )
+            sealed_type._probe_pair_store = lambda *_args: None
+            policy_type._probe_pair_project = lambda *_args: None
+            sealed_type._pair_changed = lambda *_args: self.ns["CFError"](
+                "forged sealed change"
+            )
+            sealed_type._borrow_mutation_failure = (
+                lambda *_args: self.ns["CFError"]("forged borrow change")
+            )
+            policy_type._fingerprint = lambda _metadata: ()
+            policy_type._safe_policy_metadata = lambda _metadata: True
+            slot_type.open = lambda *_args, **_kwargs: -1
+            slot_type.close = lambda *_args: None
+
+        deadline.callback = mutate_and_replace
+        deadline.match = "upload terminal pair probe"
+        try:
+            with self.assertRaisesRegex(
+                self.ns["SealedValidationSubjectChanged"], "identity_changed"
+            ):
+                owner.finalize_pair(ledger)
+        finally:
+            for (target, name), original in originals.items():
+                setattr(target, name, original)
+        self.assertEqual(forged_commits, [])
+        self.assertEqual(owner._state, owner.ABORT_ONLY)
+        self.assertIsNone(owner._verified_branch)
+        self.assertIsNone(owner._verified_head)
+        self._assert_zero(ledger)
+
+    def test_verified_subject_refs_survive_pair_until_explicit_close(self):
+        branch = "".join(("ma", "in"))
+        ledger, _deadline, _sealed, _policy, owner = self._prepare(
+            "pair subject refs", branch=branch
+        )
+        self.assertIs(owner._verified_branch, branch)
+        self.assertIs(owner._verified_head, self.head)
+        owner.finalize_pair(ledger)
+        self.assertIs(owner._verified_branch, branch)
+        self.assertEqual(owner._verified_head, self.head)
+        self._assert_pair_live(ledger, owner)
+        owner.close(ledger)
+        self.assertIsNone(owner._verified_branch)
+        self.assertIsNone(owner._verified_head)
+        self._assert_zero(ledger)
+
+    def test_pair_rejects_pinned_head_drift_and_drops_subject_refs(self):
+        ledger, _deadline, sealed, _policy, owner = self._prepare(
+            "pair pinned subject drift"
+        )
+        sealed._head = self.initial
+        with self.assertRaisesRegex(self.ns["CFError"], "pair subject changed"):
+            owner.finalize_pair(ledger)
+        self.assertEqual(owner._state, owner.ABORT_ONLY)
+        self.assertIsNone(owner._verified_branch)
+        self.assertIsNone(owner._verified_head)
         self._assert_zero(ledger)
 
     def test_last_callback_mutating_both_sides_reports_sealed_first(self):

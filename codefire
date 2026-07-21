@@ -5337,7 +5337,15 @@ class AccountedRemoteSignaturePolicyAuthority:
         self._poll("commit signature policy final fence")
         object.__setattr__(self, "_pair_probe_prepared", True)
 
-    def _probe_upload_terminal_pair(self, owner: Any) -> None:
+    def _probe_upload_terminal_pair(
+        self,
+        owner: Any,
+        project_probe: Any,
+        fingerprint: Any,
+        safe_policy_metadata: Any,
+        fd_open: Any,
+        fd_close: Any,
+    ) -> None:
         """Callback-free policy half of the terminal pair decision."""
         if object.__getattribute__(self, "_closed"):
             raise CFError("commit signature policy authority is closed")
@@ -5349,7 +5357,7 @@ class AccountedRemoteSignaturePolicyAuthority:
             raise CFError("upload terminal composite owns policy authority")
         if not self._pair_probe_prepared or self._pair_detached:
             raise CFError("commit signature policy pair probe is unavailable")
-        AccountedRemoteSignaturePolicyAuthority._probe_pair_project(self)
+        project_probe(self, fingerprint, fd_open, fd_close)
         project_root = self._project_root
         if project_root is None:
             raise CFError("commit signature project authority is unavailable")
@@ -5397,7 +5405,7 @@ class AccountedRemoteSignaturePolicyAuthority:
                         dir_fd=self._project_fd,
                         follow_symlinks=False,
                     )
-                    descriptor = _CallbackFreeFD.open(
+                    descriptor = fd_open(
                         policy_slot,
                         policy_path.name,
                         os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
@@ -5405,12 +5413,8 @@ class AccountedRemoteSignaturePolicyAuthority:
                     )
                     opened = _CODEFIRE_OS_FSTAT(descriptor)
                     if any(
-                        not AccountedRemoteSignaturePolicyAuthority._safe_policy_metadata(
-                            metadata
-                        )
-                        or AccountedRemoteSignaturePolicyAuthority._fingerprint(
-                            metadata
-                        )
+                        not safe_policy_metadata(metadata)
+                        or fingerprint(metadata)
                         != expected
                         for metadata in (
                             _CODEFIRE_OS_FSTAT(self._policy_fd),
@@ -5441,12 +5445,8 @@ class AccountedRemoteSignaturePolicyAuthority:
                         offset != len(expected_raw)
                         or extension
                         or any(
-                            not AccountedRemoteSignaturePolicyAuthority._safe_policy_metadata(
-                                metadata
-                            )
-                            or AccountedRemoteSignaturePolicyAuthority._fingerprint(
-                                metadata
-                            )
+                            not safe_policy_metadata(metadata)
+                            or fingerprint(metadata)
                             != expected
                             for metadata in (after, named)
                         )
@@ -5465,10 +5465,15 @@ class AccountedRemoteSignaturePolicyAuthority:
                 finally:
                     view = None
                     if descriptor >= 0:
-                        _CallbackFreeFD.close(policy_slot)
-        AccountedRemoteSignaturePolicyAuthority._probe_pair_project(self)
+                        fd_close(policy_slot)
+        project_probe(self, fingerprint, fd_open, fd_close)
 
-    def _probe_pair_project(self) -> None:
+    def _probe_pair_project(
+        self,
+        fingerprint: Any,
+        fd_open: Any,
+        fd_close: Any,
+    ) -> None:
         """Revalidate the project using only captured OS primitives."""
         project_root = object.__getattribute__(self, "_project_root")
         prefix_path = object.__getattribute__(self, "_prefix_path")
@@ -5491,23 +5496,19 @@ class AccountedRemoteSignaturePolicyAuthority:
         ambient_prefix = -1
         ambient_project = -1
         try:
-            walk_fd = _CallbackFreeFD.open(current_slot, os.sep, flags)
+            walk_fd = fd_open(current_slot, os.sep, flags)
             for component in prefix_path.parts[1:]:
-                next_fd = _CallbackFreeFD.open(
+                next_fd = fd_open(
                     next_slot, component, flags, dir_fd=walk_fd
                 )
-                _CallbackFreeFD.close(current_slot)
+                fd_close(current_slot)
                 current_slot, next_slot = next_slot, current_slot
                 walk_fd = next_fd
             ambient_prefix = walk_fd
             if (
-                AccountedRemoteSignaturePolicyAuthority._fingerprint(
-                    _CODEFIRE_OS_FSTAT(prefix_fd)
-                )
+                fingerprint(_CODEFIRE_OS_FSTAT(prefix_fd))
                 != prefix_expected
-                or AccountedRemoteSignaturePolicyAuthority._fingerprint(
-                    _CODEFIRE_OS_FSTAT(ambient_prefix)
-                )
+                or fingerprint(_CODEFIRE_OS_FSTAT(ambient_prefix))
                 != prefix_expected
             ):
                 raise SignaturePolicySubjectChanged(
@@ -5535,12 +5536,12 @@ class AccountedRemoteSignaturePolicyAuthority:
                 dir_fd=ambient_prefix,
                 follow_symlinks=False,
             )
-            ambient_project = _CallbackFreeFD.open(
+            ambient_project = fd_open(
                 project_slot,
                 project_root.name, flags, dir_fd=ambient_prefix
             )
             if any(
-                AccountedRemoteSignaturePolicyAuthority._fingerprint(metadata)
+                fingerprint(metadata)
                 != expected
                 for metadata in (
                     _CODEFIRE_OS_FSTAT(project_fd),
@@ -5558,9 +5559,9 @@ class AccountedRemoteSignaturePolicyAuthority:
                 project_root, "project_unavailable"
             ) from error
         finally:
-            _CallbackFreeFD.close(project_slot)
-            _CallbackFreeFD.close(next_slot)
-            _CallbackFreeFD.close(current_slot)
+            fd_close(project_slot)
+            fd_close(next_slot)
+            fd_close(current_slot)
 
     def _commit_upload_terminal_pair(self, owner: Any) -> None:
         """Detach logical policy authority with field assignments only."""
@@ -19668,7 +19669,15 @@ class AccountedHTTPUploadSealedValidation:
             actual,
         )
 
-    def _probe_upload_terminal_pair(self, owner: Any) -> None:
+    def _probe_upload_terminal_pair(
+        self,
+        owner: Any,
+        store_probe: Any,
+        pair_changed: Any,
+        borrow_mutation_failure: Any,
+        fd_open: Any,
+        fd_close: Any,
+    ) -> None:
         """Callback-free sealed half of the terminal pair decision."""
         if object.__getattribute__(self, "_closed"):
             raise CFError("HTTP upload sealed validation owner is closed")
@@ -19700,7 +19709,7 @@ class AccountedHTTPUploadSealedValidation:
                 document.record, document.retained_bytes, None
             )
             if actual_size != document.borrow_canonical_bytes:
-                raise self._borrow_mutation_failure(document, actual_size)
+                raise borrow_mutation_failure(self, document, actual_size)
             encoded = canonical_json(document.record)
             try:
                 if (
@@ -19708,11 +19717,11 @@ class AccountedHTTPUploadSealedValidation:
                     or hashlib.sha256(encoded).hexdigest()
                     != document.borrow_digest
                 ):
-                    raise self._borrow_mutation_failure(document, actual_size)
+                    raise borrow_mutation_failure(self, document, actual_size)
             finally:
                 encoded = None
 
-        AccountedHTTPUploadSealedValidation._probe_pair_store(self, session)
+        store_probe(self, session, fd_open, fd_close)
         for document in documents:
             if document.path is None:
                 continue
@@ -19735,7 +19744,7 @@ class AccountedHTTPUploadSealedValidation:
                     dir_fd=directory_fd,
                     follow_symlinks=False,
                 )
-                descriptor = _CallbackFreeFD.open(
+                descriptor = fd_open(
                     file_slot,
                     document.file_name,
                     os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
@@ -19753,9 +19762,7 @@ class AccountedHTTPUploadSealedValidation:
                     or initial.st_size != opened.st_size
                     or opened.st_size != document.physical_bytes
                 ):
-                    raise self._pair_changed(
-                        document, "identity_changed", opened.st_size
-                    )
+                    raise pair_changed(document, "identity_changed", opened.st_size)
                 _CODEFIRE_OS_LSEEK(descriptor, 0, os.SEEK_SET)
                 view = memoryview(scratch)
                 offset = 0
@@ -19784,22 +19791,25 @@ class AccountedHTTPUploadSealedValidation:
                     or after.st_size != document.physical_bytes
                     or named.st_size != document.physical_bytes
                 ):
-                    raise self._pair_changed(
-                        document, "size_changed", named.st_size
-                    )
+                    raise pair_changed(document, "size_changed", named.st_size)
                 if hashlib.sha256(view[:offset]).hexdigest() != document.digest:
-                    raise self._pair_changed(document, "digest_changed", offset)
+                    raise pair_changed(document, "digest_changed", offset)
             except SealedValidationSubjectChanged:
                 raise
             except OSError as error:
-                raise self._pair_changed(document, "unreadable", None) from error
+                raise pair_changed(document, "unreadable", None) from error
             finally:
                 view = None
                 if descriptor >= 0:
-                    _CallbackFreeFD.close(file_slot)
-        AccountedHTTPUploadSealedValidation._probe_pair_store(self, session)
+                    fd_close(file_slot)
+        store_probe(self, session, fd_open, fd_close)
 
-    def _probe_pair_store(self, session: SealedCommitValidationSession) -> None:
+    def _probe_pair_store(
+        self,
+        session: SealedCommitValidationSession,
+        fd_open: Any,
+        fd_close: Any,
+    ) -> None:
         """Revalidate retained and ambient store FDs without callbacks."""
         def changed(path: Path) -> SealedValidationSubjectChanged:
             return SealedValidationSubjectChanged(
@@ -19843,12 +19853,12 @@ class AccountedHTTPUploadSealedValidation:
         )
         ambient_root = -1
         try:
-            ambient_root = _CallbackFreeFD.open(root_slot, objects_root, flags)
+            ambient_root = fd_open(root_slot, objects_root, flags)
             actual_root = _CODEFIRE_OS_FSTAT(ambient_root)
             if (actual_root.st_dev, actual_root.st_ino) != root_identity:
                 raise changed(objects_root)
             for subdir, retained_owner, slot in subdir_slots:
-                ambient_subdir = _CallbackFreeFD.open(
+                ambient_subdir = fd_open(
                     slot,
                     subdir, flags, dir_fd=ambient_root
                 )
@@ -19858,15 +19868,15 @@ class AccountedHTTPUploadSealedValidation:
                     actual.st_ino,
                 ) != object.__getattribute__(retained_owner, "_identity"):
                     raise changed(objects_root / subdir)
-                _CallbackFreeFD.close(slot)
+                fd_close(slot)
         except SealedValidationSubjectChanged:
             raise
         except OSError as error:
             raise changed(objects_root) from error
         finally:
             for _subdir, _retained_owner, slot in subdir_slots:
-                _CallbackFreeFD.close(slot)
-            _CallbackFreeFD.close(root_slot)
+                fd_close(slot)
+            fd_close(root_slot)
 
     def _commit_upload_terminal_pair(self, owner: Any) -> None:
         """Detach logical sealed authority with field assignments only."""
@@ -20424,6 +20434,10 @@ class AccountedHTTPUploadExistingTerminalOwner:
         self._verification: AccountedServerVerification | None = None
         self._ancestry_borrow: _HTTPUploadSealedCommitBorrow | None = None
         self._ancestry: AccountedHTTPUploadAncestry | None = None
+        # Fixed control-plane reference slots bind the exact immutable
+        # verification subject without cloning either caller string.
+        self._verified_branch: str | None = None
+        self._verified_head: str | None = None
         self._state = self.BOUND
         self._operating = False
         self._closing = False
@@ -20592,6 +20606,8 @@ class AccountedHTTPUploadExistingTerminalOwner:
             if not verification._closed:
                 raise CFError("existing upload terminal verification cleanup is incomplete")
             self._verification = None
+            object.__setattr__(self, "_verified_branch", branch)
+            object.__setattr__(self, "_verified_head", head)
             object.__setattr__(self, "_state", self.VERIFIED)
         except BaseException as exc:
             failure = self._detach_failure(exc)
@@ -20628,6 +20644,8 @@ class AccountedHTTPUploadExistingTerminalOwner:
             raise CFError("existing upload terminal is abort-only")
         if self._state != self.VERIFIED:
             raise CFError("existing upload terminal ancestry requires verification")
+        if head != self._verified_head:
+            raise CFError("existing upload terminal ancestry subject changed")
         sealed_owner = self._sealed_owner
         if sealed_owner is None:
             raise CFError("existing upload terminal has no sealed authority")
@@ -20704,19 +20722,55 @@ class AccountedHTTPUploadExistingTerminalOwner:
         policy_authority = self._policy_authority
         if sealed_owner is None or policy_authority is None:
             raise CFError("existing upload terminal has no parent authority")
-
         failure: BaseException | None = None
         detached = False
+        # Resolve every replaceable class attribute before the first
+        # cooperative callback. The critical probe/commit interval invokes
+        # only these exact function objects and captured OS primitives.
+        policy_prepare = (
+            AccountedRemoteSignaturePolicyAuthority._prepare_upload_terminal_pair
+        )
+        sealed_prepare = (
+            AccountedHTTPUploadSealedValidation._prepare_upload_terminal_pair
+        )
+        sealed_probe = (
+            AccountedHTTPUploadSealedValidation._probe_upload_terminal_pair
+        )
+        policy_probe = (
+            AccountedRemoteSignaturePolicyAuthority._probe_upload_terminal_pair
+        )
+        sealed_commit = (
+            AccountedHTTPUploadSealedValidation._commit_upload_terminal_pair
+        )
+        policy_commit = (
+            AccountedRemoteSignaturePolicyAuthority._commit_upload_terminal_pair
+        )
+        sealed_store_probe = AccountedHTTPUploadSealedValidation._probe_pair_store
+        policy_project_probe = (
+            AccountedRemoteSignaturePolicyAuthority._probe_pair_project
+        )
+        pair_changed = AccountedHTTPUploadSealedValidation._pair_changed
+        borrow_mutation_failure = (
+            AccountedHTTPUploadSealedValidation._borrow_mutation_failure
+        )
+        fingerprint = AccountedRemoteSignaturePolicyAuthority._fingerprint
+        safe_policy_metadata = (
+            AccountedRemoteSignaturePolicyAuthority._safe_policy_metadata
+        )
+        fd_open = _CallbackFreeFD.open
+        fd_close = _CallbackFreeFD.close
         try:
             object.__setattr__(self, "_state", self.PAIR_PREPARING)
             object.__setattr__(self, "_operating", True)
             object.__setattr__(sealed_owner, "_upload_terminal_active", True)
-            AccountedRemoteSignaturePolicyAuthority._prepare_upload_terminal_pair(
-                policy_authority, self
-            )
-            AccountedHTTPUploadSealedValidation._prepare_upload_terminal_pair(
-                sealed_owner, self
-            )
+            if (
+                self._verified_branch is None
+                or self._verified_head is None
+                or sealed_owner._head != self._verified_head
+            ):
+                raise CFError("existing upload terminal pair subject changed")
+            policy_prepare(policy_authority, self)
+            sealed_prepare(sealed_owner, self)
             if self._deadline is not None:
                 self._deadline.check("upload terminal pair probe")
             if self._close_requested:
@@ -20727,26 +20781,34 @@ class AccountedHTTPUploadExistingTerminalOwner:
             object.__setattr__(self, "_state", self.PAIR_DETACHING)
             # This exact order is the legacy diagnostic contract.  Neither
             # half changes success state until both callback-free probes pass.
-            AccountedHTTPUploadSealedValidation._probe_upload_terminal_pair(
-                sealed_owner, self
+            sealed_probe(
+                sealed_owner,
+                self,
+                sealed_store_probe,
+                pair_changed,
+                borrow_mutation_failure,
+                fd_open,
+                fd_close,
             )
             if self._close_requested:
                 raise CFError(
                     "existing upload terminal pair was cancelled during probe"
                 )
-            AccountedRemoteSignaturePolicyAuthority._probe_upload_terminal_pair(
-                policy_authority, self
+            policy_probe(
+                policy_authority,
+                self,
+                policy_project_probe,
+                fingerprint,
+                safe_policy_metadata,
+                fd_open,
+                fd_close,
             )
             if self._close_requested:
                 raise CFError(
                     "existing upload terminal pair was cancelled during probe"
                 )
-            AccountedHTTPUploadSealedValidation._commit_upload_terminal_pair(
-                sealed_owner, self
-            )
-            AccountedRemoteSignaturePolicyAuthority._commit_upload_terminal_pair(
-                policy_authority, self
-            )
+            sealed_commit(sealed_owner, self)
+            policy_commit(policy_authority, self)
             object.__setattr__(self, "_state", self.PAIR_DETACHED)
             detached = True
         except BaseException as exc:
@@ -20754,6 +20816,20 @@ class AccountedHTTPUploadExistingTerminalOwner:
         finally:
             object.__setattr__(sealed_owner, "_upload_terminal_active", False)
             object.__setattr__(self, "_operating", False)
+            policy_prepare = None
+            sealed_prepare = None
+            sealed_probe = None
+            policy_probe = None
+            sealed_commit = None
+            policy_commit = None
+            sealed_store_probe = None
+            policy_project_probe = None
+            pair_changed = None
+            borrow_mutation_failure = None
+            fingerprint = None
+            safe_policy_metadata = None
+            fd_open = None
+            fd_close = None
         sealed_owner = None
         policy_authority = None
         if not detached:
@@ -20887,6 +20963,8 @@ class AccountedHTTPUploadExistingTerminalOwner:
                 self._close_requested = False
                 self._pair_resources_released = True
                 if not _preserve_pair:
+                    self._verified_branch = None
+                    self._verified_head = None
                     object.__setattr__(
                         self._ledger, "_upload_terminal_owner", None
                     )

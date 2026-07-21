@@ -339,8 +339,9 @@ child-before-borrow and policy-before-sealed. After ancestry, its private produc
 callback-rich policy then sealed preparation, performs one last deadline callback, probes sealed then policy with captured OS
 primitives and preowned/accounted buffers and FD slots, and only after both probes pass performs field-only logical commits.
 Cleanup remains policy-before-sealed and is stop/retry without rerunning either probe. Success retains only a live, resource-zero
-`PAIR_DETACHED` exact ledger capability; explicit close discards it. It still has no missing-project bootstrap, semantic connection,
-immutable publication input, effect, publication, or handler surface. The characterization tests therefore remain evidence for the
+`PAIR_DETACHED` exact ledger capability plus private references to the exact immutable verified branch/head; explicit close discards
+them. These are prepublished fixed control slots and clone no subject strings. It still has no stable project-identity authority,
+missing-project bootstrap, semantic connection, immutable publication input, effect, publication, or handler surface. The characterization tests therefore remain evidence for the
 missing publication boundary rather than a claim that the complete coordinator exists.
 
 ## Store and Identity Flow
