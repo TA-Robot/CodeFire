@@ -239,27 +239,23 @@ token.
 
 The production-unwired Python prerequisite now implements the local ownership portion of that contract. A caller-owned one-shot
 `AccountedHTTPUploadParserScalar` performs the pre-parse Retained-upper acquisition and retry-safe post-parse exact shrink itself.
-Generic `ledger.current >= amount` evidence is rejected:
-it cannot prove which owner acquired the scalar and permits duplicate bind/double release. `AccountedHTTPUploadRequestSource` moves
-one exact reconciled token into the exact full request and objects list, and rejects a second source. Caller-owned two-stage
-`AccountedHTTPUploadSemantic` adopts that exact source owner before
-digest work, rejects a Stage-like false bound by remeasuring the full request, publishes the exact digest child and caller-created
-permit before reservation,
-and privately transfers its digest into one stable semantic mapping. It separately preaccounts the same conservative `4096 + 256L`
-canonical encoder Temporary envelope used by the digest owner and builds effect-ready core-plus-newline object bytes while retaining
-the full record identities and full-record digest evidence, so historical `remote`
-fields remain semantic even though they are absent from persisted copy bytes. Eight source-sized semantic work passes cover prepare
-size/fingerprint, validation/hash, serialization, and their terminal size/fingerprint/full-record/copy-parity counterparts; digest
-child work and its simultaneous encoder envelope remain separately charged. Deep/key-heavy request fixtures hold the exact combined
-Temporary upper and reject exact-minus-one. The last deadline callback precedes callback-free full request fingerprint/list/ID/duplicate/
-digest/copy-parity revalidation. Mutable request refs then drop before the parser scalar, construction
-Temporary releases with post-effect reconciliation, and the preallocated read-only mapping proxy/copy tuple move into private
-effect slots by field assignment only; the owner drops its direct underlying-dict reference. There is no digest or copy getter.
-The real handler must mint/adopt this token at its parser-upper acquisition boundary, reconcile exact after parse, and never bind
-generic current. That parser-token
-transfer, mapping lending through recovery and
-publication preflight, missing-project bootstrap proof, effect-start, and pinned-byte writer remain unwired; this prerequisite does
-not change production first-error or effect ordering.
+Generic `ledger.current >= amount` evidence is rejected because it cannot prove which owner acquired the scalar and permits duplicate
+bind/double release. `AccountedHTTPUploadRequestSource` moves one exact reconciled token into the exact full request and objects list,
+and rejects a second source. Caller-owned two-stage `AccountedHTTPUploadSemantic` adopts that exact source owner before digest work,
+rejects a Stage-like false bound by remeasuring the full request, publishes the exact digest child and caller-created permit before
+reservation, and privately transfers its digest into one stable semantic mapping. It separately preaccounts the same conservative
+`4096 + 256L` canonical encoder Temporary envelope used by the digest owner and builds effect-ready core-plus-newline object bytes
+while retaining the full record identities and full-record digest evidence, so historical `remote` fields remain semantic even
+though they are absent from persisted copy bytes. Eight source-sized semantic work passes cover prepare size/fingerprint,
+validation/hash, serialization, and their terminal size/fingerprint/full-record/copy-parity counterparts; digest child work and its
+simultaneous encoder envelope remain separately charged. Deep/key-heavy request fixtures hold the exact combined Temporary upper
+and reject exact-minus-one. The last deadline callback precedes callback-free full request fingerprint/list/ID/duplicate/digest/
+copy-parity revalidation. Mutable request refs then drop before the parser scalar, construction Temporary releases with post-effect
+reconciliation, and the preallocated read-only mapping proxy/copy tuple move into private effect slots by field assignment only; the
+owner drops its direct underlying-dict reference. There is no digest or copy getter. The real handler must mint/adopt this token at
+its parser-upper acquisition boundary, reconcile exact after parse, and never bind generic current. That parser-token transfer,
+mapping lending through recovery and publication preflight, missing-project bootstrap proof, effect-start, and pinned-byte writer
+remain unwired; this prerequisite does not change production first-error or effect ordering.
 
 Server verification is isolated behind production `AccountedServerVerification`. It reserves capability/path and raw-policy-derived
 AST/parse ownership before materialization, opens policy and cwd relative to a pinned project, and fences exact project/policy
@@ -271,6 +267,12 @@ captured-builtin close invocation; an exception consumes numeric ownership becau
 distinguished safely. Config/exception payloads are dropped before Retained release. These boundaries cannot roll back filesystem,
 network, or service effects already performed by a configured command. Production HTTP upload passes the handler's same request
 ledger and deadline through the compatibility wrapper into this owner; standalone/no-ledger callers retain the local-ledger path.
+A production-unwired seeded construction path is reachable only through `AccountedRemoteSignaturePolicyAuthority`. After the
+signature child verifies and closes, it borrows the identical immutable P0 bytes, duplicates the pinned project/policy descriptors,
+and opens every cwd relative to that duplicate without an ambient policy parse. The two children never overlap. A partial verification
+child is published to the authority before its first fallible acquisition, and a guard spans signature construction/verification/close
+through verification construction so loader/dup callbacks cannot consume the final fence or close either owner early. The child must
+run and close before the authority final fence. This is a terminal-coordinator prerequisite, not production handler wiring.
 
 Production HTTP upload now moves only the sealed Stage's immutable record-count, aggregate-byte, and maximum-record-byte bounds
 into `AccountedHTTPUploadSealedValidation`. The same handler ledger/deadline spans prepare, iterative validation, final staged-tree
@@ -291,13 +293,25 @@ Two additional fallback owners remain deliberately prerequisite-only.
 through fixed-slot intrusive transitions that reconcile post-effect accounting faults and unlink fully released nodes without
 allocation. A separate production-unwired `AccountedRemoteSignaturePolicyAuthority` pre-reserves path ownership, pins an absent
 or exact regular single-link `server_policy.json` behind no-follow project capabilities, and lends its immutable raw bytes once to
-the pure signature owner on the same ledger/deadline. Its final fence rechecks ambient project and exact policy identity/content;
+the pure signature owner on the same ledger/deadline. Its combined one-shot surface can instead verify and close that child before
+lending the same bytes and duplicated capabilities to server verification. Its final fence rechecks ambient project and exact policy identity/content;
 child payload closes before raw/digest/FD/scalar ownership, and malformed JSON/UTF-8 errors retain no raw policy payload.
+A production-unwired `AccountedHTTPUploadSignatureVerificationComposite` owns one validated sealed owner and one unused policy
+authority on the same ledger and identical deadline. It passes the exact preallocated signature handle itself as loader—without
+lambda, clone, session load, or store reopen—then closes the signature child and owner-first releases/revalidates the handle under
+both parent guards. Only a successful midpoint release permits verification config/cwd construction or child publication. Failure
+returns no child and retains both parents for explicit retry; cleanup releases an active borrow, then policy authority, then sealed
+authority, stopping before sealed cleanup if policy cleanup fails. Coordinator tokens reject stale direct aliases for its lifetime.
 `AccountedHTTPUploadAncestry` owns a full BFS seen/deque and frame lifecycle through a
 borrowed validated-commit loader. A fixed owner gate accounts transition bytes before construction; child depth is created only after
 frame acquisition; per-insertion retained/overlap bounds cover CPython growth and deque popleft churn. It preserves full traversal
-after a match and drops loader/parent locals before retryable scalar release. Signature and ancestry owners remain production-unwired;
-sealed-session borrow, ordered signature/digest/ancestry, publication, and complete upload deadline closure remain CFR-168 residuals.
+after a match and drops loader/parent locals before retryable scalar release. The production-unwired
+`AccountedHTTPUploadSealedAncestry` is returned before explicit single-use prepare activates only the sealed owner's preallocated
+ancestry handle. It passes that exact callable and identical ledger/deadline into the BFS owner, then closes BFS payload/loader before
+releasing the borrow. Both cleanup fields publish before fallible activation/construction. Partial decision/reentrant prepare is rejected;
+callback close is carried through the active outer frame and returns typed cancellation instead of successful closed prepare. Faults
+retain exact caller-owned retry state. It neither clones/reopens commits nor finishes the sealed owner. Signature integration,
+handler/terminal fencing, ordered signature/digest/ancestry, publication, and complete upload deadline closure remain residuals.
 
 These sealed-borrow and signature-authority prerequisites cannot be production-wired by choosing one final-fence order.
 Policy-first leaves policy mutable during sealed callbacks; sealed-first leaves staged objects mutable during policy callbacks.
@@ -306,6 +320,15 @@ and ambient server-verification policy rereads can select a command outside the 
 upload terminal coordinator: own the verification plan from pinned policy, prove typed bootstrap transitions, keep consumers
 through gate/recovery/ancestry/preflight, preconsume fallible callbacks/read charges, then callback-free detach both authorities
 immediately before an effect consuming immutable staged/publication bytes. No partial coordinator is claimed.
+The signature composite closes only the retained-borrow-to-verification-plan prerequisite and is not that terminal coordinator.
+The existing-project consumer characterization runs pinned signature verification and, through a test-only unified token, full
+BFS ancestry under `remote_project_gate`. Production cannot make that transition: the signature composite retains both parent
+tokens, the ancestry handoff rejects the sealed parent, and closing the composite destroys both parents. Verification failure may
+already leave subprocess effects, while the composite has no later abort transition. Even after all consumers, the cooperative gate
+does not suppress same-thread callbacks: policy-first permits a sealed callback to change policy, sealed-first permits a policy
+callback to replace a staged object, and live policy scalars make sealed-first cleanup indeterminate. The current publication helper
+also accepts ambient records created after sealed final. These six tests characterize the missing top-level token, callback-free
+pair detach, abort transition, and immutable publication capability; they are not a coordinator implementation.
 
 ## Store and Identity Flow
 

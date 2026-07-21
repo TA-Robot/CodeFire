@@ -4501,6 +4501,11 @@ class AccountedRemoteSignaturePolicyAuthority:
         self._policy_missing = False
         self._policy_bound = False
         self._policy_owner: AccountedCommitSignaturePolicy | None = None
+        self._verification_bound = False
+        self._verification_handoff_open = False
+        self._verification_constructing = False
+        self._verification_owner: AccountedServerVerification | None = None
+        self._signature_composite_owner: Any | None = None
         self._revalidated = False
         self._closed = False
         self._walk_fd = -1
@@ -4865,12 +4870,20 @@ class AccountedRemoteSignaturePolicyAuthority:
         self._open_subject()
         self._read_policy()
 
+    def _ensure_signature_composite_access(self, owner: Any | None) -> None:
+        bound = self._signature_composite_owner
+        if bound is not None and bound is not owner:
+            raise CFError("signature verification composite owns policy authority")
+
     def prepare_policy(
         self,
         loader: Any,
         ledger: DecisionWorkLedger | None = None,
+        *,
+        _signature_composite_owner: Any | None = None,
     ) -> "AccountedCommitSignaturePolicy":
         self._ensure_open(ledger)
+        self._ensure_signature_composite_access(_signature_composite_owner)
         if self._policy_bound:
             raise CFError("commit signature policy authority is single-use")
         raw = self._policy_raw
@@ -4907,6 +4920,134 @@ class AccountedRemoteSignaturePolicyAuthority:
         self._policy_owner = owner
         raw = None
         return owner
+
+    def prepare_verified_server_verification(
+        self,
+        loader: Any,
+        branch: str,
+        commit_id: str,
+        ledger: DecisionWorkLedger | None = None,
+        *,
+        output_limit_bytes: int = 1024 * 1024,
+        allow_missing_project: bool = False,
+    ) -> "AccountedServerVerification":
+        """Verify the signature, then lend the exact snapshot to verification.
+
+        This production-unwired handoff deliberately makes the two child
+        lifetimes non-overlapping.  Signature parsing and verification retain
+        their legacy first-error position; only after that child closes may a
+        server-verification plan be derived from the already pinned raw bytes
+        and duplicated project/policy capabilities.
+        """
+        owns_begin_cleanup = not (
+            self._policy_bound or self._verification_bound
+        )
+        try:
+            self._begin_verified_server_verification(branch, commit_id, ledger)
+            return self._prepare_verified_server_verification_core(
+                loader,
+                branch,
+                commit_id,
+                output_limit_bytes=output_limit_bytes,
+                allow_missing_project=allow_missing_project,
+            )
+        finally:
+            if owns_begin_cleanup:
+                object.__setattr__(
+                    self, "_verification_handoff_open", False
+                )
+                object.__setattr__(
+                    self, "_verification_constructing", False
+                )
+
+    def _begin_verified_server_verification(
+        self,
+        branch: str,
+        commit_id: str,
+        ledger: DecisionWorkLedger | None,
+        *,
+        _signature_composite_owner: Any | None = None,
+    ) -> None:
+        self._ensure_open(ledger)
+        self._ensure_signature_composite_access(_signature_composite_owner)
+        if self._policy_bound or self._verification_bound:
+            raise CFError("commit signature policy authority is single-use")
+        if not isinstance(branch, str) or not isinstance(commit_id, str):
+            raise CFError("server verification branch and commit must be strings")
+        self._verification_bound = True
+        self._verification_constructing = True
+
+    def _prepare_verified_server_verification_core(
+        self,
+        loader: Any,
+        branch: str,
+        commit_id: str,
+        *,
+        output_limit_bytes: int,
+        allow_missing_project: bool,
+        close_loader: bool = False,
+        _signature_composite_owner: Any | None = None,
+    ) -> "AccountedServerVerification":
+        signature_owner = self.prepare_policy(
+            loader,
+            self._ledger,
+            _signature_composite_owner=_signature_composite_owner,
+        )
+        signature_owner.verify(commit_id)
+        signature_owner.close(self._ledger)
+        self._policy_owner = None
+        if close_loader:
+            loader.close(self._ledger)
+            if not isinstance(loader, _HTTPUploadSealedCommitBorrow):
+                raise CFError(
+                    "sealed signature handoff closed a foreign loader"
+                )
+            borrow_owner = object.__getattribute__(loader, "_owner")
+            if (
+                not isinstance(
+                    borrow_owner, AccountedHTTPUploadSealedValidation
+                )
+                or object.__getattribute__(loader, "_token") != 0
+                or object.__getattribute__(
+                    borrow_owner, "_active_borrow_token"
+                )
+                != 0
+            ):
+                raise CFError(
+                    "sealed signature handoff borrow release is incomplete"
+                )
+        project_root = self._project_root
+        if project_root is None:
+            raise CFError("commit signature project authority is unavailable")
+        self._verification_handoff_open = True
+        verification_owner = AccountedServerVerification(
+            project_root,
+            branch,
+            commit_id,
+            self._ledger,
+            self._deadline,
+            output_limit_bytes=output_limit_bytes,
+            allow_missing_project=allow_missing_project,
+            _signature_policy_authority=self,
+        )
+        self._verification_owner = verification_owner
+        return verification_owner
+
+    def _publish_verification_child(
+        self, owner: "AccountedServerVerification"
+    ) -> None:
+        """Publish a partial child before its first fallible acquisition."""
+        self._ensure_open(owner._ledger)
+        if (
+            not self._verification_bound
+            or not self._verification_handoff_open
+            or not self._verification_constructing
+            or self._policy_owner is not None
+            or self._verification_owner is not None
+        ):
+            raise CFError("server verification policy handoff is unavailable")
+        self._verification_handoff_open = False
+        self._verification_owner = owner
 
     def _revalidate_project(self) -> None:
         project_root = self._project_root
@@ -5084,10 +5225,21 @@ class AccountedRemoteSignaturePolicyAuthority:
 
     def revalidate(self, ledger: DecisionWorkLedger | None = None) -> None:
         self._ensure_open(ledger)
+        self._ensure_signature_composite_access(None)
+        if self._verification_constructing:
+            raise CFError("server verification child construction is in progress")
         if not self._policy_bound:
             raise CFError("commit signature policy authority has no bound policy")
         if self._revalidated:
             raise CFError("commit signature policy authority is single-use")
+        verification_owner = self._verification_owner
+        if verification_owner is not None and (
+            not verification_owner._completed or not verification_owner._closed
+        ):
+            raise CFError(
+                "server verification child must complete and close before "
+                "the signature policy final fence"
+            )
         self._poll("commit signature policy final fence")
         self._revalidate_project()
         self._revalidate_policy()
@@ -5116,7 +5268,13 @@ class AccountedRemoteSignaturePolicyAuthority:
         setattr(self, attribute, -1)
         self.CLOSE_CAPABILITY(descriptor)
 
-    def close(self, ledger: DecisionWorkLedger | None = None) -> None:
+    def close(
+        self,
+        ledger: DecisionWorkLedger | None = None,
+        *,
+        _signature_composite_owner: Any | None = None,
+    ) -> None:
+        self._ensure_signature_composite_access(_signature_composite_owner)
         if self._closed:
             selected = self._ledger if ledger is None else ledger
             if id(selected) != self._ledger_identity:
@@ -5125,6 +5283,11 @@ class AccountedRemoteSignaturePolicyAuthority:
                 )
             return
         self._ensure_open(ledger)
+        if self._verification_constructing:
+            raise CFError("server verification child construction is in progress")
+        if self._verification_owner is not None:
+            self._verification_owner.close()
+        self._verification_owner = None
         if self._policy_owner is not None:
             self._policy_owner.close(self._ledger)
         self._policy_owner = None
@@ -5182,7 +5345,6 @@ class AccountedRemoteSignaturePolicyAuthority:
             self.close()
         except BaseException:
             pass
-
 
 
 class AccountedCommitSignaturePolicy:
@@ -6356,6 +6518,9 @@ class AccountedServerVerification:
         *,
         output_limit_bytes: int = DEFAULT_OUTPUT_LIMIT_BYTES,
         allow_missing_project: bool = False,
+        _signature_policy_authority: (
+            AccountedRemoteSignaturePolicyAuthority | None
+        ) = None,
     ) -> None:
         if (
             isinstance(output_limit_bytes, bool)
@@ -6377,11 +6542,13 @@ class AccountedServerVerification:
         self._orphaned_cwd_fd = -1
         self._project_root: Path | None = project_root
         self._project_identity: tuple[int, int] | None = None
+        self._project_fingerprint: tuple[int, ...] | None = None
         self._project_fd = -1
         self._policy_fd = -1
         self._policy_identity: tuple[int, int] | None = None
+        self._policy_fingerprint: tuple[int, ...] | None = None
         self._policy_size: int | None = None
-        self._policy_raw: bytearray | None = None
+        self._policy_raw: bytearray | bytes | None = None
         self._policy_digest: bytes | None = None
         self._process: subprocess.Popen[bytes] | None = None
         self._capability_permit: DecisionWorkPermit | None = None
@@ -6403,15 +6570,20 @@ class AccountedServerVerification:
         self._failure_message: str | None = None
         self._requires_missing_project = allow_missing_project
         self._started = False
+        self._completed = False
         self._closed = False
+        self._constructing = True
         construction_error: BaseException | None = None
         try:
+            if _signature_policy_authority is not None:
+                _signature_policy_authority._publish_verification_child(self)
             self._acquire_capability_owner(project_root)
             self._prepare(
                 project_root,
                 branch,
                 commit_id,
                 allow_missing_project=allow_missing_project,
+                signature_policy_authority=_signature_policy_authority,
             )
         except BaseException as exc:
             # Constructor frames can retain the parsed policy, raw bytes, and
@@ -6420,6 +6592,7 @@ class AccountedServerVerification:
             # releases their accounted storage.
             self._detach_exception_tracebacks(exc)
             construction_error = exc
+        self._constructing = False
         if construction_error is not None:
             try:
                 self.close()
@@ -6865,11 +7038,25 @@ class AccountedServerVerification:
             ambient_fd = _open_directory_nofollow(project_root)
             pinned = os.fstat(self._project_fd)
             ambient = os.fstat(ambient_fd)
+            expected_fingerprint = self._project_fingerprint
             if (
                 not stat.S_ISDIR(pinned.st_mode)
                 or not stat.S_ISDIR(ambient.st_mode)
                 or (pinned.st_dev, pinned.st_ino) != project_identity
                 or (ambient.st_dev, ambient.st_ino) != project_identity
+                or (
+                    expected_fingerprint is not None
+                    and (
+                        AccountedRemoteSignaturePolicyAuthority._fingerprint(
+                            pinned
+                        )
+                        != expected_fingerprint
+                        or AccountedRemoteSignaturePolicyAuthority._fingerprint(
+                            ambient
+                        )
+                        != expected_fingerprint
+                    )
+                )
             ):
                 raise CFError(
                     "server verification project changed before execution"
@@ -6977,6 +7164,7 @@ class AccountedServerVerification:
                 raise CFError(
                     "server verification policy changed before execution"
                 ) from exc
+            expected_fingerprint = self._policy_fingerprint
             if (
                 len(raw) != self._policy_size
                 or extension
@@ -6988,6 +7176,16 @@ class AccountedServerVerification:
                 )
                 or hashlib.sha256(raw).digest() != self._policy_digest
                 or raw != self._policy_raw
+                or (
+                    expected_fingerprint is not None
+                    and any(
+                        AccountedRemoteSignaturePolicyAuthority._fingerprint(
+                            metadata
+                        )
+                        != expected_fingerprint
+                        for metadata in (pinned, initial, opened, after, named)
+                    )
+                )
             ):
                 raise CFError(
                     "server verification policy changed before execution"
@@ -7002,6 +7200,143 @@ class AccountedServerVerification:
         self._revalidate_project_identity()
         self._revalidate_policy()
 
+    def _adopt_borrowed_policy(
+        self, raw: bytes
+    ) -> tuple[dict[str, Any], int]:
+        """Parse one authority-owned immutable snapshot without copying it."""
+        physical_bytes = len(raw)
+        retained_bytes = (
+            self.POLICY_AST_BASE_BYTES
+            + self.POLICY_AST_BYTES_PER_INPUT_BYTE * physical_bytes
+        )
+        temporary_bytes = (
+            self.POLICY_PARSE_BASE_BYTES
+            + self.POLICY_PARSE_BYTES_PER_INPUT_BYTE * physical_bytes
+        )
+        permit = DecisionWorkPermit()
+        self._policy_permit = permit
+        self._ledger.reserve_into(
+            permit,
+            "record_read",
+            acquires={
+                "retained_bytes": retained_bytes,
+                "temporary_bytes": temporary_bytes,
+            },
+        )
+        parsed: Any = None
+        try:
+            self._consume_owned_acquisition(
+                permit,
+                phase="record_read",
+                retained_bytes=retained_bytes,
+                temporary_bytes=temporary_bytes,
+            )
+            self._policy_permit = None
+            self._policy_raw = raw
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError as error:
+                message = (
+                    "server verification policy JSON is invalid: "
+                    f"{error.msg}: line {error.lineno} column {error.colno}"
+                )
+                _detach_exception_chain(error)
+                raise CFError(message) from None
+            except UnicodeDecodeError as error:
+                message = (
+                    "server verification policy UTF-8 is invalid: "
+                    f"byte {error.start}: {error.reason}"
+                )
+                _detach_exception_chain(error)
+                raise CFError(message) from None
+            if not isinstance(parsed, dict):
+                raise CFError("server verification policy must be an object")
+            policy = parsed
+            parsed = None
+            self._policy = policy
+            self._policy_digest = hashlib.sha256(raw).digest()
+            self._release_owned("temporary_bytes", temporary_bytes)
+            return policy, retained_bytes
+        finally:
+            parsed = None
+            self._cancel_owned_permit("_policy_permit")
+
+    def _adopt_signature_policy_authority(
+        self,
+        authority: AccountedRemoteSignaturePolicyAuthority,
+        project_root: Path,
+        *,
+        allow_missing_project: bool,
+    ) -> tuple[bool, dict[str, Any], int]:
+        """Duplicate capabilities and borrow P0 directly from its authority."""
+        authority._ensure_open(self._ledger)
+        if (
+            not authority._verification_bound
+            or not authority._verification_constructing
+            or authority._policy_owner is not None
+            or authority._verification_owner is not self
+        ):
+            raise CFError("server verification policy handoff is unavailable")
+        if authority._project_root != Path(os.path.abspath(project_root)):
+            raise CFError("server verification policy authority project differs")
+        raw = authority._policy_raw
+        if raw is None:
+            raise CFError("server verification policy authority has no raw policy")
+        project_missing = bool(authority._missing_parts)
+        if project_missing:
+            if not allow_missing_project:
+                raise CFError(
+                    f"server verification project is unavailable: {project_root}"
+                )
+        else:
+            if allow_missing_project:
+                raise CFError(
+                    "server verification project changed before execution"
+                )
+            if authority._project_fd < 0:
+                raise CFError(
+                    "server verification project capability is unavailable"
+                )
+            self._project_fd = os.dup(authority._project_fd)
+            expected_project = authority._project_fingerprint
+            opened_project = os.fstat(self._project_fd)
+            if (
+                expected_project is None
+                or authority._fingerprint(opened_project) != expected_project
+            ):
+                raise SignaturePolicySubjectChanged(
+                    project_root, "verification_project_identity"
+                )
+            self._project_fingerprint = expected_project
+            self._project_identity = (
+                opened_project.st_dev,
+                opened_project.st_ino,
+            )
+            if not authority._policy_missing:
+                if authority._policy_fd < 0:
+                    raise CFError(
+                        "server verification policy capability is unavailable"
+                    )
+                self._policy_fd = os.dup(authority._policy_fd)
+                expected_policy = authority._policy_fingerprint
+                opened_policy = os.fstat(self._policy_fd)
+                if (
+                    expected_policy is None
+                    or authority._fingerprint(opened_policy) != expected_policy
+                ):
+                    raise SignaturePolicySubjectChanged(
+                        remote_policy_path(project_root),
+                        "verification_policy_identity",
+                    )
+                self._policy_fingerprint = expected_policy
+                self._policy_identity = (
+                    opened_policy.st_dev,
+                    opened_policy.st_ino,
+                )
+                self._policy_size = opened_policy.st_size
+        policy, retained = self._adopt_borrowed_policy(raw)
+        return project_missing, policy, retained
+
     def _prepare(
         self,
         project_root: Path,
@@ -7009,6 +7344,9 @@ class AccountedServerVerification:
         commit_id: str,
         *,
         allow_missing_project: bool,
+        signature_policy_authority: (
+            AccountedRemoteSignaturePolicyAuthority | None
+        ) = None,
     ) -> None:
         if (
             sys.implementation.name != "cpython"
@@ -7020,39 +7358,48 @@ class AccountedServerVerification:
                 "directory capabilities"
             )
         project_missing = False
-        try:
-            self._project_fd = _open_directory_nofollow(project_root)
-        except FileNotFoundError as exc:
-            if not allow_missing_project:
+        if signature_policy_authority is not None:
+            project_missing, policy, policy_retained = (
+                self._adopt_signature_policy_authority(
+                    signature_policy_authority,
+                    project_root,
+                    allow_missing_project=allow_missing_project,
+                )
+            )
+        else:
+            try:
+                self._project_fd = _open_directory_nofollow(project_root)
+            except FileNotFoundError as exc:
+                if not allow_missing_project:
+                    raise CFError(
+                        f"server verification project is unavailable: {project_root}"
+                    ) from exc
+                project_missing = True
+            except OSError as exc:
                 raise CFError(
                     f"server verification project is unavailable: {project_root}"
                 ) from exc
-            project_missing = True
-        except OSError as exc:
-            raise CFError(
-                f"server verification project is unavailable: {project_root}"
-            ) from exc
-        if allow_missing_project and not project_missing:
-            self._close_owned_capability("_project_fd")
-            raise CFError(
-                "server verification project changed before execution"
-            )
-        if project_missing:
-            policy, policy_retained = self._retain_empty_policy()
-        else:
-            project_metadata = os.fstat(self._project_fd)
-            if not stat.S_ISDIR(project_metadata.st_mode):
+            if allow_missing_project and not project_missing:
+                self._close_owned_capability("_project_fd")
                 raise CFError(
-                    f"server verification project is unavailable: {project_root}"
+                    "server verification project changed before execution"
                 )
-            self._project_identity = (
-                project_metadata.st_dev,
-                project_metadata.st_ino,
-            )
-            self._poll("upload server verification policy")
-            policy, policy_retained = self._read_policy(
-                remote_policy_path(project_root)
-            )
+            if project_missing:
+                policy, policy_retained = self._retain_empty_policy()
+            else:
+                project_metadata = os.fstat(self._project_fd)
+                if not stat.S_ISDIR(project_metadata.st_mode):
+                    raise CFError(
+                        f"server verification project is unavailable: {project_root}"
+                    )
+                self._project_identity = (
+                    project_metadata.st_dev,
+                    project_metadata.st_ino,
+                )
+                self._poll("upload server verification policy")
+                policy, policy_retained = self._read_policy(
+                    remote_policy_path(project_root)
+                )
         self._policy = policy
         verification = policy.get("verification", {})
         if not isinstance(verification, dict):
@@ -7541,6 +7888,8 @@ class AccountedServerVerification:
             output.clear()
 
     def run(self) -> None:
+        if self._constructing:
+            raise CFError("server verification child construction is in progress")
         self._ensure_open()
         if self._started:
             raise CFError("server verification owner is single-use")
@@ -7592,8 +7941,11 @@ class AccountedServerVerification:
             if permit is not None and self._ledger.permit_is_open(permit):
                 self._ledger.cancel_permit(permit)
             self._output_permit = None
+        self._completed = True
 
     def close(self) -> None:
+        if self._constructing:
+            raise CFError("server verification child construction is in progress")
         if self._closed:
             return
         if id(self._ledger) != self._ledger_identity:
@@ -7630,13 +7982,15 @@ class AccountedServerVerification:
         if self._policy is not None:
             self._policy.clear()
             self._policy = None
-        if self._policy_raw is not None:
+        if isinstance(self._policy_raw, bytearray):
             self._policy_raw.clear()
-            self._policy_raw = None
+        self._policy_raw = None
         self._policy_digest = None
         self._policy_identity = None
+        self._policy_fingerprint = None
         self._policy_size = None
         self._project_identity = None
+        self._project_fingerprint = None
         self._project_root = None
         self._failure_message = None
         self._resume_pending_release()
@@ -9929,8 +10283,9 @@ class AccountedHTTPUploadAncestry:
     """Own one provisional BFS ancestry decision on a request ledger.
 
     ``loader`` must return a borrowed, already-validated commit mapping whose
-    lifetime exceeds this owner. Production wiring is intentionally deferred
-    until sealed validation can provide that snapshot-bound borrow.
+    lifetime exceeds this owner. ``AccountedHTTPUploadSealedAncestry`` now
+    provides that snapshot-bound handoff; handler/terminal wiring remains
+    intentionally deferred.
     """
 
     TRANSITION_BYTES = sys.getsizeof(
@@ -9953,6 +10308,8 @@ class AccountedHTTPUploadAncestry:
         ledger: DecisionWorkLedger,
         loader: Any,
         deadline: HTTPRequestDeadline | None = None,
+        *,
+        _handoff_owner: Any | None = None,
     ) -> None:
         if not callable(loader):
             raise CFError("HTTP upload ancestry loader must be callable")
@@ -9974,6 +10331,13 @@ class AccountedHTTPUploadAncestry:
         self._used = False
         self._closed = False
         self._closing = False
+        if _handoff_owner is not None:
+            if object.__getattribute__(_handoff_owner, "_ancestry") is not None:
+                raise CFError("HTTP upload ancestry handoff slot is occupied")
+            # Publish before the collection reservation and allocators.  An
+            # initialization/cleanup fault therefore remains reachable from
+            # the destination composite instead of relying on __del__.
+            object.__setattr__(_handoff_owner, "_ancestry", self)
         failure: BaseException | None = None
         try:
             self._prepare_transition(
@@ -18245,6 +18609,8 @@ class AccountedHTTPUploadSealedValidation:
         owner._borrow_failed = False
         owner._borrow_releasing = False
         owner._borrow_reading = False
+        owner._signature_composite_active = False
+        owner._signature_composite_owner = None
         owner._closed = False
         owner._closing = False
         owner._finishing = False
@@ -18287,6 +18653,11 @@ class AccountedHTTPUploadSealedValidation:
         self._ensure_ledger(ledger)
         if self._closed:
             raise CFError("HTTP upload sealed validation owner is closed")
+
+    def _ensure_signature_composite_access(self, owner: Any | None) -> None:
+        bound = self._signature_composite_owner
+        if bound is not None and bound is not owner:
+            raise CFError("signature verification composite owns sealed authority")
 
     def _poll(self) -> None:
         if self._deadline is not None:
@@ -18410,10 +18781,16 @@ class AccountedHTTPUploadSealedValidation:
             raise failure
 
     def borrow_commits(
-        self, ledger: DecisionWorkLedger, mode: str
+        self,
+        ledger: DecisionWorkLedger,
+        mode: str,
+        *,
+        _handoff_owner: Any | None = None,
+        _signature_composite_owner: Any | None = None,
     ) -> _HTTPUploadSealedCommitBorrow:
         """Activate the preallocated callable for one synchronous consumer."""
         self._ensure_open(ledger)
+        self._ensure_signature_composite_access(_signature_composite_owner)
         if not self._validated:
             raise CFError("HTTP upload sealed validation has not validated its head")
         if self._finishing:
@@ -18433,6 +18810,13 @@ class AccountedHTTPUploadSealedValidation:
             raise CFError("HTTP upload sealed commit borrow is unavailable")
         if handle._used:
             raise CFError("HTTP upload sealed commit borrow is single-use")
+        if _handoff_owner is not None:
+            if object.__getattribute__(_handoff_owner, "_borrow") is not None:
+                raise CFError("HTTP upload sealed borrow handoff slot is occupied")
+            # Destination-first publication closes the activation-return gap.
+            # A post-effect activation fault leaves this exact handle under
+            # composite cleanup even when it is already revoked/abort-only.
+            object.__setattr__(_handoff_owner, "_borrow", handle)
         token = self._borrow_generation + 1
         try:
             handle._activate(token)
@@ -18693,6 +19077,9 @@ class AccountedHTTPUploadSealedValidation:
 
     def finish(self, ledger: DecisionWorkLedger) -> None:
         self._ensure_open(ledger)
+        self._ensure_signature_composite_access(None)
+        if self._signature_composite_active:
+            raise CFError("sealed signature handoff is active")
         if self._finishing:
             raise CFError("HTTP upload sealed validation final fence is already active")
         if self._borrow_releasing:
@@ -18733,14 +19120,25 @@ class AccountedHTTPUploadSealedValidation:
         if failure is not None:
             raise failure
 
-    def close(self, ledger: DecisionWorkLedger) -> None:
+    def close(
+        self,
+        ledger: DecisionWorkLedger,
+        *,
+        _signature_composite_owner: Any | None = None,
+    ) -> None:
+        self._ensure_signature_composite_access(_signature_composite_owner)
         if self._closed:
             self._ensure_ledger(ledger)
             return
         self._ensure_ledger(ledger)
         if self._closing:
             return
-        if self._finishing or self._borrow_releasing or self._borrow_reading:
+        if (
+            self._finishing
+            or self._borrow_releasing
+            or self._borrow_reading
+            or self._signature_composite_active
+        ):
             # Abort remains available after the outer release attempt exits;
             # do not tear down document or scalar ownership from a
             # deadline/accounting callback while fingerprint/final-fence
@@ -18776,6 +19174,334 @@ class AccountedHTTPUploadSealedValidation:
             if completed:
                 self._closed = True
             self._closing = False
+
+    def __del__(self) -> None:
+        try:
+            self.close(self._ledger)
+        except BaseException:
+            pass
+
+
+class AccountedHTTPUploadSignatureVerificationComposite:
+    """Own the sealed-to-signature-to-verification prerequisite handoff.
+
+    Construction transfers the two parent owners to this production-unwired
+    controller.  Callers must not use stale parent aliases.  ``prepare`` lends
+    the sealed owner's exact preallocated signature handle and revokes it
+    before any verification child can be constructed or published.
+    """
+
+    def __init__(
+        self,
+        sealed_owner: AccountedHTTPUploadSealedValidation,
+        policy_authority: AccountedRemoteSignaturePolicyAuthority,
+        ledger: DecisionWorkLedger,
+    ) -> None:
+        if not isinstance(sealed_owner, AccountedHTTPUploadSealedValidation):
+            raise CFError("signature verification composite requires a sealed owner")
+        if not isinstance(
+            policy_authority, AccountedRemoteSignaturePolicyAuthority
+        ):
+            raise CFError(
+                "signature verification composite requires a policy authority"
+            )
+        sealed_owner._ensure_open(ledger)
+        policy_authority._ensure_open(ledger)
+        if sealed_owner._deadline is not policy_authority._deadline:
+            raise CFError(
+                "signature verification composite requires the same deadline"
+            )
+        if not sealed_owner._validated:
+            raise CFError(
+                "signature verification composite requires validated authority"
+            )
+        if sealed_owner._signature_composite_active:
+            raise CFError("signature verification composite is already active")
+        if policy_authority._policy_bound or policy_authority._verification_bound:
+            raise CFError(
+                "signature verification composite requires an unused policy authority"
+            )
+        if (
+            sealed_owner._signature_composite_owner is not None
+            or policy_authority._signature_composite_owner is not None
+        ):
+            raise CFError("signature verification composite already owns a parent")
+        self._ledger = ledger
+        self._sealed_owner: AccountedHTTPUploadSealedValidation | None = sealed_owner
+        self._policy_authority: AccountedRemoteSignaturePolicyAuthority | None = (
+            policy_authority
+        )
+        self._signature_borrow: _HTTPUploadSealedCommitBorrow | None = None
+        self._used = False
+        self._operating = False
+        self._closing = False
+        self._abort_only = False
+        self._closed = False
+        bind_failure: BaseException | None = None
+        try:
+            sealed_owner._signature_composite_owner = self
+            policy_authority._signature_composite_owner = self
+        except BaseException as error:
+            _detach_exception_chain(error)
+            bind_failure = error
+        if bind_failure is not None:
+            # The caller cannot receive this controller after constructor
+            # failure. Bypass replaceable __setattr__ hooks and roll back only
+            # fields whose pre/post-effect assignment published this exact
+            # controller, leaving any foreign authority untouched.
+            if (
+                object.__getattribute__(
+                    sealed_owner, "_signature_composite_owner"
+                )
+                is self
+            ):
+                object.__setattr__(
+                    sealed_owner, "_signature_composite_owner", None
+                )
+            if (
+                object.__getattribute__(
+                    policy_authority, "_signature_composite_owner"
+                )
+                is self
+            ):
+                object.__setattr__(
+                    policy_authority, "_signature_composite_owner", None
+                )
+            # A failed constructor never transferred parent ownership. Make
+            # this unreachable partial controller inert before rethrow so its
+            # finalizer cannot later close caller-owned parents.
+            object.__setattr__(self, "_policy_authority", None)
+            object.__setattr__(self, "_sealed_owner", None)
+            object.__setattr__(self, "_closed", True)
+            raise bind_failure.with_traceback(None)
+
+    def _ensure_ledger(self, ledger: DecisionWorkLedger) -> None:
+        if ledger is not self._ledger:
+            raise CFError(
+                "signature verification composite belongs to a different ledger"
+            )
+
+    def prepare(
+        self,
+        branch: str,
+        commit_id: str,
+        ledger: DecisionWorkLedger,
+        *,
+        output_limit_bytes: int = 1024 * 1024,
+        allow_missing_project: bool = False,
+    ) -> "AccountedServerVerification":
+        self._ensure_ledger(ledger)
+        if self._closed:
+            raise CFError("signature verification composite is closed")
+        if self._used:
+            raise CFError("signature verification composite is single-use")
+        if self._operating or self._closing:
+            raise CFError("signature verification composite is already active")
+        sealed_owner = self._sealed_owner
+        policy_authority = self._policy_authority
+        if sealed_owner is None or policy_authority is None:
+            raise CFError("signature verification composite has no parent authority")
+        sealed_owner._ensure_open(ledger)
+        policy_authority._ensure_open(ledger)
+        if sealed_owner._head != commit_id:
+            raise CFError(
+                "signature verification composite requires the validated head"
+            )
+
+        self._used = True
+        authority_started = False
+        verification_owner: AccountedServerVerification | None = None
+        failure: BaseException | None = None
+        try:
+            # Both operating guards are inside this try so a pre/post-effect
+            # __setattr__ or asynchronous exception still enters the
+            # callback-free finally rollback below.
+            self._operating = True
+            sealed_owner._signature_composite_active = True
+            try:
+                # Publish finally-cleanup responsibility before the fallible
+                # begin call. A wrapper may raise after begin committed its
+                # construction guard but before control returns here.
+                authority_started = True
+                policy_authority._begin_verified_server_verification(
+                    branch,
+                    commit_id,
+                    ledger,
+                    _signature_composite_owner=self,
+                )
+                expected_borrow = sealed_owner._borrow_handles.get("signature")
+                if not isinstance(expected_borrow, _HTTPUploadSealedCommitBorrow):
+                    raise CFError(
+                        "signature verification composite has no signature borrow"
+                    )
+                # Publish the exact preallocated cleanup authority before the
+                # fallible activation call. A wrapper that raises after the
+                # real borrow returned cannot strand the active token.
+                self._signature_borrow = expected_borrow
+                signature_borrow = sealed_owner.borrow_commits(
+                    ledger,
+                    "signature",
+                    _signature_composite_owner=self,
+                )
+                if signature_borrow is not expected_borrow:
+                    raise CFError(
+                        "signature verification composite received a foreign borrow"
+                    )
+                verification_owner = (
+                    policy_authority._prepare_verified_server_verification_core(
+                        signature_borrow,
+                        branch,
+                        commit_id,
+                        output_limit_bytes=output_limit_bytes,
+                        allow_missing_project=allow_missing_project,
+                        close_loader=True,
+                        _signature_composite_owner=self,
+                    )
+                )
+                if (
+                    not isinstance(
+                        verification_owner, AccountedServerVerification
+                    )
+                    or verification_owner
+                    is not policy_authority._verification_owner
+                ):
+                    raise CFError(
+                        "signature verification composite received a foreign "
+                        "verification owner"
+                    )
+            except BaseException as error:
+                _detach_exception_chain(error)
+                failure = error
+
+            cleanup_failure: BaseException | None = None
+            signature_borrow = self._signature_borrow
+            if (
+                signature_borrow is not None
+                and object.__getattribute__(signature_borrow, "_token")
+            ):
+                try:
+                    signature_borrow.close(ledger)
+                except BaseException as error:
+                    _detach_exception_chain(error)
+                    cleanup_failure = error
+            if signature_borrow is not None:
+                borrow_owner = object.__getattribute__(
+                    signature_borrow, "_owner"
+                )
+                release_complete = (
+                    borrow_owner is sealed_owner
+                    and object.__getattribute__(signature_borrow, "_token") == 0
+                    and object.__getattribute__(
+                        sealed_owner, "_active_borrow_token"
+                    )
+                    == 0
+                )
+                if release_complete:
+                    self._signature_borrow = None
+                elif cleanup_failure is None:
+                    cleanup_failure = CFError(
+                        "sealed signature handoff borrow release is incomplete"
+                    )
+            signature_borrow = None
+
+            if failure is not None or cleanup_failure is not None:
+                self._abort_only = True
+            if cleanup_failure is not None:
+                if failure is not None:
+                    raise cleanup_failure.with_traceback(None) from failure
+                raise cleanup_failure.with_traceback(None)
+            if failure is not None:
+                raise failure.with_traceback(None)
+            if verification_owner is None:
+                self._abort_only = True
+                raise CFError(
+                    "signature verification composite produced no verification owner"
+                )
+            return verification_owner
+        finally:
+            verification_owner = None
+            if authority_started:
+                # This composite published cleanup responsibility before
+                # begin. Clear the two existing guard fields directly so a
+                # replaceable helper call cannot introduce a pre-effect
+                # cleanup fault that strands the parent forever.
+                object.__setattr__(
+                    policy_authority, "_verification_handoff_open", False
+                )
+                object.__setattr__(
+                    policy_authority, "_verification_constructing", False
+                )
+            object.__setattr__(
+                sealed_owner, "_signature_composite_active", False
+            )
+            object.__setattr__(self, "_operating", False)
+
+    def close(self, ledger: DecisionWorkLedger) -> None:
+        self._ensure_ledger(ledger)
+        if self._closed:
+            return
+        if self._operating:
+            raise CFError("signature verification composite operation is in progress")
+        if self._closing:
+            raise CFError("signature verification composite cleanup is in progress")
+        completed = False
+        failure: BaseException | None = None
+        try:
+            # As with prepare, install the reentry guard only after the
+            # finally cleanup region is active.
+            self._closing = True
+            signature_borrow = self._signature_borrow
+            if signature_borrow is not None:
+                try:
+                    signature_borrow.close(ledger)
+                except BaseException as error:
+                    _detach_exception_chain(error)
+                    failure = error
+                if not signature_borrow._token:
+                    self._signature_borrow = None
+            signature_borrow = None
+            if failure is None:
+                policy_authority = self._policy_authority
+                if policy_authority is not None:
+                    try:
+                        policy_authority.close(
+                            ledger, _signature_composite_owner=self
+                        )
+                    except BaseException as error:
+                        _detach_exception_chain(error)
+                        failure = error
+            if failure is None:
+                sealed_owner = self._sealed_owner
+                if sealed_owner is not None:
+                    try:
+                        sealed_owner.close(
+                            ledger, _signature_composite_owner=self
+                        )
+                    except BaseException as error:
+                        _detach_exception_chain(error)
+                        failure = error
+            policy_authority = self._policy_authority
+            sealed_owner = self._sealed_owner
+            completed = (
+                failure is None
+                and self._signature_borrow is None
+                and (policy_authority is None or policy_authority._closed)
+                and (sealed_owner is None or sealed_owner._closed)
+            )
+            if completed:
+                if policy_authority is not None:
+                    policy_authority._signature_composite_owner = None
+                if sealed_owner is not None:
+                    sealed_owner._signature_composite_owner = None
+                self._policy_authority = None
+                self._sealed_owner = None
+                self._closed = True
+        finally:
+            object.__setattr__(self, "_closing", False)
+        if failure is not None:
+            raise failure.with_traceback(None)
+        if not completed:
+            raise CFError("signature verification composite cleanup is incomplete")
 
     def __del__(self) -> None:
         try:
@@ -19007,6 +19733,220 @@ def prepare_http_upload_sealed_validation(
         owner = None
         raise construction_failure
     return owner
+
+
+class AccountedHTTPUploadSealedAncestry:
+    """Own one sealed commit borrow through one accounted ancestry walk.
+
+    This is a production-unwired handoff.  It never reopens or clones a
+    commit: ``AccountedHTTPUploadAncestry`` receives only the sealed owner's
+    purpose-specific callable borrow.  The ancestry payload/loader is always
+    dropped before the borrow is released, and the sealed owner remains with
+    its caller for the later terminal fence.
+    """
+
+    def __init__(
+        self,
+        sealed_owner: AccountedHTTPUploadSealedValidation,
+        ledger: DecisionWorkLedger,
+        deadline: HTTPRequestDeadline | None,
+    ) -> None:
+        # Publish every cleanup field before the first fallible authority
+        # operation.  A prepare fault can then unwind through this same
+        # object without losing an activated sealed borrow.
+        self._ledger = ledger
+        self._ledger_identity = id(ledger)
+        self._deadline = deadline
+        self._sealed_owner: AccountedHTTPUploadSealedValidation | None = None
+        self._borrow: _HTTPUploadSealedCommitBorrow | None = None
+        self._ancestry: AccountedHTTPUploadAncestry | None = None
+        self._preparing = False
+        self._prepared = False
+        self._running = False
+        self._closing = False
+        self._close_requested = False
+        self._closed = False
+        self._prepare_used = False
+        self._decision_used = False
+
+        if not isinstance(sealed_owner, AccountedHTTPUploadSealedValidation):
+            raise CFError("HTTP upload sealed ancestry requires a sealed owner")
+        sealed_owner._ensure_open(ledger)
+        if sealed_owner._deadline is not deadline:
+            raise CFError(
+                "HTTP upload sealed ancestry must share the sealed deadline"
+            )
+        self._sealed_owner = sealed_owner
+
+    def _ensure_ledger(self, ledger: DecisionWorkLedger) -> None:
+        if (
+            id(ledger) != self._ledger_identity
+            or id(self._ledger) != self._ledger_identity
+        ):
+            raise CFError(
+                "HTTP upload sealed ancestry belongs to a different ledger"
+            )
+
+    def _ensure_bound(self) -> None:
+        self._ensure_ledger(self._ledger)
+        if self._closed:
+            raise CFError("HTTP upload sealed ancestry owner is closed")
+
+    def _ensure_open(self) -> None:
+        self._ensure_bound()
+        if (
+            not self._prepared
+            or self._borrow is None
+            or self._ancestry is None
+        ):
+            raise CFError("HTTP upload sealed ancestry owner is not prepared")
+
+    def prepare(self, ledger: DecisionWorkLedger) -> None:
+        """Activate both child owners after the caller owns this composite."""
+        self._ensure_ledger(ledger)
+        self._ensure_bound()
+        if self._preparing:
+            raise CFError("HTTP upload sealed ancestry prepare is already active")
+        if self._prepare_used:
+            raise CFError("HTTP upload sealed ancestry prepare is single-use")
+        sealed_owner = self._sealed_owner
+        if sealed_owner is None:
+            raise CFError("HTTP upload sealed ancestry has no sealed owner")
+        if sealed_owner._deadline is not self._deadline:
+            raise CFError(
+                "HTTP upload sealed ancestry deadline changed before prepare"
+            )
+        self._prepare_used = True
+        self._preparing = True
+        failure: BaseException | None = None
+        try:
+            sealed_owner.borrow_commits(
+                ledger, "ancestry", _handoff_owner=self
+            )
+            assert self._borrow is not None
+            AccountedHTTPUploadAncestry(
+                ledger,
+                self._borrow,
+                self._deadline,
+                _handoff_owner=self,
+            )
+            self._prepared = True
+        except BaseException as exc:
+            _detach_ancestry_exception_chain(exc)
+            failure = exc
+        sealed_owner = None
+        self._sealed_owner = None
+        self._preparing = False
+        close_requested = self._close_requested
+        cleanup_failure: BaseException | None = None
+        if close_requested:
+            try:
+                self.close(ledger)
+            except BaseException as exc:
+                _detach_ancestry_exception_chain(exc)
+                cleanup_failure = exc
+        if cleanup_failure is not None:
+            if failure is not None:
+                raise cleanup_failure from failure
+            raise cleanup_failure from None
+        if failure is not None:
+            # Do not auto-close.  The caller received this owner before
+            # prepare and can retry an arbitrary cleanup failure on the same
+            # exact ancestry/borrow fields.
+            raise failure from None
+        if close_requested:
+            raise CFError(
+                "HTTP upload sealed ancestry prepare was cancelled by close"
+            )
+
+    def contains(self, ancestor: str, head: str) -> bool:
+        self._ensure_open()
+        if self._running:
+            raise CFError("HTTP upload sealed ancestry decision is already active")
+        if self._decision_used:
+            raise CFError("HTTP upload sealed ancestry owner is single-use")
+        self._decision_used = True
+        self._running = True
+        result = False
+        failure: BaseException | None = None
+        ancestry = self._ancestry
+        try:
+            assert ancestry is not None
+            result = ancestry.contains(ancestor, head)
+        except BaseException as exc:
+            _detach_ancestry_exception_chain(exc)
+            failure = exc
+        ancestry = None
+        self._running = False
+
+        cleanup_failure: BaseException | None = None
+        try:
+            self.close(self._ledger)
+        except BaseException as exc:
+            _detach_ancestry_exception_chain(exc)
+            cleanup_failure = exc
+        if cleanup_failure is not None:
+            result = False
+            if failure is not None:
+                raise cleanup_failure from failure
+            raise cleanup_failure from None
+        if failure is not None:
+            raise failure from None
+        return result
+
+    def close(self, ledger: DecisionWorkLedger | None = None) -> None:
+        selected = self._ledger if ledger is None else ledger
+        self._ensure_ledger(selected)
+        if self._closed:
+            return
+        if self._preparing:
+            self._close_requested = True
+            return
+        if self._running:
+            # A deadline/accounting callback may request teardown while the
+            # ancestry owner or borrow lookup still has payload locals.  The
+            # outer decision performs the close after those frames unwind.
+            self._close_requested = True
+            return
+        if self._closing:
+            return
+        self._closing = True
+        completed = False
+        try:
+            ancestry = self._ancestry
+            if ancestry is not None:
+                ancestry.close(self._ledger)
+                self._ancestry = None
+            borrow = self._borrow
+            if borrow is not None:
+                borrow.close(self._ledger)
+                self._borrow = None
+            self._sealed_owner = None
+            self._deadline = None
+            self._prepared = False
+            self._close_requested = False
+            completed = True
+        finally:
+            if completed:
+                self._closed = True
+            self._closing = False
+
+    def __del__(self) -> None:
+        try:
+            self.close(self._ledger)
+        except BaseException:
+            pass
+
+
+def prepare_http_upload_sealed_ancestry(
+    sealed_owner: AccountedHTTPUploadSealedValidation,
+    ledger: DecisionWorkLedger,
+    deadline: HTTPRequestDeadline | None = None,
+) -> AccountedHTTPUploadSealedAncestry:
+    """Allocate the handoff destination before its explicit prepare step."""
+    return AccountedHTTPUploadSealedAncestry(
+        sealed_owner, ledger, deadline
+    )
 
 
 def validate_sealed_commit(objects_root: Path, commit_id: str, seen: set[str] | None = None) -> None:

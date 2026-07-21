@@ -90,26 +90,44 @@ no-ledger callerだけlocal ledgerを維持する。全reservationはcaller-owne
 close前にdetachして一度だけ閉じるためsame-number ABAをretryしない。pure `AccountedCommitSignaturePolicy`はpolicy/history/HMACを、
 そのproduction-unwired `AccountedRemoteSignaturePolicyAuthority`はabsentまたはexact single-link raw policyをno-follow project capabilityへ
 固定し、same-ledger/deadlineでpure ownerへ一度だけ貸してfinal identity/content fenceを行う。malformed JSON/UTF-8はraw payloadを
-exceptionへ残さず、authority closeはchildを先に閉じる。
+exceptionへ残さず、authority closeはchildを先に閉じる。別のproduction-unwired combined surfaceはsignature childの成功・close後だけ、
+同じP0 bytesとduplicated project/policy capabilityを`AccountedServerVerification`へ貸し、ambient policy readなしでplan/cwdを作る。
+partial childはfallible acquisition前にauthorityへ公開し、combined construction全域のcallback再入を拒否する。handlerはまだこのsurfaceを使わない。
 production接続済み`AccountedHTTPUploadSealedValidation`はsealed Stageからincoming/existingのcount/aggregate/max-record scalar
 boundsだけを一度moveし、staged session/FDをhandler ledger/deadlineへ閉じる。さらにproduction-unwired
 `AccountedHTTPUploadAncestry`はvalidated commit loaderを借用するfull BFS decisionのcollection/frame/deadlineを閉じ、match後も
-legacy late-error orderのため全走査する。signatureとancestryはまだupload/MR/publicationのproduction pathに未接続であり、sealed
-session borrow、signature/digest/ancestry ordering、最終publicationの完全なallocation/deadline closureは残る。
+legacy late-error orderのため全走査する。production-unwired `AccountedHTTPUploadSealedAncestry`はsealed ownerのpreallocated ancestry
+handleを、callerへcompositeを返した後のsingle-use `prepare`で同じledger/deadlineのBFS loaderへ貸す。BFS payload/loaderを先にdropして
+borrowをreleaseし、prepare/close faultはowner fieldへretry ownershipを残す。prepare中callback closeは外側frameでcleanupしてtyped
+cancellationにする。signatureとancestryはまだupload/MR/publicationのproduction pathに未接続であり、terminal fence、
+signature/digest/ancestry ordering、最終publicationの完全なallocation/deadline closureは残る。
+
+Existing-project terminal characterizationは、signature compositeからancestry handoffへparent tokenを移管できず、project gateを
+保持してもpolicy-first/sealed-firstの両final orderにcallback mutation窓が残ることを固定する。verification subprocess failureは
+external effectを残し得るがfixtureではancestry/publicationへ進まない。sealed final後にambient recordsを読むpublication helperも
+detached immutable inputではない。terminal coordinatorやhandler call siteは追加していない。
 
 Sealed ownerのproduction-unwired signature/ancestry handleは、retained validated commitだけをloaderなしで借用する。raw mutable
 aliasはdestination-first canonical fingerprintでhandle close時とfinal fence時に検査する。disk callback完了後の最終checkはcallback
 なしで行い、成功したdocumentを即session authorityからdetachしてからscalar cleanupへ進む。lookup/release/finishはsingle-flightで、
 callback後かつpayload取得前にhandle/owner tokenを再確認する。
 
+別のproduction-unwired二段階compositeは、このsealed ownerとpinned signature-policy authorityをsame ledger/identical deadlineで束縛する。
+exact preallocated signature handleをpolicy loaderへ貸し、signature child close後、parent coordinator tokenがstale aliasを拒否している間に
+handleをowner-first release/revalidateする。その成功後だけverification config/cwd/childを構築できる。signature/release failureは
+verification config/spawn effect 0で、abort cleanupはactive borrow→policy authority→sealed authorityの順に最初の未完ownerで停止・retryする。
+handlerはまだこのcompositeを使わず、verification実行、final fences、ancestry、bootstrap、publicationも行わない。
+
 production-unwired digest handoffは、parser pre-parse upperをcaller-owned one-shot `AccountedHTTPUploadParserScalar`で取得し、
-同owner内でpost-parse exact full-request scalarへretry-safeにshrinkしてから、
-そのexact tokenを`AccountedHTTPUploadRequestSource`へmoveする。Stage closure/core/newline boundsは使わない。caller-owned二段階
-`AccountedHTTPUploadSemantic`がsourceをrelease/reacquire gapなしでadoptし、
-digestを公開せずexact semantic mapping、full-request fingerprint、元record identity、別Retainedのeffect-ready core-plus-newline bytesを保持する。
-semantic側8 source passと`4096 + 256L` canonical scratch、digest child work/scratchを別々にaccountし、deep/key-heavy combined Temporary exact-minus-oneを拒否する。last deadline callback後にfull request fingerprint/list/ID/duplicate/full-record digest/copy parityを再検証し、mutable AST scalarをpayload-first releaseしてsemantic/copyをfield assignment
-だけでread-only mapping proxy/copy tupleのprivate effect slotへdetachする。同tokenのduplicate bindは拒否する。existingのcontinuous gate、missingのbootstrap-locked private-stage gate/proof、mapping lending、
-effect consumer、handler parser release-slot移管は未接続である。
+同owner内でpost-parse exact full-request scalarへretry-safeにshrinkしてから、そのexact tokenを
+`AccountedHTTPUploadRequestSource`へmoveする。Stage closure/core/newline boundsは使わない。caller-owned二段階
+`AccountedHTTPUploadSemantic`がsourceをrelease/reacquire gapなしでadoptし、digestを公開せずexact semantic mapping、
+full-request fingerprint、元record identity、別Retainedのeffect-ready core-plus-newline bytesを保持する。semantic側8 source passと
+`4096 + 256L` canonical scratch、digest child work/scratchを別々にaccountし、deep/key-heavy combined Temporary exact-minus-oneを
+拒否する。last deadline callback後にfull request fingerprint/list/ID/duplicate/full-record digest/copy parityを再検証し、mutable AST
+scalarをpayload-first releaseしてsemantic/copyをfield assignmentだけでread-only mapping proxy/copy tupleのprivate effect slotへ
+detachする。同tokenのduplicate bindは拒否する。existingのcontinuous gate、missingのbootstrap-locked private-stage gate/proof、
+mapping lending、effect consumer、handler parser release-slot移管は未接続である。
 
 ## Cross-Cutting Paths
 

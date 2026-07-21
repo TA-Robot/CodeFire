@@ -135,6 +135,20 @@ revalidation, then perform a callback-free final canonical check and immediately
 Make lookup, release, and finish single-flight; after any callback-rich fingerprint work, recheck handle identity and owner/handle
 tokens before obtaining the payload local. Test same-size nested and post-close mutation, callback reentry, stale/revoked handles,
 foreign/unknown authority, payload-before-release, final-fence ordering, and retry faults.
+When composing the signature purpose with pinned policy/verification planning, use a two-stage owner so prepare failure leaves retry
+authority with the caller. Bind both parents with coordinator tokens, pass the exact preallocated handle as the signature loader,
+and keep the authority construction guard active through signature-child close and owner-first handle release/revalidation.
+Verification config/cwd/child publication may start only after that midpoint release. Abort cleanup is active borrow, policy authority,
+then sealed authority and stops before sealed cleanup if policy cleanup fails. This remains production-unwired until a terminal
+coordinator owns verification execution, both final fences, ancestry, bootstrap, and publication ordering.
+
+Do not compose the signature and ancestry handoffs by clearing parent tokens or closing the signature composite. A valid
+existing-project terminal owner must acquire one top-level token before either child, proxy signature/verification/ancestry,
+and retain both parents through one gate-held terminal phase. Verification failure is abort-only even though subprocess effects
+may already exist. Run every reject-capable read/poll/accounting/preflight before a callback-free pair recheck and detach; neither
+`policy.revalidate` then `sealed.finish` nor the reverse is sufficient, even under the cooperative project gate. Abort cleanup is
+ancestry child/borrow, verification child, policy authority, then sealed authority with stop/retry. Without that pair API, keep
+source wiring frozen and add characterization tests only.
 
 For Python upload object-set digest, do not use Stage sealed bounds: they cover closure/core/newline, not the full request object list.
 Transfer the parser-owned exact full-request canonical scalar to a destination-first same-ledger semantic owner with no digest getter.
@@ -144,11 +158,11 @@ recovery/current/ancestry/preseal→terminal→effect. Missing projects hold boo
 terminal, then effect-start→exact rename→durable reducer with the same gate token. Terminal detaches semantic and immutable copy
 inputs; post-terminal copy never rereads ambient records. The production-unwired Python prerequisite acquires the pre-parse upper
 into a caller-owned one-shot `AccountedHTTPUploadParserScalar`, reconciles it in-place to the exact post-parse scalar, moves that
-exact token through `AccountedHTTPUploadRequestSource`, and
-returns `AccountedHTTPUploadSemantic` before explicit single-use prepare,
+exact token through `AccountedHTTPUploadRequestSource`, returns `AccountedHTTPUploadSemantic` before explicit single-use prepare,
 and keeps the digest, exact mapping, record identities, and effect-ready core-plus-newline bytes private. Its last deadline callback
-precedes callback-free full-request fingerprint/record revalidation and field-only detach. A future handler wire must move the real parser release
-slot into this token chain exactly once and consume the read-only mapping proxy/copy tuple without adding a digest/copy getter.
+precedes callback-free full-request fingerprint/record revalidation and field-only detach. A future handler wire must move the real
+parser release slot into this token chain exactly once and consume the read-only mapping proxy/copy tuple without adding a
+digest/copy getter.
 
 ## Recipe: Synchronize Documentation
 
