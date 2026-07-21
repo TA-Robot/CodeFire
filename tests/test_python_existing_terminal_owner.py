@@ -283,6 +283,38 @@ class PythonExistingTerminalOwnerTests(unittest.TestCase):
         self.assertTrue(authority._closed)
         self.assert_zero(ledger)
 
+    def test_noop_helper_and_subclass_override_cannot_skip_pair_bind(self):
+        self.policy()
+        ledger = self.ledger("no-op parent bind")
+        deadline = SelectiveDeadline()
+        sealed = self.prepare_sealed(ledger, deadline)
+        authority = self.Authority(self.project, ledger, deadline)
+        original_bind = self.Owner._bind_parent_tokens
+        self.Owner._bind_parent_tokens = staticmethod(
+            lambda _sealed, _policy, _owner: None
+        )
+        try:
+            with self.assertRaisesRegex(
+                self.namespace["CFError"], "did not bind both parents"
+            ):
+                self.Owner(sealed, authority, ledger)
+        finally:
+            self.Owner._bind_parent_tokens = staticmethod(original_bind)
+        self.assertIsNone(ledger._upload_terminal_owner)
+        self.assertIsNone(sealed._upload_terminal_owner)
+        self.assertIsNone(authority._upload_terminal_owner)
+
+        class NoopSubclass(self.Owner):
+            @staticmethod
+            def _bind_parent_tokens(_sealed, _policy, _owner):
+                raise AssertionError("subclass override was called")
+
+        owner = NoopSubclass(sealed, authority, ledger)
+        self.assertIs(sealed._upload_terminal_owner, owner)
+        self.assertIs(authority._upload_terminal_owner, owner)
+        owner.close(ledger)
+        self.assert_zero(ledger)
+
     def test_parent_mirror_setters_are_never_called(self):
         self.policy()
         ledger = self.ledger("callback-free parent mirrors")

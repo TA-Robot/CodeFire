@@ -19651,9 +19651,22 @@ class AccountedHTTPUploadExistingTerminalOwner:
             # One callback-free request registry assignment blocks stale
             # aliases of both parents before either diagnostic mirror bind.
             object.__setattr__(ledger, "_upload_terminal_owner", self)
-            type(self)._bind_parent_tokens(
+            AccountedHTTPUploadExistingTerminalOwner._bind_parent_tokens(
                 sealed_owner, policy_authority, self
             )
+            if (
+                object.__getattribute__(
+                    sealed_owner, "_upload_terminal_owner"
+                )
+                is not self
+                or object.__getattribute__(
+                    policy_authority, "_upload_terminal_owner"
+                )
+                is not self
+            ):
+                raise CFError(
+                    "existing upload terminal did not bind both parents"
+                )
         except BaseException as exc:
             _detach_exception_chain(exc)
             bind_failure = exc
