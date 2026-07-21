@@ -575,4 +575,3 @@ class PythonAncestryOwnerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

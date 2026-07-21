@@ -48,4 +48,3 @@ historical conflict array as permanently blocking is safe but leaves no supporte
   Rust resolution writer is not backported implicitly.
 - Concurrent non-CodeFire edits during a local mutation remain outside repository-lock serialization;
   continue rechecks the pinned worktree identity and commit still recomputes verification before publish.
-
