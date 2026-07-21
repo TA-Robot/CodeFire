@@ -319,7 +319,7 @@ Scalar cleanup is LIFO, signature-time finish would close future ancestry, missi
 and ambient server-verification policy rereads can select a command outside the pinned authority. The required boundary is an
 upload terminal coordinator: own the verification plan from pinned policy, prove typed bootstrap transitions, keep consumers
 through gate/recovery/ancestry/preflight, preconsume fallible callbacks/read charges, then callback-free detach both authorities
-immediately before an effect consuming immutable staged/publication bytes. No partial coordinator is claimed.
+immediately before an effect consuming immutable staged/publication bytes. No complete terminal pair is claimed.
 The signature composite closes only the retained-borrow-to-verification-plan prerequisite and is not that terminal coordinator.
 The existing-project consumer characterization runs pinned signature verification and, through a test-only unified token, full
 BFS ancestry under `remote_project_gate`. Production cannot make that transition: the signature composite retains both parent
@@ -329,6 +329,14 @@ does not suppress same-thread callbacks: policy-first permits a sealed callback 
 callback to replace a staged object, and live policy scalars make sealed-first cleanup indeterminate. The current publication helper
 also accepts ambient records created after sealed final. These six tests characterize the missing top-level token, callback-free
 pair detach, abort transition, and immutable publication capability; they are not a coordinator implementation.
+
+The production-unwired `AccountedHTTPUploadExistingTerminalOwner` now resolves only that consumer-lifetime token dead end for an
+already-existing project. A request-scoped ledger registry blocks both exact parents before their diagnostic mirror slots are bound.
+It returns no child: exact signature borrow, pinned server-verification run/close, and exact full-BFS ancestry borrow are proxied in
+one owner. External-effect failure is abort-only, callback close becomes outer-frame typed cancellation, and cleanup stops/retries
+child-before-borrow and policy-before-sealed. It has no missing-project bootstrap, policy/sealed pair recheck or detach, semantic
+connection, immutable publication input, effect, or handler surface. The characterization tests therefore remain evidence for the
+missing terminal pair/publication boundary rather than a claim that the complete coordinator exists.
 
 ## Store and Identity Flow
 

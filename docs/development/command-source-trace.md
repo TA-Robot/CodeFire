@@ -105,7 +105,12 @@ signature/digest/ancestry ordering、最終publicationの完全なallocation/dea
 Existing-project terminal characterizationは、signature compositeからancestry handoffへparent tokenを移管できず、project gateを
 保持してもpolicy-first/sealed-firstの両final orderにcallback mutation窓が残ることを固定する。verification subprocess failureは
 external effectを残し得るがfixtureではancestry/publicationへ進まない。sealed final後にambient recordsを読むpublication helperも
-detached immutable inputではない。terminal coordinatorやhandler call siteは追加していない。
+detached immutable inputではない。完全なterminal pairやhandler call siteは追加していない。
+
+production-unwired `AccountedHTTPUploadExistingTerminalOwner`はexisting-projectのconsumer lifetimeだけを単一ledger tokenへ閉じる。
+exact signature handle→pinned verification run/close→exact ancestry handle→full BFSをproxyし、failureはabort-only、callback closeは
+outer-frame typed cancellation、abortはchild/borrow→policy→sealedでstop/retryする。missing bootstrap、policy/sealed pair final、
+semantic detach、immutable publication input、effect、handler call siteは追加していない。
 
 Sealed ownerのproduction-unwired signature/ancestry handleは、retained validated commitだけをloaderなしで借用する。raw mutable
 aliasはdestination-first canonical fingerprintでhandle close時とfinal fence時に検査する。disk callback完了後の最終checkはcallback

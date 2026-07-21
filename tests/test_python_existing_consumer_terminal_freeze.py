@@ -129,7 +129,7 @@ class PythonExistingConsumerTerminalFreezeTests(unittest.TestCase):
             borrow = sealed.borrow_commits(
                 ledger,
                 "ancestry",
-                _signature_composite_owner=composite,
+                _upload_terminal_owner=composite,
             )
             ancestry = self.Ancestry(ledger, borrow, deadline)
             try:
@@ -144,8 +144,9 @@ class PythonExistingConsumerTerminalFreezeTests(unittest.TestCase):
     def detach_test_token(composite, sealed, authority):
         # Characterization-only stand-in for the missing successful transfer
         # API. Production code must not clear coordinator tokens this way.
-        object.__setattr__(sealed, "_signature_composite_owner", None)
-        object.__setattr__(authority, "_signature_composite_owner", None)
+        object.__setattr__(sealed, "_upload_terminal_owner", None)
+        object.__setattr__(authority, "_upload_terminal_owner", None)
+        object.__setattr__(composite._ledger, "_upload_terminal_owner", None)
         object.__setattr__(composite, "_sealed_owner", None)
         object.__setattr__(composite, "_policy_authority", None)
         object.__setattr__(composite, "_closed", True)
@@ -167,7 +168,7 @@ class PythonExistingConsumerTerminalFreezeTests(unittest.TestCase):
             sealed, ledger, deadline
         )
         with self.assertRaisesRegex(
-            self.namespace["CFError"], "composite owns sealed authority"
+            self.namespace["CFError"], "upload terminal composite owns sealed authority"
         ):
             handoff.prepare(ledger)
         self.assertFalse(sealed._borrow_handles["ancestry"]._used)

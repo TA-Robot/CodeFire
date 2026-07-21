@@ -148,7 +148,14 @@ and retain both parents through one gate-held terminal phase. Verification failu
 may already exist. Run every reject-capable read/poll/accounting/preflight before a callback-free pair recheck and detach; neither
 `policy.revalidate` then `sealed.finish` nor the reverse is sufficient, even under the cooperative project gate. Abort cleanup is
 ancestry child/borrow, verification child, policy authority, then sealed authority with stop/retry. Without that pair API, keep
-source wiring frozen and add characterization tests only.
+production wiring frozen and add only characterization or a production-unwired prerequisite.
+
+The production-unwired existing-project prerequisite may close only the consumer-lifetime part with
+`AccountedHTTPUploadExistingTerminalOwner`: claim the shared ledger registry before either mirrored parent token, return no child,
+and stop before verification spawn if callback close was already requested. Every later failure is abort-only. Close ancestry child
+before its borrow, verification/partial signature children before the residual signature borrow, and policy before sealed; preserve
+the exact field and stop on the first cleanup fault. This owner is not the terminal pair and has no final recheck/detach, semantic
+input, bootstrap, effect, publication, or handler method.
 
 For Python upload object-set digest, do not use Stage sealed bounds: they cover closure/core/newline, not the full request object list.
 Transfer the parser-owned exact full-request canonical scalar to a destination-first same-ledger semantic owner with no digest getter.

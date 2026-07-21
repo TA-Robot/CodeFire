@@ -169,7 +169,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
         self.assertTrue(handle._used)
         self.assertEqual(handle._token, 0)
         self.assertEqual(sealed._active_borrow_token, 0)
-        self.assertFalse(sealed._signature_composite_active)
+        self.assertFalse(sealed._upload_terminal_active)
         self.complete_success(ledger, composite, verification)
 
     def test_ledger_deadline_head_and_validation_must_match_before_use(self):
@@ -251,47 +251,43 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
         self.assertEqual(release_callbacks, [True])
         self.complete_success(ledger, composite, verification)
 
-    def test_constructor_token_bind_faults_rollback_both_parents(self):
+    def test_constructor_parent_mirrors_are_callback_free(self):
         head = self.signed_head()
         self.write_policy()
         authority_type = self.Authority
+        sealed_type = self.namespace["AccountedHTTPUploadSealedValidation"]
+        original_sealed_setattr = sealed_type.__setattr__
         original_setattr = authority_type.__setattr__
+        ledger = self.ledger("composite callback-free token bind")
+        sealed = self.prepare_sealed(ledger, head)
+        authority = self.Authority(self.project, ledger)
+        calls = []
 
-        for after_effect in (False, True):
-            with self.subTest(after_effect=after_effect):
-                ledger = self.ledger(
-                    f"composite token bind {'post' if after_effect else 'pre'}"
-                )
-                sealed = self.prepare_sealed(ledger, head)
-                authority = self.Authority(self.project, ledger)
+        def observe_sealed(owner, name, value):
+            if owner is sealed and name == "_upload_terminal_owner":
+                calls.append("sealed")
+                raise KeyboardInterrupt("replaceable sealed mirror")
+            return original_sealed_setattr(owner, name, value)
 
-                def fail_policy_bind(owner, name, value):
-                    if (
-                        owner is authority
-                        and name == "_signature_composite_owner"
-                        and value is not None
-                    ):
-                        if after_effect:
-                            original_setattr(owner, name, value)
-                        raise KeyboardInterrupt("synthetic token bind failure")
-                    return original_setattr(owner, name, value)
+        def observe_policy(owner, name, value):
+            if owner is authority and name == "_upload_terminal_owner":
+                calls.append("policy")
+                raise KeyboardInterrupt("replaceable policy mirror")
+            return original_setattr(owner, name, value)
 
-                authority_type.__setattr__ = fail_policy_bind
-                try:
-                    with self.assertRaisesRegex(
-                        KeyboardInterrupt, "token bind failure"
-                    ):
-                        self.Composite(sealed, authority, ledger)
-                finally:
-                    authority_type.__setattr__ = original_setattr
-                self.assertIsNone(sealed._signature_composite_owner)
-                self.assertIsNone(authority._signature_composite_owner)
-                gc.collect()
-                self.assertFalse(sealed._closed)
-                self.assertFalse(authority._closed)
-                authority.close(ledger)
-                sealed.close(ledger)
-                self.assert_closed(ledger)
+        sealed_type.__setattr__ = observe_sealed
+        authority_type.__setattr__ = observe_policy
+        try:
+            composite = self.Composite(sealed, authority, ledger)
+        finally:
+            sealed_type.__setattr__ = original_sealed_setattr
+            authority_type.__setattr__ = original_setattr
+        self.assertEqual(calls, [])
+        self.assertIs(sealed._upload_terminal_owner, composite)
+        self.assertIs(authority._upload_terminal_owner, composite)
+        composite.close(ledger)
+        gc.collect()
+        self.assert_closed(ledger)
 
     def test_parent_coordinator_tokens_reject_stale_aliases(self):
         head = self.signed_head()
@@ -314,7 +310,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
         )
         for operation in operations:
             with self.assertRaisesRegex(
-                self.namespace["CFError"], "composite owns"
+                self.namespace["CFError"], "upload terminal composite owns"
             ):
                 operation()
         self.assertFalse(sealed._borrow_handles["signature"]._used)
@@ -387,7 +383,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
                 def fail_sealed_guard(owner, name, value):
                     if (
                         owner is sealed
-                        and name == "_signature_composite_active"
+                        and name == "_upload_terminal_active"
                         and value is True
                     ):
                         if after_effect:
@@ -406,7 +402,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
                 finally:
                     sealed_type.__setattr__ = original_sealed_setattr
                 self.assertFalse(composite._operating)
-                self.assertFalse(sealed._signature_composite_active)
+                self.assertFalse(sealed._upload_terminal_active)
                 composite.close(ledger)
                 self.assert_closed(ledger)
 
@@ -449,7 +445,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
                     authority_type.__setattr__ = original_setattr
                 self.assertFalse(authority._verification_handoff_open)
                 self.assertFalse(authority._verification_constructing)
-                self.assertFalse(sealed._signature_composite_active)
+                self.assertFalse(sealed._upload_terminal_active)
                 self.assertFalse(composite._operating)
                 composite.close(ledger)
                 self.assert_closed(ledger)
@@ -522,7 +518,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
         self.assertEqual(cwd_calls, [])
         self.assertEqual(spawn_calls, [])
         self.assertEqual(sealed._borrow_handles["signature"]._token, 0)
-        self.assertFalse(sealed._signature_composite_active)
+        self.assertFalse(sealed._upload_terminal_active)
         composite.close(ledger)
         self.assert_closed(ledger)
 
@@ -541,7 +537,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
         self.assertIsNotNone(child)
         self.assertTrue(child._closed)
         self.assertEqual(sealed._borrow_handles["signature"]._token, 0)
-        self.assertFalse(sealed._signature_composite_active)
+        self.assertFalse(sealed._upload_terminal_active)
         composite.close(ledger)
         self.assert_closed(ledger)
 
@@ -573,7 +569,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
                     authority._closed,
                     authority._revalidated,
                     sealed._closed,
-                    sealed._signature_composite_active,
+                    sealed._upload_terminal_active,
                 )
             )
 
@@ -581,7 +577,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
         deadline.armed = True
         verification = composite.prepare("main", head, ledger)
         self.assertEqual(observations, [(False, False, False, True)])
-        self.assertFalse(sealed._signature_composite_active)
+        self.assertFalse(sealed._upload_terminal_active)
         self.complete_success(ledger, composite, verification)
 
     def test_handle_activation_failure_leaves_both_parents_closeable(self):
@@ -606,7 +602,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
             handle._activate = original_activate
         self.assertTrue(sealed._borrow_failed)
         self.assertEqual(sealed._active_borrow_token, 0)
-        self.assertFalse(sealed._signature_composite_active)
+        self.assertFalse(sealed._upload_terminal_active)
         self.assertFalse(authority._verification_constructing)
         composite.close(ledger)
         self.assert_closed(ledger)
@@ -636,7 +632,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
             handle.close = original_close
         self.assertEqual(failed, [True, True])
         self.assertNotEqual(handle._token, 0)
-        self.assertFalse(sealed._signature_composite_active)
+        self.assertFalse(sealed._upload_terminal_active)
         self.assertIsNone(authority._verification_owner)
         composite.close(ledger)
         self.assert_closed(ledger)
@@ -759,7 +755,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
         finally:
             authority._begin_verified_server_verification = original_begin
         self.assertFalse(authority._verification_constructing)
-        self.assertFalse(sealed._signature_composite_active)
+        self.assertFalse(sealed._upload_terminal_active)
         self.assertFalse(sealed._borrow_handles["signature"]._used)
         composite.close(ledger)
         self.assert_closed(ledger)
@@ -783,7 +779,7 @@ class PythonSealedSignatureCompositeTests(unittest.TestCase):
         finally:
             sealed._borrow_commit = original_borrow
         self.assertEqual(sealed._borrow_handles["signature"]._token, 0)
-        self.assertFalse(sealed._signature_composite_active)
+        self.assertFalse(sealed._upload_terminal_active)
         composite.close(ledger)
         self.assert_closed(ledger)
 
