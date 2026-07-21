@@ -159,7 +159,8 @@ last deadline callback before the critical section, probe sealed then policy usi
 destinations, and commit neither side until both probes pass. Logical-detach cleanup is policy then sealed, stop/retry, and must not
 rerun probes. Resolve every probe/commit/helper/FD function before the first prepare callback; no mutable class lookup belongs in the
 critical interval. Keep the successful resource-zero `PAIR_DETACHED` owner and its clone-free exact immutable verified branch/head
-references as the exact ledger capability until explicit close. This owner still has no stable project ID authority, semantic input,
+references as the exact ledger capability until explicit close. Capture those refs before preparation, recheck the sealed head after
+the last callback, and restore only the captured refs during field-only commit. This owner still has no stable project ID authority, semantic input,
 bootstrap, immutable effect input, effect, publication, or handler method.
 
 For Python upload object-set digest, do not use Stage sealed bounds: they cover closure/core/newline, not the full request object list.

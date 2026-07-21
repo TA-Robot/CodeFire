@@ -20724,6 +20724,8 @@ class AccountedHTTPUploadExistingTerminalOwner:
             raise CFError("existing upload terminal has no parent authority")
         failure: BaseException | None = None
         detached = False
+        verified_branch = self._verified_branch
+        verified_head = self._verified_head
         # Resolve every replaceable class attribute before the first
         # cooperative callback. The critical probe/commit interval invokes
         # only these exact function objects and captured OS primitives.
@@ -20764,9 +20766,9 @@ class AccountedHTTPUploadExistingTerminalOwner:
             object.__setattr__(self, "_operating", True)
             object.__setattr__(sealed_owner, "_upload_terminal_active", True)
             if (
-                self._verified_branch is None
-                or self._verified_head is None
-                or sealed_owner._head != self._verified_head
+                verified_branch is None
+                or verified_head is None
+                or sealed_owner._head != verified_head
             ):
                 raise CFError("existing upload terminal pair subject changed")
             policy_prepare(policy_authority, self)
@@ -20777,6 +20779,8 @@ class AccountedHTTPUploadExistingTerminalOwner:
                 raise CFError(
                     "existing upload terminal pair was cancelled before probe"
                 )
+            if sealed_owner._head != verified_head:
+                raise CFError("existing upload terminal pair subject changed")
 
             object.__setattr__(self, "_state", self.PAIR_DETACHING)
             # This exact order is the legacy diagnostic contract.  Neither
@@ -20807,6 +20811,10 @@ class AccountedHTTPUploadExistingTerminalOwner:
                 raise CFError(
                     "existing upload terminal pair was cancelled during probe"
                 )
+            # Restore the exact pre-callback immutable subject references as
+            # part of the field-only logical commit. No callback follows.
+            object.__setattr__(self, "_verified_branch", verified_branch)
+            object.__setattr__(self, "_verified_head", verified_head)
             sealed_commit(sealed_owner, self)
             policy_commit(policy_authority, self)
             object.__setattr__(self, "_state", self.PAIR_DETACHED)
@@ -20830,6 +20838,8 @@ class AccountedHTTPUploadExistingTerminalOwner:
             safe_policy_metadata = None
             fd_open = None
             fd_close = None
+            verified_branch = None
+            verified_head = None
         sealed_owner = None
         policy_authority = None
         if not detached:

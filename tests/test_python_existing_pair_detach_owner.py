@@ -252,6 +252,30 @@ class PythonExistingPairDetachTests(unittest.TestCase):
         self.assertIsNone(owner._verified_head)
         self._assert_zero(ledger)
 
+    def test_last_callback_cannot_replace_pinned_subject_refs(self):
+        ledger, deadline, sealed, _policy, owner = self._prepare(
+            "pair callback subject replacement"
+        )
+        original_branch = owner._verified_branch
+        original_head = owner._verified_head
+        fake_head = f"{self.initial}-fake"
+
+        def replace_subject(_phase):
+            owner._verified_branch = "other"
+            owner._verified_head = fake_head
+            sealed._head = fake_head
+
+        deadline.callback = replace_subject
+        deadline.match = "upload terminal pair probe"
+        with self.assertRaisesRegex(self.ns["CFError"], "pair subject changed"):
+            owner.finalize_pair(ledger)
+        self.assertNotEqual(original_branch, "other")
+        self.assertNotEqual(original_head, fake_head)
+        self.assertEqual(owner._state, owner.ABORT_ONLY)
+        self.assertIsNone(owner._verified_branch)
+        self.assertIsNone(owner._verified_head)
+        self._assert_zero(ledger)
+
     def test_last_callback_mutating_both_sides_reports_sealed_first(self):
         ledger, deadline, sealed, policy, owner = self._prepare(
             "pair diagnostic order"

@@ -340,7 +340,8 @@ callback-rich policy then sealed preparation, performs one last deadline callbac
 primitives and preowned/accounted buffers and FD slots, and only after both probes pass performs field-only logical commits.
 Cleanup remains policy-before-sealed and is stop/retry without rerunning either probe. Success retains only a live, resource-zero
 `PAIR_DETACHED` exact ledger capability plus private references to the exact immutable verified branch/head; explicit close discards
-them. These are prepublished fixed control slots and clone no subject strings. It still has no stable project-identity authority,
+them. The exact refs are captured before preparation, the sealed head is rechecked after the last callback, and the captured refs are
+restored in the field-only commit. These are prepublished fixed control slots and clone no subject strings. It still has no stable project-identity authority,
 missing-project bootstrap, semantic connection, immutable publication input, effect, publication, or handler surface. The characterization tests therefore remain evidence for the
 missing publication boundary rather than a claim that the complete coordinator exists.
 
