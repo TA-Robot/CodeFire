@@ -107,10 +107,12 @@ Existing-project terminal characterizationは、signature compositeからancestr
 external effectを残し得るがfixtureではancestry/publicationへ進まない。sealed final後にambient recordsを読むpublication helperも
 detached immutable inputではない。完全なterminal pairやhandler call siteは追加していない。
 
-production-unwired `AccountedHTTPUploadExistingTerminalOwner`はexisting-projectのconsumer lifetimeだけを単一ledger tokenへ閉じる。
+production-unwired `AccountedHTTPUploadExistingTerminalOwner`はexisting-projectのconsumer lifetimeとpair detach prerequisiteを単一ledger tokenへ閉じる。
 exact signature handle→pinned verification run/close→exact ancestry handle→full BFSをproxyし、failureはabort-only、callback closeは
-outer-frame typed cancellation、abortはchild/borrow→policy→sealedでstop/retryする。missing bootstrap、policy/sealed pair final、
-semantic detach、immutable publication input、effect、handler call siteは追加していない。
+outer-frame typed cancellation、abortはchild/borrow→policy→sealedでstop/retryする。ancestry後はpolicy→sealedのcallback-rich prepare、
+最後のdeadline callback、sealed→policyのcaptured-primitive probe、両probe成功後だけのfield-only commitを行う。logical detach後の
+cleanupもpolicy→sealedでstop/retryしprobeを再実行しない。成功時はresource-zeroのlive `PAIR_DETACHED` ledger capabilityだけを保持し、
+explicit closeで破棄する。missing bootstrap、semantic detach、immutable publication input、effect/publication、handler call siteは追加していない。
 
 Sealed ownerのproduction-unwired signature/ancestry handleは、retained validated commitだけをloaderなしで借用する。raw mutable
 aliasはdestination-first canonical fingerprintでhandle close時とfinal fence時に検査する。disk callback完了後の最終checkはcallback

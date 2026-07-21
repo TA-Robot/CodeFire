@@ -313,13 +313,14 @@ callback close is carried through the active outer frame and returns typed cance
 retain exact caller-owned retry state. It neither clones/reopens commits nor finishes the sealed owner. Signature integration,
 handler/terminal fencing, ordered signature/digest/ancestry, publication, and complete upload deadline closure remain residuals.
 
-These sealed-borrow and signature-authority prerequisites cannot be production-wired by choosing one final-fence order.
+These sealed-borrow and signature-authority prerequisites cannot be production-wired by choosing one callback-rich final-fence order.
 Policy-first leaves policy mutable during sealed callbacks; sealed-first leaves staged objects mutable during policy callbacks.
 Scalar cleanup is LIFO, signature-time finish would close future ancestry, missing layout conflicts with the absent-policy fence,
 and ambient server-verification policy rereads can select a command outside the pinned authority. The required boundary is an
 upload terminal coordinator: own the verification plan from pinned policy, prove typed bootstrap transitions, keep consumers
 through gate/recovery/ancestry/preflight, preconsume fallible callbacks/read charges, then callback-free detach both authorities
-immediately before an effect consuming immutable staged/publication bytes. No complete terminal pair is claimed.
+immediately before an effect consuming immutable staged/publication bytes. The pair primitive described below closes only that
+existing-project prerequisite; no complete effect-capable terminal coordinator is claimed.
 The signature composite closes only the retained-borrow-to-verification-plan prerequisite and is not that terminal coordinator.
 The existing-project consumer characterization runs pinned signature verification and, through a test-only unified token, full
 BFS ancestry under `remote_project_gate`. Production cannot make that transition: the signature composite retains both parent
@@ -330,13 +331,17 @@ callback to replace a staged object, and live policy scalars make sealed-first c
 also accepts ambient records created after sealed final. These six tests characterize the missing top-level token, callback-free
 pair detach, abort transition, and immutable publication capability; they are not a coordinator implementation.
 
-The production-unwired `AccountedHTTPUploadExistingTerminalOwner` now resolves only that consumer-lifetime token dead end for an
+The production-unwired `AccountedHTTPUploadExistingTerminalOwner` resolves that consumer-lifetime token dead end for an
 already-existing project. A request-scoped ledger registry blocks both exact parents before their diagnostic mirror slots are bound.
 It returns no child: exact signature borrow, pinned server-verification run/close, and exact full-BFS ancestry borrow are proxied in
 one owner. External-effect failure is abort-only, callback close becomes outer-frame typed cancellation, and cleanup stops/retries
-child-before-borrow and policy-before-sealed. It has no missing-project bootstrap, policy/sealed pair recheck or detach, semantic
-connection, immutable publication input, effect, or handler surface. The characterization tests therefore remain evidence for the
-missing terminal pair/publication boundary rather than a claim that the complete coordinator exists.
+child-before-borrow and policy-before-sealed. After ancestry, its private production-unwired pair operation runs all remaining
+callback-rich policy then sealed preparation, performs one last deadline callback, probes sealed then policy with captured OS
+primitives and preowned/accounted buffers and FD slots, and only after both probes pass performs field-only logical commits.
+Cleanup remains policy-before-sealed and is stop/retry without rerunning either probe. Success retains only a live, resource-zero
+`PAIR_DETACHED` exact ledger capability; explicit close discards it. It still has no missing-project bootstrap, semantic connection,
+immutable publication input, effect, publication, or handler surface. The characterization tests therefore remain evidence for the
+missing publication boundary rather than a claim that the complete coordinator exists.
 
 ## Store and Identity Flow
 

@@ -150,12 +150,15 @@ may already exist. Run every reject-capable read/poll/accounting/preflight befor
 ancestry child/borrow, verification child, policy authority, then sealed authority with stop/retry. Without that pair API, keep
 production wiring frozen and add only characterization or a production-unwired prerequisite.
 
-The production-unwired existing-project prerequisite may close only the consumer-lifetime part with
+The production-unwired existing-project prerequisite closes consumer lifetime and the pair-detach primitive with
 `AccountedHTTPUploadExistingTerminalOwner`: claim the shared ledger registry before either mirrored parent token, return no child,
 and stop before verification spawn if callback close was already requested. Every later failure is abort-only. Close ancestry child
 before its borrow, verification/partial signature children before the residual signature borrow, and policy before sealed; preserve
-the exact field and stop on the first cleanup fault. This owner is not the terminal pair and has no final recheck/detach, semantic
-input, bootstrap, effect, publication, or handler method.
+the exact field and stop on the first cleanup fault. After ancestry, perform callback-rich preparation policy then sealed, place the
+last deadline callback before the critical section, probe sealed then policy using only captured primitives and preowned/accounted
+destinations, and commit neither side until both probes pass. Logical-detach cleanup is policy then sealed, stop/retry, and must not
+rerun probes. Keep the successful resource-zero `PAIR_DETACHED` owner as the exact ledger capability until explicit close. This owner
+still has no semantic input, bootstrap, immutable effect input, effect, publication, or handler method.
 
 For Python upload object-set digest, do not use Stage sealed bounds: they cover closure/core/newline, not the full request object list.
 Transfer the parser-owned exact full-request canonical scalar to a destination-first same-ledger semantic owner with no digest getter.
