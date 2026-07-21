@@ -15652,6 +15652,8 @@ class AccountedRemoteObjectSetDigest:
         ledger: DecisionWorkLedger,
         source_canonical_upper: int,
         deadline: HTTPRequestDeadline | None = None,
+        *,
+        _handoff_owner: Any | None = None,
     ) -> None:
         if (
             isinstance(source_canonical_upper, bool)
@@ -15673,6 +15675,13 @@ class AccountedRemoteObjectSetDigest:
         self._temporary_bytes = 0
         self._work_permit: DecisionWorkPermit | None = None
         self._closed = False
+        if _handoff_owner is not None:
+            if object.__getattribute__(_handoff_owner, "_digest_owner") is not None:
+                raise CFError("remote object-set digest handoff slot is occupied")
+            # Publish the exact child before its first reservation.  A
+            # constructor/cleanup failure therefore remains caller-owned by
+            # the already-returned semantic destination.
+            object.__setattr__(_handoff_owner, "_digest_owner", self)
         initialized = False
         failure: BaseException | None = None
         work_permit: DecisionWorkPermit | None = None
@@ -15913,15 +15922,33 @@ class AccountedRemoteObjectSetDigest:
         if permit is not None and self._ledger.permit_is_open(permit):
             self._ledger.cancel_permit(permit)
         self._work_permit = None
-        if self._temporary_bytes:
-            self._ledger.release(
-                "temporary_bytes", self._temporary_bytes
-            )
-            self._temporary_bytes = 0
-        if self._retained_bytes:
-            self._ledger.release("retained_bytes", self._retained_bytes)
-            self._retained_bytes = 0
+        self._release_owned_dimension("temporary_bytes", "_temporary_bytes")
+        self._release_owned_dimension("retained_bytes", "_retained_bytes")
         self._closed = True
+
+    def _release_owned_dimension(self, dimension: str, attribute: str) -> None:
+        amount = getattr(self, attribute)
+        if not amount:
+            return
+        before = self._ledger._current.get(dimension, 0)
+        expected_after = before - amount
+        failure: BaseException | None = None
+        try:
+            self._ledger.release(dimension, amount)
+        except BaseException as error:
+            failure = error
+        after = self._ledger._current.get(dimension, 0)
+        committed = after == expected_after
+        if committed:
+            setattr(self, attribute, 0)
+        if failure is not None:
+            if not committed:
+                raise failure
+            self._detach_failure_chain(failure)
+        elif not committed:
+            raise CFError(
+                f"remote object-set digest {dimension} release did not commit"
+            )
 
     def __del__(self) -> None:
         try:
@@ -15939,6 +15966,731 @@ def prepare_remote_object_set_digest(
     """Prepare a non-escaping digest owner from an already-owned source upper."""
     return AccountedRemoteObjectSetDigest(
         records, ledger, source_canonical_upper, deadline
+    )
+
+
+class AccountedHTTPUploadParserScalar:
+    """Own one parser Retained scalar before request-source adoption."""
+
+    def __init__(
+        self, ledger: DecisionWorkLedger, parser_canonical_bytes: int
+    ) -> None:
+        if (
+            isinstance(parser_canonical_bytes, bool)
+            or not isinstance(parser_canonical_bytes, int)
+            or parser_canonical_bytes < 0
+        ):
+            raise CFError(
+                "HTTP upload parser scalar must be a non-negative integer"
+            )
+        self._ledger = ledger
+        self._ledger_identity = id(ledger)
+        self._parser_canonical_bytes = parser_canonical_bytes
+        self._allocation = _StablePermitTransition(ledger)
+        self._source: AccountedHTTPUploadRequestSource | None = None
+        self._acquiring = False
+        self._acquired = False
+        self._acquire_used = False
+        self._closing = False
+        self._close_requested = False
+        self._closed = False
+
+    def _ensure_ledger(self, ledger: DecisionWorkLedger) -> None:
+        if (
+            id(ledger) != self._ledger_identity
+            or id(self._ledger) != self._ledger_identity
+        ):
+            raise CFError("HTTP upload parser scalar belongs to a different ledger")
+
+    def acquire(self, ledger: DecisionWorkLedger) -> None:
+        """Acquire the exact scalar after the caller owns this token."""
+        self._ensure_ledger(ledger)
+        if self._closed:
+            raise CFError("HTTP upload parser scalar is closed")
+        if self._acquiring:
+            raise CFError("HTTP upload parser scalar acquisition is already active")
+        if self._acquire_used:
+            raise CFError("HTTP upload parser scalar acquisition is single-use")
+        self._acquire_used = True
+        self._acquiring = True
+        failure: BaseException | None = None
+        amount = self._parser_canonical_bytes
+        try:
+            self._allocation.__init__(ledger, retained_primary=amount)
+            self._allocation.reserve(
+                "request_body", acquires={"retained_bytes": amount}
+            )
+            self._allocation.consume(
+                phase="request_body", acquires={"retained_bytes": amount}
+            )
+            self._allocation.cancel()
+            self._acquired = True
+        except BaseException as error:
+            AccountedRemoteObjectSetDigest._detach_failure_chain(error)
+            failure = error
+        self._acquiring = False
+        close_requested = self._close_requested
+        cleanup_failure: BaseException | None = None
+        if close_requested:
+            try:
+                self.close(ledger)
+            except BaseException as error:
+                AccountedRemoteObjectSetDigest._detach_failure_chain(error)
+                cleanup_failure = error
+        if cleanup_failure is not None:
+            if failure is not None:
+                raise cleanup_failure from failure
+            raise cleanup_failure from None
+        if failure is not None:
+            raise failure from None
+        if close_requested:
+            raise CFError("HTTP upload parser scalar acquisition was cancelled by close")
+
+    def _ensure_acquired(self, ledger: DecisionWorkLedger) -> None:
+        self._ensure_ledger(ledger)
+        if self._closed or not self._acquired:
+            raise CFError("HTTP upload parser scalar is not acquired")
+
+    def _close_from_source(
+        self, source: "AccountedHTTPUploadRequestSource"
+    ) -> None:
+        if self._source is not source:
+            raise CFError("HTTP upload parser scalar has a foreign source")
+        self._close(source)
+
+    def _close(
+        self, source: "AccountedHTTPUploadRequestSource" | None
+    ) -> None:
+        if self._closed:
+            return
+        if self._source is not source:
+            if self._source is not None:
+                raise CFError("HTTP upload parser scalar was adopted")
+            raise CFError("HTTP upload parser scalar has a foreign source")
+        if self._acquiring:
+            self._close_requested = True
+            return
+        if self._closing:
+            return
+        self._closing = True
+        completed = False
+        try:
+            self._allocation.release_all()
+            self._source = None
+            self._parser_canonical_bytes = 0
+            self._acquired = False
+            self._close_requested = False
+            completed = True
+        finally:
+            if completed:
+                self._closed = True
+            self._closing = False
+
+    def close(self, ledger: DecisionWorkLedger) -> None:
+        self._ensure_ledger(ledger)
+        self._close(None)
+
+    def __del__(self) -> None:
+        try:
+            if self._source is None:
+                self._close(None)
+        except BaseException:
+            pass
+
+
+def prepare_http_upload_parser_scalar(
+    ledger: DecisionWorkLedger, parser_canonical_bytes: int
+) -> AccountedHTTPUploadParserScalar:
+    """Allocate a one-shot parser scalar token before explicit acquire."""
+    return AccountedHTTPUploadParserScalar(ledger, parser_canonical_bytes)
+
+
+class AccountedHTTPUploadRequestSource:
+    """Bind one already-acquired parser AST scalar to its exact request.
+
+    This production-unwired source does not acquire memory.  The HTTP parser
+    has already acquired ``parser_canonical_bytes`` for ``request``; the
+    source merely makes that existing scalar transferable without a
+    release/reacquire gap.  Only ``AccountedHTTPUploadSemantic`` may adopt it.
+    """
+
+    def __init__(
+        self,
+        request: dict[str, Any],
+        ledger: DecisionWorkLedger,
+        scalar: AccountedHTTPUploadParserScalar,
+    ) -> None:
+        if type(request) is not dict:
+            raise CFError("HTTP upload request source requires a parser mapping")
+        records = dict.get(request, "objects")
+        if type(records) is not list:
+            raise CFError("HTTP upload request source requires the exact objects list")
+        if not isinstance(scalar, AccountedHTTPUploadParserScalar):
+            raise CFError("HTTP upload request source requires a parser scalar token")
+        scalar._ensure_acquired(ledger)
+        if scalar._source is not None:
+            raise CFError("HTTP upload parser scalar is already adopted")
+        self._ledger = ledger
+        self._ledger_identity = id(ledger)
+        self._request: dict[str, Any] | None = request
+        self._records: list[dict[str, Any]] | None = records
+        self._scalar: AccountedHTTPUploadParserScalar | None = scalar
+        self._parser_canonical_bytes = scalar._parser_canonical_bytes
+        self._destination: AccountedHTTPUploadSemantic | None = None
+        self._closing = False
+        self._closed = False
+        # Destination-first at the source boundary as well: the exact token
+        # is reachable from this source before its public alias is marked.
+        scalar._source = self
+
+    def _ensure_ledger(self, ledger: DecisionWorkLedger) -> None:
+        if (
+            id(ledger) != self._ledger_identity
+            or id(self._ledger) != self._ledger_identity
+        ):
+            raise CFError("HTTP upload request source belongs to a different ledger")
+
+    def _ensure_open(self, ledger: DecisionWorkLedger) -> None:
+        self._ensure_ledger(ledger)
+        if self._closed or self._request is None or self._records is None:
+            raise CFError("HTTP upload request source is closed")
+
+    def _close_from_destination(
+        self, destination: "AccountedHTTPUploadSemantic"
+    ) -> None:
+        if self._destination is not destination:
+            raise CFError("HTTP upload request source has a foreign destination")
+        self._close(destination)
+
+    def _close(
+        self, destination: "AccountedHTTPUploadSemantic" | None
+    ) -> None:
+        if self._closed:
+            return
+        if self._destination is not destination:
+            if self._destination is not None:
+                raise CFError("HTTP upload request source was adopted")
+            raise CFError("HTTP upload request source has a foreign destination")
+        if self._closing:
+            return
+        self._closing = True
+        completed = False
+        try:
+            # The complete parser AST and exact objects list die before their
+            # scalar. A pre-effect release failure retains only the scalar for
+            # the same destination-owned retry.
+            self._request = None
+            self._records = None
+            scalar = self._scalar
+            if scalar is not None:
+                scalar._close_from_source(self)
+                self._scalar = None
+            self._parser_canonical_bytes = 0
+            self._destination = None
+            completed = True
+        finally:
+            if completed:
+                self._closed = True
+            self._closing = False
+
+    def close(self, ledger: DecisionWorkLedger) -> None:
+        self._ensure_ledger(ledger)
+        self._close(None)
+
+    def __del__(self) -> None:
+        try:
+            if self._destination is None:
+                self._close(None)
+        except BaseException:
+            pass
+
+
+def bind_http_upload_request_source(
+    request: dict[str, Any],
+    ledger: DecisionWorkLedger,
+    scalar: AccountedHTTPUploadParserScalar,
+) -> AccountedHTTPUploadRequestSource:
+    """Move one exact acquired parser token into its request source."""
+    return AccountedHTTPUploadRequestSource(request, ledger, scalar)
+
+
+class AccountedHTTPUploadSemantic:
+    """Own one unwired upload semantic and immutable object-copy input.
+
+    The caller receives this destination before explicit ``prepare`` performs
+    digest/copy work.  The digest and future effect inputs remain private;
+    this type deliberately has no digest or payload getter.
+    """
+
+    SEMANTIC_RETAINED_BYTES = 8192
+    REFERENCE_TUPLE_BASE_BYTES = sys.getsizeof(())
+    REFERENCE_SLOT_BYTES = 16
+    COPY_LIST_BASE_BYTES = sys.getsizeof([])
+    COPY_LIST_SLOT_BYTES = 16
+    COPY_BYTES_BASE_BYTES = sys.getsizeof(b"")
+    COPY_TEMPORARY_BASE_BYTES = 4096
+    COPY_TEMPORARY_BYTES_PER_SOURCE_BYTE = 2
+    COPY_WORK_PASSES = 3
+
+    def __init__(
+        self,
+        source: AccountedHTTPUploadRequestSource,
+        ledger: DecisionWorkLedger,
+        stable_project_id: str,
+        remote_branch: str,
+        deadline: HTTPRequestDeadline | None,
+    ) -> None:
+        self._ledger = ledger
+        self._ledger_identity = id(ledger)
+        self._deadline = deadline
+        self._source: AccountedHTTPUploadRequestSource | None = None
+        self._digest_owner: AccountedRemoteObjectSetDigest | None = None
+        self._allocation = _StablePermitTransition(ledger)
+        self._record_refs: tuple[dict[str, Any], ...] | None = None
+        self._sorted_refs: tuple[dict[str, Any], ...] | None = None
+        self._copy_build: list[bytes] | None = None
+        self._copy_bytes: tuple[bytes, ...] | None = None
+        self._semantic: dict[str, Any] | None = None
+        self._semantic_view: MappingProxyType | None = None
+        self._effect_copy_bytes: tuple[bytes, ...] | None = None
+        self._effect_semantic: MappingProxyType | None = None
+        self._stable_project_id = stable_project_id
+        self._remote_branch = remote_branch
+        self._preparing = False
+        self._prepared = False
+        self._prepare_used = False
+        self._terminal_active = False
+        self._terminal_started = False
+        self._terminal_revalidated = False
+        self._terminal_failed = False
+        self._terminal_complete = False
+        self._closing = False
+        self._close_requested = False
+        self._closed = False
+
+        if not isinstance(source, AccountedHTTPUploadRequestSource):
+            raise CFError("HTTP upload semantic requires a request source")
+        source._ensure_open(ledger)
+        if source._destination is not None:
+            raise CFError("HTTP upload request source is already adopted")
+        if type(stable_project_id) is not str or not stable_project_id:
+            raise CFError("HTTP upload semantic requires a stable project ID")
+        if type(remote_branch) is not str or not remote_branch:
+            raise CFError("HTTP upload semantic requires a remote branch")
+        request = source._request
+        if request is None:
+            raise CFError("HTTP upload request source is unavailable")
+        local_branch = dict.get(request, "branch")
+        head = dict.get(request, "head")
+        if type(local_branch) is not str or not local_branch:
+            raise CFError("HTTP upload semantic requires a local branch")
+        if (
+            type(head) is not str
+            or not head.startswith("CF-COMMIT-")
+        ):
+            raise CFError("HTTP upload semantic requires a commit head")
+        if any(
+            len(value) > 255
+            for value in (
+                stable_project_id,
+                remote_branch,
+                local_branch,
+                head,
+            )
+        ):
+            raise CFError("HTTP upload semantic identity exceeds 255 characters")
+        # Destination-first adoption: the exact source owner is reachable
+        # from this caller-owned object before its public alias is marked as
+        # transferred. There is no scalar release/reacquire operation.
+        self._source = source
+        source._destination = self
+
+    def _ensure_ledger(self, ledger: DecisionWorkLedger) -> None:
+        if (
+            id(ledger) != self._ledger_identity
+            or id(self._ledger) != self._ledger_identity
+        ):
+            raise CFError("HTTP upload semantic belongs to a different ledger")
+
+    def _ensure_bound(self) -> None:
+        self._ensure_ledger(self._ledger)
+        if self._closed:
+            raise CFError("HTTP upload semantic owner is closed")
+
+    @staticmethod
+    def _checked_product(value: int, multiplier: int, label: str) -> int:
+        if value > U64_MAX // multiplier:
+            raise CFError(f"HTTP upload semantic {label} exceeds the u64 domain")
+        return value * multiplier
+
+    def _allocation_upper(
+        self, source_bytes: int, record_count: int
+    ) -> tuple[int, int, int]:
+        reference_slots = self._checked_product(
+            record_count, self.REFERENCE_SLOT_BYTES * 2, "reference storage"
+        )
+        copy_slots = self._checked_product(
+            record_count,
+            self.COPY_LIST_SLOT_BYTES + self.COPY_BYTES_BASE_BYTES,
+            "copy storage",
+        )
+        retained = (
+            self.SEMANTIC_RETAINED_BYTES
+            + 2 * self.REFERENCE_TUPLE_BASE_BYTES
+            + self.COPY_LIST_BASE_BYTES
+            + reference_slots
+            + copy_slots
+            + source_bytes
+        )
+        temporary = (
+            self.COPY_TEMPORARY_BASE_BYTES
+            + self._checked_product(
+                source_bytes,
+                self.COPY_TEMPORARY_BYTES_PER_SOURCE_BYTE,
+                "copy overlap",
+            )
+        )
+        work = self._checked_product(
+            source_bytes, self.COPY_WORK_PASSES, "copy work"
+        )
+        if retained > U64_MAX or temporary > U64_MAX:
+            raise CFError("HTTP upload semantic allocation exceeds the u64 domain")
+        return retained, temporary, work
+
+    def _poll(self) -> None:
+        if self._deadline is not None:
+            self._deadline.check("upload semantic preparation")
+
+    def _validate_source_exact(self, *, polling: bool) -> None:
+        source = self._source
+        if source is None:
+            raise CFError("HTTP upload semantic request source is unavailable")
+        source._ensure_open(self._ledger)
+        request = source._request
+        records = source._records
+        if request is None or records is None or dict.get(request, "objects") is not records:
+            raise CFError("HTTP upload semantic request source changed")
+        limit = source._parser_canonical_bytes
+        actual = canonical_json_size_up_to(
+            request,
+            limit,
+            self._poll if polling else None,
+        )
+        if actual != limit:
+            raise CFError("HTTP upload parser scalar does not match its full request")
+
+    def prepare(self, ledger: DecisionWorkLedger) -> None:
+        """Prepare private semantic/copy inputs after caller ownership exists."""
+        self._ensure_ledger(ledger)
+        self._ensure_bound()
+        if self._preparing:
+            raise CFError("HTTP upload semantic prepare is already active")
+        if self._prepare_used:
+            raise CFError("HTTP upload semantic prepare is single-use")
+        source = self._source
+        if source is None:
+            raise CFError("HTTP upload semantic request source is unavailable")
+        source._ensure_open(ledger)
+        records = source._records
+        request = source._request
+        if records is None or request is None:
+            raise CFError("HTTP upload semantic request source is unavailable")
+        source_bytes = source._parser_canonical_bytes
+        retained, temporary, work = self._allocation_upper(
+            source_bytes, len(records)
+        )
+        self._prepare_used = True
+        self._preparing = True
+        failure: BaseException | None = None
+        digest_owner: AccountedRemoteObjectSetDigest | None = None
+        record: dict[str, Any] | None = None
+        digest: str | None = None
+        local_branch: str | None = None
+        head: str | None = None
+        try:
+            self._allocation.__init__(
+                ledger,
+                retained_primary=retained,
+                temporary=temporary,
+            )
+            self._allocation.reserve(
+                "query",
+                charges={"aggregate_bytes": work},
+                acquires={
+                    "retained_bytes": retained,
+                    "temporary_bytes": temporary,
+                },
+            )
+            self._allocation.consume(
+                phase="query",
+                charges={"aggregate_bytes": work},
+                acquires={
+                    "retained_bytes": retained,
+                    "temporary_bytes": temporary,
+                },
+            )
+            self._allocation.cancel()
+            self._validate_source_exact(polling=True)
+            AccountedRemoteObjectSetDigest(
+                records,
+                ledger,
+                source_bytes,
+                self._deadline,
+                _handoff_owner=self,
+            )
+            digest_owner = self._digest_owner
+            if digest_owner is None or digest_owner._ordered is None:
+                raise CFError("HTTP upload semantic digest owner is unavailable")
+            self._record_refs = tuple(records)
+            self._sorted_refs = tuple(digest_owner._ordered)
+            self._copy_build = []
+            for record in self._sorted_refs:
+                self._poll()
+                validate_object_record(record)
+                # Freeze the exact bytes the post-terminal object-copy effect
+                # can write. Digest evidence remains the full request record,
+                # including historical ``remote`` extensions; publication
+                # bytes intentionally use the existing core-plus-newline form.
+                self._copy_build.append(_serialize_object_record_core(record))
+            self._copy_bytes = tuple(self._copy_build)
+            self._copy_build = None
+            record = None
+            digest = digest_owner._digest
+            if digest is None:
+                raise CFError("HTTP upload semantic digest is unavailable")
+            local_branch = dict.get(request, "branch")
+            head = dict.get(request, "head")
+            self._semantic = {
+                "stable_project_id": self._stable_project_id,
+                "remote_branch": self._remote_branch,
+                "local_branch": local_branch,
+                "head": head,
+                "object_set_digest": digest,
+            }
+            self._semantic_view = MappingProxyType(self._semantic)
+            # The destination mapping owns the exact string before the child
+            # drops its copy/reference collections and scalar reservation.
+            digest_owner._digest = None
+            digest_owner.close()
+            self._digest_owner = None
+            self._prepared = True
+        except BaseException as error:
+            AccountedRemoteObjectSetDigest._detach_failure_chain(error)
+            failure = error
+        source = None
+        records = None
+        request = None
+        digest_owner = None
+        record = None
+        digest = None
+        local_branch = None
+        head = None
+        self._preparing = False
+        close_requested = self._close_requested
+        cleanup_failure: BaseException | None = None
+        if close_requested:
+            try:
+                self.close(ledger)
+            except BaseException as error:
+                AccountedRemoteObjectSetDigest._detach_failure_chain(error)
+                cleanup_failure = error
+        if cleanup_failure is not None:
+            if failure is not None:
+                raise cleanup_failure from failure
+            raise cleanup_failure from None
+        if failure is not None:
+            # The caller already owns every exact partial child/source field.
+            raise failure from None
+        if close_requested:
+            raise CFError("HTTP upload semantic prepare was cancelled by close")
+
+    def _selected_semantic(self) -> Any:
+        if self._effect_semantic is not None:
+            return self._effect_semantic
+        return self._semantic_view
+
+    def matches_semantic(self, expected: Any) -> bool:
+        self._ensure_bound()
+        if self._preparing or self._terminal_active:
+            raise CFError("HTTP upload semantic owner is active")
+        semantic = self._selected_semantic()
+        if not self._prepared or semantic is None:
+            raise CFError("HTTP upload semantic owner is not prepared")
+        return type(expected) is dict and semantic == expected
+
+    def _revalidate_terminal_inputs(self) -> None:
+        self._validate_source_exact(polling=False)
+        source = self._source
+        if source is None or source._records is None:
+            raise CFError("HTTP upload semantic request source is unavailable")
+        records = source._records
+        record_refs = self._record_refs
+        sorted_refs = self._sorted_refs
+        copy_bytes = self._copy_bytes
+        semantic = self._semantic
+        if (
+            record_refs is None
+            or sorted_refs is None
+            or copy_bytes is None
+            or semantic is None
+            or len(records) != len(record_refs)
+            or len(sorted_refs) != len(copy_bytes)
+        ):
+            raise CFError("HTTP upload semantic terminal inputs are unavailable")
+        for index, record in enumerate(records):
+            if record is not record_refs[index]:
+                raise CFError("HTTP upload request record identity changed")
+        digest = hashlib.sha256()
+        digest.update(b"[")
+        prior_object_id: str | None = None
+        for index, record in enumerate(sorted_refs):
+            object_id = dict.get(record, "object_id") if type(record) is dict else None
+            if type(object_id) is not str or not object_id:
+                raise CFError("HTTP upload request record identity changed")
+            if prior_object_id is not None and object_id <= prior_object_id:
+                raise CFError("HTTP upload request record identity changed")
+            prior_object_id = object_id
+            encoded = canonical_json(record)
+            if index:
+                digest.update(b",")
+            digest.update(encoded)
+            encoded = None
+            copy_input = _serialize_object_record_core(record)
+            if copy_input != copy_bytes[index]:
+                copy_input = None
+                raise CFError("HTTP upload object-copy input changed before terminal")
+            copy_input = None
+        digest.update(b"]")
+        actual = "sha256:" + digest.hexdigest()
+        expected = dict.get(semantic, "object_set_digest")
+        if type(expected) is not str or not hmac.compare_digest(actual, expected):
+            raise CFError("HTTP upload semantic digest changed before terminal")
+
+    def terminal_detach(self, ledger: DecisionWorkLedger) -> None:
+        """Revalidate mutable input, then detach private effect slots."""
+        self._ensure_ledger(ledger)
+        self._ensure_bound()
+        if not self._prepared:
+            raise CFError("HTTP upload semantic owner is not prepared")
+        if self._terminal_complete:
+            raise CFError("HTTP upload semantic terminal detach is single-use")
+        if self._terminal_active:
+            raise CFError("HTTP upload semantic terminal detach is already active")
+        if self._terminal_failed:
+            raise CFError("HTTP upload semantic owner is abort-only")
+        if self._terminal_started and not self._terminal_revalidated:
+            raise CFError("HTTP upload semantic owner is abort-only")
+        self._terminal_started = True
+        self._terminal_active = True
+        failure: BaseException | None = None
+        try:
+            if not self._terminal_revalidated:
+                # This is the last callback-rich fence. Any mutation it
+                # triggers is observed by the callback-free revalidation that
+                # immediately follows.
+                if self._deadline is not None:
+                    self._deadline.check("upload semantic terminal")
+                self._revalidate_terminal_inputs()
+                # All locals in the revalidation frame are gone before the
+                # parser source can release its mutable AST scalar.
+                self._record_refs = None
+                self._sorted_refs = None
+                self._terminal_revalidated = True
+            source = self._source
+            if source is not None:
+                source._close_from_destination(self)
+                self._source = None
+            self._allocation.release_temporary()
+        except BaseException as error:
+            AccountedRemoteObjectSetDigest._detach_failure_chain(error)
+            failure = error
+            if not self._terminal_revalidated:
+                self._terminal_failed = True
+        self._terminal_active = False
+        close_requested = self._close_requested
+        cleanup_failure: BaseException | None = None
+        if close_requested:
+            try:
+                self.close(ledger)
+            except BaseException as error:
+                AccountedRemoteObjectSetDigest._detach_failure_chain(error)
+                cleanup_failure = error
+        if cleanup_failure is not None:
+            if failure is not None:
+                raise cleanup_failure from failure
+            raise cleanup_failure from None
+        if failure is not None:
+            raise failure from None
+        if close_requested:
+            raise CFError("HTTP upload semantic terminal was cancelled by close")
+        # Callback-free final detach: only prepublished field assignments.
+        self._effect_semantic = self._semantic_view
+        self._effect_copy_bytes = self._copy_bytes
+        self._semantic = None
+        self._semantic_view = None
+        self._copy_bytes = None
+        self._terminal_complete = True
+
+    def close(self, ledger: DecisionWorkLedger) -> None:
+        self._ensure_ledger(ledger)
+        if self._closed:
+            return
+        if self._preparing or self._terminal_active:
+            self._close_requested = True
+            return
+        if self._closing:
+            return
+        self._closing = True
+        completed = False
+        try:
+            self._effect_semantic = None
+            self._effect_copy_bytes = None
+            self._semantic = None
+            self._semantic_view = None
+            self._copy_bytes = None
+            self._copy_build = None
+            self._record_refs = None
+            self._sorted_refs = None
+            digest_owner = self._digest_owner
+            if digest_owner is not None:
+                digest_owner.close()
+                self._digest_owner = None
+            source = self._source
+            if source is not None:
+                source._close_from_destination(self)
+                self._source = None
+            self._allocation.release_all()
+            self._deadline = None
+            self._stable_project_id = None
+            self._remote_branch = None
+            self._close_requested = False
+            completed = True
+        finally:
+            if completed:
+                self._closed = True
+            self._closing = False
+
+    def __del__(self) -> None:
+        try:
+            self.close(self._ledger)
+        except BaseException:
+            pass
+
+
+def prepare_http_upload_semantic(
+    source: AccountedHTTPUploadRequestSource,
+    ledger: DecisionWorkLedger,
+    stable_project_id: str,
+    remote_branch: str,
+    deadline: HTTPRequestDeadline | None = None,
+) -> AccountedHTTPUploadSemantic:
+    """Allocate the private semantic destination before explicit prepare."""
+    return AccountedHTTPUploadSemantic(
+        source,
+        ledger,
+        stable_project_id,
+        remote_branch,
+        deadline,
     )
 
 
