@@ -1,0 +1,262 @@
+{
+  "schema": "codefire.current_state_review.v1",
+  "snapshot": "e2a218e015953f082245f36dbc6aee906b837e5a",
+  "decision": "REQUEST_CHANGES",
+  "must_findings": [
+    {
+      "id": "M1",
+      "title": "Python production HTTP upload decides fast-forward with a full reachable-history map, unbudgeted and undeadlined",
+      "category": "asymptotic / bounded-before-effect",
+      "surface": "python_http_upload",
+      "evidence": [
+        "codefire:12205-12207 handle_http_upload calls is_ancestor_from_objects(tmp_objects, current[\"head\"], head) inside remote_project_gate",
+        "codefire:11189-11190 is_ancestor_from_objects delegates to ancestor_distances_from_objects",
+        "codefire:11175-11187 ancestor_distances_from_objects performs BFS over the entire reachable set with one load_object_from_root per node and takes no ledger and no deadline",
+        "codefire:10672-11174 AccountedHTTPUploadAncestry (503 lines) has zero production constructors; only unwired owners at codefire:23991 and codefire:28654 build it"
+      ],
+      "runtime_probe": "300-commit linear history; deciding that the immediate parent is an ancestor of head performed 300 load_object_from_root calls, none charged",
+      "contract_violated": [
+        "cfr-168.md:35 acceptance criterion on stopping internal read/validation/materialization by budget",
+        "ADR-020 invariant bounded-before-effect",
+        "cfr-168.md:56 frozen characterization of is_ancestor_in_objects"
+      ],
+      "contrast": "Rust HTTP upload/apply are correct here via is_ancestor_in_provisional_subject_with_poll at http.rs:7419 and http.rs:9698",
+      "severity": "high",
+      "confidence": "high"
+    },
+    {
+      "id": "M2",
+      "title": "Python HTTP GET /doctor runs on a second local_v1 ledger, defeating the request-wide HTTP bound",
+      "category": "ownership / accounting",
+      "surface": "python_http_doctor",
+      "evidence": [
+        "codefire:14402-14405 do_GET calls handle_http_doctor without passing self.decision_work or deadline, unlike the bundle route at codefire:14411-14418",
+        "codefire:11491-11499 handle_http_doctor delegates to remote_doctor_payload",
+        "codefire:14950-14953 remote_doctor_payload constructs DecisionWorkLedger(DecisionWorkProfile.local_v1(), \"remote doctor\")",
+        "codefire:14882-14907 AccountedDoctorPayload binds retained bytes to that separate ledger and terminates it in close()"
+      ],
+      "runtime_probe": "HTTP request ledger current stayed {} across a successful 200 doctor response; payload ledger retained limit 1073741824 (local_v1) versus request ledger retained limit 33554432 (http_v1)",
+      "contract_violated": [
+        "ADR-020 single shared per-request DecisionWorkLedger",
+        "ADR-020 required proof that one cumulative ledger prevents N phases each consuming a full budget",
+        "cfr-168.md:35 acceptance criterion"
+      ],
+      "contrast": "Rust handle_http_doctor at http.rs:5811-5818 correctly passes context.ledger and the request deadline",
+      "severity": "high",
+      "confidence": "high"
+    },
+    {
+      "id": "M3",
+      "title": "Seven of nine Python HTTP routes have no request-ledger accounting, no deadline, and no pre-effect response preflight for the mutating ones",
+      "category": "coverage / no-partial-effect",
+      "surface": "python_http_routes",
+      "evidence": [
+        "Ledger passed only at codefire:14411 (bundle) and codefire:14601 (upload)",
+        "No ledger at codefire:14397 branches, 14402 doctor, 14420 merge-requests list, 14613 gc, 14615 MR create, 14617 MR review, 14619 MR apply",
+        "codefire:11483-11487 handle_http_list calls validate_sealed_commit per head with a fresh cache, the exact shape named in cfb-136.md:21",
+        "codefire:14680-14687 prepare_json runs after the handler and outside the ResourceBudgetExceeded and CFError handlers; only upload freezes a response before effect via _HTTPMutationResponseSlot at codefire:14599-14609"
+      ],
+      "contract_violated": [
+        "cfr-168.md:28-29 Required Fix items on command-scoped shared validation and pre-publication stop",
+        "cfb-136.md:45 requirement that Rust and Python use the same mutation fixture and diagnostic for branch, Doctor, storage, ancestry",
+        "ADR-020 section 5 pre-publication stop for the publication lane"
+      ],
+      "contrast": "Rust local branch list (main.rs:11467-11560) and Rust HTTP branch list (http.rs:5929) both use one shared session with a single finalize",
+      "severity": "high",
+      "confidence": "high"
+    },
+    {
+      "id": "M4",
+      "title": "Named local and file-transport Rust surfaces remain entirely unbudgeted with the original characterization defects intact",
+      "category": "coverage / asymptotic",
+      "surface": "rust_local_and_file_transport",
+      "evidence": [
+        "Only production DecisionWorkLedger::new sites in the CLI crate are main.rs:11468 (list_branches), doctor/checks.rs:1403, and http.rs:345/710/5213; crates/codefire-cli/src/remote.rs has none outside #[cfg(test)] mod object_set_digest_owner_tests at remote.rs:3937",
+        "cf merge: main.rs:5227 common_ancestor -> main.rs:10756-10758 -> main.rs:10767-10793 ancestor_distances builds the full reachable map with one commit_info read per node and no ledger",
+        "cf remote upload (file): remote.rs:170-173 upload_branch takes no ledger; remote.rs:178 validate_sealed_commit; remote.rs:293-297 enforce_remote_commit_signature_policy (signatures.rs:137-141, unaccounted); remote.rs:311 and remote.rs:372 is_ancestor_in_objects (remote.rs:3721-3727); remote.rs:341 copy_object_graph",
+        "cf remote doctor cf://: remote/doctor.rs:471-514 routes to the unaccounted diagnose_remote_project at remote/doctor.rs:518, a second implementation of the surface whose accounted twin diagnose_remote_project_with_work_and_poll at remote/doctor.rs:1573 is reachable only from http.rs:5811",
+        "cf storage: storage.rs:466-560 unbounded warnings, by_type, and largest_objects growth with no ledger, although storage is named verbatim in cfr-168.md:28",
+        "cf scan: main.rs:6400-6408 fresh SealedCommitValidationCache and main.rs:6457 validate_sealed_commit_pinned_with_cache with no ledger; build_scan_result_against_base_with_work has no CLI caller so TraceWorkCounters are discarded, and metrics.rs:212-232 scan_metrics still reports cache_unimplemented (metrics.rs:481-491)"
+      ],
+      "note": "In fairness the legacy remote doctor path is snapshot-safe for CFB-136: inspect_sealed_roots at remote/doctor.rs:1966-2010 uses one shared session with finalize. It is unbudgeted, not unsafe.",
+      "contract_violated": [
+        "cfr-168.md:28 Required Fix naming branch, storage, doctor, ancestry",
+        "cfr-168.md:56 frozen characterization"
+      ],
+      "severity": "high",
+      "confidence": "high"
+    },
+    {
+      "id": "M5",
+      "title": "Python production upload signature-history enforcement is unaccounted and both accounted signature owners are dead code",
+      "category": "ownership / accounting",
+      "surface": "python_http_upload_signatures",
+      "evidence": [
+        "codefire:12111 handle_http_upload calls enforce_remote_commit_signature_policy(project_root, tmp_objects, head)",
+        "codefire:6587-6617 the function is iterative but takes no ledger and no deadline; the policy read_json, per-commit load_object_from_root, and unbounded seen set and stack are uncharged",
+        "codefire:4505-5739 AccountedRemoteSignaturePolicyAuthority (1235 lines) has no production constructor",
+        "codefire:5740-6570 AccountedCommitSignaturePolicy (831 lines) has no production constructor",
+        "codefire:6910-6913 the only bridge is AccountedServerVerification.__init__'s private _signature_policy_authority kwarg, never supplied by prepare_server_verification or run_server_verification at codefire:8405-8465"
+      ],
+      "note": "AccountedServerVerification itself is wired: codefire:12114-12120 passes ledger=decision_work and deadline=deadline",
+      "contract_violated": [
+        "cfr-168.md:35 acceptance criterion",
+        "ADR-020 invariant bounded-before-effect"
+      ],
+      "severity": "high",
+      "confidence": "high"
+    },
+    {
+      "id": "M6",
+      "title": "The Python test corpus's centre of mass is code with zero production callers, so a green Python gate cannot evidence closure",
+      "category": "test-validity / integration",
+      "surface": "python_owners_and_tests",
+      "evidence": [
+        "Eleven public factories have no non-test caller in codefire: prepare_remote_object_set_digest (16801), prepare_http_upload_existing_publication_input (17570), prepare_http_upload_response_input (18287), prepare_http_upload_parser_scalar (18569), bind_http_upload_request_source (18694), prepare_http_upload_semantic (20400), prepare_http_upload_existing_project_gate (25704), prepare_http_upload_missing_project_bootstrap_transaction (26689), prepare_http_upload_existing_pair_semantic_carrier (28278), prepare_http_upload_existing_effect_input (28287), prepare_http_upload_sealed_ancestry (28768)",
+        "Measured owner-class spans total 11687 lines, approximately 35 percent of the 33456-line codefire script",
+        "22 of 30 tests/test_python_*.py files, at least 12547 of 17433 lines (about 72 percent), reference at least one unwired symbol; the true figure is higher because tests/test_python_existing_response_composition.py:3 imports another file's harness and tests/test_python_sealed_borrow.py targets a borrow API no production consumer receives",
+        "Decisive pairing: python3 -m unittest tests.test_python_ancestry_owner passes 13/13 in this worktree while the production ancestry path it nominally protects is the unbudgeted 300-read traversal of M1"
+      ],
+      "note": "cfr-168.md and history.md consistently and honestly label these slices production-unwired and maintain a Freeze; the finding is that accumulated green counts must not be read as closure evidence at the Close gate",
+      "contract_violated": [
+        "Review contract requirement that tests exercise production paths and cannot pass by testing only scaffolding"
+      ],
+      "severity": "high",
+      "confidence": "high"
+    }
+  ],
+  "should_findings": [
+    {
+      "id": "S1",
+      "title": "branch list cache metrics are self-inconsistent and omit the invalidated counter CFB-136 requires",
+      "evidence": [
+        "metrics.rs:196-208 sets entry_count and miss_count both to store_work.document_reads, so the fields are always equal and entry_count counts reads rather than cache entries",
+        "No test asserts either field; the only entry_count assertions in the CLI crate are for the unrelated nonce cache at signatures.rs:3333 and tests.rs:8400",
+        "grep for invalidated across codefire-store/src/lib.rs and codefire-cli/src/metrics.rs returns no hits; SealedValidationWork at codefire-store/src/lib.rs:5528-5537 has no invalidated counter and CacheMetrics at metrics.rs:33-41 has no revalidated or invalidated field, although revalidated_documents and revalidated_bytes are projected as decision counters at metrics.rs:167-186"
+      ],
+      "contract_violated": ["cfb-136.md:52 acceptance criterion on hit/miss/revalidated/invalidated aggregate counters"],
+      "confidence": "high"
+    },
+    {
+      "id": "S2",
+      "title": "The metrics-orthogonality test is structurally unable to falsify its invariant",
+      "evidence": [
+        "tests.rs:627-648 builds without_metrics synthetically from the same result.branches value used for with_metrics and then asserts they match, which is a projection test rather than two independent executions"
+      ],
+      "contract_violated": ["task packet invariant metrics-orthogonal falsification_test requires comparing metrics-disabled and metrics-enabled command results"],
+      "note": "The invariant holds structurally because list_branches always creates the ledger and metrics is computed post hoc from a snapshot, so this is a test-strength issue rather than a live defect",
+      "confidence": "medium"
+    },
+    {
+      "id": "S3",
+      "title": "No asymptotic order table exists in any canonical document",
+      "evidence": [
+        "grep for O( across docs/*.md and docs/development/source-architecture.md returns no hits",
+        "The only order statement found is the Rust doc comment at codefire-core/src/lib.rs:2253-2255",
+        "docs/09_index_trace_policy.md:1-6 describes the index qualitatively; ADR-020:256-273 lists proof obligations but no orders"
+      ],
+      "contract_violated": [
+        "cfr-168.md:34 acceptance criterion requiring time and memory order fixed in docs and scale fixtures",
+        "task packet handoff.required_outputs entry complexity_table"
+      ],
+      "note": "The scale-fixture half is satisfied for Trace: codefire-core/src/lib.rs:4612-4661 pins exact TraceWorkCounters at 1x/3x/10x on a production-path evaluator",
+      "confidence": "high"
+    },
+    {
+      "id": "S4",
+      "title": "Rust MR create and review lack the pre-effect response preflight that upload and apply have; reachability unproven",
+      "evidence": [
+        "context.prepared is set only in handle_http_upload_with_request_source at http.rs:7068, 7078, 7123 and handle_http_request_apply_with_request_source at http.rs:10924",
+        "handle_http_request_merge at http.rs:8506 and handle_http_request_review at http.rs:9103 leave context.prepared empty, so responses are encoded after the mutation via write_http_json_with_ledger at http.rs:807-814"
+      ],
+      "contract_violated": ["ADR-020 section 5 requirement to stop the whole publication lane before publication"],
+      "note": "I could not demonstrate reachability at the current 16 MiB ResponseBytes and 32 MiB concurrent RetainedBytes ceilings; the MR create and review payloads traced are small. Reported as an unmet contract item with an unproven exploit, not a confirmed partial-effect bug. The same structural gap in Python is folded into M3.",
+      "confidence": "low"
+    },
+    {
+      "id": "S5",
+      "title": "Decision-work metrics projection covers exactly one command, and the capability manifest carries one stale coverage value",
+      "evidence": [
+        "metrics.rs exposes status_metrics, branch_list_metrics, scan_metrics, verification_metrics; only branch_list_metrics takes a DecisionWorkSnapshot",
+        "compatibility.rs:132-161 discloses this honestly with metrics_commands [\"branch list\"], coverage.status partial, and explicit not_fully_claimed / not_claimed entries, guarded by the test at compatibility.rs:185",
+        "compatibility.rs still reports python_http_transport as not_fully_claimed although the Python HTTP transport, bundle GET, connection admission, and upload response preflight were landed and accepted per cfr-168.md:556-563, 603-613, 614-622, 656-663"
+      ],
+      "contract_violated": ["cfr-168.md:30 Required Fix on projecting stable work counters and budget-exceeded typed outcomes to metrics and diagnostics"],
+      "note": "The partial disclosure is correct behaviour for an open root and simultaneously proves the criterion is unmet; the stale python_http_transport value understates the shipped surface and must be refreshed at Close",
+      "confidence": "high"
+    }
+  ],
+  "missing_close_evidence": [
+    {
+      "id": "E1",
+      "item": "Fresh isolated Install from e2a218e with recorded source and installed SHA-256",
+      "basis": "current-cycle-burn-down-plan.md:63 states Install/Dogfood remain for CFR-168; rows 1-5 at :58-62 each record a fresh Install; the CFR-167 pattern is at :33"
+    },
+    {
+      "id": "E2",
+      "item": "Installed scale and budget reversal: limit-1 / exact / limit+1 producing exit 60 with the full typed diagnostic, plus an installed x10 counter-curve check",
+      "basis": "task packet validation id fresh-install-dogfood requires installed scale/budget reversals; cfr-168.md:37 acceptance criterion on x10 counters and explicit failure"
+    },
+    {
+      "id": "E3",
+      "item": "Canonical Dogfood on subprojects/algorithm-evolution-agent-lab including Algorithm 281 tests and installed status, scan, verify, doctor",
+      "basis": "task packet validation id fresh-install-dogfood; current-cycle-burn-down-plan.md:79"
+    },
+    {
+      "id": "E4",
+      "item": "Full Rust and Python cross-runtime counter and golden-vector corpus",
+      "basis": "cfr-168.md:239-240 lists the corpus as outstanding; ADR-020:268 requires Rust and Python common-ancestor, required-link, sealed/signature, object, and HTTP golden vectors to agree. The Python side of the surfaces in M1, M3, and M5 currently has no counters to compare."
+    },
+    {
+      "id": "E5",
+      "item": "Gates for the surfaces in M4: cf merge, cf storage, cf scan, file-transport cf remote upload, file-transport cf remote doctor",
+      "basis": "cfr-168.md:28 Required Fix names branch, storage, doctor, ancestry; these surfaces currently have no budget to gate"
+    },
+    {
+      "id": "E6",
+      "item": "Retrospect record of new issues or an explicit no-new-issue finding for CFR-168 and CFB-136",
+      "basis": "cfr-168.md:50 and cfb-136.md:79 Triage checklist items unchecked; none of the 61 CFR-168 rows in history.md is an Install, Dogfood, Retrospect, or Close entry"
+    },
+    {
+      "id": "E7",
+      "item": "Capability re-advertisement at full coverage, flipping coverage.status off partial and refreshing the stale python_http_transport value",
+      "basis": "cfr-168.md:126-127 committed to not re-advertising until every surface, schema, and conformance item is present; see also should finding S5"
+    }
+  ],
+  "later_root_work_not_in_scope": [
+    {"item": "Giant-module and test-fixture-sprawl architecture: http.rs 18639 lines, main.rs 12647, codefire-store/src/lib.rs 20539, tests.rs 13069, and the 30-file 17433-line Python owner-test corpus treated as an architecture problem", "owner": "CFR-169", "basis": "cfr-169.md:13-17, :22-23 which explicitly excludes raw line count, and :29-31 on splitting test helpers and fixtures. Must finding M6 above is scoped to production reachability, not module size."},
+    {"item": "Typed executable automation outcomes, next-action vocabulary, migration", "owner": "CFR-170"},
+    {"item": "Machine-readable consistency-claim and certificate-proof descriptors", "owner": "CFR-171"},
+    {"item": "Read-only adoption and workspace-UX bounded experiments", "owner": "CFR-172"},
+    {"item": "Progress, Fire-value, and product stop-rule pilot protocol", "owner": "CFR-173"},
+    {"item": "Resumable or paged bundle protocol with its own versioned snapshot and object-set token", "owner": "explicitly deferred by ADR-020:250-253; must not be accepted as CFR-168 scope"},
+    {"item": "Python-only POST /gc route at codefire:14613 with no Rust server route or client", "owner": "unassigned pre-existing transport asymmetry; triage separately, do not fold in"},
+    {"item": "CFB-137 wall-clock Date header test flake", "owner": "already fixed per cfb-137.md:8"},
+    {"item": "CFR-174 and CFR-175", "owner": "already fixed; do not reopen"}
+  ],
+  "validations_run": [
+    {"command": "cargo test -p codefire-core --lib", "result": "89 passed, 0 failed"},
+    {"command": "cargo test -p codefire-store --lib", "result": "196 passed, 0 failed"},
+    {"command": "cargo test -p codefire-util --lib", "result": "3 passed, 0 failed"},
+    {"command": "cargo test -p codefire-cli --bins", "result": "768 passed, 0 failed in 42.59s"},
+    {"command": "cargo fmt --check", "result": "pass, exit 0"},
+    {"command": "cargo clippy --workspace --all-targets -- -D warnings", "result": "pass, exit 0, 0 warnings, 1m15s"},
+    {"command": "python3 docs/development/tools/check_project_docs.py", "result": "pass, 522 Markdown files inventoried"},
+    {"command": "python3 docs/development/tools/check_source_docs.py", "result": "pass, 44 modules / 34 commands / 12 object kinds"},
+    {"command": "python3 -m unittest tests.test_python_sealed_production tests.test_python_external_production", "result": "13 passed in 13.365s"},
+    {"command": "python3 -m unittest tests.test_python_ancestry_owner", "result": "13 passed in 7.586s; cited as evidence for must finding M6"},
+    {"command": "runtime probe: Python HTTP doctor route ledger identity (script under /tmp, repository untouched)", "result": "reproduced must finding M2"},
+    {"command": "runtime probe: Python production upload ancestry read count (script under /tmp, repository untouched)", "result": "reproduced must finding M1: 300 reads for a 300-commit history"}
+  ],
+  "validations_skipped": [
+    {"command": "python3 -m unittest discover -s tests", "reason": "approximately 650 s per history.md and already green in the manager baseline; focused Python suites were run instead"},
+    {"command": "demo.sh", "reason": "covered by the manager baseline; no CFR-168 finding depends on it"},
+    {"command": "cargo test --workspace integration binaries", "reason": "covered by the manager baseline; Rust unit counts measured here match the recorded numbers CLI 768 / Core 89 / Store 196 / Util 3"}
+  ],
+  "confidence": {
+    "overall": "high",
+    "rust_and_python_production_wiring": "high",
+    "metrics_and_documentation": "medium",
+    "unproven_boundary_items_S4": "low"
+  }
+}
