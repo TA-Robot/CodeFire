@@ -1,4 +1,4 @@
-# GPT-5.6 Sol Model Routing Policy
+# Codex GPT-5.6 Sol Model Routing Policy
 
 Status: active development policy  
 Last verified locally: 2026-07-11  
@@ -6,13 +6,17 @@ Applies to: external AI development of CodeFire, not the CodeFire product runtim
 
 ## Decision
 
-CodeFire development uses `gpt-5.6-sol` as the explicit primary model and exposes three project-level reasoning tiers:
+When external provider routing explicitly selects Codex, CodeFire development uses `gpt-5.6-sol` and exposes three project-level reasoning tiers:
 
 - `Medium`
 - `High`
 - `Ultra`
 
 The tier is selected from task risk, uncertainty, blast radius, reversibility, and verification cost. It is not a prestige label and must not be chosen only because a task is large.
+
+Provider selection is governed first by `provider-routing-policy.md` and
+`provider-routing-matrix.json`. Medium work normally runs on Fugu and High implementation/review normally runs
+on Claude. This document does not authorize routing those tasks to Codex merely because Codex is available.
 
 ## Why The Policy Has An Adapter
 

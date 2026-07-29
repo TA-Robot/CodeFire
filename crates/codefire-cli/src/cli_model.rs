@@ -74,6 +74,7 @@ pub(crate) struct PathJsonOptions {
     pub(crate) json_output: bool,
     pub(crate) metrics: bool,
     pub(crate) full: bool,
+    pub(crate) lock: LockOptions,
 }
 
 #[derive(Debug)]
@@ -283,14 +284,21 @@ pub(crate) struct OpenContext {
     pub(crate) open_dir: PathBuf,
     pub(crate) branch: String,
     pub(crate) registry_path: PathBuf,
+    pub(crate) active_state: crate::active_state::ActiveStateDir,
     pub(crate) registry: Value,
+    pub(crate) authority: OpenContextAuthority,
+}
+
+pub(crate) enum OpenContextAuthority {
+    Verified(Box<crate::open_snapshot::VerifiedOpenSnapshot>),
+    LegacyPythonStatus,
 }
 
 pub(crate) struct ScanExecution {
     pub(crate) context: OpenContext,
-    pub(crate) active_state_path: PathBuf,
     pub(crate) scan: codefire_core::ScanResult,
     pub(crate) fires: Vec<codefire_core::Fire>,
+    pub(crate) validated_base: codefire_store::ValidatedSealedCommit,
 }
 
 pub(crate) struct VerifyExecution {

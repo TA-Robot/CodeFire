@@ -34,6 +34,12 @@ next_actions: machine-readable remediation hints
 Human output may change between releases. JSON output with the same schema version must remain backward compatible.
 Suggested commands use the installed CLI display name `codefire`.
 
+Checked base schemas live under `schemas/public/`. `codefire capabilities --json` advertises those
+schema IDs and a generated `codefire.support.v1` manifest containing readable/current versions,
+missing-version policy, canonical JSON and public-ID profiles, runtime roles, command targets, and
+pagination mode. A schema is not advertised until it is checked in. Unknown persisted versions fail
+closed unless that format explicitly declares a legacy missing-version case.
+
 `next_actions` entries use this shape:
 
 ```json
@@ -70,7 +76,7 @@ CodeFire v0.6 uses a stable process exit code taxonomy. The `exit_code` field in
 | 12 | stale resolution blocks operation | `verify` with stale resolutions |
 | 13 | duplicate Atom ID blocks operation | `verify` with duplicate Atom IDs |
 | 14 | verification command failed | `verify` with failed configured checks |
-| 15 | merge conflict blocks operation | reserved for blocking operation plans |
+| 15 | merge conflict blocks operation | `verify`, `commit`, and blocked `merge --continue` with unresolved text/binary/semantic facts |
 | 20 | repository corruption detected | invalid marker/repository JSON or structural corruption |
 | 21 | object hash or object reference invalid | object id/hash/reference validation failures, including missing evidence refs in `verify` |
 | 22 | sealed commit validation failed | sealed commit graph/certificate validation failures |
@@ -80,16 +86,31 @@ CodeFire v0.6 uses a stable process exit code taxonomy. The `exit_code` field in
 | 33 | idempotency conflict | same idempotency key reused with a different payload |
 | 40 | migration incompatibility | reserved for migration checks |
 | 50 | external artifact missing or hash mismatch | reserved for artifact validation |
+| 60 | deterministic resource budget exhausted | graph/object/HTTP decision-work limit reached before the attempted effect |
 
-When multiple `verify` blockers are present, CodeFire reports the first blocker class in this order: open fires, missing required links, stale resolutions, missing evidence refs, duplicate Atom IDs, failed verification commands.
+`resource_budget_exceeded` diagnostics preserve `profile`, `dimension`, `observed`, `limit`, `phase`,
+`command`, and `continuation_supported` in local envelopes and through HTTP server/client transport. `observed`
+is the first rejected `limit + 1` unit; the rejected atomic reservation does not partially advance domain work or
+return `ok=true`. HTTP maps this outcome to 413 before a success header.
 
-Mutating commands that acquire repository or remote resource locks accept `--wait-lock` and `--lock-timeout <duration>`.
-`--lock-timeout` accepts seconds (`2`, `2s`) or milliseconds (`250ms`) and returns exit code 30 when elapsed. If the lock file contains `pid` or `created_at`, human diagnostics include that owner metadata.
+`capabilities --json` publishes a `decision_work_profile` entry in `support.formats` with the exact
+serialized local and HTTP `codefire.decision-work.v1` profiles, including limits, applicable phases,
+exit 60 semantics, and current coverage. Keeping this as a versioned format entry preserves the
+`codefire.capabilities.v1` object shape. Coverage is deliberately `partial`: only listed metric
+commands and the listed Rust request/response transport boundary are claimed. Python transport,
+handler-internal work, deadline, connection admission, and unlisted surfaces remain explicit non-claims
+until their integrated runtime gates are complete.
+
+When multiple `verify` blockers are present, CodeFire reports the first blocker class in this order: unresolved merge conflicts, open fires, missing required links, stale resolutions, missing evidence refs, duplicate Atom IDs, failed verification commands.
+
+Mutating commands that acquire repository or remote resource locks—including live `scan` and `verify`—accept `--wait-lock` and `--lock-timeout <duration>`.
+`--lock-timeout` accepts seconds (`2`, `2s`) or milliseconds (`250ms`) and returns exit code 30 when elapsed. Repository lock files are persistent, content-opaque kernel-lock inodes; contention is determined by the kernel lock, not pathname existence. Local and import-created `repo.lock` files are accepted only as no-follow regular files with exactly one provable filesystem link, their bytes are never truncated/written by acquisition, and pathname identity/provenance is rechecked after locking. Best-effort `pid` / `created_at` diagnostics come from the atomically replaced sibling `repo.lock.owner.json`, read no-follow with a 16 KiB cap. Invalid sidecars are ignored and never define ownership.
 When a remote mutator is run with `--json`, lock contention prints a `codefire.command_result.v1` envelope with a `lock_contention` diagnostic and `retry_with_wait_lock` next action before exiting with code 30.
 
 Idempotency keys are implemented incrementally for mutating commands:
 
 ```text
+import --idempotency-key <key>
 open --idempotency-key <key>
 clone --idempotency-key <key>
 merge --idempotency-key <key>
@@ -103,6 +124,10 @@ extinguish --idempotency-key <key>
 ```
 
 Same key + same payload returns the stored result. Same key + different payload returns exit code 33.
+
+`import` uses a version-2 hash-only record: operation, normalized target scope, key, payload version/hash/mode, and original result are persisted without the raw canonical payload. Replay also validates the persistent bootstrap lock, durable import transaction, repository initialization provenance, sealed recorded base, and current marker/opened/branch subject. A result-only legacy marker is not replayable. `.codefire-import.lock` and `.codefire/locks/repo.lock` are persistent files whose kernel locks express ownership; `repo.lock.owner.json` is only diagnostic metadata. Automation must not delete any of them or treat existence as contention.
+
+Import parses bootstrap, transaction, idempotency, and other operational JSON through a 1 MiB no-follow/non-blocking regular-file reader with metadata and limit-plus-one checks. Repository byte-copy reads are capped at 64 MiB. Imported user files are capped at 49,545,216 bytes (47.25 MiB) so their base64 blob records remain within the object store's 64 MiB serialized-record limit; oversized, growing, symlinked, or non-regular inputs fail closed.
 
 ## Supported Commands
 
@@ -206,8 +231,37 @@ When `--metrics` is present on `status`, `scan`, `verify`, or `branch list`, the
 ```json
 {
   "result": "failed",
+  "profile": "local_verification_v1",
+  "phase": "post_execution",
+  "subject": {
+    "type": "codefire_assessment_subject",
+    "version": 1,
+    "kind": "live_open",
+    "trust_kind": "local_unisolated",
+    "subject_digest": "sha256:...",
+    "content_digest": "sha256:...",
+    "worktree_digest": "sha256:...",
+    "immutable": false
+  },
+  "execution": [
+    {
+      "id": "unit-tests",
+      "profile": "trusted_local_shell_v1",
+      "phase": "verification_command",
+      "subject_digest": "sha256:...",
+      "input_digest": "sha256:...",
+      "environment_digest": "sha256:...",
+      "environment_policy": "minimal_allowlist_with_explicit_overrides",
+      "stdout_bytes_seen": 120,
+      "stdout_bytes_stored": 120,
+      "stdout_truncated": false,
+      "timed_out": false,
+      "termination_scope": "process_group"
+    }
+  ],
   "trace_completeness_required": true,
   "open_required_fires": 1,
+  "unresolved_merge_conflicts": [],
   "missing_required_links": [],
   "stale_resolutions": [],
   "missing_evidence_refs": [],
@@ -217,19 +271,25 @@ When `--metrics` is present on `status`, `scan`, `verify`, or `branch list`, the
 }
 ```
 
-`verify --json` sets `exit_code` to the matching blocker code from the exit code taxonomy. For example, missing required links produce code `11`, missing evidence refs produce code `21`, and failed configured verification commands produce code `14`.
+`verify --json` sets `exit_code` to the matching blocker code from the exit code taxonomy. For example, unresolved merge conflicts produce code `15`, missing required links produce code `11`, missing evidence refs produce code `21`, and failed configured verification commands produce code `14`.
 `diagnostic_filter` is `all` by default and `blocking_only` when `--blocking-only` is present. Verification diagnostics include `blocking`; `missing_required_link` is `severity=warning` and `blocking=false` when `trace_completeness_required` is false.
+`subject` is the exact versioned assessment identity shared with context/explain and a later certificate. `execution` never carries raw environment values; its digests, profile/phase, cwd classification, resource counters, timeout/termination scope, worktree before/after, and redaction count describe the trust boundary.
 
 `status --json`, `scan --json`, `verify --json`, `doctor --json`, `storage report --json`, and `migrate ... --json` include remediation-oriented `next_actions`:
 
 ```text
 status: verify, scan, context_changed, commit
 scan: context_changed, context_fire, extinguish_fire, verify
-verify: context_changed, scan, context_atom, refresh_resolution, repair_evidence_ref, rerun_check, commit
+verify: continue_merge, context_changed, scan, context_atom, refresh_resolution, repair_evidence_ref, rerun_check, commit
 doctor: inspect_object_store_corruption, repair_branch_head, reopen_branch_workspace, inspect_doctor_report
 storage report: inspect_storage_warnings
-migrate: review_migration_plan, inspect_migration_blockers
+migrate: review_migration_plan, apply_migration_plan, retry_remaining_migration_actions, inspect_migration_blockers
 ```
+
+Migration actions are derived from the current command mode and postcondition. A successful or exact-replay
+`migrate apply` with no `remaining_actions` returns no action even though its historical `planned_actions` audit
+is retained. A failed/partial apply only recommends a bounded revalidation retry when current remaining actions
+exist; check and dry-run continue to project review and apply actions respectively.
 
 `doctor --json` data:
 
@@ -261,6 +321,18 @@ migrate: review_migration_plan, inspect_migration_blockers
 Doctor layout diagnostics use the shared repository layout registry. Required layout gaps are blocking errors. Auto-creatable layout gaps are non-blocking repairable warnings and produce a `review_migration_plan` next action that points to `migrate dry-run --json`.
 
 Doctor active state diagnostics include `missing_active_state_file` when an active state directory lacks `state.json`, and `active_state_invariant_violation` when `open-clean` / `open-consistent` coexists with non-empty `fires.json`.
+
+For `cf://`, `cf+http://`, or `cf+https://` targets, `doctor --json` keeps the command-result envelope
+and places a `codefire.remote_doctor.v1` report in `data`. The report identifies project and transport,
+layout and semantic profile, checked/count fields, bounded issues, and skipped quick checks. A missing
+remote project is a typed unsuccessful report, not a local-path or transport traceback. Rust clients
+accept the same report shape from the Python HTTP fallback.
+
+Remote `list` and `request-list` accept `--limit 1..1000` and `--cursor`. Paginated results include a
+`codefire.page.v1` object in `data.page` with `returned`, `total`, `snapshot`, and nullable
+`next_cursor`. The bounded `codefire.page_cursor.v1` binds collection, snapshot, offset, and limit;
+cross-collection reuse, changed limit, malformed/future cursor, or collection drift fails closed.
+Without pagination options, the historical full-result shape remains available.
 
 `storage report --json` data:
 
@@ -356,11 +428,13 @@ Doctor active state diagnostics include `missing_active_state_file` when an acti
 }
 ```
 
-`link --batch <file> --json` data uses `type=codefire_link_batch_result`, includes `dry_run`, `item_count`, `links_file`, a `codefire_operation_plan`, and applied `added_links`. `--dry-run` validates Atom references and duplicate links without modifying `codefire.links.yaml`.
+`link --batch <file> --json` data uses `type=codefire_link_batch_result`, includes `dry_run`, `item_count`, `links_file`, `valid`, bounded `diagnostics`, `diagnostic_total`, `diagnostics_omitted`, a `codefire_operation_plan`, and bounded applied-link output. `--dry-run` validates Atom references and duplicate links without modifying `codefire.links.yaml`. Detail diagnostics are capped at 100; a `diagnostics_omitted` summary reports additional issues. `data.plan.item_count` is the full planned count, `plan.items` contains at most 100 projections, and `plan.items_omitted` reports the remainder. Live success returns the full count in `data.added_link_count`, at most 100 projections in `data.added_links`, and the remainder in `data.added_links_omitted`. Endpoint/link `from`/`to`/`type` samples are UTF-8-safe and capped at 256 bytes per field with `*_truncated` and `*_omitted_bytes` metadata, so neither plan nor apply result echoes an unbounded batch string.
 
-Mutating commands that still expose legacy operation/merge plan payloads return the same plan under `data.plan` in a `codefire.command_result.v1` envelope with `data.type=codefire_plan_result`. This applies to `open`, `clone`, `extinguish` variants, `upload`, `request-merge`, `request-review`, `request-apply`, and `merge`. `patch import --json` returns its patch import result directly as envelope `data`.
+Mutating commands that still expose legacy operation/merge plan payloads return the same plan under `data.plan` in a `codefire.command_result.v1` envelope with `data.type=codefire_plan_result`. This applies to `open`, `clone`, `extinguish` variants, `upload`, `request-merge`, `request-review`, `request-apply`, and merge apply/planning. `merge --continue --json` instead returns `data.type=codefire_merge_continue_result` with `blocked`, `applied`, `already_resolved`, typed conflicts, and validation blockers; blocked output is one envelope with exit 15. `patch import --json` returns its patch import result directly as envelope `data`.
 
-`commit --json` returns typed `data.type=codefire_commit_result` rather than the legacy generic plan result. Dry-run and applied results include `branch`, `open_dir`, `changed_atom_count`, bounded `changed_atoms`, `changed_atoms_omitted`, `verification`, and the operation `plan`. A blocked dry-run is still JSON: top-level `ok=false`, nonzero `exit_code`, `data.blocked=true`, and a verify next action. Applied commit results have top-level `repo` populated from execution context and do not return apply-only next actions.
+`commit --json` returns typed `data.type=codefire_commit_result` rather than the legacy generic plan result. Dry-run, blocked live, and applied results include `branch`, `open_dir`, `changed_atom_count`, bounded `changed_atoms`, `changed_atoms_omitted`, `verification`, and the operation `plan`. A blocked dry-run or live attempt is still one JSON document: top-level `ok=false`, the typed verification exit code, `data.blocked=true`, `data.applied=false`, and a verify/repair next action. Applied commit results have top-level `repo` populated from execution context and do not return apply-only next actions.
+
+Live commit recovery state is not embedded in the successful result. If signature policy requires a key and none is available, the command fails before any immutable write and leaves a `phase=started`, zero-object marker. Otherwise the writer computes every manifest-blob, seven-root, candidate-commit, and next-branch-snapshot ID before the first store, then publishes ordered `objects[]` entries containing `role`, nullable `path`, `object_type`, `object_id`, and `state=planned`. Each exact-ID store changes only its role entry to `stored`; duplicate blob IDs on different paths remain separate entries. Candidate validation precedes branch-snapshot storage, and both precede mutable branch-ref publication. `doctor --json` reports a survivor as `kind=pending_commit_transaction` with its `path` and a message containing phase plus stored/planned role-entry counts. Entry details and candidate alias remain in the marker rather than separate doctor issue fields; legacy string entries count as stored.
 
 `fire --json` data uses `type=codefire_fire_result`, includes `dry_run`, `item_count`, `branch`, `open_dir`, a `codefire_operation_plan`, and applied manual fires. `fire --batch <file> --json` uses `type=codefire_fire_batch_result` with the same shape and all-item validation. `--dry-run` validates Atom references and duplicate fire keys without modifying `fires.json` or branch state.
 
@@ -393,7 +467,7 @@ Evidence capture stores command output as a sealed `evidence` object and externa
 
 Supported explain targets are `fire <id>`, `atom <id>`, `verify-failure`, and `storage-warning`. The command is read-only and returns diagnostics plus next_actions appropriate to the target.
 
-`migrate check --json` / `migrate dry-run --json` data:
+`migrate check --json` / `migrate dry-run --json` / `migrate apply --json` data:
 
 ```json
 {
@@ -401,6 +475,7 @@ Supported explain targets are `fire <id>`, `atom <id>`, `verify-failure`, and `s
   "version": 1,
   "mode": "check",
   "target_format": "current",
+  "target_format_semantics": "compatibility_profile_only",
   "current_format": "current",
   "supported_target_formats": ["current", "v0.6"],
   "repository_version": 1,
@@ -412,13 +487,32 @@ Supported explain targets are `fire <id>`, `atom <id>`, `verify-failure`, and `s
   "blockers": [],
   "warnings": [],
   "planned_actions": [{"kind": "create_directory", "path": "/repo/.codefire/idempotency", "description": "create .codefire/idempotency"}],
-  "would_write": false
+  "applied_actions": [],
+  "skipped_actions": [],
+  "remaining_actions": [{"kind": "create_directory", "path": "/repo/.codefire/idempotency", "description": "create .codefire/idempotency"}],
+  "applied_count": 0,
+  "skipped_count": 0,
+  "remaining_count": 1,
+  "would_write": false,
+  "did_write": false,
+  "format_write_supported": false,
+  "format_write_performed": false
 }
 ```
 
 `migrate check --quick --json` skips object record integrity scanning, sets `scan_mode:"quick"`, returns `checked_objects:0`, and lists `object_record_integrity` in `skipped_checks`.
 
-When compatibility blockers exist, `migrate check --json` sets `ok=false` and `exit_code=40`.
+`migrate dry-run` sets `would_write=true` when a compatible repository has registered auto-create
+actions and returns `apply_migration_plan`. `migrate apply` requires a full scan, acquires the shared
+repository lock, reloads the plan, and applies only those repo-contained actions through retained
+no-follow parent capabilities. A successful exact replay has zero applied/remaining actions and
+`did_write=false`; operational `repo.lock` owner diagnostics are not counted as migration writes.
+`current` and `v0.6` are compatibility-profile selectors only: neither requests a repository/object
+format rewrite. A missing branch-head semantic profile is returned as the non-blocking
+`legacy_semantic_validation_profile` warning.
+
+When compatibility or apply precondition blockers exist, migrate JSON sets `ok=false` and
+`exit_code=40`. Initial compatibility blockers are returned before lock bootstrap or layout writes.
 
 `context --json` data:
 
@@ -497,7 +591,7 @@ kind
 severity
 ```
 
-Current diagnostic kinds:
+Selected current diagnostic kinds include:
 
 ```text
 open_fire
@@ -506,7 +600,19 @@ missing_required_link
 stale_resolution
 duplicate_atom_id
 failed_check
+trace_graph_endpoint_integrity
+open_target_resolution_failed
+object_id_collision
+object_not_found
+sealed_commit_invalid
+lock_contention
 ```
+
+`trace_graph_endpoint_integrity` is blocking and uses exit code 21. It carries `repo`, `path`, `total_issues`, `issues_omitted`, and at most 100 typed `issues`; each endpoint issue distinguishes `missing_atom` from `ambiguous_atom_id` and carries bounded IDs plus omitted-byte metadata.
+
+`open_target_resolution_failed` carries `reason`, `repo`, `branch`, `requested_path`, nullable `resolved_path`, and `workspace_boundary`. Automation should follow its `choose_safe_open_target` next action rather than retrying the same path. `object_id_collision` carries requested/existing type and full hashes plus `canonical_payload_matches`; `sealed_commit_invalid` and `object_not_found` retain repo/path context when the caller has it.
+
+Doctor transaction findings live under doctor result issues. `pending_state_transaction` exposes path and a message with operation/phase/intended state; an unsupported or malformed marker is `invalid_active_state_shape`, not a valid pending transaction. Retry validates the marker before its first recovery write. Adjacent phase transitions are enforced by the writer; a doctor issue reports only the persisted current phase and does not prove the marker's historical transition sequence.
 
 Each verification diagnostic has a stable `severity` and `blocking` flag. Automation should use `blocking=true` for commit-blocker filtering instead of assuming every verification diagnostic is an error.
 

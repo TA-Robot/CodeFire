@@ -33,12 +33,21 @@ Rust CLIでは、以下の責務分離を標準形とする。
 | CLI dispatch / argument routing | `main.rs` | 薄く保つ。command固有ロジックを置かない |
 | CLI option/result/context model | `crates/codefire-cli/src/cli_model.rs` | command modulesが共有する型を集約し、fieldsは`pub(crate)`に限定する |
 | command-specific planning | `crates/codefire-cli/src/<command>.rs` | parse済み入力からplanを作る |
-| repository/object invariants | `codefire-core` or dedicated CLI module | object ID、canonical JSON、sealed commitを集中管理する |
-| remote mutation policy | `remote/` | file-backed/HTTPで共通policyを共有する |
-| request/commit signatures | `signatures.rs` | signing、verification、policy evaluationを集約する |
+| domain/Trace invariants | `codefire-core` | Atom/Trace endpoint、Fire、resolution、verification predicateを集中管理する。effective policyは`effective_policy.rs`、manifest/Atom relationは`change_coverage.rs`、indexed direct Trace evaluationは`trace_evaluation.rs`をownerとする |
+| deterministic work contract | `codefire-core/work_budget.rs` | profile/dimension/counter/phase/terminalとatomic reservation ledgerを所有する。HTTP/Store/CLIは独自limit語彙やfork可能なper-head ledgerを作らない |
+| object/sealed invariants | `codefire-store` | canonical JSON、full digest/object ID、collision、descriptor-relative sealed validation/cache subjectを集中管理する |
+| open/close/import filesystem capability | `secure_worktree.rs`, `close_worktree.rs`, `active_state.rs`, `import_workflow.rs` | stable identity/no-replace primitiveは共有し、open staging、close subject、active instance、import recoveryのpolicyは各ownerへ分ける |
+| close/discard publication | `crates/codefire-cli/src/close_transaction.rs` | request/evidence/phase/archiveとordered applyを所有し、`main.rs`はdispatchだけにする |
+| remote project authority | `remote/project.rs` | percent-decode後component、stable project descriptor、ledger-bound hidden bootstrap、bounded recovery/quarantine、legacy-adoption境界を所有する |
+| remote project locking | `remote/locks.rs`, `stable_lock.rs` | persistent inode、shared/exclusive gate、stable-ID順の複数project取得、単一deadline、pending read guardを所有する |
+| remote mutation policy | `remote/` | file-backed/HTTPで共通policyを共有し、任意pathをpublication APIへ渡さない |
+| request/commit signatures | `signatures.rs` | signing、verification、policy evaluation、iterative history walk、nonce validation/publication境界を集約する |
+| HTTP parsed request ownership | `http.rs` | parser ledger identity、raw `Value`、exact Retained scalarを一ownerに閉じ、payload drop後だけreleaseする。upload/apply用typed intentはsignature/publication/Store ownerと共同設計する |
 | rendering / view | `view/` | human outputとstructured outputを分ける |
 | diagnostics | feature module or `doctor/` | exit codeとmachine-readable detailsを明確にする |
-| idempotency / lock handling | dedicated module | mutation commandから共通利用する |
+| idempotency / lock handling | dedicated module | mutation commandから共通利用する。persistent kernel lockはcontent-immutable inode、exactly-one-link identity、atomic owner sidecarを一契約にし、legacy create-new lockと同じ型に見せかけない |
+
+Stage 1の現行所有では、`secure_worktree` がstable filesystem identity、atomic no-replace rename、open targetとrepository-lock pathのno-follow primitiveを所有する。単一file pathの再検証authorityは最初に開いたparent/file identityを一つのopaque tokenに束ねる。Doctorのopen/close markerは`doctor::checks`のaccounted readerを共有し、branch-head列挙・bounded read・closing fenceは`doctor::branch_heads`のledger-bound snapshotが所有する。opened registryのrecursive membership、sorted candidate path、directory capability、absolute-parent traversal scratch、raw bytes、parsed JSON `Value`、final membership/content fenceは`doctor::opened_registry`の同一ledger-bound snapshotが所有する。parse transitionと上位finish/abortはcleanup失敗時にもsnapshotとledgerを同じownerへ戻し、再試行可能性を保つ。object-recordのfilesystem binding/read/parse/hash/cacheは`codefire-store` scannerが所有し、`doctor::checks`はscanner evidenceからのordered diagnosticだけをconsuming `DiagnosticScanWork`下で生成する。`doctor::checks`は同じStore sessionでrecoverable validationとordered issue materializationを調停する。record固有のsemanticsは`open_transaction` / `close_transaction`が所有する。`close_worktree`、`active_state`、`import_workflow`、`codefire-store`の既存authority境界は維持し、異なるfilesystem責務を一つの巨大moduleへ統合しない。
 
 Python reference implementationは歴史的に単一ファイルだが、Rust v0.6 default化後は互換性確認用referenceとして扱う。新規の本流機能はRust側でmodule分割して実装する。
 

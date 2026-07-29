@@ -7,6 +7,7 @@
 - `docs/development/README.md`: 開発管理ハブ、現在状態、正本ドキュメント対応表。
 - `docs/development/project-management.md`: 長期開発に耐えるproject管理モデル、issue/cycle/dirty tree運用。
 - `docs/development/ai/README.md`: 外部AIで開発を加速するためのcontext pack、task packet、role routing、review、parallel lane、local tool運用。
+- `docs/development/ai/provider-routing-policy.md`: Fugu/Claude優先、Codex明示guard、長時間swarm、provider停止時の引継ぎ。
 - `docs/development/agent-code-quality.md`: AtCoder red レベルのコード品質、計算量、メモリ、アルゴリズム、不変条件。
 - `docs/development/module-boundaries.md`: module/file分割、責務境界、`main.rs` 肥大化防止。
 - `docs/development/agent-workflow.md`: 作業運用、Rust v0.6方針、diff/merge方針、テスト、禁止事項。

@@ -1,4 +1,4 @@
-use super::{open_context, parse_lock_option, CliError, LockOptions, RepoLock};
+use super::{acquire_locked_open_context, open_context, parse_lock_option, CliError, LockOptions};
 use crate::{limited_yaml, read_batch_file};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
@@ -9,6 +9,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static LINK_BATCH_TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 const YAML_CONTEXT: &str = "link batch YAML";
+const MAX_LINK_BATCH_DIAGNOSTICS: usize = 100;
+const MAX_LINK_BATCH_OUTPUT_ITEMS: usize = 100;
+const MAX_LINK_BATCH_MESSAGE_DETAILS: usize = 12;
+const MAX_LINK_BATCH_MESSAGE_DETAIL_CHARS: usize = 256;
 
 #[derive(Debug)]
 pub(super) struct LinkBatchOptions {
@@ -30,6 +34,11 @@ pub(super) struct LinkBatchResult {
     pub(super) diagnostics: Vec<Value>,
     pub(super) plan: Value,
     pub(super) added_links: Vec<LinkBatchLink>,
+}
+
+struct LinkValidationResult {
+    diagnostics: Vec<Value>,
+    endpoint_error: Option<codefire_core::TraceGraphEndpointError>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -128,20 +137,38 @@ pub(super) fn run_link_batch(options: &LinkBatchOptions) -> Result<LinkBatchResu
         ));
     }
 
-    let context = open_context(&options.path)?;
-    let _lock = if options.dry_run {
-        None
+    let _lock;
+    let context;
+    if options.dry_run {
+        _lock = None;
+        context = open_context(&options.path)?;
     } else {
-        Some(RepoLock::acquire_with_options(
-            &context.repo_root,
-            &options.lock,
-        )?)
-    };
+        let (lock, locked_context) = acquire_locked_open_context(&options.path, &options.lock)?;
+        _lock = Some(lock);
+        context = locked_context;
+    }
     let resolved = resolve_links(&batch)?;
-    let diagnostics = validate_links(&context.open_dir, &resolved)?;
+    let validation = validate_links(&context.open_dir, &resolved).map_err(|error| match error {
+        CliError::Core(error @ codefire_core::CoreError::TraceGraphEndpointIntegrity(_)) => {
+            CliError::CoreContext {
+                error,
+                repo_root: context.repo_root.clone(),
+                path: context.open_dir.join("codefire.links.yaml"),
+            }
+        }
+        other => other,
+    })?;
+    let diagnostics = validation.diagnostics;
     let links_file = context.open_dir.join("codefire.links.yaml");
     let valid = diagnostics.is_empty();
     if !valid && !options.dry_run {
+        if let Some(error) = validation.endpoint_error {
+            return Err(CliError::CoreContext {
+                error: codefire_core::CoreError::TraceGraphEndpointIntegrity(error),
+                repo_root: context.repo_root.clone(),
+                path: links_file,
+            });
+        }
         return Err(CliError::Usage(link_batch_validation_message(&diagnostics)));
     }
     let plan = link_batch_operation_plan(
@@ -174,6 +201,9 @@ pub(super) fn run_link_batch(options: &LinkBatchOptions) -> Result<LinkBatchResu
 }
 
 pub(super) fn link_batch_data_json(result: &LinkBatchResult) -> Value {
+    let (diagnostic_total, diagnostics_omitted) = diagnostic_counts(&result.diagnostics);
+    let added_link_count = result.added_links.len();
+    let added_links_omitted = added_link_count.saturating_sub(MAX_LINK_BATCH_OUTPUT_ITEMS);
     json!({
         "type": "codefire_link_batch_result",
         "version": 1,
@@ -183,8 +213,12 @@ pub(super) fn link_batch_data_json(result: &LinkBatchResult) -> Value {
         "open_dir": &result.open_dir,
         "links_file": &result.links_file,
         "diagnostics": &result.diagnostics,
+        "diagnostic_total": diagnostic_total,
+        "diagnostics_omitted": diagnostics_omitted,
         "plan": &result.plan,
-        "added_links": result.added_links.iter().map(link_json).collect::<Vec<_>>(),
+        "added_link_count": added_link_count,
+        "added_links": result.added_links.iter().take(MAX_LINK_BATCH_OUTPUT_ITEMS).map(diagnostic_link_json).collect::<Vec<_>>(),
+        "added_links_omitted": added_links_omitted,
     })
 }
 
@@ -229,70 +263,173 @@ fn missing_link_field(index: usize, field: &str) -> CliError {
     CliError::Usage(format!("link batch item {} missing {field}", index + 1))
 }
 
-fn validate_links(open_dir: &Path, links: &[LinkBatchLink]) -> Result<Vec<Value>, CliError> {
+fn validate_links(
+    open_dir: &Path,
+    links: &[LinkBatchLink],
+) -> Result<LinkValidationResult, CliError> {
     let atom_index = codefire_core::build_atom_index(open_dir)?;
-    let atom_ids = atom_index
-        .atoms
-        .iter()
-        .map(|atom| atom.atom_id.as_str())
-        .collect::<BTreeSet<_>>();
-    let existing = codefire_core::current_trace_graph(open_dir)?
+    let existing_graph = codefire_core::current_trace_graph(open_dir)?;
+    codefire_core::validate_trace_graph_endpoints(&atom_index, &existing_graph)?;
+    let existing = existing_graph
         .links
-        .into_iter()
-        .map(|link| (link.from, link.to, link.link_type))
+        .iter()
+        .map(|link| (link.from.clone(), link.to.clone(), link.link_type.clone()))
         .collect::<BTreeSet<_>>();
+    let candidate_graph = codefire_core::TraceGraph {
+        type_tag: "trace_graph".to_string(),
+        version: codefire_core::VERSION,
+        links: links
+            .iter()
+            .map(|link| codefire_core::TraceLinkInput {
+                from: link.from.clone(),
+                to: Some(link.to.clone()),
+                link_type: Some(link.link_type.clone()),
+            })
+            .map(codefire_core::TraceLinkInput::into_trace_link)
+            .collect::<Result<Vec<_>, _>>()?,
+    };
+    let (endpoint_issues, omitted_endpoint_issues, endpoint_error) =
+        match codefire_core::validate_trace_graph_endpoints(&atom_index, &candidate_graph) {
+            Ok(()) => (Vec::new(), 0, None),
+            Err(codefire_core::CoreError::TraceGraphEndpointIntegrity(error)) => {
+                (error.issues.clone(), error.omitted_issues, Some(error))
+            }
+            Err(error) => return Err(error.into()),
+        };
     let mut seen = BTreeSet::new();
     let mut diagnostics = Vec::new();
+    let mut diagnostic_total = 0usize;
     for (index, link) in links.iter().enumerate() {
         if link.from == link.to {
-            diagnostics.push(link_validation_diagnostic(
-                index,
-                "self_link",
-                format!("link batch self-link is not allowed: {}", link.from),
-                link,
-            ));
-        }
-        if !atom_ids.contains(link.from.as_str()) {
-            diagnostics.push(link_validation_diagnostic(
-                index,
-                "unknown_from_atom",
-                format!("link batch references unknown from atom: {}", link.from),
-                link,
-            ));
-        }
-        if !atom_ids.contains(link.to.as_str()) {
-            diagnostics.push(link_validation_diagnostic(
-                index,
-                "unknown_to_atom",
-                format!("link batch references unknown to atom: {}", link.to),
-                link,
-            ));
+            push_bounded_diagnostic(
+                &mut diagnostics,
+                &mut diagnostic_total,
+                link_validation_diagnostic(
+                    index,
+                    "self_link",
+                    format!(
+                        "link batch self-link is not allowed: {}",
+                        diagnostic_display_sample(&link.from)
+                    ),
+                    link,
+                ),
+            );
         }
         let key = (link.from.clone(), link.to.clone(), link.link_type.clone());
         if !seen.insert(key.clone()) {
-            diagnostics.push(link_validation_diagnostic(
-                index,
-                "duplicate_batch_link",
-                format!(
-                    "duplicate link batch item: {} --{}--> {}",
-                    link.from, link.link_type, link.to
+            push_bounded_diagnostic(
+                &mut diagnostics,
+                &mut diagnostic_total,
+                link_validation_diagnostic(
+                    index,
+                    "duplicate_batch_link",
+                    format!(
+                        "duplicate link batch item: {} --{}--> {}",
+                        diagnostic_display_sample(&link.from),
+                        diagnostic_display_sample(&link.link_type),
+                        diagnostic_display_sample(&link.to)
+                    ),
+                    link,
                 ),
-                link,
-            ));
+            );
         }
         if existing.contains(&key) {
-            diagnostics.push(link_validation_diagnostic(
-                index,
-                "existing_link",
-                format!(
-                    "link already exists: {} --{}--> {}",
-                    link.from, link.link_type, link.to
+            push_bounded_diagnostic(
+                &mut diagnostics,
+                &mut diagnostic_total,
+                link_validation_diagnostic(
+                    index,
+                    "existing_link",
+                    format!(
+                        "link already exists: {} --{}--> {}",
+                        diagnostic_display_sample(&link.from),
+                        diagnostic_display_sample(&link.link_type),
+                        diagnostic_display_sample(&link.to)
+                    ),
+                    link,
                 ),
-                link,
-            ));
+            );
         }
     }
-    Ok(diagnostics)
+    for issue in endpoint_issues {
+        let link = links.get(issue.link_index).ok_or_else(|| {
+            CliError::Core(codefire_core::CoreError::Config(
+                "trace endpoint diagnostic refers to an unknown batch item".to_string(),
+            ))
+        })?;
+        push_bounded_diagnostic(
+            &mut diagnostics,
+            &mut diagnostic_total,
+            json!({
+                "kind": issue.kind.as_str(),
+                "severity": "error",
+                "message": format!(
+                    "link batch {} endpoint {} resolves to {} Atom(s)",
+                    issue.endpoint,
+                    issue.atom_id,
+                    issue.atom_occurrences,
+                ),
+                "item_index": issue.link_index,
+                "item_number": issue.link_index + 1,
+                "endpoint": issue.endpoint.as_str(),
+                "atom_id": issue.atom_id,
+                "atom_id_truncated": issue.atom_id_truncated,
+                "atom_id_omitted_bytes": issue.atom_id_omitted_bytes,
+                "atom_occurrences": issue.atom_occurrences,
+                "link_id": issue.link_id,
+                "link_id_truncated": issue.link_id_truncated,
+                "link_id_omitted_bytes": issue.link_id_omitted_bytes,
+                "link": diagnostic_link_json(link),
+            }),
+        );
+    }
+    diagnostic_total = diagnostic_total.saturating_add(omitted_endpoint_issues);
+    let diagnostics_omitted = diagnostic_total.saturating_sub(diagnostics.len());
+    if diagnostics_omitted > 0 {
+        diagnostics.push(json!({
+            "kind": "diagnostics_omitted",
+            "severity": "error",
+            "message": format!("{diagnostics_omitted} additional link validation issue(s) omitted"),
+            "diagnostic_total": diagnostic_total,
+            "diagnostics_omitted": diagnostics_omitted,
+        }));
+    }
+    Ok(LinkValidationResult {
+        diagnostics,
+        endpoint_error,
+    })
+}
+
+fn push_bounded_diagnostic(
+    diagnostics: &mut Vec<Value>,
+    diagnostic_total: &mut usize,
+    diagnostic: Value,
+) {
+    *diagnostic_total = (*diagnostic_total).saturating_add(1);
+    if diagnostics.len() < MAX_LINK_BATCH_DIAGNOSTICS {
+        diagnostics.push(diagnostic);
+    }
+}
+
+fn diagnostic_counts(diagnostics: &[Value]) -> (usize, usize) {
+    diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.get("kind").and_then(Value::as_str) == Some("diagnostics_omitted")
+        })
+        .map(|summary| {
+            (
+                summary
+                    .get("diagnostic_total")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(diagnostics.len() as u64) as usize,
+                summary
+                    .get("diagnostics_omitted")
+                    .and_then(Value::as_u64)
+                    .unwrap_or_default() as usize,
+            )
+        })
+        .unwrap_or((diagnostics.len(), 0))
 }
 
 fn link_validation_diagnostic(
@@ -307,22 +444,87 @@ fn link_validation_diagnostic(
         "message": message,
         "item_index": index,
         "item_number": index + 1,
-        "link": link_json(link),
+        "link": diagnostic_link_json(link),
     })
 }
 
+fn diagnostic_link_json(link: &LinkBatchLink) -> Value {
+    let (from, from_omitted_bytes) = bounded_diagnostic_sample(&link.from);
+    let (to, to_omitted_bytes) = bounded_diagnostic_sample(&link.to);
+    let (link_type, type_omitted_bytes) = bounded_diagnostic_sample(&link.link_type);
+    json!({
+        "from": from,
+        "from_truncated": from_omitted_bytes > 0,
+        "from_omitted_bytes": from_omitted_bytes,
+        "to": to,
+        "to_truncated": to_omitted_bytes > 0,
+        "to_omitted_bytes": to_omitted_bytes,
+        "type": link_type,
+        "type_truncated": type_omitted_bytes > 0,
+        "type_omitted_bytes": type_omitted_bytes,
+    })
+}
+
+fn bounded_diagnostic_sample(value: &str) -> (String, usize) {
+    let limit = codefire_core::TRACE_GRAPH_ENDPOINT_SAMPLE_BYTE_LIMIT;
+    if value.len() <= limit {
+        return (value.to_string(), 0);
+    }
+    let mut end = limit;
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    (value[..end].to_string(), value.len() - end)
+}
+
+fn diagnostic_display_sample(value: &str) -> String {
+    let (mut sample, omitted_bytes) = bounded_diagnostic_sample(value);
+    if omitted_bytes > 0 {
+        sample.push('…');
+    }
+    sample
+}
+
 fn link_batch_validation_message(diagnostics: &[Value]) -> String {
+    let (diagnostic_total, diagnostics_omitted) = diagnostic_counts(diagnostics);
     let mut message = format!(
         "link batch validation failed: {} issue(s)",
-        diagnostics.len()
+        diagnostic_total
     );
-    for diagnostic in diagnostics {
+    let mut displayed = 0usize;
+    for diagnostic in diagnostics.iter().filter(|diagnostic| {
+        diagnostic.get("kind").and_then(Value::as_str) != Some("diagnostics_omitted")
+    }) {
+        if displayed >= MAX_LINK_BATCH_MESSAGE_DETAILS {
+            break;
+        }
         if let Some(detail) = diagnostic.get("message").and_then(Value::as_str) {
             message.push_str("; ");
-            message.push_str(detail);
+            message.push_str(&bounded_detail(detail));
+            displayed += 1;
         }
     }
+    let omitted_from_message = diagnostic_total.saturating_sub(displayed);
+    if omitted_from_message > 0 || diagnostics_omitted > 0 {
+        message.push_str(&format!(
+            "; {} additional issue(s) omitted",
+            omitted_from_message.max(diagnostics_omitted)
+        ));
+    }
     message
+}
+
+fn bounded_detail(detail: &str) -> String {
+    let mut chars = detail.chars();
+    let bounded = chars
+        .by_ref()
+        .take(MAX_LINK_BATCH_MESSAGE_DETAIL_CHARS)
+        .collect::<String>();
+    if chars.next().is_some() {
+        format!("{bounded}…")
+    } else {
+        bounded
+    }
 }
 
 fn append_links(path: &Path, links: &[LinkBatchLink]) -> Result<(), CliError> {
@@ -447,6 +649,7 @@ fn link_batch_operation_plan(
     links: &[LinkBatchLink],
     diagnostics: &[Value],
 ) -> Value {
+    let items_omitted = links.len().saturating_sub(MAX_LINK_BATCH_OUTPUT_ITEMS);
     json!({
         "type": "codefire_operation_plan",
         "version": 1,
@@ -459,7 +662,8 @@ fn link_batch_operation_plan(
         "item_count": links.len(),
         "valid": diagnostics.is_empty(),
         "diagnostics": diagnostics,
-        "items": links.iter().map(link_json).collect::<Vec<_>>(),
+        "items": links.iter().take(MAX_LINK_BATCH_OUTPUT_ITEMS).map(diagnostic_link_json).collect::<Vec<_>>(),
+        "items_omitted": items_omitted,
         "operations": [
             {"kind": "validate_all_batch_items", "count": links.len()},
             {"kind": "validate_atom_references", "count": links.len()},
@@ -469,14 +673,6 @@ fn link_batch_operation_plan(
             {"kind": "verify", "command": "codefire verify --details --json", "target": {"path": open_dir}},
             {"kind": "trace_graph", "command": "codefire trace-graph", "target": {"path": open_dir}},
         ],
-    })
-}
-
-fn link_json(link: &LinkBatchLink) -> Value {
-    json!({
-        "from": &link.from,
-        "to": &link.to,
-        "type": &link.link_type,
     })
 }
 
@@ -700,5 +896,110 @@ mod tests {
         assert_ne!(first, second);
         assert!(first.to_string_lossy().contains(".tmp"));
         assert!(second.to_string_lossy().contains(".tmp"));
+    }
+
+    #[test]
+    fn validation_message_bounds_detail_count_and_individual_message_size() {
+        let diagnostics = (0..250)
+            .map(|index| {
+                json!({
+                    "kind": "self_link",
+                    "message": format!("issue {index}: {}", "x".repeat(1_000)),
+                })
+            })
+            .collect::<Vec<_>>();
+        let message = link_batch_validation_message(&diagnostics);
+        assert!(message.starts_with("link batch validation failed: 250 issue(s)"));
+        assert!(message.contains("238 additional issue(s) omitted"));
+        assert!(message.len() < 4_000);
+    }
+
+    #[test]
+    fn diagnostic_link_projection_bounds_multibyte_fields_with_omission_metadata() {
+        let huge = "🔥".repeat(200);
+        let link = LinkBatchLink {
+            from: huge.clone(),
+            to: huge.clone(),
+            link_type: huge,
+        };
+        let diagnostic = link_validation_diagnostic(
+            0,
+            "self_link",
+            format!(
+                "link batch self-link is not allowed: {}",
+                diagnostic_display_sample(&link.from)
+            ),
+            &link,
+        );
+        for field in ["from", "to", "type"] {
+            let sample = diagnostic["link"][field].as_str().unwrap();
+            assert!(sample.len() <= codefire_core::TRACE_GRAPH_ENDPOINT_SAMPLE_BYTE_LIMIT);
+            assert!(sample.is_char_boundary(sample.len()));
+            let truncated_field = format!("{field}_truncated");
+            let omitted_field = format!("{field}_omitted_bytes");
+            assert_eq!(
+                diagnostic["link"]
+                    .get(&truncated_field)
+                    .and_then(Value::as_bool),
+                Some(true)
+            );
+            assert!(diagnostic["link"]
+                .get(&omitted_field)
+                .unwrap()
+                .as_u64()
+                .is_some_and(|omitted| omitted > 0));
+        }
+        assert!(diagnostic["message"].as_str().unwrap().len() < 400);
+    }
+
+    #[test]
+    fn plan_and_applied_link_samples_are_counted_and_byte_bounded() {
+        let huge = "界".repeat(1_000);
+        let links = (0..137)
+            .map(|index| LinkBatchLink {
+                from: format!("REQ-{index}-{huge}"),
+                to: format!("DES-{index}-{huge}"),
+                link_type: format!("refined_by-{index}-{huge}"),
+            })
+            .collect::<Vec<_>>();
+        let options = LinkBatchOptions {
+            path: PathBuf::from("open"),
+            batch_path: PathBuf::from("batch.json"),
+            dry_run: true,
+            json_output: true,
+            lock: LockOptions::default(),
+        };
+        let plan = link_batch_operation_plan(
+            &options,
+            Path::new("open"),
+            Path::new("open/codefire.links.yaml"),
+            &links,
+            &[],
+        );
+        assert_eq!(plan["item_count"], 137);
+        assert_eq!(plan["items"].as_array().unwrap().len(), 100);
+        assert_eq!(plan["items_omitted"], 37);
+        assert_eq!(plan["items"][0]["from_truncated"], true);
+
+        let result = LinkBatchResult {
+            repo_root: PathBuf::from("repo"),
+            open_dir: PathBuf::from("open"),
+            links_file: PathBuf::from("open/codefire.links.yaml"),
+            item_count: links.len(),
+            dry_run: false,
+            valid: true,
+            diagnostics: Vec::new(),
+            plan,
+            added_links: links,
+        };
+        let data = link_batch_data_json(&result);
+        assert_eq!(data["added_link_count"], 137);
+        assert_eq!(data["added_links"].as_array().unwrap().len(), 100);
+        assert_eq!(data["added_links_omitted"], 37);
+        assert_eq!(data["added_links"][0]["from_truncated"], true);
+        assert!(
+            data["added_links"][0]["from"].as_str().unwrap().len()
+                <= codefire_core::TRACE_GRAPH_ENDPOINT_SAMPLE_BYTE_LIMIT
+        );
     }
 }

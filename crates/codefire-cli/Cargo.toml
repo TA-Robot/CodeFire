@@ -15,12 +15,19 @@ codefire-core = { path = "../codefire-core" }
 codefire-store = { path = "../codefire-store" }
 codefire-util = { path = "../codefire-util" }
 serde_json = "1"
+serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 hmac = "0.12"
 getrandom = "0.2"
 rustls = { version = "0.21", features = ["dangerous_configuration"] }
 rustls-pemfile = "1"
 webpki-roots = "0.25"
+cap-std = "=4.0.2"
+cap-fs-ext = { version = "=4.0.2", features = ["std"] }
+fs2 = "=0.4.3"
+
+[target.'cfg(any(target_os = "linux", target_os = "android", target_vendor = "apple", target_os = "redox"))'.dependencies]
+rustix = { version = "=1.1.4", features = ["fs"] }
 
 [dev-dependencies]
 tempfile = "=3.10.1"

@@ -1,4 +1,5 @@
 use crate::{scan_branch_state, scan_change_count, Status};
+use codefire_core::{committable_decision, CommittableReason};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -7,6 +8,33 @@ pub(crate) const COMMAND_RESULT_SCHEMA: &str = "codefire.command_result.v1";
 pub(crate) const CLI_DISPLAY_NAME: &str = "codefire";
 pub(crate) const MAX_NEXT_ACTIONS: usize = 12;
 pub(crate) const MAX_SCAN_JSON_SAMPLE: usize = 50;
+
+pub(crate) fn change_coverage_data_json(
+    coverage: Option<&codefire_core::ChangeCoverage>,
+    entry_limit: usize,
+) -> Value {
+    let Some(coverage) = coverage else {
+        return Value::Null;
+    };
+    let entries = coverage
+        .entries
+        .iter()
+        .take(entry_limit)
+        .collect::<Vec<_>>();
+    let entries_omitted = coverage.entries.len().saturating_sub(entries.len());
+    json!({
+        "type": &coverage.type_tag,
+        "version": coverage.version,
+        "profile": &coverage.profile,
+        "span_precision": &coverage.span_precision,
+        "summary": &coverage.summary,
+        "tool_migration": &coverage.tool_migration,
+        "digest": &coverage.digest,
+        "entries": entries,
+        "entries_omitted": entries_omitted,
+        "entries_truncated": entries_omitted > 0,
+    })
+}
 
 pub(crate) fn command_result_envelope(
     command: &str,
@@ -187,6 +215,15 @@ pub(crate) fn scan_data_json_with_full(scan: &codefire_core::ScanResult, full: b
     } else {
         MAX_SCAN_JSON_SAMPLE
     };
+    let coverage_limit = if full {
+        scan.change_coverage
+            .as_ref()
+            .map(|coverage| coverage.entries.len())
+            .unwrap_or_default()
+    } else {
+        MAX_SCAN_JSON_SAMPLE
+    };
+    let change_coverage = change_coverage_data_json(scan.change_coverage.as_ref(), coverage_limit);
     let changed_atom_ids = scan
         .changed_atoms
         .iter()
@@ -228,6 +265,7 @@ pub(crate) fn scan_data_json_with_full(scan: &codefire_core::ScanResult, full: b
         "branch_state": scan_branch_state(scan_change_count(scan), scan.open_fires.len()),
         "base_commit": &scan.base_commit,
         "tool_migration": &scan.tool_migration,
+        "change_coverage": change_coverage,
         "full": full,
         "sample_limit": MAX_SCAN_JSON_SAMPLE,
         "changed_count": changed_count,
@@ -359,15 +397,24 @@ pub(crate) fn scan_next_actions(
 }
 
 pub(crate) fn verification_data_json(verification: &codefire_core::Verification) -> Value {
+    let decision = committable_decision(verification);
     json!({
-        "result": &verification.result,
+        "result": decision.outcome.as_str(),
+        "decision": &decision,
+        "profile": "local_verification_v1",
+        "phase": "post_execution",
+        "subject": &verification.subject,
+        "execution": &verification.execution,
         "trace_completeness_required": verification.trace_completeness_required,
         "open_required_fires": verification.open_required_fires,
         "missing_required_links": &verification.missing_required_links,
         "stale_resolutions": &verification.stale_resolutions,
         "missing_evidence_refs": &verification.missing_evidence_refs,
+        "unresolved_merge_conflicts": &verification.unresolved_merge_conflicts,
         "duplicate_atom_ids": &verification.duplicate_atom_ids,
         "failed_checks": &verification.failed_checks,
+        "effective_policy": &verification.effective_policy,
+        "change_coverage": &verification.change_coverage,
     })
 }
 
@@ -376,13 +423,15 @@ pub(crate) fn verification_data_json_with_filter(
     diagnostic_filter: &str,
 ) -> Value {
     let mut data = verification_data_json(verification);
+    let decision = committable_decision(verification);
     let blocking_only = diagnostic_filter == "blocking_only";
     let all_missing_required_links = json!(&verification.missing_required_links);
-    let blocking_missing_required_links = if verification.trace_completeness_required {
-        json!(&verification.missing_required_links)
-    } else {
-        json!([])
-    };
+    let blocking_missing_required_links =
+        if decision.is_blocking(CommittableReason::MissingRequiredLinks) {
+            json!(&verification.missing_required_links)
+        } else {
+            json!([])
+        };
     data["all_missing_required_links"] = all_missing_required_links;
     data["blocking_missing_required_links"] = blocking_missing_required_links.clone();
     if blocking_only {
@@ -404,25 +453,41 @@ pub(crate) fn verification_diagnostics_json_with_filter(
     blocking_only: bool,
 ) -> Vec<Value> {
     let mut diagnostics = Vec::new();
-    if verification.open_required_fires > 0 {
+    let decision = committable_decision(verification);
+    for conflict in &verification.unresolved_merge_conflicts {
+        let blocking = decision.is_blocking(CommittableReason::UnresolvedMergeConflicts);
         push_diagnostic(
             &mut diagnostics,
             blocking_only,
             json!({
-            "kind": "open_required_fires",
-            "severity": "error",
-            "blocking": true,
+                "kind": verification_reason_diagnostic_kind(CommittableReason::UnresolvedMergeConflicts),
+                "severity": if blocking { "error" } else { "warning" },
+                "blocking": blocking,
+                "conflict_kind": conflict.kind.as_str(),
+                "subject": &conflict.subject,
+            }),
+        );
+    }
+    if verification.open_required_fires > 0 {
+        let blocking = decision.is_blocking(CommittableReason::OpenRequiredFires);
+        push_diagnostic(
+            &mut diagnostics,
+            blocking_only,
+            json!({
+            "kind": verification_reason_diagnostic_kind(CommittableReason::OpenRequiredFires),
+            "severity": if blocking { "error" } else { "warning" },
+            "blocking": blocking,
             "count": verification.open_required_fires,
             }),
         );
     }
     for item in &verification.missing_required_links {
-        let blocking = verification.trace_completeness_required;
+        let blocking = decision.is_blocking(CommittableReason::MissingRequiredLinks);
         push_diagnostic(
             &mut diagnostics,
             blocking_only,
             json!({
-            "kind": "missing_required_link",
+            "kind": verification_reason_diagnostic_kind(CommittableReason::MissingRequiredLinks),
             "severity": if blocking { "error" } else { "warning" },
             "blocking": blocking,
             "atom_id": &item.atom_id,
@@ -434,58 +499,80 @@ pub(crate) fn verification_diagnostics_json_with_filter(
         );
     }
     for item in &verification.stale_resolutions {
+        let blocking = decision.is_blocking(CommittableReason::StaleResolutions);
         push_diagnostic(
             &mut diagnostics,
             blocking_only,
             json!({
-            "kind": "stale_resolution",
-            "severity": "error",
-            "blocking": true,
+            "kind": verification_reason_diagnostic_kind(CommittableReason::StaleResolutions),
+            "severity": if blocking { "error" } else { "warning" },
+            "blocking": blocking,
             "resolution_uid": &item.resolution_uid,
             "reason": &item.reason,
             }),
         );
     }
     for item in &verification.missing_evidence_refs {
+        let blocking = decision.is_blocking(CommittableReason::MissingEvidenceRefs);
         push_diagnostic(
             &mut diagnostics,
             blocking_only,
             json!({
-            "kind": "missing_evidence_ref",
-            "severity": "error",
-            "blocking": true,
+            "kind": verification_reason_diagnostic_kind(CommittableReason::MissingEvidenceRefs),
+            "severity": if blocking { "error" } else { "warning" },
+            "blocking": blocking,
             "resolution_uid": &item.resolution_uid,
             "evidence_id": &item.evidence_id,
             }),
         );
     }
     for atom_id in &verification.duplicate_atom_ids {
+        let blocking = decision.is_blocking(CommittableReason::DuplicateAtomIds);
         push_diagnostic(
             &mut diagnostics,
             blocking_only,
             json!({
-            "kind": "duplicate_atom_id",
-            "severity": "error",
-            "blocking": true,
+            "kind": verification_reason_diagnostic_kind(CommittableReason::DuplicateAtomIds),
+            "severity": if blocking { "error" } else { "warning" },
+            "blocking": blocking,
             "atom_id": atom_id,
             }),
         );
     }
     for check in &verification.failed_checks {
+        let blocking = decision.is_blocking(CommittableReason::FailedChecks);
         push_diagnostic(
             &mut diagnostics,
             blocking_only,
             json!({
-            "kind": "failed_check",
-            "severity": "error",
-            "blocking": true,
+            "kind": verification_reason_diagnostic_kind(CommittableReason::FailedChecks),
+            "severity": if blocking { "error" } else { "warning" },
+            "blocking": blocking,
             "id": &check.id,
             "command": &check.command,
             "output": &check.output,
             }),
         );
     }
+    for diagnostic in &mut diagnostics {
+        diagnostic["decision_contract"] = json!({
+            "effective_policy_digest": verification.effective_policy.as_ref().map(|policy| &policy.digest),
+            "change_coverage_digest": verification.change_coverage.as_ref().map(|coverage| &coverage.digest),
+        });
+    }
     diagnostics
+}
+
+fn verification_reason_diagnostic_kind(reason: CommittableReason) -> &'static str {
+    match reason {
+        CommittableReason::UnresolvedMergeConflicts => "unresolved_merge_conflict",
+        CommittableReason::OpenRequiredFires => "open_required_fires",
+        CommittableReason::MissingRequiredLinks => "missing_required_link",
+        CommittableReason::StaleResolutions => "stale_resolution",
+        CommittableReason::MissingEvidenceRefs => "missing_evidence_ref",
+        CommittableReason::DuplicateAtomIds => "duplicate_atom_id",
+        CommittableReason::FailedChecks => "failed_check",
+    }
 }
 
 fn push_diagnostic(diagnostics: &mut Vec<Value>, blocking_only: bool, diagnostic: Value) {
@@ -506,7 +593,8 @@ pub(crate) fn verification_next_actions(
     action_path: Option<&Path>,
 ) -> Vec<Value> {
     let mut actions = Vec::new();
-    if verification.result == "passed" {
+    let decision = committable_decision(verification);
+    if decision.is_committable() {
         if has_pending_scan_changes(scan) {
             actions.push(next_action(
                 "commit",
@@ -524,9 +612,25 @@ pub(crate) fn verification_next_actions(
         }
         return actions;
     }
+    if !verification.unresolved_merge_conflicts.is_empty() {
+        actions.push(next_action(
+            verification_reason_action_kind(CommittableReason::UnresolvedMergeConflicts),
+            cli_command(path_command(
+                "merge --continue --dry-run --json",
+                action_path,
+            )),
+            "resolve text and binary conflicts, acknowledge semantic candidates, and continue the merge",
+            action_target(
+                json!({
+                    "unresolved_merge_conflicts": &verification.unresolved_merge_conflicts,
+                }),
+                action_path,
+            ),
+        ));
+    }
     if verification.open_required_fires > 0 {
         actions.push(next_action(
-            "context_changed",
+            verification_reason_action_kind(CommittableReason::OpenRequiredFires),
             cli_command(path_command("context --changed --json", action_path)),
             "inspect changed atoms and open fire context",
             action_target(
@@ -559,10 +663,10 @@ pub(crate) fn verification_next_actions(
             ));
         }
     }
-    if !blocking_only || verification.trace_completeness_required {
+    if !blocking_only || decision.is_blocking(CommittableReason::MissingRequiredLinks) {
         for item in &verification.missing_required_links {
             actions.push(next_action(
-                "context_atom",
+                verification_reason_action_kind(CommittableReason::MissingRequiredLinks),
                 cli_command(path_command(
                     format!("context --atom {} --depth 2 --json", item.atom_id),
                     action_path,
@@ -575,7 +679,7 @@ pub(crate) fn verification_next_actions(
                         "target_kind": &item.target_kind,
                         "min": item.min,
                         "found": item.found,
-                        "blocking": verification.trace_completeness_required,
+                        "blocking": decision.is_blocking(CommittableReason::MissingRequiredLinks),
                     }),
                     action_path,
                 ),
@@ -584,7 +688,7 @@ pub(crate) fn verification_next_actions(
     }
     for item in &verification.stale_resolutions {
         actions.push(next_action(
-            "refresh_resolution",
+            verification_reason_action_kind(CommittableReason::StaleResolutions),
             cli_command(path_command(
                 "extinguish <fire-id> --refresh --resolution <type> --rationale <text>",
                 action_path,
@@ -601,7 +705,7 @@ pub(crate) fn verification_next_actions(
     }
     for item in &verification.missing_evidence_refs {
         actions.push(next_action(
-            "repair_evidence_ref",
+            verification_reason_action_kind(CommittableReason::MissingEvidenceRefs),
             cli_command(path_command(
                 "evidence add --artifact <path> --json",
                 action_path,
@@ -618,7 +722,7 @@ pub(crate) fn verification_next_actions(
     }
     for atom_id in &verification.duplicate_atom_ids {
         actions.push(next_action(
-            "context_atom",
+            verification_reason_action_kind(CommittableReason::DuplicateAtomIds),
             cli_command(path_command(
                 format!("context --atom {atom_id} --depth 1 --json"),
                 action_path,
@@ -629,7 +733,7 @@ pub(crate) fn verification_next_actions(
     }
     for check in &verification.failed_checks {
         actions.push(next_action(
-            "rerun_check",
+            verification_reason_action_kind(CommittableReason::FailedChecks),
             check.command.clone(),
             "rerun the failed verification command and capture its output",
             json!({
@@ -639,6 +743,19 @@ pub(crate) fn verification_next_actions(
         ));
     }
     actions
+}
+
+fn verification_reason_action_kind(reason: CommittableReason) -> &'static str {
+    match reason {
+        CommittableReason::UnresolvedMergeConflicts => "continue_merge",
+        CommittableReason::OpenRequiredFires => "context_changed",
+        CommittableReason::MissingRequiredLinks | CommittableReason::DuplicateAtomIds => {
+            "context_atom"
+        }
+        CommittableReason::StaleResolutions => "refresh_resolution",
+        CommittableReason::MissingEvidenceRefs => "repair_evidence_ref",
+        CommittableReason::FailedChecks => "rerun_check",
+    }
 }
 
 fn verification_diagnostic_summary(
@@ -1128,8 +1245,16 @@ mod tests {
                 resolution_uid: "resolution_1".to_string(),
                 evidence_id: "CF-EVIDENCE-missing".to_string(),
             }],
+            unresolved_merge_conflicts: vec![codefire_core::UnresolvedMergeConflict {
+                kind: codefire_core::MergeConflictKind::Text,
+                subject: "README.md".to_string(),
+            }],
             duplicate_atom_ids: vec!["REQ-session".to_string()],
             verified_at: "2026-06-04T00:00:00Z".to_string(),
+            subject: None,
+            execution: Vec::new(),
+            effective_policy: None,
+            change_coverage: None,
         };
 
         let diagnostics = verification_diagnostics_json(&verification);
@@ -1138,6 +1263,7 @@ mod tests {
             .filter_map(|item| item.get("kind").and_then(Value::as_str))
             .collect::<Vec<_>>();
         assert!(kinds.contains(&"open_required_fires"));
+        assert!(kinds.contains(&"unresolved_merge_conflict"));
         assert!(kinds.contains(&"missing_required_link"));
         assert!(kinds.contains(&"stale_resolution"));
         assert!(kinds.contains(&"missing_evidence_ref"));
@@ -1163,8 +1289,13 @@ mod tests {
             }],
             stale_resolutions: Vec::new(),
             missing_evidence_refs: Vec::new(),
+            unresolved_merge_conflicts: Vec::new(),
             duplicate_atom_ids: Vec::new(),
             verified_at: "2026-06-04T00:00:00Z".to_string(),
+            subject: None,
+            execution: Vec::new(),
+            effective_policy: None,
+            change_coverage: None,
         };
 
         let diagnostics = verification_diagnostics_json(&verification);
@@ -1203,8 +1334,16 @@ mod tests {
                 resolution_uid: "resolution_1".to_string(),
                 evidence_id: "CF-EVIDENCE-missing".to_string(),
             }],
+            unresolved_merge_conflicts: vec![codefire_core::UnresolvedMergeConflict {
+                kind: codefire_core::MergeConflictKind::Semantic,
+                subject: "REQ-session".to_string(),
+            }],
             duplicate_atom_ids: vec!["REQ-session".to_string()],
             verified_at: "2026-06-04T00:00:00Z".to_string(),
+            subject: None,
+            execution: Vec::new(),
+            effective_policy: None,
+            change_coverage: None,
         };
 
         let actions = verification_next_actions(&verification, &empty_scan(), false, None);
@@ -1213,6 +1352,7 @@ mod tests {
             .filter_map(|item| item.get("kind").and_then(Value::as_str))
             .collect::<Vec<_>>();
         assert!(kinds.contains(&"context_changed"));
+        assert!(kinds.contains(&"continue_merge"));
         assert!(kinds.contains(&"context_atom"));
         assert!(kinds.contains(&"refresh_resolution"));
         assert!(kinds.contains(&"repair_evidence_ref"));
@@ -1247,11 +1387,11 @@ mod tests {
     #[test]
     fn verification_next_actions_preserve_explicit_path_context() {
         let mut verification = passed_verification();
-        verification.result = "failed".to_string();
         verification.open_required_fires = 1;
         let actions =
             verification_next_actions(&verification, &empty_scan(), false, Some(Path::new(".")));
 
+        assert!(!actions.iter().any(|action| action["kind"] == "commit"));
         assert!(actions.iter().any(|action| action["kind"] == "scan"
             && action["command"].as_str().unwrap().contains("--path .")
             && action["target"]["path"] == "."));
@@ -1260,6 +1400,26 @@ mod tests {
             .any(|action| action["kind"] == "context_changed"
                 && action["command"].as_str().unwrap().contains("--path .")
                 && action["target"]["path"] == "."));
+    }
+
+    #[test]
+    fn verification_json_projects_the_typed_decision_over_recorded_result() {
+        let mut verification = passed_verification();
+        verification.open_required_fires = 1;
+
+        let data = verification_data_json(&verification);
+        let diagnostics = verification_diagnostics_json(&verification);
+
+        assert_eq!(data["result"], "failed");
+        assert_eq!(data["decision"]["outcome"], "failed");
+        assert_eq!(data["decision"]["primary_reason"], "open_required_fires");
+        assert_eq!(
+            data["decision"]["blocking_reasons"],
+            json!(["open_required_fires"])
+        );
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0]["kind"], "open_required_fires");
+        assert_eq!(diagnostics[0]["blocking"], true);
     }
 
     #[test]
@@ -1391,8 +1551,13 @@ mod tests {
             }],
             stale_resolutions: Vec::new(),
             missing_evidence_refs: Vec::new(),
+            unresolved_merge_conflicts: Vec::new(),
             duplicate_atom_ids: Vec::new(),
             verified_at: "2026-06-04T00:00:00Z".to_string(),
+            subject: None,
+            execution: Vec::new(),
+            effective_policy: None,
+            change_coverage: None,
         };
 
         let actions = verification_next_actions(&verification, &empty_scan(), true, None);
@@ -1416,8 +1581,13 @@ mod tests {
             missing_required_links: Vec::new(),
             stale_resolutions: Vec::new(),
             missing_evidence_refs: Vec::new(),
+            unresolved_merge_conflicts: Vec::new(),
             duplicate_atom_ids: Vec::new(),
             verified_at: "2026-06-04T00:00:00Z".to_string(),
+            subject: None,
+            execution: Vec::new(),
+            effective_policy: None,
+            change_coverage: None,
         }
     }
 
@@ -1440,6 +1610,7 @@ mod tests {
             },
             changed_atoms: Vec::new(),
             non_atom_changed_files: Vec::new(),
+            change_coverage: None,
             open_fires: Vec::new(),
             tool_migration: None,
         }

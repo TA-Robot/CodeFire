@@ -20,6 +20,8 @@ REQUIRED_AI_FILES = [
     "docs/development/ai/context-packs.json",
     "docs/development/ai/operating-protocol.md",
     "docs/development/ai/role-routing-matrix.json",
+    "docs/development/ai/provider-routing-matrix.json",
+    "docs/development/ai/provider-routing-policy.md",
     "docs/development/ai/model-routing-policy.md",
     "docs/development/ai/acceleration-master-plan.md",
     "docs/development/ai/capability-registry.v1.json",
@@ -212,6 +214,97 @@ def check_role_routing(root: Path, findings: list[Finding]) -> None:
         findings.append(Finding("error", "missing-required-role", relative_path, f"Missing role: {role_name}"))
 
 
+def check_provider_routing(root: Path, findings: list[Finding]) -> None:
+    relative_path = "docs/development/ai/provider-routing-matrix.json"
+    data = load_json(root, relative_path, findings)
+    if data is None:
+        return
+    if data.get("schema") != "codefire.ai_provider_routing.v1":
+        findings.append(Finding("error", "bad-provider-schema", relative_path, "Unexpected provider-routing schema"))
+    routes = data.get("tier_routes")
+    expected = {"medium": "fugu", "high": "claude", "ultra": "codex"}
+    if not isinstance(routes, dict):
+        findings.append(Finding("error", "missing-tier-routes", relative_path, "tier_routes is required"))
+    else:
+        for tier, provider in expected.items():
+            route = routes.get(tier)
+            if not isinstance(route, dict) or route.get("provider") != provider:
+                findings.append(
+                    Finding(
+                        "error",
+                        "bad-provider-tier-route",
+                        relative_path,
+                        f"{tier} must route to {provider}",
+                    )
+                )
+        medium = routes.get("medium")
+        if isinstance(medium, dict) and medium.get("model") != "fugu-ultra-v1.1":
+            findings.append(
+                Finding(
+                    "error",
+                    "bad-fugu-provider-model",
+                    relative_path,
+                    "Medium Fugu must use fugu-ultra-v1.1",
+                )
+            )
+        high = routes.get("high")
+        if isinstance(high, dict):
+            models = high.get("models")
+            expected_claude_models = {
+                "implementation": "claude-opus-5",
+                "review_or_research": "claude-opus-5",
+            }
+            if not isinstance(models, dict) or models != expected_claude_models:
+                findings.append(
+                    Finding(
+                        "error",
+                        "bad-claude-provider-models",
+                        relative_path,
+                        "High Claude implementation and review/research must use claude-opus-5",
+                    )
+                )
+        ultra = routes.get("ultra")
+        if isinstance(ultra, dict):
+            if ultra.get("model") != "gpt-5.6-sol":
+                findings.append(Finding("error", "bad-codex-provider-model", relative_path, "Ultra Codex must use gpt-5.6-sol"))
+            if ultra.get("requires_explicit_allow_codex") is not True:
+                findings.append(Finding("error", "unguarded-codex-route", relative_path, "Ultra Codex must require explicit allow"))
+    concurrency = data.get("concurrency")
+    if not isinstance(concurrency, dict):
+        findings.append(Finding("error", "missing-provider-concurrency", relative_path, "concurrency is required"))
+    else:
+        for provider in ("fugu", "claude", "codex"):
+            value = concurrency.get(provider)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                findings.append(Finding("error", "bad-provider-concurrency", relative_path, f"{provider} must be a positive integer"))
+        if isinstance(concurrency.get("codex"), int) and concurrency["codex"] != 1:
+            findings.append(Finding("error", "codex-concurrency-not-one", relative_path, "Codex control plane must stay at one lane"))
+    fallback = data.get("fallback")
+    if not isinstance(fallback, dict) or fallback.get("automatic_codex_fallback") is not False:
+        findings.append(Finding("error", "automatic-codex-fallback", relative_path, "automatic Codex fallback must be false"))
+    role_defaults = data.get("role_defaults")
+    if not isinstance(role_defaults, dict):
+        findings.append(Finding("error", "missing-provider-role-defaults", relative_path, "role_defaults is required"))
+    else:
+        required = {
+            "implementer": "claude",
+            "reviewer": "claude",
+            "classifier": "fugu",
+            "validation_runner": "fugu",
+            "integrator": "codex",
+        }
+        for role, provider in required.items():
+            if role_defaults.get(role) != provider:
+                findings.append(
+                    Finding(
+                        "error",
+                        "bad-provider-role-default",
+                        relative_path,
+                        f"{role} must default to {provider}",
+                    )
+                )
+
+
 def check_task_packets(root: Path, findings: list[Finding]) -> None:
     packet_dir = root / "docs/development/ai/task-packets"
     if not packet_dir.is_dir():
@@ -297,6 +390,7 @@ def run(root: Path) -> list[Finding]:
     check_required_files(root, findings)
     check_context_packs(root, findings)
     check_role_routing(root, findings)
+    check_provider_routing(root, findings)
     check_task_packets(root, findings)
     check_live_routing_smoke(root, findings)
     check_stale_active_state(root, findings)

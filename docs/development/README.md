@@ -4,14 +4,18 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 ## Current Operating Snapshot
 
-Last audited: 2026-07-12.
+Last audited: 2026-07-19.
 
 - Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
-- CFB detail ledger: 127 total; 120 `fixed`, 7 `open`.
-- CFR detail ledger: 160 total; 150 `fixed`, 10 `fixed in v0.7`.
-- `subprojects/algorithm-evolution-agent-lab/` reports CodeFire `open-clean` with 0 open fires when checked via the local Rust binary.
-- The mixed worktree was split into eight purpose-specific commits on 2026-07-12; the organization checkpoint is clean and no unknown paths remain.
-- The base environment does not expose `cargo` on `PATH`. The 2026-07-11 audit used an isolated Rust 1.97.0 toolchain under `/tmp` and passed fmt, locked workspace tests, and warning-denying Clippy; a durable pinned toolchain/CI identity is still release work.
+- CFB detail ledger: 137 total; 135 `fixed`, 2 `investigating`. Open/investigating count: 2.
+- CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, 6 `investigating`. Open/investigating count: 6.
+- Final installed `/tmp/codefire-cfr167-final.KWa8TC/bin/codefire` has source-matching SHA-256 `1483874b4c1de4a78478595d5d158cf34a12e5ec3b05255dfc8819f511f00272`; policy/coverage reversal, sealed digest binding, and canonical Dogfood pass.
+- The current Git worktree contains the intentional uncommitted review, invariant-fix, regression, ADR, and management-document packages. They remain classified project state and must not be destructively cleaned or presented as a clean checkpoint.
+- CFB-120..132 and the complete Stage 1 Dogfood-blocker lifecycle are closed. Canonical Algorithm is now sealed at `CF-COMMIT-e5ca290905c2a4b5e2c05bd4` with Atom hash schema 4, `sealed-snapshot-v1`, `open-clean`, and zero Fires; the configured legacy repository was not mutated.
+- RVC-011 / CFR-161 is closed through Install, installed counterexample replay, both real-repository read-only probes, canonical trace-warning verification, and Retrospect. ADR-013 now owns the typed committable decision and non-relaxable safety floor.
+- RVC-039 / CFR-162 is closed through the full lifecycle. ADR-014 makes unresolved text, binary, and semantic merge facts authoritative blockers and makes `merge --continue` the explicit validated resolution boundary.
+- `BATCH-2026-07-review-portfolio-completion` remains frozen. Roots through CFR-167/CFB-134 completed through Retrospect; CFB-133, admitted CFR-168 blocker CFB-136, and CFR-168..173 are the 8 active issues. No unrelated Discovery is admitted until the batch completes.
+- The base environment still does not expose `cargo` on `PATH`; a durable pinned toolchain/CI identity remains release work.
 
 If any line above changes, update this snapshot and append the reason to `docs/development/history.md`.
 
@@ -46,12 +50,11 @@ Before starting implementation:
 
 ## Current Cleanup Priorities
 
-The organization gate is complete. The next constrained work is:
+The CFB-120..132, CFR-161, CFR-162, CFR-163/CFB-135, CFR-164, CFR-165/CFR-174/CFR-175, CFR-166/CFB-134, and CFR-167 roots are complete. The active constrained work is:
 
-1. Keep CFB-120..CFB-126 frozen as the first Stage 1 correctness batch; do not claim zero open product issues.
-2. Resolve sealed-base/publish, path-containment, Trace Graph endpoint, mutable-state locking, full-digest collision, and import-idempotency invariants before discretionary feature work.
-3. Preserve the green Rust source gate in a durable pinned toolchain/CI environment and produce a source-bound binary from a clean checkpoint.
-4. Investigate the recorded `branch list` timeout before treating that surface as healthy.
+1. Implement CFR-168 bounded graph/object/HTTP work and stable counters without changing decision semantics.
+2. Burn down architecture, automation, and claim roots in the frozen dependency order; CFB-133 closes with CFR-170.
+3. Run CFR-172/173 experiments only after their safety/contract predecessors, record adopt/narrow/stop outcomes, then perform one portfolio-wide completion audit.
 
 ## Validation Matrix
 
@@ -73,6 +76,7 @@ If an environment cannot run a required gate, record that limitation explicitly 
 | Management | `README.md`, `project-management.md`, `history.md`, `current-cycle-burn-down-plan.md` | State, workflow, cycle execution, and handoff control. |
 | Strategy | `strategy/README.md`, engineering principles, product strategy, modernization and release/format roadmaps, decision register | Promoted decisions, bounded hypotheses, and the only active strategic roadmap. |
 | Exploration | `exploration/` | Non-authoritative alternatives, falsifiable hypotheses, and experiment designs from the three completed exploration phases. |
+| CodeFire improvement review | [`codefire-review-portfolio/`](codefire-review-portfolio/README.md) | Evidence-backed product, domain, architecture, implementation, workflow, and evolution reviews kept as next-discovery candidates until promotion. |
 | AI acceleration | `ai/README.md`, `ai/context-packs.json`, `ai/schemas/`, `ai/evals/`, role/runtime policy, task/review packets, and `tools/` | External AI task definition, typed contracts, context compression, review, model routing, validation selection, and parallel-lane operation. |
 | Issues | `bug-backlog.md`, `bug-issues/`, `code-review-issues-2026-06-06.md`, `code-review-issues/`, `issue-root-cause-map.json` | Product and source-review issue tracking. |
 | Historical deletion audit | `archive/deletion-manifest.md`, `history.md`, Git history | Destinations and recovery path for removed completion/version plans. |

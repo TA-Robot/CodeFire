@@ -46,7 +46,7 @@ Priority experiments:
 6. root/path/symlink and server-verification trust-boundary red team;
 7. stale lock, pending transaction, corrupt object, and user-work recovery table.
 
-The first frozen implementation batch is CFB-120..CFB-126: scan base sealing, pre-publication commit sealing, resolved path containment, Trace Graph endpoint integrity, live mutable-state locking, full-digest collision rejection, and import idempotency request binding.
+The CFB-120..132 correctness batch and the CFR-161..167 safety/contract roots completed source gates, isolated Install, Algorithm Dogfood, and Retrospect by 2026-07-19; same-root CFB-134/135 and CFR-174/175 are also closed. CFR-163 gives local authority one verified snapshot, CFR-164 binds trust subjects, CFR-165 gives remote publication one durable protocol, CFR-166 establishes support/version, public base-schema, conformance, extension, pagination, and remote-Doctor contracts, and CFR-167 binds effective-policy provenance and typed ChangeCoverage without overstating span precision. The 60-review terminal audit remains frozen as `BATCH-2026-07-review-portfolio-completion`: CFB-133, admitted CFR-168 blocker CFB-136, and CFR-168..173 remain active, with CFR-168/CFB-136 in progress. Bounded-work roots preempt architecture/contract consumers; read-only adoption and product falsification experiments run last and must record an adopt/narrow/stop decision. No later-stage prototype may bypass these frozen safety gates.
 
 Exit gate:
 
