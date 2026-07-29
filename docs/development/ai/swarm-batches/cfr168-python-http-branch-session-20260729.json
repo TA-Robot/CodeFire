@@ -1,0 +1,27 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-python-http-branch-session-20260729",
+  "workspace": "/workspace/worktrees/cfr168-p0-canonical",
+  "base_revision": "775366e3c3fe89dafe307b9beacab88eb9384d93",
+  "max_parallel": {
+    "fugu": 0,
+    "claude": 1,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "branch-request-session",
+      "role": "implementer",
+      "tier": "high",
+      "provider": "claude",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-python-http-branch-session-20260729.md",
+      "depends_on": [],
+      "write_set": [
+        "codefire",
+        "tests/test_python_http_branch_decision_work.py"
+      ],
+      "expected_commit": true,
+      "timeout": "8h"
+    }
+  ]
+}
