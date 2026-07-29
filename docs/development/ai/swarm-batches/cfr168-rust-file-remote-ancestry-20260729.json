@@ -1,0 +1,26 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-rust-file-remote-ancestry-20260729",
+  "workspace": "/workspace/worktrees/cfr168-p0-canonical",
+  "base_revision": "fe54e60d22dfd081bf271593ba794e4f567ed915",
+  "max_parallel": {
+    "fugu": 1,
+    "claude": 0,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "file-remote-ancestry",
+      "role": "implementer",
+      "tier": "ultra",
+      "provider": "fugu",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-rust-file-remote-ancestry-20260729.md",
+      "depends_on": [],
+      "write_set": [
+        "crates/codefire-cli/src/remote.rs"
+      ],
+      "expected_commit": true,
+      "timeout": "8h"
+    }
+  ]
+}
