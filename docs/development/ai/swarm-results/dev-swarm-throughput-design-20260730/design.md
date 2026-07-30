@@ -111,6 +111,77 @@ lower-priority task can use the remaining capacity.
 Count both scheduler-managed and adopted live tasks. Provider, total-session,
 and heavy limits must all pass before launch.
 
+### Review rollover and shadow integration train
+
+`candidate.ready` must be a typed event, not a condition discovered by manager
+polling. It binds the exact base/head/tree, changed-file set, patch digest,
+task-packet digest, focused validation IDs, clean-state result, and provider
+run identity. The portfolio supervisor may then enqueue a prepared independent
+review automatically when:
+
+- the candidate is a descendant of its frozen base;
+- every changed path is inside the declared write set;
+- no required focused validation is missing or stale;
+- the requested reviewer is independent of the candidate run; and
+- global provider/resource permits are available.
+
+Automatic enqueueing is not automatic acceptance. A `REQUEST_CHANGES` result
+returns the surface to Freeze with immutable findings; `ACCEPT` enters a
+manager-controlled integration queue.
+
+The integration queue owns one shadow head per frozen batch. It applies only
+the accepted product delta, never a worker branch tip or its manager/control
+documents. After each admitted delta it runs the smallest cross-surface gates
+selected by the packet's invariant and changed-symbol map. A broad/full gate
+runs only when the ready accepted queue is empty and the composition revision
+is stable. Any conflict, changed patch digest, failed focused gate, or
+previously unreviewed conflict resolution produces a new exact candidate and
+review; it never falls through to the next delta.
+
+### Content-addressed validation evidence
+
+Store a successful deterministic gate under a key covering:
+
+```text
+sha256(
+  exact tree and declared non-Git input digests
+  + validation ID and argv
+  + selected environment contract
+  + toolchain/binary provenance
+  + fixture/corpus version
+)
+```
+
+The scheduler may reuse the result only for the exact same key and must expose
+the original run, log digest, duration, and cache decision in collection
+output. Failed, flaky, interrupted, time-sensitive, install, dogfood, and
+final release gates are never promoted from cache. A packet may mark a
+focused deterministic gate cacheable; absence of that declaration remains
+the compatible run-always behavior.
+
+This cache avoids rebuilding and rerunning unchanged proof while preserving
+the exact-revision evidence boundary. It is separate from Cargo's compilation
+cache.
+
+### Counterexample and context compaction
+
+Freeze resolves recurring failure signatures from
+`docs/development/ai/failure-cookbook.md` into stable counterexample IDs. Each
+reviewable invariant carries:
+
+- one real production entry point;
+- one independent observable oracle;
+- one deliberate-regression mutation that the oracle rejects;
+- exact boundary/minus-one/plus-one cases when a limit exists; and
+- the smallest source/test/context files required to reproduce it.
+
+The generated worker handoff contains only the frozen objective, exact
+identity, applicable counterexamples, write set, focused validations, and
+their content-addressed files. Stable repository/role instructions form a
+cacheable prompt prefix; historical transcripts and unrelated packet prose do
+not enter the worker context. The full manager record remains durable outside
+the prompt.
+
 ### Durable progress events
 
 Write append-only events to:
@@ -200,6 +271,20 @@ Scheduler coverage:
 - `light=2, heavy=1` permits one heavy plus one light but not two heavy jobs;
 - critical-path priority wins a constrained permit;
 - provider limits remain active;
+- exact candidate-ready events enqueue an independent review once and bind all
+  candidate identities;
+- dirty, out-of-write-set, stale-evidence, non-descendant, and non-independent
+  candidates do not enqueue;
+- accepted product deltas enter the shadow queue while reports/control files
+  remain excluded;
+- conflict resolution and post-apply focused-gate failure stop the train and
+  require a fresh exact review;
+- broad validation waits for a stable empty accepted queue;
+- validation-cache keys change for tree, argv, environment, toolchain,
+  fixture, and declared-input changes;
+- failed, flaky, install, dogfood, and final gates cannot be reused;
+- counterexample handoffs contain the production entry point, oracle,
+  deliberate regression, exact write set, and no unrelated transcript;
 - stale/resumed/checkpoint events fire once per epoch and bind exact SHAs;
 - hedge base and lineage validation fail closed;
 - lineage survives plan, prompt, state, and collection;
@@ -229,7 +314,11 @@ polling remains unchanged.
 3. `dev-swarm: bind hedge and supersedes lineage`
 4. `dev-swarm: emit signal and checkpoint age events`
 5. `dev-swarm: adopt manually resumed second-agent runs`
-6. `docs: document swarm scheduling and recovery contracts`
+6. `dev-swarm: enqueue exact independent reviews from candidate events`
+7. `dev-swarm: add content-addressed deterministic gate evidence`
+8. `dev-swarm: run manager-owned shadow integration trains`
+9. `dev-agent: generate counterexample-bound compact handoffs`
+10. `docs: document swarm scheduling and recovery contracts`
 
 Each functional commit includes its black-box tests. Documentation remains a
 separate commit.
