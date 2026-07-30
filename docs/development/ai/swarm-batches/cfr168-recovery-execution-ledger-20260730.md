@@ -889,3 +889,29 @@ now: typed event stream and atomic run state; automatic exact-review rollover;
 global resource/write-set locks; shadow integration train; generated status
 views; terminal cache/log retention. It remains blocked from direct edits
 until `/workspace` has usable version-control metadata.
+
+## 2026-07-30 19:21 UTC first review-first rollover
+
+The File Doctor zero-residual repair completed with scheduler
+`all_passed=true` on exact candidate
+`1a04490806b59f8c39b5c1cf03f42d06aa750a98`. Its exact task base is
+`dbeaac1526acc8c2e102ee2b137e8f2a708890b0`, candidate tree is
+`eafb2cbf20980944d16086a972100c321a8b56be`, manifest SHA-256 is
+`db98dc6dd28218522bafe9ce80fac7f7aeadae527ace2cdd1ea977c9b5e45e55`,
+and the one-commit changed set is `remote/doctor.rs` plus four shared source
+documents. The worker worktree is clean. This proves a candidate handoff, not
+acceptance.
+
+The released external permit was not used for another implementation
+surface. A report-only Claude Opus 5 exact rereview was frozen at task commit
+`cb561908fe97e10faaa927946ccd051805be1bd4` and registered in canonical as
+`92d80c7`. It binds the candidate tree, binary patch digest, prior report and
+repair-contract digests, all four Should and four Could residuals, production
+reachability, and deliberate-regression evidence. The review is active under
+batch
+`cfr168-rust-file-doctor-zero-residual-rereview-claude-20260730`.
+
+This is the first live application of the trusted-throughput decision:
+candidate-ready to reviewer start occurred in the same manager interval, no
+new surface WIP was opened, and no candidate product byte was copied to
+canonical before an exact decision.
