@@ -60,6 +60,7 @@ No CodeFire product file needs to change.
   "tasks": [
     {
       "resource_class": "heavy",
+      "execution_profile": "rust-shared-low-memory-v1",
       "progress_events": {
         "checkpoint_due_seconds": 2700
       },
@@ -85,6 +86,7 @@ Compatibility rules:
 - missing `scheduling` preserves current topological launch order and
   provider-only limits;
 - missing `resource_class` means `light`;
+- missing `execution_profile` preserves the inherited environment;
 - missing progress thresholds disables age events;
 - missing lineage preserves the current state and collection shape;
 - a hedge must have no task dependency and its exact revision must equal the
@@ -92,6 +94,21 @@ Compatibility rules:
 - every lineage revision must resolve as an exact Git subject.
 
 ## Scheduler changes
+
+### Validated execution profiles
+
+Do not add arbitrary manifest environment injection. Resolve an optional
+`execution_profile` through a foundation-owned allowlist and record its ID and
+non-secret effective values in task state. The initial
+`rust-shared-low-memory-v1` profile sets the pinned Rust/Cargo homes, one
+shared target directory, bounded Cargo/test jobs, and incremental-build
+policy already used by the recovery envelope. Reject an unknown profile or a
+resolved cache path outside the configured workspace cache.
+
+The profile makes build reuse and resource limits part of task identity
+instead of prompt advice. Terminal cleanup removes an inactive task-local
+target, but never blindly cleans the shared target. Shared-cache retention is
+size/age based and runs only when no matching Cargo process is active.
 
 ### Priority and capacity
 
@@ -268,6 +285,11 @@ Scheduler coverage:
 
 - old manifests preserve current behavior;
 - invalid resource classes/limits fail;
+- unknown execution profiles and cache paths outside the configured root fail;
+- the Rust profile binds one shared target and bounded build/test concurrency
+  into state, launch environment, and validation-cache identity;
+- terminal cleanup reclaims an inactive private target but never an active or
+  shared target;
 - `light=2, heavy=1` permits one heavy plus one light but not two heavy jobs;
 - critical-path priority wins a constrained permit;
 - provider limits remain active;
@@ -310,15 +332,16 @@ polling remains unchanged.
 ## Safe implementation partitions
 
 1. `second-agent: publish atomic invocation state`
-2. `dev-swarm: enforce opt-in resource and critical-path scheduling`
-3. `dev-swarm: bind hedge and supersedes lineage`
-4. `dev-swarm: emit signal and checkpoint age events`
-5. `dev-swarm: adopt manually resumed second-agent runs`
-6. `dev-swarm: enqueue exact independent reviews from candidate events`
-7. `dev-swarm: add content-addressed deterministic gate evidence`
-8. `dev-swarm: run manager-owned shadow integration trains`
-9. `dev-agent: generate counterexample-bound compact handoffs`
-10. `docs: document swarm scheduling and recovery contracts`
+2. `dev-swarm: add validated execution profiles and terminal cache policy`
+3. `dev-swarm: enforce opt-in resource and critical-path scheduling`
+4. `dev-swarm: bind hedge and supersedes lineage`
+5. `dev-swarm: emit signal and checkpoint age events`
+6. `dev-swarm: adopt manually resumed second-agent runs`
+7. `dev-swarm: enqueue exact independent reviews from candidate events`
+8. `dev-swarm: add content-addressed deterministic gate evidence`
+9. `dev-swarm: run manager-owned shadow integration trains`
+10. `dev-agent: generate counterexample-bound compact handoffs`
+11. `docs: document swarm scheduling and recovery contracts`
 
 Each functional commit includes its black-box tests. Documentation remains a
 separate commit.
