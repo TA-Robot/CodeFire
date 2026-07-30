@@ -2,7 +2,7 @@
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "cfr168-python-http-composition-freeze-20260730",
   "status": "blocked",
-  "objective": "Manager-compose the exact accepted Python HTTP Doctor+Branch scaffold, Upload successor, MR-list successor, and MR-write successor in that order using product-delta-only ports, explicit shared-dispatcher/session/response ownership, fresh composition reviews, and exact-head focused and broad gates; remain blocked until all three successor SHAs and ACCEPT reports are bound.",
+  "objective": "Manager-compose the exact accepted Python HTTP Doctor+Branch scaffold, Upload successor, MR-list successor, and preflight-bound MR-write successor in that order using product-delta-only ports, explicit shared-dispatcher/session/response ownership, fresh composition reviews, and exact-head focused and broad gates; remain blocked until all three successor SHAs, ACCEPT reports, and the MR-write shared-primitives READY report are bound.",
   "base_revision": "740ea18eb42630ba265a8aad83c950ceb96aacca",
   "role": "manager",
   "risk": {
@@ -33,6 +33,7 @@
     ],
     "additional_files": [
       "docs/development/ai/task-packets/cfr168-python-http-composition-freeze-20260730.md",
+      "docs/development/ai/task-packets/cfr168-python-http-shared-primitives-preflight-20260730.md",
       "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md",
       "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md",
       "docs/development/ai/swarm-results/cfr168-python-http-doctor-branch-composition-rereview-20260730/review.md",
@@ -59,6 +60,7 @@
       "accepted-mr-list-sha:UNBOUND",
       "mr-list-rejected-candidate:38da8988ac8bc1fcdfcb82c62e7aa0d28791500c",
       "mr-list-request-changes-review:80784151e0a42b2f839cdcf01336252319e5830a",
+      "shared-primitives-preflight-ready-report:UNBOUND",
       "accepted-mr-write-sha:UNBOUND",
       "mr-write-rejected-candidate:6dd4527f23135388b53fc5c6d637c4105cc5d659",
       "mr-write-request-changes-review:b86a782b6ac72cabe684106f969681c5cd56380e",
@@ -116,6 +118,7 @@
       "Replay duplicate Upload recovery commits 3153d75 or cb13da0 already represented by 0703f71",
       "Import product bytes from rejected candidates 38da898 or 6dd4527 without their independently accepted additive successor semantics",
       "Port MR-write before the accepted Upload and MR-list ownership models are composed",
+      "Launch or compose an MR-write successor that did not bind the exact shared-primitives preflight READY report before implementation",
       "Resolve shared dispatcher, response, session, authority, cleanup, nonce, or reducer conflicts outside the manager lane",
       "Let the conflict-resolution author independently approve the same composed product tree",
       "Treat an isolated-candidate test or review as evidence for manager-authored composition bytes",
@@ -144,8 +147,8 @@
     },
     {
       "id": "serialized-order",
-      "statement": "The only authorized product order is Doctor+Branch scaffold, accepted Upload, accepted MR-list, accepted MR-write, then final full-spine review.",
-      "falsification_test": "Swap MR-list and Upload, port MR-write before either predecessor, or run final review before the last conflict resolution; dependency readiness must fail."
+      "statement": "The only authorized product order is Doctor+Branch scaffold, accepted Upload, accepted MR-list, shared-primitives READY preflight, accepted MR-write, then final full-spine review.",
+      "falsification_test": "Swap MR-list and Upload, launch or port MR-write before either predecessor or without the bound READY report, or run final review before the last conflict resolution; dependency readiness must fail."
     },
     {
       "id": "product-delta-only",
@@ -196,8 +199,8 @@
   "validation": [
     {
       "id": "accepted-input-audit",
-      "command": "Bind ACCEPTED_UPLOAD_SHA, ACCEPTED_MR_LIST_SHA, and ACCEPTED_MR_WRITE_SHA plus each exact ACCEPT report commit/SHA-256, candidate parent/head/tree, deterministic patch digest, changed-file set, and finding disposition before changing status to ready.",
-      "purpose": "Make dependency readiness and accepted product provenance explicit before any composition write.",
+      "command": "Bind ACCEPTED_UPLOAD_SHA, ACCEPTED_MR_LIST_SHA, and ACCEPTED_MR_WRITE_SHA plus each exact ACCEPT report commit/SHA-256, candidate parent/head/tree, deterministic patch digest, changed-file set, finding disposition, and the pre-implementation shared-primitives READY report commit/SHA-256 before changing status to ready.",
+      "purpose": "Make dependency readiness, preflight provenance, and accepted product provenance explicit before any composition write.",
       "required": true
     },
     {
@@ -271,6 +274,7 @@
   "handoff": {
     "required_outputs": [
       "accepted_candidate_report_and_digest_matrix",
+      "shared_primitives_ready_report_and_digest",
       "exact_composition_base_head_tree_and_patch_digest",
       "linear_product_commit_and_excluded_management_commit_lists",
       "product_delta_provenance_and_changed_path_audit",

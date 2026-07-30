@@ -34,6 +34,7 @@ Dogfood, Retrospect, or capability re-advertisement.
 | Embedded old Upload slice | `0703f71b9800ff19ce52d01bcd46c8eddb323df2`, representing the earlier `cb13da08…` recovery product/test slice | must be advanced to the accepted Upload successor before the scaffold is landable |
 | Upload repair | current candidate `76baff84cb1192e11b26dcc669fb800f7b13fa30`; exact rereview pending | `ACCEPTED_UPLOAD_SHA = UNBOUND`; exact report commit, report SHA-256, decision, and accepted product-delta range are also unbound |
 | MR-list repair | `38da8988ac8bc1fcdfcb82c62e7aa0d28791500c` rejected by `80784151e0a42b2f839cdcf01336252319e5830a`; closure repair active | `ACCEPTED_MR_LIST_SHA = UNBOUND`; exact fresh report commit, report SHA-256, and accepted product-delta range are unbound |
+| Shared-primitives adversarial preflight | blocked packet `cfr168-python-http-shared-primitives-preflight-20260730`; no manifest while Upload/MR-list are unbound | exact Fugu `READY` report commit and SHA-256 must be bound before MR-write closure implementation starts |
 | MR-write repair | `6dd4527f23135388b53fc5c6d637c4105cc5d659` rejected by `b86a782b6ac72cabe684106f969681c5cd56380e`; closure repair prepared | `ACCEPTED_MR_WRITE_SHA = UNBOUND`; exact fresh report commit, report SHA-256, and accepted product-delta range are unbound |
 
 The packet may move from `blocked` to `ready` only after all three `UNBOUND`
@@ -47,6 +48,9 @@ by:
    write set;
 5. a disposition for every prior finding and every new finding;
 6. proof that no later report supersedes or rejects the candidate.
+7. for MR-write, the committed shared-primitives preflight decision and
+   SHA-256, with decision `READY`, were bound before the implementation lane
+   launched.
 
 A focused test pass, clean worktree, agent success, report draft, accepted
 predecessor, or manager inspection does not satisfy an accepted binding.
@@ -113,6 +117,12 @@ Reconcile GET and POST dispatch through:
 Port `ACCEPTED_MR_WRITE_SHA` last. The MR-write lineage diverges at
 `cab3126f216c595c0d2211174b364e8532a310e2`; blind merge, rebase, or wholesale
 cherry-pick is forbidden.
+
+The successor must descend from an implementation packet that binds the exact
+`READY` report produced by
+`cfr168-python-http-shared-primitives-preflight-20260730`. A preflight
+`BLOCK`, missing report, later predecessor finding, or unbound report digest
+keeps the MR-write implementation and this composition packet blocked.
 
 The port must reuse, not fork:
 

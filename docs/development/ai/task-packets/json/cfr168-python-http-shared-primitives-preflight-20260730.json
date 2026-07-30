@@ -1,0 +1,197 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "cfr168-python-http-shared-primitives-preflight-20260730",
+  "status": "blocked",
+  "objective": "Before the MR-write closure implementation, independently reconcile the exact accepted Doctor/Branch, Upload, and MR-list request/session/response/publication ownership contracts; bind physical owner/effect/cleanup/authority/response counterexamples and return READY or BLOCK without changing product code.",
+  "base_revision": "c97d6488b6349ae46d4f4887a2630b2f9ff59e02",
+  "role": "architect",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 2,
+      "reversibility": 1,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "sealed_commit_or_branch_atomicity",
+      "security_auth_signature_or_remote_mutation",
+      "cross_subsystem_architecture",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 11,
+    "selected_tier": "ultra",
+    "rationale": "The preflight is report-only and reversible, but it arbitrates accepted or candidate request-ledger, sealed-session, response, cleanup, nonce, publication, and authority semantics across diverged Python HTTP lineages. A wrong READY decision multiplies implementation and composition rework."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-3-store-object-commit-integrity",
+      "pack-4-remote-http-security"
+    ],
+    "additional_files": [
+      "docs/development/ai/task-packets/cfr168-python-http-shared-primitives-preflight-20260730.md",
+      "docs/development/ai/task-packets/cfr168-python-http-composition-freeze-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-doctor-branch-composition-rereview-20260730/review.md",
+      "docs/development/ai/swarm-batches/cfr168-python-http-upload-zero-residual-rereview-fugu-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-mr-list-zero-residual-rereview-fugu-20260730/review.md",
+      "docs/development/ai/swarm-batches/cfr168-python-http-mr-list-review-closure-repair-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-mr-mutation-zero-residual-rereview-fugu-20260730/review.md",
+      "docs/development/ai/swarm-batches/cfr168-python-http-mr-write-review-closure-repair-20260730.md",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "adr/ADR-020-decision-equivalent-work-budget.md"
+    ],
+    "evidence_refs": [
+      "freeze-base:c97d6488b6349ae46d4f4887a2630b2f9ff59e02",
+      "doctor-branch-product:701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714",
+      "doctor-branch-accept:c57215e243839b224a641251fc9e3bf092f7e116",
+      "upload-current-candidate:76baff84cb1192e11b26dcc669fb800f7b13fa30",
+      "accepted-upload-sha:UNBOUND",
+      "accepted-upload-report:UNBOUND",
+      "mr-list-rejected-candidate:38da8988ac8bc1fcdfcb82c62e7aa0d28791500c",
+      "accepted-mr-list-sha:UNBOUND",
+      "accepted-mr-list-report:UNBOUND",
+      "mr-write-rejected-candidate:6dd4527f23135388b53fc5c6d637c4105cc5d659",
+      "mr-write-request-changes-review:b86a782b6ac72cabe684106f969681c5cd56380e",
+      "launch-blocker:accepted-upload-and-mr-list-exact-bindings-required",
+      "manifest-state:none-authorized-while-blocked"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "codefire",
+      "tests/test_codefire_cli.py",
+      "tests/test_python_http_doctor_decision_work.py",
+      "tests/test_python_http_branch_decision_work.py",
+      "tests/test_python_http_upload_accounted_traversal.py",
+      "tests/test_python_http_mr_list_decision_work.py",
+      "tests/test_python_http_mr_mutation_decision_work.py",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "docs/development/ai/task-packets/**",
+      "docs/development/ai/swarm-batches/**",
+      "docs/development/ai/swarm-results/**",
+      "adr/ADR-020-decision-equivalent-work-budget.md"
+    ],
+    "write_set": [
+      "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-fugu-20260730/preflight.md"
+    ],
+    "disallowed_paths": [
+      "codefire",
+      "tests/**",
+      "crates/**",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "docs/development/bug-issues/**",
+      "docs/development/code-review-issues/**",
+      "docs/development/history.md",
+      "docs/development/todo-checklist.md",
+      ".devcontainer/**",
+      "subprojects/**",
+      "install.sh"
+    ],
+    "disallowed_actions": [
+      "Create a dev-swarm manifest or launch the preflight while an accepted Upload or MR-list binding remains UNBOUND",
+      "Modify product, tests, source contracts, issue state, lifecycle state, or an existing review report",
+      "Treat a green candidate gate, worker handoff, draft report, or scoped predecessor review as an accepted binding",
+      "Implement the MR-write repair before the preflight report is committed and bound",
+      "Approve or integrate any product candidate from this report-only task",
+      "Replace an accepted predecessor contract with a weaker third model merely to obtain READY",
+      "Use helper-call counts, deleted helpers, constant labels, test-only stage jumps, or incomplete snapshots as physical ownership proof",
+      "Run Install, Dogfood, Close, Retrospect, Docker, or unrelated broad validation"
+    ]
+  },
+  "non_goals": [
+    "Repair Upload, MR-list, MR-write, Doctor, Branch, GC, Rust, file transport, packaging, or devcontainer code",
+    "Independently accept an implementation candidate or authorize product integration",
+    "Compose the Python HTTP product tree or resolve manager-owned product conflicts",
+    "Run unrestricted full-suite, Install, Dogfood, Close, or Retrospect work",
+    "Infer future accepted predecessor identities before their exact reports exist"
+  ],
+  "invariants": [
+    {
+      "id": "accepted-predecessors-only",
+      "statement": "Preflight begins only after exact Upload and MR-list candidate parent, head, tree, patch digest, ACCEPT report commit, and report digest are bound with every finding disposed.",
+      "falsification_test": "Leave one binding UNBOUND, substitute a REQUEST_CHANGES candidate, alter one product byte after review, or omit a report digest; readiness must remain blocked."
+    },
+    {
+      "id": "one-physical-owner-model",
+      "statement": "Every request-reachable descriptor, buffer, record, permit, session, response, publication plan, postimage, and cleanup debt has one creating ledger, bounded lifetime, transfer, and terminal owner across the shared routes.",
+      "falsification_test": "Omit each owner before allocation, restore a duplicate physical read, or leave one unreleased amount after a failing cleanup; the proposed oracle must detect the exact defect."
+    },
+    {
+      "id": "effect-response-order",
+      "statement": "Response preparation, publication planning, sealing, and the complete final authority fence precede the first effect; committed or durably recoverable effects cannot be replaced by a later selected response.",
+      "falsification_test": "Move response preparation after escrow/publication, mutate each authority after its last observation, or inject postcommit cleanup failure; require no stale success, one exact response, and one terminal outcome."
+    },
+    {
+      "id": "shared-primitives-before-surface",
+      "statement": "Request context, sealed snapshot, authority fence, prepared response, retryable cleanup, publication transaction, and error-origin behavior are reused or explicitly adapted; a surface-local fork requires a proven incompatibility.",
+      "falsification_test": "Introduce a second ledger, snapshot reader, response selector, cleanup state, nonce transaction, or filesystem/transport classifier without an incompatibility proof; decision must be BLOCK."
+    },
+    {
+      "id": "non-vacuous-counterexamples",
+      "statement": "Every material F1-F7 claim has a live production entry point, independent observable oracle, exact boundary where applicable, and deliberate regression that fails for the intended reason.",
+      "falsification_test": "Replace the regression with a deleted helper, constant label, helper counter, test-only skip, incomplete snapshot, or unrelated earlier limit; counterexample coverage must fail."
+    },
+    {
+      "id": "report-only-independence",
+      "statement": "The preflight changes only its report and cannot approve, repair, compose, or integrate product bytes.",
+      "falsification_test": "Add any product, test, source-doc, issue, lifecycle, or existing report path to the diff; postflight write-set validation must reject the run."
+    }
+  ],
+  "validation": [
+    {
+      "id": "accepted-binding-audit",
+      "command": "Recompute accepted Upload and MR-list parent/head/tree/patch/report identities and all finding dispositions before changing packet status to ready.",
+      "purpose": "Prevent preflight against a moving, rejected, or partially reviewed substitute.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "production-call-graph",
+      "command": "Trace Doctor, Branch, Upload, MR-list, and MR-write through the live HTTP dispatcher and map every owner, physical read, effect, response, cleanup, and terminal edge.",
+      "purpose": "Bind the shared primitive decision to production behavior rather than helper-only structure.",
+      "required": true
+    },
+    {
+      "id": "counterexample-completeness",
+      "command": "For each material owner/effect/fence/response/cleanup/publication claim, specify or run one independent oracle and deliberate regression plus exact/minus-one/plus-one and 1x/3x/10x cases where applicable.",
+      "purpose": "Make the next implementation packet fail closed before coding when its proof plan is vacuous.",
+      "required": true
+    },
+    {
+      "id": "output-scope",
+      "command": "git diff --name-only <launch-revision>..HEAD and git status --porcelain must contain only the declared preflight report and the worktree must be clean.",
+      "purpose": "Preserve reviewer independence and report-only scope.",
+      "required": true,
+      "requires_capability": "git"
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "recomputed_predecessor_identity_and_report_matrix",
+      "ready_or_block_decision",
+      "production_call_graphs",
+      "physical_owner_lifetime_and_formula_table",
+      "effect_response_and_cleanup_timelines",
+      "shared_primitive_reuse_adapt_incompatible_decisions",
+      "counterexample_and_deliberate_regression_matrix",
+      "exact_boundary_and_scaling_plan",
+      "bounded_mr_write_implementation_write_set",
+      "composition_conflict_map",
+      "residual_predecessor_gates",
+      "next_action"
+    ],
+    "evidence_digest_required": true
+  }
+}
