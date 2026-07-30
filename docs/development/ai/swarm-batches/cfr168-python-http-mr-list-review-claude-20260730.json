@@ -2,7 +2,7 @@
   "schema": "dev-swarm.v1",
   "batch_id": "cfr168-python-http-mr-list-review-claude-20260730",
   "workspace": "/workspace/worktrees/cfr168-p0-canonical",
-  "base_revision": "REPLACE_WITH_REGISTRATION_COMMIT",
+  "base_revision": "f13ddabfc521336c0056d7cb384d0269d39bf3b7",
   "max_parallel": {
     "fugu": 0,
     "claude": 1,
