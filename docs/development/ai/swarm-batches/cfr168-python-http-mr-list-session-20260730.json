@@ -1,0 +1,27 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-python-http-mr-list-session-20260730",
+  "workspace": "/workspace/worktrees/cfr168-p0-canonical",
+  "base_revision": "7327e2a8e72f6af84b0eadd8bb6b16233f86882a",
+  "max_parallel": {
+    "fugu": 0,
+    "claude": 1,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "mr-list-session",
+      "role": "implementer",
+      "tier": "high",
+      "provider": "claude",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-python-http-mr-list-session-20260730.md",
+      "depends_on": [],
+      "write_set": [
+        "codefire",
+        "tests/test_python_http_mr_list_decision_work.py"
+      ],
+      "expected_commit": true,
+      "timeout": "8h"
+    }
+  ]
+}
