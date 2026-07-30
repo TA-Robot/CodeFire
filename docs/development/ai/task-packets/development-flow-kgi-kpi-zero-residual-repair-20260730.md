@@ -1,6 +1,12 @@
 # Development-Flow KGI/KPI Zero-Residual Repair Task Packet
 
-Status: ready
+Status: cancelled — implementation produced exact candidate
+`0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1`, but eight manager
+counterexamples make that candidate non-integratable
+
+Successor:
+[`development-flow-kgi-kpi-manager-counterexample-repair-20260730.md`](development-flow-kgi-kpi-manager-counterexample-repair-20260730.md)
+is blocked pending the exact-candidate Fugu rereview.
 
 Typed packet:
 [`json/development-flow-kgi-kpi-zero-residual-repair-20260730.json`](json/development-flow-kgi-kpi-zero-residual-repair-20260730.json)

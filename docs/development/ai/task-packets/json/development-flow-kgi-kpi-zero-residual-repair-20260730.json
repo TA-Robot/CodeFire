@@ -1,7 +1,7 @@
 {
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "development-flow-kgi-kpi-zero-residual-repair-20260730",
-  "status": "ready",
+  "status": "cancelled",
   "objective": "Make the development-flow KGI/KPI framework decision-grade by closing every MUST, SHOULD, and COULD finding in the bound independent review in one semantically validated candidate, repairing the active CFR-168 flow record, and adding negative tests for every accepted adversarial mutation.",
   "base_revision": "b307b47f51f73b054b66444493c4590379518c4f",
   "role": "implementer",
