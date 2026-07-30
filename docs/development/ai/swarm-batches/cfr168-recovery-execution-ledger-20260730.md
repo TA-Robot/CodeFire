@@ -445,10 +445,10 @@ The first newly available external slot was dispatched immediately to
 
 | Lane | Provider/model | State |
 |---|---|---|
-| Python upload / CFB-138 zero-residual repair | Claude `claude-opus-5` | active from exact base `5f79899`; no product commit yet |
+| Python upload / CFB-138 zero-residual repair | Claude `claude-opus-5` | active from exact base `5f79899`; durable WIPs `600750c` (bounded canonical encoding) and `c33592a` (pre-allocation session control ownership) are clean checkpoints |
 | Python MR-list exact rereview | Fugu `fugu-ultra-v1.1` | active against `38da898`; confirmed symlinked/replaced `branches` absence-conflation defect remains under final report analysis |
 | Python MR-mutation exact rereview | Fugu `fugu-ultra-v1.1` | active against `6dd4527`; confirmed unaccounted authority reads remain under final report analysis |
-| Rust storage zero-residual repair | Claude `claude-opus-5` | active from exact base `13767c7` through the registered dev-swarm batch |
+| Rust storage zero-residual repair | Claude `claude-opus-5` | active from exact base `13767c7` through the registered dev-swarm batch; durable WIP `e9e42aa` records the F1-F8 repair before continued `main.rs`/`storage.rs` refinement |
 
 The development-flow KGI/KPI repair completed cleanly at exact candidate
 `0ae583e`. Manager reproduction passes 79/79 tool tests, the AI contract check,
