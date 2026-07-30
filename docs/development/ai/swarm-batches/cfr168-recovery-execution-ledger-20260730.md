@@ -55,6 +55,11 @@ foreground run passes its dedicated production suite 18/18 in 54.077 seconds, an
 plus `git diff --check` pass. Python-pattern discovery, final commit, and independent review remain
 pending, so this surface is not yet a durable candidate.
 
+The Rust storage work was preserved at WIP snapshot
+`f5bce305da7ebfd08a840a4b281e29b0476874e0` after the Fugu session could not be resumed. The
+Claude Opus 5 finisher `cfr168-rust-storage-claude-finisher-20260730` is auditing and validating
+that exact snapshot. The WIP commit is recovery evidence only and is not an integration candidate.
+
 ## Recovered Python composition evidence
 
 - The isolated composition probe is
