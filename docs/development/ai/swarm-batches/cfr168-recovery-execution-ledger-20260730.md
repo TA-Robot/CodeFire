@@ -212,6 +212,31 @@ The Storage repair enters this queue as soon as its report-only checkpoint and e
 are committed. Its relative priority is recomputed from the report's confirmed write set; the
 uncommitted reviewer transcript is not a task contract.
 
+### Gate ladder and evidence posture
+
+Canonical head `984906a` is still byte-identical to immutable product snapshot `e2a218e` across
+`codefire`, `crates/`, `tests/`, `Cargo.toml`, and `Cargo.lock`. The commits since that snapshot are
+control-plane evidence and task contracts; no recovery candidate is integrated. Candidate-only or
+rejected-revision test results therefore cannot authorize canonical product acceptance.
+
+To preserve the mandatory final evidence without repeatedly spending heavy-gate time on revisions
+already expected to change:
+
+1. **Lane candidate:** syntax/static, focused production, mutation/non-vacuity, exact/−1/+1, and
+   1x/3x/10x evidence.
+2. **Each overlapping port:** the affected composition-focused suites and an exact-candidate
+   independent decision.
+3. **Stable Python or Rust runtime-group head:** one broad runtime gate after no more same-runtime
+   ports are pending.
+4. **One final frozen integrated SHA:** full Python, Rust workspace, format, strict Clippy, demo,
+   source/project docs, shared Rust/Python conformance, independent High review, clean release,
+   isolated Install, installed reversals, canonical Dogfood, issue synchronization, Retrospect, and
+   the final zero-residual ledger audit.
+
+An intermediate pre-install milestone is a `source-close candidate`, not a status transition.
+`CFR-168`/`CFB-136`/`CFB-138` remain open until the final installed and dogfood evidence is bound to
+the immutable accepted product SHA.
+
 ### Resource and lightweight-gate sample
 
 At `2026-07-30T10:24:11Z`, `/workspace` measured `2,836,481,180` bytes, the mounted filesystem
