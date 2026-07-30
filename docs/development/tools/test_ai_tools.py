@@ -31,6 +31,10 @@ from ai_contracts import (  # noqa: E402
     validate_task_packet,
 )
 from classify_worktree import classify_path  # noqa: E402
+from capture_candidate_identity import (  # noqa: E402
+    capture_candidate_identity,
+    markdown_card,
+)
 from check_ai_acceleration_docs import (  # noqa: E402
     STALE_PATTERNS,
     check_dev_swarm_v1_stage5_fields,
@@ -624,6 +628,126 @@ class ReviewBindingTests(unittest.TestCase):
             self.assertEqual(files, {"change.txt"})
             self.assertEqual(resolved_base, base)
             self.assertEqual(resolved_head, head)
+
+
+class CandidateIdentityTests(unittest.TestCase):
+    def make_repository(self, sandbox: Path) -> tuple[Path, str, str, Path]:
+        root = sandbox / "repo"
+        root.mkdir()
+        packet_dir = root / "docs/development/ai/swarm-batches"
+        packet_dir.mkdir(parents=True)
+        ticket = packet_dir / "candidate-task.md"
+        ticket.write_text("# Candidate task\n", encoding="utf-8")
+        target = root / "product.txt"
+        target.write_text("base\n", encoding="utf-8")
+        subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "ai-test@example.invalid"],
+            cwd=root,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "AI Test"], cwd=root, check=True
+        )
+        subprocess.run(["git", "add", "."], cwd=root, check=True)
+        subprocess.run(["git", "commit", "-qm", "base"], cwd=root, check=True)
+        base = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        control = sandbox / "control"
+        control.mkdir()
+        manifest_path = control / "candidate-task.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "schema": "dev-swarm.v1",
+                    "batch_id": "candidate-batch",
+                    "base_revision": base,
+                    "tasks": [
+                        {
+                            "id": "candidate-task",
+                            "role": "implementer",
+                            "tier": "high",
+                            "provider": "claude",
+                            "ticket": ticket.relative_to(root).as_posix(),
+                            "write_set": ["product.txt"],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        target.write_text("candidate\n", encoding="utf-8")
+        subprocess.run(["git", "add", target], cwd=root, check=True)
+        subprocess.run(["git", "commit", "-qm", "candidate"], cwd=root, check=True)
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        return root, base, head, manifest_path
+
+    def test_clean_linear_candidate_is_ready_and_exact(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root, base, head, manifest_path = self.make_repository(
+                Path(temporary).resolve()
+            )
+            identity = capture_candidate_identity(
+                root,
+                base,
+                head,
+                manifest_ref=str(manifest_path),
+                task_id="candidate-task",
+            )
+            self.assertEqual(identity["decision"], "READY_FOR_REVIEW")
+            self.assertEqual(identity["commit_count"], 1)
+            self.assertEqual(
+                [entry["path"] for entry in identity["changed_paths"]],
+                ["product.txt"],
+            )
+            self.assertEqual(identity["manifest"]["outside_write_set"], [])
+            self.assertIn(identity["patch_sha256"], markdown_card(identity))
+
+    def test_dirty_candidate_blocks_without_losing_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root, base, head, _ = self.make_repository(Path(temporary).resolve())
+            (root / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+            identity = capture_candidate_identity(root, base, head)
+            self.assertEqual(identity["decision"], "BLOCK")
+            self.assertFalse(identity["clean"])
+            self.assertIn(
+                "candidate worktree has tracked or untracked changes",
+                identity["blocking_reasons"],
+            )
+
+    def test_changed_path_outside_manifest_write_set_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root, base, _, manifest_path = self.make_repository(
+                Path(temporary).resolve()
+            )
+            outside = root / "outside.txt"
+            outside.write_text("outside\n", encoding="utf-8")
+            subprocess.run(["git", "add", outside], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "outside"], cwd=root, check=True)
+            identity = capture_candidate_identity(
+                root,
+                base,
+                "HEAD",
+                manifest_ref=str(manifest_path),
+                task_id="candidate-task",
+            )
+            self.assertEqual(identity["decision"], "BLOCK")
+            self.assertIn(
+                "candidate changed paths outside the declared write_set",
+                identity["blocking_reasons"],
+            )
+            self.assertEqual(identity["manifest"]["outside_write_set"], ["outside.txt"])
 
 
 class FocusedTestMapTests(unittest.TestCase):

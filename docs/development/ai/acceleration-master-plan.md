@@ -199,6 +199,7 @@ Only keep items that remove repeated human/AI overhead, can be checked cheaply, 
 | AIA-035 | Hot-file conflict-domain decomposition | After accepted CFR-168 composition, extract stable request/session/authority/response/cleanup/publication primitives and owner-layered tests from the 33k-line Python reference, Rust `http.rs`, `main.rs`, and `remote.rs`; preserve exact behavior and measure write-set overlap, conflict time, context bytes, and focused-suite size. |
 | AIA-036 | Manual Stage 5 capability/control board | Implemented in `stage5-manual-control-runbook.md`: current versus manual versus future capability matrix, portfolio leases, candidate card, prepared review rollover, exact continuation, gate index, shadow train, event/KPI record, and resource floors. |
 | AIA-037 | Fail-closed Stage 5 manifest boundary | Design corrected to use `dev-swarm.v2`. The project-side AI checker now rejects known Stage 5 fields anywhere in a `dev-swarm.v1` batch manifest, with negative tests. Full recursive unknown-field rejection in both versions and old-binary v2 rejection remain foundation work blocked on usable Git provenance. |
+| AIA-038 | Manager-recomputed candidate identity | Implemented in `../tools/capture_candidate_identity.py`: one read-only command binds exact base/merge-base/parents/head/tree, additive and merge commit lists, canonical binary patch digest, name-status/numstat/blob identities, checkout and clean state, manifest/ticket digests, and write-set containment. Unsafe or moving subjects emit `BLOCK` with exit 2. Validation/session evidence remains an explicit manager append rather than a worker claim. |
 
 The AIA-021 provenance is intentionally local evidence. It does not claim a trusted/reproducible builder or dependency supply-chain attestation.
 
@@ -216,9 +217,11 @@ Current recommended next items:
    partitions.
 5. Run the next five comparable CFR-168 packets under the Stage 5 WIP,
    preflight, review, and shadow-composition controls.
-6. Start AIA-035 only after the accepted Python/Rust composition trees are
+6. Use AIA-038 for every completed repair so identity collection and
+   candidate-card rendering leave the candidate-to-review critical path.
+7. Start AIA-035 only after the accepted Python/Rust composition trees are
    frozen so move-only work does not invalidate active exact reviews.
-7. Promote AIA-033 KGI/KPI changes only from complete event evidence; keep
+8. Promote AIA-033 KGI/KPI changes only from complete event evidence; keep
    unavailable queue/cost fields explicit.
 
 ## Success Metrics

@@ -121,31 +121,24 @@ The card contains:
 Recompute identity rather than copying worker prose:
 
 ```bash
-PYTHONPATH=docs/development/tools python3 - "$BASE" "$HEAD" <<'PY'
-import hashlib
-import json
-import subprocess
-import sys
-from pathlib import Path
-
-from ai_contracts import canonical_git_patch
-
-patch, paths, base, head = canonical_git_patch(
-    Path("."), sys.argv[1], sys.argv[2]
-)
-tree = subprocess.check_output(
-    ["git", "rev-parse", f"{head}^{{tree}}"], text=True
-).strip()
-print(json.dumps({
-    "base": base,
-    "head": head,
-    "tree": tree,
-    "patch_sha256": hashlib.sha256(patch).hexdigest(),
-    "files_changed": sorted(paths),
-}, indent=2))
-PY
-git status --porcelain=v1 --untracked-files=all
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  docs/development/tools/capture_candidate_identity.py \
+  --repo "$CANDIDATE_WORKTREE" \
+  --base "$BASE" \
+  --head "$HEAD" \
+  --manifest "$CONTROL_WORKTREE/$MANIFEST" \
+  --task-id "$TASK_ID" \
+  --format markdown
 ```
+
+The command resolves the exact commits, merge base, parents, tree, additive
+commit list, merge commits, canonical binary patch digest, sorted
+name-status/numstat/blob identities, checkout HEAD, clean tracked/untracked
+state, manifest/ticket digests, and declared write-set containment. It emits
+`READY_FOR_REVIEW` only for a clean, linear, non-empty exact range; otherwise
+it emits `BLOCK` and exits 2 while preserving the evidence needed to diagnose
+the block. The manifest may live in a manager control worktree above the task
+base; its ticket is always resolved from the candidate repository.
 
 Dirty, non-descendant, out-of-write-set, rewritten-with-unreconciled-evidence,
 missing-focused-gate, or moving candidates remain `BLOCK`.

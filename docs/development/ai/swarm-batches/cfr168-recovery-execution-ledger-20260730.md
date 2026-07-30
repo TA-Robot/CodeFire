@@ -1164,3 +1164,28 @@ No manifest was created, no external permit was occupied, and no provider
 cost was incurred by this preparation. This moves review specification work
 off the candidate-ready critical path without creating speculative product
 WIP or allowing a branch tip to become the review subject.
+
+## 2026-07-30 20:43 UTC candidate-identity automation
+
+The repeated manager handoff step is now automated by
+`docs/development/tools/capture_candidate_identity.py`. One read-only command
+recomputes the task base, merge base, parent/head/tree, additive and merge
+commit lists, canonical binary patch SHA-256, sorted
+name-status/numstat/base-and-head blob identities, checkout HEAD, clean
+tracked/untracked state, manifest/ticket digests, and declared write-set
+containment. A dirty, moving, empty, merged, wrong-base, or out-of-scope
+candidate emits `BLOCK` and exits 2; worker prose cannot override it.
+
+The helper was exercised against the live clean MR-list worktree while its
+manager remained active. It independently resolved six additive commits,
+tree `17cb396ee30a887be6698b822b60f52ac2adb67c`, patch SHA-256
+`6a9ca3d1046ba5ec213645c0710f900425191269360a70a3d5c4a50090528543`,
+six changed paths, exact manifest/ticket digests, and no write-set escape.
+This is a provisional identity observation only: the candidate is not frozen
+until the worker and scheduler are terminal, so a later HEAD must be
+recomputed rather than inheriting these values.
+
+Three focused fail-closed tests cover a clean linear candidate, dirty state,
+and a committed path outside the manifest write set. The complete AI-tool
+suite now has 47 passing tests. The Stage 5 runbook invokes the helper
+directly, and the acceleration plan records AIA-038 as implemented.
