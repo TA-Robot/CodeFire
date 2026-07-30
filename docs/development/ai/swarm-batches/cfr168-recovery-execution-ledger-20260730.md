@@ -475,6 +475,16 @@ The rereview is frozen on taskbase
 with confirmed-probe launch base `110a38c` and manifest commit `09e5911`, for
 Fugu Ultra 1.1 dispatch when a review slot becomes available.
 
+The eight already reproduced counterexamples also have a blocked successor
+packet at
+`docs/development/ai/task-packets/development-flow-kgi-kpi-manager-counterexample-repair-20260730.md`
+and typed packet JSON, integrated as `f118262`. It binds exact-nanosecond
+instants, finite JSON numbers, iterative candidate/record lineage,
+operational due dates, per-batch freshness, symlink-safe repository
+resolution, normalized locators, and Git-history-backed final provenance.
+Its status remains `blocked`; no implementation manifest is created until the
+exact Fugu rereview report and any additional findings are bound.
+
 The next-slot policy is result-driven:
 
 1. a completed active reviewer first yields a durable report and, on
