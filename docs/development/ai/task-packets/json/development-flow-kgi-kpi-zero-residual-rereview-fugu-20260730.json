@@ -1,0 +1,176 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730",
+  "status": "ready",
+  "objective": "Independently adversarially review exact development-flow KGI/KPI candidate 0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1, dispose every prior MUST/SHOULD/COULD finding, test semantic and mutation non-vacuity, and issue an exact-revision ACCEPT or REQUEST_CHANGES report.",
+  "base_revision": "3458cec8d2fb13eb23a3d99607664633c5b02e10",
+  "role": "reviewer",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 2,
+      "reversibility": 1,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "cross_subsystem_architecture",
+      "release_completion_audit",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 11,
+    "selected_tier": "ultra",
+    "rationale": "This contract controls later throughput, safety, routing, continuity, and provider-cost decisions; false acceptance would multiply misleading evidence across the development process."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-5-project-management-docs"
+    ],
+    "additional_files": [
+      "docs/development/ai/task-packets/development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730.md",
+      "docs/development/ai/swarm-results/development-flow-kgi-kpi-independent-review-claude-20260730/review.md",
+      "docs/development/ai/task-packets/development-flow-kgi-kpi-zero-residual-repair-20260730.md",
+      "docs/development/ai/task-packets/json/development-flow-kgi-kpi-zero-residual-repair-20260730.json",
+      "docs/development/ai/development-flow-kgi-kpi.md",
+      "docs/development/ai/schemas/development-flow-record.v1.schema.json",
+      "docs/development/ai/flow-metrics/cfr168-recovery-20260730.v1.json",
+      "docs/development/tools/ai_contracts.py",
+      "docs/development/tools/check_ai_contracts.py",
+      "docs/development/tools/test_ai_tools.py"
+    ],
+    "evidence_refs": [
+      "review-commit:b307b47f51f73b054b66444493c4590379518c4f",
+      "review-sha256:02a0d259c55121379f07c2c1d893d4a29dd546b16e6f237659a5081c60fd3336",
+      "subject-commit:0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1",
+      "subject-parent:a6d41a9d7cdae2157cdcc5ca9f9008e4734c4e16",
+      "implementer-claim:55-of-55-semantic-mutations-rejected",
+      "implementer-claim:15-of-15-structural-controls-rejected",
+      "manager-reproduction:79-tests-and-ai-development-gate-pass"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "docs/development/ai/**",
+      "docs/development/tools/**",
+      "docs/development/project-management.md",
+      "docs/development/README.md",
+      "docs/development/history.md",
+      "docs/development/exploration/phase-2/experiment-catalog-and-kpi-scorecard.md",
+      ".git/**"
+    ],
+    "write_set": [
+      "docs/development/ai/swarm-results/development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730/review.md"
+    ],
+    "disallowed_paths": [
+      "codefire",
+      "crates/**",
+      "tests/**",
+      ".devcontainer/**",
+      "subprojects/**",
+      "docs/development/code-review-issues/**",
+      "docs/development/bug-issues/**",
+      "docs/development/ai/task-packets/**",
+      "docs/development/ai/development-flow-kgi-kpi.md",
+      "docs/development/ai/flow-metrics/**",
+      "docs/development/ai/schemas/**",
+      "docs/development/tools/**"
+    ],
+    "disallowed_actions": [
+      "Edit the reviewed candidate, original review, task packets, policy, schema, exemplar, validators, tests, product, or issue state",
+      "Run Cargo, builds, install, demo, dogfood, broad product Python suites, or network calls other than the Fugu provider request",
+      "Accept on implementer claims, test count, commit size, runtime, or provider confidence",
+      "Treat any MUST, SHOULD, or COULD finding as optional under the zero-residual rule",
+      "Authorize integration, Close, Install, Dogfood, or Retrospect"
+    ]
+  },
+  "non_goals": [
+    "Fix a discovered defect in the review lane",
+    "Change CodeFire product behavior or CFR-168 product candidates",
+    "Review devcontainer implementation, CI, packaging, host resources, or provider wrappers",
+    "Establish an efficiency cohort or fabricate unavailable measurements",
+    "Rerun release, install, dogfood, Cargo, or broad product gates"
+  ],
+  "invariants": [
+    {
+      "id": "exact-subject",
+      "statement": "The decision and every source claim are bound to exact candidate 0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1 and its committed blobs.",
+      "falsification_test": "Verify HEAD, parent, ancestry, changed paths, and blobs before review; reject any dirty or different subject."
+    },
+    {
+      "id": "complete-prior-disposition",
+      "statement": "Every original MUST F1-F14, SHOULD F-S1-F-S14, and COULD F-C1-F-C7 has an independently traced, non-vacuous disposition.",
+      "falsification_test": "Require a row for each identifier with enforcing code/policy/test and a falsification result; any absent or partial row forces REQUEST_CHANGES."
+    },
+    {
+      "id": "semantic-non-vacuity",
+      "statement": "A mutation is considered closed only when the intended production semantic rule rejects it with the expected stable finding.",
+      "falsification_test": "Replay all 55 semantic mutations and 15 controls, inspect test oracles, and add independent malformed-but-schema-valid probes."
+    },
+    {
+      "id": "honest-decision-readiness",
+      "statement": "The report separates contract validity, record honesty, and actual KPI/KGI decision capability without turning unavailable or absent evidence into zero or achievement.",
+      "falsification_test": "Recompute the exemplar and attempt decisions with missing safety, cohort, cost, digest, and runtime evidence."
+    },
+    {
+      "id": "review-only",
+      "statement": "The lane changes only one new report and never repairs or mutates its subject.",
+      "falsification_test": "Compare the final commit against the launch revision and require a single added report path."
+    }
+  ],
+  "validation": [
+    {
+      "id": "ai-tools-tests",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/test_ai_tools.py",
+      "purpose": "Reproduce the candidate's complete positive and negative tool matrix.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "ai-contracts",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_ai_contracts.py",
+      "purpose": "Exercise the production contract and active record route.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "ai-development",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_ai_development.py --timeout 120",
+      "purpose": "Reproduce the bounded aggregate AI-development gate.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "project-docs",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_project_docs.py",
+      "purpose": "Confirm project-management, policy, indexes, and history remain structurally consistent.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "subject-diff-check",
+      "command": "git diff --check a6d41a9d7cdae2157cdcc5ca9f9008e4734c4e16..0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1",
+      "purpose": "Check the exact implementation range without mutating it.",
+      "required": true,
+      "requires_capability": "git"
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "single_committed_review",
+      "exact_subject_and_blobs",
+      "complete_prior_finding_matrix",
+      "severity_ordered_findings",
+      "semantic_and_mutation_non_vacuity",
+      "reference_digest_lifecycle_and_arithmetic_audit",
+      "complexity_and_attack_surface_audit",
+      "validation_table",
+      "explicit_accept_or_request_changes",
+      "required_next_action",
+      "clean_worktree"
+    ],
+    "evidence_digest_required": true
+  }
+}
