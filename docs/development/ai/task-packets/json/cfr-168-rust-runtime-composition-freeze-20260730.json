@@ -1,0 +1,304 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "cfr-168-rust-runtime-composition-freeze-20260730",
+  "status": "blocked",
+  "objective": "Manager-only composition of the independently accepted CFR-168 Rust file-remote ancestry, HTTP merge-request closure, storage, and file-remote Doctor candidates on canonical 740ea18, followed by one canonical source-document synthesis, the focused composed gate ladder, and a fresh independent review of the exact composed commit. Composition remains blocked until every final candidate SHA and exact ACCEPT report commit/digest is bound.",
+  "base_revision": "740ea18eb42630ba265a8aad83c950ceb96aacca",
+  "role": "manager",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 2,
+      "reversibility": 2,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "sealed_commit_or_branch_atomicity",
+      "cross_subsystem_architecture",
+      "release_completion_audit",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 12,
+    "selected_tier": "ultra",
+    "rationale": "The manager must compose four separately reviewed runtime branches, manually reconcile the shared decision-work core, preserve effect and publication ordering, synthesize canonical source truth, and prevent candidate-local evidence from being misrepresented as composed or release completion evidence."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-1-rust-cli-command-work",
+      "pack-3-store-object-commit-integrity",
+      "pack-4-remote-http-security",
+      "pack-5-project-management-docs"
+    ],
+    "additional_files": [
+      "docs/development/ai/swarm-batches/cfr168-rust-file-ancestry-zero-residual-rereview-fugu-20260730.md",
+      "docs/development/ai/swarm-batches/cfr168-rust-http-mr-preflight-review-closure-repair-20260730.md",
+      "docs/development/ai/swarm-batches/cfr168-rust-storage-zero-residual-rereview-fugu-20260730.md",
+      "docs/development/ai/swarm-batches/cfr168-rust-file-doctor-zero-residual-repair-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-rust-file-ancestry-review-claude-fallback-20260730/review.md",
+      "docs/development/ai/swarm-results/cfr168-rust-http-mr-preflight-review-claude-20260730/review.md",
+      "docs/development/ai/swarm-results/cfr168-rust-storage-independent-review-fugu-20260730/review.md",
+      "docs/development/ai/swarm-results/cfr168-rust-file-doctor-review-claude-fallback-20260730/review.md",
+      "crates/codefire-core/src/work_budget.rs",
+      "crates/codefire-cli/src/remote.rs",
+      "crates/codefire-cli/src/http.rs",
+      "crates/codefire-cli/src/main.rs",
+      "crates/codefire-cli/src/secure_worktree.rs",
+      "crates/codefire-cli/src/storage.rs",
+      "crates/codefire-cli/src/remote/doctor.rs",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md"
+    ],
+    "evidence_refs": [
+      "canonical-base:740ea18eb42630ba265a8aad83c950ceb96aacca",
+      "product-baseline:e2a218e015953f082245f36dbc6aee906b837e5a",
+      "ancestry-candidate:02b0d63651703aaac88c249bdc437cd173dfa397",
+      "ancestry-prior-review:0db912d58bc9c013dfccfaa175056dc463b177b0:REQUEST_CHANGES",
+      "blocker:ancestry-exact-accept-report-commit-and-digest-unbound",
+      "http-rejected-candidate:71854e20689d2dd79246fa741e0e6da443d04d1a",
+      "http-prior-review:b1905e9383e0201b841a6efd94578f46ffa98808:REQUEST_CHANGES",
+      "http-closure-task-base:7e4e685efbfc453a6d2209f37c99edb1ab46243d",
+      "blocker:http-final-candidate-and-exact-accept-report-unbound",
+      "storage-candidate:cdcb9bdefe7d25a118a9dc14171864d75f5ad304",
+      "storage-prior-review:4cfb607cfd6ac95d26d24a4542ac15ba56b428d6:REQUEST_CHANGES",
+      "blocker:storage-exact-accept-report-commit-and-digest-unbound",
+      "doctor-accepted-predecessor:52a025ecda3fe2f5ad8b5b2a485562e7c16ab6de",
+      "doctor-predecessor-review:ac725ae7a2bf3e419384ea599fc2f273130caf50:ACCEPT",
+      "doctor-zero-residual-task-base:dbeaac1526acc8c2e102ee2b137e8f2a708890b0",
+      "blocker:doctor-final-candidate-and-fresh-exact-accept-report-unbound",
+      "integration-order:ancestry-http-storage-doctor-source-doc-synthesis",
+      "composition-review:required-after-focused-gates"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "adr/ADR-020-decision-equivalent-work-budget.md",
+      "crates/codefire-core/src/work_budget.rs",
+      "crates/codefire-cli/src/remote.rs",
+      "crates/codefire-cli/src/http.rs",
+      "crates/codefire-cli/src/main.rs",
+      "crates/codefire-cli/src/secure_worktree.rs",
+      "crates/codefire-cli/src/storage.rs",
+      "crates/codefire-cli/src/tests.rs",
+      "crates/codefire-cli/src/tests/storage_decision_work.rs",
+      "crates/codefire-cli/src/remote/doctor.rs",
+      "docs/development/ai/swarm-batches/**",
+      "docs/development/ai/swarm-results/**",
+      "docs/development/ai/task-packets/**",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md"
+    ],
+    "write_set": [
+      "crates/codefire-core/src/work_budget.rs",
+      "crates/codefire-cli/src/remote.rs",
+      "crates/codefire-cli/src/http.rs",
+      "crates/codefire-cli/src/main.rs",
+      "crates/codefire-cli/src/secure_worktree.rs",
+      "crates/codefire-cli/src/storage.rs",
+      "crates/codefire-cli/src/tests.rs",
+      "crates/codefire-cli/src/tests/storage_decision_work.rs",
+      "crates/codefire-cli/src/remote/doctor.rs",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md"
+    ],
+    "disallowed_paths": [
+      "codefire",
+      "tests/**",
+      "crates/codefire-store/src/**",
+      "crates/codefire-cli/src/explain.rs",
+      "install.sh",
+      "pyproject.toml",
+      "setup.py",
+      ".devcontainer/**",
+      "subprojects/**",
+      "docs/development/code-review-issues/**",
+      "docs/development/bug-issues/**",
+      "docs/development/ai/swarm-results/**",
+      "docs/development/ai/swarm-batches/**",
+      "docs/development/ai/task-packets/**",
+      "docs/development/history.md",
+      "docs/development/README.md"
+    ],
+    "disallowed_actions": [
+      "Create or run a dev-swarm manifest while this packet is blocked",
+      "Start composition before all four exact final candidates and independent ACCEPT report commits and SHA-256 digests are bound",
+      "Integrate or partially salvage any candidate whose exact review decision is REQUEST_CHANGES",
+      "Merge review, task, result, manifest, or recovery-control history as product implementation history",
+      "Resolve work_budget.rs or canonical source-document overlap by taking one branch blob without semantic reconciliation",
+      "Add behavior not already covered by an exact accepted candidate; create a separately reviewed successor instead",
+      "Parallelize Cargo, reuse per-lane passing output as composed evidence, or skip a required focused gate",
+      "Claim closure of Explain combined ownership, the typed Store signal, or separately owned local merge, scan, clone, storage-report, or GC residuals",
+      "Update canonical, issue status, release status, Install, Dogfood, Close, or Retrospect from this packet",
+      "Discard user changes or mutate an implementation or independent-review worktree"
+    ]
+  },
+  "non_goals": [
+    "Implement a new product fix while resolving composition conflicts",
+    "Change Python fallback, Store types, Explain, packaging, devcontainer, CI, agent wrappers, or dogfood project code",
+    "Close separately owned local merge, scan, clone, storage-report, GC, typed Store, or Explain residuals",
+    "Raise public limits, weaken subject validation, or change accepted error precedence",
+    "Merge canonical or run Install, Dogfood, Close, or Retrospect",
+    "Treat four candidate-local acceptances as proof that the composed tree is accepted"
+  ],
+  "invariants": [
+    {
+      "id": "exact-acceptance-lineage",
+      "statement": "Every ported implementation commit belongs to the exact final candidate bound by an independent ACCEPT report commit and report digest.",
+      "falsification_test": "Substitute a parent, sibling, abbreviated-only hash, worker-success state, or report for another candidate and require the packet to remain blocked."
+    },
+    {
+      "id": "ordered-whole-candidate-composition",
+      "statement": "The manager composes ancestry, HTTP closure, storage, Doctor, and one source-document synthesis in that order, with no partial salvage from a REQUEST_CHANGES candidate.",
+      "falsification_test": "Omit or reorder one accepted implementation commit, copy one rejected hunk, or include a control-plane commit and require inventory verification to reject the composition before product validation."
+    },
+    {
+      "id": "semantic-work-budget-reconciliation",
+      "statement": "The final work_budget.rs preserves the ancestry deadline and one-way limit primitives plus the HTTP request-ledger sealer and transactional response-pair primitives without widening or conflating their scopes.",
+      "falsification_test": "Delete either primitive family, widen a profile, set a local_v1 deadline, add a third HTTP response sealer, or permit half-consumed response selection and require focused core and route regressions to fail."
+    },
+    {
+      "id": "single-ledger-sealer-terminal-owner",
+      "statement": "Each composed route has one operation or request ledger, at most one authorized prepublication owner at a time, one terminal observation, and zero retained, temporary, and permit ownership at handoff.",
+      "falsification_test": "Inject double seal, partial selection, cleanup failure, session loss, deadline, subject change, encoding failure, and partial publication; require the primary typed outcome, one terminal observation, and zero residual ownership."
+    },
+    {
+      "id": "effect-and-publication-order",
+      "statement": "Every accepted subject fence, response preflight, ownership admission, and required fallible cleanup remains before the first applicable authority effect or publication.",
+      "falsification_test": "Move ancestry copy, HTTP response preparation, storage response ownership, or the Doctor final subject fence across the first effect and require byte-for-byte pre-effect and response regressions to fail."
+    },
+    {
+      "id": "canonical-source-synthesis",
+      "statement": "One four-document synthesis describes the exact composed call chains, owners, data models, terminal semantics, and remaining boundaries.",
+      "falsification_test": "Restore one pre-candidate row, choose one candidate's whole document blob, or omit an accepted owner and require source/project document checks or the independent trace review to reject it."
+    },
+    {
+      "id": "bounded-closure-claim",
+      "statement": "The composition decision covers only the exact four accepted runtime surfaces and leaves every separately owned residual explicitly open.",
+      "falsification_test": "Claim closure of Explain combined ownership, the typed Store signal, or adjacent local merge, scan, clone, storage-report, or GC work without a separately accepted candidate and require the composed review to return REQUEST_CHANGES."
+    },
+    {
+      "id": "composed-evidence-only",
+      "statement": "Focused gates and independent review bind the exact clean composed commit and tree; earlier per-lane results are context only.",
+      "falsification_test": "Change one composed blob after validation, cite a per-lane run, or review a parent tree and require digest and ancestry checks to reject approval."
+    }
+  ],
+  "validation": [
+    {
+      "id": "composition-inventory",
+      "command": "Verify canonical base, all accepted candidate/report hashes, ordered implementation commits, excluded control-plane commits, exact changed-file set, clean status, tree hash, and patch digest.",
+      "purpose": "Reject stale, partial, reordered, or over-broad composition before product execution.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "diff-check-pre",
+      "command": "git diff --check",
+      "purpose": "Reject patch-integrity defects before focused Rust gates.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "rust-format",
+      "command": "cargo fmt --all -- --check",
+      "purpose": "Verify the composed Rust sources before building tests.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "core-work-budget",
+      "command": "cargo test -p codefire-core --locked work_budget -- --nocapture",
+      "purpose": "Prove the manually reconciled profile, permit, sealer, and terminal core behavior.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "file-ancestry",
+      "command": "cargo test -p codefire-cli --bin codefire-rs --locked remote::file_remote_ancestry_tests -- --nocapture",
+      "purpose": "Prove the accepted file-remote operation ordering, boundaries, cleanup, and counter curves after composition.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "http-merge-request",
+      "command": "cargo test -p codefire-cli --bin codefire-rs --locked merge_request -- --nocapture && cargo test -p codefire-cli --bin codefire-rs --locked http::tests -- --nocapture",
+      "purpose": "Prove response preflight, selection, publication, replay, and request-ledger ownership against the reconciled core.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "storage",
+      "command": "cargo test -p codefire-cli --bin codefire-rs --locked storage_decision_work -- --nocapture && cargo test -p codefire-cli --bin codefire-rs --locked storage -- --nocapture",
+      "purpose": "Prove portable owners, traversal, pinned reads, publication state, top-level output routing, and zero debt after composition.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "file-doctor",
+      "command": "cargo test -p codefire-cli --bin codefire-rs --locked remote::doctor -- --nocapture && cargo test -p codefire-cli --bin codefire-rs --locked doctor -- --nocapture",
+      "purpose": "Prove production factory identity, phase attribution, subject fences, cleanup precedence, parity, and zero debt against the final core and main routing.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "cli-binary",
+      "command": "cargo test -p codefire-cli --bin codefire-rs --locked",
+      "purpose": "Exercise cross-route and neighboring Rust CLI behavior on the exact composed tree.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "rust-clippy",
+      "command": "cargo clippy -p codefire-cli --all-targets --locked -- -D warnings",
+      "purpose": "Reject composed API, lifecycle, match-exhaustiveness, and warning regressions.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "source-docs",
+      "command": "python3 docs/development/tools/check_source_docs.py && python3 docs/development/tools/check_project_docs.py",
+      "purpose": "Validate the single canonical source-document synthesis and repository references.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "diff-check-final",
+      "command": "git diff --check",
+      "purpose": "Reconfirm patch integrity after all source-document and evidence work.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "composed-independent-review",
+      "command": "Freeze and run a separate report-only independent review against the exact composed commit and tree; require a committed report with a literal ACCEPT decision.",
+      "purpose": "Decide the newly composed core/runtime/doc behavior rather than extrapolating from candidate-local reviews and tests.",
+      "required": true
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "frozen_canonical_base",
+      "clean_composed_head_and_tree",
+      "four_candidate_and_acceptance_report_commit_digest_table",
+      "ported_and_excluded_commit_inventory",
+      "candidate_to_composed_blob_map",
+      "work_budget_semantic_reconciliation",
+      "source_document_synthesis_commit_and_trace",
+      "shared_ledger_sealer_terminal_matrix",
+      "focused_validation_commands_counts_durations_hashes_and_resources",
+      "composed_review_packet_report_commit_digest_and_decision",
+      "excluded_residual_disposition",
+      "new_conflict_or_successor_requirements",
+      "canonical_integration_remains_unauthorized"
+    ],
+    "evidence_digest_required": true
+  }
+}
