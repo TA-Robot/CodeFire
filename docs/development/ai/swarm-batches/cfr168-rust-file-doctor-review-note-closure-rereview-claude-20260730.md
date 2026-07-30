@@ -134,6 +134,16 @@ clean-state result for:
 - source-document checker; and
 - exact-base `git diff --check`.
 
+Identity, N1/N2/N3 focused debug/release tests, every deliberate regression,
+and live production-route probes are non-cacheable and must be run by this
+reviewer. The full CLI target, core target, strict Clippy, and format check may
+be reused only from a manager-generated gate-evidence index whose key matches
+the exact candidate tree, argv, environment profile above, Rust toolchain,
+Cargo lock/config inputs, fixture/corpus versions, terminal pass result, and
+complete log digest. Cite the key and digest when reused; otherwise run the
+gate. A worker summary, mutable log name, different tree, incomplete log, or
+failed/flaky/interrupted result is never reusable.
+
 Each deliberate regression changes production code, produces the intended
 targeted failure, is reverted, and is followed by recomputation of candidate
 HEAD/tree/patch/clean state. Run broad gates once on the stable exact subject.

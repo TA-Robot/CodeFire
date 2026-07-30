@@ -185,6 +185,17 @@ and log digests for:
 7. source/project docs checks when affected; and
 8. `git diff --check`.
 
+Identity, all eleven mutations, byte/scale probes, exact R-3/R-5
+debug-and-release cases, and the changed merge-request/HTTP focused groups
+are non-cacheable and must be run by this reviewer. Full CLI/core targets,
+strict Clippy, and format may be reused only from a manager-generated
+gate-evidence index whose key matches the exact candidate tree, argv, shared
+environment above, Rust toolchain, Cargo lock/config inputs,
+fixture/corpus versions, terminal pass result, and complete log digest. Cite
+the key and digest when reused; otherwise run the gate. Worker prose, a
+mutable log path, different tree, incomplete log, or
+failed/flaky/interrupted result is never reusable.
+
 Do not run Docker, Install, Dogfood, unrestricted all-language discovery, or
 full-workspace release validation.
 

@@ -1250,3 +1250,12 @@ cost: future review task commits now carry the manager-vetted helper blob when
 the candidate predates it, and cards bind its SHA-256. The current canonical
 helper digest is
 `ef548dd9a0c84ff617e2553110b0f3e25d68c0c2eb1857275e684ee561cfbd02`.
+
+The two prepared Rust reviews now also separate non-cacheable independent
+falsification from deterministic broad gates. Identity, live routes, focused
+debug/release cases, and every deliberate mutation must be rerun. Full
+CLI/core, strict Clippy, and format may be reused only through a
+manager-generated key binding the exact tree, argv, shared environment,
+toolchain, Cargo lock/config, fixtures, terminal pass, and complete log
+digest. This removes duplicate stable compilation when evidence is exact
+without turning worker prose or a mutable log filename into acceptance.
