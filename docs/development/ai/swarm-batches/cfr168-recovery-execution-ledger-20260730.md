@@ -60,6 +60,12 @@ The Rust storage work was preserved at WIP snapshot
 Claude Opus 5 finisher `cfr168-rust-storage-claude-finisher-20260730` is auditing and validating
 that exact snapshot. The WIP commit is recovery evidence only and is not an integration candidate.
 
+The four new Fugu independent-review sessions ended before producing reports after repeated Sakana
+model-list response incompatibility. Their partial logs are non-authoritative evidence only.
+Separate Claude Opus 5 fallback reviews are active for File Doctor, the Claude File Ancestry
+candidate, Python MR mutation, and the corrected Upload/CFB-138 candidate. No candidate is accepted
+from an interrupted reviewer transcript.
+
 ## Recovered Python composition evidence
 
 - The isolated composition probe is
