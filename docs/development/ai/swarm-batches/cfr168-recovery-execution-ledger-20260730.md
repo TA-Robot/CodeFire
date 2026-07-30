@@ -194,6 +194,24 @@ however, create a durable artifact while it continues:
 This is a flow control, not a task timeout. It preserves hours-long useful investigation while
 preventing an entire dependency chain from waiting for the reviewer's last possible observation.
 
+### Next-slot ready queue
+
+The four-external-session recovery ceiling remains in force. All four slots are occupied at this
+checkpoint, so a fifth external lane is not launched merely to maximize utilization. When a slot
+becomes available, the manager dispatches from this verified clean queue without repeating
+orientation:
+
+| Priority | Ready task base | Why it is ready / collision boundary |
+|---:|---|---|
+| 1 | Python Upload/CFB-138 zero-residual repair `72209c5` (packet `5f79899`) | Critical predecessor for the Python spine; exact rejected candidate `dece688` and review `0b1fd6f` are bound. It writes `codefire` and source docs, so implementation stays isolated until the later MR ports |
+| 2 | Rust file-remote ancestry zero-residual repair `aba1439` (packet `86a0c2e`) | Exact rejected candidate `e93ebc2` and review `ac626f6` are bound; unlocks clone/storage-report/GC successors. It avoids storage `main.rs` but overlaps later HTTP work in `work_budget.rs` |
+| 3 | Rust File Doctor zero-residual repair `e41f26c` (packet `dbeaac1`) | Exact candidate `52a025e` has independent accepted-nucleus report `84ea698`; zero-residual Should/Could repair is concentrated in `remote/doctor.rs` apart from shared docs |
+| 4 | Rust HTTP MR preflight zero-residual repair `9e5aec3` (packet `1a371fc`) | Exact candidate `71854e2` and rejecting report `b1905e9` are bound, but its Rust/Python/conformance/source-doc write set has the largest overlap and is therefore last in this ready group |
+
+The Storage repair enters this queue as soon as its report-only checkpoint and exact repair packet
+are committed. Its relative priority is recomputed from the report's confirmed write set; the
+uncommitted reviewer transcript is not a task contract.
+
 ### Resource and lightweight-gate sample
 
 At `2026-07-30T10:24:11Z`, `/workspace` measured `2,836,481,180` bytes, the mounted filesystem
