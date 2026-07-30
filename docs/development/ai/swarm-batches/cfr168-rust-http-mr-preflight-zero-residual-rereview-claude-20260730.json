@@ -1,0 +1,26 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-rust-http-mr-preflight-zero-residual-rereview-claude-20260730",
+  "workspace": "/workspace/worktrees/cfr168-rust-http-mr-preflight-zero-residual-rereview-claude-base",
+  "base_revision": "56719771342e8c7b94e22ae53fb6551605d9342a",
+  "max_parallel": {
+    "fugu": 0,
+    "claude": 1,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "rust-http-mr-preflight-zero-residual-rereview",
+      "role": "reviewer",
+      "tier": "ultra",
+      "provider": "claude",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-rust-http-mr-preflight-zero-residual-rereview-claude-20260730.md",
+      "depends_on": [],
+      "write_set": [
+        "docs/development/ai/swarm-results/cfr168-rust-http-mr-preflight-zero-residual-rereview-claude-20260730/review.md"
+      ],
+      "expected_commit": true,
+      "timeout": "12h"
+    }
+  ]
+}
