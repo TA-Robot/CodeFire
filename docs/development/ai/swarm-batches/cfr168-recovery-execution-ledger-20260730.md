@@ -16,18 +16,79 @@ Canonical issue status remains `investigating`; this ledger does not authorize C
   (`fugu-ultra-v1.1`). No external Codex implementation lane is active.
 - Recovery task timeout is eight hours.
 
+## 2026-07-30 second host-restart recovery
+
+The host restarted again at approximately 2026-07-30 02:58 UTC. The operator reported memory
+exhaustion as the cause. The restarted container cannot read the previous host boot's kernel OOM
+record, so the cause is operator-observed rather than independently proven by this container.
+
+The restart interrupted every remaining external-agent process. Their `dev-swarm` state files still
+say `running`, but all recorded manager/worker PIDs are stale and no Claude, Fugu, Cargo, Rust,
+Python-test, `second-agent`, or `dev-swarm` process survived. The states must not be interpreted as
+live work.
+
+Crash recovery found and repaired filesystem write loss:
+
+- 19 zero-length loose Git objects were moved, without deletion, to
+  `.git/recovery/oom-20260730T0258Z/zero-objects/`.
+- The staged ledger blob
+  `ce848ba02134dd762a3da84ea61d8f13c9a2d830`, canonical ledger commit
+  `afcfa9bac88f616162658a00ec21fbf792991f28`, canonical HTTP-review commit
+  `e28c90d4f10a8e7c0a27846750bf682e341e0cd5`, and HTTP repair-base review commit
+  `b382b27a73ffabf7668dd8924ae75cd14dba93be` were reconstructed byte-for-byte from
+  surviving trees, source commits, indexes, and metadata.
+- The HTTP-review working file was zero-length in the canonical and HTTP repair-base worktrees. It
+  was restored from committed blob `52127017c52819fc014159633875997a71f108e4`; both working copies
+  now hash to that exact blob.
+- Two branch reflogs, two linked-worktree HEAD reflogs, and five interrupted Claude event logs had
+  one trailing NUL run. The pre-repair bytes were copied under
+  `.git/recovery/oom-20260730T0258Z/`; only the trailing NUL runs were removed. Every repaired event
+  log parses as JSONL.
+- `git fsck --full` now reports no missing or corrupt object. Its remaining output consists only of
+  ordinary dangling objects from interrupted/reconstructed work.
+
+Every non-empty CFR-168 agent worktree found by the post-restart audit is now durable:
+
+| Interrupted work | Recovery commit | Post-recovery state |
+|---|---|---|
+| Rust storage Claude finisher | `b3bc32a6bd4c792edc5a1302c61e16c624a9b648` | 436 insertions / 59 deletions preserved; 779/779 CLI binary tests and source-doc check had passed before the final strict-Clippy command was interrupted |
+| Rust file-remote ancestry Fugu precursor | `9437ed86cd4fd7b5ed752d645b078101ef6bedaa` | prior 859-insertion / 173-deletion precursor preserved for comparison; it is not the reviewed Claude candidate |
+| Rust HTTP MR preflight Fugu precursor | `dd8ef3e0c71064ba5cc8c71a3d32ea4955faec1c` | prior 272-insertion / 8-deletion precursor preserved for comparison; it is not the reviewed Claude candidate |
+
+The File Doctor, File Ancestry, and Python Upload zero-residual repair workers had only inspected
+their inputs and left clean worktrees. The MR-list and MR-mutation reviewers preserved analysis in
+their event logs but had not committed formal reports. Those five tasks therefore require resume or
+replacement; no product/report commit is inferred from a transcript.
+
+The temporary Rust toolchain previously installed below `/tmp/codefire-rustup` did not survive the
+host restart. Rust gates remain historical evidence until the exact toolchain is rehydrated and
+rerun on the resumed candidate.
+
+### Memory-safe restart envelope
+
+Until the scheduler enforces resource classes directly, recovery uses this explicit envelope:
+
+- at most four external-agent sessions at once;
+- at most two heavy test/build jobs at once, with only one full-suite gate at a time;
+- Rust work uses `CARGO_BUILD_JOBS=2` and `RUST_TEST_THREADS=2`;
+- full Python, full Rust, release builds, and cross-runtime corpus runs are manager-serialized;
+- no new heavy job starts below 6 GiB host `MemAvailable` or while swap use exceeds 2 GiB;
+- each implementer creates a durable WIP checkpoint before a broad/full gate;
+- no stale `running` state is resumed until its worktree, event log, and exact base/head have been
+  re-audited.
+
 ## Active recovery lanes
 
 | Surface | Recovery base | Provider | New batch | State at restart audit | Required finish |
 |---|---|---|---|---|---|
 | Python HTTP Doctor | `d79be3e` | Claude Opus 5 | `cfr168-python-http-doctor-canonical-recovery-20260729` | product result `01a7c862`; focused 19/19 and 11 neighboring cases pass; standalone full-suite claim is not accepted because its background run stopped with the agent | independent review, composition gate, canonical integration |
-| Python HTTP upload ancestry/signature | `3153d75` | Claude Opus 5 | `cfr168-python-http-upload-recovery-20260729` | product result `cb13da08`; focused 10/10 and agent full Python 431/431 pass; CFB-138 discovered at default-profile scale | independent review, CFB-138 scale correction, canonical integration |
+| Python HTTP upload ancestry/signature | `3153d75` | Claude Opus 5 | `cfr168-python-http-upload-recovery-20260729` | product result `cb13da08`; focused 10/10 and agent full Python 431/431 pass; CFB-138 discovered at default-profile scale | zero-residual repair was interrupted before a diff; resume repair, independent re-review, canonical integration |
 | Python HTTP branch session | `8265ea1` | Claude Opus 5 | `cfr168-python-http-branch-recovery-20260729` | product result `fbef572e`; focused 13/13 and agent full Python 433/433 pass; one old CLI assertion encoded the former deadline defect | independent review, corrected neighboring assertion, canonical integration |
-| Python HTTP MR create/review/apply | `cab3126` | Claude Opus 5 | `cfr168-python-http-mr-mutation-recovery-20260729` | task packet only | one request ledger/deadline, pre-effect response owner, no-effect tests |
-| Rust storage | `40c095d` | Fugu 1.1 Ultra | `cfr168-rust-storage-recovery-20260729` | interrupted owner skeleton; 9 compile errors and 2 warnings reproduced after toolchain recovery | complete or replace skeleton, focused/broad tests, strict Clippy |
-| Rust file-remote ancestry | `fe54e60` | Fugu 1.1 Ultra | `cfr168-rust-file-remote-ancestry-recovery-20260729` | task packet only | live file upload/apply adoption, final fence, bounded traversal tests |
-| Rust file-remote Doctor | `ea8f2a6` | Fugu 1.1 Ultra | `cfr168-rust-file-doctor-recovery-20260729` | task packet only | unify live file command with accounted Doctor path |
-| Rust HTTP MR create/review preflight | `3c23e38` | Fugu 1.1 Ultra | `cfr168-rust-http-mr-preflight-20260729` | task packet only | prepared response before effect and no-effect fault tests |
+| Python HTTP MR create/review/apply | `cab3126` | Claude Opus 5 | `cfr168-python-http-mr-mutation-recovery-20260729` | candidate exists; independent review was interrupted after finding hidden nested sealed ledgers but before a report | finish formal review, repair under one request-owned authority/session, re-review |
+| Rust storage | `40c095d` | Fugu 1.1 Ultra, Claude Opus 5 finisher | `cfr168-rust-storage-recovery-20260729` | finisher WIP preserved as `b3bc32a`; 779/779 CLI tests passed; final strict Clippy was interrupted | rehydrate toolchain, finish strict Clippy and focused/broad evidence, independent review |
+| Rust file-remote ancestry | `fe54e60` | Fugu 1.1 Ultra, Claude Opus 5 hedge | `cfr168-rust-file-remote-ancestry-recovery-20260729` | Claude candidate rejected; zero-residual repair was interrupted before a diff | resume operation-scoped owner/fence repair and re-review |
+| Rust file-remote Doctor | `ea8f2a6` | Fugu 1.1 Ultra, Claude Opus 5 hedge | `cfr168-rust-file-doctor-recovery-20260729` | Claude candidate accepted with residual findings; zero-residual repair was interrupted before a diff | resume all Should/Could hardening and re-review |
+| Rust HTTP MR create/review preflight | `3c23e38` | Fugu 1.1 Ultra, Claude Opus 5 hedge | `cfr168-rust-http-mr-preflight-20260729` | Claude candidate review says `REQUEST_CHANGES` on missing/inexact evidence; Fugu precursor preserved as `dd8ef3e` | create exact repair packet, fix/rebind tests, re-review |
 
 Two Rust lanes remained in design analysis for about 45 minutes without a product diff. They were
 not stopped: independent Claude Opus 5 hedge lanes now run from the same immutable task bases:
@@ -46,20 +107,22 @@ The following results are durable candidate commits, not canonical integration o
 |---|---|---|---|
 | Python HTTP Doctor + branch composition | `701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714` | combined focused 42/42, Python-pattern 463/463, and unrestricted 691/691 in 2550.503 seconds pass with the configured Cargo toolchain; corrected expectation is included | Fugu report `4659318` says `ACCEPT` for the corrected composition only; product integration still waits for the upload disposition |
 | Python HTTP upload default-profile scale | `dece688afea815d1242e7751367052d1ceac4580` | focused 13/13, neighboring owners 59/59, selected legacy 22/22, and Python-pattern 434/434 pass; 1201-commit default-profile reversal and 1x/3x/10x counters are bound | independent report `0b1fd6f50fce2126a07238c422b1ff01b575c047` says `REQUEST_CHANGES`; zero-residual repair `cfr168-python-http-upload-zero-residual-repair-20260730` is active |
-| Python HTTP MR create/review/apply | `21fe75175e997cc7c6f8c3ef2a7558144d850f94` | dedicated 18/18 pass; broad 667-case run has 665 passes and two Cargo-PATH-only install failures | review `cfr168-python-http-mr-mutation-independent-review-20260730` is active; nonce timing and hidden sealed-validation ledger remain explicit review subjects |
-| Python HTTP MR list | `37f7427d46d2cf3ad66de3c1885ef4c0527cae70` | dedicated 18/18 in 54.077 seconds, Python-pattern 481/481 in 432.026 seconds, compilation, source/project docs, and diff checks pass | Claude review `cfr168-python-http-mr-list-review-claude-20260730` is pending; aggregate slope, multi-fault precedence, session reuse, and request isolation remain explicit subjects |
-| Rust live file Doctor | `52a025ecda3fe2f5ad8b5b2a485562e7c16ab6de` | focused 8/8, all Doctor 119/119, full `codefire-cli` binary 775/775, strict Clippy, format, source docs, and diff checks pass | independent Claude fallback report `84ea698b397e57a193cc5faa0ef63a0cff027e2c` says `ACCEPT`; zero-residual repair `cfr168-rust-file-doctor-zero-residual-repair-20260730` is active before product integration |
-| Rust file-remote ancestry Claude hedge | `e93ebc2394c8bd0398cfc23e8bf2d23d52e253b9` | focused remote 118/118, clean full-binary rerun 778/778, strict Clippy, format, source docs, and diff checks pass | independent report `ac626f65cdfa57a097bef5d757f02be6bbef409e` says `REQUEST_CHANGES`; zero-residual repair `cfr168-rust-file-ancestry-zero-residual-repair-20260730` is active |
-| Rust HTTP MR create/review preflight Claude hedge | `71854e20689d2dd79246fa741e0e6da443d04d1a` | focused HTTP 141/141, full binary 776/776, strict Clippy/all-targets, format, source docs, cross-runtime neighbors, and diff checks pass | Claude review `cfr168-rust-http-mr-preflight-review-claude-20260730` is pending; outer retained residual, dual preflight ownership, replay, and post-commit selection remain explicit subjects |
+| Python HTTP MR create/review/apply | `21fe75175e997cc7c6f8c3ef2a7558144d850f94` | dedicated 18/18 pass; broad 667-case run has 665 passes and two Cargo-PATH-only install failures | Claude review was interrupted before its report after proving several hidden nested sealed-validation ledgers; resume from transcript-backed evidence, then repair and re-review |
+| Python HTTP MR list | `37f7427d46d2cf3ad66de3c1885ef4c0527cae70` | dedicated 18/18 in 54.077 seconds, Python-pattern 481/481 in 432.026 seconds, compilation, source/project docs, and diff checks pass | Claude review was interrupted before its report after reproducing multi-fault precedence and nofollow/symlink fail-closed defects; resume formal report, repair, and re-review |
+| Rust live file Doctor | `52a025ecda3fe2f5ad8b5b2a485562e7c16ab6de` | focused 8/8, all Doctor 119/119, full `codefire-cli` binary 775/775, strict Clippy, format, source docs, and diff checks pass | independent Claude fallback report `84ea698b397e57a193cc5faa0ef63a0cff027e2c` says `ACCEPT`; zero-residual repair was interrupted before a diff |
+| Rust file-remote ancestry Claude hedge | `e93ebc2394c8bd0398cfc23e8bf2d23d52e253b9` | focused remote 118/118, clean full-binary rerun 778/778, strict Clippy, format, source docs, and diff checks pass | independent report `ac626f65cdfa57a097bef5d757f02be6bbef409e` says `REQUEST_CHANGES`; zero-residual repair was interrupted before a diff |
+| Rust HTTP MR create/review preflight Claude hedge | `71854e20689d2dd79246fa741e0e6da443d04d1a` | focused HTTP 141/141, full binary 776/776, strict Clippy/all-targets, format, source docs, cross-runtime neighbors, and diff checks pass | independent report `b1905e9383e0201b841a6efd94578f46ffa98808` says `REQUEST_CHANGES`: the product core is sound, but required test evidence is missing or not bound to the stated production boundary |
 
 The interrupted Python MR-list worktree was resumed without discarding its diff. Background
 validation that died with the worker was not accepted; manager-owned foreground runs produced the
 durable results recorded above before the final clean candidate commit.
 
-The Rust storage work was preserved at WIP snapshot
+The Rust storage work was first preserved at WIP snapshot
 `f5bce305da7ebfd08a840a4b281e29b0476874e0` after the Fugu session could not be resumed. The
-Claude Opus 5 finisher `cfr168-rust-storage-claude-finisher-20260730` is auditing and validating
-that exact snapshot. The WIP commit is recovery evidence only and is not an integration candidate.
+Claude Opus 5 finisher then produced recovery checkpoint
+`b3bc32a6bd4c792edc5a1302c61e16c624a9b648` and passed 779/779 CLI binary tests before the second
+host restart interrupted the final strict-Clippy command. Both WIP commits are recovery evidence
+only and are not integration candidates.
 
 The four new Fugu independent-review sessions ended before producing reports after repeated Sakana
 model-list response incompatibility. Their partial logs are non-authoritative evidence only.
