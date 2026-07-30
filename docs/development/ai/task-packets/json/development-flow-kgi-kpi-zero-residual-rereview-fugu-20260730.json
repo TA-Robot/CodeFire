@@ -47,7 +47,15 @@
       "subject-parent:a6d41a9d7cdae2157cdcc5ca9f9008e4734c4e16",
       "implementer-claim:55-of-55-semantic-mutations-rejected",
       "implementer-claim:15-of-15-structural-controls-rejected",
-      "manager-reproduction:79-tests-and-ai-development-gate-pass"
+      "manager-reproduction:79-tests-and-ai-development-gate-pass",
+      "manager-probe:nanosecond-post-capture-event-accepted",
+      "manager-probe:non-finite-scalar-measurement-accepted",
+      "manager-probe:multi-node-candidate-cycle-accepted",
+      "manager-probe:overdue-active-record-accepted",
+      "manager-probe:cross-batch-newest-record-coupling",
+      "manager-probe:repository-external-doc-symlink-accepted",
+      "manager-probe:non-normalized-agent-log-path-accepted",
+      "manager-probe:self-recomputable-final-record-seal"
     ]
   },
   "scope": {
@@ -113,6 +121,11 @@
       "id": "honest-decision-readiness",
       "statement": "The report separates contract validity, record honesty, and actual KPI/KGI decision capability without turning unavailable or absent evidence into zero or achievement.",
       "falsification_test": "Recompute the exemplar and attempt decisions with missing safety, cohort, cost, digest, and runtime evidence."
+    },
+    {
+      "id": "manager-counterexamples-disposed",
+      "statement": "The report confirms and disposes every manager-reproduced representation, graph, lifecycle, and repository-path counterexample against the exact candidate.",
+      "falsification_test": "Replay the eight launch counterexamples from the Markdown packet through the production checker and require an exact finding and severity for each."
     },
     {
       "id": "review-only",

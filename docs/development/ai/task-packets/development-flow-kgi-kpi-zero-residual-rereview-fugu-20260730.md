@@ -100,6 +100,48 @@ Independently verify:
 - error findings are stable, specific, deterministic, and do not crash or
   perform unbounded work on malformed-but-schema-valid input.
 
+### Manager-confirmed launch counterexamples
+
+The manager reproduced the following against exact candidate `0ae583e`.
+Confirm each result through the production checker and include it in the
+decision; do not spend the review rediscovering whether the probe exists.
+
+1. An event at
+   `2026-07-30T09:51:55.000000001Z` with `captured_at` at
+   `2026-07-30T09:51:55Z` returns zero findings. Timestamp parsing converts
+   nanosecond instants to binary `float`, so an event one nanosecond after the
+   record boundary compares equal at 2026 epoch magnitude.
+2. Setting measured scalar `MET-FLOW-017` to Python JSON `NaN` or `Infinity`
+   returns zero findings. The schema's number check and semantic comparisons
+   do not require finite numbers.
+3. One candidate root plus a two-node cycle
+   `b1c29fc… -> 6dd4527… -> b1c29fc…` returns zero findings. The validator
+   rejects only self-cycles and counts roots; it does not traverse the
+   candidate graph.
+4. Setting an active record's `next_review_due_at` to one second after
+   `captured_at`, but before the actual validation instant, returns zero
+   findings. The field has ordering semantics but no operational overdue
+   semantics.
+5. Two active records from different batches are not independent: the
+   directory validator marks the older one superseded because it compares
+   every active record with the globally newest capture, rather than the
+   newest record in the same batch.
+6. `doc:` resolution accepts a repository path whose final component is a
+   symlink to `/etc/passwd`: lexical path validation and `Path.is_file()`
+   both pass while the resolved target is outside the repository.
+7. Agent-log locator parsing accepts `../`, `./`, and a doubled leading slash
+   in the path component because the parser validates characters but not
+   normalized relative-path components.
+8. A final record's `record_sha256` is self-recomputable after arbitrary
+   edits. No rule binds the sealed bytes to `source_revision` or the first
+   commit that introduced the final record, so the claimed final-record
+   immutability is not yet independently enforced.
+
+These are candidate defects or explicit contract-policy conflicts, not
+authorization to edit in the review lane. Verify their exact severity and
+look for the same representation, graph, path, and lifecycle mistakes on
+adjacent fields.
+
 ### Non-vacuity and mutation audit
 
 - Reproduce all 55 semantic mutations and 15 structural controls against the
