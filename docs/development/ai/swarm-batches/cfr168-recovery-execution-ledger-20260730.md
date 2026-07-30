@@ -47,13 +47,13 @@ The following results are durable candidate commits, not canonical integration o
 | Python HTTP Doctor + branch composition | `701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714` | combined focused 42/42, Python-pattern 463/463, and unrestricted 691/691 in 2550.503 seconds pass with the configured Cargo toolchain; corrected expectation is included | Fugu report `4659318` says `ACCEPT` for the corrected composition only; product integration still waits for the upload disposition |
 | Python HTTP upload default-profile scale | `dece688afea815d1242e7751367052d1ceac4580` | focused 13/13 and Python-pattern 434/434 pass; 1201-commit default-profile reversal and 1x/3x/10x counters are bound | combined root-level review `cfr168-python-http-upload-scale-combined-review-20260730` is active; baseline-identical live-path work is not exempt from the CFR-168 invariant |
 | Python HTTP MR create/review/apply | `21fe75175e997cc7c6f8c3ef2a7558144d850f94` | dedicated 18/18 pass; broad 667-case run has 665 passes and two Cargo-PATH-only install failures | review `cfr168-python-http-mr-mutation-independent-review-20260730` is active; nonce timing and hidden sealed-validation ledger remain explicit review subjects |
+| Python HTTP MR list | `37f7427d46d2cf3ad66de3c1885ef4c0527cae70` | dedicated 18/18 in 54.077 seconds, Python-pattern 481/481 in 432.026 seconds, compilation, source/project docs, and diff checks pass | Claude review `cfr168-python-http-mr-list-review-claude-20260730` is pending; aggregate slope, multi-fault precedence, session reuse, and request isolation remain explicit subjects |
 | Rust live file Doctor | `52a025ecda3fe2f5ad8b5b2a485562e7c16ab6de` | focused 8/8, full `codefire-cli` binary 775/775, strict Clippy, format, source docs, and diff checks pass | review `cfr168-rust-file-doctor-independent-review-20260730` is active |
 | Rust file-remote ancestry Claude hedge | `e93ebc2394c8bd0398cfc23e8bf2d23d52e253b9` | focused remote 118/118, full binary 778/778, strict Clippy, format, source docs, and diff checks pass | review `cfr168-rust-file-ancestry-claude-independent-review-20260730` is active; predecessor traversal and pre-decision copy effects must be accepted or repaired |
 
-The interrupted Python MR-list worktree was resumed without discarding its diff. A manager-owned
-foreground run passes its dedicated production suite 18/18 in 54.077 seconds, and both docs checks
-plus `git diff --check` pass. Python-pattern discovery, final commit, and independent review remain
-pending, so this surface is not yet a durable candidate.
+The interrupted Python MR-list worktree was resumed without discarding its diff. Background
+validation that died with the worker was not accepted; manager-owned foreground runs produced the
+durable results recorded above before the final clean candidate commit.
 
 The Rust storage work was preserved at WIP snapshot
 `f5bce305da7ebfd08a840a4b281e29b0476874e0` after the Fugu session could not be resumed. The
