@@ -787,3 +787,15 @@ packet, and manifest were restored by `bef89c5` through `c59b47c`; the old
 Its manager-counterexample successor remains correctly blocked until the
 single-Fugu CFR-168 product-review queue releases and the exact KGI/KPI report
 is bound.
+
+The audit's next-stage designs are now typed, blocked execution contracts:
+
+| Contract | Canonical commit | Readiness blocker |
+|---|---|---|
+| Python HTTP composition | `53cf720` | exact accepted Upload, MR-list, and MR-write SHAs plus immutable review identities |
+| Rust runtime composition | `08dced5` | exact accepted ancestry, Rust HTTP, storage, and File Doctor SHAs |
+| Post-composition Close→Install→Dogfood→Retrospect | `619f439` | accepted Python/Rust compositions, every successor surface, exact installed runner and real-repository commands |
+
+These packets contain no worker manifest and cannot launch while their inputs
+are unbound. This keeps planning ahead of implementation without converting a
+candidate, worker success, or isolated review into an integration decision.
