@@ -784,7 +784,7 @@
       "prefix_bytes": 35674208,
       "sha256": "b8a0d128416bf04040b8a97eb7cd19f1df93fd79b98e618b73f08becaf7feceb",
       "captured_at": "2026-07-30T09:51:55Z",
-      "mutable_after_capture": false
+      "mutable_after_capture": true
     },
     {
       "evidence_id": "mr-mutation-claude-20260730",
@@ -792,7 +792,7 @@
       "prefix_bytes": 91053127,
       "sha256": "68e890356dd0c1278f621e01fce6e113725b30ccb3260888df71b0f1d9ccb932",
       "captured_at": "2026-07-30T09:51:55Z",
-      "mutable_after_capture": false
+      "mutable_after_capture": true
     },
     {
       "evidence_id": "mr-list-fugu-hedge-20260730",
