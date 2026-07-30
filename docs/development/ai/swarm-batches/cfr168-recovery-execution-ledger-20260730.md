@@ -964,3 +964,43 @@ Cargo-aware cleanup removed 1,614 reproducible files while preserving the
 report commit, source candidate, logs, and clean state. `/workspace/worktrees`
 then measured `3,007,461,624` bytes and the mounted filesystem reported
 `904,419,512,320` bytes available. Active Rust targets were not touched.
+
+## 2026-07-30 19:54 UTC Rust HTTP repair handoff and exact rereview
+
+The Rust HTTP MR preflight closure repair completed with scheduler
+`all_passed=true` on exact candidate
+`73bc5327ff6d750ce95f63333055ee39b693cb8c`. Its parent/task revision is
+`7e4e685efbfc453a6d2209f37c99edb1ab46243d`, tree is
+`430f2e2ccf9dca485575e7f9db0b639390d7e761`, manifest SHA-256 is
+`478a17fc4d9a1a3f72ecd5404f1389c713063f985100bfb00eb6d4f99abedcc0`,
+and binary patch SHA-256 is
+`216c12f8d9e0c6939bf6889856a999e8f45b56237eca9ff63cdef34105ef268d`.
+The exact changed set is `http.rs`, `work_budget.rs`, and the four canonical
+source documents. The worker reported the focused 788-case CLI target,
+89-case core target, strict Clippy, format, and source-document gates green.
+Those are worker evidence, not an acceptance decision.
+
+The lane created intermediate WIP commits and then rewrote them into the
+single delivered commit despite the repair packet's additive/no-rewrite
+instruction. The final parent, tree, patch, and clean state are exact and
+reviewable, but the process deviation is not inferred away. The fresh review
+must reconcile whether any intended product bytes or evidence disappeared and
+must report the deviation explicitly.
+
+The released implementation permit was rolled directly into a report-only
+Claude Opus 5 exact rereview. Its packet and manifest were committed as
+`5671977` and `49a977a`, registered in canonical as `ced46da` and `d9061c6`,
+and started under batch
+`cfr168-rust-http-mr-preflight-zero-residual-rereview-claude-20260730`.
+The review binds F1--F5, R1--R4, production call-graph reachability, deliberate
+regressions, exact response bytes, simultaneous ownership peaks, and WIP
+provenance. It may write only its immutable report. No Rust HTTP product byte
+has entered canonical.
+
+At launch, the resource floor was healthy: `MemAvailable` was approximately
+13.3 GiB, swap use was zero, and the workspace filesystem had approximately
+843 GiB available. Four external lanes are now occupied: Upload exact review,
+Python MR-list repair, File Doctor note repair, and Rust HTTP exact review.
+The manager continues control-plane, composition, and evidence work rather
+than polling idly; the next released Fugu permit is reserved for Storage exact
+review.
