@@ -46,6 +46,30 @@ CFR-168 closure.
    closure only after active ancestry releases `work_budget.rs`.
 5. Keep MR-write repair behind upload/composed-Python ownership ordering.
 
+## Root-finding coverage map
+
+The earlier current-state closure audit remains the root review. Its findings
+are routed as follows; a routed finding is not yet a closed finding.
+
+| Root finding | Current owner |
+|---|---|
+| M1 — Python upload full-history decision is unbounded/undeadlined | Active Python upload repair plus active Rust/Python reusable file-ancestry repair; final composed upload review must prove the live path. |
+| M2 — HTTP Doctor used a second request ledger | Corrected Doctor+Branch composition `701469f`, independently accepted at `c57215e`; composed-spine review still required. |
+| M3 — uncovered Python HTTP routes and mutating pre-effect response | Upload active; MR-list rereview active; MR-write closure queued; `POST …/gc` remains explicitly predecessor-gated on their response/session result. |
+| M4 — unbudgeted Rust local/file surfaces | Storage and file ancestry active; File Doctor restart queued; local `cf merge`, `cf scan`, clone/storage/GC consumers remain predecessor-gated with exact symbols in the recovery ledger. |
+| M5 — upload signature history outside accounting | Active upload repair owns signature policy/history under the same request ledger and final fence. |
+| M6 — tests concentrated on non-production callers | Every current packet requires production-call reachability, exact-candidate reversal, and full snapshot/zero-debt evidence; final composition must rerun broad gates. |
+| S1 — cache metrics omit/contradict invalidation | Blocked until all validation-session consumers are stable, then owned by the final cache/command projection packet. |
+| S2 — metrics-orthogonality test cannot falsify its claim | Same final metrics/projection packet, with an independent deliberate-regression oracle. |
+| S3 — no canonical asymptotic order table | Final stable-counter documentation packet after all selected production call graphs are fixed. |
+| S4 — Rust MR create/review response preflight | `cfr168-rust-http-mr-preflight-review-closure-repair-20260730` is validated and queued. |
+| S5 — one-command metrics projection and stale capability value | Final command-wide projection/conformance packet, followed by capability re-advertisement only after all gates pass. |
+
+The seven missing Close-evidence items remain manager-serialized after product
+composition: clean-HEAD Install with hashes, installed boundary/scale
+reversals, canonical Algorithm Dogfood, full cross-runtime corpus, all M4
+surface gates, Retrospect, and final capability re-advertisement.
+
 ## Closure invariant
 
 Final CFR-168 review closure requires every row to end in one of two terminal
