@@ -1,0 +1,34 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-rust-storage-zero-residual-repair-20260730",
+  "workspace": "/workspace/worktrees/cfr168-rust-storage-zero-residual-repair-base",
+  "base_revision": "13767c7f39eca82d4a9093a055abf568814cfef0",
+  "max_parallel": {
+    "fugu": 0,
+    "claude": 1,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "rust-storage-zero-residual-repair",
+      "role": "implementer",
+      "tier": "high",
+      "provider": "claude",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-rust-storage-zero-residual-repair-20260730.md",
+      "depends_on": [],
+      "write_set": [
+        "crates/codefire-cli/src/storage.rs",
+        "crates/codefire-cli/src/main.rs",
+        "crates/codefire-cli/src/secure_worktree.rs",
+        "crates/codefire-cli/src/tests.rs",
+        "crates/codefire-cli/src/tests/storage_decision_work.rs",
+        "docs/development/source-architecture.md",
+        "docs/development/command-source-trace.md",
+        "docs/development/source-data-model-catalog.md",
+        "docs/development/change-playbook.md"
+      ],
+      "expected_commit": true,
+      "timeout": "12h"
+    }
+  ]
+}
