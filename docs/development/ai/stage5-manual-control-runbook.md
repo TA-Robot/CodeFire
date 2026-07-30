@@ -175,6 +175,27 @@ p50 10 minutes and p95 30 minutes. Never change the bound candidate after
 review starts. A missing helper is not an identity mismatch—the reviewer can
 reconstruct the command—but it is avoidable manager/reviewer time.
 
+After the scheduler and reviewer are terminal, verify a report-only handoff
+with the same tool:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  docs/development/tools/capture_candidate_identity.py \
+  --repo "$REVIEW_WORKTREE" \
+  --base "$REVIEW_TASK_COMMIT" \
+  --head "$REVIEW_HEAD" \
+  --manifest "$CONTROL_WORKTREE/$REVIEW_MANIFEST" \
+  --task-id "$REVIEW_TASK_ID" \
+  --expected-role reviewer \
+  --require-exact-write-set
+```
+
+This additionally blocks a wrong role or any declared report path missing
+from the committed range. Each changed blob carries committed byte length and
+SHA-256, so the immutable report digest comes from Git rather than a mutable
+working file. The manager must still read and route the literal verdict;
+identity automation never converts scheduler success into acceptance.
+
 ## Exact implementer continuation
 
 After `REQUEST_CHANGES`, prefer the original Claude implementer session only

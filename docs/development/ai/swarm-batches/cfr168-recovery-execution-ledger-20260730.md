@@ -1259,3 +1259,11 @@ manager-generated key binding the exact tree, argv, shared environment,
 toolchain, Cargo lock/config, fixtures, terminal pass, and complete log
 digest. This removes duplicate stable compilation when evidence is exact
 without turning worker prose or a mutable log filename into acceptance.
+
+AIA-038 now covers the other side of rollover as well. In report mode it
+requires the selected manifest task to be a reviewer, requires every declared
+report-only output to exist in the committed range, and records committed
+blob bytes and SHA-256. Wrong role, missing report, extra path, dirty state,
+moving HEAD, merge, or wrong base remains `BLOCK`. Verdict interpretation is
+deliberately not automated, so scheduler success can never become `ACCEPT`
+without reading the exact immutable report.

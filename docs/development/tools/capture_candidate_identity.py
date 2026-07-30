@@ -53,6 +53,19 @@ def tree_entries(root: Path, revision: str) -> dict[str, dict[str, str]]:
     return entries
 
 
+def blob_evidence(
+    root: Path, entry: dict[str, str] | None
+) -> dict[str, str | int] | None:
+    if entry is None:
+        return None
+    evidence: dict[str, str | int] = dict(entry)
+    if entry["type"] == "blob":
+        content = git_bytes(root, "cat-file", "blob", entry["oid"])
+        evidence["bytes"] = len(content)
+        evidence["sha256"] = hashlib.sha256(content).hexdigest()
+    return evidence
+
+
 def changed_statuses(root: Path, base: str, head: str) -> dict[str, str]:
     raw = git_bytes(
         root,
@@ -175,6 +188,8 @@ def capture_candidate_identity(
     *,
     manifest_ref: str | None = None,
     task_id: str | None = None,
+    expected_role: str | None = None,
+    require_exact_write_set: bool = False,
 ) -> dict[str, Any]:
     root = root.resolve(strict=True)
     repository_root = Path(
@@ -242,8 +257,8 @@ def capture_candidate_identity(
             "path": path,
             "status": statuses[path],
             "numstat": numstat[path],
-            "base_object": base_tree.get(path),
-            "head_object": head_tree.get(path),
+            "base_object": blob_evidence(root, base_tree.get(path)),
+            "head_object": blob_evidence(root, head_tree.get(path)),
         }
         for path in sorted(changed_paths)
     ]
@@ -275,10 +290,19 @@ def capture_candidate_identity(
             for path in sorted(changed_paths)
             if not any(write_set_matches(path, pattern) for pattern in write_set)
         ]
+        unmatched_write_set = [
+            pattern
+            for pattern in write_set
+            if not any(write_set_matches(path, pattern) for path in changed_paths)
+        ]
         if manifest.get("base_revision") != base:
             blockers.append("manifest base_revision differs from the exact task base")
+        if expected_role is not None and task.get("role") != expected_role:
+            blockers.append("manifest task role differs from the expected role")
         if outside_write_set:
             blockers.append("candidate changed paths outside the declared write_set")
+        if require_exact_write_set and unmatched_write_set:
+            blockers.append("declared write_set contains paths absent from the candidate")
         manifest_evidence = {
             "path": manifest_path,
             "sha256": manifest_digest,
@@ -292,6 +316,7 @@ def capture_candidate_identity(
             "ticket_sha256": ticket_digest,
             "write_set": write_set,
             "outside_write_set": outside_write_set,
+            "unmatched_write_set": unmatched_write_set,
         }
 
     return {
@@ -338,18 +363,20 @@ def markdown_card(identity: dict[str, Any]) -> str:
         "",
         "## Changed paths",
         "",
-        "| Status | Path | Added | Deleted | Base object | Head object |",
-        "|---|---|---:|---:|---|---|",
+        "| Status | Path | Added | Deleted | Base object | Head object | Head bytes | Head SHA-256 |",
+        "|---|---|---:|---:|---|---|---:|---|",
     ]
     for entry in identity["changed_paths"]:
         numstat = entry["numstat"]
         base_oid = (entry["base_object"] or {}).get("oid", "-")
         head_oid = (entry["head_object"] or {}).get("oid", "-")
+        head_bytes = (entry["head_object"] or {}).get("bytes", "-")
+        head_sha256 = (entry["head_object"] or {}).get("sha256", "-")
         added = "-" if numstat["added"] is None else str(numstat["added"])
         deleted = "-" if numstat["deleted"] is None else str(numstat["deleted"])
         lines.append(
             f"| `{entry['status']}` | `{entry['path']}` | {added} | {deleted} | "
-            f"`{base_oid}` | `{head_oid}` |"
+            f"`{base_oid}` | `{head_oid}` | {head_bytes} | `{head_sha256}` |"
         )
     lines.extend(["", "## Additive commits", ""])
     lines.extend(f"- `{commit}`" for commit in identity["commits"])
@@ -367,6 +394,8 @@ def markdown_card(identity: dict[str, Any]) -> str:
                 f"- ticket SHA-256: `{manifest['ticket_sha256']}`",
                 f"- outside declared write set: "
                 f"`{json.dumps(manifest['outside_write_set'], ensure_ascii=True)}`",
+                f"- unmatched declared write set: "
+                f"`{json.dumps(manifest['unmatched_write_set'], ensure_ascii=True)}`",
             ]
         )
     lines.extend(["", "## Blocking reasons", ""])
@@ -395,6 +424,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--head", default="HEAD")
     parser.add_argument("--manifest")
     parser.add_argument("--task-id")
+    parser.add_argument("--expected-role")
+    parser.add_argument("--require-exact-write-set", action="store_true")
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
     return parser.parse_args(argv)
 
@@ -408,6 +439,8 @@ def main(argv: list[str] | None = None) -> int:
             args.head,
             manifest_ref=args.manifest,
             task_id=args.task_id,
+            expected_role=args.expected_role,
+            require_exact_write_set=args.require_exact_write_set,
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"candidate identity error: {exc}", file=sys.stderr)

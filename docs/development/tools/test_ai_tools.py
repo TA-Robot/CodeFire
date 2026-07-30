@@ -713,6 +713,11 @@ class CandidateIdentityTests(unittest.TestCase):
                 [entry["path"] for entry in identity["changed_paths"]],
                 ["product.txt"],
             )
+            head_object = identity["changed_paths"][0]["head_object"]
+            self.assertEqual(head_object["bytes"], len(b"candidate\n"))
+            self.assertEqual(
+                head_object["sha256"], hashlib.sha256(b"candidate\n").hexdigest()
+            )
             self.assertEqual(identity["manifest"]["outside_write_set"], [])
             self.assertIn(identity["patch_sha256"], markdown_card(identity))
 
@@ -750,6 +755,33 @@ class CandidateIdentityTests(unittest.TestCase):
                 identity["blocking_reasons"],
             )
             self.assertEqual(identity["manifest"]["outside_write_set"], ["outside.txt"])
+
+    def test_report_mode_requires_role_and_every_declared_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root, base, head, manifest_path = self.make_repository(
+                Path(temporary).resolve()
+            )
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["tasks"][0]["role"] = "reviewer"
+            manifest["tasks"][0]["write_set"].append("missing-report.md")
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            identity = capture_candidate_identity(
+                root,
+                base,
+                head,
+                manifest_ref=str(manifest_path),
+                task_id="candidate-task",
+                expected_role="reviewer",
+                require_exact_write_set=True,
+            )
+            self.assertEqual(identity["decision"], "BLOCK")
+            self.assertIn(
+                "declared write_set contains paths absent from the candidate",
+                identity["blocking_reasons"],
+            )
+            self.assertEqual(
+                identity["manifest"]["unmatched_write_set"], ["missing-report.md"]
+            )
 
 
 class FocusedTestMapTests(unittest.TestCase):
