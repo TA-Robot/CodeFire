@@ -924,3 +924,43 @@ removed 2,256 reproducible files; source, branch, scheduler state, logs, and
 the exact candidate remained clean and intact. `/workspace/worktrees` then
 measured `2,977,396,538` bytes and the mounted filesystem reported
 `904,444,588,032` bytes available. Active Rust targets were not touched.
+
+## 2026-07-30 19:48 UTC File Doctor accepted rereview and note closure
+
+The report-only File Doctor exact rereview completed with scheduler
+`all_passed=true` at report commit
+`1c555ff3f426d7fa6874db92ceb71515a8d908e6`. Its exact subject is candidate
+`1a04490806b59f8c39b5c1cf03f42d06aa750a98`; the report SHA-256 is
+`f7c52b05e312cc131fdfc2e2c0d9d486f5ee372b5ec93a85fdb44a95fb3ce1b9`,
+and the reviewer manifest SHA-256 is
+`b4672384b3552f519fd7ae74bb53007b589430bab99c25431e161192a3223247`.
+Only the immutable report was integrated into canonical as `c22a78a`.
+
+The verdict is `ACCEPT`: all four inherited Should and four inherited Could
+items pass production reachability, 20 focused cases, 787 binary cases,
+strict Clippy, release-build enforcement, and eight deliberate regressions.
+The report also records three new notes:
+
+1. a fail-closed production panic if failure cleanup cannot remove an open
+   permit or ownership invariant violation;
+2. digest/path projection allocations occur immediately before their fence
+   reservation; and
+3. metadata/read-unavailable records are not fenced against becoming readable
+   before publication.
+
+The accepted verdict is retained as exact evidence, but the batch-wide
+zero-residual goal does not infer those notes away. A successor packet binds
+N1 as an explicit typed-failure-versus-abort decision and requires product
+repairs plus deliberate regressions for N2 and N3. Its task and manifest
+commits are `1e5a6f9` and `a1e3b52`, registered in canonical as `3a0bc67` and
+`0145cc4`. Claude Opus 5 is active under
+`cfr168-rust-file-doctor-review-note-closure-repair-20260730` with the shared
+Cargo target, two build jobs, two test threads, and incremental compilation
+disabled. No File Doctor product candidate has entered canonical.
+
+After the reviewer terminated, its private default target measured
+`1,590,727,568` bytes. No process had a cwd beneath the reviewer worktree;
+Cargo-aware cleanup removed 1,614 reproducible files while preserving the
+report commit, source candidate, logs, and clean state. `/workspace/worktrees`
+then measured `3,007,461,624` bytes and the mounted filesystem reported
+`904,419,512,320` bytes available. Active Rust targets were not touched.
