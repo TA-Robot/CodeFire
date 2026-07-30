@@ -68,10 +68,15 @@ All gate claims in section 3 are quoted from completed `tool_result` records in:
 /workspace/worktrees/cfr168-aa5-probe/.fugu-second-agent/773723eb10c28988a9ce2c1863aa7df70e61559ee90f8e4c55e48911b7f44e66/worktrees/cfr168-rust-storage-recovery-20260729-storage-finish-after-reboot/.claude-second-agent/191250450d736b75461fc95410e9f0ff0e70b9c960b2b6eed801143e5d1d3a76/agents/cfr168-rust-storage-claude-finisher-20260730/logs/events.jsonl
 ```
 
-648 lines, 2 719 170 bytes, mtime 2026-07-30 08:32. The log contains 78 `Bash`
-tool uses; 75 have a completed `tool_result`, and 3 have none. `seq NN` below is
-the zero-based index of the tool use in that log's tool-use order, so each row
-can be re-read directly.
+The immutable audit subject is the log's first 648 LF-terminated records, exactly
+2 719 170 bytes, with SHA-256
+`6923c01a2bac3791c2ba03d3b1e7c46b2fec89da9b98140e97a1758e89c96a04`; that prefix
+ended at mtime 2026-07-30 08:32. The same session log is append-only and gained
+later recovery/report-writing events, so its current total line count and whole-file
+digest are intentionally not evidence identities. The fixed prefix contains 78
+`Bash` tool uses; 75 have a completed `tool_result`, and 3 have none. `seq NN`
+below is the zero-based index of the tool use within that prefix, so each row can
+be re-read directly.
 
 Audit method used to build this table: pair every `tool_use` with its
 `tool_use_id` in a later `tool_result`. A tool use with no matching result is
