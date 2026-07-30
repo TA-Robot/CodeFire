@@ -154,6 +154,54 @@ not stopped: independent Claude Opus 5 hedge lanes now run from the same immutab
 This is candidate competition, not dual integration. Each result must satisfy the same packet,
 focused/broad gates, and independent review; only the accepted product commit is integrated.
 
+## 2026-07-30 10:24 UTC streaming checkpoint
+
+The recovery pipeline now has durable repair candidates on three still-open surfaces. None is
+accepted or integrated:
+
+| Surface | Exact repair range | Changed production/test set | Current independent work |
+|---|---|---|---|
+| Rust storage | `40c095d..b3bc32a` | `crates/codefire-cli/src/main.rs`, `storage.rs`, `tests.rs`, and new `tests/storage_decision_work.rs`; +2310/-498 | Fugu 1.1 Ultra review is checkpointing its confirmed severity-ordered findings as a report-only commit; no Cargo rerun belongs to that review |
+| Python HTTP MR list | `20b5080..38da898` | `codefire`, four source-contract documents, and `tests/test_python_http_mr_list_decision_work.py`; +1635/-105 | Fugu 1.1 Ultra is reproducing live-socket authority-fence and filesystem-identity boundaries after the exact focused module passed 33/33 |
+| Python HTTP MR mutation | `3afef8f..6dd4527` | `codefire` and `tests/test_python_http_mr_mutation_decision_work.py`; +1516/-295 | Fugu 1.1 Ultra is reproducing request-ledger, replay/publication, cleanup, and unowned-authority counterexamples |
+
+The MR-list and MR-mutation candidates both modify `codefire`; they are not independent
+cherry-picks. Their accepted successors must be ported in the serialized Python-spine order below
+and re-reviewed on the composed exact revision. The Rust storage range has no file overlap with
+those Python ranges, but it still waits for its own report and repair.
+
+The development control plane is also under repair, independently of product source. Canonical
+commit `b307b47` binds the KGI/KPI `REQUEST_CHANGES` review, `9dd0da4` freezes the one-piece
+zero-residual repair packet, and `8e49bac` completes the packet's Markdown contract. Claude Opus 5
+is implementing the semantic validator, 55-mutation negative matrix, honest reference record,
+lifecycle reconciliation, and decision-rule repair in an isolated worktree. These commits do not
+authorize a product acceptance decision.
+
+### Streaming review rule
+
+Long adversarial review remains valuable and is not stopped merely for elapsed time. It must,
+however, create a durable artifact while it continues:
+
+- after 45 minutes without a committed unique artifact, checkpoint all confirmed findings in a
+  report-only WIP or final review commit;
+- mark hypotheses and unresolved questions separately from reproduced blockers;
+- a repair lane may start from confirmed blocking findings while deeper review continues against
+  the eventual repaired exact candidate;
+- only the final review decision on that exact repaired candidate can authorize integration;
+- manager coordination continues with changed-file mapping, dependency ordering, task-packet
+  preparation, and lightweight gates instead of polling as an idle lane.
+
+This is a flow control, not a task timeout. It preserves hours-long useful investigation while
+preventing an entire dependency chain from waiting for the reviewer's last possible observation.
+
+### Resource and lightweight-gate sample
+
+At `2026-07-30T10:24:11Z`, `/workspace` measured `2,836,481,180` bytes, the mounted filesystem
+reported `905,999,032,320` bytes available, `MemAvailable` was `15,124,860` KiB, and swap use was
+zero. No heavy gate is running. Canonical head `8e49bac` is clean, and the bounded aggregate AI
+development gate passes all seven subchecks. Windows C-drive space remains unavailable from the
+container and no claim is made about it.
+
 ## Recovered candidate checkpoint
 
 The following results are durable candidate commits, not canonical integration or Close evidence:
