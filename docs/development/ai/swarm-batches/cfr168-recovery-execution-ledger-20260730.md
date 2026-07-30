@@ -14,7 +14,9 @@ Canonical issue status remains `investigating`; this ledger does not authorize C
   start from those commits and do not mutate the dirty main worktree.
 - External implementation models are fixed to Claude Opus 5 (`claude-opus-5`) and Fugu 1.1 Ultra
   (`fugu-ultra-v1.1`). No external Codex implementation lane is active.
-- Recovery task timeout is eight hours.
+- The initial recovery tasks used an eight-hour envelope. Current
+  repair/review successors use 12 hours; the streaming checkpoint rule below
+  is a durability requirement, not an early task timeout.
 
 ## 2026-07-30 second host-restart recovery
 
@@ -132,7 +134,7 @@ The memory envelope above remains in force and is extended as follows:
 - worktrees, `.git`, task packets, reports, state, and event logs are never selected by automatic
   cache cleanup.
 
-## Active recovery lanes
+## Active recovery lanes (superseded restart snapshot)
 
 | Surface | Recovery base | Provider | New batch | State at restart audit | Required finish |
 |---|---|---|---|---|---|
@@ -194,7 +196,7 @@ however, create a durable artifact while it continues:
 This is a flow control, not a task timeout. It preserves hours-long useful investigation while
 preventing an entire dependency chain from waiting for the reviewer's last possible observation.
 
-### Next-slot ready queue
+### Next-slot ready queue (superseded checkpoint snapshot)
 
 The four-external-session recovery ceiling remains in force. All four slots are occupied at this
 checkpoint, so a fifth external lane is not launched merely to maximize utilization. When a slot
@@ -712,3 +714,76 @@ use was zero, and the mounted filesystem reported `901,535,006,720` bytes
 available. The canonical worktree was clean before this ledger update and all
 three documentation/contract gates plus diff checks passed after registering
 the six review-packet commits.
+
+## 2026-07-30 manager composition and ownership audit
+
+Three read-only manager audits ran while the four external lanes continued.
+All 13 committed independent reviews are present in the disposition index;
+there is no unindexed report. The audits fixed the following composition
+boundaries before any candidate integration:
+
+### Python HTTP spine
+
+The safe order is:
+
+1. accepted Doctor+Branch composition;
+2. exact accepted Upload successor;
+3. exact accepted MR-list successor;
+4. exact accepted MR-write successor;
+5. final full-spine review.
+
+Accepted Doctor+Branch tree `701469f` contains the older Upload slice
+`0703f71`. It is therefore a composition scaffold, not a whole-tree
+integration candidate while Upload remains undecided. If Upload is rejected,
+no descendant tree that carries those bytes may be integrated wholesale.
+MR-write diverges at `cab3126`; only its eventual accepted product delta may
+be ported last. Every manager conflict-resolution head receives a fresh exact
+review; isolated predecessor acceptance does not authorize the composed
+dispatcher, session, response-owner, or final-fence bytes.
+
+### Rust runtime composition
+
+The preferred accepted-candidate order is:
+
+1. file ancestry `e93ebc2` through `02b0d63`;
+2. Rust HTTP MR `71854e2` through its eventual closure head;
+3. storage `40c095d` through `cdcb9bd`;
+4. File Doctor `52a025e` through its eventual residual-repair head;
+5. one manager-owned synchronization commit for the four shared source docs.
+
+The only current direct code overlap is ancestry and Rust HTTP on
+`work_budget.rs`. Their observed hunks are line-disjoint, but both alter
+ledger/deadline semantics and therefore require manual composition plus a
+fresh semantic review. Storage owns `main.rs`, `secure_worktree.rs`,
+`storage.rs`, and focused storage tests; Doctor owns `remote/doctor.rs`.
+All four lanes overlap on the same source-document set, so agent-authored doc
+tips must not be merged independently.
+
+### Remaining predecessor ownership
+
+The current repair/review packets do not yet close these successor surfaces:
+
+1. Python `POST …/gc`;
+2. Python local `common_ancestor` and `ancestor_distances`;
+3. Rust local `cf merge`;
+4. Rust `cf scan`;
+5. Rust local Doctor open-summary/evidence/active-state;
+6. file clone, storage-report, and GC graph walks;
+7. cache invalidation/entry metrics and command-wide projection;
+8. the canonical asymptotic table and cross-runtime corpus;
+9. final capability re-advertisement.
+
+File transport branch/generation/plan authority, HTTP-client Upload, and
+`remote::publication::validate_object_roots` remain explicit ancestry
+handoffs. Typed composition packets must bind the eventual accepted SHAs
+before these successors launch.
+
+### Canonical self-containment repair
+
+The active File Doctor manifest's referenced Markdown contract was restored
+as canonical commit `abe52d2`. The KGI/KPI exact-rereview Markdown, typed
+packet, and manifest were restored by `bef89c5` through `c59b47c`; the old
+`ready` repair packet was retired as a rejected-candidate task by `8b5f21f`.
+Its manager-counterexample successor remains correctly blocked until the
+single-Fugu CFR-168 product-review queue releases and the exact KGI/KPI report
+is bound.
