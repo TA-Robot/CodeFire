@@ -102,6 +102,15 @@ DEV_SWARM_V1_STAGE5_FIELDS = frozenset(
     }
 )
 
+ACTIVE_RUST_PROFILE_MARKERS = (
+    "RUSTUP_HOME=/home/devuser/.cache/codefire-rust-1.97/rustup",
+    "CARGO_HOME=/home/devuser/.cache/codefire-rust-1.97/cargo",
+    "CARGO_TARGET_DIR=/workspace/.cache/cargo-target-shared",
+    "CARGO_BUILD_JOBS=2",
+    "RUST_TEST_THREADS=2",
+    "CARGO_INCREMENTAL=0",
+)
+
 
 def path_has_glob(path_ref: str) -> bool:
     return any(char in path_ref for char in "*?[")
@@ -429,6 +438,28 @@ def check_dev_swarm_v1_stage5_fields(root: Path, findings: list[Finding]) -> Non
         visit(data, "")
 
 
+def check_active_rust_packet_profiles(root: Path, findings: list[Finding]) -> None:
+    batch_dir = root / "docs/development/ai/swarm-batches"
+    if not batch_dir.is_dir():
+        return
+    for path in sorted(batch_dir.glob("cfr168-rust-*.md")):
+        text = path.read_text(encoding="utf-8")
+        if not re.search(r"^Status: (?:blocked|ready)\b", text, flags=re.MULTILINE):
+            continue
+        if "## Validation" not in text or "cargo " not in text.lower():
+            continue
+        missing = [marker for marker in ACTIVE_RUST_PROFILE_MARKERS if marker not in text]
+        if missing:
+            findings.append(
+                Finding(
+                    "error",
+                    "active-rust-packet-missing-shared-profile",
+                    path.relative_to(root).as_posix(),
+                    f"missing exact shared low-memory marker(s): {', '.join(missing)}",
+                )
+            )
+
+
 def check_stale_active_state(root: Path, findings: list[Finding]) -> None:
     active_paths = [root / path for path in ACTIVE_STATE_FILES]
     active_paths.extend((root / "docs/development/ai").rglob("*.md"))
@@ -451,6 +482,7 @@ def run(root: Path) -> list[Finding]:
     check_task_packets(root, findings)
     check_live_routing_smoke(root, findings)
     check_dev_swarm_v1_stage5_fields(root, findings)
+    check_active_rust_packet_profiles(root, findings)
     check_stale_active_state(root, findings)
     return findings
 

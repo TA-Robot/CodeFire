@@ -1229,3 +1229,15 @@ implementer session was `3dd468cb-d9a9-42be-b266-befde4fba6fd`, so session,
 agent, branch, role, and worktree independence are all explicit. Candidate
 card capture to verified reviewer start was under five minutes. Total
 external occupancy returned to four while heavy occupancy remained two.
+
+The manager also found a resource-contract omission in the two remaining
+prepared Rust review tickets. The active File Doctor worker selected
+`/tmp/codefire-rustup`, which currently duplicates about 727 MiB of toolchain
+state; it still uses the shared Cargo target and remains healthy, so it was
+not interrupted. The future File Doctor and Rust HTTP exact-review tickets
+now pin the shared Rustup/Cargo homes, shared target, two build jobs, two test
+threads, disabled incremental compilation, and serialized Cargo. They
+explicitly forbid a worktree-local target or another toolchain home. The AI
+checker now rejects any active CFR-168 Rust packet with Cargo validation that
+omits one of those exact profile markers; its focused negative/positive test
+and the complete 48-test AI-tool suite pass.

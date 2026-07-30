@@ -159,9 +159,21 @@ original candidate tree/patch/clean state before the next:
 
 ## Validation
 
-Use the pinned shared low-memory Rust profile, serialized Cargo, two build
-jobs, two test threads, and incremental compilation disabled. Record exact
-commands/counts/durations/toolchain/target/log digests for:
+Use this exact shared low-memory Rust profile for every Cargo command:
+
+```bash
+export RUSTUP_HOME=/home/devuser/.cache/codefire-rust-1.97/rustup
+export CARGO_HOME=/home/devuser/.cache/codefire-rust-1.97/cargo
+export PATH="$CARGO_HOME/bin:$PATH"
+export CARGO_TARGET_DIR=/workspace/.cache/cargo-target-shared
+export CARGO_BUILD_JOBS=2
+export RUST_TEST_THREADS=2
+export CARGO_INCREMENTAL=0
+```
+
+Do not create a worktree-local target or another Rustup/Cargo home. Serialize
+Cargo invocations and record exact commands/counts/durations/toolchain/target
+and log digests for:
 
 1. identity, no-merge ancestry, commit list, path set, result digest,
    cumulative patch, and clean state;

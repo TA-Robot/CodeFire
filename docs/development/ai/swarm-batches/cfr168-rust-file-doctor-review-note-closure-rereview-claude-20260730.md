@@ -108,8 +108,21 @@ remains explicitly excluded.
 
 ## Validation
 
-Using the pinned low-memory Rust profile, record exact command, counts,
-duration, toolchain, target, log digest, and clean-state result for:
+Use this exact shared low-memory Rust profile for every Cargo command:
+
+```bash
+export RUSTUP_HOME=/home/devuser/.cache/codefire-rust-1.97/rustup
+export CARGO_HOME=/home/devuser/.cache/codefire-rust-1.97/cargo
+export PATH="$CARGO_HOME/bin:$PATH"
+export CARGO_TARGET_DIR=/workspace/.cache/cargo-target-shared
+export CARGO_BUILD_JOBS=2
+export RUST_TEST_THREADS=2
+export CARGO_INCREMENTAL=0
+```
+
+Do not create a worktree-local target or another Rustup/Cargo home. Record
+exact command, counts, duration, toolchain, target, log digest, and
+clean-state result for:
 
 - focused N1/N2/N3 tests in debug and release;
 - `cargo test -p codefire-cli --bin codefire-rs remote::doctor --locked`;

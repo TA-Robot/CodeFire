@@ -36,7 +36,9 @@ from capture_candidate_identity import (  # noqa: E402
     markdown_card,
 )
 from check_ai_acceleration_docs import (  # noqa: E402
+    ACTIVE_RUST_PROFILE_MARKERS,
     STALE_PATTERNS,
+    check_active_rust_packet_profiles,
     check_dev_swarm_v1_stage5_fields,
     check_live_routing_smoke,
 )
@@ -943,6 +945,35 @@ class DevSwarmManifestSafetyTests(unittest.TestCase):
             )
             findings = []
             check_dev_swarm_v1_stage5_fields(root, findings)
+            self.assertEqual(findings, [])
+
+
+class RustPacketProfileTests(unittest.TestCase):
+    def test_active_cargo_packet_requires_exact_shared_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            batch_dir = root / "docs/development/ai/swarm-batches"
+            batch_dir.mkdir(parents=True)
+            packet = batch_dir / "cfr168-rust-example-rereview.md"
+            packet.write_text(
+                "Status: ready for review\n\n## Validation\n\nRun `cargo test`.\n",
+                encoding="utf-8",
+            )
+            findings = []
+            check_active_rust_packet_profiles(root, findings)
+            self.assertEqual(
+                [finding.code for finding in findings],
+                ["active-rust-packet-missing-shared-profile"],
+            )
+
+            packet.write_text(
+                "Status: ready for review\n\n## Validation\n\n"
+                + "\n".join(ACTIVE_RUST_PROFILE_MARKERS)
+                + "\n\nRun `cargo test`.\n",
+                encoding="utf-8",
+            )
+            findings = []
+            check_active_rust_packet_profiles(root, findings)
             self.assertEqual(findings, [])
 
 
