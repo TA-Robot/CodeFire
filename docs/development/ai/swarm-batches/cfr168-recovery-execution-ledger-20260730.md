@@ -113,12 +113,19 @@ leave a reusable accounted API for the separately tracked local-merge/clone/stor
 
 Product commits are reviewed and integrated, never entire agent worktrees:
 
-1. Python Doctor, then upload, then branch-session changes.
-2. Resolve the adjacent `do_GET` hunks while preserving one exact request ledger and deadline.
-3. Integrate Python MR mutation after upload response-owner invariants are present.
+1. Build the Python spine from the reviewed product commits, not branch tips:
+   Doctor `5e3b0c7`, upload `0703f71`, the accepted successor of scale delta `dece688`, branch
+   `7e87665`, composition correction `701469f`, then the accepted MR-list successor. Do not replay
+   duplicate recovery commits `3153d75`/`cb13da0`; their upload code/test patch is already present.
+2. Resolve the adjacent `do_GET`/response-dispatch hunks while preserving one exact request ledger
+   and deadline, and re-review the composed head because no isolated review proves that resolution.
+3. Port the accepted Python MR-mutation successor onto that composed head instead of blindly
+   cherry-picking `21fe751`; its response dispatcher overlaps the read-route spine.
 4. Integrate non-overlapping Rust `remote.rs`, `remote/doctor.rs`, and `http.rs` changes.
-5. Port the accepted Rust storage commit from its probe base onto the canonical branch; do not merge
-   the rejected Python candidate line or unrelated probe history.
+5. Port the cumulative accepted Rust storage range including precursor `40c095d` and the final
+   successor of `f5bce30`, limited to `main.rs`, `storage.rs`, `tests.rs`, and
+   `tests/storage_decision_work.rs`. Never cherry-pick `f5bce30` alone or merge its 75-commit
+   recovery branch.
 6. Run focused tests after every product commit and broad gates after each runtime group.
 
 ## Predecessor-gated residual packets
@@ -130,9 +137,12 @@ overlapping write set:
 |---|---|
 | Python `GET …/merge-requests` request ledger/session | predecessor satisfied by the reviewed composition input; active batch `cfr168-python-http-mr-list-session-20260730` starts from `7327e2a8` |
 | Python `POST …/gc` request ledger/deadline and pre-effect response | Python upload/MR mutation response-owner result |
+| Python local `common_ancestor` / `ancestor_distances` parity | stable integrated Python ancestry and cross-runtime tie-break contract |
 | Rust local `cf merge` ancestry | Rust storage task releases overlapping `main.rs` write set |
 | Rust `cf scan` validation ledger/session | Rust storage task releases overlapping `main.rs`/metrics write set |
-| cache `invalidated`/entry-count metrics and command-wide decision-work projection | all selected production surfaces integrated |
+| Rust local Doctor open-summary/evidence/active-state ownership | Rust storage/session boundary and local `main.rs` integration slot |
+| file clone/storage-report/GC graph walks | accepted reusable file-ancestry session plus storage integration |
+| cache `invalidated`/entry-count metrics and command-wide decision-work projection, including final CLI envelope/text bytes | all selected production surfaces integrated |
 | asymptotic/order table and cross-runtime corpus | stable final counters and production call graph |
 | capability re-advertisement | every surface/schema/conformance gate passes |
 
