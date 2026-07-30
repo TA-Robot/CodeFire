@@ -814,3 +814,78 @@ mounted filesystem reported `902,231,105,536` bytes available. Active File
 Doctor build artifacts were not touched. This is the intended terminal-cache
 retention rule: preserve source/evidence identity, reclaim only inactive
 reproducible targets.
+
+## 2026-07-30 19:10 UTC trusted-throughput acceleration decision
+
+The current bottleneck is not lack of occupied lanes. All four external
+permits remained occupied for roughly 39--46 minutes, but none had yet
+produced a newly accepted, integration-ready result. The disposition index
+contains 13 independent decisions: 2 `ACCEPT` and 11 `REQUEST_CHANGES`.
+Increasing implementation concurrency before changing that correction rate
+would create more review debt and composition work rather than trusted
+throughput.
+
+The operating objective is therefore changed from keeping every permit busy
+to minimizing packet-ready-to-reviewed-and-integration-ready lead time. Raw
+agent count, patch size, commits, and transcript activity remain
+anti-metrics. The following controls apply immediately to the remaining
+CFR-168 recovery:
+
+1. **Counterexample before implementation.** Freeze must bind a production
+   reproducer, an independent oracle, and a deliberate-regression reversal
+   for each material finding. A prose-only invariant is not implementation
+   ready.
+2. **Primitive before surface.** Repeated authority, ledger, deadline,
+   response, cleanup, publication, and snapshot findings are repaired through
+   one shared primitive and then composed into consumers. Surface-local
+   variants require an explicit incompatibility reason.
+3. **Review debt before new surface WIP.** When any current lane releases a
+   permit, the prepared Storage and ancestry exact reviews and fresh reviews
+   of completed repairs take precedence over another implementation surface.
+   A rejected review first yields a bounded successor packet.
+4. **Product-only handoff.** A candidate handoff contains the exact product
+   delta and focused evidence. Manager task/report/control documents remain
+   separate so integration does not have to untangle worker-authored control
+   files.
+5. **Continuous shadow composition.** Only independently accepted deltas
+   enter a manager-owned composition head. Run the smallest affected
+   cross-surface gate after each accepted delta; reserve broad/full gates for
+   stable composition boundaries.
+6. **Review findings become reusable gates.** Every confirmed counterexample
+   is converted into a regression oracle and tagged by invariant family so
+   later packets can preflight the same failure class instead of rediscovering
+   it after implementation.
+7. **Event-driven rollover.** Candidate-ready, review-decision,
+   checkpoint-due, provider-retry, resource-floor, and terminal-cleanup events
+   are the scheduler inputs. Manual polling is observation only and must not
+   be the mechanism that releases the next task.
+8. **Terminal resource lifecycle.** Preserve commits, exact reports, logs,
+   and lineage; clean only inactive reproducible build targets and compress
+   terminal transcripts after their immutable evidence prefix is bound.
+
+The first bounded experiment is the next five comparable reviewable product
+packets. It does not rewrite the authoritative KGI baseline. It tests these
+leading outcomes:
+
+| Signal | Experimental target | Failure action |
+|---|---|---|
+| material reviewer correction | at most 2 of 5 packets | strengthen Freeze counterexamples and primitive contract before adding WIP |
+| review-ready queue time | below 15% of trusted-integration lead time | reserve the next released permit for review and auto-dispatch |
+| manager integration time | below 20% of trusted-integration lead time | shrink product deltas and move overlap into a composition packet |
+| broad/full validation | no more than one run per stable composition revision | move lane proof to focused deterministic gates |
+| first durable checkpoint | before long or broad validation after mutation | require a clean WIP checkpoint before continuing |
+| lost source/evidence work | zero | stop new launches and repair recovery controls |
+
+Model/provider routing will be changed from a fixed quota to observed outcome
+by task class: exact acceptance rate, trusted lead time, rework cost, and
+provider continuity. Claude remains the primary bounded implementer, Fugu the
+primary adversarial reviewer, and Codex the freeze/composition/final-authority
+coordinator only while those measured roles remain superior. No silent model
+downgrade or automatic acceptance is introduced.
+
+Foundation automation remains the durable
+`dev-swarm-throughput-design-20260730` work item. Its implementation order is
+now: typed event stream and atomic run state; automatic exact-review rollover;
+global resource/write-set locks; shadow integration train; generated status
+views; terminal cache/log retention. It remains blocked from direct edits
+until `/workspace` has usable version-control metadata.
