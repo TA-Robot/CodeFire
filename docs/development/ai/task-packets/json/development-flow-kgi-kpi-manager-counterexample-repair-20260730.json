@@ -1,0 +1,195 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "development-flow-kgi-kpi-manager-counterexample-repair-20260730",
+  "status": "blocked",
+  "objective": "Repair exact candidate 0ae583ef through shared exact-instant, finite-number, iterative-lineage, and symlink-safe provenance primitives; close all eight manager counterexamples and every later exact-candidate independent-rereview finding before the KGI/KPI control plane can be decision-grade.",
+  "base_revision": "0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1",
+  "role": "implementer",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 2,
+      "reversibility": 1,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "cross_subsystem_architecture",
+      "release_completion_audit",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 11,
+    "selected_tier": "ultra",
+    "rationale": "This control plane determines completion, throughput, quality, continuity, provider routing, and cost policy; accepting float-collapsed time, non-finite numbers, cyclic lineage, unsafe paths, or self-recomputable final evidence would multiply incorrect decisions across later development."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-5-project-management-docs"
+    ],
+    "additional_files": [
+      "docs/development/ai/swarm-results/development-flow-kgi-kpi-manager-repair-design-20260730/design.md",
+      "docs/development/ai/task-packets/development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730.md",
+      "docs/development/ai/development-flow-kgi-kpi.md",
+      "docs/development/ai/schemas/development-flow-record.v1.schema.json",
+      "docs/development/ai/flow-metrics/cfr168-recovery-20260730.v1.json",
+      "docs/development/tools/ai_contracts.py",
+      "docs/development/tools/check_ai_contracts.py",
+      "docs/development/tools/test_ai_tools.py",
+      "docs/development/project-management.md",
+      "docs/development/exploration/phase-2/experiment-catalog-and-kpi-scorecard.md"
+    ],
+    "evidence_refs": [
+      "candidate:0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1",
+      "candidate-parent:a6d41a9d7cdae2157cdcc5ca9f9008e4734c4e16",
+      "manager-gate:79-of-79-focused-tests-passed",
+      "manager-counterexamples:8-reproduced",
+      "repair-design-sha256:fdd218b61e933d36a1e4dea647e8d105aab55b9dd7a940693f5128da0dce842c",
+      "launch-blocker:exact-candidate-independent-rereview-pending"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "docs/development/ai/**",
+      "docs/development/tools/**",
+      "docs/development/project-management.md",
+      "docs/development/README.md",
+      "docs/development/history.md",
+      "docs/development/exploration/phase-2/experiment-catalog-and-kpi-scorecard.md"
+    ],
+    "write_set": [
+      "docs/development/README.md",
+      "docs/development/ai/README.md",
+      "docs/development/ai/acceleration-master-plan.md",
+      "docs/development/ai/development-flow-kgi-kpi.md",
+      "docs/development/ai/flow-metrics/README.md",
+      "docs/development/ai/flow-metrics/cfr168-recovery-20260730.v1.json",
+      "docs/development/ai/schemas/README.md",
+      "docs/development/ai/schemas/development-flow-record.v1.schema.json",
+      "docs/development/exploration/phase-2/experiment-catalog-and-kpi-scorecard.md",
+      "docs/development/history.md",
+      "docs/development/project-management.md",
+      "docs/development/tools/ai_contracts.py",
+      "docs/development/tools/check_ai_contracts.py",
+      "docs/development/tools/test_ai_tools.py"
+    ],
+    "disallowed_paths": [
+      "codefire",
+      "crates/**",
+      "tests/**",
+      ".devcontainer/**",
+      "subprojects/**",
+      "docs/development/code-review-issues/**",
+      "docs/development/ai/swarm-results/**",
+      "docs/development/ai/task-packets/**"
+    ],
+    "disallowed_actions": [
+      "Launch before the exact-candidate Fugu rereview report is committed and bound into this packet",
+      "Run Cargo, product builds, install, demo, dogfood, broad product Python suites, or network calls",
+      "Split the shared primitive, lifecycle, provenance, documentation, exemplar, and regression closure into independently acceptable partial candidates",
+      "Extend a due date, recompute a checksum, or rewrite an old final record merely to make validation pass",
+      "Claim decision-grade finality when required Git provenance is uncommitted, shallow, exported, or unavailable",
+      "Edit independent reports, task packets, result/design evidence, issue state, product source, or user-owned worktree changes"
+    ]
+  },
+  "non_goals": [
+    "Change CodeFire product behavior or CFR-168 product candidates",
+    "Review the devcontainer, CI, packaging, host resources, or agent-wrapper implementation",
+    "Fabricate a five-packet baseline, evidence, provider cost, KGI achievement, or refreshed lifecycle date",
+    "Run release, install, dogfood, Cargo, or broad product gates",
+    "Redesign unrelated task, review, context-manifest, or routing contracts"
+  ],
+  "invariants": [
+    {
+      "id": "exact-time",
+      "statement": "Every contract instant is ordered as integer nanoseconds and no post-boundary event can compare equal through floating-point collapse.",
+      "falsification_test": "Place events one nanosecond before and after capture, recompute a one-nanosecond interval, and require literal-oracle ordering and value."
+    },
+    {
+      "id": "finite-json",
+      "statement": "Only finite JSON numbers excluding booleans can enter schema, semantic, canonical-hash, or measurement arithmetic paths.",
+      "falsification_test": "Inject NaN and both infinities through JSON and direct-object routes at every numeric position and require stable intended findings without crashes."
+    },
+    {
+      "id": "acyclic-lineage",
+      "statement": "Every candidate and record-version lineage is one rooted acyclic graph validated iteratively with monotone readiness.",
+      "falsification_test": "Inject two- and three-node cycles beside a valid root, dangling and duplicate nodes, cross-batch supersession, and reversed readiness; each must fail."
+    },
+    {
+      "id": "operational-lifecycle",
+      "statement": "One injected validation instant enforces active and in-progress due dates while freshness comparisons remain isolated by batch.",
+      "falsification_test": "Validate due minus one nanosecond, due, and due plus one nanosecond across active/in-progress/final states and cross-batch newest records."
+    },
+    {
+      "id": "canonical-paths",
+      "statement": "Repository documents, flow records, context artifacts, and agent locators preserve the raw subject and cannot traverse symlinks or non-normalized components.",
+      "falsification_test": "Use final/intermediate/broken external symlinks and paths containing dot, dot-dot, empty, leading, doubled, or trailing components; each must fail closed."
+    },
+    {
+      "id": "committed-finality",
+      "statement": "A final record is decision-grade only when its current raw bytes equal the first committed final blob for that exact version in current HEAD ancestry.",
+      "falsification_test": "Recompute the content checksum after worktree and committed rewrites, use unavailable history, and require failure; preserve old bytes while adding a valid superseding version."
+    },
+    {
+      "id": "original-semantic-closure",
+      "statement": "All 55 semantic reversals closed by the candidate remain rejected with stable intended findings after shared primitives are repaired.",
+      "falsification_test": "Rerun the complete original semantic matrix and the eight manager counterexamples against the repaired candidate and exact rejected candidate."
+    }
+  ],
+  "validation": [
+    {
+      "id": "ai-tools-tests",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/test_ai_tools.py",
+      "purpose": "Exercise exact-time, finite-number, graph, lifecycle, path, provenance, and the original semantic regression matrix.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "ai-contracts",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_ai_contracts.py",
+      "purpose": "Validate all repository AI contracts and the factual active flow record.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "ai-development",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_ai_development.py --timeout 120",
+      "purpose": "Run the bounded aggregate AI-development gate after semantic and provenance repair.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "project-docs",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_project_docs.py",
+      "purpose": "Keep policy, schema, exemplar, lifecycle, indexes, Phase-2 record, and history consistent.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "diff-check",
+      "command": "git diff --check",
+      "purpose": "Reject whitespace and patch-integrity defects.",
+      "required": true,
+      "requires_capability": "git"
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "clean_committed_candidate",
+      "exact_base_and_head",
+      "changed_and_untouched_file_lists",
+      "manager_and_independent-review_closure_matrix",
+      "shared_primitive_and_complexity_table",
+      "semantic_and_counterexample_reversal_results",
+      "temporary_git_provenance_results",
+      "migration_and_unavailable-history_contract",
+      "validation_commands_counts_durations_and_hashes",
+      "decision_readiness_statement",
+      "residual_risks",
+      "fresh_independent_review_request"
+    ],
+    "evidence_digest_required": true
+  }
+}
