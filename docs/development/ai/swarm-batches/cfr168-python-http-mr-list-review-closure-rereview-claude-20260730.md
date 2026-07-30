@@ -1,15 +1,16 @@
-# CFR-168 Python HTTP MR-List Review-Closure Rereview Prep
+# CFR-168 Python HTTP MR-List Review-Closure Rereview
 
-Status: blocked pending exact candidate binding
+Status: ready for exact independent review
 
-Provider/model when unblocked: fresh Claude Opus 5 (`claude-opus-5`)
+Provider/model: fresh Claude Opus 5 (`claude-opus-5`)
 
 Role: independent reviewer
 
 Mode: report-only
 
-No runnable `dev-swarm.v1` manifest exists while any candidate field remains
-`UNBOUND`.
+All candidate fields are bound to the immutable manager-recomputed subject
+below. The runnable report-only manifest is created only above this ticket's
+task-base commit.
 
 ## Objective
 
@@ -22,7 +23,7 @@ decision report.
 The reviewer uses a new agent/session/worktree and inherits no implementer
 conversation, WIP, or conclusion.
 
-## Exact blocked subject
+## Exact subject
 
 | Item | Exact value |
 |---|---|
@@ -33,17 +34,18 @@ conversation, WIP, or conclusion.
 | Second Fugu report in canonical | `78b127c` |
 | Second report SHA-256 | `6840035553871f5251e32d67bb5b2f9d6c6ee061b7ab3106e94de373ec97b20d` |
 | Closure repair task base | `7f37394c76e3626f810d0cd133be70feea89b5d2` |
-| Candidate SHA / parent / tree | `UNBOUND` / `UNBOUND` / `UNBOUND` |
-| Additive commit list/count | `UNBOUND` |
-| Cumulative binary patch SHA-256 | `UNBOUND` |
-| Exact changed paths/blobs/numstat | `UNBOUND` |
-| Clean tracked/untracked evidence | `UNBOUND` |
+| Candidate SHA / parent / tree | `4930d25178be11e064060487f8c254802b09868d` / `2045955951d595d05602aa31f3cdae2596f6054a` / `17cb396ee30a887be6698b822b60f52ac2adb67c` |
+| Additive commit list/count | `38dfeb28479828821484d9284b8bc2ee815d578a`, `f781b03549b6f6f72b1b5340e3164d678250a017`, `a3d864548af4b0b856d3b897f2ce31113b0dc2a7`, `d6c6b2b3f42db3641d2e5b9e2c98aec04841d625`, `2045955951d595d05602aa31f3cdae2596f6054a`, `4930d25178be11e064060487f8c254802b09868d` / `6` |
+| Cumulative binary patch SHA-256 | `6a9ca3d1046ba5ec213645c0710f900425191269360a70a3d5c4a50090528543` |
+| Exact changed paths/blobs/numstat | six paths bound in `cfr168-python-http-mr-list-review-closure-repair-candidate-ready-20260730/candidate.md`: `codefire`, four source docs, and `tests/test_python_http_mr_list_decision_work.py` |
+| Clean tracked/untracked evidence | manager capture at `2026-07-30T20:44:58Z`: checkout HEAD equals candidate, `git status --porcelain=v1 --untracked-files=all` empty, no merge commits, no write-set escape |
 
-Before launch the manager replaces every `UNBOUND` atomically, generates a
-candidate-ready card, and creates a fresh report-only manifest. The reviewer
-recomputes identity, ancestry from the task base and rejected predecessor,
-tree, commit range, patch digest, actual changed paths, and clean state. Any
-mismatch is immediate `REQUEST_CHANGES`; never follow a branch tip.
+The reviewer recomputes identity, ancestry from the task base and rejected
+predecessor, tree, commit range, patch digest, actual changed paths, and clean
+state. Any mismatch is immediate `REQUEST_CHANGES`; never follow a branch
+tip. The complete manager card is:
+
+`docs/development/ai/swarm-results/cfr168-python-http-mr-list-review-closure-repair-candidate-ready-20260730/candidate.md`
 
 ## Scope
 

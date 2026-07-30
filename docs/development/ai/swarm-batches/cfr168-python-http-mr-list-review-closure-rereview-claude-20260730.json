@@ -1,0 +1,26 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-python-http-mr-list-review-closure-rereview-claude-20260730",
+  "workspace": "/workspace/worktrees/cfr168-python-http-mr-list-review-closure-rereview-claude-base",
+  "base_revision": "8143f437342cf7bf11322d82f6ca63ab888382e8",
+  "max_parallel": {
+    "fugu": 0,
+    "claude": 1,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "python-http-mr-list-review-closure-rereview",
+      "role": "reviewer",
+      "tier": "ultra",
+      "provider": "claude",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-python-http-mr-list-review-closure-rereview-claude-20260730.md",
+      "depends_on": [],
+      "write_set": [
+        "docs/development/ai/swarm-results/cfr168-python-http-mr-list-review-closure-rereview-claude-20260730/review.md"
+      ],
+      "expected_commit": true,
+      "timeout": "12h"
+    }
+  ]
+}

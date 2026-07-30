@@ -1189,3 +1189,35 @@ Three focused fail-closed tests cover a clean linear candidate, dirty state,
 and a committed path outside the manifest write set. The complete AI-tool
 suite now has 47 passing tests. The Stage 5 runbook invokes the helper
 directly, and the acceleration plan records AIA-038 as implemented.
+
+## 2026-07-30 20:45 UTC MR-list candidate-ready rollover
+
+The Python HTTP MR-list closure repair terminated with scheduler
+`all_passed=true` on clean candidate
+`4930d25178be11e064060487f8c254802b09868d`. The exact task base and merge
+base are `7f37394c76e3626f810d0cd133be70feea89b5d2`, its parent is
+`2045955951d595d05602aa31f3cdae2596f6054a`, tree is
+`17cb396ee30a887be6698b822b60f52ac2adb67c`, and cumulative canonical binary
+patch SHA-256 is
+`6a9ca3d1046ba5ec213645c0710f900425191269360a70a3d5c4a50090528543`.
+The range contains six additive commits, no merge, no rewrite, six changed
+paths, and no declared-write-set escape.
+
+The candidate-ready card is committed at
+`swarm-results/cfr168-python-http-mr-list-review-closure-repair-candidate-ready-20260730/candidate.md`.
+It binds exact name-status, numstat, base/head blobs, implementation
+manifest/ticket digests, scheduler result, provider/model/role/session, and
+three terminal log digests. Worker evidence includes ten consecutive 44-case
+focused passes, 115 affected legacy CLI passes, the stable 507-case Python
+gate, source/project doc checks, exact reversals, and a clean final worktree.
+These remain worker evidence, not acceptance.
+
+The prebuilt review ticket was atomically bound with no `UNBOUND` candidate
+field. Review task commit `8143f437342cf7bf11322d82f6ca63ab888382e8`
+sits immediately above the immutable candidate; manifest commit
+`0c13d1339178118890685dc94bf9d79c4ccec8e1` sits above the ticket. The
+report-only manifest SHA-256 is
+`2a306dba5102da788b3e2ec4cefc258e72a638a1f098bb790f2b1a301f58d45b`;
+`dev-swarm validate` and `plan` pass. Its only write is the fresh Claude Opus
+5 review report. This is the first live use of AIA-038 from terminal
+candidate to bound exact-review task.
