@@ -618,3 +618,64 @@ At `2026-07-30T11:23:50Z`, `/workspace` measured `3,708,179,380` bytes,
 `MemAvailable` was `15,068,104` KiB, swap use was zero, and the mounted
 filesystem reported `905,087,758,336` bytes available. This remains above the
 6 GiB memory and 100 GiB free-space launch floors.
+
+## 2026-07-30 18:27 UTC four-result rollover checkpoint
+
+All four external lanes from the prior checkpoint reached durable terminal
+results. No product result was integrated automatically:
+
+| Completed lane | Exact result | Scope | Manager disposition |
+|---|---|---|---|
+| Python Upload/CFB-138 repair | `76baff84cb1192e11b26dcc669fb800f7b13fa30` | 11 commits from `5f79899`; six files, `+2227/-120` | clean candidate; exact independent rereview required |
+| Python MR-list rereview | report `80784151e0a42b2f839cdcf01336252319e5830a` on candidate `38da898` | one 497-line report | `REQUEST_CHANGES`; report integrated as `78b127c` |
+| Rust storage repair | `cdcb9bdefe7d25a118a9dc14171864d75f5ad304` | two commits from `13767c7`; eight files, `+2972/-291` | scheduler passed and clean; exact independent rereview required |
+| Rust file-ancestry repair | `02b0d63651703aaac88c249bdc437cd173dfa397` | one commit from `86a0c2e`; six files, `+2900/-815` | scheduler passed and clean; exact independent rereview required |
+
+`dev-swarm collect` reports `all_passed=true` for storage and ancestry with
+manifest SHA-256 values
+`bb1fa233191f9f04dcf298c5fd950429df500480e6d4448d9470988cea3b1c30`
+and
+`cc04bb6d5d6d99f1e427f36a8677a3bc2df03a0f96e8335628e380cbf115e82a`.
+Those scheduler results prove task completion and clean handoff, not product
+acceptance.
+
+The MR-list rereview report SHA-256 is
+`6840035553871f5251e32d67bb5b2f9d6c6ee061b7ab3106e94de373ec97b20d`.
+It preserves the candidate's precedence, leaf-symlink, escrow-memo,
+single-session, helper-scoped descriptor, and affine-counter improvements,
+but rejects seven remaining areas:
+
+1. unavailable/symlinked/denied parent authority is treated as leaf absence;
+2. filesystem `TimeoutError` is confused with client transport failure on GET
+   and POST;
+3. cleanup erases local ownership before a release succeeds;
+4. mode/link-count changes after the last metadata observation escape;
+5. authority can change after every fence but before response publication;
+6. the descriptor oracle overclaims a whole-route one-read property;
+7. poll evidence removes whole helpers instead of proving individual sites.
+
+All seven plus the shared GET/POST composition handoff are frozen in
+`cfr168-python-http-mr-list-review-closure-repair-20260730.md`. Taskbase
+commits `7f37394` and `a38b5f2` were integrated report/task-only as `8b3fd1d`
+and `fb65837`. The new implementation lane is active under verified
+Claude Opus 5 with a 12-hour envelope.
+
+Two queued heavy repairs were started immediately after the prior storage and
+ancestry lanes released their permits:
+
+| Active lane | Provider/model | Resource class | Exact task base |
+|---|---|---|---|
+| Rust File Doctor zero-residual restart | Claude `claude-opus-5` | heavy | `dbeaac1526acc8c2e102ee2b137e8f2a708890b0` |
+| Rust HTTP MR preflight review closure | Claude `claude-opus-5` | heavy | `7e4e685efbfc453a6d2209f37c99edb1ab46243d` |
+| Python MR-list review closure | Claude `claude-opus-5` | light | `7f37394c76e3626f810d0cd133be70feea89b5d2` |
+
+The fourth external permit remains intentionally reserved for the Upload exact
+Fugu rereview rather than dispatching a lower-priority review. Upload,
+storage, and ancestry rereview packets are being prepared in three isolated
+manager worktrees; only one Fugu review will run at a time.
+
+At `2026-07-30T18:26:41Z`, `/workspace` measured `7,333,166,047` bytes,
+`MemAvailable` was `13,397,540` KiB, swap use was zero, and the mounted
+filesystem reported `901,302,951,936` bytes available. The larger workspace
+measurement reflects preserved result/review worktrees and remains above all
+launch floors.
