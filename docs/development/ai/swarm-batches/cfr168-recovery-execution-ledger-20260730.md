@@ -563,6 +563,15 @@ registration is `3611fb4`, integrated report-only into canonical as
 `53b220d`. The replacement lane is now running under verified
 `claude-opus-5` with a 12-hour envelope.
 
+The same cross-state audit found the earlier File Doctor zero-residual task
+stopped by the host interruption before its first implementation commit. Its
+preserved worktree is clean at exact task revision
+`dbeaac1526acc8c2e102ee2b137e8f2a708890b0`; the dead batch was reconciled
+without deleting its state. A collision-free replacement is prevalidated as
+`cfr168-rust-file-doctor-zero-residual-repair-r1-20260730.json`, registered on
+its taskbase as `5231403` and in canonical as `18ddd57`. It remains queued
+until one of the two heavy permits is released.
+
 The external-session set is again full without exceeding the two-heavy limit:
 
 | Lane | Provider/model | Resource class | Durable state |
