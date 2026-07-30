@@ -1,0 +1,30 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-rust-storage-recovery-20260729",
+  "workspace": "/workspace/worktrees/cfr168-aa5-probe",
+  "base_revision": "40c095de250df2ee9e9e34526e1926069b476e42",
+  "max_parallel": {
+    "fugu": 1,
+    "claude": 0,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "storage-finish-after-reboot",
+      "role": "implementer",
+      "tier": "ultra",
+      "provider": "fugu",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-rust-storage-ledger-20260729.md",
+      "depends_on": [],
+      "write_set": [
+        "crates/codefire-cli/src/storage.rs",
+        "crates/codefire-cli/src/main.rs",
+        "crates/codefire-cli/src/metrics.rs",
+        "crates/codefire-cli/src/tests.rs",
+        "crates/codefire-cli/src/tests/storage_decision_work.rs"
+      ],
+      "expected_commit": true,
+      "timeout": "8h"
+    }
+  ]
+}

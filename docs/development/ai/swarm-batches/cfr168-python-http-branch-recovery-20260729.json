@@ -1,0 +1,27 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-python-http-branch-recovery-20260729",
+  "workspace": "/workspace/worktrees/cfr168-p0-canonical",
+  "base_revision": "8265ea1102688d9df3d3a1c3b82f2dcd4c1b64d8",
+  "max_parallel": {
+    "fugu": 0,
+    "claude": 1,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "branch-finish-after-reboot",
+      "role": "implementer",
+      "tier": "high",
+      "provider": "claude",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-python-http-branch-session-20260729.md",
+      "depends_on": [],
+      "write_set": [
+        "codefire",
+        "tests/test_python_http_branch_decision_work.py"
+      ],
+      "expected_commit": true,
+      "timeout": "8h"
+    }
+  ]
+}
