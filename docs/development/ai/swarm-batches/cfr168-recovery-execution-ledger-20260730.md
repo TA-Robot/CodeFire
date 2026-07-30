@@ -29,6 +29,15 @@ Canonical issue status remains `investigating`; this ledger does not authorize C
 | Rust file-remote Doctor | `ea8f2a6` | Fugu 1.1 Ultra | `cfr168-rust-file-doctor-recovery-20260729` | task packet only | unify live file command with accounted Doctor path |
 | Rust HTTP MR create/review preflight | `3c23e38` | Fugu 1.1 Ultra | `cfr168-rust-http-mr-preflight-20260729` | task packet only | prepared response before effect and no-effect fault tests |
 
+Two Rust lanes remained in design analysis for about 45 minutes without a product diff. They were
+not stopped: independent Claude Opus 5 hedge lanes now run from the same immutable task bases:
+
+- `cfr168-rust-file-remote-ancestry-claude-hedge-20260730`;
+- `cfr168-rust-http-mr-preflight-claude-hedge-20260730`.
+
+This is candidate competition, not dual integration. Each result must satisfy the same packet,
+focused/broad gates, and independent review; only the accepted product commit is integrated.
+
 ## Recovered Python composition evidence
 
 - The isolated composition probe is
