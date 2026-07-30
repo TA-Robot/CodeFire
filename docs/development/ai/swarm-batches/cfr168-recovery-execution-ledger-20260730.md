@@ -1031,3 +1031,13 @@ initialize an unrelated history or mutate unversioned scheduler code. Atomic
 run state, resource leases, event telemetry, auto-review rollover, validation
 cache, and shadow-train automation remain ready to implement as soon as the
 actual foundation Git provenance is restored.
+
+The first Stage 5 shift-left packet is committed as `ba8dd25`. It blocks the
+prepared MR-write implementation until exact accepted Upload and MR-list
+identities are bound and an independent Fugu 1.1 Ultra report returns
+`READY`. The report must reconcile one request context, sealed snapshot,
+authority fence, prepared response, retryable cleanup, publication
+transaction, and error-origin model through physical owner/lifetime and
+effect timelines. Every MR-write F1--F7 claim requires a production oracle and
+deliberate regression before Claude implementation begins. The packet has no
+worker manifest while blocked, so it adds no live WIP or provider cost.
