@@ -231,7 +231,7 @@ Current named cycle:
 - Active strategic line: repository/development control, then invariant-backed correctness and recovery.
 - Current roadmap: `docs/development/strategy/modernization-roadmap.md`。
 - Release/format identity: `docs/development/strategy/release-and-format-roadmap.md`; old v0.6–v1.0 labels are internal milestones/plans, not current public release claims.
-- Current phase: `BATCH-2026-07-review-portfolio-completion` is executing root by root. Roots through CFR-167/CFB-134 completed through Retrospect; CFB-133, CFR-168 blocker CFB-136, and CFR-168..173 remain. CFR-168/CFB-136 is active.
+- Current phase: `BATCH-2026-07-review-portfolio-completion` is executing root by root. Roots through CFR-167/CFB-134 completed through Retrospect; CFB-133, CFR-168 blockers CFB-136/138, and CFR-168..173 remain. CFR-168/CFB-136/CFB-138 is active.
 - Final isolated Rust binary: `/tmp/codefire-cfr167-final.KWa8TC/bin/codefire`, version output `codefire foundation 1`, source/installed SHA-256 `1483874b4c1de4a78478595d5d158cf34a12e5ec3b05255dfc8819f511f00272`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
 - Algorithm CodeFire state: canonical is `open-clean` at strict bridge `CF-COMMIT-e5ca290905c2a4b5e2c05bd4`, Fire 0 and no tool migration. The configured legacy workspace passes the installed read-only surface and its control hashes remain unchanged.
@@ -241,9 +241,9 @@ Current global issue inventory:
 
 | Series | Total tracked | Fixed / closed | Open |
 |---|---:|---:|---:|
-| CFB dogfood issues | 137 | 135 | 2 |
+| CFB dogfood issues | 138 | 135 | 3 |
 | CFR code review issues | 175 | 169 | 6 |
-| Total | 312 | 304 | 8 |
+| Total | 313 | 304 | 9 |
 
 Close audit note:
 
@@ -252,7 +252,7 @@ Close audit note:
 - 2026-07-12 source Close後の必須Install/Dogfoodは CFB-128..132 を同じfrozen batchへ追加した。全blockerをroot fixし、最終Install、canonical bridge、Retrospectまで完了したため、現在は132 CFB中132 fixedである。
 - `BATCH-2026-07-authoritative-committable-decision` はCFR-161のtyped decision、safety-floor config、full regression、fresh Install、old counterexample反転、real read-only matrix、canonical warning-policy Dogfoodを完了した。
 - `BATCH-2026-07-unresolved-merge-sealing` は非Atom text conflictがpassedになる反例から始まり、CFR-162/ADR-014のtyped blockerと`merge --continue`を実装した。495-test gate、fresh Install、installed反例反転、real 12-command matrix、canonical Dogfood、Retrospectまで完了した。
-- `BATCH-2026-07-review-portfolio-completion` はRVC-001..060をcurrent sourceへ再照合し、6 implemented、3 accepted non-goal、51 residualへterminal triageした。residualはCFR-163..173へexactly-once mappingした。CFR-167までにsupport/version contractに加えてeffective-policy provenanceとtyped ChangeCoverageを実装し、622 Rust / 117 Python gate、fresh Install、installed reversal、canonical Dogfoodまで完了した。CFR-168設計反証でsnapshotにbindされないsame-inode validation-cache reuseをCFB-136として同根admitした。残る8件のRetrospectまで無関係な新Discoveryを停止し、CFR-168/CFB-136を実行する。
+- `BATCH-2026-07-review-portfolio-completion` はRVC-001..060をcurrent sourceへ再照合し、6 implemented、3 accepted non-goal、51 residualへterminal triageした。residualはCFR-163..173へexactly-once mappingした。CFR-167までにsupport/version contractに加えてeffective-policy provenanceとtyped ChangeCoverageを実装し、622 Rust / 117 Python gate、fresh Install、installed reversal、canonical Dogfoodまで完了した。CFR-168設計反証でsnapshotにbindされないsame-inode validation-cache reuseをCFB-136、upload recoveryで全record heap upperをconcurrent retainedへ合算して既定profileを拒否するscale defectをCFB-138として同根admitした。残る9件のRetrospectまで無関係な新Discoveryを停止し、CFR-168/CFB-136/CFB-138を実行する。
 - 最後に残っていた `CFR-120` は、`docs/development/issue-root-cause-map.json` と `issue_root_cause_map_covers_open_issues` で、今後のopen issueをroot cause計画へ機械的に接続する形でcloseした。
 - Cycle 4 dogfoodingでは `ResearchCyclePlanSynthesizer` を追加し、`CFB-093` を発見、同cycle内でfixedにした。
 - Cycle 5 dogfoodingでは `ResearchCyclePlanMarkdown` をdocs-firstで追加し、6件のCodeFire open fireを同cycle内でextinguishして `CF-COMMIT-476c73ed58ac5e64be166e38` でsealした。CodeFire本体issueは新規発見なし。

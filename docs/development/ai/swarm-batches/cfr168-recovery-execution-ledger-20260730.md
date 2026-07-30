@@ -59,6 +59,18 @@ overlapping write set:
 Later roots CFR-169 through CFR-173 and CFB-133 remain predecessor-gated. Their probes are evidence,
 not authorization to violate the frozen-batch-to-zero rule.
 
+## Same-root blocker admitted during recovery
+
+- `CFB-138` was reproduced against upload target `cb13da0`: a root plus 1200 descendants under the
+  default HTTP profile is refused during `semantic_validation` because a `130,977,816` byte
+  all-record heap upper is treated as concurrent retained memory against the `33,554,432` byte
+  limit, although the reached retained peak is `2,274,829` bytes.
+- The refusal is typed, authority remains byte-identical, and cleanup reaches zero, but the test's
+  512 MiB override cannot count as CFR-168 scale acceptance.
+- The fix is frozen in
+  `cfr168-python-http-upload-staging-scale-20260730.md`: stream actual per-record owner lifetime,
+  keep the default profile, and bind 1x/3x/10x plus exact-boundary evidence before Close.
+
 ## Mandatory acceptance sequence
 
 The batch cannot Close until all of the following are bound to the exact integrated revision:

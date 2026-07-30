@@ -4,17 +4,17 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 ## Current Operating Snapshot
 
-Last audited: 2026-07-19.
+Last audited: 2026-07-30 during CFR-168 recovery.
 
 - Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
-- CFB detail ledger: 137 total; 135 `fixed`, 2 `investigating`. Open/investigating count: 2.
+- CFB detail ledger: 138 total; 135 `fixed`, 3 `investigating`. Open/investigating count: 3.
 - CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, 6 `investigating`. Open/investigating count: 6.
 - Final installed `/tmp/codefire-cfr167-final.KWa8TC/bin/codefire` has source-matching SHA-256 `1483874b4c1de4a78478595d5d158cf34a12e5ec3b05255dfc8819f511f00272`; policy/coverage reversal, sealed digest binding, and canonical Dogfood pass.
 - The current Git worktree contains the intentional uncommitted review, invariant-fix, regression, ADR, and management-document packages. They remain classified project state and must not be destructively cleaned or presented as a clean checkpoint.
 - CFB-120..132 and the complete Stage 1 Dogfood-blocker lifecycle are closed. Canonical Algorithm is now sealed at `CF-COMMIT-e5ca290905c2a4b5e2c05bd4` with Atom hash schema 4, `sealed-snapshot-v1`, `open-clean`, and zero Fires; the configured legacy repository was not mutated.
 - RVC-011 / CFR-161 is closed through Install, installed counterexample replay, both real-repository read-only probes, canonical trace-warning verification, and Retrospect. ADR-013 now owns the typed committable decision and non-relaxable safety floor.
 - RVC-039 / CFR-162 is closed through the full lifecycle. ADR-014 makes unresolved text, binary, and semantic merge facts authoritative blockers and makes `merge --continue` the explicit validated resolution boundary.
-- `BATCH-2026-07-review-portfolio-completion` remains frozen. Roots through CFR-167/CFB-134 completed through Retrospect; CFB-133, admitted CFR-168 blocker CFB-136, and CFR-168..173 are the 8 active issues. No unrelated Discovery is admitted until the batch completes.
+- `BATCH-2026-07-review-portfolio-completion` remains frozen. Roots through CFR-167/CFB-134 completed through Retrospect; CFB-133, admitted CFR-168 blockers CFB-136/138, and CFR-168..173 are the 9 active issues. No unrelated Discovery is admitted until the batch completes.
 - The base environment still does not expose `cargo` on `PATH`; a durable pinned toolchain/CI identity remains release work.
 
 If any line above changes, update this snapshot and append the reason to `docs/development/history.md`.

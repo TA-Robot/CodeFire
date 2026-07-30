@@ -1,7 +1,7 @@
 {
   "type": "codefire.issue_root_cause_map.v1",
   "version": 1,
-  "updated_at": "2026-07-19",
+  "updated_at": "2026-07-30",
   "sources": [
     "docs/development/bug-backlog.md",
     "docs/development/bug-issues/",
@@ -742,6 +742,24 @@
         "docs/development/bug-issues/cfb-136.md",
         "docs/development/code-review-issues/cfr-168.md",
         "adr/ADR-020-decision-equivalent-work-budget.md"
+      ]
+    },
+    {
+      "id": "CFB-138",
+      "status": "investigating",
+      "root_cause": "sealed_validation_sums_all_record_heap_uppers_as_concurrent_retained_memory",
+      "fix_group": "decision-equivalent-work-budget",
+      "target_version": "portfolio-completion-batch",
+      "owner_module": "codefire",
+      "next_plan_mapping": {
+        "plan": "docs/development/current-cycle-burn-down-plan.md",
+        "phase": "BATCH-2026-07-review-portfolio-completion",
+        "decision": "Stream per-record sealed validation ownership so default-profile upload scale reflects real concurrent lifetime without weakening validation."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-138.md",
+        "docs/development/code-review-issues/cfr-168.md",
+        "docs/development/ai/swarm-batches/cfr168-python-http-upload-staging-scale-20260730.md"
       ]
     },
     {
