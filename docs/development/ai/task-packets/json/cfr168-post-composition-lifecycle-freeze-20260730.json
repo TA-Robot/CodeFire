@@ -1,0 +1,368 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "cfr168-post-composition-lifecycle-freeze-20260730",
+  "status": "blocked",
+  "objective": "Freeze the manager-only CFR-168 post-composition lifecycle so one exact accepted integrated revision must pass full Close, reproducible source-bound release evidence, isolated installed reversals, canonical and real-repository Dogfood, authoritative synchronization, KGI/KPI finality, and final capability re-advertisement with fresh post-mutation evidence.",
+  "base_revision": "740ea18eb42630ba265a8aad83c950ceb96aacca",
+  "role": "manager",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 2,
+      "reversibility": 2,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "sealed_commit_or_branch_atomicity",
+      "cross_subsystem_architecture",
+      "release_completion_audit",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 12,
+    "selected_tier": "ultra",
+    "rationale": "This packet controls acceptance of cross-runtime composition, release provenance, installed mutation safety, capability truth, authoritative issue closure, and the final development KGI. A stale subject or false pass would multiply into the next frozen roots."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-1-rust-cli-command-work",
+      "pack-2-core-semantics",
+      "pack-3-store-object-commit-integrity",
+      "pack-4-remote-http-security",
+      "pack-5-project-management-docs",
+      "pack-6-dogfood-algorithm-project"
+    ],
+    "additional_files": [
+      "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md",
+      "docs/development/ai/swarm-results/current-state-closure-audit-20260729/03-acceptance-evidence.md",
+      "docs/development/code-review-issues/cfr-168.md",
+      "docs/development/bug-issues/cfb-136.md",
+      "docs/development/bug-issues/cfb-138.md",
+      "docs/development/current-cycle-burn-down-plan.md",
+      "docs/development/issue-root-cause-map.json",
+      "docs/development/ai/development-flow-kgi-kpi.md",
+      "docs/development/ai/flow-metrics/cfr168-recovery-20260730.v1.json",
+      "docs/development/tools/build_source_bound_rust.py",
+      "docs/development/tools/probe_validation_capabilities.py",
+      "schemas/conformance/manifest-v1.json"
+    ],
+    "evidence_refs": [
+      "freeze-base:740ea18eb42630ba265a8aad83c950ceb96aacca",
+      "freeze-tree:40ec9ebe9ab30fa63858ee3d4dc4b17f38e67fe8",
+      "immutable-product-snapshot:e2a218e015953f082245f36dbc6aee906b837e5a",
+      "immutable-product-tree:9be2b8aca8a8538d12852b835b95aafb8601f4a4",
+      "recovery-ledger-sha256:af8d5dccd9993d1d8e16f481a4ba74996e356641d9c1bbe06a82cc85bec11422",
+      "review-index-sha256:76de456efc526b53086878b958f69b6c10ddc2aee970bab89b8323c403a21294",
+      "launch-blocker:accepted-python-composition-not-bound",
+      "launch-blocker:accepted-rust-composition-not-bound",
+      "launch-blocker:successor-surface-set-not-accepted",
+      "launch-blocker:final-integrated-sha-not-bound",
+      "launch-blocker:installed-reversal-runner-not-bound",
+      "launch-blocker:final-capability-commit-not-bound"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "README.md",
+      "Cargo.toml",
+      "Cargo.lock",
+      "codefire",
+      "crates/**",
+      "tests/**",
+      "schemas/**",
+      "docs/**",
+      "adr/**",
+      "install.sh",
+      "demo.sh",
+      "subprojects/algorithm-evolution-agent-lab/**"
+    ],
+    "write_set": [
+      "docs/development/ai/task-packets/cfr168-post-composition-lifecycle-freeze-20260730.md",
+      "docs/development/ai/task-packets/json/cfr168-post-composition-lifecycle-freeze-20260730.json",
+      "docs/development/ai/review-packets/**",
+      "docs/development/ai/flow-metrics/**",
+      "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md",
+      "docs/development/code-review-issues/cfr-168.md",
+      "docs/development/code-review-issues-2026-06-06.md",
+      "docs/development/bug-issues/cfb-136.md",
+      "docs/development/bug-issues/cfb-138.md",
+      "docs/development/bug-backlog.md",
+      "docs/development/current-cycle-burn-down-plan.md",
+      "docs/development/issue-root-cause-map.json",
+      "docs/development/history.md",
+      "docs/development/known-limitations.md",
+      "crates/codefire-cli/src/compatibility.rs",
+      "crates/codefire-cli/src/tests.rs",
+      "codefire",
+      "tests/test_codefire_cli.py",
+      "schemas/conformance/**",
+      "docs/04_cli_spec.md",
+      "docs/automation_interface.md",
+      "subprojects/algorithm-evolution-agent-lab/.codefire/**"
+    ],
+    "disallowed_paths": [
+      ".devcontainer/**",
+      ".github/**",
+      "Cargo.toml",
+      "Cargo.lock",
+      "install.sh",
+      "demo.sh",
+      "crates/codefire-core/**",
+      "crates/codefire-store/**",
+      "crates/codefire-cli/src/main.rs",
+      "crates/codefire-cli/src/http.rs",
+      "crates/codefire-cli/src/remote.rs",
+      "crates/codefire-cli/src/remote/**",
+      "crates/codefire-cli/src/storage.rs",
+      "crates/codefire-cli/src/doctor/**",
+      "subprojects/algorithm-evolution-agent-lab/src/**",
+      "subprojects/algorithm-evolution-agent-lab/tests/**",
+      "subprojects/algorithm-evolution-agent-lab/docs/**",
+      "subprojects/algorithm-evolution-agent-lab/codefire.yaml",
+      "subprojects/algorithm-evolution-agent-lab/codefire.links.yaml",
+      "subprojects/algorithm-evolution-agent-lab/codefire.policy.yaml",
+      "docs/development/ai/swarm-results/**/review.md"
+    ],
+    "disallowed_actions": [
+      "Launch or change status to ready before exact accepted Python/Rust compositions, every successor, the integrated SHA, the installed runner, and the held capability commit are committed into both packet files",
+      "Author or opportunistically repair product behavior under this lifecycle packet; only the separately accepted final capability re-advertisement commit may be applied as a product mutation",
+      "Merge a whole candidate branch, recovery worktree, WIP commit, interrupted transcript, or duplicate product range",
+      "Treat candidate-only, predecessor, stale-review, stale-install, or pre-capability evidence as evidence for a changed revision",
+      "Close CFR-168, CFB-136, or CFB-138 or advertise final coverage before terminal-SHA Close, Install, Dogfood, and KGI/KPI evidence pass",
+      "Allow a reviewer to approve a revision they authored or composed",
+      "Mutate a real-repository read-only dogfood subject or edit Algorithm source, tests, documentation, or configuration to make Dogfood pass",
+      "Ignore, downgrade, or route away a same-root defect, evidence-integrity failure, capability overclaim, authority drift, or flaky release gate",
+      "Claim that local build provenance is trusted or supply-chain reproducibility evidence",
+      "Run overlapping heavy builds or retain duplicate disposable targets after compact evidence is committed when resource guardrails would be crossed",
+      "Delete user-owned changes, worktrees, caches, repositories, or evidence"
+    ]
+  },
+  "non_goals": [
+    "Implement or refactor remaining CFR-168 product behavior",
+    "Review devcontainer, CI, host setup, agent wrappers, packaging design, or unrelated later roots",
+    "Change Algorithm implementation, tests, documents, or configuration",
+    "Provide trusted-builder or dependency supply-chain attestation",
+    "Authorize CFR-169 through CFR-173 or CFB-133 before this root reaches terminal Retrospect",
+    "Convert activity counts, model approvals, or generated artifacts into KGI achievement"
+  ],
+  "invariants": [
+    {
+      "id": "exact-terminal-subject",
+      "statement": "Every terminal claim names one exact commit, tree, patch digest, clean status, release binary digest, installed path, and dogfood subject.",
+      "falsification_test": "Change any source, test, corpus, schema, documentation, capability declaration, binary, or dogfood subject after evidence capture and require the affected stage and all downstream evidence to become stale."
+    },
+    {
+      "id": "accepted-predecessors-only",
+      "statement": "The post-composition subject contains only independently accepted Python, Rust, successor-surface, and manager conflict-resolution ranges.",
+      "falsification_test": "Insert a WIP, rejected candidate, branch-tip-only, duplicate recovery, unresolved review, or unreviewed conflict commit and require Close entry to fail."
+    },
+    {
+      "id": "full-cross-runtime-close",
+      "statement": "Python, Rust, shared conformance, source/project/AI documentation, diff integrity, boundary, scale, complexity, and exact-subject review gates all pass together.",
+      "falsification_test": "Remove one runtime, one selected production surface, one exact boundary, the 1x/3x/10x curve, the literal oracle, or the independent High decision and require source Close to remain a non-terminal candidate."
+    },
+    {
+      "id": "fresh-independent-review",
+      "statement": "An independent High reviewer accepts the exact subject and exact complete evidence after composition and after the final capability mutation.",
+      "falsification_test": "Reuse a predecessor review, let an author self-approve, alter one byte after review, omit a required log digest, or return anything but exact ACCEPT and require review freshness to fail."
+    },
+    {
+      "id": "release-reproducibility",
+      "statement": "Two isolated clean builds at the same exact source and toolchain produce matching binary hashes and complete source-bound provenance.",
+      "falsification_test": "Change source inputs, HEAD, lock/toolchain, build inputs, binary bytes, or one build digest and require Install entry to fail without selecting the preferred output."
+    },
+    {
+      "id": "installed-binary-identity",
+      "statement": "Every installed reversal and dogfood command resolves to the temp-prefix binary whose digest equals the accepted release digest.",
+      "falsification_test": "Prepend a stale binary, replace the installed file, invoke a source helper, or change PATH and require the active-path/hash preflight to fail before the case runs."
+    },
+    {
+      "id": "installed-boundary-effect-safety",
+      "statement": "The installed binary preserves exact/minus-one/plus-one, 1x/3x/10x, typed diagnostic, no-partial-response, no-mutation, cleanup, and authority invariants on every selected surface.",
+      "falsification_test": "Run the accepted installed corpus with a limit-plus-one, CFB-136 mutation, CFB-138 1201-descendant upload, expired deadline, response overflow, and metrics toggle; any success, partial output, debt, drift, or semantic difference blocks Install."
+    },
+    {
+      "id": "dogfood-authority",
+      "statement": "Canonical Algorithm Dogfood uses the exact installed binary and real-repository probes are read-only with frozen before/after authority hashes.",
+      "falsification_test": "Edit Algorithm inputs, use a different binary, produce an unexpected Algorithm authority transition, or change any real-repository Git/CodeFire authority byte and require Dogfood to fail."
+    },
+    {
+      "id": "new-finding-loop",
+      "statement": "Every new finding is identified, reproduced, owned, classified, routed, and either resolved with fresh downstream evidence or explicitly admitted as a distinct non-blocking issue.",
+      "falsification_test": "Leave an observation untracked, label a same-root finding unrelated, use an environment incident as a pass, or infer no-new-finding from silence and require Retrospect to fail."
+    },
+    {
+      "id": "no-early-capability",
+      "statement": "Final decision-work capability coverage is not re-advertised until all predecessor lifecycle gates pass, and that re-advertisement is the last product mutation.",
+      "falsification_test": "Expose final coverage earlier, apply an unreviewed declaration, mutate product after it, or retain pre-mutation evidence and require terminal status to be withdrawn."
+    },
+    {
+      "id": "authoritative-close",
+      "statement": "Issue ledgers, root map, plan, history, limitations, disposition index, recovery ledger, review evidence, capability payload, and KGI/KPI final record agree on the exact terminal subject and zero same-root residual.",
+      "falsification_test": "Change one status, count, root, dependency, evidence reference, capability field, KGI value, record lineage, or final provenance and require canonical documentation and AI-contract validation to fail."
+    },
+    {
+      "id": "resource-continuity",
+      "statement": "Heavy builds and gates are serialized, durable evidence precedes cleanup, and only manager-created disposable outputs may be removed.",
+      "falsification_test": "Overlap heavy gates across the resource ceiling, retain duplicate target trees without need, delete user-owned state, or lose a completed gate before its digest is committed and require the lifecycle to pause and record an incident."
+    }
+  ],
+  "validation": [
+    {
+      "id": "exact-subject-preflight",
+      "command": "git rev-parse HEAD && git rev-parse HEAD^{tree} && git status --porcelain=v1 --untracked-files=all && git diff --name-status e2a218e015953f082245f36dbc6aee906b837e5a..HEAD && git diff --binary e2a218e015953f082245f36dbc6aee906b837e5a..HEAD | sha256sum",
+      "purpose": "Freeze the exact integrated revision, tree, clean state, changed paths, and canonical patch digest.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "python-compile",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile codefire tests/test_codefire_cli.py",
+      "purpose": "Compile the complete Python reference and test module on the exact subject.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "python-full",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+      "purpose": "Run the unrestricted Python compatibility and behavior suite.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "demo",
+      "command": "./demo.sh",
+      "purpose": "Exercise the complete supported demonstration workflow.",
+      "required": true,
+      "requires_capability": "bash"
+    },
+    {
+      "id": "rust-format",
+      "command": "cargo fmt --all -- --check",
+      "purpose": "Require formatting across the exact Rust workspace.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "rust-clippy",
+      "command": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+      "purpose": "Reject warnings and all-target implementation-quality regressions with the locked graph.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "rust-workspace",
+      "command": "cargo test --workspace --locked",
+      "purpose": "Run complete cross-crate Rust coverage.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "shared-conformance",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 schemas/conformance/minimal_consumer.py schemas/conformance/manifest-v1.json && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_codefire_cli.CodeFireCliTests.test_checked_conformance_manifest_matches_python_support_decisions && cargo test --locked -p codefire-cli --bin codefire-rs checked_conformance_manifest_matches_rust_support_decisions",
+      "purpose": "Run the final versioned Rust/Python/independent-consumer corpus, which must include every frozen CFR-168 semantic, boundary, diagnostic, metric, and capability surface.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "documentation",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_source_docs.py && PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_project_docs.py",
+      "purpose": "Keep source architecture, product contract, issue, map, plan, history, and current-state owners synchronized.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "ai-control-plane",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_ai_contracts.py && PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_ai_development.py --timeout 120",
+      "purpose": "Validate task/review/KGI/KPI schemas, semantics, lineage, evidence, runtime routing, and committed-final provenance.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "diff-integrity",
+      "command": "git diff --check e2a218e015953f082245f36dbc6aee906b837e5a...HEAD",
+      "purpose": "Reject whitespace and patch-integrity defects over the complete product change.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "independent-high-review",
+      "command": "The manager must bind one committed independent High ACCEPT review packet for the exact source-close SHA and a second fresh one for the post-capability terminal SHA; check_ai_contracts.py must validate both exact subjects, patches, commands, logs, provenance, and decisions.",
+      "purpose": "Prevent self-approval, predecessor approval, stale evidence, and unreviewed composition or capability changes.",
+      "required": true
+    },
+    {
+      "id": "release-provenance",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/build_source_bound_rust.py --output target/codefire-ai/rust-build-provenance.json && PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/probe_validation_capabilities.py",
+      "purpose": "Produce and verify clean-HEAD source/toolchain/build-log/binary provenance in each of two isolated worktrees; their binary SHA-256 values must match.",
+      "required": true,
+      "requires_capability": "cargo"
+    },
+    {
+      "id": "isolated-install",
+      "command": "CFR168_PREFIX=\"$(mktemp -d /tmp/codefire-cfr168-final.XXXXXX)\" && ./install.sh --prefix \"$CFR168_PREFIX\" --binary \"$PWD/target/release/codefire-rs\" && test \"$(sha256sum \"$PWD/target/release/codefire-rs\" | awk '{print $1}')\" = \"$(sha256sum \"$CFR168_PREFIX/bin/codefire\" | awk '{print $1}')\" && test \"$(PATH=\"$CFR168_PREFIX/bin:$PATH\" command -v codefire)\" = \"$CFR168_PREFIX/bin/codefire\" && \"$CFR168_PREFIX/bin/codefire\" --version && \"$CFR168_PREFIX/bin/codefire\" --help && \"$CFR168_PREFIX/bin/codefire-py\" --help && \"$CFR168_PREFIX/bin/codefire\" capabilities --json",
+      "purpose": "Install into an isolated prefix and prove source/installed hash, active PATH, runtime identity, fallback, and pre-advertisement capability output.",
+      "required": true,
+      "requires_capability": "rust-source-bound-binary"
+    },
+    {
+      "id": "installed-reversals",
+      "command": "BLOCKED at 740ea18: before status ready, replace this text with the exact accepted repository-local runner and arguments for the installed boundary, scale, CFB-136, CFB-138, HTTP effect-safety, metrics, cleanup, and authority matrix.",
+      "purpose": "Ensure the installed production binary, rather than source helpers, proves every frozen exact/minus-one/plus-one and 1x/3x/10x acceptance boundary.",
+      "required": true
+    },
+    {
+      "id": "algorithm-tests",
+      "command": "(cd subprojects/algorithm-evolution-agent-lab && PYTHONPATH=src python3 -m unittest discover -s tests -v)",
+      "purpose": "Run all current canonical Algorithm tests and record the exact discovered count.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "installed-algorithm-dogfood",
+      "command": "test -n \"$CFR168_PREFIX\" && \"$CFR168_PREFIX/bin/codefire\" status --path subprojects/algorithm-evolution-agent-lab --json && \"$CFR168_PREFIX/bin/codefire\" scan --path subprojects/algorithm-evolution-agent-lab --json && \"$CFR168_PREFIX/bin/codefire\" verify --path subprojects/algorithm-evolution-agent-lab --json && \"$CFR168_PREFIX/bin/codefire\" doctor --path subprojects/algorithm-evolution-agent-lab --json",
+      "purpose": "Exercise the canonical Algorithm status/scan/verify/Doctor workflow with the exact installed binary and frozen authority transition.",
+      "required": true,
+      "requires_capability": "codefire"
+    },
+    {
+      "id": "real-repository-dogfood",
+      "command": "BLOCKED at 740ea18: before status ready, replace this text with exact installed read-only commands and canonical subjects for every configured and plain real-repository probe, including before/after Git and CodeFire authority hashing.",
+      "purpose": "Prove production read-only behavior without repository, branch, object, open, active, index, ref, or worktree drift.",
+      "required": true
+    },
+    {
+      "id": "terminal-synchronization",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_project_docs.py && PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_ai_contracts.py && git status --porcelain=v1 --untracked-files=all",
+      "purpose": "Validate terminal issue/map/history/index/ledger/capability/KGI/KPI agreement and require a clean terminal worktree after committed evidence.",
+      "required": true,
+      "requires_capability": "python3"
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "blocked_to_ready_exact_binding_commit",
+      "accepted_composition_and_successor_revision_table",
+      "terminal_commit_tree_patch_and_clean_status",
+      "issue_and_finding_disposition_matrix",
+      "full_source_conformance_docs_and_diff_gate_table",
+      "independent_high_review_packets",
+      "release_reproducibility_and_provenance_table",
+      "source_installed_and_active_binary_identity",
+      "installed_boundary_scale_and_effect_safety_matrix",
+      "canonical_algorithm_and_real_repository_dogfood_matrix",
+      "new_finding_routing",
+      "issue_map_history_index_and_ledger_sync",
+      "committed_final_kgi_kpi_record",
+      "final_capability_payload_and_conformance",
+      "resource_incident_and_cleanup_record",
+      "terminal_readiness_decision"
+    ],
+    "evidence_digest_required": true
+  }
+}
