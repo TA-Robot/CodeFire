@@ -799,3 +799,18 @@ The audit's next-stage designs are now typed, blocked execution contracts:
 These packets contain no worker manifest and cannot launch while their inputs
 are unbound. This keeps planning ahead of implementation without converting a
 candidate, worker success, or isolated review into an integration decision.
+
+## 2026-07-30 19:06 UTC terminal-cache maintenance
+
+Resource re-audit found a `3,204,719,352`-byte per-worktree Cargo target under
+the completed file-ancestry repair lane. No live process referenced that
+target; exact candidate `02b0d63651703aaac88c249bdc437cd173dfa397`,
+its branch, worktree, scheduler state, logs, task packet, and review packet
+were already durable. Cargo-aware cleanup removed only reproducible build
+artifacts and left the worktree clean.
+
+After cleanup, `/workspace/worktrees` measured `5,265,503,056` bytes and the
+mounted filesystem reported `902,231,105,536` bytes available. Active File
+Doctor build artifacts were not touched. This is the intended terminal-cache
+retention rule: preserve source/evidence identity, reclaim only inactive
+reproducible targets.
