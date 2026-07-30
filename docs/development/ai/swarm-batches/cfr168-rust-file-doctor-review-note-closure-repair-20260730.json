@@ -1,0 +1,30 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-rust-file-doctor-review-note-closure-repair-20260730",
+  "workspace": "/workspace/worktrees/cfr168-rust-file-doctor-review-note-repair-base",
+  "base_revision": "1e5a6f9467b90251b656e240f8c9b4f4700468a8",
+  "max_parallel": {
+    "fugu": 0,
+    "claude": 1,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "file-doctor-review-note-closure-repair",
+      "role": "implementer",
+      "tier": "high",
+      "provider": "claude",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-rust-file-doctor-review-note-closure-repair-20260730.md",
+      "depends_on": [],
+      "write_set": [
+        "crates/codefire-cli/src/remote/doctor.rs",
+        "docs/development/change-playbook.md",
+        "docs/development/command-source-trace.md",
+        "docs/development/source-architecture.md",
+        "docs/development/source-data-model-catalog.md"
+      ],
+      "expected_commit": true,
+      "timeout": "12h"
+    }
+  ]
+}
