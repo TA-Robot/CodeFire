@@ -23,6 +23,21 @@ The KGI remains trusted frozen-batch completion with quality, continuity, Codex-
 and improving cost-to-trusted-integration as guardrails. Activity counts, commit counts, agent
 runtime, and cheap incomplete cohorts must not become success signals.
 
+## Scope
+
+The policy, flow-record schema and exemplar, semantic contract checker, focused negative tests,
+canonical lifecycle documentation, Phase-2 promotion record, and their indexes/history are in
+scope. The independent review is immutable input evidence. The typed packet's exact `write_set`
+is authoritative.
+
+## Non-Goals
+
+- Do not change CodeFire product behavior or any CFR-168 product candidate.
+- Do not review or alter the devcontainer, CI, packaging, host-resource controls, or agent wrappers.
+- Do not fabricate a five-packet baseline, evidence, provider cost, or KGI achievement.
+- Do not run release, install, dogfood, Cargo, build, demo, or broad product test gates.
+- Do not redesign unrelated task, review, context-manifest, or routing contracts.
+
 ## Required Closure
 
 ### 1. Temporal integrity
