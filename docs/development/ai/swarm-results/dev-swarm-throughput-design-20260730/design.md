@@ -69,6 +69,12 @@ No CodeFire product file needs to change.
         "task_id": "original-task",
         "revision": "<exact-launch-commit>"
       },
+      "continuation_of": {
+        "batch_id": "older-batch",
+        "task_id": "original-implementer",
+        "head_revision": "<exact-clean-candidate>",
+        "run_id": "<durable-provider-run-id>"
+      },
       "supersedes": [
         {
           "batch_id": "older-batch",
@@ -91,6 +97,8 @@ Compatibility rules:
 - missing lineage preserves the current state and collection shape;
 - a hedge must have no task dependency and its exact revision must equal the
   batch base;
+- a continuation is opt-in, implementer-only, and must begin at its declared
+  terminal clean head;
 - every lineage revision must resolve as an exact Git subject.
 
 ## Scheduler changes
@@ -145,6 +153,34 @@ review automatically when:
 Automatic enqueueing is not automatic acceptance. A `REQUEST_CHANGES` result
 returns the surface to Freeze with immutable findings; `ACCEPT` enters a
 manager-controlled integration queue.
+
+### Review-derived repair continuation
+
+After a bound `REQUEST_CHANGES`, the manager may resume the original
+implementer session instead of paying repository-orientation cost again.
+`continuation_of` is accepted only when:
+
+- the prior task is a terminal implementer task with durable run/session
+  identity;
+- its worktree and branch still exist, are clean, and equal the declared exact
+  candidate head and tree;
+- the new repair packet is a committed immutable successor that binds the
+  exact review report and findings;
+- provider, exact model, role, workspace, worktree, branch, and ancestry
+  match;
+- the new write set is equal to or narrower than the manager-approved repair
+  set; and
+- no other process or scheduler state owns the agent lock.
+
+Resume appends a new provider invocation and new commits; it never amends,
+rebases, rewrites the prior log, or treats old validation as evidence for the
+new head. Put the new findings and changed acceptance evidence first in the
+resume prompt so stale session assumptions are explicitly superseded.
+
+Reviewer sessions are never used as implementation continuations, and a
+reviewer remains a new independent run. If any continuation identity cannot
+be proven, fail closed and create a new isolated implementation lane; do not
+silently fall back to an unbound session.
 
 The integration queue owns one shadow head per frozen batch. It applies only
 the accepted product delta, never a worker branch tip or its manager/control
@@ -346,6 +382,12 @@ Scheduler coverage:
   unselected running tasks are rejected;
 - completed-before-adoption runs postflight normally;
 - stop never signals adopted PIDs.
+- exact clean implementer continuation resumes the durable session/worktree
+  and appends commits and a new invocation record;
+- dirty, moved, rewritten, wrong-model, wrong-role, widened-write-set,
+  unbound-review, and locked continuations fail closed;
+- a reviewer run cannot become an implementation continuation and old gate
+  evidence cannot satisfy the successor head;
 
 Shared second-agent coverage:
 
@@ -368,13 +410,14 @@ polling remains unchanged.
 4. `dev-swarm: bind hedge and supersedes lineage`
 5. `dev-swarm: emit signal and checkpoint age events`
 6. `dev-swarm: adopt manually resumed second-agent runs`
-7. `dev-swarm: enqueue exact independent reviews from candidate events`
-8. `dev-swarm: add content-addressed deterministic gate evidence`
-9. `dev-gate: emit typed validation evidence`
-10. `dev-swarm: generate state-owned postflight handoff cards`
-11. `dev-swarm: run manager-owned shadow integration trains`
-12. `dev-agent: generate counterexample-bound compact handoffs`
-13. `docs: document swarm scheduling and recovery contracts`
+7. `dev-swarm: resume exact review-derived implementer continuations`
+8. `dev-swarm: enqueue exact independent reviews from candidate events`
+9. `dev-swarm: add content-addressed deterministic gate evidence`
+10. `dev-gate: emit typed validation evidence`
+11. `dev-swarm: generate state-owned postflight handoff cards`
+12. `dev-swarm: run manager-owned shadow integration trains`
+13. `dev-agent: generate counterexample-bound compact handoffs`
+14. `docs: document swarm scheduling and recovery contracts`
 
 Each functional commit includes its black-box tests. Documentation remains a
 separate commit.
