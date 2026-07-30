@@ -1,0 +1,185 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "development-flow-kgi-kpi-zero-residual-repair-20260730",
+  "status": "ready",
+  "objective": "Make the development-flow KGI/KPI framework decision-grade by closing every MUST, SHOULD, and COULD finding in the bound independent review in one semantically validated candidate, repairing the active CFR-168 flow record, and adding negative tests for every accepted adversarial mutation.",
+  "base_revision": "b307b47f51f73b054b66444493c4590379518c4f",
+  "role": "implementer",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 2,
+      "reversibility": 1,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "cross_subsystem_architecture",
+      "release_completion_audit",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 11,
+    "selected_tier": "ultra",
+    "rationale": "This is the control plane that decides throughput, routing, quality, continuity, and provider-cost policy; a partial validator or misleading exemplar would multiply incorrect decisions across all later development."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-5-project-management-docs"
+    ],
+    "additional_files": [
+      "docs/development/ai/swarm-results/development-flow-kgi-kpi-independent-review-claude-20260730/review.md",
+      "docs/development/ai/development-flow-kgi-kpi.md",
+      "docs/development/ai/schemas/development-flow-record.v1.schema.json",
+      "docs/development/ai/flow-metrics/cfr168-recovery-20260730.v1.json",
+      "docs/development/tools/ai_contracts.py",
+      "docs/development/tools/check_ai_contracts.py",
+      "docs/development/tools/test_ai_tools.py",
+      "docs/development/project-management.md",
+      "docs/development/exploration/phase-2/experiment-catalog-and-kpi-scorecard.md"
+    ],
+    "evidence_refs": [
+      "review-commit:b307b47f51f73b054b66444493c4590379518c4f",
+      "review-sha256:02a0d259c55121379f07c2c1d893d4a29dd546b16e6f237659a5081c60fd3336",
+      "review-decision:REQUEST_CHANGES",
+      "review-mutation-result:55-of-55-semantic-mutations-accepted",
+      "review-control-result:15-of-15-structural-controls-rejected"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "docs/development/ai/**",
+      "docs/development/tools/**",
+      "docs/development/project-management.md",
+      "docs/development/README.md",
+      "docs/development/history.md",
+      "docs/development/exploration/phase-2/experiment-catalog-and-kpi-scorecard.md"
+    ],
+    "write_set": [
+      "docs/development/ai/development-flow-kgi-kpi.md",
+      "docs/development/ai/flow-metrics/README.md",
+      "docs/development/ai/flow-metrics/cfr168-recovery-20260730.v1.json",
+      "docs/development/ai/schemas/development-flow-record.v1.schema.json",
+      "docs/development/ai/schemas/README.md",
+      "docs/development/ai/README.md",
+      "docs/development/ai/acceleration-master-plan.md",
+      "docs/development/tools/ai_contracts.py",
+      "docs/development/tools/check_ai_contracts.py",
+      "docs/development/tools/test_ai_tools.py",
+      "docs/development/project-management.md",
+      "docs/development/README.md",
+      "docs/development/history.md",
+      "docs/development/exploration/phase-2/experiment-catalog-and-kpi-scorecard.md"
+    ],
+    "disallowed_paths": [
+      "codefire",
+      "crates/**",
+      "tests/**",
+      ".devcontainer/**",
+      "subprojects/**",
+      "docs/development/code-review-issues/**",
+      "docs/development/ai/swarm-results/**",
+      "docs/development/ai/task-packets/**"
+    ],
+    "disallowed_actions": [
+      "Run Cargo, build, install, demo, broad product Python suites, or network calls",
+      "Split the semantic validator, policy, exemplar, and negative tests into independently acceptable partial candidates",
+      "Claim a baseline, target, zero safety result, cost total, or KGI achievement without decision-grade evidence",
+      "Treat commit count, agent runtime, token volume, or unique_artifact_count as delivery success",
+      "Invent evidence, runtime metadata, cohort membership, provider cost, or unavailable measurements",
+      "Edit the independent review, issue state, product source, or user-owned worktree changes"
+    ]
+  },
+  "non_goals": [
+    "Change CodeFire product behavior or CFR-168 product candidates",
+    "Review the devcontainer, CI, packaging, host resources, or agent wrapper implementation",
+    "Establish a fabricated five-packet baseline from the current incomplete recovery batch",
+    "Run release, install, dogfood, Cargo, or broad product test gates",
+    "Redesign unrelated task, review, context-manifest, or routing contracts"
+  ],
+  "invariants": [
+    {
+      "id": "semantic-rejection",
+      "statement": "Every structurally valid but semantically misleading mutation enumerated in review section 5.1 is rejected with a stable finding while the repaired exemplar passes.",
+      "falsification_test": "Run the repository negative-test matrix for all 55 semantic mutations and assert each produces the expected semantic finding; run the positive reference record through both schema and semantic validation."
+    },
+    {
+      "id": "decision-evidence",
+      "statement": "No KGI, cohort comparison, throughput claim, cost total, rate, or zero-target safety result can become authoritative without resolved measurements and evidence of the required status, unit, interval, and denominator.",
+      "falsification_test": "Remove or forge each binding, set unavailable values to zero, create zero denominators, omit safety rows, and claim KGI achievement; each case must fail closed."
+    },
+    {
+      "id": "canonical-lifecycle",
+      "statement": "All stage and event semantics derive the canonical Discover, Freeze, Plan, Implement, Close, Install, Dogfood, Retrospect lifecycle and make queue, review, integration, conflict, and completion intervals computable.",
+      "falsification_test": "Create a record with an unknown stage, missing lane/event endpoint, reversed interval, or lifecycle-complete event before prior stages; semantic validation must reject it."
+    },
+    {
+      "id": "reference-integrity",
+      "statement": "Every repository-local commit, document, lane, event, measurement, evidence prefix, candidate, artifact, and supersession reference resolves to a unique bound subject.",
+      "falsification_test": "Inject dangling, duplicate, non-hex, zero-byte, wrong-filename, and unresolved references and assert stable rejection findings."
+    },
+    {
+      "id": "anti-gaming",
+      "statement": "Recommitting, splitting commits, omitting slow open work, leaving metrics in progress, or selecting a denominator cannot improve the measured KGI/KPI outcome.",
+      "falsification_test": "Mutate candidate lineage, cohort censoring, due dates, artifact identity, and MET-FLOW-019 membership and assert that validation refuses the gamed record."
+    },
+    {
+      "id": "honest-current-record",
+      "statement": "The CFR-168 recovery record distinguishes measured, estimated, unavailable, absent, and in-progress facts and does not claim decision readiness that current evidence cannot support.",
+      "falsification_test": "Recompute every recorded duration/rate and resolve every repository-local reference; reject any value that contradicts its definition, including resumed-start understatement and cumulative-token-as-window-delta."
+    }
+  ],
+  "validation": [
+    {
+      "id": "ai-tools-tests",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/test_ai_tools.py",
+      "purpose": "Exercise the complete positive and negative contract matrix, including every independent-review mutation.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "ai-contracts",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_ai_contracts.py",
+      "purpose": "Validate all repository AI contracts and the repaired active flow record.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "ai-development",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_ai_development.py --timeout 120",
+      "purpose": "Run the bounded AI-development aggregate gate after semantic validation is integrated.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "project-docs",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_project_docs.py",
+      "purpose": "Keep the KGI/KPI policy, lifecycle, indexes, Phase-2 promotion record, and history consistent.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "diff-check",
+      "command": "git diff --check",
+      "purpose": "Reject whitespace and patch-integrity defects.",
+      "required": true,
+      "requires_capability": "git"
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "clean_committed_candidate",
+      "exact_base_and_head",
+      "changed_file_list",
+      "must_should_could_closure_matrix",
+      "semantic_mutation_results",
+      "reference_and_arithmetic_audit",
+      "validation_table",
+      "decision_readiness_statement",
+      "residual_risks"
+    ],
+    "evidence_digest_required": true
+  }
+}
