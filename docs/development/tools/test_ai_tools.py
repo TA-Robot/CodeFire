@@ -41,7 +41,12 @@ from build_source_bound_rust import (  # noqa: E402
 from prepare_historical_eval import build_candidate_input  # noqa: E402
 from probe_validation_capabilities import rust_binary_state  # noqa: E402
 from resolve_context_pack import build_manifest, expand_reference  # noqa: E402
-from run_ai_role import preflight_task_execution, resolve_packet_manifest  # noqa: E402
+from run_ai_role import (  # noqa: E402
+    codex_cli_adapter_key,
+    preflight_task_execution,
+    resolve_packet_manifest,
+    select_codex_cli_adapter,
+)
 from run_dogfood_smoke import smoke_commands, validate_result  # noqa: E402
 from suggest_validation import parse_porcelain_paths, suggestions  # noqa: E402
 from validate_ai_runtime import strict_config_probe  # noqa: E402
@@ -316,6 +321,32 @@ class ExecutionPreflightTests(unittest.TestCase):
         self.assertTrue(matches)
         self.assertEqual(dirty, [])
         self.assertEqual(errors, [])
+
+
+class CodexRuntimeAdapterTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.matrix = load_object(ROOT / "docs/development/ai/role-routing-matrix.json")
+
+    def test_version_resolves_to_registered_major_minor_adapter(self) -> None:
+        self.assertEqual(
+            codex_cli_adapter_key("codex-cli 0.146.0\n"),
+            "codex_cli_0_146",
+        )
+        key, adapter = select_codex_cli_adapter(
+            self.matrix,
+            "codex-cli 0.146.7",
+        )
+        self.assertEqual(key, "codex_cli_0_146")
+        self.assertEqual(adapter["ultra"]["reasoning_effort"], "ultra")
+
+    def test_unregistered_cli_version_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "codex_cli_0_147"):
+            select_codex_cli_adapter(self.matrix, "codex-cli 0.147.0")
+
+    def test_unparseable_cli_version_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "cannot parse"):
+            codex_cli_adapter_key("not-codex")
 
 
 class RustBuildProvenanceTests(unittest.TestCase):

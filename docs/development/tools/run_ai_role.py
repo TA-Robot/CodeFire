@@ -7,6 +7,7 @@ import argparse
 import fnmatch
 import hashlib
 import json
+import re
 import shlex
 import subprocess
 import sys
@@ -26,6 +27,7 @@ from resolve_context_pack import build_manifest, expand_reference
 
 MATRIX_PATH = Path("docs/development/ai/role-routing-matrix.json")
 CAPABILITY_REGISTRY_PATH = Path("docs/development/ai/capability-registry.v1.json")
+CODEX_CLI_VERSION_PATTERN = re.compile(r"codex-cli\s+(\d+)\.(\d+)(?:\.(\d+))?")
 
 
 def repository_root() -> Path:
@@ -46,6 +48,51 @@ def select_role(matrix: dict[str, Any], name: str) -> dict[str, Any]:
             return role
     available = sorted(role.get("role") for role in roles if isinstance(role, dict) and isinstance(role.get("role"), str))
     raise ValueError(f"unknown role {name!r}; choose one of: {', '.join(available)}")
+
+
+def codex_cli_adapter_key(version_output: str) -> str:
+    match = CODEX_CLI_VERSION_PATTERN.search(version_output)
+    if match is None:
+        raise ValueError(f"cannot parse Codex CLI version: {version_output.strip()!r}")
+    return f"codex_cli_{match.group(1)}_{match.group(2)}"
+
+
+def select_codex_cli_adapter(
+    matrix: dict[str, Any],
+    version_output: str,
+) -> tuple[str, dict[str, Any]]:
+    adapter_key = codex_cli_adapter_key(version_output)
+    adapters = matrix.get("runtime_policy", {}).get("adapters", {})
+    adapter = adapters.get(adapter_key) if isinstance(adapters, dict) else None
+    if not isinstance(adapter, dict):
+        raise ValueError(
+            f"Codex CLI {adapter_key.removeprefix('codex_cli_').replace('_', '.')} "
+            f"has no registered runtime adapter ({adapter_key})"
+        )
+    return adapter_key, adapter
+
+
+def installed_codex_cli_adapter(
+    matrix: dict[str, Any],
+    root: Path,
+    timeout: float = 10.0,
+) -> tuple[str, dict[str, Any]]:
+    try:
+        result = subprocess.run(
+            ["codex", "--version"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError(f"codex --version exceeded {timeout}s") from exc
+    if result.returncode != 0:
+        raise ValueError(
+            (result.stderr or result.stdout).strip() or "codex --version failed"
+        )
+    return select_codex_cli_adapter(matrix, result.stdout)
 
 
 def contained_path(root: Path, value: Path) -> Path:
@@ -248,6 +295,7 @@ def capability_phases(root: Path) -> dict[str, str]:
 
 def build_command(
     matrix: dict[str, Any],
+    adapter_key: str,
     role: dict[str, Any],
     tier: str,
     root: Path,
@@ -256,7 +304,7 @@ def build_command(
     json_events: bool,
 ) -> list[str]:
     runtime = matrix["runtime_policy"]
-    adapter = runtime["adapters"]["codex_cli_0_144"][tier]
+    adapter = runtime["adapters"][adapter_key][tier]
     effort = adapter["reasoning_effort"]
     command = [
         "codex",
@@ -392,8 +440,16 @@ def main() -> int:
                 "required validation capabilities are unavailable: "
                 + ", ".join(unavailable_capabilities)
             )
+        runtime_adapter_key, runtime_adapter = installed_codex_cli_adapter(matrix, root)
         command = build_command(
-            matrix, role, tier, root, args.sandbox, args.persist, args.json_events
+            matrix,
+            runtime_adapter_key,
+            role,
+            tier,
+            root,
+            args.sandbox,
+            args.persist,
+            args.json_events,
         )
     except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -405,8 +461,9 @@ def main() -> int:
         "role": role["role"],
         "model": role["model"],
         "reasoning_tier": tier,
-        "effective_effort": runtime["adapters"]["codex_cli_0_144"][tier]["reasoning_effort"],
-        "delegation": runtime["adapters"]["codex_cli_0_144"][tier]["delegation"],
+        "runtime_adapter": runtime_adapter_key,
+        "effective_effort": runtime_adapter[tier]["reasoning_effort"],
+        "delegation": runtime_adapter[tier]["delegation"],
         "sandbox": args.sandbox,
         "cwd": str(root),
         "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),

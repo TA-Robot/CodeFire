@@ -174,6 +174,7 @@ def check_matrix(root: Path, findings: list[Finding]) -> set[str]:
     else:
         expected_efforts = {
             "codex_cli_0_144": {"medium": "medium", "high": "high", "ultra": "ultra"},
+            "codex_cli_0_146": {"medium": "medium", "high": "high", "ultra": "ultra"},
             "openai_responses_api": {"medium": "medium", "high": "high", "ultra": "max"},
             "portable_codex_fallback": {"medium": "medium", "high": "high", "ultra": "xhigh"},
         }

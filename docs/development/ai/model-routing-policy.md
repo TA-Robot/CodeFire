@@ -1,7 +1,7 @@
 # Codex GPT-5.6 Sol Model Routing Policy
 
 Status: active development policy  
-Last verified locally: 2026-07-11  
+Last verified locally: 2026-07-30
 Applies to: external AI development of CodeFire, not the CodeFire product runtime
 
 ## Decision
@@ -27,14 +27,22 @@ Runtime vocabularies currently differ:
 | Surface | Medium | High | Strongest CodeFire tier |
 |---|---|---|---|
 | CodeFire policy | `Medium` | `High` | `Ultra` |
-| Current local Codex CLI 0.144.1 | `medium` | `high` | `ultra` |
+| Current local Codex CLI 0.146.0 | `medium` | `high` | `ultra` |
 | Public GPT-5.6 Sol API model page | `medium` | `high` | `max` |
 | Portable Codex fallback | `medium` | `high` | `xhigh` |
 
-Local evidence:
+Current local evidence:
 
-- `codex doctor --json` reports the project configuration loaded with `gpt-5.6-sol`.
-- the installed Codex 0.144.1 bundle contains the GPT-5.6 Sol catalog entry and the `Ultra` description “Maximum reasoning with automatic task delegation”.
+- strict-config probes accept the repository project and role layers plus `medium`, `high`, and `ultra`
+  overrides without making a remote model request.
+- the installed Codex 0.146.0 bundled catalog contains the GPT-5.6 Sol entry and describes `Ultra` as
+  maximum reasoning with automatic task delegation.
+- the dated account-level live smoke remains bound to Codex 0.144.1; it is historical evidence and is not
+  rewritten as a 0.146.0 live invocation.
+
+`role-routing-matrix.json` therefore retains the observed 0.144 adapter and records the active 0.146
+adapter separately. `run_ai_role.py` derives the major/minor adapter key from `codex --version` and refuses
+an unregistered CLI version instead of silently using a stale adapter.
 
 Official references:
 

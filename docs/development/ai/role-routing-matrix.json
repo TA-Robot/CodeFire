@@ -18,6 +18,20 @@
           "delegation": "proactive_when_parallelism_materially_helps"
         }
       },
+      "codex_cli_0_146": {
+        "medium": {
+          "reasoning_effort": "medium",
+          "delegation": "explicit_or_instruction_driven"
+        },
+        "high": {
+          "reasoning_effort": "high",
+          "delegation": "explicit_or_instruction_driven"
+        },
+        "ultra": {
+          "reasoning_effort": "ultra",
+          "delegation": "proactive_when_parallelism_materially_helps"
+        }
+      },
       "openai_responses_api": {
         "medium": {
           "reasoning_effort": "medium",
