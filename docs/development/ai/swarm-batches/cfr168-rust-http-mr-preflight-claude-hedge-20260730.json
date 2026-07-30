@@ -1,0 +1,26 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-rust-http-mr-preflight-claude-hedge-20260730",
+  "workspace": "/workspace/worktrees/cfr168-p0-canonical",
+  "base_revision": "3c23e381f871724d31332bd179671db7cbb9d941",
+  "max_parallel": {
+    "fugu": 0,
+    "claude": 1,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "mr-create-review-preflight-hedge",
+      "role": "implementer",
+      "tier": "high",
+      "provider": "claude",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-rust-http-mr-preflight-20260729.md",
+      "depends_on": [],
+      "write_set": [
+        "crates/codefire-cli/src/http.rs"
+      ],
+      "expected_commit": true,
+      "timeout": "8h"
+    }
+  ]
+}
