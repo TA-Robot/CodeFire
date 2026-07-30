@@ -503,3 +503,82 @@ At `2026-07-30T10:48:57Z`, `/workspace` measured `2,887,872,262` bytes,
 `MemAvailable` was `15,433,168` KiB, swap use was zero, and the mounted
 filesystem reported `905,927,389,184` bytes available. This remains within
 the four-session/two-heavy recovery envelope.
+
+## 2026-07-30 11:24 UTC review-to-repair and restart checkpoint
+
+The Python HTTP MR-write independent review completed on exact candidate
+`6dd4527f23135388b53fc5c6d637c4105cc5d659`. Its report commit is
+`b86a782b6ac72cabe684106f969681c5cd56380e`, and the exact report SHA-256 is
+`214e42fc8f36108f45e17b13e4343bfc2b56cc89b72be5c1258f5b497c9ec6ef`.
+The verdict is `REQUEST_CHANGES`. The report-only commit was integrated into
+canonical as `84175bd`; no reviewed product byte was integrated.
+
+The seven required closure areas are now frozen in
+`cfr168-python-http-mr-write-review-closure-repair-20260730.md` and its
+validated `dev-swarm.v1` manifest:
+
+1. whole-request ownership of authority reads and allocations;
+2. reuse of the sealed request snapshot during apply, with zero physical
+   reread gap at 1x/3x/10x;
+3. independent exact/minus-one/plus-one and deliberate-regression evidence;
+4. prepublication sealing before any authoritative object copy;
+5. retryable cleanup that cannot forget debt or replace a durable response;
+6. replay nonce persistence only with reducer confirmation;
+7. synchronized canonical source data-model truth.
+
+The task packet commits are `fcb2324` and `8cd2511`; their report/task-only
+canonical equivalents are `59f786c` and `1248ed2`. The taskbase remains an
+additive successor of the reviewed candidate. It is ready for Claude Opus 5
+when a product-implementation slot becomes available.
+
+The Upload/CFB-138 lane advanced from `c33592a` to clean durable WIP
+`0b288985aa37b23567e8e28afb6505cc54b0ce2a`, which records one
+request-owned sealed traversal and a final effect fence. The lane remains
+active and must still finish its focused evidence, source-document alignment,
+full authorized Python gate, and exact-candidate handoff before review.
+
+The Rust storage lane remains active at durable WIP
+`e9e42aae9eb3c5a0993ca07688ade5d4d6e0eed3`. Its current uncommitted
+continuation is confined to `main.rs`, `storage.rs`, and
+`tests/storage_decision_work.rs`; the diff check remains manager-owned until
+the next checkpoint. No partial storage range is eligible for integration.
+
+The MR-list Fugu review remains active against exact candidate
+`38da8988ac8bc1fcdfcb82c62e7aa0d28791500c`. It has not produced an
+authoritative report commit, so no partial transcript is used for acceptance
+or repair scope.
+
+The first Rust file-ancestry launch inherited scheduler state from the earlier
+host interruption. Reconciliation proved that its preserved worktree was
+clean at exact launch revision
+`86a0c2e42c15bb44df8a2ff299140fedbcff4aae` with zero task commits. Both the
+interrupted state and the subsequent same-name launch-conflict state were
+retained under `.dev-swarm/archive/`; neither was deleted or treated as
+evidence.
+
+The replacement manifest
+`cfr168-rust-file-ancestry-zero-residual-repair-r1-20260730.json` uses a new
+batch identity while preserving the exact task base and write set. Its taskbase
+registration is `3611fb4`, integrated report-only into canonical as
+`53b220d`. The replacement lane is now running under verified
+`claude-opus-5` with a 12-hour envelope.
+
+The external-session set is again full without exceeding the two-heavy limit:
+
+| Lane | Provider/model | Resource class | Durable state |
+|---|---|---|---|
+| Python upload / CFB-138 repair | Claude `claude-opus-5` | light | active at clean WIP `0b28898` |
+| Python MR-list exact review | Fugu `fugu-ultra-v1.1` | light | active on `38da898` |
+| Rust storage repair | Claude `claude-opus-5` | heavy | active after WIP `e9e42aa` |
+| Rust file-ancestry repair restart | Claude `claude-opus-5` | heavy | active from exact base `86a0c2e` |
+
+Coordinator work during the full four-lane interval produced one durable
+review integration, one seven-finding repair contract and manifest, one
+reconciled/restarted implementation lane, and the corresponding canonical
+ledger updates. This interval therefore contains no polling-only coordinator
+wait.
+
+At `2026-07-30T11:23:50Z`, `/workspace` measured `3,708,179,380` bytes,
+`MemAvailable` was `15,068,104` KiB, swap use was zero, and the mounted
+filesystem reported `905,087,758,336` bytes available. This remains above the
+6 GiB memory and 100 GiB free-space launch floors.
