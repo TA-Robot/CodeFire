@@ -45,7 +45,7 @@ The following results are durable candidate commits, not canonical integration o
 | Surface | Candidate | Verified candidate evidence | Independent disposition |
 |---|---|---|---|
 | Python HTTP Doctor + branch composition | `701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714` | combined focused 42/42, Python-pattern 463/463, and unrestricted 691/691 in 2550.503 seconds pass with the configured Cargo toolchain; corrected expectation is included | Fugu report `4659318` says `ACCEPT` for the corrected composition only; product integration still waits for the upload disposition |
-| Python HTTP upload default-profile scale | `dece688afea815d1242e7751367052d1ceac4580` | focused 13/13 and Python-pattern 434/434 pass; 1201-commit default-profile reversal and 1x/3x/10x counters are bound | combined root-level review `cfr168-python-http-upload-scale-combined-review-20260730` is active; baseline-identical live-path work is not exempt from the CFR-168 invariant |
+| Python HTTP upload default-profile scale | `dece688afea815d1242e7751367052d1ceac4580` | focused 13/13, neighboring owners 59/59, selected legacy 22/22, and Python-pattern 434/434 pass; 1201-commit default-profile reversal and 1x/3x/10x counters are bound | independent report `0b1fd6f50fce2126a07238c422b1ff01b575c047` says `REQUEST_CHANGES`; zero-residual repair `cfr168-python-http-upload-zero-residual-repair-20260730` is active |
 | Python HTTP MR create/review/apply | `21fe75175e997cc7c6f8c3ef2a7558144d850f94` | dedicated 18/18 pass; broad 667-case run has 665 passes and two Cargo-PATH-only install failures | review `cfr168-python-http-mr-mutation-independent-review-20260730` is active; nonce timing and hidden sealed-validation ledger remain explicit review subjects |
 | Python HTTP MR list | `37f7427d46d2cf3ad66de3c1885ef4c0527cae70` | dedicated 18/18 in 54.077 seconds, Python-pattern 481/481 in 432.026 seconds, compilation, source/project docs, and diff checks pass | Claude review `cfr168-python-http-mr-list-review-claude-20260730` is pending; aggregate slope, multi-fault precedence, session reuse, and request isolation remain explicit subjects |
 | Rust live file Doctor | `52a025ecda3fe2f5ad8b5b2a485562e7c16ab6de` | focused 8/8, all Doctor 119/119, full `codefire-cli` binary 775/775, strict Clippy, format, source docs, and diff checks pass | independent Claude fallback report `84ea698b397e57a193cc5faa0ef63a0cff027e2c` says `ACCEPT`; zero-residual repair `cfr168-rust-file-doctor-zero-residual-repair-20260730` is active before product integration |
@@ -85,6 +85,16 @@ ledger-loss/primary-error cleanup gaps. The repair task rooted at the rejected c
 one operation-scoped validation/collection/ancestry/publication owner, move or stage all object
 effects behind the final fence, bind production cancellation and all exact/1x/3x/10x evidence, and
 leave a reusable accounted API for the separately tracked local-merge/clone/storage/GC residuals.
+
+The Upload/CFB-138 fallback review verified that the 1201-commit default-profile reversal is real,
+but rejected `dece688…` for three remaining live defects: publication-root validation performs two
+fresh `local_v1()` sealed traversals outside the request ledger/deadline, the traversal source
+constructs collection/path/descriptor owners without a reservation, and a
+`128×`/`129× maximum_record_bytes` term refuses otherwise valid records at about 127 KiB. The
+reviewer reproduced an elapsed 1.0 s request against a 100 ms deadline still returning 200 and
+publishing. The repair lane must reuse one request-owned sealed snapshot, poll immediately before
+effect, reserve every source/session owner, and derive tight retained/temporary bounds from real
+lifetimes without raising the public profile.
 
 ## Recovered Python composition evidence
 
