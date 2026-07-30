@@ -2,9 +2,9 @@
   "schema": "codefire.ai_development_flow_record.v1",
   "record_id": "cfr168-recovery-20260730",
   "batch_id": "BATCH-2026-07-review-portfolio-completion",
-  "source_revision": "0be103950120a36dabd258301fb090b89cc9ba5d",
+  "source_revision": "dd993ccf59cf7a369fc6694a7d0242dc6355eaa4",
   "status": "active",
-  "captured_at": "2026-07-30T09:24:13Z",
+  "captured_at": "2026-07-30T09:51:55Z",
   "measurement_window": {
     "started_at": "2026-07-30T08:21:00Z",
     "time_basis": "mixed"
@@ -14,20 +14,21 @@
       "kgi_id": "KGI-DEV-001",
       "status": "in_progress",
       "target": "Complete the frozen review-portfolio batch through exact-revision review, gates, Close, Install, Dogfood, and Retrospect with no blocking residual.",
-      "observed": "The CFR-168 recovery wave has durable candidates and review evidence, but no current-wave product package is integrated and the batch remains open.",
+      "observed": "The MR-list and MR-mutation repair lanes reached exact candidate revisions and independent rereviews are active, but no current-wave product package is integrated and the batch remains open.",
       "evidence_refs": [
         "doc:docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md",
-        "commit:0be103950120a36dabd258301fb090b89cc9ba5d"
+        "commit:dd993ccf59cf7a369fc6694a7d0242dc6355eaa4"
       ]
     },
     {
       "kgi_id": "KGI-DEV-002",
       "status": "at_risk",
       "target": "Zero critical escapes, zero accepted false-completion claims, and complete fresh evidence.",
-      "observed": "Independent reviews are still finding candidate-owned residuals, and the MR-list focused gate produced one unclassified non-repeatable failure. Neither result has been accepted or hidden.",
+      "observed": "Independent review logs contain confirmed candidate-owned storage and MR-list defects, and the MR-list focused gate retains one unclassified non-repeatable failure. Formal reports are pending and neither candidate has been accepted.",
       "evidence_refs": [
         "prefix:storage-fugu-review-20260730",
-        "prefix:mr-list-claude-20260730"
+        "prefix:mr-list-claude-20260730",
+        "prefix:mr-list-rereview-fugu-20260730"
       ]
     },
     {
@@ -45,10 +46,11 @@
       "kgi_id": "KGI-DEV-004",
       "status": "in_progress",
       "target": "No batch stop caused solely by Codex quota; Claude/Fugu implementation and review remain recoverable from portable Git/log evidence.",
-      "observed": "Implementation and review are running on Claude Opus 5 and Fugu 1.1 Ultra. A Claude 529 outage was resumed and hedged without Codex implementation, while Codex remains the coordinator.",
+      "observed": "Two Claude Opus 5 implementation lanes produced durable candidates and three Fugu 1.1 Ultra product reviews plus one Claude control-plane review are active without external Codex implementation. Codex remains the coordinator.",
       "evidence_refs": [
         "prefix:mr-list-claude-20260730",
         "prefix:mr-list-fugu-hedge-20260730",
+        "prefix:mr-mutation-claude-20260730",
         "measurement:MET-FLOW-024"
       ]
     },
@@ -74,7 +76,7 @@
       "started_at": "2026-07-30T08:37:35.281868Z",
       "status": "running",
       "unique_artifact_count": 0,
-      "outcome": "Four candidate-owned contract/race defects had been identified in the live log; the formal committed report was still pending at capture.",
+      "outcome": "The live review had stabilized at six or more candidate-owned blockers and was resolving a precedence contradiction; the formal committed report was still pending at capture.",
       "evidence_refs": [
         "prefix:storage-fugu-review-20260730"
       ]
@@ -89,19 +91,22 @@
       "branch": "claude-agent/cfr168-python-http-mr-mutation-zero-residual-repair-20260730",
       "started_at": "2026-07-30T08:39:24.630213Z",
       "first_checkpoint_at": "2026-07-30T09:01:22Z",
-      "status": "checkpointed",
+      "candidate_ready_at": "2026-07-30T09:44:06Z",
+      "ended_at": "2026-07-30T09:45:29.582413Z",
+      "status": "candidate_ready",
       "checkpoint_commits": [
         "57607cc9e5202764df522f36390d67b19904bb70",
         "3a20c85e6ccf52e4427f0751d3393bc7de22a979",
-        "89dfcefe4a4fcdc45e98c0e622433d9d034067a2"
+        "89dfcefe4a4fcdc45e98c0e622433d9d034067a2",
+        "b1c29fc97a9f6190c726b31d465b872558ce2808",
+        "6dd4527f23135388b53fc5c6d637c4105cc5d659"
       ],
-      "unique_artifact_count": 3,
-      "outcome": "Implementation, counter rebaseline, and zero-residual regression work were durable while mutation-strength testing continued.",
+      "unique_artifact_count": 5,
+      "outcome": "The final product and test commits report zero nested/hidden work, linear 1x/3x/10x counters, three clean focused runs, prior-candidate reversal, and detection of all seven deliberate mutations; independent rereview is active.",
       "evidence_refs": [
         "prefix:mr-mutation-claude-20260730",
-        "commit:57607cc9e5202764df522f36390d67b19904bb70",
-        "commit:3a20c85e6ccf52e4427f0751d3393bc7de22a979",
-        "commit:89dfcefe4a4fcdc45e98c0e622433d9d034067a2"
+        "commit:b1c29fc97a9f6190c726b31d465b872558ce2808",
+        "commit:6dd4527f23135388b53fc5c6d637c4105cc5d659"
       ]
     },
     {
@@ -116,14 +121,16 @@
       "first_trusted_signal_at": "2026-07-30T08:54:40.271Z",
       "first_mutation_at": "2026-07-30T08:54:40.271Z",
       "first_checkpoint_at": "2026-07-30T09:01:11Z",
-      "status": "checkpointed",
+      "candidate_ready_at": "2026-07-30T09:37:10.904294Z",
+      "ended_at": "2026-07-30T09:37:10.904294Z",
+      "status": "candidate_ready",
       "checkpoint_commits": [
         "29c421fc68ef445d8116693789a214fc72c83a95",
         "535515ca30333d0d5c82c070923e2441ae7871a5",
         "38da8988ac8bc1fcdfcb82c62e7aa0d28791500c"
       ],
       "unique_artifact_count": 3,
-      "outcome": "Product, tests, and source docs were committed; the focused 33-test gate had one first-run failure and repeat diagnosis was active.",
+      "outcome": "Product, tests, and source docs were committed; twelve later focused reruns and fourteen targeted stress runs were clean, but the first unexplained failure remains unclassified and independent rereview has reproduced separate candidate-owned defects.",
       "evidence_refs": [
         "prefix:mr-list-claude-20260730",
         "commit:29c421fc68ef445d8116693789a214fc72c83a95",
@@ -147,6 +154,54 @@
       "outcome": "The outage hedge remained clean and produced no unique artifact after the Claude lane reached a clean committed candidate; its slot was reclaimed for independent review.",
       "evidence_refs": [
         "prefix:mr-list-fugu-hedge-20260730"
+      ]
+    },
+    {
+      "lane_id": "cfr168-python-http-mr-list-zero-residual-rereview-fugu-20260730",
+      "task_id": "cfr168-python-http-mr-list-zero-residual-rereview",
+      "task_class": "independent_review",
+      "role": "reviewer",
+      "provider": "fugu",
+      "model": "fugu-ultra-v1.1",
+      "branch": "fugu-agent/cfr168-python-http-mr-list-zero-residual-rereview-fugu-20260730",
+      "started_at": "2026-07-30T09:38:35.615276Z",
+      "status": "running",
+      "unique_artifact_count": 0,
+      "outcome": "Socket-level probes had reproduced a stale-success fence/publication race and a symlinked authority-directory false success; the formal report was pending.",
+      "evidence_refs": [
+        "prefix:mr-list-rereview-fugu-20260730"
+      ]
+    },
+    {
+      "lane_id": "development-flow-kgi-kpi-independent-review-claude-20260730",
+      "task_id": "development-flow-kgi-kpi-independent-review",
+      "task_class": "independent_review",
+      "role": "reviewer",
+      "provider": "claude",
+      "model": "claude-opus-5",
+      "branch": "claude-agent/development-flow-kgi-kpi-independent-review-claude-20260730",
+      "started_at": "2026-07-30T09:44:24.382700Z",
+      "status": "running",
+      "unique_artifact_count": 0,
+      "outcome": "The schema, checker, KGI/KPI semantics, baseline arithmetic, anti-gaming controls, and evidence binding were under independent review.",
+      "evidence_refs": [
+        "prefix:kgi-kpi-review-claude-20260730"
+      ]
+    },
+    {
+      "lane_id": "cfr168-python-http-mr-mutation-zero-residual-rereview-fugu-20260730",
+      "task_id": "cfr168-python-http-mr-mutation-zero-residual-rereview",
+      "task_class": "independent_review",
+      "role": "reviewer",
+      "provider": "fugu",
+      "model": "fugu-ultra-v1.1",
+      "branch": "fugu-agent/cfr168-python-http-mr-mutation-zero-residual-rereview-fugu-20260730",
+      "started_at": "2026-07-30T09:45:51.585140Z",
+      "status": "running",
+      "unique_artifact_count": 0,
+      "outcome": "The exact 6dd4527 candidate was under independent ownership, precedence, effect, cleanup, counter, and mutation-oracle review.",
+      "evidence_refs": [
+        "prefix:mr-mutation-rereview-fugu-20260730"
       ]
     }
   ],
@@ -192,6 +247,36 @@
       ]
     },
     {
+      "metric_id": "MET-FLOW-002",
+      "status": "measured",
+      "value": 4019.063,
+      "unit": "seconds",
+      "scope": "Claude-reported MR-mutation repair-lane duration through candidate handoff",
+      "lane_id": "cfr168-python-http-mr-mutation-zero-residual-repair-20260730",
+      "task_id": "cfr168-python-http-mr-mutation-zero-residual-repair",
+      "window_started_at": "2026-07-30T08:39:24.630213Z",
+      "window_ended_at": "2026-07-30T09:45:29.582413Z",
+      "note": "Provider duration_ms is retained rather than recomputed from mixed filesystem timestamps.",
+      "evidence_refs": [
+        "prefix:mr-mutation-claude-20260730"
+      ]
+    },
+    {
+      "metric_id": "MET-FLOW-002",
+      "status": "measured",
+      "value": 3164.042,
+      "unit": "seconds",
+      "scope": "Claude-reported resumed MR-list repair-lane duration through candidate handoff",
+      "lane_id": "cfr168-python-http-mr-list-zero-residual-repair-20260730",
+      "task_id": "cfr168-python-http-mr-list-zero-residual-repair",
+      "window_started_at": "2026-07-30T08:45:14.632472Z",
+      "window_ended_at": "2026-07-30T09:37:10.904294Z",
+      "note": "The earlier failed 529 attempt is measured separately and is not added to provider duration_ms.",
+      "evidence_refs": [
+        "prefix:mr-list-claude-20260730"
+      ]
+    },
+    {
       "metric_id": "MET-FLOW-010",
       "status": "estimated",
       "value": 1974.668417,
@@ -228,7 +313,7 @@
       "scope": "MR-list focused gate flake classification",
       "lane_id": "cfr168-python-http-mr-list-zero-residual-repair-20260730",
       "task_id": "cfr168-python-http-mr-list-zero-residual-repair",
-      "note": "One failure did not reproduce immediately; no pass or flake classification is claimed yet.",
+      "note": "One failure did not reproduce across twelve later module reruns and fourteen targeted stress runs. Its name was lost by output truncation, so no flake or pass classification is claimed.",
       "evidence_refs": [
         "prefix:mr-list-claude-20260730"
       ]
@@ -293,6 +378,16 @@
       ]
     },
     {
+      "metric_id": "MET-FLOW-020",
+      "status": "measured",
+      "value": 2813909982,
+      "unit": "bytes",
+      "scope": "Point sample of /workspace at 2026-07-30T09:51:55Z",
+      "evidence_refs": [
+        "event:resource-sample-20260730-095155"
+      ]
+    },
+    {
       "metric_id": "MET-FLOW-021",
       "status": "measured",
       "value": 91.8,
@@ -313,6 +408,16 @@
       ]
     },
     {
+      "metric_id": "MET-FLOW-021",
+      "status": "measured",
+      "value": 93884,
+      "unit": "bytes",
+      "scope": "Aggregate Cargo target point sample at 2026-07-30T09:51:55Z",
+      "evidence_refs": [
+        "event:resource-sample-20260730-095155"
+      ]
+    },
+    {
       "metric_id": "MET-FLOW-022",
       "status": "measured",
       "value": 16816082944,
@@ -324,6 +429,17 @@
       ]
     },
     {
+      "metric_id": "MET-FLOW-022",
+      "status": "measured",
+      "value": 16864874496,
+      "unit": "bytes",
+      "scope": "Host MemAvailable point sample at 2026-07-30T09:51:55Z",
+      "note": "This is a point sample, not yet the measurement-window minimum.",
+      "evidence_refs": [
+        "event:resource-sample-20260730-095155"
+      ]
+    },
+    {
       "metric_id": "MET-FLOW-023",
       "status": "measured",
       "value": 0,
@@ -331,6 +447,16 @@
       "scope": "Host swap used point sample at 2026-07-30T09:24:13Z",
       "evidence_refs": [
         "event:resource-sample-20260730-092413"
+      ]
+    },
+    {
+      "metric_id": "MET-FLOW-023",
+      "status": "measured",
+      "value": 0,
+      "unit": "bytes",
+      "scope": "Host swap used point sample at 2026-07-30T09:51:55Z",
+      "evidence_refs": [
+        "event:resource-sample-20260730-095155"
       ]
     },
     {
@@ -345,6 +471,17 @@
       ]
     },
     {
+      "metric_id": "MET-FLOW-024",
+      "status": "measured",
+      "value": 1382958,
+      "unit": "tokens",
+      "scope": "Codex coordinator active-goal thread total at 2026-07-30T09:51:55Z",
+      "note": "This is a cumulative coordinator-thread sample, not a billed-cost claim or a per-package value.",
+      "evidence_refs": [
+        "manager-goal-snapshot:2026-07-30T09:51:55Z"
+      ]
+    },
+    {
       "metric_id": "MET-FLOW-025",
       "status": "measured",
       "value": 2.29561,
@@ -354,6 +491,31 @@
       "task_id": "cfr168-python-http-mr-list-zero-residual-repair",
       "evidence_refs": [
         "prefix:mr-list-claude-20260730"
+      ]
+    },
+    {
+      "metric_id": "MET-FLOW-025",
+      "status": "measured",
+      "value": 17.520932,
+      "unit": "usd",
+      "scope": "Provider-reported cost of the resumed MR-list Claude repair lane",
+      "lane_id": "cfr168-python-http-mr-list-zero-residual-repair-20260730",
+      "task_id": "cfr168-python-http-mr-list-zero-residual-repair",
+      "note": "The separate failed 529 attempt cost is not included in this value.",
+      "evidence_refs": [
+        "prefix:mr-list-claude-20260730"
+      ]
+    },
+    {
+      "metric_id": "MET-FLOW-025",
+      "status": "measured",
+      "value": 27.294168,
+      "unit": "usd",
+      "scope": "Provider-reported cost of the MR-mutation Claude repair lane",
+      "lane_id": "cfr168-python-http-mr-mutation-zero-residual-repair-20260730",
+      "task_id": "cfr168-python-http-mr-mutation-zero-residual-repair",
+      "evidence_refs": [
+        "prefix:mr-mutation-claude-20260730"
       ]
     },
     {
@@ -382,7 +544,7 @@
       "status": "unavailable",
       "unit": "usd",
       "scope": "Total cross-provider model cost per trusted integration",
-      "note": "Active Claude/Fugu lanes had not finalized comparable usage/cost records, and no package was integrated.",
+      "note": "Two Claude lane costs are now recorded, but Fugu costs are unavailable and no package has reached trusted integration.",
       "evidence_refs": [
         "doc:docs/development/ai/development-flow-kgi-kpi.md"
       ]
@@ -505,24 +667,132 @@
         "measurement:MET-FLOW-022",
         "measurement:MET-FLOW-023"
       ]
+    },
+    {
+      "event_id": "mr-list-candidate-ready-20260730-093710",
+      "at": "2026-07-30T09:37:10.904294Z",
+      "kind": "candidate_ready",
+      "stage": "implement",
+      "lane_id": "cfr168-python-http-mr-list-zero-residual-repair-20260730",
+      "task_id": "cfr168-python-http-mr-list-zero-residual-repair",
+      "provider": "claude",
+      "model": "claude-opus-5",
+      "summary": "The MR-list lane handed off exact candidate 38da898 after twelve clean module reruns and fourteen targeted stress reruns.",
+      "outcome": "The first unidentified failure remained unclassified and the candidate entered independent review rather than integration.",
+      "evidence_refs": [
+        "commit:38da8988ac8bc1fcdfcb82c62e7aa0d28791500c",
+        "prefix:mr-list-claude-20260730"
+      ]
+    },
+    {
+      "event_id": "mr-list-rereview-start-20260730-093835",
+      "at": "2026-07-30T09:38:35.615276Z",
+      "kind": "lane_start",
+      "stage": "review",
+      "lane_id": "cfr168-python-http-mr-list-zero-residual-rereview-fugu-20260730",
+      "task_id": "cfr168-python-http-mr-list-zero-residual-rereview",
+      "provider": "fugu",
+      "model": "fugu-ultra-v1.1",
+      "summary": "A fresh independent Fugu review started from exact candidate 38da898.",
+      "outcome": "Product mutation was forbidden; one bound review report is required.",
+      "evidence_refs": [
+        "prefix:mr-list-rereview-fugu-20260730"
+      ]
+    },
+    {
+      "event_id": "kgi-kpi-rereview-start-20260730-094424",
+      "at": "2026-07-30T09:44:24.382700Z",
+      "kind": "lane_start",
+      "stage": "review",
+      "lane_id": "development-flow-kgi-kpi-independent-review-claude-20260730",
+      "task_id": "development-flow-kgi-kpi-independent-review",
+      "provider": "claude",
+      "model": "claude-opus-5",
+      "summary": "An independent control-plane review started for KGI/KPI commit bfa7f08 as present on canonical dd993cc.",
+      "outcome": "Schema, checker, evidence, arithmetic, comparability, and anti-gaming claims require a report-only disposition.",
+      "evidence_refs": [
+        "prefix:kgi-kpi-review-claude-20260730"
+      ]
+    },
+    {
+      "event_id": "mr-mutation-candidate-ready-20260730-094529",
+      "at": "2026-07-30T09:45:29.582413Z",
+      "kind": "candidate_ready",
+      "stage": "implement",
+      "lane_id": "cfr168-python-http-mr-mutation-zero-residual-repair-20260730",
+      "task_id": "cfr168-python-http-mr-mutation-zero-residual-repair",
+      "provider": "claude",
+      "model": "claude-opus-5",
+      "summary": "The MR-mutation lane handed off exact candidate 6dd4527 after focused, neighboring, reversal, and seven-mutation checks.",
+      "outcome": "Candidate entered independent review; broad and integration gates remain deferred.",
+      "evidence_refs": [
+        "commit:6dd4527f23135388b53fc5c6d637c4105cc5d659",
+        "prefix:mr-mutation-claude-20260730"
+      ]
+    },
+    {
+      "event_id": "mr-mutation-rereview-start-20260730-094551",
+      "at": "2026-07-30T09:45:51.585140Z",
+      "kind": "lane_start",
+      "stage": "review",
+      "lane_id": "cfr168-python-http-mr-mutation-zero-residual-rereview-fugu-20260730",
+      "task_id": "cfr168-python-http-mr-mutation-zero-residual-rereview",
+      "provider": "fugu",
+      "model": "fugu-ultra-v1.1",
+      "summary": "A fresh independent Fugu review started from exact candidate 6dd4527.",
+      "outcome": "Product mutation was forbidden; one bound review report is required.",
+      "evidence_refs": [
+        "prefix:mr-mutation-rereview-fugu-20260730"
+      ]
+    },
+    {
+      "event_id": "mr-list-rereview-defects-20260730-095155",
+      "at": "2026-07-30T09:51:55Z",
+      "kind": "trusted_signal",
+      "stage": "review",
+      "lane_id": "cfr168-python-http-mr-list-zero-residual-rereview-fugu-20260730",
+      "task_id": "cfr168-python-http-mr-list-zero-residual-rereview",
+      "provider": "fugu",
+      "model": "fugu-ultra-v1.1",
+      "summary": "Socket-level probes reproduced a stale-success race after the final authority fence and a symlinked authority-directory false success.",
+      "outcome": "Candidate 38da898 remains unaccepted while the reviewer completes the severity-ordered report.",
+      "evidence_refs": [
+        "prefix:mr-list-rereview-fugu-20260730"
+      ]
+    },
+    {
+      "event_id": "resource-sample-20260730-095155",
+      "at": "2026-07-30T09:51:55Z",
+      "kind": "resource_sample",
+      "stage": "operations",
+      "provider": "system",
+      "model": "linux-proc-du",
+      "summary": "Point sample: /workspace 2,813,909,982 bytes; aggregate Cargo targets 93,884 bytes; MemAvailable 16,864,874,496 bytes; swap used zero.",
+      "outcome": "Four external light review lanes remained inside the disk and memory envelope.",
+      "evidence_refs": [
+        "measurement:MET-FLOW-020",
+        "measurement:MET-FLOW-021",
+        "measurement:MET-FLOW-022",
+        "measurement:MET-FLOW-023"
+      ]
     }
   ],
   "evidence_prefixes": [
     {
       "evidence_id": "mr-list-claude-20260730",
       "locator": "second-agent://claude/cfr168-python-http-mr-list-zero-residual-repair-20260730/logs/events.jsonl",
-      "prefix_bytes": 35627395,
-      "sha256": "dc9e9fa35e84937a8a4f4a6297e4bbe3999e20b042a89c673a18194fa5b58827",
-      "captured_at": "2026-07-30T09:24:13Z",
-      "mutable_after_capture": true
+      "prefix_bytes": 35674208,
+      "sha256": "b8a0d128416bf04040b8a97eb7cd19f1df93fd79b98e618b73f08becaf7feceb",
+      "captured_at": "2026-07-30T09:51:55Z",
+      "mutable_after_capture": false
     },
     {
       "evidence_id": "mr-mutation-claude-20260730",
       "locator": "second-agent://claude/cfr168-python-http-mr-mutation-zero-residual-repair-20260730/logs/events.jsonl",
-      "prefix_bytes": 90461986,
-      "sha256": "4c12c2ea58735908065529813faff62927ffea71c5b64d5df6a95299c03cfed4",
-      "captured_at": "2026-07-30T09:24:13Z",
-      "mutable_after_capture": true
+      "prefix_bytes": 91053127,
+      "sha256": "68e890356dd0c1278f621e01fce6e113725b30ccb3260888df71b0f1d9ccb932",
+      "captured_at": "2026-07-30T09:51:55Z",
+      "mutable_after_capture": false
     },
     {
       "evidence_id": "mr-list-fugu-hedge-20260730",
@@ -535,9 +805,33 @@
     {
       "evidence_id": "storage-fugu-review-20260730",
       "locator": "second-agent://fugu/cfr168-rust-storage-independent-review-fugu-20260730/logs/events.jsonl",
-      "prefix_bytes": 2858205,
-      "sha256": "e05e286fb5a1a165e0b20ef7fcdf20f6fa80b480a9f8106c6af3d3bb844bdf51",
-      "captured_at": "2026-07-30T09:24:13Z",
+      "prefix_bytes": 4689054,
+      "sha256": "1a557731ae60dbf3540993937d9fcc748d5aa1de7ac29e4960036a66fcd2b8f8",
+      "captured_at": "2026-07-30T09:51:55Z",
+      "mutable_after_capture": true
+    },
+    {
+      "evidence_id": "mr-list-rereview-fugu-20260730",
+      "locator": "second-agent://fugu/cfr168-python-http-mr-list-zero-residual-rereview-fugu-20260730/logs/events.jsonl",
+      "prefix_bytes": 1136948,
+      "sha256": "b2eb819d9acfb9ab89cde2d7aa148ddfc367f0211ac11720737d6230f564fe22",
+      "captured_at": "2026-07-30T09:51:55Z",
+      "mutable_after_capture": true
+    },
+    {
+      "evidence_id": "mr-mutation-rereview-fugu-20260730",
+      "locator": "second-agent://fugu/cfr168-python-http-mr-mutation-zero-residual-rereview-fugu-20260730/logs/events.jsonl",
+      "prefix_bytes": 1128812,
+      "sha256": "7426621b84b5ffce048c222514b9740bc82b27e1c690cc4609d4cb248da4bd19",
+      "captured_at": "2026-07-30T09:51:55Z",
+      "mutable_after_capture": true
+    },
+    {
+      "evidence_id": "kgi-kpi-review-claude-20260730",
+      "locator": "second-agent://claude/development-flow-kgi-kpi-independent-review-claude-20260730/logs/events.jsonl",
+      "prefix_bytes": 463430,
+      "sha256": "b2158835a701b52d3e93e796eb9736b081b2daf5e403a6f531283fffc1731fd1",
+      "captured_at": "2026-07-30T09:51:55Z",
       "mutable_after_capture": true
     }
   ],
@@ -546,7 +840,7 @@
     "Active event logs may grow after capture; evidence hashes bind only the declared immutable byte prefixes.",
     "The container cannot observe current Windows C-drive free space or prove VHDX compaction.",
     "The Codex token value is a cumulative coordinator-thread sample and is not a billed-cost or per-package value.",
-    "Cross-provider token and cost totals are incomplete until each lane terminates and comparable provider usage records are available.",
+    "Claude duration and cost values come from provider result events; Fugu review cost is unavailable, so cross-provider totals remain incomplete.",
     "No five-packet comparable cohort or trusted current-wave integration existed at capture, so throughput, flow efficiency, useful parallelism, and the 20 percent KGI target remain unscored."
   ]
 }
