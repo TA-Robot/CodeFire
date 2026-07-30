@@ -31,6 +31,7 @@ Use a small number of live documents and many append-only or historical document
 | Management hub | `docs/development/README.md` | Current state entry and source-of-truth map. |
 | Governance | `docs/development/project-management.md` | This model. Update only when the model changes. |
 | AI acceleration | `docs/development/ai/README.md` | External AI task packets, context packs, role routing, review packets, strategy notes, checks, and parallel-agent playbooks. |
+| Development-flow KGI/KPI | `docs/development/ai/development-flow-kgi-kpi.md`, `docs/development/ai/flow-metrics/` | Trusted-integration outcomes, diagnostic metrics, incidents, and dated management decisions. |
 | Strategy and roadmap | `docs/development/strategy/README.md` | Accepted principles, product direction, decision status, modernization gates, and release/format identity. |
 | Exploration | `docs/development/exploration/README.md` | Non-authoritative hypotheses, alternatives, falsifiers, and experiments. |
 | History | `docs/development/history.md` | Append-only work log. |
@@ -112,6 +113,30 @@ Use `docs/development/ai/README.md` for:
 AI agents may accelerate implementation, review, docs synchronization, dogfood, and validation, but they must still follow the same issue lifecycle, dirty-tree rules, module boundaries, and validation policy as human contributors.
 
 Do not convert AI workflow convenience into CodeFire product features unless the feature belongs to CodeFire's consistency, evidence, or automation CLI contract.
+
+## Development-System KGI / KPI
+
+Development-system performance is governed by
+`docs/development/ai/development-flow-kgi-kpi.md`. KGI states the required outcome; KPI diagnoses
+flow, quality, cost, continuity, and resource behavior. Raw agent count, lines, commits, transcript
+size, and model tier are not progress indicators.
+
+The active batch keeps a schema-checked record under `docs/development/ai/flow-metrics/`. Record at
+least lane start, first trusted signal, first mutation, first durable checkpoint, candidate/review
+decision, gate results, integration, provider incidents/reroutes, resource incidents, and lifecycle
+completion. Bind an active log by byte-prefix length and SHA-256 so later appends do not rewrite
+history.
+
+Review the measurements:
+
+- when a task completes;
+- daily while a frozen batch is active;
+- after every provider/host/resource incident;
+- after each five-packet comparable cohort;
+- at batch Retrospect.
+
+Every review records `keep`, `change`, `stop`, or `experiment`. Threshold changes require a dated
+cohort and evidence; do not loosen them to make an active task appear healthy.
 
 ## Dirty Tree Triage
 

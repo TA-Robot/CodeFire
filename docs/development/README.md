@@ -24,6 +24,7 @@ If any line above changes, update this snapshot and append the reason to `docs/d
 | Question | Source of truth | Update rule |
 |---|---|---|
 | What is the project-management model? | `docs/development/project-management.md` | Update when the workflow or document ownership model changes. |
+| How is development speed/quality/cost measured? | `docs/development/ai/development-flow-kgi-kpi.md`, `docs/development/ai/flow-metrics/` | Record lane events continuously; review per task, incident, five comparable packets, and Retrospect. |
 | What happened? | `docs/development/history.md` | Append-only chronological work log. Do not rewrite history to fix current state. |
 | What is the active issue ledger? | `docs/development/bug-backlog.md`, `docs/development/bug-issues/` | Summary row and detail file must agree. |
 | What source-review issues exist? | `docs/development/code-review-issues-2026-06-06.md`, `docs/development/code-review-issues/` | Index count and detail statuses must agree. |
@@ -77,7 +78,7 @@ If an environment cannot run a required gate, record that limitation explicitly 
 | Strategy | `strategy/README.md`, engineering principles, product strategy, modernization and release/format roadmaps, decision register | Promoted decisions, bounded hypotheses, and the only active strategic roadmap. |
 | Exploration | `exploration/` | Non-authoritative alternatives, falsifiable hypotheses, and experiment designs from the three completed exploration phases. |
 | CodeFire improvement review | [`codefire-review-portfolio/`](codefire-review-portfolio/README.md) | Evidence-backed product, domain, architecture, implementation, workflow, and evolution reviews kept as next-discovery candidates until promotion. |
-| AI acceleration | `ai/README.md`, `ai/context-packs.json`, `ai/schemas/`, `ai/evals/`, role/runtime policy, task/review packets, and `tools/` | External AI task definition, typed contracts, context compression, review, model routing, validation selection, and parallel-lane operation. |
+| AI acceleration | `ai/README.md`, `ai/development-flow-kgi-kpi.md`, `ai/flow-metrics/`, `ai/context-packs.json`, `ai/schemas/`, `ai/evals/`, role/runtime policy, task/review packets, and `tools/` | External AI task definition, typed contracts, context compression, review, model routing, validation selection, parallel-lane operation, and KGI/KPI measurement. |
 | Issues | `bug-backlog.md`, `bug-issues/`, `code-review-issues-2026-06-06.md`, `code-review-issues/`, `issue-root-cause-map.json` | Product and source-review issue tracking. |
 | Historical deletion audit | `archive/deletion-manifest.md`, `history.md`, Git history | Destinations and recovery path for removed completion/version plans. |
 | Source architecture | `source-architecture.md`, `command-source-trace.md`, `source-data-model-catalog.md`, `change-playbook.md` | Stable ownership, exact command routing, data contracts, and task-oriented navigation. |

@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codefire.dev/schemas/ai/development-flow-record.v1.schema.json",
+  "title": "CodeFire AI Development Flow Record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "record_id",
+    "batch_id",
+    "source_revision",
+    "status",
+    "captured_at",
+    "measurement_window",
+    "kgi_status",
+    "lane_runs",
+    "measurements",
+    "events",
+    "evidence_prefixes",
+    "limitations"
+  ],
+  "properties": {
+    "schema": {"const": "codefire.ai_development_flow_record.v1"},
+    "record_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"},
+    "batch_id": {"type": "string", "minLength": 1, "maxLength": 255},
+    "source_revision": {"type": "string", "minLength": 7, "maxLength": 64},
+    "status": {"enum": ["active", "final"]},
+    "captured_at": {"type": "string", "minLength": 20, "maxLength": 64},
+    "measurement_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["started_at", "time_basis"],
+      "properties": {
+        "started_at": {"type": "string", "minLength": 20, "maxLength": 64},
+        "ended_at": {"type": "string", "minLength": 20, "maxLength": 64},
+        "time_basis": {"enum": ["exact", "mixed", "operator_observed"]}
+      }
+    },
+    "kgi_status": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kgi_id", "status", "target", "observed", "evidence_refs"],
+        "properties": {
+          "kgi_id": {"type": "string", "pattern": "^KGI-[A-Z0-9-]{3,63}$"},
+          "status": {"enum": ["not_started", "in_progress", "at_risk", "achieved", "failed"]},
+          "target": {"type": "string", "minLength": 1},
+          "observed": {"type": "string", "minLength": 1},
+          "evidence_refs": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "lane_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lane_id",
+          "task_id",
+          "task_class",
+          "role",
+          "provider",
+          "model",
+          "started_at",
+          "status",
+          "unique_artifact_count",
+          "evidence_refs"
+        ],
+        "properties": {
+          "lane_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"},
+          "task_id": {"type": "string", "minLength": 1, "maxLength": 255},
+          "task_class": {
+            "enum": [
+              "docs",
+              "bounded_implementation",
+              "architecture_security_repair",
+              "independent_review",
+              "validation",
+              "integration",
+              "recovery"
+            ]
+          },
+          "role": {
+            "enum": [
+              "manager",
+              "implementer",
+              "reviewer",
+              "validation_runner",
+              "integrator",
+              "recovery"
+            ]
+          },
+          "provider": {"enum": ["claude", "fugu", "codex", "human", "system"]},
+          "model": {"type": "string", "minLength": 1, "maxLength": 255},
+          "branch": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "started_at": {"type": "string", "minLength": 20, "maxLength": 64},
+          "ended_at": {"type": "string", "minLength": 20, "maxLength": 64},
+          "first_trusted_signal_at": {"type": "string", "minLength": 20, "maxLength": 64},
+          "first_mutation_at": {"type": "string", "minLength": 20, "maxLength": 64},
+          "first_checkpoint_at": {"type": "string", "minLength": 20, "maxLength": 64},
+          "candidate_ready_at": {"type": "string", "minLength": 20, "maxLength": 64},
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "checkpointed",
+              "candidate_ready",
+              "reviewing",
+              "accepted",
+              "request_changes",
+              "failed",
+              "stopped_duplicate",
+              "interrupted",
+              "recovered"
+            ]
+          },
+          "checkpoint_commits": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 7, "maxLength": 64},
+            "uniqueItems": true
+          },
+          "unique_artifact_count": {"type": "integer", "minimum": 0},
+          "outcome": {"type": "string", "minLength": 1},
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1},
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "measurements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["metric_id", "status", "unit", "scope", "evidence_refs"],
+        "properties": {
+          "metric_id": {"type": "string", "pattern": "^MET-[A-Z0-9-]{3,63}$"},
+          "status": {"enum": ["measured", "estimated", "unavailable", "in_progress"]},
+          "value": {"type": "number"},
+          "unit": {
+            "enum": [
+              "seconds",
+              "count",
+              "ratio",
+              "percent",
+              "bytes",
+              "gibibytes",
+              "tokens",
+              "usd"
+            ]
+          },
+          "scope": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "lane_id": {"type": "string", "minLength": 1, "maxLength": 127},
+          "task_id": {"type": "string", "minLength": 1, "maxLength": 255},
+          "window_started_at": {"type": "string", "minLength": 20, "maxLength": 64},
+          "window_ended_at": {"type": "string", "minLength": 20, "maxLength": 64},
+          "numerator": {"type": "number"},
+          "denominator": {"type": "number"},
+          "note": {"type": "string", "minLength": 1},
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1},
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event_id", "at", "kind", "stage", "summary", "evidence_refs"],
+        "properties": {
+          "event_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"},
+          "at": {"type": "string", "minLength": 20, "maxLength": 64},
+          "kind": {
+            "enum": [
+              "lane_start",
+              "trusted_signal",
+              "mutation",
+              "checkpoint",
+              "candidate_ready",
+              "review_decision",
+              "validation",
+              "integration",
+              "provider_error",
+              "reroute",
+              "lane_stop",
+              "resource_sample",
+              "incident",
+              "recovery",
+              "decision"
+            ]
+          },
+          "stage": {
+            "enum": [
+              "discover",
+              "freeze",
+              "plan",
+              "implement",
+              "review",
+              "integrate",
+              "close",
+              "install",
+              "dogfood",
+              "retrospect",
+              "operations"
+            ]
+          },
+          "lane_id": {"type": "string", "minLength": 1, "maxLength": 127},
+          "task_id": {"type": "string", "minLength": 1, "maxLength": 255},
+          "provider": {"enum": ["claude", "fugu", "codex", "human", "system"]},
+          "model": {"type": "string", "minLength": 1, "maxLength": 255},
+          "summary": {"type": "string", "minLength": 1},
+          "outcome": {"type": "string", "minLength": 1},
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1},
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "evidence_prefixes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "locator",
+          "prefix_bytes",
+          "sha256",
+          "captured_at",
+          "mutable_after_capture"
+        ],
+        "properties": {
+          "evidence_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"},
+          "locator": {"type": "string", "minLength": 1},
+          "prefix_bytes": {"type": "integer", "minimum": 0},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "captured_at": {"type": "string", "minLength": 20, "maxLength": 64},
+          "mutable_after_capture": {"type": "boolean"}
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  }
+}

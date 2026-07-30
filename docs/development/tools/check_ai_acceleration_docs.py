@@ -24,6 +24,8 @@ REQUIRED_AI_FILES = [
     "docs/development/ai/provider-routing-policy.md",
     "docs/development/ai/model-routing-policy.md",
     "docs/development/ai/acceleration-master-plan.md",
+    "docs/development/ai/development-flow-kgi-kpi.md",
+    "docs/development/ai/schemas/development-flow-record.v1.schema.json",
     "docs/development/ai/capability-registry.v1.json",
     "docs/development/ai/focused-test-map.v1.json",
     "docs/development/ai/evals/historical-cases.v1.json",

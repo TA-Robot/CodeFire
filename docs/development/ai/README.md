@@ -8,7 +8,7 @@ It is not a CodeFire product feature. CodeFire should not grow agent orchestrati
 
 Maximize development speed without losing control of correctness, repository safety, or long-term maintainability.
 
-The acceleration system has eight parts:
+The acceleration system has nine parts:
 
 1. **Context packs**: minimal, task-specific reading lists so agents do not reread the whole repository.
 2. **Task packets**: a standard unit of work with scope, constraints, files, validation, and handoff expectations.
@@ -18,6 +18,8 @@ The acceleration system has eight parts:
 6. **Tooling**: small repository-local checks that make context packs, task packets, and dirty-tree classification executable.
 7. **Provider and model routing**: Fugu/Claude/Codex are selected first; Codex `gpt-5.6-sol` Medium/High/Ultra remains the guarded high-assurance adapter.
 8. **Exploration and evals**: falsifiable research notes and task corpora that prevent operating policy from becoming unsupported folklore.
+9. **Development-flow measurement**: KGI/KPI, immutable event prefixes, resource samples, and
+   management triggers that measure cost to trusted integration rather than activity.
 
 ## Core Rule
 
@@ -45,6 +47,7 @@ Do not spawn or delegate implementation work until the task packet has:
 | Codex model routing | Select GPT-5.6 Sol Medium/High/Ultra when Codex is explicitly selected. | `model-routing-policy.md`, `role-routing-matrix.json`, `.codex/` |
 | Exploration | Keep hypotheses separate from accepted strategy and executable policy. | `../exploration/` |
 | Retrospective | Convert friction into better systems. | `acceleration-master-plan.md`, `../bug-backlog.md`, `../history.md` |
+| Flow measurement | Record KGI/KPI, lane timing, quality/rework, provider cost, and resource continuity. | `development-flow-kgi-kpi.md`, `flow-metrics/` |
 
 ## Fast Path
 
@@ -58,7 +61,8 @@ For a new task:
 6. Inspect the dry-run manifest from `../tools/run_ai_role.py` or a `dev-swarm plan`; resolve stale base, unavailable provider/capabilities, and dirty write-set intersections before granting writes.
 7. Run an independent reviewer and bind the review to task/patch digests.
 8. Run `python3 docs/development/tools/check_ai_development.py` when the AI system or strategy changed.
-9. Update canonical docs and history with the result.
+9. Record the lane/candidate/review/gate events required by `development-flow-kgi-kpi.md`.
+10. Update canonical docs and history with the result.
 
 For a batch:
 
@@ -144,6 +148,7 @@ If the agent cannot state these, the work is not ready.
 | `operating-protocol.md` | Task packet shape, review packet shape, parallel-lane rules, and handoff format. |
 | `failure-cookbook.md` | Maps recurring environment, provenance, packet, timeout, JSON, and review failures to safe next actions. |
 | `validation-report-template.md` | Human handoff shape corresponding to the typed review contract; placeholders are never evidence. |
+| `development-flow-kgi-kpi.md`, `flow-metrics/` | Promoted KGI/KPI definitions, management triggers, and schema-checked active/final measurement records. |
 
 ## Local Tools and Evidence
 

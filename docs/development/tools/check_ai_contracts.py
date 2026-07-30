@@ -29,6 +29,7 @@ SCHEMAS = {
     "docs/development/ai/schemas/task-packet.v1.schema.json": "https://codefire.dev/schemas/ai/task-packet.v1.schema.json",
     "docs/development/ai/schemas/context-manifest.v1.schema.json": "https://codefire.dev/schemas/ai/context-manifest.v1.schema.json",
     "docs/development/ai/schemas/review-packet.v1.schema.json": "https://codefire.dev/schemas/ai/review-packet.v1.schema.json",
+    "docs/development/ai/schemas/development-flow-record.v1.schema.json": "https://codefire.dev/schemas/ai/development-flow-record.v1.schema.json",
 }
 
 
@@ -138,6 +139,36 @@ def run(root: Path, extra_tasks: list[Path], extra_reviews: list[Path]) -> list[
                 historical_corpus_path,
             )
         )
+
+    flow_schema = loaded_schemas.get(
+        "docs/development/ai/schemas/development-flow-record.v1.schema.json"
+    )
+    flow_paths = sorted((root / "docs/development/ai/flow-metrics").glob("*.json"))
+    if not flow_paths:
+        findings.append(
+            Finding(
+                "error",
+                "missing-development-flow-records",
+                "docs/development/ai/flow-metrics",
+                "at least one active or final KGI/KPI record is required",
+            )
+        )
+    flow_record_ids: set[str] = set()
+    for path in flow_paths:
+        relative = path.relative_to(root).as_posix()
+        data = read_object(root, relative, findings)
+        if data is None or flow_schema is None:
+            continue
+        flow_findings = validate_json_schema(data, flow_schema, relative)
+        findings.extend(flow_findings)
+        record_id = data.get("record_id")
+        if isinstance(record_id, str):
+            if record_id in flow_record_ids:
+                findings.append(
+                    Finding("error", "duplicate-development-flow-record-id", relative, record_id)
+                )
+            else:
+                flow_record_ids.add(record_id)
 
     task_paths = sorted((root / "docs/development/ai/task-packets/json").glob("*.json"))
     task_paths.extend(path.resolve() for path in extra_tasks)

@@ -160,6 +160,8 @@ Current recommended next items:
 - No product/dogfood mixed commits.
 - Every AI implementation handoff includes validation evidence.
 - Reviewers can identify invariants without rereading entire repo.
+- Every active batch records KGI/KPI and incident evidence under `flow-metrics/`; throughput is
+  evaluated at trusted integration rather than first patch or agent count.
 
 ## Governance
 

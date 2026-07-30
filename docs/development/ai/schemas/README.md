@@ -7,6 +7,7 @@ These JSON Schemas are the portable contract for AI-assisted CodeFire developmen
 | `task-packet.v1.schema.json` | Bounded objective, context, read/write scope, risk route, invariants, validation, and handoff. |
 | `context-manifest.v1.schema.json` | Resolved and content-addressed context inputs for reproducible delegation. |
 | `review-packet.v1.schema.json` | Patch identity, claims, independent evidence, findings, and an explicit decision. |
+| `development-flow-record.v1.schema.json` | Batch KGI status, lane timing, KPI measurements, incidents, and immutable active-log prefixes. |
 
 Contract rules:
 
