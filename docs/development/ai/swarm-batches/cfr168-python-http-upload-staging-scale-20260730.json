@@ -1,0 +1,27 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-python-http-upload-staging-scale-20260730",
+  "workspace": "/workspace/worktrees/cfr168-p0-canonical",
+  "base_revision": "88df84b7fd962cd33f4c897f555d083bc2e58677",
+  "max_parallel": {
+    "fugu": 0,
+    "claude": 1,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "upload-staging-scale",
+      "role": "implementer",
+      "tier": "high",
+      "provider": "claude",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-python-http-upload-staging-scale-20260730.md",
+      "depends_on": [],
+      "write_set": [
+        "codefire",
+        "tests/test_python_http_upload_accounted_traversal.py"
+      ],
+      "expected_commit": true,
+      "timeout": "8h"
+    }
+  ]
+}
