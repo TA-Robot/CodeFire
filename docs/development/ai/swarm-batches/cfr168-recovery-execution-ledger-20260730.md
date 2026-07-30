@@ -1141,3 +1141,26 @@ Four external sessions are occupied again: Upload exact Fugu review, Python
 MR-list repair, File Doctor note repair, and this Rust HTTP repair. Heavy
 occupancy is two, so Storage remains queued behind the single Fugu review
 permit and the next heavy release. No third heavy lane was started.
+
+## 2026-07-30 20:34 UTC prepared exact-review rollover
+
+Three fresh Claude Opus 5 report-only review tickets are now frozen before
+their implementation candidates finish:
+
+- `cfr168-python-http-mr-list-review-closure-rereview-claude-20260730`;
+- `cfr168-rust-file-doctor-review-note-closure-rereview-claude-20260730`; and
+- `cfr168-rust-http-mr-preflight-evidence-closure-rereview-claude-20260730`.
+
+Each ticket already fixes the independent reviewer role, exact writable
+report path, inherited findings, counterexamples, mutation matrix, broad-gate
+ownership, and strict `ACCEPT`/`REQUEST_CHANGES` boundary. Candidate SHA,
+parent, tree, cumulative patch digest, changed paths, result digest, and clean
+state remain literally `UNBOUND`. The manager must bind every value
+atomically from a clean completed candidate and generate the candidate-ready
+card before creating a runnable manifest. A reviewer must then recompute the
+identity rather than trust the card.
+
+No manifest was created, no external permit was occupied, and no provider
+cost was incurred by this preparation. This moves review specification work
+off the candidate-ready critical path without creating speculative product
+WIP or allowing a branch tip to become the review subject.

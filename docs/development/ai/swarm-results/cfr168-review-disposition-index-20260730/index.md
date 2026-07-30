@@ -47,7 +47,10 @@ CFR-168 closure.
    CFR-168 product candidates.
 3. Collect the active exact-session Rust HTTP evidence repair, File Doctor
    review-note repair, and Python MR-list closure repair. Each completed repair
-   candidate requires a fresh exact report-only review.
+   candidate requires a fresh exact report-only review. Their blocked review
+   tickets are already prepared with every identity field `UNBOUND`; freeze a
+   candidate-ready card, bind all fields atomically, and launch the fresh
+   reviewer in the same manager interval when a permit is available.
 4. Bind exact accepted Upload/MR-list inputs, run the blocked shared-primitives
    Fugu preflight, and launch MR-write repair only on a committed `READY`
    decision.
