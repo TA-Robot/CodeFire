@@ -180,6 +180,32 @@ This cache avoids rebuilding and rerunning unchanged proof while preserving
 the exact-revision evidence boundary. It is separate from Cargo's compilation
 cache.
 
+### Manager-generated postflight evidence
+
+Workers must not spend model time transcribing identities and gate output that
+the coordinator can derive. Run declared validations through a small
+`dev-gate` wrapper that emits one append-only typed record containing:
+
+- validation ID, exact argv/cwd, execution profile, start/end, and return code;
+- exact tree and declared-input digests;
+- toolchain/binary provenance and fixture/corpus version;
+- stdout/stderr byte counts and SHA-256 digests, plus a bounded terminal
+  excerpt;
+- parsed test pass/fail/skip counts when the command exposes a supported
+  format; and
+- resource samples and cache/run decision.
+
+At task exit, `dev-swarm` generates a state-owned handoff card with base, head,
+tree, parent, merge base, commit range, patch digest, changed paths,
+write-set conformance, clean state, log/event-prefix digests, duration,
+provider identity, and every required validation record. The worker supplies
+only semantic outcome, residual risk, and next action. The generated card is
+evidence input, not an acceptance decision, and is stored outside the product
+worktree so it cannot contaminate a candidate delta.
+
+`candidate.ready` is emitted from this generated evidence. A worker-authored
+hash, count, or success sentence never overrides a recomputed value.
+
 ### Counterexample and context compaction
 
 Freeze resolves recurring failure signatures from
@@ -305,6 +331,11 @@ Scheduler coverage:
 - validation-cache keys change for tree, argv, environment, toolchain,
   fixture, and declared-input changes;
 - failed, flaky, install, dogfood, and final gates cannot be reused;
+- postflight handoff cards recompute identity, patch, path, clean-state, log,
+  duration, provider, and validation evidence without worker transcription;
+- malformed gate output remains raw bounded evidence and never fabricates a
+  parsed count or passing state;
+- worker-authored identity/count fields cannot override generated values;
 - counterexample handoffs contain the production entry point, oracle,
   deliberate regression, exact write set, and no unrelated transcript;
 - stale/resumed/checkpoint events fire once per epoch and bind exact SHAs;
@@ -339,9 +370,11 @@ polling remains unchanged.
 6. `dev-swarm: adopt manually resumed second-agent runs`
 7. `dev-swarm: enqueue exact independent reviews from candidate events`
 8. `dev-swarm: add content-addressed deterministic gate evidence`
-9. `dev-swarm: run manager-owned shadow integration trains`
-10. `dev-agent: generate counterexample-bound compact handoffs`
-11. `docs: document swarm scheduling and recovery contracts`
+9. `dev-gate: emit typed validation evidence`
+10. `dev-swarm: generate state-owned postflight handoff cards`
+11. `dev-swarm: run manager-owned shadow integration trains`
+12. `dev-agent: generate counterexample-bound compact handoffs`
+13. `docs: document swarm scheduling and recovery contracts`
 
 Each functional commit includes its black-box tests. Documentation remains a
 separate commit.
