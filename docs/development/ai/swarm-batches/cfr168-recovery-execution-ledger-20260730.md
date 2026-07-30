@@ -455,11 +455,22 @@ The development-flow KGI/KPI repair completed cleanly at exact candidate
 all seven aggregate AI-development checks, project-doc validation, and the
 exact diff check. This is not yet integrated: the change adds roughly 4,000
 lines across semantic validation, schema, policy, record, and tests and
-therefore requires a fresh exact-candidate independent review. That rereview
-is frozen on taskbase
+therefore requires a fresh exact-candidate independent review.
+
+Additional manager probes prove the passing official gate is not sufficient:
+the exact candidate accepts a one-nanosecond post-capture event, `NaN` and
+`Infinity` scalar measurements, a two-node candidate cycle beside one root,
+and an already-overdue active record. It also couples active records from
+different batches through one global newest timestamp, accepts repository
+document references whose final symlink resolves outside the repository,
+accepts non-normalized agent-log locator paths, and makes a final-record digest
+self-recomputable without binding it to the introducing commit. These are now
+required review dispositions; `0ae583e` is not an integration candidate.
+
+The rereview is frozen on taskbase
 `/workspace/worktrees/development-flow-kgi-kpi-zero-residual-rereview-base`
-at `148a570`, for Fugu Ultra 1.1 dispatch when a review slot becomes
-available.
+with confirmed-probe launch base `110a38c` and manifest commit `09e5911`, for
+Fugu Ultra 1.1 dispatch when a review slot becomes available.
 
 The next-slot policy is result-driven:
 
