@@ -466,6 +466,9 @@ document references whose final symlink resolves outside the repository,
 accepts non-normalized agent-log locator paths, and makes a final-record digest
 self-recomputable without binding it to the introducing commit. These are now
 required review dispositions; `0ae583e` is not an integration candidate.
+The shared-primitives repair architecture and independent regression matrix
+are frozen at
+`docs/development/ai/swarm-results/development-flow-kgi-kpi-manager-repair-design-20260730/design.md`.
 
 The rereview is frozen on taskbase
 `/workspace/worktrees/development-flow-kgi-kpi-zero-residual-rereview-base`
