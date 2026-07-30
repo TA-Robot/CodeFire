@@ -1103,3 +1103,35 @@ implementation, exact clean implementer continuation, deterministic
 focused-gate evidence keys, accepted-product-only shadow composition, stage
 events, resource floors, and trusted-throughput metrics. No `/workspace`
 script was changed and no live lane was added.
+
+## 2026-07-30 20:27 UTC Rust HTTP exact review rollover
+
+The Rust HTTP exact rereview terminated cleanly with report commit
+`28eb5a94e2f452740df7e8c5b64a8a8f3b9646b0`, report tree
+`41369845a91a005b50c6d499b1c757c5990f1559`, and report SHA-256
+`8bb1a418ce6db1aa932eca2d19990212a58a5f44ad42eb3ccd439e68b4f1417d`.
+Only the immutable report changed; canonical integrated it as `4b11ef9`.
+
+The decision is `REQUEST_CHANGES`. The review independently closes F1--F5
+and R1--R4 product behavior and found no shipped-behavior defect. Its blockers
+are a vacuous 1x/3x/10x test that adds unreachable objects so no counter moves,
+and a durable evidence claim of 57 review-success bytes when the exact
+production fixture measures 60. Under the batch-wide zero-residual goal, the
+two non-blocking comment/suppression findings and local residuals R-1--R-5 are
+also included. Cross-runtime 149-byte parity R-6 is routed to the final
+complexity/conformance corpus; snapshot mode/ownership R-7 remains a
+file-authority successor.
+
+The manager froze additive repair task `e3b005a` and registered it in
+canonical as `f92dab4`. Instead of opening another large rewrite, it resumed
+the exact original Claude Opus 5 implementer session
+`8d2b5b6e-54d7-4151-84bb-0820ea5d1efb` on its clean worktree at reviewed
+candidate `73bc532`, after the prior manager/task had terminated. The launch
+uses the pinned shared Cargo target, two build jobs, two test threads,
+incremental compilation disabled, and a 12-hour progress lease. The provider
+command includes `-r 8d2b5b6e-…`, proving actual session continuation.
+
+Four external sessions are occupied again: Upload exact Fugu review, Python
+MR-list repair, File Doctor note repair, and this Rust HTTP repair. Heavy
+occupancy is two, so Storage remains queued behind the single Fugu review
+permit and the next heavy release. No third heavy lane was started.
