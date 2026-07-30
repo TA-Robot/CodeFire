@@ -915,3 +915,12 @@ This is the first live application of the trusted-throughput decision:
 candidate-ready to reviewer start occurred in the same manager interval, no
 new surface WIP was opened, and no candidate product byte was copied to
 canonical before an exact decision.
+
+After the implementation manager and every child process terminated, the
+completed File Doctor worktree had a private
+`2,327,617,292`-byte Cargo target and no process with a cwd beneath that
+worktree. `cargo clean` with the pinned toolchain and explicit manifest
+removed 2,256 reproducible files; source, branch, scheduler state, logs, and
+the exact candidate remained clean and intact. `/workspace/worktrees` then
+measured `2,977,396,538` bytes and the mounted filesystem reported
+`904,444,588,032` bytes available. Active Rust targets were not touched.
