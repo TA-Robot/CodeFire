@@ -29,23 +29,27 @@ CFR-168 closure.
 | [`cfr168-python-http-mr-list-zero-residual-rereview-fugu-20260730`](../cfr168-python-http-mr-list-zero-residual-rereview-fugu-20260730/review.md) | `78b127c` / `6840035553871f5251e32d67bb5b2f9d6c6ee061b7ab3106e94de373ec97b20d` | `REQUEST_CHANGES` | Parent-authority absence, error-origin classification, retryable cleanup, late metadata, final publication gap, and two oracle defects are frozen in `cfr168-python-http-mr-list-review-closure-repair-20260730.md`. Claude Opus 5 repair is active; final acceptance requires manager composition with the accepted MR-write/Upload successors. |
 | [`cfr168-python-http-mr-mutation-review-claude-fallback-20260730`](../cfr168-python-http-mr-mutation-review-claude-fallback-20260730/review.md) | `0da5855` / `925cbcdbd5e414b962a92ea9af3a20622f0881da664617b74cb964236b0a4681` | `REQUEST_CHANGES` | Initial zero-residual successor produced exact candidate `6dd4527`; that candidate was independently rejected again below. |
 | [`cfr168-python-http-mr-mutation-zero-residual-rereview-fugu-20260730`](../cfr168-python-http-mr-mutation-zero-residual-rereview-fugu-20260730/review.md) | `84175bd` / `214e42fc8f36108f45e17b13e4343bfc2b56cc89b72be5c1258f5b497c9ec6ef` | `REQUEST_CHANGES` | F1–F7 are frozen in `cfr168-python-http-mr-write-review-closure-repair-20260730.md` and its validated manifest. The next Claude implementation waits for a free light lane and Python write-set ordering. |
-| [`cfr168-python-http-upload-scale-review-claude-fallback-20260730`](../cfr168-python-http-upload-scale-review-claude-fallback-20260730/review.md) | `c734b55` / `534f098348e72fdc377b56ebf561a931e53284055a1f8a0e37d6d5393d956486` | `REQUEST_CHANGES` | Claude Opus 5 repair is active from exact base `5f79899`; durable WIPs are `600750c`, `c33592a`, and `0b28898`. Final candidate requires a fresh exact review. |
-| [`cfr168-rust-file-ancestry-review-claude-fallback-20260730`](../cfr168-rust-file-ancestry-review-claude-fallback-20260730/review.md) | `30bbb46` / `64a4831ea0a639d7f87fe0b08312677efcab8bfe014f0d5ba72806e9caceecf1` | `REQUEST_CHANGES` | Reconciled after host interruption and active under replacement batch `cfr168-rust-file-ancestry-zero-residual-repair-r1-20260730` from exact task base `86a0c2e`. |
-| [`cfr168-rust-file-doctor-review-claude-fallback-20260730`](../cfr168-rust-file-doctor-review-claude-fallback-20260730/review.md) | `e9480c7` / `c1b39ffc6f25cf9f19007af3cd5336421400e467e6e3c28969de775b86ed8045` | `ACCEPT` | Exact product target `52a025e` is accepted, but four Should and four Could items remain mandatory under zero-residual closure. The interrupted empty repair was reconciled; replacement manifest `cfr168-rust-file-doctor-zero-residual-repair-r1-20260730.json` is queued for a heavy permit. |
-| [`cfr168-rust-http-mr-preflight-review-claude-20260730`](../cfr168-rust-http-mr-preflight-review-claude-20260730/review.md) | `e28c90d` / `f30c22aa34559829254b6ca305449abc874b653c8b3dbc767248fdbbc5fe0a5a` | `REQUEST_CHANGES` | Exact target `71854e2` is product-sound but lacks a non-vacuous central ordering barrier and has lifecycle/boundary residuals. F1–F5 and R1–R4 are queued in `cfr168-rust-http-mr-preflight-review-closure-repair-20260730.md`; launch waits for active `work_budget.rs` ancestry work. |
-| [`cfr168-rust-storage-independent-review-fugu-20260730`](../cfr168-rust-storage-independent-review-fugu-20260730/review.md) | `4380985` / `628a37f51cad4710eeccb8c9b34286b9e41332a59a421068a6a1aaa61ed4140a` | `REQUEST_CHANGES` | F1–F9 repair is active under Claude Opus 5 from exact task revision `13767c7`; durable WIP `e9e42aa` is not integration-ready. |
+| [`cfr168-python-http-upload-scale-review-claude-fallback-20260730`](../cfr168-python-http-upload-scale-review-claude-fallback-20260730/review.md) | `c734b55` / `534f098348e72fdc377b56ebf561a931e53284055a1f8a0e37d6d5393d956486` | `REQUEST_CHANGES` | Repair produced clean exact candidate `76baff8`. Its report-only Fugu Ultra rereview packet is registered by canonical commits `4537cf9` and `8a8267d`; the exact-candidate review is active. No product integration is permitted before its decision. |
+| [`cfr168-rust-file-ancestry-review-claude-fallback-20260730`](../cfr168-rust-file-ancestry-review-claude-fallback-20260730/review.md) | `30bbb46` / `64a4831ea0a639d7f87fe0b08312677efcab8bfe014f0d5ba72806e9caceecf1` | `REQUEST_CHANGES` | Replacement repair produced clean exact candidate `02b0d63`. Its report-only Fugu Ultra rereview packet is registered by canonical commits `ecefdf2` and `ab119b0` and is queued behind the single-Fugu upload/storage order. |
+| [`cfr168-rust-file-doctor-review-claude-fallback-20260730`](../cfr168-rust-file-doctor-review-claude-fallback-20260730/review.md) | `e9480c7` / `c1b39ffc6f25cf9f19007af3cd5336421400e467e6e3c28969de775b86ed8045` | `ACCEPT` | Exact product target `52a025e` is accepted, but four Should and four Could items remain mandatory under zero-residual closure. The collision-free Claude Opus 5 replacement repair is active under `cfr168-rust-file-doctor-zero-residual-repair-r1-20260730`. |
+| [`cfr168-rust-http-mr-preflight-review-claude-20260730`](../cfr168-rust-http-mr-preflight-review-claude-20260730/review.md) | `e28c90d` / `f30c22aa34559829254b6ca305449abc874b653c8b3dbc767248fdbbc5fe0a5a` | `REQUEST_CHANGES` | Exact target `71854e2` is product-sound but lacks a non-vacuous central ordering barrier and has lifecycle/boundary residuals. F1–F5 and R1–R4 are now active in the Claude Opus 5 closure repair from exact task base `7e4e685`. |
+| [`cfr168-rust-storage-independent-review-fugu-20260730`](../cfr168-rust-storage-independent-review-fugu-20260730/review.md) | `4380985` / `628a37f51cad4710eeccb8c9b34286b9e41332a59a421068a6a1aaa61ed4140a` | `REQUEST_CHANGES` | F1–F9 repair produced clean exact candidate `cdcb9bd`. Its report-only Fugu Ultra rereview packet is registered by canonical commits `0981524` and `f7bf266` and is queued immediately after the active upload review. |
 | [`development-flow-kgi-kpi-independent-review-claude-20260730`](../development-flow-kgi-kpi-independent-review-claude-20260730/review.md) | `b307b47` / `02a0d259c55121379f07c2c1d893d4a29dd546b16e6f237659a5081c60fd3336` | `REQUEST_CHANGES` | First repair candidate `0ae583e` passes its official gates but fails eight manager counterexamples. Exact Fugu rereview is ready; the shared-primitives successor packet is committed with status `blocked` until that report is bound. |
 
 ## Current review queue
 
-1. Finish and commit the MR-list exact rereview; integrate only its report.
-2. Dispatch the prepared KGI/KPI Fugu rereview into the next free review lane.
-3. For each active implementer result (upload, storage, ancestry), freeze an
-   exact report-only review task before any product integration.
-4. After a heavy permit is released, use dependency/write-set order:
-   File Doctor restart first when `remote/doctor.rs` is isolated; Rust HTTP MR
-   closure only after active ancestry releases `work_budget.rs`.
-5. Keep MR-write repair behind upload/composed-Python ownership ordering.
+1. Finish the active Upload exact-candidate Fugu review and integrate only its
+   immutable report.
+2. Reuse the single Fugu permit in order for the prepared Storage and
+   File-ancestry exact-candidate reviews; keep the KGI/KPI review behind those
+   CFR-168 product candidates.
+3. Collect the three active Claude repairs: File Doctor, Rust HTTP MR
+   preflight closure, and Python MR-list closure. Each completed candidate
+   requires a fresh exact report-only review.
+4. Keep MR-write repair behind upload/MR-list and shared Python composition
+   ownership ordering.
+5. Integrate product commits only after exact acceptance, then run composed
+   broad gates before Install, Dogfood, Close, and Retrospect.
 
 ## Root-finding coverage map
 

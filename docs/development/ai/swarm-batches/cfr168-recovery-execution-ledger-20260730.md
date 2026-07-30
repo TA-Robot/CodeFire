@@ -679,3 +679,36 @@ At `2026-07-30T18:26:41Z`, `/workspace` measured `7,333,166,047` bytes,
 filesystem reported `901,302,951,936` bytes available. The larger workspace
 measurement reflects preserved result/review worktrees and remains above all
 launch floors.
+
+## 2026-07-30 18:30 UTC exact-review dispatch checkpoint
+
+The three manager-isolated exact-candidate review packets are now complete and
+clean. They were registered in canonical without importing any candidate
+product bytes:
+
+| Candidate | Review task commits | Canonical packet commits | Queue state |
+|---|---|---|---|
+| Python Upload `76baff84cb1192e11b26dcc669fb800f7b13fa30` | `de63a14`, `2c0de3e` | `4537cf9`, `8a8267d` | Fugu Ultra review active |
+| Rust storage `cdcb9bdefe7d25a118a9dc14171864d75f5ad304` | `844e4a3`, `dfbad64` | `0981524`, `f7bf266` | prepared; next single-Fugu review |
+| Rust file ancestry `02b0d63651703aaac88c249bdc437cd173dfa397` | `8882ead`, `37b0a02` | `ecefdf2`, `ab119b0` | prepared; follows storage |
+
+All three manifests bind a 12-hour report-only reviewer envelope and exact
+candidate identity. The active Upload task is routed to Fugu
+`fugu-ultra-v1.1`; its scheduler manager and reviewer process are both live.
+Storage and ancestry remain deliberately unlaunched so the one-Fugu limit is
+not exceeded.
+
+The external-session set is full and remains within the two-heavy limit:
+
+| Active lane | Provider/model | Resource class | Current purpose |
+|---|---|---|---|
+| Rust File Doctor repair | Claude `claude-opus-5` | heavy | close accepted-review Should/Could residuals |
+| Rust HTTP MR preflight closure | Claude `claude-opus-5` | heavy | close ordering and lifecycle findings |
+| Python MR-list closure | Claude `claude-opus-5` | light | close seven rejected-review findings and composition handoff |
+| Python Upload exact rereview | Fugu `fugu-ultra-v1.1` | light | independent decision on `76baff8` |
+
+At `2026-07-30T18:30:49Z`, `MemAvailable` was `15,089,623,040` bytes, swap
+use was zero, and the mounted filesystem reported `901,535,006,720` bytes
+available. The canonical worktree was clean before this ledger update and all
+three documentation/contract gates plus diff checks passed after registering
+the six review-packet commits.
