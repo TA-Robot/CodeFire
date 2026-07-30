@@ -2,7 +2,7 @@
   "schema": "dev-swarm.v1",
   "batch_id": "cfr168-rust-http-mr-preflight-review-claude-20260730",
   "workspace": "/workspace/worktrees/cfr168-p0-canonical",
-  "base_revision": "REPLACE_WITH_REGISTRATION_COMMIT",
+  "base_revision": "fcaa99b6808aad9cdbb217473217812d0cbb19e0",
   "max_parallel": {
     "fugu": 0,
     "claude": 1,
