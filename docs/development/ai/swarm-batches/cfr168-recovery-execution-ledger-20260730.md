@@ -418,3 +418,74 @@ The batch cannot Close until all of the following are bound to the exact integra
 - `docs/development/ai/swarm-results/claude-cfr168-review-20260729/review.md`
 - `docs/development/ai/swarm-results/cfr168-python-http-mr-list-review-claude-20260730/review.md`
 - `docs/development/ai/swarm-results/cfr168-python-http-mr-mutation-review-claude-fallback-20260730/review.md`
+
+## 2026-07-30 10:49 UTC continuous-utilization checkpoint
+
+Canonical head `63962c7` remains byte-identical to immutable product snapshot
+`e2a218e015953f082245f36dbc6aee906b837e5a` across `codefire`, `crates/`,
+`tests/`, `Cargo.toml`, and `Cargo.lock`. The new commits are report and task
+contracts only:
+
+- independent Rust storage report integrated as `4380985`;
+- storage repair Markdown integrated as `daba568`;
+- storage repair manifest integrated as `63962c7`.
+
+The storage report binds exact candidate `b3bc32a` and returns
+`REQUEST_CHANGES` for F1 through F9: ABI-dependent accounting, unreserved JSON
+projection, recursive/off-by-one traversal depth, ambient-size/reopened-size
+JSON reads, unbounded URL parsing, incomplete path ownership, collapsed
+terminal semantics, partial/dual stdout, and a stale command trace. The
+zero-residual task freezes all nine findings, every missing non-vacuous
+boundary/race/publication test, and the three review questions. Its original
+taskbase commits are `13767c7` and `c5f008a`.
+
+The first newly available external slot was dispatched immediately to
+`cfr168-rust-storage-zero-residual-repair-20260730` under Claude Opus 5 with a
+12-hour envelope. The active external-session set is now:
+
+| Lane | Provider/model | State |
+|---|---|---|
+| Python upload / CFB-138 zero-residual repair | Claude `claude-opus-5` | active from exact base `5f79899`; no product commit yet |
+| Python MR-list exact rereview | Fugu `fugu-ultra-v1.1` | active against `38da898`; confirmed symlinked/replaced `branches` absence-conflation defect remains under final report analysis |
+| Python MR-mutation exact rereview | Fugu `fugu-ultra-v1.1` | active against `6dd4527`; confirmed unaccounted authority reads remain under final report analysis |
+| Rust storage zero-residual repair | Claude `claude-opus-5` | active from exact base `13767c7` through the registered dev-swarm batch |
+
+The development-flow KGI/KPI repair completed cleanly at exact candidate
+`0ae583e`. Manager reproduction passes 79/79 tool tests, the AI contract check,
+all seven aggregate AI-development checks, project-doc validation, and the
+exact diff check. This is not yet integrated: the change adds roughly 4,000
+lines across semantic validation, schema, policy, record, and tests and
+therefore requires a fresh exact-candidate independent review. That rereview
+is frozen on taskbase
+`/workspace/worktrees/development-flow-kgi-kpi-zero-residual-rereview-base`
+at `148a570`, for Fugu Ultra 1.1 dispatch when a review slot becomes
+available.
+
+The next-slot policy is result-driven:
+
+1. a completed active reviewer first yields a durable report and, on
+   `REQUEST_CHANGES`, an exact repair packet before reuse of that surface;
+2. a completed implementer yields an exact candidate and independent-review
+   packet before any integration;
+3. otherwise dispatch the KGI/KPI exact rereview, Rust ancestry repair, Rust
+   File Doctor repair, then Rust HTTP MR evidence repair in dependency and
+   write-collision order.
+
+The coordinator is not a polling-only lane. While all four external slots are
+occupied it owns task freezing, exact-range/write-collision mapping,
+lightweight evidence reproduction, canonical report/task integration,
+ready-queue maintenance, and final gate preparation.
+
+The swarm-control improvement design is durable at
+`docs/development/ai/swarm-results/dev-swarm-throughput-design-20260730/design.md`.
+It specifies additive critical-path scheduling, nested light/heavy
+semaphores, durable signal/checkpoint events, hedge/supersedes lineage, and
+safe adoption of manually resumed second-agent runs. Direct implementation in
+`/workspace/scripts` waits for usable version-control metadata in the
+devcontainer foundation rather than creating unreviewable infrastructure
+changes.
+
+At `2026-07-30T10:48:57Z`, `/workspace` measured `2,887,872,262` bytes,
+`MemAvailable` was `15,433,168` KiB, swap use was zero, and the mounted
+filesystem reported `905,927,389,184` bytes available. This remains within
+the four-session/two-heavy recovery envelope.
