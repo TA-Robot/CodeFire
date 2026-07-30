@@ -1,0 +1,31 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-rust-file-ancestry-zero-residual-repair-r1-20260730",
+  "workspace": "/workspace/worktrees/cfr168-rust-file-ancestry-zero-residual-repair-base",
+  "base_revision": "86a0c2e42c15bb44df8a2ff299140fedbcff4aae",
+  "max_parallel": {
+    "fugu": 0,
+    "claude": 1,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "file-ancestry-zero-residual-repair",
+      "role": "implementer",
+      "tier": "high",
+      "provider": "claude",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-rust-file-ancestry-zero-residual-repair-20260730.md",
+      "depends_on": [],
+      "write_set": [
+        "crates/codefire-cli/src/remote.rs",
+        "crates/codefire-core/src/work_budget.rs",
+        "docs/development/source-architecture.md",
+        "docs/development/command-source-trace.md",
+        "docs/development/source-data-model-catalog.md",
+        "docs/development/change-playbook.md"
+      ],
+      "expected_commit": true,
+      "timeout": "12h"
+    }
+  ]
+}
