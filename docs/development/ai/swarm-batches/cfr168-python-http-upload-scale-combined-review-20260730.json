@@ -2,7 +2,7 @@
   "schema": "dev-swarm.v1",
   "batch_id": "cfr168-python-http-upload-scale-combined-review-20260730",
   "workspace": "/workspace/worktrees/cfr168-p0-canonical",
-  "base_revision": "REPLACE_WITH_REGISTRATION_COMMIT",
+  "base_revision": "1ef0c1939a9e6d3188c14f05308ef37fb872af25",
   "max_parallel": {
     "fugu": 1,
     "claude": 0,
