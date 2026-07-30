@@ -1,0 +1,291 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "cfr168-python-http-composition-freeze-20260730",
+  "status": "blocked",
+  "objective": "Manager-compose the exact accepted Python HTTP Doctor+Branch scaffold, Upload successor, MR-list successor, and MR-write successor in that order using product-delta-only ports, explicit shared-dispatcher/session/response ownership, fresh composition reviews, and exact-head focused and broad gates; remain blocked until all three successor SHAs and ACCEPT reports are bound.",
+  "base_revision": "740ea18eb42630ba265a8aad83c950ceb96aacca",
+  "role": "manager",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 2,
+      "reversibility": 2,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "sealed_commit_or_branch_atomicity",
+      "security_auth_signature_or_remote_mutation",
+      "cross_subsystem_architecture",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 12,
+    "selected_tier": "ultra",
+    "rationale": "All Python HTTP routes share one codefire dispatcher, request ledger/deadline, sealed-session and authority owners, response publication, cleanup, and reducer seams. The scaffold embeds an unaccepted Upload slice, MR-list descendants inherit it, MR-write diverges on another lineage, and isolated reviews cannot validate manager conflict resolution."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-3-store-object-commit-integrity",
+      "pack-4-remote-http-security",
+      "pack-5-project-management-docs"
+    ],
+    "additional_files": [
+      "docs/development/ai/task-packets/cfr168-python-http-composition-freeze-20260730.md",
+      "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-doctor-branch-composition-rereview-20260730/review.md",
+      "docs/development/ai/swarm-batches/cfr168-python-http-upload-zero-residual-rereview-fugu-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-mr-list-zero-residual-rereview-fugu-20260730/review.md",
+      "docs/development/ai/swarm-batches/cfr168-python-http-mr-list-review-closure-repair-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-mr-mutation-zero-residual-rereview-fugu-20260730/review.md",
+      "docs/development/ai/swarm-batches/cfr168-python-http-mr-write-review-closure-repair-20260730.md",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "docs/development/agent-workflow.md",
+      "adr/ADR-020-decision-equivalent-work-budget.md"
+    ],
+    "evidence_refs": [
+      "canonical-composition-freeze:740ea18eb42630ba265a8aad83c950ceb96aacca",
+      "doctor-branch-scaffold:701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714",
+      "doctor-branch-review:c57215e243839b224a641251fc9e3bf092f7e116:ACCEPT",
+      "doctor-branch-report-sha256:c7a1665fdf4a6e1104bbab18ec8051c048ace1d25e865952bbbcd35a06eb19c0",
+      "embedded-old-upload:0703f71b9800ff19ce52d01bcd46c8eddb323df2",
+      "accepted-upload-sha:UNBOUND",
+      "upload-current-candidate:76baff84cb1192e11b26dcc669fb800f7b13fa30",
+      "accepted-mr-list-sha:UNBOUND",
+      "mr-list-rejected-candidate:38da8988ac8bc1fcdfcb82c62e7aa0d28791500c",
+      "mr-list-request-changes-review:80784151e0a42b2f839cdcf01336252319e5830a",
+      "accepted-mr-write-sha:UNBOUND",
+      "mr-write-rejected-candidate:6dd4527f23135388b53fc5c6d637c4105cc5d659",
+      "mr-write-request-changes-review:b86a782b6ac72cabe684106f969681c5cd56380e",
+      "mr-write-divergence-base:cab3126f216c595c0d2211174b364e8532a310e2",
+      "launch-blocker:all-three-accepted-sha-report-and-product-delta-bindings-required",
+      "manifest-state:none-authorized-while-blocked"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "codefire",
+      "tests/**",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "docs/development/agent-workflow.md",
+      "docs/development/ai/swarm-batches/**",
+      "docs/development/ai/swarm-results/**",
+      "docs/development/ai/task-packets/**",
+      "adr/ADR-020-decision-equivalent-work-budget.md"
+    ],
+    "write_set": [
+      "codefire",
+      "tests/test_codefire_cli.py",
+      "tests/test_python_http_doctor_decision_work.py",
+      "tests/test_python_http_branch_decision_work.py",
+      "tests/test_python_http_upload_accounted_traversal.py",
+      "tests/test_python_http_mr_list_decision_work.py",
+      "tests/test_python_http_mr_mutation_decision_work.py",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md"
+    ],
+    "disallowed_paths": [
+      "crates/**",
+      ".devcontainer/**",
+      "subprojects/**",
+      "install.sh",
+      "pyproject.toml",
+      "setup.py",
+      "docs/development/ai/**",
+      "docs/development/code-review-issues/**",
+      "docs/development/bug-issues/**",
+      "docs/development/history.md",
+      "docs/development/todo-checklist.md"
+    ],
+    "disallowed_actions": [
+      "Create a dev-swarm manifest, launch a worker, or write product bytes while packet status is blocked",
+      "Replace an UNBOUND accepted SHA without an immutable exact-candidate ACCEPT report commit, report SHA-256, product tree, and patch digest",
+      "Merge, rebase, or cherry-pick an agent worktree or branch tip wholesale",
+      "Integrate 701469f or an MR-list descendant wholesale when Upload is pending, rejected, interrupted, or unavailable",
+      "Replay duplicate Upload recovery commits 3153d75 or cb13da0 already represented by 0703f71",
+      "Import product bytes from rejected candidates 38da898 or 6dd4527 without their independently accepted additive successor semantics",
+      "Port MR-write before the accepted Upload and MR-list ownership models are composed",
+      "Resolve shared dispatcher, response, session, authority, cleanup, nonce, or reducer conflicts outside the manager lane",
+      "Let the conflict-resolution author independently approve the same composed product tree",
+      "Treat an isolated-candidate test or review as evidence for manager-authored composition bytes",
+      "Run or integrate the Python POST GC successor under this packet",
+      "Update issue state, history, reports, task packets, manifests, recovery ledgers, Install, Dogfood, Close, Retrospect, or capability advertisement"
+    ]
+  },
+  "non_goals": [
+    "Implement or independently review the isolated Upload, MR-list, or MR-write repairs",
+    "Reconstruct a no-Upload Doctor/Branch/MR-list alternative when Upload is rejected",
+    "Change Rust, file transport, Python GC, packaging, devcontainer, CI, or dogfood source",
+    "Merge management, report, task, manifest, agent-state, or recovery-ledger commits as product deltas",
+    "Perform Install, Dogfood, Close, Retrospect, capability re-advertisement, or final CFR-168 issue synchronization",
+    "Invent a third weaker semantic model merely to make conflicting accepted patches apply"
+  ],
+  "invariants": [
+    {
+      "id": "accepted-inputs-only",
+      "statement": "Upload, MR-list, and MR-write enter composition only through exact immutable successor SHAs with independent ACCEPT reports, report digests, product trees, and patch digests bound into this packet.",
+      "falsification_test": "Leave one accepted binding UNBOUND, substitute a REQUEST_CHANGES parent, alter one accepted product blob after review, or omit the report digest; every case must keep the packet blocked before any product write."
+    },
+    {
+      "id": "conditional-scaffold",
+      "statement": "The 701469f Doctor+Branch tree is only a scaffold because it carries old Upload commit 0703f71; it is never a wholesale integration candidate without an accepted Upload advancement.",
+      "falsification_test": "Set Upload to pending or REQUEST_CHANGES and attempt to select 701469f or an MR-list descendant as the final tree; provenance validation must reject the inherited 0703f71 bytes."
+    },
+    {
+      "id": "serialized-order",
+      "statement": "The only authorized product order is Doctor+Branch scaffold, accepted Upload, accepted MR-list, accepted MR-write, then final full-spine review.",
+      "falsification_test": "Swap MR-list and Upload, port MR-write before either predecessor, or run final review before the last conflict resolution; dependency readiness must fail."
+    },
+    {
+      "id": "product-delta-only",
+      "statement": "Every input is an explicit accepted product/test/source-doc delta inside the write set; no agent branch tip, report, packet, manifest, ledger, issue, or unrelated source byte enters the composition.",
+      "falsification_test": "Compare the composed changed-file and commit provenance against the declared accepted ranges; add one management path or unlisted product path and require failure."
+    },
+    {
+      "id": "one-request-ownership",
+      "statement": "Each mixed GET or POST request owns exactly one handler http_v1 ledger, one deadline, one route-appropriate session/snapshot set, one response selection, and one terminal cleanup path.",
+      "falsification_test": "Instrument alternating Doctor, Branch, Upload, MR-list, and MR-write requests; any fresh request-reachable local_v1 ledger, duplicate physical object read, foreign response owner, residual scalar, permit, or second terminal observation fails."
+    },
+    {
+      "id": "shared-dispatcher-isolation",
+      "statement": "Bundle, Doctor, list, and mutation flags reset before every request; one origin-sensitive filesystem/transport taxonomy, response publication boundary, and phase dispatcher preserves every accepted route outcome.",
+      "falsification_test": "Alternate GET and POST routes on one connection and inject filesystem ETIMEDOUT, actual transport timeout/reset, deadline expiry, encoding/header limits, and cleanup failure; require the exact route-specific typed or abandoned outcome without state leakage."
+    },
+    {
+      "id": "session-authority-finality",
+      "statement": "Upload, MR-list, and MR-write reuse validated sealed snapshots and pinned authority through complete response preparation and the immediate final prepublication fence, with no post-fence input-dependent work.",
+      "falsification_test": "Change content, identity, mode, link count, project descriptor, branch, MR, or generation before, during, and after digest/encoding/fence hooks; stale success, duplicate reread, or publication after change fails."
+    },
+    {
+      "id": "transaction-and-cleanup",
+      "statement": "Upload and MR writes share one prepublication-sealed reducer/nonce/object/escrow/recovery protocol, and cleanup retains retry ownership until every release succeeds without replacing the selected primary result.",
+      "falsification_test": "Fail each first object write, later object write, nonce confirmation, reducer transition, response handoff, owner release, and second cleanup attempt; require either no effect or durable recoverability, exact retry, one response, zero debt, zero permits, and one terminal observation."
+    },
+    {
+      "id": "fresh-composition-review",
+      "statement": "Every cumulative manager conflict-resolution series and the final full spine receive a fresh independent review bound to the exact composed product tree and patch digest.",
+      "falsification_test": "Reuse an isolated review, review a parent head, or change one product byte after ACCEPT; the review binding must become insufficient for integration."
+    },
+    {
+      "id": "exact-head-gates",
+      "statement": "Focused checks follow every product/conflict commit, Python-pattern discovery follows every stable next-wave head, and unrestricted discovery plus demo follow the final MR-write composition on the exact unchanged product tree.",
+      "falsification_test": "Run a gate on a parent/export with different blobs or add one product byte after a green run; the evidence must be invalidated and rerun."
+    },
+    {
+      "id": "gc-successor-gate",
+      "statement": "Python POST GC remains excluded until the independently accepted full spine exposes reusable ledger/deadline, session/response, reducer, cleanup, and terminal interfaces through a separate typed packet.",
+      "falsification_test": "Add a GC product or test path, claim uniform POST nonce/publication closure, or launch GC before final spine ACCEPT; scope and predecessor checks must fail."
+    },
+    {
+      "id": "canonical-source-truth",
+      "statement": "The four canonical source documents describe the one composed dispatcher, ledger/deadline, session/snapshot, authority, response, reducer, cleanup, and GC handoff model implemented by the final tree.",
+      "falsification_test": "Compare every changed owner and route symbol with all four source documents, then remove or contradict one route/owner statement and require source-doc/review failure."
+    }
+  ],
+  "validation": [
+    {
+      "id": "accepted-input-audit",
+      "command": "Bind ACCEPTED_UPLOAD_SHA, ACCEPTED_MR_LIST_SHA, and ACCEPTED_MR_WRITE_SHA plus each exact ACCEPT report commit/SHA-256, candidate parent/head/tree, deterministic patch digest, changed-file set, and finding disposition before changing status to ready.",
+      "purpose": "Make dependency readiness and accepted product provenance explicit before any composition write.",
+      "required": true
+    },
+    {
+      "id": "python-compile",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile codefire tests/test_codefire_cli.py tests/test_python_http_doctor_decision_work.py tests/test_python_http_branch_decision_work.py tests/test_python_http_upload_accounted_traversal.py tests/test_python_http_mr_list_decision_work.py tests/test_python_http_mr_mutation_decision_work.py",
+      "purpose": "Reject syntax/import defects after each product-delta or conflict-resolution commit.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "focused-http-spine",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v tests.test_python_http_doctor_decision_work tests.test_python_http_branch_decision_work tests.test_python_http_upload_accounted_traversal tests.test_python_http_mr_list_decision_work tests.test_python_http_mr_mutation_decision_work",
+      "purpose": "Exercise every composed route owner; run the directly affected subset after each delta and the complete set on the final spine.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "mixed-route-reversals",
+      "command": "Run the packet's mixed GET/POST dispatcher, filesystem/transport, deadline, response, session, authority-fence, reducer, nonce, cleanup, exact-boundary, and durable-state reversal matrix on the exact composed head.",
+      "purpose": "Prove manual conflict resolution preserves cross-route ownership rather than only isolated focused cases.",
+      "required": true
+    },
+    {
+      "id": "python-pattern",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_python_*.py'",
+      "purpose": "Run the broad Python runtime group at every stable composition head used as a later base.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "python-full",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+      "purpose": "Run unrestricted discovery after MR-write and the final manager conflict resolution.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "demo",
+      "command": "./demo.sh",
+      "purpose": "Exercise the repository demo on the exact final composition before composition handoff.",
+      "required": true
+    },
+    {
+      "id": "source-docs",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_source_docs.py",
+      "purpose": "Keep the four canonical source documents synchronized with the composed route and owner model.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "project-docs",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_project_docs.py",
+      "purpose": "Validate links and document inventory without changing issue or lifecycle state.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "diff-check",
+      "command": "git diff --check",
+      "purpose": "Reject whitespace and patch-integrity defects after every composition commit and at handoff.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "fresh-independent-review",
+      "command": "Obtain a report-only independent ACCEPT bound to the exact final composed product head/tree and cumulative patch digest after the last manager conflict-resolution commit.",
+      "purpose": "Prevent isolated predecessor reviews or stale broad evidence from authorizing manager-authored composition bytes.",
+      "required": true
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "accepted_candidate_report_and_digest_matrix",
+      "exact_composition_base_head_tree_and_patch_digest",
+      "linear_product_commit_and_excluded_management_commit_lists",
+      "product_delta_provenance_and_changed_path_audit",
+      "manager_conflict_resolution_table",
+      "shared_dispatcher_session_response_authority_reducer_decisions",
+      "per_delta_focused_validation_results",
+      "stable_head_python_pattern_results",
+      "final_unrestricted_suite_and_demo_results",
+      "mixed_route_reversal_and_authority_snapshot_matrix",
+      "zero_debt_zero_permit_one_terminal_evidence",
+      "fresh_composition_review_commits_hashes_and_decisions",
+      "gc_and_other_predecessor_gated_residuals",
+      "intentionally_untouched_paths",
+      "no_install_dogfood_close_or_capability_authorization_statement"
+    ],
+    "evidence_digest_required": true
+  }
+}
