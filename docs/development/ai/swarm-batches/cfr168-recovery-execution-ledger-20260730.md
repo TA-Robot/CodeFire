@@ -38,6 +38,23 @@ not stopped: independent Claude Opus 5 hedge lanes now run from the same immutab
 This is candidate competition, not dual integration. Each result must satisfy the same packet,
 focused/broad gates, and independent review; only the accepted product commit is integrated.
 
+## Recovered candidate checkpoint
+
+The following results are durable candidate commits, not canonical integration or Close evidence:
+
+| Surface | Candidate | Verified candidate evidence | Independent disposition |
+|---|---|---|---|
+| Python HTTP Doctor + branch composition | `701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714` | combined focused 42/42 and Python-pattern 463/463 pass; corrected expectation is included | Fugu report `4659318` says `ACCEPT` for the corrected composition only; unrestricted 691-case exact-target gate is still running |
+| Python HTTP upload default-profile scale | `dece688afea815d1242e7751367052d1ceac4580` | focused 13/13 and Python-pattern 434/434 pass; 1201-commit default-profile reversal and 1x/3x/10x counters are bound | combined root-level review `cfr168-python-http-upload-scale-combined-review-20260730` is active; baseline-identical live-path work is not exempt from the CFR-168 invariant |
+| Python HTTP MR create/review/apply | `21fe75175e997cc7c6f8c3ef2a7558144d850f94` | dedicated 18/18 pass; broad 667-case run has 665 passes and two Cargo-PATH-only install failures | review `cfr168-python-http-mr-mutation-independent-review-20260730` is active; nonce timing and hidden sealed-validation ledger remain explicit review subjects |
+| Rust live file Doctor | `52a025ecda3fe2f5ad8b5b2a485562e7c16ab6de` | focused 8/8, full `codefire-cli` binary 775/775, strict Clippy, format, source docs, and diff checks pass | review `cfr168-rust-file-doctor-independent-review-20260730` is active |
+| Rust file-remote ancestry Claude hedge | `e93ebc2394c8bd0398cfc23e8bf2d23d52e253b9` | focused remote 118/118, full binary 778/778, strict Clippy, format, source docs, and diff checks pass | review `cfr168-rust-file-ancestry-claude-independent-review-20260730` is active; predecessor traversal and pre-decision copy effects must be accepted or repaired |
+
+The interrupted Python MR-list worktree was resumed without discarding its diff. A manager-owned
+foreground run passes its dedicated production suite 18/18 in 54.077 seconds, and both docs checks
+plus `git diff --check` pass. Python-pattern discovery, final commit, and independent review remain
+pending, so this surface is not yet a durable candidate.
+
 ## Recovered Python composition evidence
 
 - The isolated composition probe is
