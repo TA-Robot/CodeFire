@@ -20,14 +20,30 @@ Canonical issue status remains `investigating`; this ledger does not authorize C
 
 | Surface | Recovery base | Provider | New batch | State at restart audit | Required finish |
 |---|---|---|---|---|---|
-| Python HTTP Doctor | `d79be3e` | Claude Opus 5 | `cfr168-python-http-doctor-canonical-recovery-20260729` | canonical WIP; focused 16/16 pass | corrupted-object direct/HTTP regression, full suite, clean commit |
-| Python HTTP upload ancestry/signature | `3153d75` | Claude Opus 5 | `cfr168-python-http-upload-recovery-20260729` | canonical WIP; focused 7/10 pass | repair three reproduced failures, full suite, clean commit |
-| Python HTTP branch session | `8265ea1` | Claude Opus 5 | `cfr168-python-http-branch-recovery-20260729` | canonical WIP; syntax/diff checks pass, dedicated test absent | production tests, exact boundaries, full suite, clean commit |
+| Python HTTP Doctor | `d79be3e` | Claude Opus 5 | `cfr168-python-http-doctor-canonical-recovery-20260729` | product result `01a7c862`; focused 19/19 and 11 neighboring cases pass; standalone full-suite claim is not accepted because its background run stopped with the agent | independent review, composition gate, canonical integration |
+| Python HTTP upload ancestry/signature | `3153d75` | Claude Opus 5 | `cfr168-python-http-upload-recovery-20260729` | product result `cb13da08`; focused 10/10 and agent full Python 431/431 pass; CFB-138 discovered at default-profile scale | independent review, CFB-138 scale correction, canonical integration |
+| Python HTTP branch session | `8265ea1` | Claude Opus 5 | `cfr168-python-http-branch-recovery-20260729` | product result `fbef572e`; focused 13/13 and agent full Python 433/433 pass; one old CLI assertion encoded the former deadline defect | independent review, corrected neighboring assertion, canonical integration |
 | Python HTTP MR create/review/apply | `cab3126` | Claude Opus 5 | `cfr168-python-http-mr-mutation-recovery-20260729` | task packet only | one request ledger/deadline, pre-effect response owner, no-effect tests |
 | Rust storage | `40c095d` | Fugu 1.1 Ultra | `cfr168-rust-storage-recovery-20260729` | interrupted owner skeleton; 9 compile errors and 2 warnings reproduced after toolchain recovery | complete or replace skeleton, focused/broad tests, strict Clippy |
 | Rust file-remote ancestry | `fe54e60` | Fugu 1.1 Ultra | `cfr168-rust-file-remote-ancestry-recovery-20260729` | task packet only | live file upload/apply adoption, final fence, bounded traversal tests |
 | Rust file-remote Doctor | `ea8f2a6` | Fugu 1.1 Ultra | `cfr168-rust-file-doctor-recovery-20260729` | task packet only | unify live file command with accounted Doctor path |
 | Rust HTTP MR create/review preflight | `3c23e38` | Fugu 1.1 Ultra | `cfr168-rust-http-mr-preflight-20260729` | task packet only | prepared response before effect and no-effect fault tests |
+
+## Recovered Python composition evidence
+
+- The isolated composition probe is
+  `probe/cfr168-python-composition` at `701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714`.
+- It composes Doctor (`5e3b0c7`), upload (`0703f71`), and branch session (`7e87665`) without
+  replaying either interrupted worktree wholesale.
+- The six adjacent `do_GET` conflicts were resolved through one shared read-route phase dispatcher,
+  preserving independent Doctor and branch-list deadline flags and resetting both per request.
+- `tests/test_codefire_cli.py` was corrected in `701469f`: an already-expired branch-list request
+  now expects the typed 503 deadline diagnostic at `branch list planning`, poll count one, and zero
+  debt instead of the pre-fix 200/no-poll behavior.
+- Combined focused Doctor, upload, and branch production tests pass 42/42.
+- Full Python discovery on the exact probe passes 463/463 in 296.500 seconds.
+- This probe is validation/input for later reviewed integration; it does not by itself Close or
+  authorize CFB-138.
 
 ## Serialized integration order
 
@@ -48,7 +64,7 @@ overlapping write set:
 
 | Residual | Predecessor |
 |---|---|
-| Python `GET …/merge-requests` request ledger/session | Python branch shared-session result |
+| Python `GET …/merge-requests` request ledger/session | predecessor satisfied by the reviewed composition input; active batch `cfr168-python-http-mr-list-session-20260730` starts from `7327e2a8` |
 | Python `POST …/gc` request ledger/deadline and pre-effect response | Python upload/MR mutation response-owner result |
 | Rust local `cf merge` ancestry | Rust storage task releases overlapping `main.rs` write set |
 | Rust `cf scan` validation ledger/session | Rust storage task releases overlapping `main.rs`/metrics write set |
@@ -70,6 +86,8 @@ not authorization to violate the frozen-batch-to-zero rule.
 - The fix is frozen in
   `cfr168-python-http-upload-staging-scale-20260730.md`: stream actual per-record owner lifetime,
   keep the default profile, and bind 1x/3x/10x plus exact-boundary evidence before Close.
+- Claude Opus 5 is executing that packet from task base `88df84b7`; the independent upload review
+  remains separate and can still reject the predecessor result.
 
 ## Mandatory acceptance sequence
 
