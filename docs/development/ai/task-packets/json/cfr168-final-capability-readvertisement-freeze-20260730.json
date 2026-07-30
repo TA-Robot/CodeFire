@@ -1,0 +1,176 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "cfr168-final-capability-readvertisement-freeze-20260730",
+  "status": "blocked",
+  "objective": "Close the declaration-only half of root finding S5 by applying one minimal, separately accepted final capability mutation whose metrics commands, Python HTTP transport status, help, manifest, schema, tests, and explicit non-claims exactly match accepted evidence, then rerun the full terminal lifecycle on the new revision.",
+  "base_revision": "1ec72e70a5241b8506afad94636392ff240816b9",
+  "role": "architect",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 2,
+      "reversibility": 1,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "cross_subsystem_architecture",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 11,
+    "selected_tier": "ultra",
+    "rationale": "The source edit is small, but it is the final public capability truth and invalidates prior source, review, release, Install, reversal, Dogfood, and KGI evidence; any overclaim defeats terminal closure."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-1-rust-cli-command-work",
+      "pack-4-remote-http-security"
+    ],
+    "additional_files": [
+      "docs/development/ai/task-packets/cfr168-final-capability-readvertisement-freeze-20260730.md",
+      "docs/development/ai/task-packets/cfr168-final-decision-work-metrics-projection-freeze-20260730.md",
+      "docs/development/ai/task-packets/cfr168-final-complexity-conformance-freeze-20260730.md",
+      "docs/development/ai/task-packets/cfr168-post-composition-lifecycle-freeze-20260730.md",
+      "docs/development/ai/swarm-results/current-state-closure-audit-20260729/04-cfr168-review.md",
+      "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md"
+    ],
+    "evidence_refs": [
+      "freeze-base:1ec72e70a5241b8506afad94636392ff240816b9",
+      "root-finding:S5-declaration",
+      "accepted-integrated-runtime-and-successors:UNBOUND",
+      "accepted-integrated-metrics-projection:UNBOUND",
+      "accepted-integrated-complexity-conformance:UNBOUND",
+      "pre-advertisement-close-install-dogfood:UNBOUND",
+      "pre-advertisement-issue-and-kgi-state:UNBOUND",
+      "minimal-declaration-write-set:UNBOUND",
+      "manifest-state:none-authorized-while-blocked"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "codefire",
+      "crates/codefire-cli/src/compatibility.rs",
+      "crates/codefire-cli/src/tests.rs",
+      "crates/codefire-cli/src/command_registry.rs",
+      "schemas/**",
+      "tests/**",
+      "docs/**"
+    ],
+    "write_set": [
+      "docs/development/ai/swarm-results/cfr168-final-capability-readvertisement-preflight-fugu-20260730/preflight.md",
+      "crates/codefire-cli/src/compatibility.rs",
+      "crates/codefire-cli/src/tests.rs",
+      "schemas/**",
+      "tests/**",
+      "docs/04_cli_spec.md",
+      "docs/automation_interface.md",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md"
+    ],
+    "disallowed_paths": [
+      "codefire",
+      "crates/codefire-cli/src/main.rs",
+      "crates/codefire-cli/src/metrics.rs",
+      "crates/codefire-store/**",
+      ".devcontainer/**",
+      "subprojects/**",
+      "install.sh"
+    ],
+    "disallowed_actions": [
+      "Create a manifest or launch while any exact prerequisite remains UNBOUND",
+      "Modify product behavior, counters, routes, commands, storage, authority, or lifecycle state under the candidate",
+      "Claim a command or surface without exact accepted evidence",
+      "Delete an honest partial or not-claimed row",
+      "Reuse source review, build, Install, reversal, Dogfood, issue, or KGI evidence from the pre-mutation SHA",
+      "Apply another product mutation after the accepted capability delta without returning to Freeze/Plan",
+      "Review development-environment or packaging design"
+    ]
+  },
+  "non_goals": [
+    "Implement or repair product behavior",
+    "Launch before all lifecycle prerequisites are exact",
+    "Convert partial coverage into a complete claim without evidence",
+    "Reuse pre-mutation terminal evidence",
+    "Review devcontainer, CI, host, packaging, or agent wrappers"
+  ],
+  "invariants": [
+    {
+      "id": "all-prerequisites-exact",
+      "statement": "Authoring begins only after every product, metrics, complexity/conformance, review-disposition, Close, Install, Dogfood, issue, and KGI prerequisite is bound to one clean pre-advertisement revision.",
+      "falsification_test": "Leave one prerequisite UNBOUND, use a stale report, or change the pre-advertisement tree; status must remain blocked."
+    },
+    {
+      "id": "minimal-declaration-only",
+      "statement": "The candidate changes only manager-bound capability/help/manifest/schema/conformance declarations and direct tests; it adds no behavior.",
+      "falsification_test": "Add a product, counter, route, storage, authority, or unrelated path; exact review must reject the candidate."
+    },
+    {
+      "id": "truthful-complete-enumeration",
+      "statement": "Every advertised command/surface has exact accepted evidence and every residual remains explicit partial or not-claimed across all public representations.",
+      "falsification_test": "Add an unsupported claim, omit an accepted row, retain a stale value, or diverge help/JSON/schema/Rust/Python; conformance must fail."
+    },
+    {
+      "id": "fresh-terminal-evidence",
+      "statement": "Applying the accepted capability delta creates a new terminal candidate requiring fresh Close, review, two-build Install, installed reversals, Dogfood, conformance, issue synchronization, and KGI/KPI finality.",
+      "falsification_test": "Reference an old source/binary SHA or reuse any pre-mutation result; terminal validation must fail."
+    }
+  ],
+  "validation": [
+    {
+      "id": "prerequisite-identity-audit",
+      "command": "Recompute every accepted product/report/composition/metrics/complexity identity and the pre-advertisement Close, Install, Dogfood, issue, and KGI evidence.",
+      "purpose": "Prevent advertising from stale or incomplete evidence.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "claim-evidence-preflight",
+      "command": "A fresh Fugu session returns READY or BLOCK with one claim-to-exact-evidence row and minimal changed-path set for every public capability byte.",
+      "purpose": "Shift overclaim and stale-value defects before authoring.",
+      "required": true
+    },
+    {
+      "id": "candidate-capability-gates",
+      "command": "Run direct capability tests, overclaim mutations, help/JSON/manifest/schema/Rust/Python conformance, source-doc checks, and exact output-scope validation.",
+      "purpose": "Verify declaration truth and minimality.",
+      "required": true
+    },
+    {
+      "id": "independent-exact-review",
+      "command": "Freeze parent/head/tree/patch/write-set/log digests and clean state; an independent Fugu session reviews the immutable declaration-only candidate.",
+      "purpose": "Separate authorship from final public acceptance.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "complete-terminal-rerun",
+      "command": "After manager application, rerun complete Close, independent High review, reproducible two-build Install, installed reversals, canonical and real-repository Dogfood, capability/conformance, issue synchronization, and committed-final KGI/KPI on the new SHA.",
+      "purpose": "Prevent transfer of stale terminal evidence across the last product mutation.",
+      "required": true
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "exact_prerequisite_identity_matrix",
+      "claim_to_evidence_preflight_and_digest",
+      "minimal_declaration_write_set",
+      "before_after_capability_bytes",
+      "negative_overclaim_and_stale_value_results",
+      "exact_candidate_identity_and_logs",
+      "independent_exact_review_decision",
+      "terminal_sha_tree_and_clean_state",
+      "fresh_close_review_install_reversal_dogfood_conformance_evidence",
+      "synchronized_issue_state",
+      "valid_committed_final_kgi_kpi_record"
+    ],
+    "evidence_digest_required": true
+  }
+}

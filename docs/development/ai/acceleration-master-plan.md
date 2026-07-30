@@ -121,6 +121,15 @@ The operating decision and baseline are frozen in
 [`swarm-results/cfr168-trusted-throughput-audit-20260730/audit.md`](swarm-results/cfr168-trusted-throughput-audit-20260730/audit.md).
 The compatible infrastructure design is frozen in
 [`swarm-results/dev-swarm-throughput-design-20260730/design.md`](swarm-results/dev-swarm-throughput-design-20260730/design.md).
+Until that foundation implementation is reviewable, implemented/manual/future
+capabilities and exact operator commands are frozen in
+[`stage5-manual-control-runbook.md`](stage5-manual-control-runbook.md).
+
+The current scheduler does not enforce proposed Stage 5 manifest fields and
+must not receive them in a `dev-swarm.v1` manifest. The implementation starts
+with a fail-closed `dev-swarm.v2` boundary so an older binary rejects, rather
+than silently ignores, resource, progress, lineage, continuation, review,
+gate, or shadow-train controls.
 
 Deliverables:
 
@@ -188,6 +197,8 @@ Only keep items that remove repeated human/AI overhead, can be checked cheaply, 
 | AIA-033 | Portfolio event/KGI telemetry | Active manual baseline in `swarm-results/cfr168-trusted-throughput-audit-20260730/audit.md`; automatic provider/gate/review/manager/resource event capture remains blocked with the foundation implementation. |
 | AIA-034 | Counterexample-bound compact context | Failure signatures are reusable in `failure-cookbook.md`; automatic preflight resolution and minimal context generation remain pending. |
 | AIA-035 | Hot-file conflict-domain decomposition | After accepted CFR-168 composition, extract stable request/session/authority/response/cleanup/publication primitives and owner-layered tests from the 33k-line Python reference, Rust `http.rs`, `main.rs`, and `remote.rs`; preserve exact behavior and measure write-set overlap, conflict time, context bytes, and focused-suite size. |
+| AIA-036 | Manual Stage 5 capability/control board | Implemented in `stage5-manual-control-runbook.md`: current versus manual versus future capability matrix, portfolio leases, candidate card, prepared review rollover, exact continuation, gate index, shadow train, event/KPI record, and resource floors. |
+| AIA-037 | Fail-closed Stage 5 manifest boundary | Design corrected to use `dev-swarm.v2`; v1 retains historical behavior but must reject unknown/Stage 5 fields, v2 is rejected by old binaries, and both versions recursively reject unknown fields. Foundation code remains blocked on usable Git provenance. |
 
 The AIA-021 provenance is intentionally local evidence. It does not claim a trusted/reproducible builder or dependency supply-chain attestation.
 
@@ -197,15 +208,17 @@ Current recommended next items:
 
 1. Restore the actual `/workspace` foundation Git metadata or bind its remote
    and intended base; do not initialize an unrelated replacement history.
-2. Implement AIA-028 and AIA-029 first so every later scheduler change is
-   restart-safe and resource-safe.
-3. Implement AIA-030 through AIA-032 as independently reviewable black-box
+2. Use AIA-036 for the active portfolio; keep unsupported future fields out
+   of every v1 manifest and treat scheduler pass as process evidence only.
+3. Implement AIA-037, AIA-028, and AIA-029 first so every later scheduler
+   change is version-safe, restart-safe, and resource-safe.
+4. Implement AIA-030 through AIA-032 as independently reviewable black-box
    partitions.
-4. Run the next five comparable CFR-168 packets under the Stage 5 WIP,
+5. Run the next five comparable CFR-168 packets under the Stage 5 WIP,
    preflight, review, and shadow-composition controls.
-5. Start AIA-035 only after the accepted Python/Rust composition trees are
+6. Start AIA-035 only after the accepted Python/Rust composition trees are
    frozen so move-only work does not invalidate active exact reviews.
-6. Promote AIA-033 KGI/KPI changes only from complete event evidence; keep
+7. Promote AIA-033 KGI/KPI changes only from complete event evidence; keep
    unavailable queue/cost fields explicit.
 
 ## Success Metrics

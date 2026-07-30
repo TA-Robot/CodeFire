@@ -82,6 +82,9 @@
     ],
     "write_set": [
       "docs/development/ai/task-packets/cfr168-post-composition-lifecycle-freeze-20260730.md",
+      "docs/development/ai/task-packets/cfr168-final-decision-work-metrics-projection-freeze-20260730.md",
+      "docs/development/ai/task-packets/cfr168-final-complexity-conformance-freeze-20260730.md",
+      "docs/development/ai/task-packets/cfr168-final-capability-readvertisement-freeze-20260730.md",
       "docs/development/ai/task-packets/json/cfr168-post-composition-lifecycle-freeze-20260730.json",
       "docs/development/ai/review-packets/**",
       "docs/development/ai/flow-metrics/**",

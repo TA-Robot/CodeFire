@@ -60,22 +60,25 @@ are routed as follows; a routed finding is not yet a closed finding.
 
 | Root finding | Current owner |
 |---|---|
-| M1 — Python upload full-history decision is unbounded/undeadlined | Active Python upload repair plus active Rust/Python reusable file-ancestry repair; final composed upload review must prove the live path. |
-| M2 — HTTP Doctor used a second request ledger | Corrected Doctor+Branch composition `701469f`, independently accepted at `c57215e`; composed-spine review still required. |
-| M3 — uncovered Python HTTP routes and mutating pre-effect response | Upload candidate `76baff8` awaits exact rereview; MR-list repair is active; MR-write closure is queued behind shared Python composition; `POST …/gc` remains explicitly predecessor-gated on their response/session result. |
-| M4 — unbudgeted Rust local/file surfaces | Storage and file ancestry active; File Doctor restart queued; local `cf merge`, `cf scan`, clone/storage/GC consumers remain predecessor-gated with exact symbols in the recovery ledger. |
-| M5 — upload signature history outside accounting | Active upload repair owns signature policy/history under the same request ledger and final fence. |
+| M1 — Python upload full-history decision is unbounded/undeadlined | Python Upload repair candidate `76baff8` is under active exact rereview. Rust file-ancestry candidate `02b0d63` is frozen and queued for its separate exact rereview; it is not evidence of Python closure. The final composed Upload path must prove one bounded/deadlined physical traversal, while Python local `common_ancestor` / `ancestor_distances` remains an unlaunched successor. |
+| M2 — HTTP Doctor used a second request ledger | Corrected Doctor+Branch composition `701469f`, independently accepted at `c57215e`; it contains the older Upload slice and is a scoped composition scaffold, not a whole-tree integration candidate. A fresh composed-spine review is still required. |
+| M3 — uncovered Python HTTP routes and mutating pre-effect response | Upload candidate `76baff8` is under active exact rereview and MR-list closure repair is active. MR-write repair is blocked until exact accepted Upload/MR-list bindings and a committed shared-primitives Fugu `READY` preflight exist; `POST …/gc` remains predecessor-gated on the composed response/session result. |
+| M4 — unbudgeted Rust local/file surfaces | Storage candidate `cdcb9bd` and file-ancestry candidate `02b0d63` are frozen and queued for exact rereview; File Doctor NOTE-1--NOTE-3 repair is active. Local `cf merge`, `cf scan`, Doctor local-state, clone/storage-report/GC consumers remain predecessor-gated with exact symbols in the recovery ledger. |
+| M5 — upload signature history outside accounting | Upload candidate `76baff8` places signature policy/history under the request ledger and final fence, but its exact rereview is active and final composed-path proof is still required. |
 | M6 — tests concentrated on non-production callers | Every current packet requires production-call reachability, exact-candidate reversal, and full snapshot/zero-debt evidence; final composition must rerun broad gates. |
-| S1 — cache metrics omit/contradict invalidation | Blocked until all validation-session consumers are stable, then owned by the final cache/command projection packet. |
-| S2 — metrics-orthogonality test cannot falsify its claim | Same final metrics/projection packet, with an independent deliberate-regression oracle. |
-| S3 — no canonical asymptotic order table | Final stable-counter documentation packet after all selected production call graphs are fixed. |
-| S4 — Rust MR create/review response preflight | `cfr168-rust-http-mr-preflight-review-closure-repair-20260730` is validated and queued. |
-| S5 — one-command metrics projection and stale capability value | Final command-wide projection/conformance packet, followed by capability re-advertisement only after all gates pass. |
+| S1 — cache metrics omit/contradict invalidation | Typed packet `cfr168-final-decision-work-metrics-projection-freeze-20260730` is committed and blocked until accepted compositions, successor surfaces, counter owners, and selected production call graphs are stable. |
+| S2 — metrics-orthogonality test cannot falsify its claim | The same blocked metrics packet requires two independent production executions plus a live deliberate-regression oracle; two projections of one result are explicitly forbidden. |
+| S3 — no canonical asymptotic order table | Typed packet `cfr168-final-complexity-conformance-freeze-20260730` is blocked behind exact acceptance and integration of the metrics packet; it binds each canonical time/memory/I/O order row to production counters, exact boundaries, and 1x/3x/10x cross-runtime fixtures. |
+| S4 — Rust MR create/review response preflight | Closure candidate `73bc532` is frozen under an active report-only Claude Opus 5 exact rereview; integration remains forbidden until that immutable decision is committed and bound. |
+| S5 — one-command metrics projection and stale capability value | Functional projection is owned by the blocked metrics packet. Declaration-only changes are isolated in `cfr168-final-capability-readvertisement-freeze-20260730`, the separately accepted last product mutation followed by the complete terminal rerun. |
 
-The seven missing Close-evidence items remain manager-serialized after product
-composition: clean-HEAD Install with hashes, installed boundary/scale
-reversals, canonical Algorithm Dogfood, full cross-runtime corpus, all M4
-surface gates, Retrospect, and final capability re-advertisement.
+Before the seven manager-serialized Close-evidence items can begin, both
+runtime compositions and every successor surface in the post-composition
+lifecycle packet must receive an exact terminal disposition. The later
+lifecycle items remain clean-HEAD Install with hashes, installed
+boundary/scale reversals, canonical Algorithm Dogfood, full cross-runtime
+corpus, all M4 surface gates, Retrospect, and final capability
+re-advertisement.
 
 ## Closure invariant
 

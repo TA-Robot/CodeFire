@@ -1041,3 +1041,65 @@ transaction, and error-origin model through physical owner/lifetime and
 effect timelines. Every MR-write F1--F7 claim requires a production oracle and
 deliberate regression before Claude implementation begins. The packet has no
 worker manifest while blocked, so it adds no live WIP or provider cost.
+
+## 2026-07-30 20:20 UTC residual review-unit decomposition
+
+The manager corrected stale root-routing rows without changing immutable
+review reports. Python Upload `76baff8` and Rust HTTP `73bc532` are active
+exact rereviews, MR-list and File Doctor NOTE-1--NOTE-3 are active repairs,
+and Storage `cdcb9bd` plus Rust file ancestry `02b0d63` are completed
+candidates waiting for their exact reviews. MR-write is explicitly blocked
+on accepted Upload/MR-list identities and a committed shared-primitives Fugu
+`READY`; it is no longer described as merely queued behind composition.
+
+A read-only parallel audit confirmed that S1, S2, S3, and S5 had no dedicated
+current Markdown/typed-JSON successor. The post-composition packet named
+their outcomes but forbade product implementation, while the older generic
+decision-work packet predated the findings. Leaving the gap until composition
+would add another planning and queue delay at the end of the critical path.
+
+The residual is now frozen as three dependency-ordered, blocked packets:
+
+1. `cfr168-final-decision-work-metrics-projection-freeze-20260730` owns S1,
+   S2, and functional S5 under one counter/schema/CLI conflict domain;
+2. `cfr168-final-complexity-conformance-freeze-20260730` owns S3 and the
+   shared Rust/Python corpus after exact metrics acceptance; and
+3. `cfr168-final-capability-readvertisement-freeze-20260730` owns the
+   declaration-only S5 tail as the separately accepted last product mutation.
+
+The split avoids both four independent schema writers and one oversized
+candidate. Each packet starts blocked with no manifest, exact predecessor
+bindings, a Fugu 1.1 Ultra `READY/BLOCK` preflight, one Claude Opus 5 writer,
+an independent exact Fugu review, deliberate regressions, durable stage
+events, and a manager-owned shadow integration. Complexity/corpus changes
+cannot repair product behavior, and capability changes cannot add behavior or
+reuse pre-mutation lifecycle evidence. This prepares the work without adding
+live WIP, provider cost, or a third heavy lane.
+
+## 2026-07-30 20:23 UTC manual Stage 5 enforcement boundary
+
+A read-only scheduler audit separated implemented behavior from the Stage 5
+design. The current scheduler provides per-manifest DAG/worktrees,
+per-batch provider limits, declared within-batch write-set checks,
+status/collect/stop/reconcile, and a process-level postflight. It does not
+provide global total/heavy leases, critical-path ordering, durable candidate
+or checkpoint events, run adoption, exact review rollover, typed gate
+evidence, validation cache, shadow integration, or event-derived KGI/KPI.
+`passed` therefore remains process/postflight evidence and never means
+candidate or review acceptance.
+
+More importantly, the v1 loader can retain proposed fields without enforcing
+their safety semantics. The throughput design now reserves all Stage 5 fields
+for fail-closed `dev-swarm.v2`; v1 keeps historical behavior but must reject
+unknown and Stage 5 fields when the foundation repair is implemented. An old
+v1-only binary will reject v2 instead of silently accepting inert resource,
+progress, continuation, gate, or integration controls.
+
+Until usable foundation Git provenance is restored, the active manual
+contract is `docs/development/ai/stage5-manual-control-runbook.md`. It freezes
+one portfolio board across all batches, total four/heavy two leases, manager-
+recomputed candidate cards, blocked review manifests prepared during
+implementation, exact clean implementer continuation, deterministic
+focused-gate evidence keys, accepted-product-only shadow composition, stage
+events, resource floors, and trusted-throughput metrics. No `/workspace`
+script was changed and no live lane was added.

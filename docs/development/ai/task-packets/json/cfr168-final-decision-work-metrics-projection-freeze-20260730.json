@@ -1,0 +1,188 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "cfr168-final-decision-work-metrics-projection-freeze-20260730",
+  "status": "blocked",
+  "objective": "Close root findings S1, S2, and the functional half of S5 by giving every selected command one physically meaningful decision-work/cache snapshot, typed budget projection, independent metrics-on/off oracle, and compatible JSON/text contract.",
+  "base_revision": "1ec72e70a5241b8506afad94636392ff240816b9",
+  "role": "architect",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 2,
+      "reversibility": 1,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "cross_subsystem_architecture",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 11,
+    "selected_tier": "ultra",
+    "rationale": "Counter ownership, cache transitions, terminal snapshots, typed failures, command projection, and conformance cross store, CLI, and runtime boundaries; a wrong shared contract amplifies every later review."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-1-rust-cli-command-work",
+      "pack-3-store-object-commit-integrity",
+      "pack-4-remote-http-security"
+    ],
+    "additional_files": [
+      "docs/development/ai/task-packets/cfr168-final-decision-work-metrics-projection-freeze-20260730.md",
+      "docs/development/ai/task-packets/cfr168-post-composition-lifecycle-freeze-20260730.md",
+      "docs/development/ai/swarm-results/current-state-closure-audit-20260729/04-cfr168-review.md",
+      "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "adr/ADR-020-decision-equivalent-work-budget.md"
+    ],
+    "evidence_refs": [
+      "freeze-base:1ec72e70a5241b8506afad94636392ff240816b9",
+      "root-findings:S1,S2,S5-functional",
+      "accepted-python-composition:UNBOUND",
+      "accepted-rust-composition:UNBOUND",
+      "accepted-successor-set:UNBOUND",
+      "selected-command-inventory:UNBOUND",
+      "counter-owner-formulas:UNBOUND",
+      "manifest-state:none-authorized-while-blocked"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "codefire",
+      "crates/codefire-cli/src/main.rs",
+      "crates/codefire-cli/src/metrics.rs",
+      "crates/codefire-cli/src/compatibility.rs",
+      "crates/codefire-cli/src/tests.rs",
+      "crates/codefire-store/src/lib.rs",
+      "tests/**",
+      "schemas/**",
+      "docs/development/**",
+      "adr/ADR-020-decision-equivalent-work-budget.md"
+    ],
+    "write_set": [
+      "docs/development/ai/swarm-results/cfr168-final-decision-work-metrics-projection-preflight-fugu-20260730/preflight.md",
+      "codefire",
+      "crates/codefire-cli/src/main.rs",
+      "crates/codefire-cli/src/metrics.rs",
+      "crates/codefire-cli/src/tests.rs",
+      "crates/codefire-store/src/lib.rs",
+      "tests/**",
+      "schemas/**",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md"
+    ],
+    "disallowed_paths": [
+      ".devcontainer/**",
+      "subprojects/**",
+      "install.sh",
+      "docs/development/bug-issues/**",
+      "docs/development/code-review-issues/**",
+      "docs/development/history.md",
+      "docs/development/todo-checklist.md"
+    ],
+    "disallowed_actions": [
+      "Create a dev-swarm manifest or launch while any exact input remains UNBOUND",
+      "Use more than one implementation writer in this conflict domain",
+      "Modify product during report-only preflight",
+      "Use two projections of one command result as metrics orthogonality evidence",
+      "Use helper-call counts, constant labels, source shape, or test-only skips as physical proof",
+      "Write the canonical complexity table or final capability re-advertisement under this candidate",
+      "Run unrestricted broad gates repeatedly on rejected intermediates",
+      "Review development-environment infrastructure"
+    ]
+  },
+  "non_goals": [
+    "Launch before accepted stable input bindings exist",
+    "Refactor large Python or Rust hot files",
+    "Advertise unsupported command coverage",
+    "Replace typed budget failures with generic diagnostics",
+    "Perform final capability re-advertisement",
+    "Review devcontainer, CI, host, packaging, or agent wrappers"
+  ],
+  "invariants": [
+    {
+      "id": "accepted-stable-inputs-only",
+      "statement": "Work begins only from exact accepted compositions and successors, a clean stable base, frozen selected commands, and final counter owners.",
+      "falsification_test": "Leave one input UNBOUND, use a REQUEST_CHANGES candidate, alter one reviewed byte, or omit a selected consumer; status must remain blocked."
+    },
+    {
+      "id": "physical-counter-semantics",
+      "statement": "Every cache and decision-work counter has one owner, unit, formula, transition, aggregation, overflow rule, and terminal snapshot.",
+      "falsification_test": "Alias entry to reads/misses, omit invalidation, double-count revalidation, overflow a boundary, or project stale state; focused oracles must fail."
+    },
+    {
+      "id": "independent-metrics-orthogonality",
+      "statement": "Equivalent frozen authority is exercised by independent metrics-disabled and metrics-enabled production commands; removing only metrics preserves result, output, exit, effects, response, cleanup, and first error.",
+      "falsification_test": "Synthesize both sides from one result or change live behavior only when metrics are enabled; the oracle must fail."
+    },
+    {
+      "id": "command-wide-typed-projection",
+      "statement": "Every selected command projects stable terminal counters and typed budget failure through declared JSON/text contracts while excluded commands remain explicit non-claims.",
+      "falsification_test": "Remove one selected projection, alter its unit/envelope, or claim one excluded command; tests and conformance must fail."
+    },
+    {
+      "id": "immutable-independent-review",
+      "statement": "One Claude writer produces an immutable candidate reviewed by an independent Fugu session; accepted product delta alone enters the shadow composition.",
+      "falsification_test": "Move candidate bytes during review, let the writer review itself, or import a branch tip; acceptance and integration must fail."
+    }
+  ],
+  "validation": [
+    {
+      "id": "accepted-input-audit",
+      "command": "Recompute every accepted composition/successor parent, head, tree, patch/report digest, changed paths, and clean state.",
+      "purpose": "Prevent work against moving or rejected inputs.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "fugu-preflight",
+      "command": "Return READY or BLOCK with production call graphs, selected commands, owner/formula tables, orthogonality oracle, and deliberate regressions.",
+      "purpose": "Shift semantic defects before implementation.",
+      "required": true
+    },
+    {
+      "id": "focused-candidate-gates",
+      "command": "Run focused counter/cache/projection/CLI tests, exact boundaries, 1x/3x/10x, deliberate regressions, cross-runtime conformance, format, strict Clippy, and source-doc checks.",
+      "purpose": "Verify the immutable candidate without broad-gate amplification.",
+      "required": true
+    },
+    {
+      "id": "exact-independent-review",
+      "command": "Freeze parent/head/tree/patch/write-set/log digests and clean state; a fresh independent Fugu session reviews only that subject.",
+      "purpose": "Separate implementation from acceptance.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "stable-composition-gate",
+      "command": "Port only an accepted product delta, run focused gates per delta, then run the unrestricted broad gate once on the stable composition head.",
+      "purpose": "Reduce repeated validation and integration delay.",
+      "required": true
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "accepted_input_identity_matrix",
+      "fugu_ready_or_block_report_and_digest",
+      "selected_command_counter_and_call_graph_matrix",
+      "physical_owner_formula_and_reconciliation_table",
+      "independent_metrics_orthogonality_oracle",
+      "deliberate_regression_results",
+      "exact_candidate_identity_and_logs",
+      "independent_exact_review_decision",
+      "stable_composition_evidence",
+      "remaining_explicit_non_claims",
+      "stage_event_and_queue_timing_record",
+      "complexity_successor_binding"
+    ],
+    "evidence_digest_required": true
+  }
+}

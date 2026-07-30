@@ -12,9 +12,14 @@ progress checkpoints, or a manually resumed second-agent process. This makes
 coordinator idle time, heavy-gate collisions, and restart recovery dependent
 on operator memory.
 
-The smallest compatible repair is an additive `dev-swarm.v1` extension:
+The smallest fail-closed compatible repair keeps historical
+`dev-swarm.v1` behavior and introduces a versioned `dev-swarm.v2` surface for
+Stage 5 controls:
 
-- retain old manifest order and behavior when new fields are absent;
+- retain v1 order and behavior for existing manifests;
+- reject Stage 5 fields on v1 and reject unknown fields on both versions;
+- make an older v1-only binary reject a v2 manifest instead of silently
+  ignoring safety controls;
 - schedule ready tasks by critical-path length when explicitly enabled;
 - enforce one total external-lane semaphore and a nested heavy-work
   semaphore;
@@ -41,11 +46,11 @@ No CodeFire product file needs to change.
    worktrees/batches.
 8. The manager never auto-merges or changes issue state from task completion.
 
-## Additive manifest surface
+## Versioned manifest surface
 
 ```json
 {
-  "schema": "dev-swarm.v1",
+  "schema": "dev-swarm.v2",
   "scheduling": {
     "ready_order": "critical_path",
     "resource_limits": {
@@ -89,12 +94,18 @@ No CodeFire product file needs to change.
 
 Compatibility rules:
 
-- missing `scheduling` preserves current topological launch order and
-  provider-only limits;
-- missing `resource_class` means `light`;
-- missing `execution_profile` preserves the inherited environment;
-- missing progress thresholds disables age events;
-- missing lineage preserves the current state and collection shape;
+- existing `dev-swarm.v1` manifests keep their current topological,
+  provider-limited behavior and collection shape;
+- v1 rejects `scheduling`, `resource_class`, `execution_profile`,
+  `progress_events`, `hedge_of`, `continuation_of`, `supersedes`, and every
+  other unrecognized field instead of accepting an inert safety promise;
+- `dev-swarm.v2` is required for any Stage 5 scheduling, resource, progress,
+  lineage, continuation, review-rollover, gate, or shadow-train behavior;
+- both versions reject unknown object fields recursively;
+- within v2, missing `scheduling` selects explicit v2 topological defaults,
+  missing `resource_class` means `light`, missing `execution_profile` keeps
+  the inherited environment, missing progress thresholds disables age
+  events, and missing lineage leaves the task unrelated;
 - a hedge must have no task dependency and its exact revision must equal the
   batch base;
 - a continuation is opt-in, implementer-only, and must begin at its declared
@@ -431,9 +442,11 @@ separate commit.
 
 ## Migration and removal
 
-No existing manifest rewrite is required. Historical manually resumed runs
-cannot be inferred; only invocations created after `run.json` support exists
-are adoptable.
+No existing manifest rewrite is required. v1 remains a supported legacy
+surface and gains strict unknown-field rejection. Stage 5 manifests are
+authored as v2 only after the installed scheduler advertises that capability.
+Historical manually resumed runs cannot be inferred; only invocations created
+after `run.json` support exists are adoptable.
 
 Rollback order:
 
@@ -453,9 +466,15 @@ The `/workspace` devcontainer foundation currently exposes an empty/unusable
 `.git` directory, so this design was not applied directly to
 `/workspace/scripts`. Mutating unversioned infrastructure would make rollback
 and review weaker. The next safe action is to restore or identify the
-foundation repository's usable Git metadata, then execute the six small
-commits above with the `AGENTS.md` wrapper and swarm test matrix.
+foundation repository's usable Git metadata, then execute the fourteen
+independently reviewable implementation partitions above, each with its
+black-box tests, followed by the separate documentation commit.
 
 Until then, the active recovery uses the same rules manually: four external
 sessions, at most two heavy lanes, 45-minute durable checkpoints, exact
 candidate/report binding, and a coordinator-owned ready queue.
+`dev-swarm.v1` manifests must not contain any proposed Stage 5 field: the
+current binary preserves unknown fields without enforcing their semantics, so
+such a manifest could validate while its intended safety control is inert.
+The manual contract is defined in
+`docs/development/ai/stage5-manual-control-runbook.md`.

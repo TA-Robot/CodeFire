@@ -85,13 +85,20 @@ The successor-surface set is:
 4. Rust `cf scan` validation ledger/session;
 5. Rust local Doctor open-summary, evidence, and active-state ownership;
 6. file clone, storage-report, and GC graph walks;
-7. cache invalidation/entry metrics and command-wide decision-work
-   projection, including the final CLI envelope and text bytes;
-8. the canonical asymptotic/order table and shared cross-runtime corpus;
+7. accepted
+   `cfr168-final-decision-work-metrics-projection-freeze-20260730` successor
+   closing cache invalidation/entry metrics, independent metrics
+   orthogonality, command-wide decision-work projection, and the final CLI
+   envelope/text bytes;
+8. accepted `cfr168-final-complexity-conformance-freeze-20260730` successor
+   binding the canonical asymptotic/order table and shared cross-runtime
+   corpus;
 9. file transport branch/generation/plan authority;
 10. HTTP-client Upload accounting;
 11. `remote::publication::validate_object_roots`; and
-12. truthful final capability re-advertisement.
+12. accepted declaration-only
+    `cfr168-final-capability-readvertisement-freeze-20260730` successor,
+    applied as the truthful final capability re-advertisement.
 
 The disposition index must also have a terminal, exact disposition for every
 formal review report and finding. An accepted nucleus with unresolved

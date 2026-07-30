@@ -1,0 +1,167 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "cfr168-final-complexity-conformance-freeze-20260730",
+  "status": "blocked",
+  "objective": "Close root finding S3 by binding every selected production operation to one canonical time/memory/physical-I/O order row, exact counter formulas and boundaries, 1x/3x/10x fixtures, and a versioned shared Rust/Python conformance corpus without changing product behavior.",
+  "base_revision": "1ec72e70a5241b8506afad94636392ff240816b9",
+  "role": "architect",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 1,
+      "reversibility": 1,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "cross_subsystem_architecture"
+    ],
+    "score": 10,
+    "selected_tier": "ultra",
+    "rationale": "The candidate is docs/corpus/test-only, but it defines cross-runtime asymptotic and budget truth used by final capability and lifecycle evidence; semantic drift would invalidate closure."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-1-rust-cli-command-work",
+      "pack-3-store-object-commit-integrity",
+      "pack-4-remote-http-security"
+    ],
+    "additional_files": [
+      "docs/development/ai/task-packets/cfr168-final-complexity-conformance-freeze-20260730.md",
+      "docs/development/ai/task-packets/cfr168-final-decision-work-metrics-projection-freeze-20260730.md",
+      "docs/development/ai/task-packets/cfr168-post-composition-lifecycle-freeze-20260730.md",
+      "docs/development/ai/swarm-results/current-state-closure-audit-20260729/04-cfr168-review.md",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "adr/ADR-020-decision-equivalent-work-budget.md"
+    ],
+    "evidence_refs": [
+      "freeze-base:1ec72e70a5241b8506afad94636392ff240816b9",
+      "root-finding:S3",
+      "accepted-integrated-metrics-projection:UNBOUND",
+      "accepted-runtime-compositions:UNBOUND",
+      "accepted-successor-set:UNBOUND",
+      "selected-operation-inventory:UNBOUND",
+      "counter-formulas-and-profiles:UNBOUND",
+      "manifest-state:none-authorized-while-blocked"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "codefire",
+      "crates/**",
+      "tests/**",
+      "schemas/**",
+      "docs/**",
+      "adr/ADR-020-decision-equivalent-work-budget.md"
+    ],
+    "write_set": [
+      "docs/development/ai/swarm-results/cfr168-final-complexity-conformance-preflight-fugu-20260730/preflight.md",
+      "docs/09_index_trace_policy.md",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "schemas/conformance/**",
+      "tests/**"
+    ],
+    "disallowed_paths": [
+      "codefire",
+      "crates/**",
+      ".devcontainer/**",
+      "subprojects/**",
+      "install.sh",
+      "docs/development/bug-issues/**",
+      "docs/development/code-review-issues/**",
+      "docs/development/history.md",
+      "docs/development/todo-checklist.md"
+    ],
+    "disallowed_actions": [
+      "Create a manifest or launch while any exact input remains UNBOUND",
+      "Modify product code, counter formulas, capability declarations, issue state, or lifecycle state",
+      "Use helper-only fixtures or qualitative O-notation without production counters and boundaries",
+      "Infer Rust/Python parity from one runtime",
+      "Accept a table row without a fixture or a fixture without one canonical row",
+      "Run unrelated broad product gates on an unchanged product tree",
+      "Review development-environment infrastructure"
+    ]
+  },
+  "non_goals": [
+    "Repair product or counter behavior",
+    "Launch before exact metrics acceptance and integration",
+    "Perform capability re-advertisement",
+    "Add unrelated benchmarks or performance claims",
+    "Review devcontainer, CI, host, packaging, or agent wrappers"
+  ],
+  "invariants": [
+    {
+      "id": "accepted-metrics-input-only",
+      "statement": "The candidate begins only from exact accepted and integrated metrics projection plus stable accepted production call graphs, counters, profiles, and selected operations.",
+      "falsification_test": "Leave one identity UNBOUND, change one product byte, or use an unaccepted counter formula; status must remain blocked."
+    },
+    {
+      "id": "table-fixture-bijection",
+      "statement": "Every canonical time/memory/I-O order row maps to production counters, budgets, exact boundaries, and 1x/3x/10x fixtures, and every fixture maps back to one row.",
+      "falsification_test": "Delete either side, alter an order/formula on only one side, or pass through an unrelated limit; validation must fail."
+    },
+    {
+      "id": "cross-runtime-corpus",
+      "statement": "One versioned deterministic corpus is consumed by Rust and Python with identical canonical outcomes or one explicit reviewed runtime-specific distinction.",
+      "falsification_test": "Change one runtime outcome, omit a selected surface, or change version/digest without lineage; conformance must fail."
+    },
+    {
+      "id": "docs-corpus-only",
+      "statement": "The candidate changes only declared docs, corpus, schema, and test paths; any product defect returns to the preceding packet.",
+      "falsification_test": "Add codefire or crates product bytes to the diff; review must return BLOCK."
+    }
+  ],
+  "validation": [
+    {
+      "id": "accepted-input-audit",
+      "command": "Recompute accepted metrics and runtime/successor identities, reports, selected operations, counters, profiles, changed paths, and clean state.",
+      "purpose": "Prevent documentation of moving or rejected behavior.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "production-table-corpus",
+      "command": "Run both runtime corpus consumers, exact/minus-one/plus-one and 1x/3x/10x production fixtures, mutation matrix, schema/lineage/digest checks, and canonical docs checks.",
+      "purpose": "Prove the table and corpus are semantic evidence rather than prose.",
+      "required": true
+    },
+    {
+      "id": "output-scope",
+      "command": "Freeze exact parent/head/tree/patch/write-set/log digests and clean status; reject any product path.",
+      "purpose": "Maintain docs/corpus-only scope.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "independent-exact-review",
+      "command": "A fresh independent Fugu session reviews only the immutable candidate and every S3/table/corpus counterexample.",
+      "purpose": "Separate authorship from acceptance.",
+      "required": true
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "accepted_input_identity_matrix",
+      "preflight_report_and_digest",
+      "canonical_complexity_order_table",
+      "table_to_fixture_bijection",
+      "versioned_cross_runtime_corpus_and_lineage",
+      "rust_python_conformance_results",
+      "deliberate_regression_matrix",
+      "exact_candidate_identity_and_logs",
+      "independent_exact_review_decision",
+      "stable_composition_binding",
+      "capability_successor_binding",
+      "stage_event_and_queue_timing_record"
+    ],
+    "evidence_digest_required": true
+  }
+}
