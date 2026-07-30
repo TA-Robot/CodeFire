@@ -77,6 +77,61 @@ Until the scheduler enforces resource classes directly, recovery uses this expli
 - no stale `running` state is resumed until its worktree, event log, and exact base/head have been
   re-audited.
 
+## 2026-07-30 third host-restart and disk recovery
+
+The host restarted a third time at approximately 2026-07-30 08:21 UTC after the operator observed
+both memory pressure and Windows C-drive exhaustion. The container cannot mount or inspect the host
+C drive, so the host's current free-space value is not claimed here. The container-side cause is
+measured:
+
+- `/workspace` occupied approximately 98 GiB before cleanup;
+- 49 per-worktree Cargo `target` directories occupied 91.8 GiB in aggregate;
+- `/workspace/worktrees` occupied 67 GiB and `/workspace/project` occupied 28 GiB because both
+  included regenerated Cargo artifacts;
+- source, Git metadata, task packets, review reports, event logs, and agent worktrees themselves
+  were not the dominant consumers.
+
+Only reproducible Cargo build artifacts were removed with Cargo-aware cleanup; source changes,
+commits, worktree registrations, agent state, logs, and review evidence were preserved.
+`fstrim /workspace` was then run so the backing filesystem could deallocate unused extents. The
+post-cleanup audit records `/workspace` at 2.678 GiB, `/workspace/project` at 403 MiB,
+`/workspace/worktrees` at 2.3 GiB, and one empty Cargo `target` directory. The mounted filesystem
+reports 844 GiB available. This does not prove that the host VHDX has already returned the same
+space to Windows.
+
+The abrupt stop also left 12 zero-length loose Git objects and two zero-length working copies of
+the MR-mutation review. The empty objects, ref/reflog snapshots, linked-worktree HEAD logs, and
+indexes were moved without deletion under
+`.git/recovery/oom-disk-20260730T0816Z/`. Surviving blobs, trees, parent identities, author and
+committer metadata, and exact commit messages were sufficient to reconstruct:
+
+- canonical review commit `0da5855124fc9f52465cabb13fafa44e55e10fde`;
+- MR-mutation repair-base review commit `a4b21fdec3dafd344396447c1c02a52e767c16d6`;
+- canonical tree `bf939fe1ca58449d41dec2ceac9c86069ab21477`;
+- repair-base tree `f424c8aa4760da4d49c845e98a6c621dfa74d022`;
+- review blob `d466db49a6d832c6509052f04d295d9500dc6003`.
+
+The reconstructed object names exactly match the damaged ref targets. A full Git audit now reports
+no missing/corrupt object, and the active object store has no zero-length loose object. The
+remaining `fsck` output is dangling interrupted/recovery work only.
+
+### Disk-safe continuation envelope
+
+The memory envelope above remains in force and is extended as follows:
+
+- all resumed Rust lanes use one manager-selected shared Cargo target directory instead of a
+  separate target below every worktree;
+- `CARGO_INCREMENTAL=0`, `CARGO_BUILD_JOBS=2`, and `RUST_TEST_THREADS=2` are fixed for recovery
+  gates;
+- only one heavy Cargo gate runs at a time; agent inspection, report writing, and Python-focused
+  work may proceed in the remaining lanes;
+- `/workspace` and the shared target are measured before and after every heavy gate;
+- no heavy gate starts if `/workspace` exceeds 20 GiB or mounted free space falls below 100 GiB;
+- the shared target is reproducible cache, not evidence, and may be Cargo-cleaned after its
+  authoritative log/result has been committed;
+- worktrees, `.git`, task packets, reports, state, and event logs are never selected by automatic
+  cache cleanup.
+
 ## Active recovery lanes
 
 | Surface | Recovery base | Provider | New batch | State at restart audit | Required finish |
@@ -84,11 +139,11 @@ Until the scheduler enforces resource classes directly, recovery uses this expli
 | Python HTTP Doctor | `d79be3e` | Claude Opus 5 | `cfr168-python-http-doctor-canonical-recovery-20260729` | product result `01a7c862`; focused 19/19 and 11 neighboring cases pass; standalone full-suite claim is not accepted because its background run stopped with the agent | independent review, composition gate, canonical integration |
 | Python HTTP upload ancestry/signature | `3153d75` | Claude Opus 5 | `cfr168-python-http-upload-recovery-20260729` | product result `cb13da08`; focused 10/10 and agent full Python 431/431 pass; CFB-138 discovered at default-profile scale | zero-residual repair was interrupted before a diff; resume repair, independent re-review, canonical integration |
 | Python HTTP branch session | `8265ea1` | Claude Opus 5 | `cfr168-python-http-branch-recovery-20260729` | product result `fbef572e`; focused 13/13 and agent full Python 433/433 pass; one old CLI assertion encoded the former deadline defect | independent review, corrected neighboring assertion, canonical integration |
-| Python HTTP MR create/review/apply | `cab3126` | Claude Opus 5 | `cfr168-python-http-mr-mutation-recovery-20260729` | candidate exists; independent review was interrupted after finding hidden nested sealed ledgers but before a report | finish formal review, repair under one request-owned authority/session, re-review |
-| Rust storage | `40c095d` | Fugu 1.1 Ultra, Claude Opus 5 finisher | `cfr168-rust-storage-recovery-20260729` | finisher WIP preserved as `b3bc32a`; 779/779 CLI tests passed; final strict Clippy was interrupted | rehydrate toolchain, finish strict Clippy and focused/broad evidence, independent review |
+| Python HTTP MR create/review/apply | `cab3126` | Claude Opus 5 | `cfr168-python-http-mr-mutation-recovery-20260729` | exact target `21fe751` is formally `REQUEST_CHANGES`; hidden `local_v1` ledgers/unaccounted traversals, reusable replay nonce, legacy preflight residue, and typed-fence defects are bound in report `3567589` | repair packet `cfr168-python-http-mr-mutation-zero-residual-repair-20260730`, re-review |
+| Rust storage | `40c095d` | Fugu 1.1 Ultra, Claude Opus 5 finisher | `cfr168-rust-storage-recovery-20260729` | finisher WIP `b3bc32a` has 779/779 CLI evidence, clean format, strict all-target Clippy, 11 focused storage-decision tests, four exact legacy storage tests, source-doc and diff checks in the recovered JSONL; the final combined remote/HTTP rerun was interrupted | write a no-build evidence report from the durable log, then independent review |
 | Rust file-remote ancestry | `fe54e60` | Fugu 1.1 Ultra, Claude Opus 5 hedge | `cfr168-rust-file-remote-ancestry-recovery-20260729` | Claude candidate rejected; zero-residual repair was interrupted before a diff | resume operation-scoped owner/fence repair and re-review |
 | Rust file-remote Doctor | `ea8f2a6` | Fugu 1.1 Ultra, Claude Opus 5 hedge | `cfr168-rust-file-doctor-recovery-20260729` | Claude candidate accepted with residual findings; zero-residual repair was interrupted before a diff | resume all Should/Could hardening and re-review |
-| Rust HTTP MR create/review preflight | `3c23e38` | Fugu 1.1 Ultra, Claude Opus 5 hedge | `cfr168-rust-http-mr-preflight-20260729` | Claude candidate review says `REQUEST_CHANGES` on missing/inexact evidence; Fugu precursor preserved as `dd8ef3e` | create exact repair packet, fix/rebind tests, re-review |
+| Rust HTTP MR create/review preflight | `3c23e38` | Fugu 1.1 Ultra, Claude Opus 5 hedge | `cfr168-rust-http-mr-preflight-20260729` | Claude candidate review says `REQUEST_CHANGES` on missing/inexact evidence; Fugu precursor preserved as `dd8ef3e`; exact repair packet is registered at `9e5aec3` | execute repair, re-review |
 
 Two Rust lanes remained in design analysis for about 45 minutes without a product diff. They were
 not stopped: independent Claude Opus 5 hedge lanes now run from the same immutable task bases:
@@ -107,8 +162,8 @@ The following results are durable candidate commits, not canonical integration o
 |---|---|---|---|
 | Python HTTP Doctor + branch composition | `701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714` | combined focused 42/42, Python-pattern 463/463, and unrestricted 691/691 in 2550.503 seconds pass with the configured Cargo toolchain; corrected expectation is included | Fugu report `4659318` says `ACCEPT` for the corrected composition only; product integration still waits for the upload disposition |
 | Python HTTP upload default-profile scale | `dece688afea815d1242e7751367052d1ceac4580` | focused 13/13, neighboring owners 59/59, selected legacy 22/22, and Python-pattern 434/434 pass; 1201-commit default-profile reversal and 1x/3x/10x counters are bound | independent report `0b1fd6f50fce2126a07238c422b1ff01b575c047` says `REQUEST_CHANGES`; zero-residual repair `cfr168-python-http-upload-zero-residual-repair-20260730` is active |
-| Python HTTP MR create/review/apply | `21fe75175e997cc7c6f8c3ef2a7558144d850f94` | dedicated 18/18 pass; broad 667-case run has 665 passes and two Cargo-PATH-only install failures | Claude review was interrupted before its report after proving several hidden nested sealed-validation ledgers; resume from transcript-backed evidence, then repair and re-review |
-| Python HTTP MR list | `37f7427d46d2cf3ad66de3c1885ef4c0527cae70` | dedicated 18/18 in 54.077 seconds, Python-pattern 481/481 in 432.026 seconds, compilation, source/project docs, and diff checks pass | Claude review was interrupted before its report after reproducing multi-fault precedence and nofollow/symlink fail-closed defects; resume formal report, repair, and re-review |
+| Python HTTP MR create/review/apply | `21fe75175e997cc7c6f8c3ef2a7558144d850f94` | dedicated 18/18 pass; broad 667-case run has 665 passes and two Cargo-PATH-only install failures | Claude report `35675899c66070564fa010894315cbe33bb57657` says `REQUEST_CHANGES`; repair task and manifest are committed at `dd23a63` and `3afef8f` |
+| Python HTTP MR list | `37f7427d46d2cf3ad66de3c1885ef4c0527cae70` | dedicated 18/18 in 54.077 seconds, Python-pattern 481/481 in 432.026 seconds, compilation, source/project docs, and diff checks pass | Claude report `39b803bad72d0faceb538f1c5fbc22964699c7c2` says `REQUEST_CHANGES`; repair task and manifest are committed at `1695cc8` and `20b5080` |
 | Rust live file Doctor | `52a025ecda3fe2f5ad8b5b2a485562e7c16ab6de` | focused 8/8, all Doctor 119/119, full `codefire-cli` binary 775/775, strict Clippy, format, source docs, and diff checks pass | independent Claude fallback report `84ea698b397e57a193cc5faa0ef63a0cff027e2c` says `ACCEPT`; zero-residual repair was interrupted before a diff |
 | Rust file-remote ancestry Claude hedge | `e93ebc2394c8bd0398cfc23e8bf2d23d52e253b9` | focused remote 118/118, clean full-binary rerun 778/778, strict Clippy, format, source docs, and diff checks pass | independent report `ac626f65cdfa57a097bef5d757f02be6bbef409e` says `REQUEST_CHANGES`; zero-residual repair was interrupted before a diff |
 | Rust HTTP MR create/review preflight Claude hedge | `71854e20689d2dd79246fa741e0e6da443d04d1a` | focused HTTP 141/141, full binary 776/776, strict Clippy/all-targets, format, source docs, cross-runtime neighbors, and diff checks pass | independent report `b1905e9383e0201b841a6efd94578f46ffa98808` says `REQUEST_CHANGES`: the product core is sound, but required test evidence is missing or not bound to the stated production boundary |
@@ -116,6 +171,20 @@ The following results are durable candidate commits, not canonical integration o
 The interrupted Python MR-list worktree was resumed without discarding its diff. Background
 validation that died with the worker was not accepted; manager-owned foreground runs produced the
 durable results recorded above before the final clean candidate commit.
+
+The resumed MR-list review reproduced eight of ten multi-fault precedence divergences and the
+uncaught no-follow `OSError` zero-byte response on MR-list, branch-list, and Doctor. It also bound
+repeated same-source escrow traversal, project-ID reopen charging, and excessive deadline-poll
+overhead. Its repair packet requires deferred raw capture that preserves the legacy first-error
+order, a shared typed `OSError` response boundary for GET and POST, memoized escrow validation per
+session/root/source-head, one pinned descriptor read, and bounded polling.
+
+The resumed MR-mutation review measured hidden sealed-validation work at 2.3x to 3.4x the request
+ledger's charged bytes, proved the focused ledger test admitted nested non-HTTP ledgers, and bound
+the replay-nonce, legacy residue, grow-tamper typing, and GC separation residuals. Its repair packet
+requires one request ledger/deadline across authorization, nonce, validation, collection, and copy,
+strictly forbids nested ledgers, restores legacy failure ordering without residue, consumes replay
+nonces correctly, and leaves GC to its separately owned successor.
 
 The Rust storage work was first preserved at WIP snapshot
 `f5bce305da7ebfd08a840a4b281e29b0476874e0` after the Fugu session could not be resumed. The
@@ -256,3 +325,5 @@ The batch cannot Close until all of the following are bound to the exact integra
 - `docs/development/ai/swarm-results/current-state-closure-audit-20260729/03-acceptance-evidence.md`
 - `docs/development/ai/swarm-results/current-state-closure-audit-20260729/04-cfr168-review.md`
 - `docs/development/ai/swarm-results/claude-cfr168-review-20260729/review.md`
+- `docs/development/ai/swarm-results/cfr168-python-http-mr-list-review-claude-20260730/review.md`
+- `docs/development/ai/swarm-results/cfr168-python-http-mr-mutation-review-claude-fallback-20260730/review.md`
