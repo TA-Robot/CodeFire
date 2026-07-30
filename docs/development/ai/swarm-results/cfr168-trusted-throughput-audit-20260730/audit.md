@@ -103,6 +103,18 @@ The system does not yet separate provider-active, provider-wait,
 validation-queue, gate-active, manager-queue, collect, and integration time.
 It can identify slow delivery but cannot automatically assign the delay.
 
+### 9. Hot files collapse otherwise independent conflict domains
+
+The current product snapshot has approximately 33,455 lines in the Python
+`codefire` reference, 18,639 in Rust `http.rs`, 12,647 in Rust `main.rs`, and
+4,101 in Rust `remote.rs`. Route-local agents repeatedly overlap the same
+dispatcher, ledger, response, test, and source-document hunks even when their
+business surfaces differ. This increases prompt context, merge conflicts,
+manual product-delta extraction, and the blast radius of a reviewer mutation.
+
+File size is not the objective by itself. The defect is that ownership and
+write-set boundaries do not match the invariant/conflict domains.
+
 ## Development topology
 
 | Plane | Default owner | Capacity | Responsibility |
@@ -183,6 +195,33 @@ not rewrite the historical baseline to make these targets pass.
 
 Quality non-inferiority is mandatory: zero critical invariant escapes, zero
 false completion, exact identity binding, and complete required evidence.
+
+## Post-closure structural acceleration
+
+Do not perform a broad move-only refactor while CFR-168 candidates are under
+exact review; changing the product tree would invalidate evidence and
+increase current lead time. After the accepted Python and Rust composition
+heads are frozen, make decomposition the first following maintenance train:
+
+1. Extract the stable request context, sealed snapshot, authority fence,
+   prepared response, retryable cleanup, publication transaction, and
+   error-origin primitives before adding another route.
+2. Split Rust `http.rs` by shared lifecycle plus route modules; keep only
+   parsing/dispatch at the root.
+3. Continue the existing Rust `remote.rs` decomposition around project,
+   locks, operations, publication, and Doctor ownership.
+4. Keep Python as a reference implementation, but move stable HTTP lifecycle
+   primitives and route fixtures out of the 33k-line executable without
+   creating a second semantics.
+5. Decompose focused tests by owner/domain/fault layer and publish a stable
+   validation ID per suite, preserving test names, count, golden bytes, and
+   behavior before/after each move.
+
+Each extraction is a behavior-preserving product-only commit with exact
+before/after public-wire and test inventory evidence. Measure write-set
+overlap, conflict-resolution seconds, context bytes, and affected focused
+suite size before claiming acceleration. A smaller file that merely moves a
+shared global owner is not success.
 
 ## Automation order
 

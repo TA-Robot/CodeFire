@@ -135,6 +135,8 @@ Deliverables:
   cache/log lifecycle;
 - event-derived review yield, queue, rework, integration, resource, and cost
   KGI/KPI views.
+- post-CFR behavior-preserving decomposition of the hot dispatcher/owner/test
+  files into actual conflict domains.
 
 Exit criteria:
 
@@ -185,6 +187,7 @@ Only keep items that remove repeated human/AI overhead, can be checked cheaply, 
 | AIA-032 | Manager shadow integration trains | Design ready; product-only delta admission, per-delta focused gates, stable-head broad gate, and conflict rereview rules are specified. |
 | AIA-033 | Portfolio event/KGI telemetry | Active manual baseline in `swarm-results/cfr168-trusted-throughput-audit-20260730/audit.md`; automatic provider/gate/review/manager/resource event capture remains blocked with the foundation implementation. |
 | AIA-034 | Counterexample-bound compact context | Failure signatures are reusable in `failure-cookbook.md`; automatic preflight resolution and minimal context generation remain pending. |
+| AIA-035 | Hot-file conflict-domain decomposition | After accepted CFR-168 composition, extract stable request/session/authority/response/cleanup/publication primitives and owner-layered tests from the 33k-line Python reference, Rust `http.rs`, `main.rs`, and `remote.rs`; preserve exact behavior and measure write-set overlap, conflict time, context bytes, and focused-suite size. |
 
 The AIA-021 provenance is intentionally local evidence. It does not claim a trusted/reproducible builder or dependency supply-chain attestation.
 
@@ -200,7 +203,9 @@ Current recommended next items:
    partitions.
 4. Run the next five comparable CFR-168 packets under the Stage 5 WIP,
    preflight, review, and shadow-composition controls.
-5. Promote AIA-033 KGI/KPI changes only from complete event evidence; keep
+5. Start AIA-035 only after the accepted Python/Rust composition trees are
+   frozen so move-only work does not invalidate active exact reviews.
+6. Promote AIA-033 KGI/KPI changes only from complete event evidence; keep
    unavailable queue/cost fields explicit.
 
 ## Success Metrics
