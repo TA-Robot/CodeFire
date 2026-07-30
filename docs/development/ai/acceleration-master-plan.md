@@ -110,6 +110,45 @@ Exit criteria:
 - Dogfood friction can be converted into a task packet within minutes.
 - negative results are captured instead of lost.
 
+## Stage 5: Trusted Throughput Operating System — Active 2026-07-30
+
+The first live CFR-168 portfolio demonstrated that safe parallel candidate
+generation is no longer the limiting factor. The measured bottleneck is exact
+review yield, review-derived rework, composition latency, validation reuse,
+and restart recovery.
+
+The operating decision and baseline are frozen in
+[`swarm-results/cfr168-trusted-throughput-audit-20260730/audit.md`](swarm-results/cfr168-trusted-throughput-audit-20260730/audit.md).
+The compatible infrastructure design is frozen in
+[`swarm-results/dev-swarm-throughput-design-20260730/design.md`](swarm-results/dev-swarm-throughput-design-20260730/design.md).
+
+Deliverables:
+
+- pre-implementation Fugu `READY/BLOCK` counterexample review;
+- WIP limited by independent review capacity and conflict domain;
+- exact candidate-ready events with automatic independent-review rollover;
+- review-derived continuation of the exact original implementer session;
+- manager-owned product-only shadow integration trains;
+- content-addressed deterministic focused gates and generated evidence cards;
+- machine-wide provider/resource/heavy leases and critical-path scheduling;
+- restart-safe invocation state, progress leases, adopt/resume, and terminal
+  cache/log lifecycle;
+- event-derived review yield, queue, rework, integration, resource, and cost
+  KGI/KPI views.
+
+Exit criteria:
+
+- first-pass exact acceptance is at least 60% for the next five comparable
+  product packets without a quality regression;
+- review-ready queue p95 is at most 30 minutes;
+- accepted-delta-to-composed-focused-gate p95 is at most two hours;
+- no broad gate runs more than once on one stable composition revision;
+- provider/host restart loses no source/evidence and at most 45 minutes of
+  uncheckpointed work;
+- the foundation implementation has usable Git provenance, black-box tests,
+  and the existing manual rules can be retired without weakening review or
+  manager authority.
+
 ## Completed Bootstrap Order
 
 1. Ran the dirty-tree classifier and saved eight purpose-specific packages.
@@ -138,19 +177,31 @@ Only keep items that remove repeated human/AI overhead, can be checked cheaply, 
 | AIA-024 | GPT-5.6 Sol role routing | Implemented in `.codex/`, `model-routing-policy.md`, `role-routing-matrix.json`, and `validate_ai_runtime.py`. The runner selects a registered major/minor CLI adapter and currently validates local 0.146.0 strict-config/catalog capability; a dated 0.144.1 account-level Medium/High/Ultra smoke remains recorded in `evals/live-routing-smoke-2026-07-11.v1.json`. Scored quality comparison remains AIA-026. |
 | AIA-025 | Typed task/context/review schemas | Implemented in `schemas/`, with schema/semantic checks, recomputed context digests, task-bound review validation, dirty/base execution preflight, typed branch-list packet, and digest-aware runner. Markdown generation/round-trip lint remains. |
 | AIA-026 | AI development eval corpus | Routing cases cover all tiers and mandatory-Ultra reasons. Eight historical CFB/CFR defect/completion cases, withheld evaluator oracles, deterministic input preparation, and corpus checks are implemented; scored live model cohorts remain Stage 2. |
+| AIA-027 | Integration/conformance wedge | Pending; evaluate read-only MCP, SARIF, and advisory CI before any core product-boundary change. |
+| AIA-028 | Atomic second-agent invocation state and adopt/resume | Design ready in `swarm-results/dev-swarm-throughput-design-20260730/design.md`; blocked on restoration of the foundation repository Git identity. |
+| AIA-029 | Global execution profiles and resource leases | Design ready: shared low-memory Rust profile, total/heavy permits, active/private target cleanup rules, and critical-path queue semantics are specified. |
+| AIA-030 | Exact review rollover and repair continuation | Design ready; candidate event, reviewer independence, immutable subject, exact-session continuation, and fail-closed identity tests are specified. |
+| AIA-031 | Content-addressed validation and generated evidence cards | Design ready; cache identity, non-cacheable gate classes, typed output, and worker-claim override prevention are specified. |
+| AIA-032 | Manager shadow integration trains | Design ready; product-only delta admission, per-delta focused gates, stable-head broad gate, and conflict rereview rules are specified. |
+| AIA-033 | Portfolio event/KGI telemetry | Active manual baseline in `swarm-results/cfr168-trusted-throughput-audit-20260730/audit.md`; automatic provider/gate/review/manager/resource event capture remains blocked with the foundation implementation. |
+| AIA-034 | Counterexample-bound compact context | Failure signatures are reusable in `failure-cookbook.md`; automatic preflight resolution and minimal context generation remain pending. |
 
 The AIA-021 provenance is intentionally local evidence. It does not claim a trusted/reproducible builder or dependency supply-chain attestation.
-| AIA-027 | Integration/conformance wedge | Pending; evaluate read-only MCP, SARIF, and advisory CI before any core product-boundary change. |
 
 Deferred ideas stay out of separate backlog files until repeated friction proves they are worth implementing: issue-to-packet generation, review-packet generation, handoff normalization, module-boundary diff checks, JSON envelope contract checks, next-action path checks, invariant checklists, source-map freshness checks, command ownership generators, error taxonomy, and failure cookbook.
 
 Current recommended next items:
 
-1. AIA-004: branch-list timeout/work-amplification investigation in a Rust-capable environment.
-2. AIA-026: execute and score pinned Medium/High/Ultra cohorts against the historical corpus.
-3. AIA-027: compare read-only MCP and SARIF/CI advisory after Stage 1 invariants.
-4. Extend AIA-022 with Markdown anchor checks.
-5. Generate/round-trip-lint Markdown packet views from canonical JSON.
+1. Restore the actual `/workspace` foundation Git metadata or bind its remote
+   and intended base; do not initialize an unrelated replacement history.
+2. Implement AIA-028 and AIA-029 first so every later scheduler change is
+   restart-safe and resource-safe.
+3. Implement AIA-030 through AIA-032 as independently reviewable black-box
+   partitions.
+4. Run the next five comparable CFR-168 packets under the Stage 5 WIP,
+   preflight, review, and shadow-composition controls.
+5. Promote AIA-033 KGI/KPI changes only from complete event evidence; keep
+   unavailable queue/cost fields explicit.
 
 ## Success Metrics
 

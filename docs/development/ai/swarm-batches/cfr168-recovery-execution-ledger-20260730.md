@@ -1004,3 +1004,30 @@ Python MR-list repair, File Doctor note repair, and Rust HTTP exact review.
 The manager continues control-plane, composition, and evidence work rather
 than polling idly; the next released Fugu permit is reserved for Storage exact
 review.
+
+## 2026-07-30 19:55 UTC trusted-throughput Stage 5 activation
+
+A fresh manager audit counted 14 indexed exact review reports: 3 `ACCEPT` and
+11 `REQUEST_CHANGES`. Accepted review wording has not yet produced one
+composition-revalidated product integration on the canonical recovery head.
+Four external permits were already active, so adding writers would increase
+review debt rather than shorten the critical path.
+
+The measured baseline, topology, WIP limits, next-five-packet targets, and
+automation order are now durable in
+`docs/development/ai/swarm-results/cfr168-trusted-throughput-audit-20260730/audit.md`.
+The acceleration master plan has an active Stage 5. Immediate controls are:
+Fugu `READY/BLOCK` counterexamples before implementation, one writer per
+conflict domain, review-waiting WIP bounded by reviewer permits, exact
+candidate freeze, original-implementer continuation after a rejecting report,
+product-only shadow composition, and at most one broad gate per stable
+composition revision.
+
+The compatible foundation implementation is already partitioned in the
+`dev-swarm-throughput-design-20260730` design. A read-only recovery audit
+confirmed that `/workspace/.git` is an empty directory, no foundation remote
+identity is present, and GitHub CLI is unauthenticated. The manager will not
+initialize an unrelated history or mutate unversioned scheduler code. Atomic
+run state, resource leases, event telemetry, auto-review rollover, validation
+cache, and shadow-train automation remain ready to implement as soon as the
+actual foundation Git provenance is restored.
