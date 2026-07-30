@@ -31,7 +31,11 @@ from ai_contracts import (  # noqa: E402
     validate_task_packet,
 )
 from classify_worktree import classify_path  # noqa: E402
-from check_ai_acceleration_docs import STALE_PATTERNS, check_live_routing_smoke  # noqa: E402
+from check_ai_acceleration_docs import (  # noqa: E402
+    STALE_PATTERNS,
+    check_dev_swarm_v1_stage5_fields,
+    check_live_routing_smoke,
+)
 from build_source_bound_rust import (  # noqa: E402
     BINARY_PATH,
     build_source_manifest,
@@ -762,6 +766,60 @@ class LiveRoutingEvidenceTests(unittest.TestCase):
             findings = []
             check_live_routing_smoke(root, findings)
             self.assertIn("live-routing-run-failed", {finding.code for finding in findings})
+
+
+class DevSwarmManifestSafetyTests(unittest.TestCase):
+    def test_v1_rejects_inert_stage5_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            batch_dir = root / "docs/development/ai/swarm-batches"
+            batch_dir.mkdir(parents=True)
+            manifest = {
+                "schema": "dev-swarm.v1",
+                "batch_id": "test",
+                "tasks": [{"id": "task", "resource_class": "heavy"}],
+                "scheduling": {"ready_order": "critical_path"},
+            }
+            (batch_dir / "test.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            findings = []
+            check_dev_swarm_v1_stage5_fields(root, findings)
+            locations = {finding.path for finding in findings}
+            self.assertIn(
+                "docs/development/ai/swarm-batches/test.json:scheduling",
+                locations,
+            )
+            self.assertIn(
+                "docs/development/ai/swarm-batches/test.json:tasks[0].resource_class",
+                locations,
+            )
+
+    def test_safe_v1_and_future_v2_are_not_flagged(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            batch_dir = root / "docs/development/ai/swarm-batches"
+            batch_dir.mkdir(parents=True)
+            safe_v1 = {
+                "schema": "dev-swarm.v1",
+                "batch_id": "safe",
+                "tasks": [{"id": "task", "provider": "claude"}],
+            }
+            future_v2 = {
+                "schema": "dev-swarm.v2",
+                "batch_id": "future",
+                "scheduling": {"ready_order": "critical_path"},
+                "tasks": [{"id": "task", "resource_class": "heavy"}],
+            }
+            (batch_dir / "safe.json").write_text(
+                json.dumps(safe_v1), encoding="utf-8"
+            )
+            (batch_dir / "future.json").write_text(
+                json.dumps(future_v2), encoding="utf-8"
+            )
+            findings = []
+            check_dev_swarm_v1_stage5_fields(root, findings)
+            self.assertEqual(findings, [])
 
 
 class HistoricalEvalTests(unittest.TestCase):

@@ -1104,6 +1104,12 @@ focused-gate evidence keys, accepted-product-only shadow composition, stage
 events, resource floors, and trusted-throughput metrics. No `/workspace`
 script was changed and no live lane was added.
 
+The CodeFire-side AI checker now rejects known Stage 5 keys at any nesting
+depth in `dev-swarm.v1` batch manifests. Two negative/compatibility tests and
+the full 44-test AI-tool suite pass. This guard cannot replace the future
+foundation parser's recursive unknown-field rejection, but it makes the
+active invariant of zero inert Stage 5 fields mechanically enforceable now.
+
 ## 2026-07-30 20:27 UTC Rust HTTP exact review rollover
 
 The Rust HTTP exact rereview terminated cleanly with report commit

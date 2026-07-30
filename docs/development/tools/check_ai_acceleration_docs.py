@@ -24,6 +24,7 @@ REQUIRED_AI_FILES = [
     "docs/development/ai/provider-routing-policy.md",
     "docs/development/ai/model-routing-policy.md",
     "docs/development/ai/acceleration-master-plan.md",
+    "docs/development/ai/stage5-manual-control-runbook.md",
     "docs/development/ai/development-flow-kgi-kpi.md",
     "docs/development/ai/schemas/development-flow-record.v1.schema.json",
     "docs/development/ai/capability-registry.v1.json",
@@ -82,6 +83,23 @@ STALE_PATTERNS = [
     (re.compile(r"Current detail issue status count"), "stale current detail status heading"),
     (re.compile(r"Active frozen issue batch"), "stale active frozen batch heading"),
 ]
+
+
+DEV_SWARM_V1_STAGE5_FIELDS = frozenset(
+    {
+        "scheduling",
+        "resource_class",
+        "execution_profile",
+        "progress_events",
+        "hedge_of",
+        "continuation_of",
+        "supersedes",
+        "candidate_event",
+        "review_rollover",
+        "validation_cache",
+        "shadow_integration",
+    }
+)
 
 
 def path_has_glob(path_ref: str) -> bool:
@@ -374,6 +392,42 @@ def check_live_routing_smoke(root: Path, findings: list[Finding]) -> None:
         findings.append(Finding("error", "missing-live-routing-limitations", relative_path, "bounded claims are required"))
 
 
+def check_dev_swarm_v1_stage5_fields(root: Path, findings: list[Finding]) -> None:
+    batch_dir = root / "docs/development/ai/swarm-batches"
+    if not batch_dir.is_dir():
+        return
+
+    for path in sorted(batch_dir.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict) or data.get("schema") != "dev-swarm.v1":
+            continue
+
+        relative_path = path.relative_to(root).as_posix()
+
+        def visit(value: Any, pointer: str) -> None:
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    child_pointer = f"{pointer}.{key}" if pointer else key
+                    if key in DEV_SWARM_V1_STAGE5_FIELDS:
+                        findings.append(
+                            Finding(
+                                "error",
+                                "unsupported-stage5-field-in-dev-swarm-v1",
+                                f"{relative_path}:{child_pointer}",
+                                "Stage 5 controls require fail-closed dev-swarm.v2; current v1 may ignore this field",
+                            )
+                        )
+                    visit(child, child_pointer)
+            elif isinstance(value, list):
+                for index, child in enumerate(value):
+                    visit(child, f"{pointer}[{index}]")
+
+        visit(data, "")
+
+
 def check_stale_active_state(root: Path, findings: list[Finding]) -> None:
     active_paths = [root / path for path in ACTIVE_STATE_FILES]
     active_paths.extend((root / "docs/development/ai").rglob("*.md"))
@@ -395,6 +449,7 @@ def run(root: Path) -> list[Finding]:
     check_provider_routing(root, findings)
     check_task_packets(root, findings)
     check_live_routing_smoke(root, findings)
+    check_dev_swarm_v1_stage5_fields(root, findings)
     check_stale_active_state(root, findings)
     return findings
 
