@@ -45,12 +45,12 @@ CFR-168 closure.
 2. Reuse the single Fugu permit in order for the prepared Storage and
    File-ancestry exact-candidate reviews; keep the KGI/KPI review behind those
    CFR-168 product candidates.
-3. Collect the active exact-session Rust HTTP evidence repair, File Doctor
-   review-note repair, and Python MR-list closure repair. Each completed repair
-   candidate requires a fresh exact report-only review. Their blocked review
-   tickets are already prepared with every identity field `UNBOUND`; freeze a
-   candidate-ready card, bind all fields atomically, and launch the fresh
-   reviewer in the same manager interval when a permit is available.
+3. The clean MR-list successor `4930d25…` is under its active fresh exact
+   Claude review. Collect the active exact-session Rust HTTP evidence repair
+   and File Doctor review-note repair; their blocked review tickets are
+   already prepared. Freeze each candidate-ready card, bind every field
+   atomically, and launch the fresh reviewer in the same manager interval
+   when a permit is available.
 4. Bind exact accepted Upload/MR-list inputs, run the blocked shared-primitives
    Fugu preflight, and launch MR-write repair only on a committed `READY`
    decision.
