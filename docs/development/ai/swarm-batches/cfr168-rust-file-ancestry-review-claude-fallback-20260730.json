@@ -2,7 +2,7 @@
   "schema": "dev-swarm.v1",
   "batch_id": "cfr168-rust-file-ancestry-review-claude-fallback-20260730",
   "workspace": "/workspace/worktrees/cfr168-p0-canonical",
-  "base_revision": "REPLACE_WITH_REGISTRATION_COMMIT",
+  "base_revision": "9f1fe186df3002198a184fdced4691123037d71f",
   "max_parallel": {
     "fugu": 0,
     "claude": 1,
