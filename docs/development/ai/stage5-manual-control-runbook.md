@@ -152,11 +152,17 @@ and blocked manifest during implementation. Keep exact candidate fields
 After the candidate card passes:
 
 1. bind base/head/tree/parent/patch/paths/log digests;
-2. bind reviewer provider/model/session independence;
-3. validate and plan the exact manifest;
-4. record `review_ready`;
-5. launch immediately when the review/light lease is free; and
-6. record `review_start`.
+2. create the review task commit immediately above the candidate with the
+   bound ticket, card, and the manager-vetted
+   `capture_candidate_identity.py` blob when the candidate baseline does not
+   already contain it;
+3. record that helper's SHA-256 in the card so the reviewer can recompute the
+   same canonical identity without leaving the isolated task worktree;
+4. bind reviewer provider/model/session independence;
+5. validate and plan the exact manifest;
+6. record `review_ready`;
+7. launch immediately when the review/light lease is free; and
+8. record `review_start`.
 
 ```bash
 /workspace/scripts/dev-swarm validate <review-manifest>
@@ -166,7 +172,8 @@ After the candidate card passes:
 
 Review preparation target is 100%. Candidate-ready to review-start target is
 p50 10 minutes and p95 30 minutes. Never change the bound candidate after
-review starts.
+review starts. A missing helper is not an identity mismatch—the reviewer can
+reconstruct the command—but it is avoidable manager/reviewer time.
 
 ## Exact implementer continuation
 

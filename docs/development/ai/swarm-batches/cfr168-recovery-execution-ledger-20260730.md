@@ -1241,3 +1241,12 @@ explicitly forbid a worktree-local target or another toolchain home. The AI
 checker now rejects any active CFR-168 Rust packet with Cargo validation that
 omits one of those exact profile markers; its focused negative/positive test
 and the complete 48-test AI-tool suite pass.
+
+The active MR-list reviewer independently reproduced all candidate blobs and
+the patch digest, but first spent time discovering that the new identity
+helper was not present in the older candidate-derived taskbase. This does not
+change the exact subject or review validity. It exposes a rollover packaging
+cost: future review task commits now carry the manager-vetted helper blob when
+the candidate predates it, and cards bind its SHA-256. The current canonical
+helper digest is
+`ef548dd9a0c84ff617e2553110b0f3e25d68c0c2eb1857275e684ee561cfbd02`.
