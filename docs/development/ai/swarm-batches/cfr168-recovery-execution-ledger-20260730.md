@@ -572,6 +572,22 @@ without deleting its state. A collision-free replacement is prevalidated as
 its taskbase as `5231403` and in canonical as `18ddd57`. It remains queued
 until one of the two heavy permits is released.
 
+The queue audit also recovered the unclosed Rust HTTP MR create/review
+preflight decision on exact candidate
+`71854e20689d2dd79246fa741e0e6da443d04d1a`. Independent report
+`b1905e9383e0201b841a6efd94578f46ffa98808` has SHA-256
+`f30c22aa34559829254b6ca305449abc874b653c8b3dbc767248fdbbc5fe0a5a`
+and returns `REQUEST_CHANGES`: the main create-order regression check remains
+green when preflight is deliberately moved after observable object escrow.
+The new closure packet binds that evidence gap plus success-residual truth,
+response-owner fail-closed lifecycle, missing response/header boundaries,
+stale dead-code claims, post-commit cleanup response stability, transactional
+fallback selection, directory-complete snapshots, and unique deadline-phase
+identity. Its taskbase commits are `7e4e685` and `3876e31`; canonical
+report/task-only equivalents are `bdacf70` and `c6dc49a`. The task conflicts
+with active ancestry work only on `work_budget.rs`, so it remains queued until
+that write set and a heavy permit are released.
+
 The external-session set is again full without exceeding the two-heavy limit:
 
 | Lane | Provider/model | Resource class | Durable state |
