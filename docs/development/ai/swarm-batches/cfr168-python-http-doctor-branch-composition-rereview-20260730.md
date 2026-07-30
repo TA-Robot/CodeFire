@@ -37,9 +37,12 @@ gate.
    composition.
 4. Run both dedicated suites, the corrected affected CLI method, representative bundle/mutation
    neighbors, Python compilation, source/project docs checks, and `git diff --check`.
-5. Inspect the manager's exact-target full-suite evidence: Python discovery at `701469f` ran
-   463/463 in 296.500 seconds. Do not claim you ran it yourself unless you do; state whether the
-   exact revision and command are sufficient corroborating evidence.
+5. Inspect the manager's exact-target Python-pattern evidence:
+   `python3 -m unittest discover -s tests -p 'test_python_*.py'` at `701469f` ran 463/463 in
+   296.500 seconds. This is not the `AGENTS.md` full suite because it excludes differently named
+   modules. State that distinction explicitly. The manager is separately running
+   `python3 -m unittest discover -s tests -v` with the configured Cargo toolchain; that exact-target
+   result remains mandatory before integration.
 
 Any new blocking finding or incomplete correction is `REQUEST_CHANGES`. Otherwise return `ACCEPT`
 for the Doctor+Branch corrected composition only.
@@ -51,5 +54,5 @@ Write exactly:
 `docs/development/ai/swarm-results/cfr168-python-http-doctor-branch-composition-rereview-20260730/review.md`
 
 Include exact hashes, verdict, finding disposition, commands/results, conflict-resolution verdict,
-full-suite evidence disposition, and residual risk. Commit only this report and leave the reviewer
-worktree clean.
+Python-pattern evidence disposition, the pending full-suite gate, and residual risk. Commit only
+this report and leave the reviewer worktree clean.

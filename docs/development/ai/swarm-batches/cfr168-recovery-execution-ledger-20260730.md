@@ -50,7 +50,12 @@ focused/broad gates, and independent review; only the accepted product commit is
   now expects the typed 503 deadline diagnostic at `branch list planning`, poll count one, and zero
   debt instead of the pre-fix 200/no-poll behavior.
 - Combined focused Doctor, upload, and branch production tests pass 42/42.
-- Full Python discovery on the exact probe passes 463/463 in 296.500 seconds.
+- Python-pattern discovery
+  (`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_python_*.py'`)
+  on the exact probe passes 463/463 in 296.500 seconds. This is a broad runtime gate, not the
+  `AGENTS.md` full-suite command because it excludes `test_codefire_cli.py` and other names.
+- The exact-probe full suite (`python3 -m unittest discover -s tests -v`) remains a mandatory
+  acceptance gate and must use the configured Cargo toolchain PATH so install tests are non-vacuous.
 - This probe is validation/input for later reviewed integration; it does not by itself Close or
   authorize CFB-138.
 
