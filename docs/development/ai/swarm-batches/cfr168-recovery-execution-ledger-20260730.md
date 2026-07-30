@@ -418,6 +418,7 @@ The batch cannot Close until all of the following are bound to the exact integra
 - `docs/development/ai/swarm-results/claude-cfr168-review-20260729/review.md`
 - `docs/development/ai/swarm-results/cfr168-python-http-mr-list-review-claude-20260730/review.md`
 - `docs/development/ai/swarm-results/cfr168-python-http-mr-mutation-review-claude-fallback-20260730/review.md`
+- `docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md`
 
 ## 2026-07-30 10:49 UTC continuous-utilization checkpoint
 
