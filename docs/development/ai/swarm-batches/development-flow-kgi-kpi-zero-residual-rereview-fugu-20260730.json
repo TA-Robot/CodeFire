@@ -1,0 +1,26 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730",
+  "workspace": "/workspace/worktrees/development-flow-kgi-kpi-zero-residual-rereview-base",
+  "base_revision": "148a5706374cae023154d27886736348e43f5b3b",
+  "max_parallel": {
+    "fugu": 1,
+    "claude": 0,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "development-flow-kgi-kpi-zero-residual-rereview",
+      "role": "reviewer",
+      "tier": "ultra",
+      "provider": "fugu",
+      "ticket": "docs/development/ai/task-packets/development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730.md",
+      "depends_on": [],
+      "write_set": [
+        "docs/development/ai/swarm-results/development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730/review.md"
+      ],
+      "expected_commit": true,
+      "timeout": "12h"
+    }
+  ]
+}
