@@ -1,0 +1,26 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-python-http-doctor-branch-composition-rereview-20260730",
+  "workspace": "/workspace/worktrees/cfr168-p0-canonical",
+  "base_revision": "ce0048ccd8d438c4fdb50566caf650ac91be58f5",
+  "max_parallel": {
+    "fugu": 1,
+    "claude": 0,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "doctor-branch-composition-rereview",
+      "role": "reviewer",
+      "tier": "ultra",
+      "provider": "fugu",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-python-http-doctor-branch-composition-rereview-20260730.md",
+      "depends_on": [],
+      "write_set": [
+        "docs/development/ai/swarm-results/cfr168-python-http-doctor-branch-composition-rereview-20260730/review.md"
+      ],
+      "expected_commit": true,
+      "timeout": "8h"
+    }
+  ]
+}
