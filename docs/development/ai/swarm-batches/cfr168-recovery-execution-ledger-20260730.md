@@ -48,7 +48,7 @@ The following results are durable candidate commits, not canonical integration o
 | Python HTTP upload default-profile scale | `dece688afea815d1242e7751367052d1ceac4580` | focused 13/13 and Python-pattern 434/434 pass; 1201-commit default-profile reversal and 1x/3x/10x counters are bound | combined root-level review `cfr168-python-http-upload-scale-combined-review-20260730` is active; baseline-identical live-path work is not exempt from the CFR-168 invariant |
 | Python HTTP MR create/review/apply | `21fe75175e997cc7c6f8c3ef2a7558144d850f94` | dedicated 18/18 pass; broad 667-case run has 665 passes and two Cargo-PATH-only install failures | review `cfr168-python-http-mr-mutation-independent-review-20260730` is active; nonce timing and hidden sealed-validation ledger remain explicit review subjects |
 | Python HTTP MR list | `37f7427d46d2cf3ad66de3c1885ef4c0527cae70` | dedicated 18/18 in 54.077 seconds, Python-pattern 481/481 in 432.026 seconds, compilation, source/project docs, and diff checks pass | Claude review `cfr168-python-http-mr-list-review-claude-20260730` is pending; aggregate slope, multi-fault precedence, session reuse, and request isolation remain explicit subjects |
-| Rust live file Doctor | `52a025ecda3fe2f5ad8b5b2a485562e7c16ab6de` | focused 8/8, full `codefire-cli` binary 775/775, strict Clippy, format, source docs, and diff checks pass | review `cfr168-rust-file-doctor-independent-review-20260730` is active |
+| Rust live file Doctor | `52a025ecda3fe2f5ad8b5b2a485562e7c16ab6de` | focused 8/8, all Doctor 119/119, full `codefire-cli` binary 775/775, strict Clippy, format, source docs, and diff checks pass | independent Claude fallback report `84ea698b397e57a193cc5faa0ef63a0cff027e2c` says `ACCEPT`; zero-residual repair `cfr168-rust-file-doctor-zero-residual-repair-20260730` is active before product integration |
 | Rust file-remote ancestry Claude hedge | `e93ebc2394c8bd0398cfc23e8bf2d23d52e253b9` | focused remote 118/118, full binary 778/778, strict Clippy, format, source docs, and diff checks pass | review `cfr168-rust-file-ancestry-claude-independent-review-20260730` is active; predecessor traversal and pre-decision copy effects must be accepted or repaired |
 | Rust HTTP MR create/review preflight Claude hedge | `71854e20689d2dd79246fa741e0e6da443d04d1a` | focused HTTP 141/141, full binary 776/776, strict Clippy/all-targets, format, source docs, cross-runtime neighbors, and diff checks pass | Claude review `cfr168-rust-http-mr-preflight-review-claude-20260730` is pending; outer retained residual, dual preflight ownership, replay, and post-commit selection remain explicit subjects |
 
@@ -66,6 +66,16 @@ model-list response incompatibility. Their partial logs are non-authoritative ev
 Separate Claude Opus 5 fallback reviews are active for File Doctor, the Claude File Ancestry
 candidate, Python MR mutation, and the corrected Upload/CFB-138 candidate. No candidate is accepted
 from an interrupted reviewer transcript.
+
+The File Doctor fallback review completed on exact target `52a025e…` and independently reproduced
+8/8 focused, 119/119 Doctor, and 775/775 full-binary passes. Its `ACCEPT` verdict does not waive the
+review's Should/Could findings under the batch-wide zero-residual rule. A new task base rooted at the
+accepted candidate therefore runs
+`cfr168-rust-file-doctor-zero-residual-repair-20260730` to bind the production local profile,
+truthful failure phases, failure-path authority snapshots, deterministic gate fields, branch/MR
+fences, extreme-scale behavior, first-error cleanup, release-build zero-debt enforcement, and the
+test observer/oracle boundaries. The broader final CLI envelope/text projection remains assigned to
+the command-wide response-projection residual packet after overlapping `main.rs` storage work.
 
 ## Recovered Python composition evidence
 
