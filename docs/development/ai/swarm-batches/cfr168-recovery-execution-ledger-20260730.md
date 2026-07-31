@@ -1757,3 +1757,35 @@ After integrating these reports, the canonical aggregate is 21 independent
 reports: four `ACCEPT` and seventeen `REQUEST_CHANGES`. Nineteen are product
 reports and two are development-control reports. No issue, Install, Dogfood,
 Close, capability, or final KGI decision is authorized by this update.
+
+## 2026-07-31 09:00 UTC Upload second closure rereview and bounded third repair
+
+Canonical `b3de0d7` integrates the independent Claude Opus 5 report for exact
+Upload candidate `02e04c7e6458035d9c7d58de4d30b4a12e7cd594`. The report blob
+has SHA-256
+`3df1db92d6adcef9d318e23182fb9c62519f6eacb091266ced9616626f64cf1f`
+and returns `REQUEST_CHANGES`.
+
+The result narrows rather than expands the lineage:
+
+- BLOCKER-1 and HIGH-3 remain independently closed;
+- MEDIUM-4 is now independently closed because both required mutation shapes
+  fail at the production pre-allocation boundary; and
+- HIGH-2 remains open because both live `_AccountedUploadCommitSource` routes
+  clear `_session` / `_memory` before fallible cleanup. One real `close(2)`
+  failure therefore strands retained debt, leaves no terminal reason, and
+  makes a later `close()` a no-op. Constructor unwind can also replace the
+  primary exception.
+
+The preceding Fugu Ultra 1.1 attempt produced no report or commit after
+provider model-refresh and process-creation failures. It made no product
+decision; the failure is retained as provider-infrastructure evidence.
+
+Original implementer session `7baa1275-0ee2-476a-af46-1907386ebceb` is
+resumed on only the remaining HIGH-2 root. Its packet requires recovery
+handles to remain reachable until cleanup succeeds, primary-error precedence
+during constructor unwind, an idempotent reachable recovery path, and real
+`close(2)` failure/retry regressions on the two live ancestry and
+signature-history routes. Candidate `02e04c7` remains excluded from
+integration, and the additive successor will require a fresh independent
+decision.
