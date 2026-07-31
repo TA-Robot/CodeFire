@@ -39,13 +39,18 @@ launch a competing pilot.
 
 The manager first requires:
 
-1. the committed Fugu blind-classification report and its freeze identity;
-2. the committed Claude adjudication of every disagreement, reproduced
-   production effect, and routed decision-critical unavailable value;
-3. aggregate sensitivity against the provisional audit;
-4. a mapping from pilot interventions I1/I3/I4/I5 to the adjudicated causal
+1. the committed Fugu blind-calibration report, row-identity digest, and proof
+   that its pre-audit snapshot excluded the provisional and temporal reports;
+2. the committed fresh-session Fugu row reconciliation, per-axis comparison,
+   comparison freeze, and unchanged temporal check;
+3. the committed Claude adjudication of every decision-relevant row/axis
+   disagreement, reproduced production effect, routed decision-critical
+   unavailable value, policy/contradiction row, and denominator-changing
+   split/merge;
+4. aggregate sensitivity against both immutable source classifications;
+5. a mapping from pilot interventions I1/I3/I4/I5 to the adjudicated causal
    classes they could actually test; and
-5. a verified Claude health probe and admission evidence.
+6. a verified Claude health probe and admission evidence.
 
 The three exact pending product/control-plane review resumes retain downstream
 release priority in a constrained Claude window. The pilot is not promoted
@@ -94,8 +99,8 @@ do not open holdouts merely to obtain a terminal report.
 
 ### `UNAVAILABLE`
 
-Use when classification/adjudication evidence is insufficient to choose among
-the above. Do not resume by default.
+Use when calibration/comparison/adjudication evidence is insufficient to
+choose among the above. Do not resume by default.
 
 ## Process-Change Boundary
 
@@ -119,11 +124,10 @@ adjudicated failure mode and adds measured signal at acceptable burden.
 
 Before any pilot continuation, append one dated decision record naming:
 
-- classifier and adjudication commits/digests;
+- classifier, comparator, and adjudication commits/digests;
 - the exact supported causal classes;
 - per-intervention relevance;
 - selected decision above and falsifier;
 - product-review priority/admission evidence;
 - preserved freeze/event-log digest verification; and
 - whether a separate sensitivity replay is required.
-

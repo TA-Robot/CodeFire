@@ -2,7 +2,7 @@
   "schema": "dev-swarm.v1",
   "batch_id": "cfr168-review-root-cause-reliability-classification-fugu-20260731",
   "workspace": "/workspace/worktrees/cfr168-p0-canonical",
-  "base_revision": "f916c7fc6f0ce10160d5ec03ec1256f50cef09ae",
+  "base_revision": "c258cbfc061b14905554c9d319b350d2da7f771b",
   "max_parallel": {
     "fugu": 1,
     "claude": 0,
@@ -10,7 +10,7 @@
   },
   "tasks": [
     {
-      "id": "review-root-cause-reliability-classification",
+      "id": "review-root-cause-blind-calibration",
       "role": "reviewer",
       "tier": "ultra",
       "provider": "fugu",

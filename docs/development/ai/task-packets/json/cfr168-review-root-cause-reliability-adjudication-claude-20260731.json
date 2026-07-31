@@ -2,7 +2,7 @@
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "cfr168-review-root-cause-reliability-adjudication-claude-20260731",
   "status": "blocked",
-  "objective": "Adjudicate only the committed blind classifier's exact row/axis disagreements with the provisional audit, all reproduced-production-effect rows, and all classifier-routed decision-critical unavailable values using exact Git objects and repeatable evidence, then publish aggregate sensitivity without adopting a review template, finding count, checklist, or process change.",
+  "objective": "Adjudicate only the committed comparator's exact decision-relevant row/axis disagreements between the blind calibration and provisional audit, all reproduced-production-effect rows, decision-critical unavailable values, policy/contradiction rows, and denominator-changing split/merge decisions using exact Git objects and repeatable evidence, then publish aggregate sensitivity without adopting a review template, finding count, checklist, or process change.",
   "base_revision": "107293420d35daf861f8d7b751472f86e794c03a",
   "role": "reviewer",
   "risk": {
@@ -31,6 +31,7 @@
       "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-adjudication-claude-20260731.md",
       "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-gate-20260731.md",
       "docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-classification-fugu-20260731/classification.md",
+      "docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-comparison-fugu-20260731/comparison.md",
       "docs/development/ai/swarm-results/cfr168-review-recursion-root-cause-audit-claude-20260731/audit.md",
       "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md",
       "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md"
@@ -38,11 +39,14 @@
     "evidence_refs": [
       "preparation-base:107293420d35daf861f8d7b751472f86e794c03a",
       "blocking-input:classifier-report-commit-tree-bytes-sha256",
-      "blocking-input:blind-freeze-bytes-sha256-event-locator",
       "blocking-input:calibration-row-identity-digest",
-      "blocking-input:all-row-axis-disagreements",
+      "blocking-input:comparator-report-commit-tree-bytes-sha256",
+      "blocking-input:comparison-freeze-bytes-sha256-event-locator",
+      "blocking-input:normalized-row-map-and-queue-digests",
+      "blocking-input:all-decision-relevant-row-axis-disagreements",
       "blocking-input:all-reproduced-production-effect-rows",
-      "blocking-input:classifier-routed-decision-critical-unavailable-rows",
+      "blocking-input:comparator-routed-decision-critical-unavailable-rows",
+      "blocking-input:policy-contradiction-and-denominator-changing-rows",
       "provider:claude-opus-5",
       "fresh-session-required",
       "codex-fallback:forbidden"
@@ -54,6 +58,7 @@
       "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-adjudication-claude-20260731.md",
       "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-gate-20260731.md",
       "docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-classification-fugu-20260731/classification.md",
+      "docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-comparison-fugu-20260731/comparison.md",
       "docs/development/ai/swarm-results/cfr168-review-recursion-root-cause-audit-claude-20260731/audit.md",
       "docs/development/ai/swarm-results/**/review.md",
       "docs/development/ai/swarm-results/**/result*.md",
@@ -82,6 +87,7 @@
       "docs/development/ai/swarm-results/**/audit.md",
       "docs/development/ai/swarm-results/**/result*.md",
       "docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-classification-fugu-20260731/classification.md",
+      "docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-comparison-fugu-20260731/comparison.md",
       "docs/development/ai/swarm-batches/**",
       "docs/development/ai/task-packets/**",
       "docs/development/tools/**",
@@ -91,12 +97,12 @@
       "docs/development/todo-checklist.md"
     ],
     "disallowed_actions": [
-      "Launch before exact classifier report, freeze, queue, and row identities are committed and digest-bound into this packet",
+      "Launch before exact classifier and comparator reports, comparison freeze, normalized row map, queue, and row identities are committed and digest-bound into this packet",
       "Resume the provisional-audit author, intervention-pilot, product-review, or implementation session",
       "Re-review agreed non-reproduced rows to generate additional observations",
       "Infer origin from report framing, effect from severity, or oracle quality from a test name",
       "Replace unavailable object, scope, effect, or oracle evidence with project-general narrative",
-      "Rewrite the Fugu classification, provisional audit, frozen pilot, or their aggregates in place",
+      "Rewrite either Fugu report, the provisional audit, frozen pilot, or their aggregates in place",
       "Run Cargo, Rust builds, Install, Dogfood, Docker, product mutation, issue mutation, or network calls other than the Claude provider request",
       "Adopt a review template, checklist, finding quota, repair threshold, severity policy, routing policy, or process change",
       "Use Codex, Fugu, another Claude session, or subagents as a fallback"
@@ -115,13 +121,13 @@
   "invariants": [
     {
       "id": "exact-finite-adjudication-queue",
-      "statement": "The input queue equals the committed classifier's complete set of row/axis disagreements, reproduced-production-effect rows, and routed decision-critical unavailable rows, with stable identities and no volume-driven additions.",
+      "statement": "The input queue equals the committed comparator's complete decision-relevant set of row/axis disagreements, reproduced-production-effect rows, routed decision-critical unavailable rows, policy/contradiction rows, and denominator-changing split/merge decisions, with stable identities and no volume-driven additions.",
       "falsification_test": "Omit one required row, add one agreed non-reproduced row without proving identity corruption, or change the queue after examining outcomes; adjudication is incomplete or contaminated."
     },
     {
       "id": "immutable-source-reports",
-      "statement": "The blind classification, its freeze, and the provisional audit remain immutable inputs; adjudicated values are published separately with exact evidence.",
-      "falsification_test": "Edit either source report/freeze, silently replace a source value, or omit the original values from the comparison; postflight rejects the lane."
+      "statement": "The blind classification, comparison report and freeze, and provisional audit remain immutable inputs; adjudicated values are published separately with exact evidence.",
+      "falsification_test": "Edit any source report/freeze, silently replace a source value, or omit the original values from the adjudication comparison; postflight rejects the lane."
     },
     {
       "id": "six-axis-independent-decision",
@@ -142,14 +148,14 @@
   "validation": [
     {
       "id": "admission-input-integrity",
-      "command": "Before launch, recompute and bind the classifier commit/tree/report bytes/SHA-256, freeze bytes/SHA-256/event locator, row identity digest, exact disagreement set, reproduced-effect set, and routed decision-critical unavailable set.",
+      "command": "Before launch, recompute and bind classifier and comparator commits/trees/report bytes/SHA-256 values, comparison-freeze bytes/SHA-256/event locator, normalized row-map and queue digests, exact decision-relevant disagreement set, reproduced-effect set, decision-critical unavailable set, policy/contradiction rows, and denominator-changing split/merge decisions.",
       "purpose": "Prevent adjudication against a moving, incomplete, or manager-selected queue.",
       "required": true,
       "requires_capability": "git"
     },
     {
       "id": "queue-completeness",
-      "command": "Mechanically compare the report's adjudication row set with the bound classifier queue and fail on any missing or unauthorized row.",
+      "command": "Mechanically compare the report's adjudication row set with the bound comparator queue and fail on any missing or unauthorized row.",
       "purpose": "Keep the task finite and prevent both omission and finding-volume expansion.",
       "required": true
     },
@@ -189,7 +195,7 @@
   ],
   "handoff": {
     "required_outputs": [
-      "exact_task_gate_classifier_audit_identities",
+      "exact_task_gate_classifier_comparator_audit_identities",
       "input_queue_completeness_and_identity_digest",
       "per_row_per_axis_source_and_adjudicated_values",
       "reproducer_oracle_and_counterevidence",

@@ -1,4 +1,4 @@
-# CFR-168 Review Root-Cause Reliability Blind Classification
+# CFR-168 Review Root-Cause Reliability Blind Calibration
 
 Status: ready as a report-only task; provider-held  
 
@@ -13,27 +13,28 @@ Reliability gate:
 
 Provider/model: Fugu / `fugu-ultra-v1.1`  
 Role: independent reviewer/classifier  
-Base: `f259e9488e9676af331b2fed45d15209feec0e7b`
+Blind base: `c258cbfc061b14905554c9d319b350d2da7f771b`
 
 ## Objective
 
-Classify the finite observed successor-finding corpus on six independent
-evidence axes before opening the provisional causal labels, freeze that blind
-classification by byte count and SHA-256, compare all disagreements, and then
-apply unchanged rules to the temporal holdout.
+At the exact pre-audit snapshot, reconstruct the finite observed
+successor-finding corpus and classify it on six independent evidence axes.
+The number of effect rows is an outcome, not an input. Publish one immutable
+blind report before a different session is allowed to see the provisional
+audit or temporal reports.
 
-This task tests whether the evidence supports review-scope omission,
-repair-introduced defects, unmet or weakened repair obligations, weak closure
-oracles, evidence-only blockers, routing problems, some combination of these,
-or no decision. It must not presume that review omission is the cause.
+This task tests whether snapshot-visible evidence supports review-scope
+omission, repair-introduced defects, unmet or weakened repair obligations,
+weak closure oracles, evidence-only blockers, routing problems, some
+combination of these, or no decision. It must not presume that review omission
+is the cause.
 
 ## Scope
 
-Read the exact predecessor/candidate/report/repair object chains bound by the
-typed packet and execution ticket. Reconstruct the calibration corpus without
-opening the provisional causal labels, preserve a digest-bound blind freeze,
-compare only after that freeze, and keep the temporal reports hidden until the
-calibration comparison is complete.
+Run from snapshot `c258cbf…`, where exactly 21 review reports exist and the
+provisional audit plus three temporal reports are absent. Read the exact
+predecessor/candidate/report/repair object chains named by snapshot-visible
+sources. Do not inspect newer refs, branches, worktrees, or commits.
 
 The only authorized write is:
 
@@ -56,9 +57,10 @@ development-environment file may change.
 
 ## Non-Adoption
 
-The 51 observed successor findings describe the frozen census; they are not a
-requested output count. The classifier receives no credit for extra bullets
-and may not split one effect for volume.
+No expected successor-effect count is supplied to the classifier. It receives
+no credit for extra bullets and may not split one effect for volume. A later
+fresh session will reconcile stable row identities without editing this
+report.
 
 The analysis row form in the reliability gate is evidence capture for this
 causal study only. This task cannot adopt a review template, checklist,
@@ -70,8 +72,7 @@ duplication, false positives, and author/reviewer burden.
 ## Validation
 
 Recompute every bound Git identity and evidence digest before classification.
-Before reading the provisional labels, emit the blind-freeze byte count and
-SHA-256 in one event-log result. Before handoff run:
+Before handoff run:
 
 ```bash
 git diff --check
@@ -84,12 +85,12 @@ classification report.
 
 ## Handoff
 
-Return the exact report commit, tree, path, and SHA-256; blind-freeze byte
-count, SHA-256, and event locator; calibration row and unavailable counts;
-per-axis aggregates and disagreements; the exact adjudication queue; temporal
-stability; all threats to validity and censoring; every validation result; and
-explicit non-decisions for template length, finding count, checklist, and
-process adoption.
+Return the exact report commit, tree, path, byte count, and SHA-256; raw row
+count and row-identity digest; per-axis aggregates and unavailable counts;
+reproduced-effect and decision-critical-unavailable row sets; all
+inclusion/exclusion disputes; all threats to validity and censoring; every
+validation result; and explicit non-decisions for template length, finding
+count, checklist, and process adoption.
 
 ## Launch Hold
 

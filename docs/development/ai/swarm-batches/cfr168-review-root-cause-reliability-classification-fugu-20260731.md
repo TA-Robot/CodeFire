@@ -1,4 +1,4 @@
-# CFR-168 Review Root-Cause Reliability Blind Classification
+# CFR-168 Review Root-Cause Reliability Blind Calibration
 
 Status: logically ready; launch held until Fugu usage reset and bounded health probe  
 Owner: portfolio manager  
@@ -7,137 +7,195 @@ Role: independent method classifier
 Codex fallback: forbidden  
 Product/process mutation: forbidden
 
-## Exact Task Base
+## Exact Blind Base
 
 | Item | Exact value |
 |---|---|
-| Canonical base | `f259e9488e9676af331b2fed45d15209feec0e7b` |
-| Base tree | `143ff061ada99533d587b9eb77c4f8811282535d` |
-| Reliability gate | `docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-gate-20260731.md` |
-| Gate SHA-256 | `cdc07044dde70b33549c7708ad3a7c3635585b3895d649ba89d49bf0a59131da` |
-| Existing provisional audit SHA-256 | `2392450e957c8437b323ded492fc7597dc77f5147b74f3056c97c0efd9329780` |
-| Review-index SHA-256 | `890c5e0b128baa8b0e369afcf8e95079780dfb3315ea4a760b6fb2e7e45da855` |
-| Recovery-ledger SHA-256 | `73ad5ce65606ae53189796a74babc6c5dccf7bda7588adea53440a5d66764beb` |
+| Calibration snapshot | `c258cbfc061b14905554c9d319b350d2da7f771b` |
+| Snapshot tree | `75135efad20c5908884231b152cde72d0c9be965` |
+| Snapshot committed at | `2026-07-31T08:37:14+00:00` |
+| Review discovery | `git ls-tree -r --name-only HEAD docs/development/ai/swarm-results \| grep '/review\\.md$'` |
+| Review files at snapshot | 21 |
+| Expected successor-effect rows | deliberately unbound |
+
+Run in the worktree created from the exact calibration snapshot. At that
+snapshot:
+
+- the provisional root-cause audit does not exist;
+- the later Upload, KGI/KPI, and Cargo reports do not exist; and
+- exactly 21 `review.md` files exist below the result tree.
+
+Do not inspect another branch, tag, reflog entry, worktree, or commit newer
+than the exact snapshot. Candidate and predecessor objects named by the
+snapshot reports and their snapshot-visible packets may be inspected even
+when they are not ancestors of the snapshot. No commit, path, or conclusion
+learned from a newer management artifact may enter calibration.
 
 Use a fresh session. Do not resume any earlier Fugu review or audit session.
-Those sessions are superseded and stopped on the separately recorded provider
-usage limit.
 
 ## Objective
 
-Independently determine what the observed successor-finding corpus supports
-about:
+Reconstruct every independently testable effect first reported in a successor
+review generation, then classify it on six independent evidence axes:
 
-- pre-existing behavior inside earlier declared review scope;
-- repair-introduced behavior;
-- exact repair obligations closed, weakened, changed, or left open;
-- production effects versus evidence, injection, or policy-only findings;
-- closure-oracle quality; and
-- review routing.
+1. code origin;
+2. detectability in the immediately prior declared review scope;
+3. handling of an exact repair obligation;
+4. strength of effect evidence;
+5. closure-oracle quality; and
+6. review-routing state.
 
 Do not assume that review omission is the cause. Do not choose one narrative
 primary cause. Do not propose a finding count, checklist, review-template
 depth, or process change.
 
-## Finite Corpus, Not A Quota
+## Census Rule — Count Is An Outcome
 
-Reconstruct the exact calibration snapshot:
+The report universe is finite, but the number of independently testable
+successor effects is not supplied to this lane.
 
-- 21 independent reports;
-- 22 candidate generations; and
-- 51 findings first observed in successor reports.
+- Start from the 21 exact report paths found at `HEAD`.
+- Reconstruct same-surface predecessor and successor generations from exact
+  report, candidate, repair, and result identities.
+- Include an effect only when it first appears in a successor report and has a
+  stable report locator.
+- One row represents one independently falsifiable product effect or one exact
+  evidence/routing defect.
+- Split a combined report item only when its effects have different subjects,
+  evidence, or axis values.
+- Do not split wording variants, severity restatements, or repeated evidence.
+- Do not merge independently testable effects.
+- Publish the observed row count and every inclusion/exclusion dispute.
 
-The 51 rows are the complete observed successor-finding census at the frozen
-snapshot, not a requested output count and not a denominator for all defects.
-Never split an effect to reach 51. Never merge effects with different
-subjects/evidence/axis values merely to stay at 51. Any reconstruction
-difference is reported and resolved from exact report locators before
-aggregation.
+There is no expected row count to hit. A later, different session will
+reconcile row identities against another analyst's census. It will not edit
+this report.
 
-## Contamination Boundary
+## Six-Axis Rubric
 
-Before opening any per-finding classification, cross-lineage total,
-intervention ranking, or conclusion in
-`cfr168-review-recursion-root-cause-audit-claude-20260731/audit.md`:
+Assign every axis independently. An axis value and its evidence are separate
+fields. Use `UNAVAILABLE` when exact evidence does not decide a value.
 
-1. reconstruct the report/candidate/repair chain from Git objects, the
-   disposition index, packets, results, and original reports;
-2. classify every calibration effect on all six axes in the reliability gate;
-3. attach the complete analysis-row fields and evidence locators;
-4. write the raw rows, rules, unavailable values, and aggregates to
-   `/tmp/cfr168-review-root-cause-blind-freeze.md`;
-5. compute and emit its byte count and SHA-256 in one event-log tool result;
-   and
-6. state explicitly that calibration content is frozen.
+### A. Code origin
 
-Only then read the provisional audit classifications and construct the
-comparison. Do not edit the freeze. If it is lost, recover its exact bytes from
-the event log; if its digest cannot be reproduced, restart the blind phase.
+| Value | Meaning |
+|---|---|
+| `PREEXISTING_IN_PREDECESSOR` | The implicated behavior or code shape exists in the immediately preceding reviewed candidate. |
+| `INTRODUCED_BY_REPAIR` | It is absent from that predecessor and introduced by the repair. |
+| `NO_PRODUCT_DEFECT_ASSERTED` | The finding concerns evidence, documentation, policy, or a non-production-reachable claim rather than an asserted product defect. |
+| `UNAVAILABLE` | Exact objects or evidence do not decide origin. |
 
-The temporal reports remain unopened until the original-audit comparison and
-all calibration disagreements are frozen.
+### B. Prior-review detectability
 
-## Required Classification
+| Value | Meaning |
+|---|---|
+| `EXPLICITLY_BOUND_BEFORE_REPAIR` | The predecessor report or repair packet already states the exact obligation. |
+| `WITHIN_DECLARED_PRIOR_SCOPE` | The defect existed then and the prior review declares the implicated path or invariant in scope, but did not bind the exact obligation. |
+| `OUTSIDE_DECLARED_PRIOR_SCOPE` | The prior review's declared scope excludes the implicated path or invariant. |
+| `NOT_PRESENT_AT_PRIOR_REVIEW` | The repair introduced the implicated surface after the prior review. |
+| `NOT_APPLICABLE` | No product-defect detectability claim is made. |
+| `UNAVAILABLE` | Scope or temporal identity cannot be decided. |
 
-Apply the reliability gate literally:
+Only `PREEXISTING_IN_PREDECESSOR` together with
+`WITHIN_DECLARED_PRIOR_SCOPE` supports the bounded statement "observed prior
+review scope miss". It does not establish absolute recall.
 
-- A — code origin;
-- B — prior-review detectability;
-- C — repair-contract handling;
-- D — effect evidence;
-- E — closure-oracle quality; and
-- F — review-routing state.
+### C. Repair-contract handling
 
-Each axis value has its own evidence field. A report's framing is not proof of
-origin; a severity word is not proof of effect; a test name is not proof of
-oracle strength. Use `UNAVAILABLE` rather than project-general prose.
+| Value | Meaning |
+|---|---|
+| `CLOSED_AS_WRITTEN` | The exact bound obligation is satisfied. |
+| `NOT_CLOSED_AS_WRITTEN` | The exact bound obligation remains false. |
+| `WEAKENED_OR_RESTATED` | The implementation or evidence silently substitutes a weaker property. |
+| `CRITERION_CHANGED_AFTER_REPAIR` | A later decision changes the obligation instead of proving the original wording. |
+| `NOT_BOUND` | No earlier exact obligation exists. |
+| `UNAVAILABLE` | Closure cannot be decided. |
 
-For every row:
+### D. Effect evidence
 
-1. resolve exact predecessor/candidate/report objects;
-2. locate the implicated path/symbol/effect at each relevant revision;
-3. inspect the earlier report's declared scope;
-4. compare exact repair wording with implementation/result/oracle;
-5. reproduce safe Python effects when needed and feasible;
-6. otherwise distinguish static production reachability, injection-only,
-   claim-only, and unavailable evidence;
-7. inspect or execute deliberate oracle falsification when feasible; and
-8. record counterevidence that could falsify the chosen axis values.
+| Value | Meaning |
+|---|---|
+| `REPRODUCED_PRODUCTION_EFFECT` | A minimal reproducer reaches production code and demonstrates an externally or durably observable wrong effect. |
+| `STATIC_PRODUCTION_REACHABLE_PROOF` | Exact source/object evidence proves production reachability and the defective state without an executed reproducer. |
+| `INJECTION_ONLY_EFFECT` | The effect requires a state or fault for which no production route is demonstrated. |
+| `CLAIM_OR_EVIDENCE_ONLY` | Behavior may be correct; a test, document, or proof overclaims it. |
+| `UNAVAILABLE` | No decision-grade effect evidence exists. |
 
-No Cargo, Rust build, Install, Dogfood, Docker, product edit, or network call
-other than the Fugu provider request is authorized.
+### E. Closure-oracle quality
 
-## Post-Freeze Comparison
+| Value | Meaning |
+|---|---|
+| `DETECTS_THE_BOUND_PROPERTY` | The oracle fails when the bound property is deliberately falsified. |
+| `PASSES_DESPITE_FALSIFICATION` | A temporary reversal or counterexample survives the oracle. |
+| `LATE_OBSERVATION` | The assertion occurs after the effect it claims to prevent. |
+| `NO_RELEVANT_ORACLE` | No oracle was offered for the property. |
+| `NOT_APPLICABLE` | The finding has no closure-oracle claim. |
+| `UNAVAILABLE` | The oracle cannot be executed or inspected sufficiently. |
 
-After the blind calibration freeze:
+### F. Review-routing state
 
-1. open the existing audit;
-2. map its claims to the six axes without changing the blind values;
-3. list every row/axis agreement, disagreement, and non-comparable claim;
-4. explain whether disagreement comes from object identity, scope,
-   obligation wording, effect evidence, oracle evidence, routing, or
-   unavailable data;
-5. flag every `REPRODUCED_PRODUCTION_EFFECT` row for Claude adjudication; and
-6. flag every disagreement whose disposition could change an intervention.
+| Value | Meaning |
+|---|---|
+| `PRODUCT_DEFECT_BLOCKER` | A demonstrated or statically proven production defect blocks acceptance. |
+| `CLOSURE_EVIDENCE_BLOCKER` | Product closure may be true, but required evidence is absent or invalid. |
+| `POLICY_PROMOTED_BLOCKER` | A non-blocking observation became mandatory through policy or manager choice. |
+| `NON_BLOCKING_FOLLOW_UP` | The report explicitly routes the item forward without changing the candidate verdict. |
+| `UNSATISFIABLE_OR_CONTRADICTORY` | The criterion cannot be satisfied as written or conflicts with another bound requirement. |
+| `UNAVAILABLE` | The report does not make the routing basis decidable. |
 
-Do not publish a generic agreement percentage without the numerator,
-denominator, unavailable count, and per-axis confusion table. Do not call
-absence of a later withdrawal precision.
+Do not infer origin from report framing, effect evidence from severity words,
+or oracle quality from a test name.
 
-## Temporal Check
+## Required Analysis Row
 
-Only after calibration/comparison freeze, apply unchanged rules to:
+Publish a compact raw table first. Every row contains:
 
-| Subject | Report commit | Candidate |
-|---|---|---|
-| Python Upload | `b3de0d7` | `02e04c7e6458035d9c7d58de4d30b4a12e7cd594` |
-| KGI/KPI | `5760c98` | `0944bf3deba9e753132b3f71716b5c009a8fc30f` |
-| Source-keyed Cargo gate | `b589864` | `aaa39b61b37df273fe4d57e274ed8e1321e788ad` |
+| Field | Required content |
+|---|---|
+| `row_id` | stable calibration ID, never reused |
+| `lineage_generation` | surface and predecessor/successor generation |
+| `object_chain` | predecessor candidate/report, repair packet/result, successor candidate/report commits |
+| `finding_locator` | exact successor report heading/item and effect sublocator when justified |
+| `effect_statement` | one falsifiable wrong effect or exact evidence/routing defect |
+| `subject_locator` | exact path/symbol/object and revision |
+| `axis_a` through `axis_f` | one declared rubric value for every axis |
+| `axis_evidence_a` through `axis_evidence_f` | exact object, report, packet, command, or reproducer supporting that axis |
+| `counterevidence_checked` | exact evidence that could falsify the selected values |
+| `reproducer` | safe command/outcome and candidate identity, or `UNAVAILABLE` with reason |
+| `oracle_reversal` | deliberate falsification and result, or `NOT_APPLICABLE`/`UNAVAILABLE` |
+| `censoring` | whether a later exact disposition exists at the snapshot and what remains unknown |
+| `decision_relevance` | which conditional aggregate could consume the row; `none` is valid |
 
-Do not change a category or evidence threshold after seeing these rows.
-Report stability and every `UNAVAILABLE` value.
+Add a detailed evidence block for:
 
-## Authorized Write
+- every `REPRODUCED_PRODUCTION_EFFECT`;
+- every decision-changing `UNAVAILABLE`;
+- every policy-promoted or contradictory row;
+- every row whose split/merge choice changes a denominator; and
+- every row where predecessor scope or origin is disputed by the source
+  objects.
+
+The form is for this causal analysis. It is not a proposed production review
+template.
+
+## Allowed Evidence And Execution
+
+Use only:
+
+- the exact snapshot tree;
+- Git objects named by snapshot-visible reports, packets, and result cards;
+- exact predecessor/candidate source and tests;
+- safe Python reproductions in isolated temporary copies; and
+- deliberate Python oracle falsifications where feasible.
+
+Do not run Cargo, Rust builds, Install, Dogfood, Docker, or network calls other
+than the Fugu provider request. Do not edit product, tests, packets, reports,
+ledgers, indexes, policy, schemas, tools, issues, or lifecycle state.
+
+If a claim requires newer evidence, a Rust execution, unavailable production
+entry point, or an unrepeatable historical environment, record `UNAVAILABLE`.
+
+## Required Report
 
 Write exactly:
 
@@ -145,29 +203,24 @@ Write exactly:
 docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-classification-fugu-20260731/classification.md
 ```
 
-Do not edit product, tests, packets, existing reports, ledgers, indexes,
-policy, schemas, tools, issues, or lifecycle state.
-
-## Required Report
-
 The report contains:
 
-1. exact task/gate/base/index/ledger identities and digests;
-2. blind protocol and freeze byte count/SHA-256/event locator;
-3. source reconstruction and any row-count discrepancy;
-4. compact raw calibration rows using every required analysis field;
-5. required detailed evidence blocks;
-6. per-axis raw aggregates with numerator, denominator, and unavailable;
-7. row/axis comparison with the provisional audit;
-8. adjudication queue containing all disagreements and reproduced effects;
-9. unchanged temporal-check rows and stability;
-10. threats to validity and right-censoring;
-11. supported conditional statements only; and
-12. explicit non-decisions for template length, item count, checklist, and
+1. exact snapshot/tree identity and proof that the excluded artifacts are
+   absent at `HEAD`;
+2. the 21 discovered report paths and content digests;
+3. reconstruction rules and every row inclusion/exclusion dispute;
+4. the complete raw row table with every required field;
+5. decision-critical detailed evidence blocks;
+6. per-axis aggregates with numerator, denominator, and unavailable count;
+7. the exact set of reproduced-effect rows;
+8. every decision-critical unavailable row;
+9. threats to validity and right-censoring;
+10. conditional statements supported by this calibration only; and
+11. explicit non-decisions for template length, finding count, checklist, and
     process adoption.
 
-The report must not include a universal remedy. It may conclude that evidence
-is insufficient.
+Do not open or compare a provisional audit. Do not inspect or classify a
+temporal holdout. Those are separate-session tasks.
 
 ## Validation And Handoff
 
@@ -179,16 +232,19 @@ PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_ai_contracts.py
 PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_project_docs.py
 ```
 
+If snapshot-era checkers fail because their schemas predate the current
+report, record the exact failure; do not import newer checker or policy files.
+
 Commit only the classification report and leave the worktree clean. Return:
 
-- report commit/tree/path/SHA-256;
-- blind-freeze byte count/SHA-256/event locator;
-- raw row and unavailable counts;
-- per-axis disagreement counts;
-- exact adjudication row set;
-- temporal stability result; and
-- every validation command and result.
+- report commit/tree/path/byte count/SHA-256;
+- raw row count and deterministic row-identity digest;
+- per-axis unavailable counts;
+- reproduced-effect row set;
+- decision-critical unavailable row set;
+- all inclusion/exclusion disputes;
+- validation results; and
+- confirmation that no provisional or temporal artifact was opened.
 
-The report is evidence for a later Claude disagreement adjudication. It
-cannot adopt a review process or change any candidate disposition.
-
+The report is immutable input for a later fresh-session comparison. It cannot
+adopt a process or change a candidate disposition.

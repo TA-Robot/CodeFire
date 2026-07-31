@@ -64,23 +64,38 @@ This gate does not decide template length or shape.
 
 ### Calibration snapshot
 
-Reconstruct the exact report/candidate universe used by the root-cause audit:
+The blind classifier runs at exact snapshot
+`c258cbfc061b14905554c9d319b350d2da7f771b`, tree
+`75135efad20c5908884231b152cde72d0c9be965`. At that snapshot:
 
-- 21 independent reports;
-- 22 candidate generations;
-- 51 findings that first appear in a successor report; and
-- the exact predecessor, repair packet, implementer result, candidate, and
-  successor report for each finding.
+- exactly 21 independent `review.md` files exist;
+- the provisional root-cause audit does not exist; and
+- the three temporal reports below do not exist.
 
-Use Git objects and the review disposition index to reconstruct identities.
-Do not read the root-cause audit's per-finding classifications, cross-lineage
-totals, intervention ranking, or the interrupted pilot's frozen calibration
-until the blind classification is content-frozen.
+The classifier receives the report-universe boundary and the six-axis rubric,
+but it is **not** told the provisional audit's 51-row result. It reconstructs
+the effect census from stable report locators and publishes the observed row
+count as an outcome. A later count difference is reconciled by effect identity;
+numerical equality is neither a coverage oracle nor a success criterion.
+
+Use only the snapshot tree plus exact candidate/predecessor objects named by
+snapshot-visible reports, packets, and results. Access to newer refs, commits,
+worktrees, the provisional audit, or the interrupted pilot invalidates the
+blind calibration.
+
+Before accepting the blind report, the manager preserves the complete Fugu
+event-log digest and audits tool calls for access to another worktree, a newer
+ref/commit, the provisional-audit path, any temporal-report path, or pilot
+artifacts. A clean report diff is not sufficient contamination evidence. Any
+forbidden access invalidates the calibration even when its conclusions appear
+reasonable.
 
 ### Temporal check
 
-After blind calibration is frozen, apply the unchanged classification rules to
-the reports that were absent from the audit snapshot:
+After the immutable blind report is committed and a fresh comparator has
+content-frozen its row reconciliation and per-axis audit comparison, apply the
+unchanged classification rules to the reports that were absent from the audit
+snapshot:
 
 | Subject | Report commit | Candidate |
 |---|---|---|
@@ -210,7 +225,7 @@ adds a detailed evidence block for:
 
 - every row with a reproduced production effect;
 - every row with any `UNAVAILABLE` value that changes an aggregate;
-- every row that disagrees with the original audit;
+- in the comparator report, every row that disagrees with the original audit;
 - every unsatisfiable/contradictory or policy-promoted blocker; and
 - every row where splitting or combining effects could change a denominator.
 
@@ -220,26 +235,39 @@ does not create credit for producing more rows.
 
 ## Blind Analysis Protocol
 
-1. Reconstruct the 51-row census without opening the existing cause labels.
-2. Classify all six axes and attach evidence locators.
-3. Content-freeze the row set, rules, counts, and unavailable values.
-4. Only then open the existing audit and build an axis-by-axis comparison.
-5. Report every disagreement; do not hide it inside an aggregate.
-6. A second agent adjudicates only disagreements and all rows marked
-   `REPRODUCED_PRODUCTION_EFFECT`.
-7. Apply the frozen axes to the temporal check.
+1. A Fugu blind-calibration session starts at exact pre-audit snapshot
+   `c258cbf…`, is not told an expected effect-row count, and cannot see the
+   provisional or temporal reports.
+2. It reconstructs the successor-effect census, classifies all six axes,
+   publishes raw rows before aggregates, commits the report, and emits a
+   deterministic row-identity digest.
+3. A **fresh Fugu comparison session** receives the immutable blind report and
+   provisional audit. It reconciles every row by exact effect identity before
+   comparing any count or axis.
+4. The comparator records every exact/semantic match, one-sided row,
+   split/merge difference, non-comparable claim, and unavailable relation. It
+   does not edit either source.
+5. The comparator content-freezes the normalized row map, comparison rules,
+   per-axis disagreements, unavailable values, and aggregates.
+6. Only after that freeze does the comparator apply the unchanged rubric to
+   the three temporal reports.
+7. A fresh Claude session adjudicates only the exact decision-relevant queue:
+   row/axis disagreements, reproduced effects, decision-critical unavailable
+   values, policy/contradiction rows, and denominator-changing splits/merges.
 
 Preferred low-Codex routing after provider recovery:
 
 - blind classifier: Fugu `fugu-ultra-v1.1`;
+- corpus comparator and temporal checker: fresh Fugu `fugu-ultra-v1.1`;
 - disagreement and reproduced-effect adjudicator: fresh Claude
   `claude-opus-5` session;
 - Codex: no worker fallback; manager records the final process decision only
   if evidence conflicts after adjudication.
 
-If Fugu remains unavailable, a fresh Claude session may perform the blind
-classification, but the shared-model limitation must be recorded and no
-same-session author/reviewer pairing is allowed.
+If Fugu remains unavailable, preserve the held tasks. A provider substitution
+requires a newly prepared packet and an explicit independence analysis; it
+must not silently collapse calibration, comparison, and adjudication into one
+Claude session.
 
 ## Required Measures
 
@@ -287,13 +315,14 @@ experiments; it may not collapse them into "make review more exhaustive".
 No review template, mandatory finding count, repair-delta threshold, severity
 vocabulary, or checklist is adopted until:
 
-1. every decision-critical disagreement and every reproduced-effect row is
+1. blind row reconciliation is complete without count-based grading;
+2. every decision-critical disagreement and every reproduced-effect row is
    adjudicated or explicitly `UNAVAILABLE`;
-2. the temporal check is reported without retuning;
-3. the existing intervention pilot completes or is explicitly retired;
-4. any changed root-cause labels receive a sensitivity replay;
-5. proposed fields map one-to-one to a measured failure mode; and
-6. a small live experiment reports capture, noise, duplication, author burden,
+3. the temporal check is reported without retuning;
+4. the existing intervention pilot completes or is explicitly retired;
+5. any changed root-cause labels receive a sensitivity replay;
+6. proposed fields map one-to-one to a measured failure mode; and
+7. a small live experiment reports capture, noise, duplication, author burden,
    reviewer burden, and false positives.
 
 The result may legitimately be "insufficient evidence to change the process".
@@ -306,13 +335,19 @@ The blind classifier may write only:
 docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-classification-fugu-20260731/classification.md
 ```
 
+The comparator may write only:
+
+```text
+docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-comparison-fugu-20260731/comparison.md
+```
+
 The adjudicator may write only:
 
 ```text
 docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-adjudication-claude-20260731/adjudication.md
 ```
 
-Both lanes are report-only, must commit only their authorized report, and must
+All three lanes are report-only, must commit only their authorized report, and must
 leave their worktrees clean. They may run Python reproductions in isolated
 temporary copies. They must not run Cargo/Rust builds, mutate product files,
 edit the audit or frozen pilot, use network calls, or change any project

@@ -1,6 +1,6 @@
 # CFR-168 Review Root-Cause Reliability Disagreement Adjudication
 
-Status: blocked on committed blind-classification report and exact digest  
+Status: blocked on committed blind-calibration and comparison reports
 Owner: portfolio manager  
 Provider/model: Claude / `claude-opus-5`  
 Role: independent disagreement adjudicator  
@@ -9,34 +9,40 @@ Product/process mutation: forbidden
 
 ## Admission Inputs
 
-This packet is deliberately incomplete until the blind Fugu classifier
-commits:
+This packet is deliberately incomplete until the blind Fugu classifier and
+fresh Fugu comparator commit:
 
 ```text
 docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-classification-fugu-20260731/classification.md
+docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-comparison-fugu-20260731/comparison.md
 ```
 
 Before launch, the manager must update this ticket and its typed packet with:
 
 - exact classifier report commit and tree;
 - report byte count and SHA-256;
-- blind-freeze byte count, SHA-256, and event locator;
 - calibration row-set digest or deterministic row identity list;
-- all row/axis disagreements;
+- exact comparator report commit, tree, byte count, and SHA-256;
+- comparison-freeze byte count, SHA-256, and event locator;
+- normalized row-map and adjudication-queue identity digests;
+- all decision-relevant row/axis disagreements;
 - all rows marked `REPRODUCED_PRODUCTION_EFFECT`;
-- every decision-critical `UNAVAILABLE` row routed by the classifier; and
-- the classifier's temporal-holdout result.
+- every decision-critical `UNAVAILABLE` row routed by the comparator;
+- every policy/contradiction row and denominator-changing split/merge; and
+- the comparator's temporal-holdout result.
 
 Do not create a `dev-swarm.v1` manifest until those values are committed and
 the updated packet passes the complete AI-development gate.
 
 ## Objective
 
-Adjudicate only the finite queue produced by the blind classifier:
+Adjudicate only the finite queue produced by the fresh comparator:
 
-1. every row/axis disagreement with the provisional audit;
+1. every decision-relevant row/axis disagreement between the immutable blind
+   report and provisional audit;
 2. every row classified as a reproduced production effect; and
-3. every classifier-routed unavailable value whose resolution could change an
+3. every comparator-routed unavailable, policy/contradiction, or
+   denominator-changing split/merge whose resolution could change an
    intervention decision.
 
 Resolve each item from exact Git objects, prior declared scope, repair wording,
@@ -52,8 +58,9 @@ author, intervention-pilot, product review, or implementation sessions.
 
 Claude produced the provisional audit, so model-family independence is
 limited even with a fresh session. Record that threat explicitly. The blind
-Fugu rows remain immutable input: the adjudicator may select a final value or
-`UNAVAILABLE`, but may not rewrite the Fugu report or its freeze.
+Fugu rows and comparison report remain immutable inputs: the adjudicator may
+select a final value or `UNAVAILABLE`, but may not rewrite either Fugu report
+or either freeze.
 
 For each queued row:
 
@@ -74,7 +81,7 @@ severity labels, test names, and report wording are not substitute evidence.
 
 ## No Volume Target
 
-The queue size is determined entirely by the committed classifier output.
+The queue size is determined entirely by the committed comparator output.
 There is no requested finding count, minimum number of disagreements, or
 credit for adding bullets. Do not reopen agreed, non-reproduced,
 non-decision-critical rows unless exact evidence proves that the row identity
@@ -91,7 +98,7 @@ docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-adjudicat
 
 The report contains:
 
-1. exact task/gate/classifier/audit identities and SHA-256 values;
+1. exact task/gate/classifier/comparator/audit identities and SHA-256 values;
 2. the immutable input queue and completeness proof;
 3. one evidence block per queued row;
 4. per-axis Fugu value, provisional-audit value, adjudicated value, and
@@ -110,8 +117,9 @@ The report may conclude that the evidence is insufficient.
 
 ## Authorized Operations
 
-Read the exact classifier, provisional audit, reliability gate, object chains,
-packets, result reports, implicated Python source/tests, and Git objects.
+Read the exact classifier, comparator, provisional audit, reliability gate,
+object chains, packets, result reports, implicated Python source/tests, and
+Git objects.
 Safe Python reproductions and deliberate oracle falsifications may run in
 temporary copies.
 
@@ -163,4 +171,3 @@ Commit only the adjudication report and leave the worktree clean. Return:
 - supported/unsupported experiment cards;
 - every threat to validity; and
 - every validation command and result.
-

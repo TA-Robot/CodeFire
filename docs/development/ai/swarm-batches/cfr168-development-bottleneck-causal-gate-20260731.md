@@ -265,7 +265,7 @@ raw outcomes and return `INSUFFICIENT_EVIDENCE`.
 
 - Hypothesis: `H-NR-09`.
 - Admission: the already prepared report-only preflight may run as evidence
-  collection before the blind classification because it mutates no product
+  collection before the blind calibration because it mutates no product
   byte and binds no rejected implementation as accepted behavior.
 - Intervention: enumerate candidate shared contracts from exact immutable
   findings; no extraction or product implementation.
@@ -277,7 +277,8 @@ raw outcomes and return `INSUFFICIENT_EVIDENCE`.
   confer acceptance on its product implementation.
 - Interpretation boundary: neither `READY` nor a later MR-write repair proves
   `H-NR-09` or a speedup. General process adoption and recurrence claims wait
-  for the blind classification, adjudication, and a later eligible subject.
+  for the blind calibration, fresh-session comparison, adjudication, and a
+  later eligible subject.
 
 ## Common Outcome Measures
 
@@ -336,8 +337,9 @@ Until this gate has decision-grade evidence:
 
 No permanent development-process change is justified by this gate until:
 
-1. the review reliability classification and disagreement adjudication are
-   complete for review/repair hypotheses;
+1. the review reliability blind calibration, fresh-session row/axis
+   comparison, temporal check, and disagreement adjudication are complete for
+   review/repair hypotheses;
 2. the intervention has a complete preregistered eligible cohort or explicitly
    returns `INSUFFICIENT_EVIDENCE`;
 3. every target and guardrail is reported with raw numerator, denominator, and
