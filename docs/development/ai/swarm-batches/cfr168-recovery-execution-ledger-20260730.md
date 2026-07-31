@@ -2210,3 +2210,18 @@ test set remains mandatory to recompute after both independent decisions.
 This evidence neither accepts `753c8db` nor starts composition. It reduces
 future ambiguity without turning a large manually generated checklist into a
 quality metric.
+
+## 2026-07-31 10:35 UTC intervention-pilot freeze reverified after reboot
+
+The frozen calibration file still exists at
+`/tmp/pilot/calibration-frozen.md`, is 27,813 bytes, and exactly matches
+SHA-256
+`4d57c323b7c20015c9cd388c4175c973631a67839d8e3d0cc427e58a7cec87d9`.
+The complete 1,065,522-byte provider event log also still exactly matches
+`af6baeac543f716784c4be65cc9c2bf6b991860c30f8b6f89394427ec586e204`.
+
+The pilot worktree remains clean at HEAD `cdaee6a`, tree
+`c8125d0008b63eafff34d6bd7057da34dcc92229`. No holdout was opened and no
+pilot result or decision was created. Resume can therefore continue from the
+original frozen calibration after verified Claude capacity; no reconstruction
+or calibration retuning is needed.
