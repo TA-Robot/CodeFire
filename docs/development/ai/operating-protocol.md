@@ -223,6 +223,53 @@ Next:
 
 Manager-owned integration then records final validation and history updates once.
 
+## Successor Review Recurrence Gate
+
+Use the recurrence gate for review generation 2 or later. It addresses three
+different failure modes without treating them as one undifferentiated
+`REQUEST_CHANGES` loop:
+
+1. a prior obligation was never actually closed;
+2. the repair introduced a new effect or review surface;
+3. the earlier review, oracle, scope, or communication missed the effect.
+
+Before repair starts, the manager freezes each prior obligation's acceptance
+criterion, authorized repair boundary, production routes, anticipated
+regressions, and forbidden shortcuts in the content-addressed repair packet.
+The implementer may not replace those obligations with self-authored closure
+claims. Unplanned public APIs, state machines, classifiers, or persisted
+shapes require a manager scope decision before integration.
+
+The independent reviewer inspects two sets separately: closure of every prior
+obligation, then every surface created by the repair. Observation IDs,
+underlying effect episodes, and review generation are recorded separately so
+reworded duplicates do not look like more defects. A closed obligation needs
+predecessor reproduction, candidate verification, an independent assertion
+boundary, and a killed negative control (or exact evidence that such a
+control is inapplicable).
+
+There is deliberately no minimum or target finding count. Review stops only
+when the declared obligations, surfaces, production routes, repair delta,
+negative controls, and unavailable evidence have all been dispositioned.
+Nonblocking adjacent work may be `routed_open`, but only with an owner,
+release condition, and manager authority. Blocking work is never routed into
+an approval.
+
+After the reviewer has stopped, all child processes have ended, and the
+report-only commit exists, the manager writes the final JSON record and runs:
+
+```bash
+python3 docs/development/tools/check_review_recurrence.py \
+  --record <final-record.json> \
+  --git-root .
+```
+
+Only `integration_decision: ALLOW` authorizes integration. `request_changes`,
+`block`, incomplete terminalization, unreviewed repair surface, missing
+required gate, mismatched Git identity, and `--no-git-verify` all remain
+`BLOCK`. The interim pilot and measurement rules are in
+`review-recurrence/README.md`.
+
 ## Prompt Construction
 
 Do not maintain separate role-specific prompt documents. Build prompts from:

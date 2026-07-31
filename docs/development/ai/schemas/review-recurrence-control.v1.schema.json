@@ -1,0 +1,950 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codefire.dev/schemas/ai/review-recurrence-control.v1.schema.json",
+  "title": "CodeFire Successor Review Recurrence Control v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "control_id",
+    "record_status",
+    "generation",
+    "subject",
+    "coverage",
+    "prior_findings",
+    "repair_delta",
+    "new_findings",
+    "validations",
+    "terminalization",
+    "outcomes",
+    "review_decision"
+  ],
+  "properties": {
+    "schema": {
+      "const": "codefire.review_recurrence_control.v1"
+    },
+    "control_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"
+    },
+    "record_status": {
+      "const": "final"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "subject": {
+      "$ref": "#/$defs/subject"
+    },
+    "coverage": {
+      "$ref": "#/$defs/coverage"
+    },
+    "prior_findings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/priorFinding"
+      }
+    },
+    "repair_delta": {
+      "$ref": "#/$defs/repairDelta"
+    },
+    "new_findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/newFinding"
+      }
+    },
+    "validations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/validation"
+      }
+    },
+    "terminalization": {
+      "$ref": "#/$defs/terminalization"
+    },
+    "outcomes": {
+      "$ref": "#/$defs/outcomes"
+    },
+    "review_decision": {
+      "enum": [
+        "accept",
+        "request_changes",
+        "block"
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullableSha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullableString": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "review_id",
+        "task_packet_id",
+        "task_packet_path",
+        "task_packet_sha256",
+        "base_revision",
+        "candidate_revision",
+        "candidate_tree",
+        "patch_sha256",
+        "changed_paths",
+        "review_control_revision",
+        "review_control_tree",
+        "control_patch_sha256",
+        "control_changed_paths",
+        "report_commit",
+        "report_path",
+        "report_sha256"
+      ],
+      "properties": {
+        "review_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_packet_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_packet_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_packet_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "base_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_tree": {
+          "type": "string",
+          "minLength": 1
+        },
+        "patch_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "changed_paths": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "review_control_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_control_tree": {
+          "type": "string",
+          "minLength": 1
+        },
+        "control_patch_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "control_changed_paths": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "report_commit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "report_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "report_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "finding_target_policy",
+        "stopping_rule",
+        "declared_surfaces",
+        "out_of_scope"
+      ],
+      "properties": {
+        "finding_target_policy": {
+          "const": "none"
+        },
+        "stopping_rule": {
+          "$ref": "#/$defs/stoppingRule"
+        },
+        "declared_surfaces": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "out_of_scope": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "stoppingRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "prior_obligations_dispositioned",
+        "declared_surfaces_checked",
+        "repair_delta_checked",
+        "production_routes_checked",
+        "negative_controls_checked",
+        "unavailable_evidence_explicit",
+        "rationale"
+      ],
+      "properties": {
+        "method": {
+          "const": "obligation_and_surface_saturation"
+        },
+        "prior_obligations_dispositioned": {
+          "type": "boolean"
+        },
+        "declared_surfaces_checked": {
+          "type": "boolean"
+        },
+        "repair_delta_checked": {
+          "type": "boolean"
+        },
+        "production_routes_checked": {
+          "type": "boolean"
+        },
+        "negative_controls_checked": {
+          "type": "boolean"
+        },
+        "unavailable_evidence_explicit": {
+          "type": "boolean"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "summary",
+        "evidence_refs"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "reproduced",
+            "verified",
+            "open",
+            "not_applicable",
+            "unavailable"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "negativeControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "rationale",
+        "evidence_refs"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "killed",
+            "survived",
+            "not_applicable",
+            "unavailable"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "property",
+        "independence_basis",
+        "assertion_boundary",
+        "positive_control_refs",
+        "negative_control"
+      ],
+      "properties": {
+        "property": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independence_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assertion_boundary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "positive_control_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "negative_control": {
+          "$ref": "#/$defs/negativeControl"
+        }
+      }
+    },
+    "causalClasses": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "initial_review_scope_miss",
+          "repair_introduced_regression",
+          "bound_finding_not_closed",
+          "oracle_gap",
+          "communication_ambiguity",
+          "reviewer_artifact",
+          "requirement_or_scope_expansion",
+          "pre_existing_adjacent",
+          "shared_primitive_or_composition_miss",
+          "unavailable"
+        ]
+      }
+    },
+    "priorFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "observation_id",
+        "effect_episode_id",
+        "origin_generation",
+        "continuity",
+        "obligation",
+        "closure_contract",
+        "blocking",
+        "disposition",
+        "causal_classes",
+        "before",
+        "after",
+        "oracle",
+        "evidence_refs",
+        "owner",
+        "release_condition",
+        "route_authority"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effect_episode_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin_generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "continuity": {
+          "enum": [
+            "new_effect",
+            "continuous_open",
+            "recurred_after_proven_closure",
+            "unknown"
+          ]
+        },
+        "obligation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "closure_contract": {
+          "$ref": "#/$defs/closureContract"
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "disposition": {
+          "enum": [
+            "closed",
+            "open",
+            "routed_open",
+            "unavailable"
+          ]
+        },
+        "causal_classes": {
+          "$ref": "#/$defs/causalClasses"
+        },
+        "before": {
+          "$ref": "#/$defs/observation"
+        },
+        "after": {
+          "$ref": "#/$defs/observation"
+        },
+        "oracle": {
+          "$ref": "#/$defs/oracle"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "owner": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "release_condition": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "route_authority": {
+          "$ref": "#/$defs/nullableString"
+        }
+      }
+    },
+    "closureContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acceptance_criterion",
+        "repair_boundary",
+        "required_production_routes",
+        "anticipated_regressions",
+        "forbidden_shortcuts"
+      ],
+      "properties": {
+        "acceptance_criterion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repair_boundary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_production_routes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "anticipated_regressions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "forbidden_shortcuts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "newSurface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "symbol",
+        "kind",
+        "required_by",
+        "planned",
+        "plan_ref",
+        "disposition",
+        "evidence_refs"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "public_api",
+            "state_machine",
+            "classifier",
+            "persisted_shape",
+            "private_symbol",
+            "test_or_oracle",
+            "claim"
+          ]
+        },
+        "required_by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "planned": {
+          "type": "boolean"
+        },
+        "plan_ref": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "disposition": {
+          "enum": [
+            "reviewed",
+            "blocked",
+            "unreviewed"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "repairDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inserted_lines",
+        "deleted_lines",
+        "binary_paths",
+        "new_surfaces",
+        "scope_expansion",
+        "scope_authority",
+        "scope_rationale"
+      ],
+      "properties": {
+        "inserted_lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deleted_lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "binary_paths": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "new_surfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/newSurface"
+          }
+        },
+        "scope_expansion": {
+          "enum": [
+            "none",
+            "manager_approved",
+            "blocked"
+          ]
+        },
+        "scope_authority": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "scope_rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "newFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "observation_id",
+        "effect_episode_id",
+        "continuity",
+        "severity",
+        "blocking",
+        "causal_classes",
+        "attribution",
+        "disposition",
+        "statement",
+        "evidence_refs",
+        "owner",
+        "release_condition",
+        "route_authority"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effect_episode_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "continuity": {
+          "enum": [
+            "new_effect",
+            "continuous_open",
+            "recurred_after_proven_closure",
+            "unknown"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "block",
+            "high",
+            "medium",
+            "low",
+            "note"
+          ]
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "causal_classes": {
+          "$ref": "#/$defs/causalClasses"
+        },
+        "attribution": {
+          "enum": [
+            "created_by_candidate",
+            "pre_existing",
+            "unknown"
+          ]
+        },
+        "disposition": {
+          "enum": [
+            "open",
+            "routed_open",
+            "unavailable"
+          ]
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "owner": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "release_condition": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "route_authority": {
+          "$ref": "#/$defs/nullableString"
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "command",
+        "required",
+        "status",
+        "exit_code",
+        "terminal",
+        "duration_ms",
+        "log_ref",
+        "log_sha256",
+        "result_summary"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "blocked",
+            "unavailable"
+          ]
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "terminal": {
+          "type": "boolean"
+        },
+        "duration_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "log_ref": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "log_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "result_summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "terminalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "worker_alive",
+        "child_processes_active",
+        "report_state",
+        "event_log_ref",
+        "event_log_sha256",
+        "checked_at"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "complete",
+            "report_committed_worker_live",
+            "report_present_not_committed",
+            "terminalization_stalled",
+            "terminal_without_report",
+            "active",
+            "unavailable"
+          ]
+        },
+        "worker_alive": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "child_processes_active": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "report_state": {
+          "enum": [
+            "committed",
+            "present_uncommitted",
+            "missing",
+            "unavailable"
+          ]
+        },
+        "event_log_ref": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "event_log_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "checked_at": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prior_findings_total",
+        "prior_findings_closed",
+        "prior_findings_open",
+        "prior_findings_routed",
+        "prior_findings_unavailable",
+        "candidate_created_findings",
+        "new_findings_total",
+        "new_findings_open",
+        "new_findings_routed",
+        "new_findings_unavailable",
+        "prior_observations_total",
+        "prior_effect_episodes_total",
+        "new_observations_total",
+        "new_effect_episodes_total",
+        "unplanned_surfaces",
+        "repair_service_ms",
+        "review_service_ms",
+        "verdict_to_report_ms",
+        "unavailable_metrics"
+      ],
+      "properties": {
+        "prior_findings_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prior_findings_closed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prior_findings_open": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prior_findings_routed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prior_findings_unavailable": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_created_findings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "new_findings_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "new_findings_open": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "new_findings_routed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "new_findings_unavailable": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prior_observations_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prior_effect_episodes_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "new_observations_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "new_effect_episodes_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unplanned_surfaces": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repair_service_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "review_service_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "verdict_to_report_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unavailable_metrics": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "repair_service_ms",
+              "review_service_ms",
+              "verdict_to_report_ms"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

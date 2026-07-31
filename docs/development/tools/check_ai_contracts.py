@@ -29,6 +29,7 @@ SCHEMAS = {
     "docs/development/ai/schemas/task-packet.v1.schema.json": "https://codefire.dev/schemas/ai/task-packet.v1.schema.json",
     "docs/development/ai/schemas/context-manifest.v1.schema.json": "https://codefire.dev/schemas/ai/context-manifest.v1.schema.json",
     "docs/development/ai/schemas/review-packet.v1.schema.json": "https://codefire.dev/schemas/ai/review-packet.v1.schema.json",
+    "docs/development/ai/schemas/review-recurrence-control.v1.schema.json": "https://codefire.dev/schemas/ai/review-recurrence-control.v1.schema.json",
     "docs/development/ai/schemas/development-flow-record.v1.schema.json": "https://codefire.dev/schemas/ai/development-flow-record.v1.schema.json",
 }
 

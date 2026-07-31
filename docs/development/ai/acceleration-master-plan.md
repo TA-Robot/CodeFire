@@ -207,6 +207,7 @@ Only keep items that remove repeated human/AI overhead, can be checked cheaply, 
 | AIA-043 | Verdict-to-rollover latency | Active measurement/control: capture decision-settled to immutable-report-commit separately from review execution, require the compact exact-review form and one terminal verdict, and bind a prepared repair continuation in the same manager interval. This targets the current period where a decisive rejection exists but downstream repair cannot safely start. |
 | AIA-044 | Enforced Rust execution profile | Project-side fail-closed audit implemented in `../tools/check_rust_execution_profile.py`: it checks live scoped Cargo/rustc/Clippy processes plus durable agent commands for alternate toolchains, private targets/out-dirs, excessive jobs/threads, and incremental builds without printing arbitrary commands. A violation blocks another Rust launch and candidate freeze until acceptance gates are rerun on the shared profile. Preventing the worker from spawning the command inside `dev-swarm` remains foundation work. |
 | AIA-045 | Review terminalization budget | Project-side state detector implemented in `../tools/check_review_terminalization.py`: agent-authored verdict/report-ready signals, later event count, worker liveness, and the exact Git report state distinguish `WAIT`, `INTERVENE`, and `COMPLETE`. Manual intervention preserves the exact session/transcript and resumes report-only rather than starting a competing reviewer. Automatic scheduler checkpoint/nudge remains foundation work. |
+| AIA-047 | Count-free successor-review recurrence gate | Interim pilot implemented in `schemas/review-recurrence-control.v1.schema.json`, `../tools/check_review_recurrence.py`, `validation-report-template.md`, and `review-recurrence/README.md`. It freezes closure communication before repair, separates prior obligations from repair-created surfaces and new effects, requires negative controls and terminal evidence, and rejects finding quotas. It is required for the next Cargo and KGI successor reviews, but is not yet a proven speedup or permanent policy; promotion depends on their measured outcomes and an independent blind causal audit. |
 
 The AIA-021 provenance is intentionally local evidence. It does not claim a trusted/reproducible builder or dependency supply-chain attestation.
 
@@ -230,6 +231,10 @@ Current recommended next items:
    frozen so move-only work does not invalidate active exact reviews.
 8. Promote AIA-033 KGI/KPI changes only from complete event evidence; keep
    unavailable queue/cost fields explicit.
+9. Run the next Cargo and KGI successor reviews through AIA-047 before any
+   further recurrence repair, compare candidate-created effects, unplanned
+   surfaces, review/repair/report time, and generation count, then retain,
+   revise, or remove the pilot from measured evidence.
 
 ## Success Metrics
 

@@ -148,6 +148,7 @@ If the agent cannot state these, the work is not ready.
 | `operating-protocol.md` | Task packet shape, review packet shape, parallel-lane rules, and handoff format. |
 | `failure-cookbook.md` | Maps recurring environment, provenance, packet, timeout, JSON, and review failures to safe next actions. |
 | `validation-report-template.md` | Human handoff shape corresponding to the typed review contract; placeholders are never evidence. |
+| `review-recurrence/README.md` | Interim count-free successor-review pilot, record ownership, comparison measures, and promotion/rollback rules. |
 | `development-flow-kgi-kpi.md`, `flow-metrics/` | Promoted KGI/KPI definitions, management triggers, and schema-checked active/final measurement records. |
 
 ## Local Tools and Evidence
@@ -168,6 +169,7 @@ If the agent cannot state these, the work is not ready.
 | `../tools/check_swarm_admission.py` | Admits one additional external lane from live memory/swap/disk/PSI/PID pressure, a per-candidate reservation, provider congestion, and conflict ownership without a fixed total-agent cap. |
 | `../tools/check_rust_execution_profile.py` | Audits live Rust processes and agent event logs for private targets, alternate toolchains, excessive jobs/threads, or incremental builds; a violation blocks another Rust launch and candidate freeze. |
 | `../tools/check_review_terminalization.py` | Distinguishes healthy long-running review progress from repeated terminal-verdict/report-ready signals without an immutable report and emits an evidence-preserving intervention decision. |
+| `../tools/check_review_recurrence.py` | Git-binds a successor review, separates prior closure from candidate-created findings, verifies repair-delta/negative-control/terminal evidence, and blocks integration without using a finding-count quota. |
 | `../tools/run_timed_gate.py` | Runs one argv-only gate with monotonic duration, process-group timeout, complete log digest, and wall-clock-discontinuity evidence. |
 | `../tools/run_ai_role.py` | Codex-specific low-level adapter; validates a typed packet and binds context/base/dirty-state. Dry-run is default and real use requires explicit `--allow-codex`. |
 | `../tools/prepare_historical_eval.py` | Materializes one deterministic historical CFB/CFR candidate input while withholding the evaluator oracle. |

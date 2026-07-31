@@ -57,6 +57,10 @@ from check_review_terminalization import (  # noqa: E402
     agent_texts,
     evaluate_terminalization,
 )
+from check_review_recurrence import (  # noqa: E402
+    main as run_review_recurrence_gate,
+    validate_recurrence_control,
+)
 from build_source_bound_rust import (  # noqa: E402
     BINARY_PATH,
     build_source_manifest,
@@ -1138,6 +1142,399 @@ class ReviewTerminalizationTests(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertEqual(agent_texts(events), ["Still gathering evidence."])
+
+
+class ReviewRecurrenceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.schema = load_object(
+            ROOT
+            / "docs/development/ai/schemas/review-recurrence-control.v1.schema.json"
+        )
+
+    def record(self) -> dict[str, object]:
+        digest = "a" * 64
+        return {
+            "schema": "codefire.review_recurrence_control.v1",
+            "control_id": "review-control-001",
+            "record_status": "final",
+            "generation": 2,
+            "subject": {
+                "review_id": "review-002",
+                "task_packet_id": "repair-001",
+                "task_packet_path": "docs/development/ai/task-packets/repair.md",
+                "task_packet_sha256": digest,
+                "base_revision": "base",
+                "candidate_revision": "candidate",
+                "candidate_tree": "tree",
+                "patch_sha256": digest,
+                "changed_paths": ["product.txt"],
+                "review_control_revision": "control",
+                "review_control_tree": "control-tree",
+                "control_patch_sha256": digest,
+                "control_changed_paths": [
+                    "docs/development/ai/task-packets/repair.md"
+                ],
+                "report_commit": "report",
+                "report_path": (
+                    "docs/development/ai/swarm-results/review-002/review.md"
+                ),
+                "report_sha256": digest,
+            },
+            "coverage": {
+                "finding_target_policy": "none",
+                "stopping_rule": {
+                    "method": "obligation_and_surface_saturation",
+                    "prior_obligations_dispositioned": True,
+                    "declared_surfaces_checked": True,
+                    "repair_delta_checked": True,
+                    "production_routes_checked": True,
+                    "negative_controls_checked": True,
+                    "unavailable_evidence_explicit": True,
+                    "rationale": "All declared obligations and introduced surfaces ended.",
+                },
+                "declared_surfaces": ["product owner and terminal fence"],
+                "out_of_scope": [],
+            },
+            "prior_findings": [
+                {
+                    "id": "F-001",
+                    "observation_id": "OBS-002-001",
+                    "effect_episode_id": "EFFECT-001",
+                    "origin_generation": 1,
+                    "continuity": "continuous_open",
+                    "obligation": "The live route must terminate at the final fence.",
+                    "closure_contract": {
+                        "acceptance_criterion": "The final fence observes zero debt.",
+                        "repair_boundary": "The product owner and its focused tests.",
+                        "required_production_routes": ["normal and unwind routes"],
+                        "anticipated_regressions": ["early release before final fence"],
+                        "forbidden_shortcuts": ["test-only or claim-only closure"],
+                    },
+                    "blocking": True,
+                    "disposition": "closed",
+                    "causal_classes": ["bound_finding_not_closed"],
+                    "before": {
+                        "status": "reproduced",
+                        "summary": "The predecessor leaks one unit.",
+                        "evidence_refs": ["predecessor:test"],
+                    },
+                    "after": {
+                        "status": "verified",
+                        "summary": "The candidate reaches zero at the fence.",
+                        "evidence_refs": ["candidate:test"],
+                    },
+                    "oracle": {
+                        "property": "terminal debt is zero",
+                        "independence_basis": "asserts externally visible state",
+                        "assertion_boundary": "after the production final fence",
+                        "positive_control_refs": ["candidate:test"],
+                        "negative_control": {
+                            "status": "killed",
+                            "rationale": "Restoring the predecessor defect fails.",
+                            "evidence_refs": ["mutation:test"],
+                        },
+                    },
+                    "evidence_refs": ["source:owner", "log:focused"],
+                    "owner": None,
+                    "release_condition": None,
+                    "route_authority": None,
+                }
+            ],
+            "repair_delta": {
+                "inserted_lines": 1,
+                "deleted_lines": 0,
+                "binary_paths": [],
+                "new_surfaces": [
+                    {
+                        "path": "product.txt",
+                        "symbol": "final_fence",
+                        "kind": "private_symbol",
+                        "required_by": "F-001",
+                        "planned": True,
+                        "plan_ref": "repair-001#authorized-change",
+                        "disposition": "reviewed",
+                        "evidence_refs": ["review:repair-delta"],
+                    }
+                ],
+                "scope_expansion": "none",
+                "scope_authority": None,
+                "scope_rationale": "The change stays inside the authorized owner.",
+            },
+            "new_findings": [],
+            "validations": [
+                {
+                    "id": "focused",
+                    "command": "test focused",
+                    "required": True,
+                    "status": "passed",
+                    "exit_code": 0,
+                    "terminal": True,
+                    "duration_ms": 10,
+                    "log_ref": "log:focused",
+                    "log_sha256": digest,
+                    "result_summary": "passed",
+                }
+            ],
+            "terminalization": {
+                "state": "complete",
+                "worker_alive": False,
+                "child_processes_active": 0,
+                "report_state": "committed",
+                "event_log_ref": "events:review-002",
+                "event_log_sha256": digest,
+                "checked_at": "2026-07-31T12:00:00Z",
+            },
+            "outcomes": {
+                "prior_findings_total": 1,
+                "prior_findings_closed": 1,
+                "prior_findings_open": 0,
+                "prior_findings_routed": 0,
+                "prior_findings_unavailable": 0,
+                "candidate_created_findings": 0,
+                "new_findings_total": 0,
+                "new_findings_open": 0,
+                "new_findings_routed": 0,
+                "new_findings_unavailable": 0,
+                "prior_observations_total": 1,
+                "prior_effect_episodes_total": 1,
+                "new_observations_total": 0,
+                "new_effect_episodes_total": 0,
+                "unplanned_surfaces": 0,
+                "repair_service_ms": 20,
+                "review_service_ms": 30,
+                "verdict_to_report_ms": 5,
+                "unavailable_metrics": [],
+            },
+            "review_decision": "accept",
+        }
+
+    def codes(self, record: dict[str, object]) -> set[str]:
+        return {
+            finding.code
+            for finding in validate_recurrence_control(
+                record,
+                schema=self.schema,
+            )
+        }
+
+    def test_valid_accept_record_is_count_free_and_complete(self) -> None:
+        self.assertEqual(self.codes(self.record()), set())
+
+    def test_closed_finding_requires_a_killed_negative_control(self) -> None:
+        record = self.record()
+        record["prior_findings"][0]["oracle"]["negative_control"]["status"] = (
+            "survived"
+        )
+        self.assertIn("closure-without-negative-control", self.codes(record))
+
+    def test_blocking_finding_cannot_be_routed(self) -> None:
+        record = self.record()
+        row = record["prior_findings"][0]
+        row["disposition"] = "routed_open"
+        row["owner"] = "successor"
+        row["release_condition"] = "successor accepted"
+        row["route_authority"] = "manager:decision"
+        self.assertIn("blocking-finding-routed", self.codes(record))
+
+    def test_passed_validation_must_be_terminal_and_content_addressed(self) -> None:
+        record = self.record()
+        validation = record["validations"][0]
+        validation["terminal"] = False
+        validation["log_ref"] = None
+        validation["log_sha256"] = None
+        codes = self.codes(record)
+        self.assertIn("completed-validation-not-terminal", codes)
+        self.assertIn("completed-validation-without-log-reference", codes)
+        self.assertIn("completed-validation-without-log-digest", codes)
+
+    def test_accept_rejects_new_blocking_finding(self) -> None:
+        record = self.record()
+        record["new_findings"] = [
+            {
+                "id": "F-NEW",
+                "observation_id": "OBS-002-NEW",
+                "effect_episode_id": "EFFECT-NEW",
+                "continuity": "new_effect",
+                "severity": "high",
+                "blocking": True,
+                "causal_classes": ["repair_introduced_regression"],
+                "attribution": "created_by_candidate",
+                "disposition": "open",
+                "statement": "The repair introduced a new live-route failure.",
+                "evidence_refs": ["candidate:new-failure"],
+                "owner": "repair implementer",
+                "release_condition": "next exact candidate closes the failure",
+                "route_authority": None,
+            }
+        ]
+        outcomes = record["outcomes"]
+        outcomes["candidate_created_findings"] = 1
+        outcomes["new_findings_total"] = 1
+        outcomes["new_findings_open"] = 1
+        outcomes["new_observations_total"] = 1
+        outcomes["new_effect_episodes_total"] = 1
+        self.assertIn("accept-with-unresolved-new-finding", self.codes(record))
+
+    def test_unplanned_surface_needs_an_explicit_scope_decision(self) -> None:
+        record = self.record()
+        surface = record["repair_delta"]["new_surfaces"][0]
+        surface["planned"] = False
+        surface["plan_ref"] = None
+        record["outcomes"]["unplanned_surfaces"] = 1
+        self.assertIn(
+            "unplanned-surface-without-scope-decision",
+            self.codes(record),
+        )
+
+    def test_outcome_counts_cannot_collapse_effects_and_observations(self) -> None:
+        record = self.record()
+        record["outcomes"]["prior_effect_episodes_total"] = 2
+        self.assertIn("outcome-count-mismatch", self.codes(record))
+
+    def test_schema_rejects_a_finding_quota(self) -> None:
+        record = self.record()
+        record["coverage"]["target_finding_count"] = 100
+        self.assertIn("schema-additional-property", self.codes(record))
+
+    def test_schema_only_mode_never_allows_integration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            record_path = Path(temporary) / "record.json"
+            record_path.write_text(
+                json.dumps(self.record()),
+                encoding="utf-8",
+            )
+            with mock.patch("builtins.print"):
+                exit_code = run_review_recurrence_gate(
+                    [
+                        "--record",
+                        str(record_path),
+                        "--schema",
+                        str(
+                            ROOT
+                            / "docs/development/ai/schemas/"
+                            "review-recurrence-control.v1.schema.json"
+                        ),
+                        "--no-git-verify",
+                    ]
+                )
+            self.assertEqual(exit_code, 3)
+
+    def test_git_binding_covers_candidate_control_report_and_task(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+
+            def git(*args: str) -> str:
+                completed = subprocess.run(
+                    ["git", *args],
+                    cwd=root,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                return completed.stdout.strip()
+
+            git("init", "-q")
+            git("config", "user.name", "Review Test")
+            git("config", "user.email", "review@example.invalid")
+            (root / "README.md").write_text("base\n", encoding="utf-8")
+            git("add", "README.md")
+            git("commit", "-qm", "base")
+            base = git("rev-parse", "HEAD")
+            (root / "product.txt").write_text("candidate\n", encoding="utf-8")
+            git("add", "product.txt")
+            git("commit", "-qm", "candidate")
+            candidate = git("rev-parse", "HEAD")
+
+            task_path = Path("docs/development/ai/task-packets/repair.md")
+            (root / task_path).parent.mkdir(parents=True)
+            (root / task_path).write_text("repair packet\n", encoding="utf-8")
+            git("add", task_path.as_posix())
+            git("commit", "-qm", "review control")
+            control = git("rev-parse", "HEAD")
+            control_patch, control_paths, _, _ = canonical_git_patch(
+                root,
+                candidate,
+                control,
+            )
+
+            report_path = Path(
+                "docs/development/ai/swarm-results/review-002/review.md"
+            )
+            (root / report_path).parent.mkdir(parents=True)
+            (root / report_path).write_text("review report\n", encoding="utf-8")
+            git("add", report_path.as_posix())
+            git("commit", "-qm", "review report")
+            report = git("rev-parse", "HEAD")
+
+            patch, paths, resolved_base, resolved_candidate = canonical_git_patch(
+                root,
+                base,
+                candidate,
+            )
+            record = self.record()
+            record["subject"].update(
+                {
+                    "task_packet_path": task_path.as_posix(),
+                    "task_packet_sha256": hashlib.sha256(
+                        (root / task_path).read_bytes()
+                    ).hexdigest(),
+                    "base_revision": resolved_base,
+                    "candidate_revision": resolved_candidate,
+                    "candidate_tree": git("rev-parse", f"{candidate}^{{tree}}"),
+                    "patch_sha256": hashlib.sha256(patch).hexdigest(),
+                    "changed_paths": sorted(paths),
+                    "review_control_revision": control,
+                    "review_control_tree": git(
+                        "rev-parse",
+                        f"{control}^{{tree}}",
+                    ),
+                    "control_patch_sha256": hashlib.sha256(
+                        control_patch
+                    ).hexdigest(),
+                    "control_changed_paths": sorted(control_paths),
+                    "report_commit": report,
+                    "report_path": report_path.as_posix(),
+                    "report_sha256": hashlib.sha256(
+                        (root / report_path).read_bytes()
+                    ).hexdigest(),
+                }
+            )
+            findings = validate_recurrence_control(
+                record,
+                schema=self.schema,
+                root=root,
+                verify_git=True,
+            )
+            self.assertEqual(findings, [])
+
+            record["repair_delta"]["inserted_lines"] = 2
+            self.assertIn(
+                "repair-delta-mismatch",
+                {
+                    finding.code
+                    for finding in validate_recurrence_control(
+                        record,
+                        schema=self.schema,
+                        root=root,
+                        verify_git=True,
+                    )
+                },
+            )
+            record["repair_delta"]["inserted_lines"] = 1
+            record["subject"]["report_sha256"] = "0" * 64
+            self.assertIn(
+                "report-digest-mismatch",
+                {
+                    finding.code
+                    for finding in validate_recurrence_control(
+                        record,
+                        schema=self.schema,
+                        root=root,
+                        verify_git=True,
+                    )
+                },
+            )
 
 
 class FocusedTestMapTests(unittest.TestCase):

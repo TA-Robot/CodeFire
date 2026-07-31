@@ -128,3 +128,74 @@ The last line appears exactly once and must be either
 `OVERALL_VERDICT: ACCEPT` or `OVERALL_VERDICT: REQUEST_CHANGES`.
 `ACCEPT_WITH_NOTES` is not permitted. Discussion may describe acceptance
 criteria, but must not emit a second `OVERALL_VERDICT` line.
+
+## Successor Review Recurrence Addendum
+
+For review generation 2 or later, use this addendum with the compact exact
+review and produce a final
+`schemas/review-recurrence-control.v1.schema.json` record. It is not a request
+for a fixed number of findings. Do not infer thoroughness from report length
+or fill a quota.
+
+### Before the repair
+
+The manager, not the implementer, freezes one closure contract for every prior
+obligation in the content-addressed repair packet:
+
+| Obligation ID | Exact acceptance criterion | Authorized boundary | Required live routes | Anticipated regressions | Forbidden shortcuts |
+|---|---|---|---|---|---|
+| <stable ID> | <externally observable result> | <smallest allowed symbols/paths> | <normal/error/unwind/composition routes> | <specific ways this repair can regress> | <test-only, claim-only, weakened oracle, new API, etc.> |
+
+This table is a communication boundary. If the implementation needs a new
+public API, state machine, classifier, persisted shape, or other unplanned
+surface, stop for a manager scope decision; do not silently redefine the
+obligation.
+
+### Independent successor review
+
+Review every prior obligation first, then review the candidate-created delta
+as a distinct pass:
+
+| Prior obligation | Observation ID | Effect episode ID | Origin generation | Before | After | Negative control | Disposition |
+|---|---|---|---:|---|---|---|---|
+| <ID> | <this report's observation> | <underlying effect> | <n> | reproduced / justified N/A | verified / open | killed / justified N/A | CLOSED / OPEN / ROUTED_OPEN / UNAVAILABLE |
+
+| Actual repair surface | Required by | Planned? | Kind | Review evidence | Disposition |
+|---|---|---|---|---|---|
+| <path:symbol/claim> | <obligation ID> | yes + plan ref / no | public API / state machine / classifier / persisted shape / private symbol / oracle / claim | <counterexample, test, source> | REVIEWED / BLOCKED / UNREVIEWED |
+
+| New observation | Effect episode | Candidate-created? | Causal class(es) | Blocking? | Evidence | Disposition/route |
+|---|---|---|---|---|---|---|
+| <ID> | <stable underlying effect> | yes / pre-existing / unknown | initial-scope miss / repair-introduced / bound-not-closed / oracle / communication / reviewer artifact / scope expansion / adjacent / composition | yes/no | <live reproducer> | OPEN / ROUTED_OPEN / UNAVAILABLE |
+
+Do not count a reworded observation as a new effect episode. Multiple causal
+classes may apply; do not use a generic `mixed` label. A routed item names an
+owner, release condition, and exact manager authority, and it must be
+nonblocking.
+
+### Count-free stopping rule
+
+Mark each condition independently. `ACCEPT` is invalid unless all are true:
+
+- every prior obligation has a disposition;
+- every declared review surface was checked;
+- the actual repair delta, including unplanned surfaces, was checked;
+- required production routes were exercised or explicitly unavailable;
+- applicable negative controls were killed;
+- unavailable evidence is explicit;
+- required validation is terminal, exit-code-bound, and content-addressed;
+- the report-only commit exists and the reviewer and all child processes have
+  stopped.
+
+After terminalization, the manager writes the JSON record and runs:
+
+```bash
+python3 docs/development/tools/check_review_recurrence.py \
+  --record <final-record.json> \
+  --git-root .
+```
+
+The manager records distinct observation/effect counts, candidate-created
+findings, unplanned surfaces, repair time, review time, and
+verdict-to-report time for later comparison. `--no-git-verify` is diagnostic
+only and can never return integration `ALLOW`.
