@@ -66,7 +66,8 @@
       "storage-spec-report:8ac6741",
       "storage-spec-sha256:6438df445b2d05510895fd23f73a4e71ba49238da15b00e86abf1a477b5ab960",
       "shape-pending:upload-retryable-cleanup",
-      "launch-ready:report-only-specification-preflight"
+            "launch-held:claude-health-provider-window-and-live-admission-required",
+            "launch-priority:after-cargo-upload-kgi-review-resumes"
     ]
   },
   "scope": {
@@ -107,8 +108,9 @@
       "subprojects/**",
       "install.sh"
     ],
-    "disallowed_actions": [
-      "Treat any rejecting candidate or currently reviewed Upload candidate as accepted product authority",
+        "disallowed_actions": [
+            "Launch before a bounded Claude health probe, review-resume priority check, live provider-window check, and live swarm admission all pass",
+            "Treat any rejecting candidate or currently reviewed Upload candidate as accepted product authority",
       "Modify product, tests, source contracts, issue state, lifecycle state, or an existing review report",
       "Freeze an exact primitive shape that depends on the open Upload cleanup residual rather than marking it shape-pending",
       "Implement the MR-write repair before the preflight report is committed and bound",

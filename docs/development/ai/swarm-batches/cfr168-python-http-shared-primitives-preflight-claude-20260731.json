@@ -1,0 +1,26 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-python-http-shared-primitives-preflight-claude-20260731",
+  "workspace": "/workspace/worktrees/cfr168-p0-canonical",
+  "base_revision": "2c439d8b483c14919633036741af43be221e98cc",
+  "max_parallel": {
+    "fugu": 0,
+    "claude": 1,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "python-http-shared-primitives-preflight",
+      "role": "architect",
+      "tier": "ultra",
+      "provider": "claude",
+      "ticket": "docs/development/ai/task-packets/cfr168-python-http-shared-primitives-preflight-20260730.md",
+      "depends_on": [],
+      "write_set": [
+        "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md"
+      ],
+      "expected_commit": true,
+      "timeout": "8h"
+    }
+  ]
+}

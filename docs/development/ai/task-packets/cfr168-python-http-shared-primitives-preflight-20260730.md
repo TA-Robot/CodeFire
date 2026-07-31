@@ -1,6 +1,6 @@
 # CFR-168 Python HTTP Shared-Primitives Adversarial Preflight
 
-Status: ready for report-only execution from immutable specifications
+Status: logically ready; provider launch held by Claude backoff and live admission
 
 Typed packet:
 [`json/cfr168-python-http-shared-primitives-preflight-20260730.json`](json/cfr168-python-http-shared-primitives-preflight-20260730.json)
@@ -219,3 +219,23 @@ The report must contain:
 Commit only the report. The manager must bind its commit and SHA-256 into the
 MR-write closure packet before creating or starting that implementation
 manifest.
+
+## Launch Hold
+
+Do not start merely because this packet is logically ready. Before launch the
+manager must:
+
+1. obtain one successful bounded Claude Opus 5 health probe after the recorded
+   provider backoff;
+2. preserve priority for the exact Cargo, Upload, and KGI/KPI review resumes
+   that release existing candidates;
+3. rerun live provider-window and
+   `docs/development/tools/check_swarm_admission.py` evidence at the actual
+   number of outstanding Claude lanes;
+4. verify the exact freeze base, declared write set, and absence of a competing
+   shared-primitives session; and
+5. record that this new report-only lane fits the current adaptive window and
+   resource floor.
+
+Provider recovery alone is not admission. If any check fails, preserve the
+manifest and leave the task held without falling back to Codex.
