@@ -344,9 +344,11 @@ boundaries.
 - Fields whose value necessarily changes with the replay location, such as an
   analysed local root path, may be excluded only by name and rationale. The
   machine-local path exclusions are exactly `analysed_git_root`,
-  `validator_source_root`, and CLI-added `record`, because they are
-  machine-local paths. They remain known closed-shape fields, not arbitrary
-  extension points.
+  `validator_source_root`, CLI-added `record`, and every top-level or
+  authority-link `deciding_gate.source_root`, because they are machine-local
+  paths. They remain known closed-shape fields, not arbitrary extension points;
+  all non-path deciding-gate state/revision/tree/artifact identity remains
+  exact authority.
 - `authority_chain.validator_identity_divergences` and
   `authority_chain.revalidated_generations` are current-gate replay
   diagnostics: a later gate necessarily derives different values. Validate
@@ -368,7 +370,9 @@ Required counterexamples independently mutate retained `git_verified`,
 `input_schema`, one timed validation fact, the authority root/arm/link set, and
 an otherwise unknown authority-looking member. Each must block a successor.
 Machine-local diagnostic paths may differ only where the contract explicitly
-permits them, while an unmodified retained result must still replay cleanly.
+permits them: a retained `deciding_gate.source_root` relocation must replay,
+while an unknown neighboring member must block. An otherwise unmodified
+retained result must still replay cleanly.
 
 ### F1h — route derivation dispositions and actions
 
