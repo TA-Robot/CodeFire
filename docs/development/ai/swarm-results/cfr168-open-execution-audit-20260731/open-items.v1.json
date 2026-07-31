@@ -1,0 +1,784 @@
+{
+  "schema": "codefire.cfr168_open_execution_audit.v1",
+  "version": 1,
+  "key_order_policy": "document-order-v1",
+  "snapshot": {
+    "head": "664f907062c9877f753b056902990916833f3b91",
+    "tree": "55256458b83a5db16fff6a944b47d27318e2b62e",
+    "captured_at": "2026-07-31T03:56:46Z",
+    "worktree": "/workspace/worktrees/cfr168-open-execution-audit-20260731-base",
+    "branch": "manager/cfr168-open-execution-audit-20260731",
+    "product_baseline": "e2a218e015953f082245f36dbc6aee906b837e5a",
+    "recovery_ledger": {
+      "path": "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md",
+      "sha256": "8362062938df520a36dd4fca6c3353ddc9cda415422dc739418ee2f5b5553f76"
+    },
+    "review_disposition_index": {
+      "path": "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md",
+      "sha256": "5739e784c4b34a6cf5a4470ac1fc066e038f92671bf09e8c4c6f38158e87478a"
+    }
+  },
+  "scope": {
+    "included_issue_ids": [
+      "CFR-168",
+      "CFB-136",
+      "CFB-138"
+    ],
+    "excluded_active_issue_ids": [
+      "CFB-133",
+      "CFR-169",
+      "CFR-170",
+      "CFR-171",
+      "CFR-172",
+      "CFR-173"
+    ],
+    "boundary": "Current CFR-168 recovery, exact-candidate review, runtime composition, successor-surface, and final lifecycle work only. Later portfolio roots are excluded."
+  },
+  "counts": {
+    "repository_active_issue_count": 9,
+    "scope_issue_count": 3,
+    "indexed_review_report_count": 18,
+    "product_review_report_count": 17,
+    "control_plane_review_report_count": 1,
+    "accept_review_count": 3,
+    "request_changes_review_count": 15,
+    "candidate_ready_card_count": 6,
+    "current_candidate_ready_card_count": 5,
+    "superseded_candidate_ready_card_count": 1,
+    "exact_fresh_review_candidate_count": 5,
+    "rejected_candidate_repair_blocker_count": 2,
+    "open_execution_item_count": 29,
+    "pending_output_count": 6
+  },
+  "scope_issues": [
+    {
+      "id": "CFR-168",
+      "status": "investigating",
+      "owner_domain": "bounded-graph-resource-work",
+      "owner_module_in_root_map": "crates/codefire-cli/src/metrics.rs",
+      "current_subject": "Aggregate root; no accepted integrated Python or Rust runtime composition exists.",
+      "remaining_blocker": "All 29 open execution items in this record.",
+      "next_required_development_step": "Finish exact candidate review and repair, runtime compositions, successor surfaces, metrics/conformance, and the complete terminal lifecycle.",
+      "evidence_paths": [
+        "docs/development/code-review-issues/cfr-168.md",
+        "docs/development/issue-root-cause-map.json"
+      ]
+    },
+    {
+      "id": "CFB-136",
+      "status": "investigating",
+      "owner_domain": "snapshot-safe validation reuse",
+      "owner_module_in_root_map": "crates/codefire-store/src/lib.rs",
+      "current_subject": "Store nucleus and branch-list connection are partial; no aggregate accepted closure candidate exists.",
+      "remaining_blocker": "Branch ref/JSON accounting, Doctor, Storage, ancestry, metrics, Install, Dogfood, and Retrospect remain.",
+      "next_required_development_step": "Close remaining consumers on accepted compositions and run installed same-inode mutation reversals.",
+      "evidence_paths": [
+        "docs/development/bug-issues/cfb-136.md",
+        "docs/development/issue-root-cause-map.json"
+      ]
+    },
+    {
+      "id": "CFB-138",
+      "status": "investigating",
+      "owner_domain": "Python Upload sealed-validation lifetime",
+      "owner_module_in_root_map": "codefire",
+      "current_subject": "Exact Upload candidate 467b0c27715e424ae18ffb5664da053b55915e2d is under fresh Fugu rereview.",
+      "remaining_blocker": "Exact acceptance, Python composition, default-profile installed scale reversal, and terminal lifecycle remain.",
+      "next_required_development_step": "Collect the exact review and, if accepted, compose and run the 1201-commit/default-profile installed evidence.",
+      "evidence_paths": [
+        "docs/development/bug-issues/cfb-138.md",
+        "docs/development/issue-root-cause-map.json"
+      ]
+    }
+  ],
+  "open_execution_items": [
+    {
+      "id": "CTRL-SOURCE-KEYED-RUST-GATE",
+      "owner_domain": "AI control / Rust validation provenance",
+      "current_subject": "UNBOUND; source-keyed guard implementation files are absent from the canonical snapshot.",
+      "verdict": "PRECOMMIT_BLOCK",
+      "remaining_blocker": "Ten mandatory audit classes remain: source TOCTOU and namespace poisoning, real aggregate budgeting, cleanup races, Git/evidence containment, exact toolchain binding, fake or zero-test summaries, durable BLOCK/fsync, source-mutating Cargo forms, indirect bypasses, and non-finite timeouts.",
+      "next_required_development_step": "Repair all ten classes, commit the exact guard, run its adversarial Python suite, obtain independent acceptance, port and machine-bind it, then rerun exact Rust candidate gates.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md",
+        "docs/development/ai/swarm-batches/cfr168-rust-storage-review-closure-resume-preflight-20260731.md"
+      ]
+    },
+    {
+      "id": "PY-DOCTOR-BRANCH-COMPOSED-INPUT",
+      "owner_domain": "Python HTTP Doctor and branch-list dispatcher",
+      "current_subject": "Candidate 701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714; ACCEPT report c57215e243839b224a641251fc9e3bf092f7e116 with SHA-256 c7a1665fdf4a6e1104bbab18ec8051c048ace1d25e865952bbbcd35a06eb19c0.",
+      "verdict": "ACCEPT_EXACT_ONLY_NOT_INTEGRATED",
+      "remaining_blocker": "The tree embeds older Upload bytes and is only a composition scaffold.",
+      "next_required_development_step": "Port the accepted product delta after accepted Upload/MR inputs and obtain a fresh composed-spine review.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-doctor-branch-composition-rereview-20260730/review.md",
+        "docs/development/ai/task-packets/cfr168-python-http-composition-freeze-20260730.md"
+      ]
+    },
+    {
+      "id": "PY-UPLOAD-CFB138",
+      "owner_domain": "Python HTTP Upload / CFB-138",
+      "current_subject": "Candidate 467b0c27715e424ae18ffb5664da053b55915e2d; predecessor REQUEST_CHANGES report f835f64abb50fecaea28673ffa5dd829f1d3fc70 with SHA-256 7632552eb0ca60addca0d83fe3ba53ead642a7cbee82937b1b7b37754f6cb2cf.",
+      "verdict": "FRESH_REREVIEW_ACTIVE_NO_REPORT",
+      "remaining_blocker": "Fresh Fugu session 019fb648-a2cb-7ae2-ab60-d0514671c933 has no committed report; the first launch failed safely before provider dispatch.",
+      "next_required_development_step": "Collect the exact Fugu report; on ACCEPT, port only the product delta into Python composition and rerun composed proof.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-upload-review-closure-repair-candidate-ready-20260731/candidate.md",
+        "docs/development/ai/swarm-batches/cfr168-python-http-upload-review-closure-rereview-fugu-20260731.md",
+        "docs/development/ai/swarm-results/cfr168-python-http-upload-review-closure-rereview-launch-20260731/incident.md"
+      ]
+    },
+    {
+      "id": "PY-MR-LIST",
+      "owner_domain": "Python HTTP MR-list",
+      "current_subject": "Candidate b16404676639336f705feffd9af4857d4a1fcc69; predecessor REQUEST_CHANGES report 909978c1537824b21c59615fa6135e3e16696145 with SHA-256 dc4f66ba9649e4333980996c6f83d7f28b0f5f4bd165683adac55bf6d9704b2e.",
+      "verdict": "FRESH_REREVIEW_ACTIVE_NO_REPORT",
+      "remaining_blocker": "Claude review session 220f8ff1-1c65-4424-be46-4e1ccf279c8c has no committed report.",
+      "next_required_development_step": "Collect the immutable exact report and either bind ACCEPT or return its findings to the same lineage.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-mr-list-final-publication-closure-repair-candidate-ready-20260731/candidate.md",
+        "docs/development/ai/swarm-batches/cfr168-python-http-mr-list-final-publication-closure-rereview-claude-20260731.md"
+      ]
+    },
+    {
+      "id": "PY-SHARED-PRIMITIVES-PREFLIGHT",
+      "owner_domain": "Python HTTP request/session/authority/response/cleanup primitives",
+      "current_subject": "UNBOUND; no READY/BLOCK preflight report exists.",
+      "verdict": "BLOCKED",
+      "remaining_blocker": "Exact accepted Upload and MR-list bindings are absent.",
+      "next_required_development_step": "After both ACCEPT decisions, run the report-only Fugu preflight and bind literal READY before MR-write implementation.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/cfr168-python-http-shared-primitives-preflight-20260730.md"
+      ]
+    },
+    {
+      "id": "PY-MR-WRITE",
+      "owner_domain": "Python HTTP MR create/review/apply",
+      "current_subject": "Candidate 6dd4527f23135388b53fc5c6d637c4105cc5d659; REQUEST_CHANGES report 84175bd2de8c92ee1eb4f64fd366e5d9b3560204 with SHA-256 214e42fc8f36108f45e17b13e4343bfc2b56cc89b72be5c1258f5b497c9ec6ef.",
+      "verdict": "REQUEST_CHANGES_PREDECESSOR_BLOCKED",
+      "remaining_blocker": "F1-F7 plus accepted Upload/MR-list and shared-primitives READY are unbound.",
+      "next_required_development_step": "Run the preflight, resume one bounded writer, produce an additive candidate, and obtain a fresh exact review.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-mr-mutation-zero-residual-rereview-fugu-20260730/review.md",
+        "docs/development/ai/swarm-batches/cfr168-python-http-mr-write-review-closure-repair-20260730.md"
+      ]
+    },
+    {
+      "id": "PY-HTTP-COMPOSITION",
+      "owner_domain": "Manager-owned Python runtime composition",
+      "current_subject": "UNBOUND.",
+      "verdict": "BLOCKED_PACKET",
+      "remaining_blocker": "Accepted Upload, MR-list, MR-write, and shared-primitives READY are not all bound.",
+      "next_required_development_step": "Port product-only deltas in frozen order, resolve shared owners, run focused/broad gates, and obtain exact independent composition ACCEPT.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/cfr168-python-http-composition-freeze-20260730.md"
+      ]
+    },
+    {
+      "id": "RUST-FILE-ANCESTRY",
+      "owner_domain": "Rust file-remote ancestry",
+      "current_subject": "Candidate 02b0d63651703aaac88c249bdc437cd173dfa397; predecessor REQUEST_CHANGES report 30bbb4609fd646ed193a69c12f906b7cb4073e9e with SHA-256 64a4831ea0a639d7f87fe0b08312677efcab8bfe014f0d5ba72806e9caceecf1.",
+      "verdict": "REVIEW_BLOCKED",
+      "remaining_blocker": "Source-keyed correct-profile Cargo evidence and fresh admission are absent.",
+      "next_required_development_step": "Pass repaired source-keyed gates with nonzero exact tests, then launch the exact Fugu rereview.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-rust-file-ancestry-zero-residual-repair-candidate-ready-20260730/candidate.md",
+        "docs/development/ai/swarm-batches/cfr168-rust-file-ancestry-zero-residual-rereview-fugu-20260730.md"
+      ]
+    },
+    {
+      "id": "RUST-FILE-DOCTOR",
+      "owner_domain": "Rust file-remote Doctor",
+      "current_subject": "Candidate cd130e544af0476162be153db58a0a840b75b134; accepted predecessor report c22a78aa025e4fd2bf38d335f9665b781e4f4714 with SHA-256 f7c52b05e312cc131fdfc2e2c0d9d486f5ee372b5ec93a85fdb44a95fb3ce1b9.",
+      "verdict": "REVIEW_BLOCKED",
+      "remaining_blocker": "The shared debug artifact selected zero tests; the release filter covered NOTE-3 only, not complete NOTE-1 through NOTE-3.",
+      "next_required_development_step": "Use the repaired source-keyed gate for nonzero exact debug/release NOTE coverage, then launch exact review.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-rust-file-doctor-review-note-closure-repair-candidate-ready-20260731/candidate.md",
+        "docs/development/ai/swarm-batches/cfr168-rust-file-doctor-review-note-closure-rereview-claude-20260730.md"
+      ]
+    },
+    {
+      "id": "RUST-HTTP-MR",
+      "owner_domain": "Rust HTTP MR create/review preflight",
+      "current_subject": "Candidate 92fc8103bb4de400eaf40e9db76075130dedbb35; predecessor REQUEST_CHANGES report 4b11ef96cb5cea2a9838bfc24bfaf5649f77624d with SHA-256 8bb1a418ce6db1aa932eca2d19990212a58a5f44ad42eb3ccd439e68b4f1417d.",
+      "verdict": "REVIEW_BLOCKED",
+      "remaining_blocker": "Source-bound shared-profile evidence must replace the private-target/full-session deviation.",
+      "next_required_development_step": "Rerun exact source-keyed nonzero gates, preserve process deviation, and launch fresh report-only review.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-rust-http-mr-preflight-evidence-closure-repair-candidate-ready-20260730/candidate.md",
+        "docs/development/ai/swarm-batches/cfr168-rust-http-mr-preflight-evidence-closure-rereview-claude-20260730.md"
+      ]
+    },
+    {
+      "id": "RUST-STORAGE",
+      "owner_domain": "Rust storage and storage-report",
+      "current_subject": "Candidate cdcb9bdefe7d25a118a9dc14171864d75f5ad304; REQUEST_CHANGES report 8ac6741d218e1869fef91d96d29ac0d18d9d674d with SHA-256 6438df445b2d05510895fd23f73a4e71ba49238da15b00e86abf1a477b5ab960.",
+      "verdict": "REQUEST_CHANGES_REPAIR_BLOCKED",
+      "remaining_blocker": "All F1-F9/R1-R14 remain; the source-keyed guard, final machine binding, fixed-L process gates, and fresh admission are absent.",
+      "next_required_development_step": "Resume the exact original session only after guard acceptance; implement within eleven paths, produce a candidate, and obtain a fresh review.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-rust-storage-zero-residual-rereview-fugu-20260730/review.md",
+        "docs/development/ai/swarm-batches/cfr168-rust-storage-review-closure-repair-control-addendum-20260731.md",
+        "docs/development/ai/swarm-batches/cfr168-rust-storage-review-closure-resume-preflight-20260731.md"
+      ]
+    },
+    {
+      "id": "RUST-RUNTIME-COMPOSITION",
+      "owner_domain": "Manager-owned Rust runtime composition",
+      "current_subject": "UNBOUND.",
+      "verdict": "BLOCKED_PACKET",
+      "remaining_blocker": "Exact ACCEPT candidates/reports for ancestry, Rust HTTP, Storage, and File Doctor are unbound.",
+      "next_required_development_step": "Compose accepted deltas only, synthesize shared docs, run source-keyed focused/broad gates, and obtain a fresh exact composition ACCEPT.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/cfr-168-rust-runtime-composition-freeze-20260730.md"
+      ]
+    },
+    {
+      "id": "PY-POST-GC",
+      "owner_domain": "Python HTTP POST gc",
+      "current_subject": "UNBOUND.",
+      "verdict": "NOT_LAUNCHED_PREDECESSOR_GATED",
+      "remaining_blocker": "The composed Upload/MR-mutation response/session owner is not accepted.",
+      "next_required_development_step": "Freeze the exact successor after Python composition, then implement and review it.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md"
+      ]
+    },
+    {
+      "id": "PY-LOCAL-ANCESTRY",
+      "owner_domain": "Python common_ancestor / ancestor_distances",
+      "current_subject": "UNBOUND.",
+      "verdict": "NOT_LAUNCHED_PREDECESSOR_GATED",
+      "remaining_blocker": "Stable integrated Python ancestry and the cross-runtime tie-break contract are absent.",
+      "next_required_development_step": "Freeze a parity packet after accepted Python composition, then implement and review it.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md"
+      ]
+    },
+    {
+      "id": "RUST-LOCAL-MERGE",
+      "owner_domain": "Rust local cf merge ancestry",
+      "current_subject": "UNBOUND.",
+      "verdict": "NOT_LAUNCHED_PREDECESSOR_GATED",
+      "remaining_blocker": "Storage main.rs ownership and the file-authority predecessor are unresolved.",
+      "next_required_development_step": "Freeze and implement the successor after accepted Rust composition.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md"
+      ]
+    },
+    {
+      "id": "RUST-SCAN",
+      "owner_domain": "Rust cf scan validation",
+      "current_subject": "UNBOUND.",
+      "verdict": "NOT_LAUNCHED_PREDECESSOR_GATED",
+      "remaining_blocker": "Storage main.rs/metrics ownership is unresolved.",
+      "next_required_development_step": "Bind shared session/counters after accepted Rust composition, then implement and review.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md"
+      ]
+    },
+    {
+      "id": "RUST-LOCAL-DOCTOR",
+      "owner_domain": "Rust local Doctor open-summary/evidence/active-state",
+      "current_subject": "UNBOUND.",
+      "verdict": "NOT_LAUNCHED_PREDECESSOR_GATED",
+      "remaining_blocker": "The Storage/session boundary and main integration slot are unresolved.",
+      "next_required_development_step": "Freeze the exact local-state successor after Rust composition, then implement and review.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md"
+      ]
+    },
+    {
+      "id": "RUST-FILE-CLONE",
+      "owner_domain": "Rust file clone graph walk",
+      "current_subject": "UNBOUND.",
+      "verdict": "NOT_LAUNCHED_PREDECESSOR_GATED",
+      "remaining_blocker": "An accepted reusable file-ancestry session and Storage integration are absent.",
+      "next_required_development_step": "Freeze the consumer packet, then implement, gate, and review it.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md"
+      ]
+    },
+    {
+      "id": "RUST-STORAGE-REPORT-GRAPH",
+      "owner_domain": "Rust storage-report graph walk",
+      "current_subject": "UNBOUND.",
+      "verdict": "NOT_LAUNCHED_PREDECESSOR_GATED",
+      "remaining_blocker": "An accepted reusable file-ancestry session and Storage integration are absent.",
+      "next_required_development_step": "Freeze the consumer packet, then implement, gate, and review it.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md"
+      ]
+    },
+    {
+      "id": "RUST-FILE-GC",
+      "owner_domain": "Rust file GC graph walk",
+      "current_subject": "UNBOUND.",
+      "verdict": "NOT_LAUNCHED_PREDECESSOR_GATED",
+      "remaining_blocker": "An accepted reusable file-ancestry session and Storage integration are absent.",
+      "next_required_development_step": "Freeze the consumer packet, then implement, gate, and review it.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md"
+      ]
+    },
+    {
+      "id": "FINAL-METRICS-PROJECTION",
+      "owner_domain": "Decision-work/cache metrics and CLI projection",
+      "current_subject": "UNBOUND blocked packet.",
+      "verdict": "BLOCKED",
+      "remaining_blocker": "Accepted runtime compositions, the successor set, selected commands, formulas, and call graphs are unbound.",
+      "next_required_development_step": "Run Fugu preflight, use one Claude writer, obtain an exact review, and manager-integrate to close S1/S2/S5-functional.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/cfr168-final-decision-work-metrics-projection-freeze-20260730.md"
+      ]
+    },
+    {
+      "id": "FINAL-COMPLEXITY-CONFORMANCE",
+      "owner_domain": "Canonical complexity table and Rust/Python corpus",
+      "current_subject": "UNBOUND blocked packet.",
+      "verdict": "BLOCKED",
+      "remaining_blocker": "Accepted integrated metrics projection and the stable runtime/successor set are absent.",
+      "next_required_development_step": "Create the table/corpus-only candidate, run both consumers and exact/1x/3x/10x gates, and obtain an exact review.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/cfr168-final-complexity-conformance-freeze-20260730.md"
+      ]
+    },
+    {
+      "id": "FINAL-SOURCE-CLOSE-PRECAP",
+      "owner_domain": "Manager Close and independent High review",
+      "current_subject": "UNBOUND.",
+      "verdict": "BLOCKED",
+      "remaining_blocker": "Accepted compositions, all successors, metrics, and complexity/corpus are absent.",
+      "next_required_development_step": "Freeze one exact integrated SHA, run complete Python/Rust/docs/conformance gates, and obtain exact High ACCEPT.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/cfr168-post-composition-lifecycle-freeze-20260730.md"
+      ]
+    },
+    {
+      "id": "FINAL-PRECAP-BUILD-INSTALL",
+      "owner_domain": "Release build provenance and isolated Install",
+      "current_subject": "UNBOUND.",
+      "verdict": "BLOCKED",
+      "remaining_blocker": "The source-close SHA and source-bound binary are absent.",
+      "next_required_development_step": "Produce two source-bound isolated matching builds, install the exact binary, and bind source/installed/PATH hashes.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/cfr168-post-composition-lifecycle-freeze-20260730.md"
+      ]
+    },
+    {
+      "id": "FINAL-PRECAP-REVERSAL-DOGFOOD",
+      "owner_domain": "Installed reversals and pre-capability Dogfood",
+      "current_subject": "UNBOUND runner and real-repository commands.",
+      "verdict": "BLOCKED",
+      "remaining_blocker": "Installed runner matrix and canonical real-repository subjects remain literal BLOCKED placeholders.",
+      "next_required_development_step": "Bind exact installed boundary/scale/CFB-136/CFB-138/effect-safety commands and run Algorithm plus read-only real-repository Dogfood.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/cfr168-post-composition-lifecycle-freeze-20260730.md"
+      ]
+    },
+    {
+      "id": "FINAL-CAPABILITY-READVERTISEMENT",
+      "owner_domain": "Public capability declarations",
+      "current_subject": "UNBOUND blocked packet.",
+      "verdict": "BLOCKED",
+      "remaining_blocker": "Accepted runtime/successors/metrics/complexity and pre-advertisement Close/Install/Dogfood evidence are absent.",
+      "next_required_development_step": "Run Fugu claim/evidence preflight, make one minimal declaration-only mutation, and obtain an exact independent review.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/cfr168-final-capability-readvertisement-freeze-20260730.md"
+      ]
+    },
+    {
+      "id": "FINAL-POSTCAP-TERMINAL-RERUN",
+      "owner_domain": "Post-capability terminal lifecycle",
+      "current_subject": "UNBOUND.",
+      "verdict": "BLOCKED",
+      "remaining_blocker": "The accepted capability mutation is absent.",
+      "next_required_development_step": "Rerun full Close, High review, two-build Install, installed reversals, conformance, and Dogfood on the new SHA.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/cfr168-final-capability-readvertisement-freeze-20260730.md",
+        "docs/development/ai/task-packets/cfr168-post-composition-lifecycle-freeze-20260730.md"
+      ]
+    },
+    {
+      "id": "FINAL-SYNC-RETROSPECT",
+      "owner_domain": "Issue/map/history/index/ledger/KGI lifecycle",
+      "current_subject": "UNBOUND.",
+      "verdict": "BLOCKED",
+      "remaining_blocker": "The terminal post-capability SHA and complete evidence are absent.",
+      "next_required_development_step": "Synchronize CFR-168/CFB-136/CFB-138, map, backlog, history, ledger/index, and a valid committed-final KGI/KPI record, then Retrospect.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/cfr168-post-composition-lifecycle-freeze-20260730.md",
+        "docs/development/issue-root-cause-map.json"
+      ]
+    },
+    {
+      "id": "CTRL-KGI-KPI",
+      "owner_domain": "AI development-flow measurement control plane",
+      "current_subject": "Candidate 0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1; predecessor REQUEST_CHANGES report b307b47f51f73b054b66444493c4590379518c4f with SHA-256 02a0d259c55121379f07c2c1d893d4a29dd546b16e6f237659a5081c60fd3336.",
+      "verdict": "REREVIEW_ACTIVE_NO_REPORT",
+      "remaining_blocker": "Eight manager counterexamples plus any new Fugu findings remain; the pending report is absent.",
+      "next_required_development_step": "Collect the exact Fugu report, run the blocked shared-primitives manager repair, rereview, then use only a validated final record.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730.md",
+        "docs/development/ai/task-packets/development-flow-kgi-kpi-manager-counterexample-repair-20260730.md"
+      ]
+    }
+  ],
+  "review_dispositions": [
+    {
+      "id": "REVIEW-001",
+      "candidate": "aa5e57d8b1e22fb83792412c68f255ceaf603e39",
+      "report_commit": "14a24a5db3603e105e7ed5f5553d16453a325be8",
+      "report_sha256": "d41ae00cfecd71fed6567c553a614ce61ac6087ced9e95b905d6a8572826362d",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "SUPERSEDED_REJECTED_STACKED_LINE",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/claude-cfr168-review-20260729/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-002",
+      "candidate": "01a7c862fb9825878e580229d1b265ae3a48115a + fbef572ef008059cbe39f12b123ac28d53b04f15",
+      "report_commit": "4e651a79fcf22980be7ecdbb64c576c3941aa5a1",
+      "report_sha256": "5d76f8a5d1efd3e75fea88464ad01108666e00e714dd11b488bd3c3c99cd93a2",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "SUPERSEDED_BY_ACCEPTED_701469f",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-doctor-branch-independent-review-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-003",
+      "candidate": "701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714",
+      "report_commit": "c57215e243839b224a641251fc9e3bf092f7e116",
+      "report_sha256": "c7a1665fdf4a6e1104bbab18ec8051c048ace1d25e865952bbbcd35a06eb19c0",
+      "decision": "ACCEPT",
+      "current_disposition": "CURRENT_COMPOSITION_INPUT_NOT_INTEGRATED",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-doctor-branch-composition-rereview-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-004",
+      "candidate": "37f7427d46d2cf3ad66de3c1885ef4c0527cae70",
+      "report_commit": "2d26695a48262a1de66ae095d76bc7b8deeead68",
+      "report_sha256": "95617c3cb48320e7256d23ae658f4cbedb18f9c4f8e9a7803a0417972f28042c",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "SUPERSEDED_BY_REJECTED_38da898",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-mr-list-review-claude-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-005",
+      "candidate": "38da8988ac8bc1fcdfcb82c62e7aa0d28791500c",
+      "report_commit": "78b127cbc0bee5142063d1c45f145effcf48db2d",
+      "report_sha256": "6840035553871f5251e32d67bb5b2f9d6c6ee061b7ab3106e94de373ec97b20d",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "SUPERSEDED_BY_REJECTED_4930d251",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-mr-list-zero-residual-rereview-fugu-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-006",
+      "candidate": "4930d25178be11e064060487f8c254802b09868d",
+      "report_commit": "909978c1537824b21c59615fa6135e3e16696145",
+      "report_sha256": "dc4f66ba9649e4333980996c6f83d7f28b0f5f4bd165683adac55bf6d9704b2e",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "SUPERSEDED_BY_b164046_PENDING_REVIEW",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-mr-list-review-closure-rereview-claude-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-007",
+      "candidate": "21fe75175e997cc7c6f8c3ef2a7558144d850f94",
+      "report_commit": "0da5855124fc9f52465cabb13fafa44e55e10fde",
+      "report_sha256": "925cbcdbd5e414b962a92ea9af3a20622f0881da664617b74cb964236b0a4681",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "SUPERSEDED_BY_REJECTED_6dd4527",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-mr-mutation-review-claude-fallback-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-008",
+      "candidate": "6dd4527f23135388b53fc5c6d637c4105cc5d659",
+      "report_commit": "84175bd2de8c92ee1eb4f64fd366e5d9b3560204",
+      "report_sha256": "214e42fc8f36108f45e17b13e4343bfc2b56cc89b72be5c1258f5b497c9ec6ef",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "ACTIVE_MR_WRITE_BLOCKER",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-mr-mutation-zero-residual-rereview-fugu-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-009",
+      "candidate": "dece688afea815d1242e7751367052d1ceac4580",
+      "report_commit": "c734b55f2214f5d7459aaf953a88c0d20e3a02f4",
+      "report_sha256": "534f098348e72fdc377b56ebf561a931e53284055a1f8a0e37d6d5393d956486",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "SUPERSEDED_BY_REJECTED_76baff8",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-upload-scale-review-claude-fallback-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-010",
+      "candidate": "76baff84cb1192e11b26dcc669fb800f7b13fa30",
+      "report_commit": "f835f64abb50fecaea28673ffa5dd829f1d3fc70",
+      "report_sha256": "7632552eb0ca60addca0d83fe3ba53ead642a7cbee82937b1b7b37754f6cb2cf",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "SUPERSEDED_BY_467b0c2_PENDING_REVIEW",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-upload-zero-residual-rereview-fugu-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-011",
+      "candidate": "e93ebc2394c8bd0398cfc23e8bf2d23d52e253b9",
+      "report_commit": "30bbb4609fd646ed193a69c12f906b7cb4073e9e",
+      "report_sha256": "64a4831ea0a639d7f87fe0b08312677efcab8bfe014f0d5ba72806e9caceecf1",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "SUPERSEDED_BY_02b0d63_REVIEW_BLOCKED",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-rust-file-ancestry-review-claude-fallback-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-012",
+      "candidate": "52a025ecda3fe2f5ad8b5b2a485562e7c16ab6de",
+      "report_commit": "e9480c7e922a98b6e9570dced1686f15b4062258",
+      "report_sha256": "c1b39ffc6f25cf9f19007af3cd5336421400e467e6e3c28969de775b86ed8045",
+      "decision": "ACCEPT",
+      "current_disposition": "ACCEPTED_EVIDENCE_SUPERSEDED_BY_ACCEPTED_1a0449",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-rust-file-doctor-review-claude-fallback-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-013",
+      "candidate": "1a04490806b59f8c39b5c1cf03f42d06aa750a98",
+      "report_commit": "c22a78aa025e4fd2bf38d335f9665b781e4f4714",
+      "report_sha256": "f7c52b05e312cc131fdfc2e2c0d9d486f5ee372b5ec93a85fdb44a95fb3ce1b9",
+      "decision": "ACCEPT",
+      "current_disposition": "ACCEPTED_EVIDENCE_cd130e5_NOTE_SUCCESSOR_REVIEW_BLOCKED",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-rust-file-doctor-zero-residual-rereview-claude-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-014",
+      "candidate": "71854e20689d2dd79246fa741e0e6da443d04d1a",
+      "report_commit": "e28c90d4f10a8e7c0a27846750bf682e341e0cd5",
+      "report_sha256": "f30c22aa34559829254b6ca305449abc874b653c8b3dbc767248fdbbc5fe0a5a",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "SUPERSEDED_BY_REJECTED_73bc532",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-rust-http-mr-preflight-review-claude-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-015",
+      "candidate": "73bc5327ff6d750ce95f63333055ee39b693cb8c",
+      "report_commit": "4b11ef96cb5cea2a9838bfc24bfaf5649f77624d",
+      "report_sha256": "8bb1a418ce6db1aa932eca2d19990212a58a5f44ad42eb3ccd439e68b4f1417d",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "SUPERSEDED_BY_92fc810_REVIEW_BLOCKED",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-rust-http-mr-preflight-zero-residual-rereview-claude-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-016",
+      "candidate": "b3bc32a6bd4c792edc5a1302c61e16c624a9b648",
+      "report_commit": "4380985d392d5c3f0866c35cf789fada9f872f58",
+      "report_sha256": "628a37f51cad4710eeccb8c9b34286b9e41332a59a421068a6a1aaa61ed4140a",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "SUPERSEDED_BY_REJECTED_cdcb9bd",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-rust-storage-independent-review-fugu-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-017",
+      "candidate": "cdcb9bdefe7d25a118a9dc14171864d75f5ad304",
+      "report_commit": "8ac6741d218e1869fef91d96d29ac0d18d9d674d",
+      "report_sha256": "6438df445b2d05510895fd23f73a4e71ba49238da15b00e86abf1a477b5ab960",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "ACTIVE_STORAGE_REPAIR_BLOCKER",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-rust-storage-zero-residual-rereview-fugu-20260730/review.md"
+      ]
+    },
+    {
+      "id": "REVIEW-018",
+      "candidate": "bfa7f08369afef313f977d3a141583567c310c18",
+      "report_commit": "b307b47f51f73b054b66444493c4590379518c4f",
+      "report_sha256": "02a0d259c55121379f07c2c1d893d4a29dd546b16e6f237659a5081c60fd3336",
+      "decision": "REQUEST_CHANGES",
+      "current_disposition": "CONTROL_PLANE_SUPERSEDED_BY_0ae583e_PENDING_REREVIEW",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/development-flow-kgi-kpi-independent-review-claude-20260730/review.md"
+      ]
+    }
+  ],
+  "pending_outputs": [
+    {
+      "id": "PENDING-001",
+      "owner_item_id": "PY-UPLOAD-CFB138",
+      "path": "docs/development/ai/swarm-results/cfr168-python-http-upload-review-closure-rereview-fugu-20260731/review.md",
+      "expected_state": "absent_at_snapshot",
+      "required_decision": "ACCEPT_OR_REQUEST_CHANGES"
+    },
+    {
+      "id": "PENDING-002",
+      "owner_item_id": "PY-MR-LIST",
+      "path": "docs/development/ai/swarm-results/cfr168-python-http-mr-list-final-publication-closure-rereview-claude-20260731/review.md",
+      "expected_state": "absent_at_snapshot",
+      "required_decision": "ACCEPT_OR_REQUEST_CHANGES"
+    },
+    {
+      "id": "PENDING-003",
+      "owner_item_id": "RUST-FILE-ANCESTRY",
+      "path": "docs/development/ai/swarm-results/cfr168-rust-file-ancestry-zero-residual-rereview-fugu-20260730/review.md",
+      "expected_state": "absent_at_snapshot",
+      "required_decision": "ACCEPT_OR_REQUEST_CHANGES"
+    },
+    {
+      "id": "PENDING-004",
+      "owner_item_id": "RUST-FILE-DOCTOR",
+      "path": "docs/development/ai/swarm-results/cfr168-rust-file-doctor-review-note-closure-rereview-claude-20260730/review.md",
+      "expected_state": "absent_at_snapshot",
+      "required_decision": "ACCEPT_OR_REQUEST_CHANGES"
+    },
+    {
+      "id": "PENDING-005",
+      "owner_item_id": "RUST-HTTP-MR",
+      "path": "docs/development/ai/swarm-results/cfr168-rust-http-mr-preflight-evidence-closure-rereview-claude-20260730/review.md",
+      "expected_state": "absent_at_snapshot",
+      "required_decision": "ACCEPT_OR_REQUEST_CHANGES"
+    },
+    {
+      "id": "PENDING-006",
+      "owner_item_id": "CTRL-KGI-KPI",
+      "path": "docs/development/ai/swarm-results/development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730/review.md",
+      "expected_state": "absent_at_snapshot",
+      "required_decision": "ACCEPT_OR_REQUEST_CHANGES"
+    }
+  ],
+  "known_stale_or_superseded_caveats": [
+    {
+      "id": "CAVEAT-001",
+      "kind": "historical_snapshot",
+      "statement": "The flow-metrics record was captured at 2026-07-30T09:51:55Z from source dd993ccf59cf7a369fc6694a7d0242dc6355eaa4. Its running lane states are not current execution state.",
+      "precedence": "Use this audit snapshot and the current recovery ledger for execution state.",
+      "evidence_paths": [
+        "docs/development/ai/flow-metrics/cfr168-recovery-20260730.v1.json"
+      ]
+    },
+    {
+      "id": "CAVEAT-002",
+      "kind": "count_scope",
+      "statement": "The 18 indexed reports include one development-flow control-plane review. Product CFR-168 review count is 17, not 18.",
+      "precedence": "Use the split counts in this record.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md"
+      ]
+    },
+    {
+      "id": "CAVEAT-003",
+      "kind": "superseded_candidate_card",
+      "statement": "The MR-list 4930d251 candidate-ready card remains immutable evidence but was rejected by report 909978c; current candidate is b164046.",
+      "precedence": "Do not schedule or integrate 4930d251.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-python-http-mr-list-review-closure-repair-candidate-ready-20260730/candidate.md",
+        "docs/development/ai/swarm-results/cfr168-python-http-mr-list-final-publication-closure-repair-candidate-ready-20260731/candidate.md"
+      ]
+    },
+    {
+      "id": "CAVEAT-004",
+      "kind": "superseded_blocker_description",
+      "statement": "Some immutable Rust candidate cards describe an earlier Cargo conflict/admission blocker. The later source-target quarantine is the current blocker.",
+      "precedence": "Use the 03:49 UTC recovery-ledger section.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md",
+        "docs/development/ai/swarm-results/cfr168-rust-file-ancestry-zero-residual-repair-candidate-ready-20260730/candidate.md"
+      ]
+    },
+    {
+      "id": "CAVEAT-005",
+      "kind": "frozen_digest",
+      "statement": "The blocked post-composition lifecycle packet binds older ledger/index digests af8d5dccd9993d1d8e16f481a4ba74996e356641d9c1bbe06a82cc85bec11422 and 76de456efc526b53086878b958f69b6c10ddc2aee970bab89b8323c403a21294. Current snapshot digests are recorded under snapshot.",
+      "precedence": "Rebind current digests before changing the lifecycle packet to ready.",
+      "evidence_paths": [
+        "docs/development/ai/task-packets/cfr168-post-composition-lifecycle-freeze-20260730.md"
+      ]
+    },
+    {
+      "id": "CAVEAT-006",
+      "kind": "owner_under_specification",
+      "statement": "issue-root-cause-map owner_module fields name one module and do not express the current cross-runtime/cross-surface execution owners.",
+      "precedence": "Use open_execution_items for execution routing.",
+      "evidence_paths": [
+        "docs/development/issue-root-cause-map.json"
+      ]
+    },
+    {
+      "id": "CAVEAT-007",
+      "kind": "no_inferred_verdict",
+      "statement": "A ticket, manifest, active session, candidate-ready card, worker pass, or absent report path is not an independent verdict.",
+      "precedence": "Only an immutable indexed review report can change a candidate decision.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md"
+      ]
+    },
+    {
+      "id": "CAVEAT-008",
+      "kind": "precommit_control",
+      "statement": "The source-keyed Cargo guard was held before commit after ten mandatory audit classes were found; no canonical guard candidate exists at this snapshot.",
+      "precedence": "All affected Rust reviews and Storage repair remain blocked.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md"
+      ]
+    },
+    {
+      "id": "CAVEAT-009",
+      "kind": "document_date",
+      "statement": "The disposition index title date is 2026-07-30 although its content includes 2026-07-31 successors. The rows and snapshot SHA, not the title date, define scope.",
+      "precedence": "Use exact report and candidate identities.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md"
+      ]
+    },
+    {
+      "id": "CAVEAT-010",
+      "kind": "issue_detail_lag",
+      "statement": "CFR-168 and CFB-138 detail documents retain correct investigating status but do not directly bind the latest Upload 467b0c2 rereview state.",
+      "precedence": "Use this audit and the current ledger until terminal Close synchronization.",
+      "evidence_paths": [
+        "docs/development/code-review-issues/cfr-168.md",
+        "docs/development/bug-issues/cfb-138.md"
+      ]
+    },
+    {
+      "id": "CAVEAT-011",
+      "kind": "snapshot_pin",
+      "statement": "The canonical integration branch advanced while the source audit was running. This durable record is intentionally pinned to head 664f907062c9877f753b056902990916833f3b91 and does not silently absorb later commits.",
+      "precedence": "Any later canonical head requires a delta audit or a new versioned record.",
+      "evidence_paths": [
+        "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md"
+      ]
+    }
+  ],
+  "claims": {
+    "acceptance_authorized": false,
+    "product_integration_authorized": false,
+    "issue_close_authorized": false,
+    "install_or_dogfood_authorized": false,
+    "record_purpose": "Durable read-only disposition and next-work inventory for exact snapshot 664f907."
+  }
+}
