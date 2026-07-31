@@ -1,0 +1,26 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-rust-file-doctor-review-note-closure-rereview-claude-20260730",
+  "workspace": "/workspace/worktrees/cfr168-rust-file-doctor-review-note-closure-rereview-base",
+  "base_revision": "2c7b9a9fc6058a169e5d6531eabe58199e7b647d",
+  "max_parallel": {
+    "fugu": 0,
+    "claude": 1,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "file-doctor-review-note-closure-rereview",
+      "role": "reviewer",
+      "tier": "ultra",
+      "provider": "claude",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-rust-file-doctor-review-note-closure-rereview-claude-20260730.md",
+      "depends_on": [],
+      "write_set": [
+        "docs/development/ai/swarm-results/cfr168-rust-file-doctor-review-note-closure-rereview-claude-20260730/review.md"
+      ],
+      "expected_commit": true,
+      "timeout": "12h"
+    }
+  ]
+}
