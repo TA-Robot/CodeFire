@@ -1,6 +1,7 @@
-# CFR-168 Rust File Doctor Review-Note Closure Rereview Prep
+# CFR-168 Rust File Doctor Review-Note Closure Rereview
 
-Status: blocked pending exact candidate binding
+Status: exact candidate bound; review launch blocked pending
+acceptance-profile revalidation
 
 Provider/model when unblocked: fresh Claude Opus 5 (`claude-opus-5`)
 
@@ -8,7 +9,10 @@ Role: independent reviewer
 
 Mode: report-only
 
-No runnable manifest exists while any candidate field remains `UNBOUND`.
+A report-only manifest may be registered for this exact subject, but it is not
+launch-authorized while the bound candidate card remains `BLOCK`. Do not run
+`dev-swarm validate`, `plan`, or `start` until a later immutable
+manager-revalidation record explicitly authorizes review launch.
 
 ## Objective
 
@@ -20,7 +24,7 @@ route, while preserving every previously accepted File Doctor residual.
 Use a new agent/session/worktree. Do not reuse the implementer or either
 earlier reviewer session.
 
-## Exact blocked subject
+## Exact bound subject
 
 | Item | Exact value |
 |---|---|
@@ -31,22 +35,64 @@ earlier reviewer session.
 | Zero-residual report SHA-256 | `f7c52b05e312cc131fdfc2e2c0d9d486f5ee372b5ec93a85fdb44a95fb3ce1b9` |
 | NOTE repair task base | `1e5a6f9467b90251b656e240f8c9b4f4700468a8` |
 | NOTE repair contract SHA-256 | `4b94d8f5e811ed968d9d9cefcbf5fd244b6847b09566cee59fc2bb36b03940c1` |
-| Candidate SHA / parent / tree | `UNBOUND` / `UNBOUND` / `UNBOUND` |
-| Additive commit list/count | `UNBOUND` |
-| Cumulative binary patch SHA-256 | `UNBOUND` |
-| Exact changed paths/blobs/numstat | `UNBOUND` |
-| Clean tracked/untracked evidence | `UNBOUND` |
+| Candidate SHA / parent / tree | `cd130e544af0476162be153db58a0a840b75b134` / `1e5a6f9467b90251b656e240f8c9b4f4700468a8` / `2cf767fa00337e167b8a54e8bd20b6af5558b8df` |
+| Additive commit list/count | `cd130e544af0476162be153db58a0a840b75b134` / `1`; merge commits `0` |
+| Cumulative binary patch SHA-256 | `84dbf05bced17d9b6aa27e90cf900c57e49338f1835340ae283256613ce0d02a` |
+| Exact changed paths/blobs/numstat | five rows frozen below and in the candidate card |
+| Clean tracked/untracked evidence | clean; porcelain empty at `2026-07-31T02:52:13Z` |
+| Candidate card | `docs/development/ai/swarm-results/cfr168-rust-file-doctor-review-note-closure-repair-candidate-ready-20260731/candidate.md` |
+| Identity helper SHA-256 | `c4606a4b48af8f844a9b42b32e681cbc028df8b884fe75a66dcb6fafc16557b9` |
+| Overall candidate status | `BLOCK`; identity-only status `READY_FOR_REVIEW` |
 
-Before launch, the manager atomically binds every value and generates a
-candidate-ready card plus fresh report-only manifest. The reviewer recomputes
-all identities, ancestry from `1e5a6f9` and `1a04490`, commit range, actual
-paths, patch digest, and clean state. Any mismatch is `REQUEST_CHANGES`.
+Exact changed paths are:
+
+| Status | Path | Added | Deleted | Base blob | Head blob |
+|---|---|---:|---:|---|---|
+| `M` | `crates/codefire-cli/src/remote/doctor.rs` | 1873 | 282 | `410d648f933ab796cd26e2822b3313a42014a73b` | `34fd05a8a1609f00bd2b6ff31baa623e8d952c45` |
+| `M` | `docs/development/change-playbook.md` | 19 | 2 | `7fe98c6943650b071b85b5c5ac0c4943bb4bd1cc` | `c49f1d446ccc264770944e8e4cbe2897040ea7ad` |
+| `M` | `docs/development/command-source-trace.md` | 1 | 1 | `f85d194aa1838e3ebbb76c6d56ea24e0a74e1186` | `87c875ac0d57949cf7fdb92017607d54f6ca9623` |
+| `M` | `docs/development/source-architecture.md` | 23 | 5 | `d722bb26fc122d689c1c911c4fe169195a477a7a` | `12c0aefe8945609ca0529800bee2327bbd2f3b8e` |
+| `M` | `docs/development/source-data-model-catalog.md` | 1 | 1 | `9fff73b5f348cb521d2d395b141f918a0ffbeb01` | `6367fed1c190bbe07373622c92049e07cee4fe7d` |
+
+The reviewer recomputes all identities, ancestry from `1e5a6f9` and
+`1a04490`, commit range, actual paths, patch digest, and clean state. Any
+mismatch is `REQUEST_CHANGES`.
+
+## Pre-launch acceptance-profile block
+
+The implementer used `/tmp/codefire-rustup/{rustup,cargo}` and
+worktree-local `target/`, `target/clippy-review`, and
+`target/release-review`. Its committed-tree release gate never produced a
+terminal result, and no `cargo test -p codefire-core --locked` invocation was
+found. Worker test claims are contextual evidence only.
+
+The manager then attempted the exact shared profile. Debug returned rc 0 but
+ran 0 tests against a stale shared-target artifact (log SHA-256
+`2bcf08a342fed5517c56f77fbb9621b4080793968c10c677dd4a8e8f4c205b20`).
+Release compiled the exact candidate and passed 16 `live_file_doctor_*` tests
+(log SHA-256
+`b7cae22be6ce2a17c16e3ed747ee62f5d6d5a2611248c5ceb403427525012acc`),
+but excluded the required N1 `file_remote_doctor_*` cases and the N2 exact
+measurement case. The release timer also recorded wall-clock discontinuity;
+its monotonic duration was 550.765473361 seconds. The manager stopped the
+chain before gate 03, preserved both terminal records, and left the candidate
+clean. Exact argv, result digests, counts, and provenance are frozen in the
+candidate card. Neither process-level `passed` result authorizes review.
+
+Before review launch, a manager-owned immutable revalidation record must bind
+the exact candidate tree, exact shared profile below, complete terminal logs,
+non-vacuous artifact provenance, and post-run clean identity for focused
+debug/release N1/N2/N3, the Doctor and full CLI gates, core, strict Clippy,
+format, source docs, and diff hygiene. That successor record must explicitly
+authorize review launch. Never infer authorization from scheduler `passed`,
+the two manager attempt statuses, this prepared manifest, or the
+identity-only `READY_FOR_REVIEW` field.
 
 ## Scope
 
 Read the exact candidate, prior reports, NOTE repair contract, live
 `run_remote_doctor`/production factory path, focused tests, source contracts,
-and Rust composition packet.
+candidate card, and Rust composition packet.
 
 The only authorized write is:
 
@@ -148,7 +194,7 @@ Each deliberate regression changes production code, produces the intended
 targeted failure, is reverted, and is followed by recomputation of candidate
 HEAD/tree/patch/clean state. Run broad gates once on the stable exact subject.
 
-## Decision and Handoff
+## Decision and handoff
 
 Commit exactly the declared report. Include exact identity, N1/N2/N3
 dispositions, inherited residual matrix, production reachability, mutation
