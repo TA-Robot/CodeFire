@@ -714,6 +714,7 @@ def load_manifest(
             )
         )
     repeated_record_ids = duplicates([row.id for row in record.prior_obligations])
+    record_origins: dict[str, int] = {}
     if repeated_record_ids:
         findings.append(
             error(
@@ -773,6 +774,7 @@ def load_manifest(
     elif record.subject.authority.kind == "legacy_bootstrap_report":
         arm = record.subject.authority.bootstrap_arm
         fixed_root = LEGACY_ROOTS.get(arm) if isinstance(arm, str) else None
+        expected_bootstrap_origins = record_origins
         if (
             fixed_root is not None
             and record.subject.authority.commit == fixed_root.commit
@@ -786,16 +788,16 @@ def load_manifest(
                         f"{fixed_root.review_generation}, got {record.generation}",
                     )
                 )
-            fixed_origins = fixed_root.obligation_origin_map()
-            if manifest_origins != fixed_origins:
-                findings.append(
-                    error(
-                        "bootstrap-manifest-origin-map-mismatch",
-                        f"{location}.prior_obligations",
-                        f"{arm} requires {sorted(fixed_origins.items())}, got "
-                        f"{sorted(manifest_origins.items())}",
-                    )
+            expected_bootstrap_origins = fixed_root.obligation_origin_map()
+        if manifest_origins != expected_bootstrap_origins:
+            findings.append(
+                error(
+                    "bootstrap-manifest-origin-map-mismatch",
+                    f"{location}.prior_obligations",
+                    f"{arm} requires {sorted(expected_bootstrap_origins.items())}, got "
+                    f"{sorted(manifest_origins.items())}",
                 )
+            )
     validation_argv = manifest.validation_argv()
     manifest_validations = frozenset(validation_argv)
     record_validations = frozenset(row.id for row in record.validations)
