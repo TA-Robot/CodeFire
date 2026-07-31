@@ -1,6 +1,6 @@
 # CFR-168 Review-Bottleneck Operating Controls Freeze
 
-Status: `DRAFT_FOR_INDEPENDENT_PREFLIGHT`
+Status: `DRAFT_FOR_INDEPENDENT_REREVIEW`
 
 Authority: detailed P0-P2 implementation proposal only. Stable lifecycle,
 review/actionability, and measurement policy lives in
@@ -18,16 +18,28 @@ Owner: CodeFire development manager.
 
 Base revision: `f951f9a4ea0b208f08baef6c931d90284b46e1a6`.
 
-Governance baseline: `3baa2afbcfe2adaa6c4604d3ed632ba6a363ea73`
-(tree `b4831e9f81da2be677083395e8fa4b217db2c5bd`). The base revision above
-remains the proposed implementation subject; this later exact governance commit
+Governance baseline: `8e09419fe1db2be18b7bcd72d5c394063d086c6e`
+(tree `b39542d053576313b0718e0e8ef77a2519ba4ac4`). The base revision above
+remains only the proposed product/implementation subject. This later exact
+governance commit, including its manager adjudication and canonical/live repair,
 owns lifecycle/review/measurement semantics for any future packet preflight or
-implementation authorization.
+implementation authorization. The old implementation base does not regain
+governance authority merely because it owns the proposed product diff.
 
 Supersedes draft: commit `914beee70f0e067a407cb13a1eeb918911379042`,
 tree `143bc765da3975f54ae8980b9792d6ba4acb27b8`, packet SHA-256
 `5ce77c4ec2c5b768c8d6f2b92b7ae6b1f7f4c9b83336311b6ad5a2eda8c2d0e1`.
 That draft remains immutable history and has no implementation authority.
+
+Supersedes reviewed governance-alignment candidate: commit
+`9f0d6bd292d0768d603b6120aae60437383a51e3`, tree
+`1fac8e7f7b43bf8201db9c36f7fd007c66897b93`, packet SHA-256
+`b5b74a6be1f6abf39eaf2cff4cdd3449b98a056687438cc07cab93e09fd8970c`.
+Its three report-only reviews remain immutable and requested changes. Manager
+adjudication and repair scope are frozen in
+`docs/development/ai/swarm-batches/cfr168-governance-canonical-adjudication-20260731.md`;
+this packet is the successor repair subject, not a rewrite of those reports or
+their verdicts.
 
 Revision reason: add `RB-08`, the pre-actionability multi-axis impact contract,
 two-stage finding-actionability and causal classification, stable
@@ -144,10 +156,14 @@ infrastructure only; it includes no CodeFire product behavior.
 
 ### 3.1 Identity and chronology
 
-- Each packet inherits the applicable `AGENTS.md` and canonical repository
-  invariants at its base revision. Omission from packet prose cannot waive them
-  or become accepted variance; an authorization-relevant omission follows the
-  additive `contract_omission` path.
+- Product/source facts and obligations are evaluated at the exact implementation
+  subject. Governance semantics come from the separately declared governance
+  baseline, its applicable `AGENTS.md`, and any manager amendment committed
+  before dispatch. Omission from packet prose cannot waive either set or become
+  accepted variance. If the two revisions leave an authorization-changing
+  ambiguity, dispatch blocks until the manager rebases or freezes an additive
+  amendment; a genuinely absent binding rule follows the `contract_omission`
+  path.
 - Every candidate, packet, report, validation, event record, result, and
   validator source is identified by full commit, tree where applicable, path,
   mode, and SHA-256. A branch name or mutable filename is never identity.
@@ -234,7 +250,8 @@ infrastructure only; it includes no CodeFire product behavior.
 - Conflicting reviewer dispositions on one locus require one manager
   adjudication before repair or acceptance. The adjudication has a stable
   `decision_id`, subject/scope, evidence, owner, adjudicator, effective candidate,
-  permitted reopen triggers, and superseded decision IDs.
+  the fixed four-value canonical reopen-trigger set, separate current
+  applicability/evidence, and superseded decision IDs.
 - For a high-impact observation, disputed impact, or proposed reversal of an
   accepted variance, the reviewer writes an impact proposal and a manager
   performs a separate impact adjudication. The proposal and adjudication have
@@ -298,17 +315,20 @@ direct path join. It does not pretend the machine already checks the matrix.
 ### 4.2 Impact assessment, then two-stage finding adjudication before repair
 
 Every post-candidate review observation receives a compact canonical impact
-screen before an actionability disposition. The screen covers every axis as
-`affected`, `unaffected`, or `unknown`, with exact evidence/reason, must-fix
-candidates, and the proposed disposition. It escalates to the full expanded
+screen before an actionability disposition. Every compact impact-state axis is
+`affected`, `unaffected`, `not_applicable`, or `unknown`, with exact
+evidence/reason, must-fix candidates, and the proposed disposition. Evidence
+availability is recorded separately as `available`, `partial`, or
+`unavailable`; unavailable evidence never implies `unaffected` or
+`not_applicable`. The screen escalates to the full expanded
 row below for a proposed `required_correction`, accepted variance,
 dispute/reopen, high or material impact, or acceptance-critical unknown. A true
 duplicate may bind its canonical expanded row; an evidenced invalid,
 out-of-scope, or nonblocking observation may terminate with the complete compact
 screen and manager disposition. Every axis is present at either depth;
-`not_applicable`, `unknown`, or `unavailable` requires a reason, and omission is
-not equivalent to no impact. This risk-proportional depth prevents the control
-itself from becoming a review-volume bottleneck.
+`not_applicable` or `unknown` impact and `unavailable` evidence require a reason,
+and omission is not equivalent to no impact. This risk-proportional depth
+prevents the control itself from becoming a review-volume bottleneck.
 
 The full expanded row uses these rules:
 
@@ -412,16 +432,20 @@ Every observation/adjudication row records:
   `decision_locus_id`;
 - exact candidate commit/tree, changed path/symbol or conceptual scope, and
   frozen requirement/criterion refs;
-- the full impact matrix above, observed facts/evidence, counterexample
-  state/ref (including an explicit unavailable/not-applicable reason),
-  hard-trigger IDs/decisions, and the impact-gate state;
+- the complete compact impact screen, observed facts/evidence, counterexample
+  state/ref, hard-trigger IDs/decisions, evidence availability, and the
+  impact-gate state;
+- the full expanded matrix above exactly when `full_record_required` is true;
+  a true duplicate may instead bind the canonical expanded record, while a
+  compact-terminal row keeps the expanded object null;
 - proposed `actionability_disposition`, whether correction is required, and the
   required-correction causal class or exact null, with a rationale joining every
   impact axis and evidence ref;
 - reviewer/proposer, owner, manager impact/actionability adjudicator, and
   distinct timestamps/event refs;
 - active `decision_id`, decision scope, effective candidate, permitted reopen
-  triggers, scope-end condition (never wall time alone), and
+  triggers fixed to all four canonical values, separate current
+  applicability/evidence, scope-end condition (never wall time alone), and
   `supersedes_decision_ids`;
 - affected owners, effects, fences, proposed repair paths, forbidden paths, and
   exact rereview scope only when correction is required;
@@ -438,8 +462,9 @@ threshold, reviewer taste, generalized slogan, or aggregate score remains a
 nonblocking proposal, accepted variance, or unsubstantiated claim according to
 the evidence.
 
-An accepted-variance decision has no arbitrary wall-clock expiry. Its permitted
-reopen triggers are drawn only from:
+An accepted-variance decision has no arbitrary wall-clock expiry. Its canonical
+admissible reopen-trigger set is exactly all four values below and is
+non-suppressible:
 
 ```text
 frozen_requirement_changed
@@ -447,6 +472,11 @@ materially_new_evidence
 new_counterexample
 prefrozen_metric_regression
 ```
+
+A manager record may state which trigger currently has applicable evidence, but
+it cannot store a subset that removes any route for later evidence. The checker
+validates the actual trigger and evidence at reopen time rather than treating an
+earlier manager-selected subset as authority.
 
 `materially_new_evidence` is relative to the active decision record, not the
 artifact's wall-clock creation. Evidence that predates the decision qualifies
@@ -501,7 +531,7 @@ events when they occur:
 | `finding_impact_assessment_adjudicated` | distinct manager event for high-impact/disputed/variance-reversal cases, final axis decisions, hard triggers, unknown routing, and rationale |
 | `impact_investigation_requested` / `impact_investigation_completed` | acceptance-criticality, unknown axis, owner, evidence objective, blocking/routed state, and result |
 | `finding_actionability_proposed` | observation/finding/locus IDs, proposed disposition, frozen criteria and evidence |
-| `finding_actionability_adjudicated` | manager decision ID, impact-adjudication ref, final disposition, owner/adjudicator, decision scope and reopen triggers |
+| `finding_actionability_adjudicated` | manager decision ID, impact-adjudication ref, final disposition, owner/adjudicator, decision scope, fixed four-value reopen-trigger set, and separate current applicability/evidence |
 | `required_correction_cause_adjudicated` | required-correction observation/decision ID, exactly one causal class, frozen repair/rereview boundary, and manager event |
 | `must_fix_offset_attempted` / `impact_score_decision_attempted` | exact trigger/axes, proposed shortcut, actor, rejected/admitted state, and adjudication evidence; rejected attempts are retained |
 | `decision_locus_conflict_detected` / `decision_locus_conflict_adjudicated` | both conflicting proposals, active decision, and manager supersession or rejection evidence |
@@ -566,7 +596,11 @@ The run record contains exactly:
 - clock-domain declarations;
 - raw events;
 - wait-interval declarations paired by stable interval ID;
-- repair-episode declarations bound to finding/effect IDs;
+- evidence-active interval declarations paired by stable interval ID, lane,
+  same-boot clock domain, activity class, and triggering rejection where
+  applicable;
+- repair-episode declarations bound to finding/effect IDs and their
+  evidence-active repair intervals;
 - observation-to-effect and decision-locus mappings and their human
   authority/evidence;
 - proposed/final multi-axis impact assessments, hard-trigger adjudications,
@@ -594,6 +628,27 @@ Every event has:
 - monotonic nanoseconds and clock-domain/boot-epoch ID only for
   `same_boot_monotonic`; and
 - a closed unavailable-reason enum when time is unavailable.
+
+`evidence_active_start` and `evidence_active_end` additionally share one
+`activity_interval_id`, lane, exact subject, and one closed activity class:
+
+```text
+first_attempt_implementation
+validation
+review
+adjudication
+post_rejection_repair
+post_rejection_retest
+integration
+install
+dogfood_evaluation
+other_evidence_production
+```
+
+The two post-rejection classes also bind the terminal rejected
+`review_decision` that caused the work. An applicable activity known to have
+occurred without a complete same-boot pair remains an explicit unavailable
+interval declaration; it is not omitted or reconstructed from UTC/Git time.
 
 Required event kinds are:
 
@@ -624,8 +679,8 @@ decision_superseded
 nonrequired_repair_attempted
 rereview_scope_frozen
 repair_start
-repair_active_start
-repair_active_end
+evidence_active_start
+evidence_active_end
 repair_end
 wait_start
 wait_end
@@ -698,8 +753,9 @@ Each decision-locus record additionally carries:
   tradeoffs, and per-axis rationale;
 - every proposed and adjudicated actionability disposition;
 - accepted-equivalence or required-correction evidence;
-- decision scope, owner, manager adjudicator, effective candidate, allowed
-  reopen triggers, and superseded decision IDs; and
+- decision scope, owner, manager adjudicator, effective candidate, the fixed
+  four-value canonical reopen-trigger set, current trigger-applicability
+  evidence, and superseded decision IDs; and
 - every later opportunity, reopen request, admitted/rejected trigger, and
   contradictory reviewer proposal.
 
@@ -729,7 +785,7 @@ P1 derives and registers these metrics while preserving existing
 | `MET-FLOW-006` | review lead time | `review_start` to first terminal `review_decision`, same-domain only. |
 | `MET-REVIEW-007` | verdict-to-report time | `review_decision` to `report_commit`, same-domain only. |
 | `MET-REVIEW-008` | repair elapsed time | `repair_start` to `repair_end`; wait overlap reported separately. This is not active service time. |
-| `MET-REVIEW-009` | evidence-producing repair service | union of paired `repair_active_start/end` intervals / repair episode. Missing active boundaries make it unavailable. |
+| `MET-REVIEW-009` | evidence-producing repair service | per-lane union of paired `evidence_active_start/end` intervals classified `post_rejection_repair` and bound to the repair episode. Missing/classless/cross-clock boundaries make it unavailable. |
 | `MET-REVIEW-010` | wait time by reason and total union | per-reason interval union plus union across all reasons. Overlapping per-reason totals are never summed as total wait. |
 | `MET-REVIEW-011` | actionability disposition distribution | exact count for each of the six dispositions / all review observations, with disputed or unavailable adjudications retained separately. No disposition count is a success target. |
 | `MET-REVIEW-012` | reopened without admissible new evidence | admitted locus reopens lacking one allowed trigger plus exact supporting evidence / all admitted locus reopens. Target zero; denominator zero is reported as unavailable with raw counts. |
@@ -741,7 +797,7 @@ P1 derives and registers these metrics while preserving existing
 | `MET-REVIEW-018` | impact proposal-to-adjudication change share | high-impact/disputed/variance-reversal observations whose manager-adjudicated impact differs materially from the reviewer proposal / all such observations with both events. This is diagnostic, has no favorable target, and reports missing adjudications separately. |
 | `MET-REVIEW-019` | impact-investigation lead and open share | same-domain `impact_investigation_requested` to `impact_investigation_completed` intervals, plus open/unavailable investigations / all requested investigations. No missing end becomes zero. |
 | `MET-REVIEW-020` | must-fix offset-attempt rate | attempts to downgrade an established hard must-fix trigger because of repair cost, workaround, score, vote, or neutral-axis count / all established hard-trigger adjudications. Target zero; rejected attempts remain in the numerator so a working guard does not erase churn. |
-| `MET-FLOW-014` | rework ratio | post-rejection evidence-producing repair/retest seconds / total evidence-producing seconds, only when both interval sets are complete; otherwise unavailable. |
+| `MET-FLOW-014` | rework ratio | per-lane union of `post_rejection_repair`/`post_rejection_retest` evidence-active intervals, summed as lane-seconds / per-lane union of all evidence-active intervals, summed as lane-seconds. Concurrent lanes are not collapsed into elapsed time. Any incomplete, classless, cross-clock/boot, or otherwise missing applicable interval makes the ratio unavailable. |
 | `MET-FLOW-015` | reviewer correction rate | cohort-eligible packets with at least one adjudicated `required_correction` / reviewed eligible packets, with causal-class breakdown and unavailable adjudications retained. Accepted variance and nonblocking improvement do not count as corrections. |
 
 Every cohort result lists raw subject rows before aggregates. The cohort manifest
@@ -832,8 +888,9 @@ The closed finding-adjudication schema contains:
 - compact frozen-outcome, affected-entity, all-ten-category,
   reachability/likelihood, blast-radius, severity/materiality,
   reversibility/recovery, recurrence, evidence-quality, and repair-tradeoff
-  screens, each explicitly `affected`, `unaffected`, or `unknown` with evidence
-  and a reason;
+  screens; every impact-state axis is explicitly `affected`, `unaffected`,
+  `not_applicable`, or `unknown`, while evidence availability is independently
+  `available`, `partial`, or `unavailable`, each with evidence and a reason;
 - for `expanded`, frozen requirement/invariant/KGI/KPI/quality-guardrail refs
   and detailed typed impact state/evidence for each; affected users, workflows,
   surfaces/symbols, and owners; all ten P0 category objects; typed
@@ -862,8 +919,9 @@ The closed finding-adjudication schema contains:
 - duplicate canonical ref, out-of-scope proof, or invalid/unsubstantiated reason
   for the corresponding disposition;
 - manager `decision_id`, exact decision scope/effective candidate, active state,
-  permitted reopen triggers, scope-end condition (never wall time alone), and
-  superseded decision IDs; and
+  the fixed non-suppressible four-value canonical reopen-trigger set, separate
+  current applicability/evidence, scope-end condition (never wall time alone),
+  and superseded decision IDs; and
 - reopen/conflict history bound to P1 event IDs and immutable evidence.
 
 The v2.1 checker derives:
@@ -873,8 +931,9 @@ The v2.1 checker derives:
   trigger requires it; omitted axes,
   unknown members, duplicate keys, weighted totals, actionability scores,
   weights, vote totals, and checklist-percentage decision fields fail closed;
-- each `not_applicable`, `unknown`, and `unavailable` state has an exact reason
-  and evidence/next-action state rather than being inferred as neutral;
+- each `not_applicable` or `unknown` impact state and each `unavailable`
+  evidence state has an exact reason and next-action state rather than being
+  inferred as neutral;
 - an acceptance-critical unknown blocks at the pre-actionability gate with null
   disposition; a routed noncritical unknown has manager evidence proving why it
   cannot affect current acceptance, an investigation ref, and cannot support
@@ -892,13 +951,16 @@ The v2.1 checker derives:
   a current required validation or successor repair obligation;
 - `out_of_scope` cannot cover a Git-changed path, applicable cross-cutting
   invariant, or reachable candidate effect left unreviewed;
-- `duplicate` points to one canonical observation/decision and does not add a
-  finding, episode, repair, or metric denominator unit;
+- `duplicate` points to one canonical observation/decision, remains an
+  observation unit for workload/churn and `MET-REVIEW-011`, and does not add a
+  second unique finding/effect/issue/repair or `MET-REVIEW-005` closure
+  opportunity; every other metric follows its own declared subject;
 - `invalid_or_unsubstantiated` retains its claim/evidence/reason and grants no
   semantic acceptance beyond proving that the claim is not a current blocker;
 - a contrary observation cannot reopen an active accepted-variance decision
-  without one permitted trigger, materially new bound evidence, and manager
-  adjudication;
+  without one member of the fixed canonical trigger set, exact supporting
+  evidence, and manager adjudication; no earlier decision may suppress one of
+  those four trigger routes;
 - high-impact, disputed-impact, and variance-reversal records fail if a reviewer
   proposal is reused as manager adjudication or either event/rationale is
   missing;
@@ -1120,7 +1182,7 @@ field, or test quota.
 | `P1-T3` | Pair interval endpoints from different clock domains/boot epochs. | Duration unavailable, never a wall-time substitute. |
 | `P1-T4` | Omit a wait end, report commit, review decision, or repair end. | Retain in-progress/unavailable state; never zero. |
 | `P1-T5` | Sum overlapping per-reason waits as total wait. | Recompute interval union and expose overlap. |
-| `P1-T6` | Label repair elapsed including waits as active repair service. | Reject the service metric unless active intervals exist. |
+| `P1-T6` | Label repair elapsed including waits as active repair service. | Reject the service metric unless same-boot `post_rejection_repair` evidence-active intervals exist. |
 | `P1-T7` | Rename a continuous-open finding and omit its earlier effect mapping. | Mapping unavailable; recurrence lower/upper bounds expose it. |
 | `P1-T8` | Label a continuous-open restatement as recurrence after proven closure. | Contradicted continuity finding. |
 | `P1-T9` | Reset a rejected lineage to round 1 by renaming the packet/surface. | Lineage continuity failure. |
@@ -1131,11 +1193,13 @@ field, or test quota.
 | `P1-T14` | Admit a decision-locus reopen without an allowed trigger and exact materially new evidence. | Emit a `MET-REVIEW-012` violation and preserve the invalid supersession evidence. |
 | `P1-T15` | Reverse a manager disposition without a trigger but omit it from contradictory-review metrics. | Derived result mismatch; count the reversal and invalidate the authored aggregate. |
 | `P1-T16` | Start repair for accepted variance or another non-correction disposition. | Count the episode and available service in overcorrection; do not relabel it as required repair. |
-| `P1-T17` | Give a duplicate restatement a new denominator unit. | Canonical-reference/denominator failure. |
+| `P1-T17` | Drop a duplicate restatement from workload/churn/`MET-REVIEW-011`, or give it a second unique effect/finding/issue/repair/`MET-REVIEW-005` opportunity. | Per-metric canonical-reference/denominator failure. |
 | `P1-T18` | Accept/integrate while an acceptance-critical impact investigation is open or unavailable. | Count an unknown-impact bypass and fail the process result. |
 | `P1-T19` | Remove a rejected must-fix cost/score offset attempt because the final disposition stayed correct. | Run/result invalid; the attempt remains in `MET-REVIEW-020`. |
 | `P1-T20` | Collapse a high-impact reviewer proposal and manager adjudication into one event/actor. | Adjudication is missing and the observation remains unavailable/blocking. |
-| `P1-P1` | One same-boot complete run with deliberate overlapping waits and known same-effect continuity. | Exact intervals, unions, raw counts, and denominators are derived correctly. |
+| `P1-T21` | Omit an applicable evidence-active interval/class/end, or pair it across clock/boot domains, then emit `MET-FLOW-014`. | Metric remains unavailable with the missing/cross-clock reason; no partial favorable ratio. |
+| `P1-T22` | Collapse simultaneous activity in two lanes into one cross-lane elapsed union, or double-count overlapping intervals inside one lane. | Derived lane-second numerator/denominator mismatch. |
+| `P1-P1` | One same-boot complete run with deliberate overlapping waits/evidence-active intervals, concurrent lanes, and known same-effect continuity. | Exact per-lane unions, lane-second sums, raw counts, and denominators are derived correctly. |
 | `P1-P2` | A high-impact reviewer proposal is separately manager-adjudicated, then an evidence-backed investigation changes one axis before actionability. | Both versions/events remain immutable and every impact/change/lead metric derives from raw evidence. |
 | `P1-P3` | Guards reject a preference-only reopen and a cost-based must-fix downgrade. | Both rejected attempts remain visible in churn/offset numerators while the active decisions stay unchanged. |
 
