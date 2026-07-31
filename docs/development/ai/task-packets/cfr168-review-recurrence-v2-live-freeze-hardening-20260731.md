@@ -62,8 +62,8 @@ manager-owned live anchor was written:
     `git_verified`, `input_schema`, `timed_validations`, and
     `authority_chain`. Mutating any of those fields in a retained generation
     currently leaves a successor at `ALLOW`. Unknown result fields are also
-    ignored, so the replay contract can drift without a deliberate schema or
-    compatibility decision.
+    ignored, and no registered closed result JSON Schema exists, so the replay
+    contract can drift without a deliberate schema or compatibility decision.
 11. Derivation `next_action` is required and parsed but never evaluated or
     emitted. A record can pair `derivation_complete` with `PRODUCT_REPAIR`,
     `REPAIR_CLAIM`, or a manager action and still reach `ALLOW` with no visible
@@ -278,12 +278,21 @@ mutations must return a structured `BLOCK`.
   decoded non-finite float. Schema number checks are not a substitute because
   comparisons against `NaN` and infinities do not provide the required
   deterministic boundary.
+- Limit object/array container nesting to 64 levels: a root object/array is
+  depth 1 and each directly nested object/array increments depth by one;
+  scalars do not increment it. Depth 64 is accepted and depth 65 returns
+  structured `json-nesting-too-deep`; catch an earlier decoder
+  `RecursionError` as the same finding rather than a traceback.
+- Convert decoder numeric `ValueError` (including Python's oversized-integer
+  digit guard) into deterministic `json-number-out-of-range`. A standards-valid
+  but impractically large integer token must never escape the shared boundary
+  as an exception.
 - Apply it to the current record and every committed current/historical record,
   result, manifest, timed result, and live anchor consumed by authority walk or
   semantic replay. Apply the same decoder to every current or historical
-  record, manifest, timed-result, and live-anchor JSON Schema blob loaded as
-  deciding-gate authority; content-addressing a schema does not make ambiguous
-  JSON member semantics safe.
+  record, manifest, gate-result, timed-result, and live-anchor JSON Schema blob
+  loaded as deciding-gate authority; content-addressing a schema does not make
+  ambiguous JSON member semantics safe.
 - Return a deterministic structured `duplicate-json-object-key` finding (or a
   CLI input error before a record model exists) naming the duplicated member
   safely. Do not continue with either value and do not emit a partial retained
@@ -300,10 +309,22 @@ named non-finite constants and both exponent-overflow forms into
 duration/threshold fields and must also fail before schema/decision use.
 Duplicate members and non-finite constraints inside each validator-owned JSON
 Schema must likewise fail during schema registration or gate loading rather
-than being parsed last-write-wins.
+than being parsed last-write-wins. Add exact depth-64/depth-65,
+decoder-recursion, and oversized-integer controls for current and retained
+boundaries.
 
 ### F1g — make retained-result replay complete and closed
 
+- Add and register
+  `docs/development/ai/schemas/review-recurrence-gate-result.v2.schema.json`,
+  and add its exact path/digest to deciding-gate source identity. It validates
+  retention-authoritative parsed v2 results, is closed at every object level,
+  models all stable and explicitly gate-relative fields named below, and may
+  admit only the known optional CLI-added machine-local `record` path.
+- Validate a fully assembled current parsed-v2 result before it can authorize
+  `ALLOW`, and validate every retained result before semantic replay. A result
+  from an unparseable input may still be emitted as diagnostic `BLOCK`, but it
+  cannot become predecessor authority.
 - Define one explicit retained-result replay contract. Do not maintain a
   drifting allowlist of a few convenient fields while ignoring the rest of the
   committed decision result.
@@ -369,11 +390,13 @@ the complete/`NONE` positive fixture must remain passing.
 
 ### F1i — stop typed consumption after schema failure
 
-- At every v2 record, manifest, timed-result, live-anchor, retained-result, and
-  validator-schema boundary, separate decode, schema validation, typed parse,
-  and decision use. If schema validation fails, retain the structured findings
-  but do not consume the invalid value as a typed model or emit partial facts
-  from it.
+- At every v2 record, manifest, timed-result, live-anchor, and retained-result
+  boundary, separate decode, its registered JSON Schema validation, typed
+  parse, and decision use. Validator-owned schema blobs instead use strict
+  decode followed by the existing registry structural checks; do not invent a
+  recursive self-validation step. If either applicable validation stage fails,
+  retain the structured findings but do not consume the invalid value as a
+  typed model or emit partial facts from it.
 - Typed parsers must still be total over their declared input boundary: a wrong
   scalar, null, or malformed nested object returns deterministic findings and
   never an uncaught `TypeError`, `AttributeError`, `KeyError`, encoding error,
@@ -460,6 +483,7 @@ port candidates exist.
 
 - `docs/development/ai/schemas/review-recurrence-control.v2.schema.json`
 - `docs/development/ai/schemas/review-recurrence-repair-manifest.v1.schema.json`
+- `docs/development/ai/schemas/review-recurrence-gate-result.v2.schema.json`
 - `docs/development/ai/schemas/review-recurrence-live-arm-anchor.v1.schema.json`
 - `docs/development/ai/schemas/timed-gate-result.v2.schema.json`
 - `docs/development/ai/schemas/README.md`
@@ -472,11 +496,12 @@ port candidates exist.
   complete retained-result semantic replay
 - `docs/development/tools/check_review_recurrence.py` for canonical schema
   loading, strict authority decoding, and result/replay plumbing
-- `docs/development/tools/run_timed_gate.py` only to emit the new bound result
-  path and preserve internally derived path/cleanliness/HEAD summaries
+- `docs/development/tools/run_timed_gate.py` to emit the new bound result path,
+  reject invalid finite/positive timing inputs before subprocess launch, and
+  preserve all frozen runner timing/path/cleanliness/HEAD relations
 - `docs/development/tools/check_ai_contracts.py` to register the new canonical
-  live-anchor schema and apply the strict decoder to registered authority
-  schema blobs
+  gate-result and live-anchor schemas and apply the strict decoder to
+  registered authority schema blobs
 - `docs/development/tools/test_ai_tools.py`
 - `docs/development/ai/review-recurrence/README.md`
 - one implementation result under
