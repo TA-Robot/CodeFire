@@ -1,8 +1,8 @@
 # CFR-168 Review Recurrence Gate v2 Repair
 
-Status: contract revision after independent preflight
-`102fc12`; implementation remains forbidden until the same contract reviewer
-accepts the exact revised packet and the manager freezes its dispatch revision.
+Status: contract revision after independent rereview `e837404`; implementation
+remains forbidden until the same contract reviewer accepts the exact revised
+packet and the manager freezes its manifest/dispatch revision.
 
 Provider/model for implementation: Claude Code / `claude-opus-5`.
 
@@ -32,7 +32,7 @@ evidence-bound v2 pilot gate that:
 This task repairs the review-control mechanism. It does not review, repair, or
 integrate the Cargo, KGI/KPI, Upload, Storage, or product candidates.
 
-## 2. Evidence that governs this repair
+## Evidence that governs this repair
 
 Read these exact repository artifacts before changing anything:
 
@@ -68,7 +68,14 @@ Read these exact repository artifacts before changing anything:
   - canonical commit `102fc1232b9a5140c72be94b8add51b5a58c5634`,
     mode `100644`, SHA-256
     `ccd5585c79acb19e7c412b336e40930dd984ea4e26217486f659a1132f6bec0b`;
-  - verdict `REQUEST_CHANGES`; C-1 through C-16 are dispositioned in §10.
+  - verdict `REQUEST_CHANGES`; C-1 through C-16 are dispositioned in
+    **Contract-preflight corrections**.
+- contract rereview:
+  - `docs/development/ai/swarm-results/cfr168-review-recurrence-v2-contract-preflight-claude-20260731/rereview.md`;
+  - canonical commit `e8374040ed177f915b3c3debed20cd4ffa21b17a`,
+    mode `100644`, SHA-256
+    `af5dab388cd2926da22ae77914a26605e067d5e884dae350f263123ad16e3dfb`;
+  - verdict `REQUEST_CHANGES`; R-1 through R-10 are dispositioned below.
 
 The replay decisions are inputs, not optional suggestions:
 
@@ -83,7 +90,7 @@ The replay did **not** justify a review-item count, checklist length, template
 depth, field count, or repair-delta threshold. None may be invented in this
 repair.
 
-## 3. Compatibility and authority boundary
+## Compatibility and authority boundary
 
 - Add a new schema identifier and file:
   `codefire.review_recurrence_control.v2` /
@@ -113,9 +120,9 @@ repair.
   nonterminal execution, and every non-`accept` review decision remain
   `BLOCK`.
 
-## 4. Exact Git chronology
+## Exact Git chronology
 
-### 4.1 Predecessor authority and candidate interval
+### Predecessor authority and candidate interval
 
 There is no independently author-chosen `base_revision`. The subject identifies
 `predecessor_candidate_revision`, `candidate_revision`, and one exact
@@ -135,6 +142,19 @@ changed paths, and all coverage over exactly
 `predecessor_candidate_revision..candidate_revision`. A later ancestor cannot
 be substituted merely because it is on candidate ancestry.
 
+A prior v2 record is not trusted as a standalone JSON blob. The named machine
+reader is the `resolve_predecessor_authority_chain` path in
+`check_review_recurrence.py`. It walks the record's `predecessor_authority`
+chain transitively until one of the manager-fixed legacy roots below. At every
+link it verifies generation continuity, candidate identity, packet/candidate/
+control/report/evidence/retention topology, exact per-commit write sets, modes,
+blob digests, record/result digest equality, and the exported
+successor-obligation set. In particular, it verifies that the retention commit
+is the direct child of the evidence commit and changes exactly the declared
+record and result paths. Cycles, missing links, a discontinuous generation, or
+a chain that does not terminate at a manager-fixed root produce `BLOCK`. Ref
+existence is never a substitute for this walk.
+
 The two allowed bootstrap bindings are manager-fixed here:
 
 | Arm | Predecessor candidate | Legacy report commit | Report path | SHA-256 |
@@ -142,10 +162,13 @@ The two allowed bootstrap bindings are manager-fixed here:
 | Cargo | `4e5c0e7f058cd406cb7a183ecda8b3a07f3ee912` | `130878d321f6be166f554ac2c68a59e2b36afa88` | `docs/development/ai/swarm-results/aia-source-keyed-cargo-gate-second-closure-rereview-claude-20260731/review.md` | `aad067b2b8feb80830c41db1608dd31f0e7e7d7ca1f37ab01d040336f788b4fd` |
 | KGI/KPI | `753c8db103579d021795d3fe6a97c5d45d4a111a` | `12f9d0b5c30ce2695ec6c96e5876703efd7b0d90` | `docs/development/ai/swarm-results/development-flow-kgi-kpi-r3-rereview-claude-20260731/review.md` | `23b59e01825e3f66d2d38b754348e3d51457f3c465def578ac99ce52729a204f` |
 
-Both report blobs must be mode `100644`. No other legacy bootstrap may
-produce `ALLOW` without a new manager contract and independent preflight.
+Both report blobs must be mode `100644`. A bootstrap generation always records
+`predecessor_obligation_completeness: unavailable` and therefore cannot
+produce machine `ALLOW`; its retained v2 record seeds the second generation,
+where `ALLOW` first becomes reachable. No other legacy binding may serve as a
+root at all without a new manager contract and independent preflight.
 
-### 4.2 Repair packet and manifest precede the presented repair
+### Repair packet and manifest precede the presented repair
 
 The v2 `ALLOW` surface supports one topology only:
 
@@ -155,6 +178,15 @@ predecessor candidate
   -> one or more repair commits
   -> candidate
 ```
+
+Steady state is an explicit fork. The predecessor candidate has one child on
+its completed review chain and a sibling packet commit for the successor
+repair. The manifest may therefore embed obligation data emitted later on the
+sibling review chain; the prior record is verified through the rooted
+authority-chain walk in **Predecessor authority and candidate interval**, not
+by pretending it is a candidate ancestor.
+The topology proves graph relationships only, not when the manifest was
+authored.
 
 The packet commit is the direct child of the predecessor. The two packet paths
 are mode `100644` and are in `docs/development/ai/task-packets/`. The manifest
@@ -167,11 +199,40 @@ exactly those two paths; it is not
 The manifest is compact and `additionalProperties: false`. It contains exactly
 the schema/manifest identity, generation, predecessor authority reference,
 predecessor candidate revision, Markdown packet path/digest,
-`finding_target_policy: "none"`, unique prior-obligation IDs, unique
-parity/closure claim rows, and unique required validation IDs with argv. The
-recurrence record must be set-equal to those three manifest collections; the
-manifest does not contain author-transcribed outcomes or semantic closure
-prose.
+`finding_target_policy: "none"`, unique prior-obligation rows mapping each ID
+to its required closure-validation IDs, unique parity/closure claim rows, and
+unique required validation IDs with argv. Every referenced closure-validation
+ID must exist in the required validation set. Except for an obligation whose
+predecessor state is `DEFECT_INJECTION_ONLY`, every prior-obligation row has at
+least one closure-validation ID. An injection-only row may have an empty list
+only because a later `CLOSED_PROVEN` state must instead bind the independently
+accepted non-reachability artifact in **I5 live experiment: evidence state vs
+next action**. The recurrence record must be
+set-equal to those three manifest collections; the manifest does not contain
+author-transcribed outcomes or semantic closure prose.
+
+The manifest is the remaining discretion boundary. Its parity/closure claims
+and required validations are manager-reviewed and content-frozen with the
+dispatch revision before an implementer starts. Set equality prevents later
+weakening but cannot prove that the manager chose a complete set; independent
+packet preflight judges that completeness without a count target.
+
+For the two canonical ports, the Markdown packet is fixed exactly:
+
+| Arm | Packet path | Source commit | SHA-256 | Predecessor state |
+|---|---|---|---|---|
+| Cargo | `docs/development/ai/task-packets/cfr168-source-keyed-cargo-third-closure-repair-20260731.md` | `8c51b712f1e3937fd462a95c70b8de79687b9289` | `7464f158cc04373af2cb5e0eacb37212233d920dc9233bf220e553361a43adc7` | absent at `4e5c0e7f` |
+| KGI/KPI | `docs/development/ai/task-packets/cfr168-development-flow-kgi-kpi-r4-repair-20260731.md` | `a22fad0698b1623d8898c47699e7ba4e61294b5f` | `bbd6ef472903079238f24ad92bf567a9143fdbd1874975d5364ddd4eea8964ad` | absent at `753c8db1` |
+
+Both source blobs are mode `100644`. The port copies their bytes to the same
+paths; the new manifest is the second path. KGI/KPI's historical
+`swarm-batches/development-flow-kgi-kpi-zero-residual-repair-r3-20260731.md`
+and `...-r4-20260731.md` remain byte-for-byte in the ported repair patch and
+are ordinary reviewed repair surfaces, not precedence packets. The Cargo
+candidate's own repair/result artifacts likewise remain repair surfaces.
+The **Repair packet and manifest precede the presented repair** proof is scoped
+to the one declared Markdown packet and its manifest; every other instruction
+artifact remains visible through exact changed-path/surface coverage.
 
 The Git-derived `repair_surface` is:
 
@@ -203,7 +264,7 @@ changes, and recompute all candidate/review identities. The port attests its
 presented topology; it must not be described as proof of the original lane's
 authorship time.
 
-### 4.3 Review, evidence, record, and result ordering
+### Review, evidence, record, and result ordering
 
 Use this exact order:
 
@@ -241,7 +302,7 @@ and routing/scope decision artifacts. Each such referenced blob must be mode
 `100644`; symlinks and all other modes fail. Review control cannot rewrite the
 gate, schema, helpers, tests, or any path other than its exact packet.
 
-## 5. Evidence-bound validations
+## Evidence-bound validations
 
 Every required validation must reference:
 
@@ -256,10 +317,20 @@ Every required validation must reference:
 Git root containing its cwd, canonical `HEAD` revision, and `HEAD^{tree}` and
 emit them in v2. Required acceptance validations run against a clean checkout
 of the exact candidate; the recurrence tool requires the timed result's
-revision/tree to equal the bound candidate. This closes a result borrowed from
-another worktree. The generic runner does not prove that a test selector chose
-a nonzero corpus; validation-specific selection claims remain report evidence
-unless a dedicated parser verifies them, and v2 must not claim otherwise.
+revision/tree to equal the bound candidate.
+
+The runner captures `git status --porcelain=v1 -z --untracked-files=all`
+immediately before and after the command, emits both cleanliness states, and
+v2 acceptance requires both empty. Timed logs/results are first written
+outside the source worktree and later copied byte-identically into the evidence
+commit, so they do not make the checkout dirty. This rejects a result from a
+different revision/tree or an ordinarily dirty checkout. A command that mutates
+and restores bytes during its own execution remains outside the provenance
+proof and is stated as such.
+
+The generic runner also does not prove that a test selector chose a nonzero
+corpus; validation-specific selection claims remain report evidence unless a
+dedicated parser verifies them, and v2 must not claim otherwise.
 
 The tool must load the exact Git blobs at the evidence commit and require:
 
@@ -280,8 +351,9 @@ The tool must load the exact Git blobs at the evidence commit and require:
 `cwd` and `log.path` remain machine-specific absolute paths; they are
 diagnostic only. The committed log is linked by its digest and byte count.
 Do not claim that the result proves honest execution, semantic oracle quality,
-or nonzero test selection. It proves that the record, manifest, exact
-candidate identity, timed result, and retained bytes agree.
+nonzero test selection, or absence of mutate/revert activity inside the
+command. It proves that the record, manifest, committed candidate identity,
+clean-before/after states, timed result, and retained bytes agree.
 
 All other evidence and authority references must be structured Git artifact
 references, not non-empty strings. The common definition binds role, exact
@@ -290,17 +362,25 @@ revision from the role:
 
 - packet/manifest evidence resolves at the packet commit on candidate ancestry;
 - candidate evidence resolves at the candidate;
-- review/report/evidence artifacts resolve at their exact §4.3 commit;
-- a prior v2 record resolves at its retained record commit;
+- review/report/evidence artifacts resolve at their exact
+  **Review, evidence, record, and result ordering** commit;
+- a prior v2 record resolves at its retained record commit and is accepted only
+  by the rooted transitive chain walk in
+  **Predecessor authority and candidate interval**;
 - the two legacy bootstrap reports resolve only at the exact commits fixed in
-  §4.1;
+  **Predecessor authority and candidate interval**;
 - routing or scope-decision artifacts resolve at or before the candidate on
   its ancestry and never inside review control, report, or evidence commits.
 
-Object existence or a dangling/throwaway-branch commit is insufficient.
-Reachability and the role-to-revision relationship are verified.
+There is no global "reachable from any ref" predicate. Contract-pinned
+bootstrap artifacts are verified by their exact commit/write set/mode/digest;
+packet, candidate, review, report, and evidence roles are verified by their
+declared topology; prior records use the rooted chain walk; routing/scope roles
+use candidate ancestry. A local branch or ref pointing at an object is never
+evidence, and a role-incompatible or unrooted commit fails even when
+`git cat-file` can read it.
 
-## 6. I1 live experiment: predecessor derivation
+## I1 live experiment: predecessor derivation
 
 The historical replay showed that the decisive cases can be byte-identical
 between predecessor and candidate. A diff-only check therefore does not
@@ -345,7 +425,7 @@ Cargo/KGI live arms are Python-side control tooling; no Rust arm may use v2
 fail-closed consequence of the replay's five unavailable Rust rows, not an
 inference that I1 was validated on Rust.
 
-## 7. I5 live experiment: evidence state vs next action
+## I5 live experiment: evidence state vs next action
 
 Do not overload a free `blocking` boolean. Use separate, enumerated fields for:
 
@@ -385,6 +465,15 @@ Required authority rules:
 - `CLOSED_PROVEN` with `next_action: NONE` is the only nonblocking state.
 - Every other evidence state blocks machine `ALLOW`; routing changes the kind of
   successor work, never integration authority.
+- `CLOSED_PROVEN` is not a free label. A prior obligation may use it only when
+  it binds every closure-validation ID frozen for that obligation in the
+  manifest, that mapping is non-empty, and every corresponding committed timed
+  v2 result passes. An item whose predecessor state is
+  `DEFECT_INJECTION_ONLY` may instead use an empty validation mapping only when
+  it binds the independently accepted non-reachability boundary below. A new
+  finding with no pre-repair manifest mapping cannot be closed in the same
+  generation. The tool verifies the identity, set equality, and passing
+  results; it does not claim those oracles semantically prove closure.
 - `DEFECT_REPRODUCED` and `DEFECT_SOURCE_PROVEN` route to product repair.
 - `DEFECT_INJECTION_ONLY` blocks unless an exact, independently reviewable
   **non-reachability** boundary is committed and bound. The validator proves
@@ -419,9 +508,9 @@ metric and must not be compared as though it were. The gate preserves
 integration evidence even when it avoids sending claim/oracle/scope work back
 through a product-repair lane. Authors transcribe none of these outcomes.
 
-## 8. Obligations, recurrence, and changed-path coverage
+## Obligations, recurrence, and changed-path coverage
 
-### 8.1 Prior obligations
+### Prior obligations
 
 Retain only fields needed to establish identity, generation, continuity,
 before/after evidence, negative-control state where required, evidence state,
@@ -435,8 +524,12 @@ next action, owner/release/authority where routed, and closure.
   `CLOSED_PROVEN` and is nonclosed now is
   `recurred_after_proven_closure`; an item that remained nonclosed is
   `continuous_open`. The author cannot choose a weaker label.
-- For the two bootstrap arms, the manifest derives its IDs from the exact
-  frozen inventories in:
+- For the two bootstrap arms, all three manifest collections are manager-derived
+  from the exact frozen packets below: prior-obligation rows from their frozen
+  row inventories; parity/closure claims from their closure-contract and
+  predecessor-failure sections; required validation IDs/argv from their
+  validation and independent-negative-control tables.
+  The exact packets are:
   - Cargo packet commit
     `0304c0e1ee835336d779e16bd6a4c96096662242`, SHA-256
     `db0d58cc45ae214306f325f1047dfa1783be7aba21ce067b4a8840b252ad999c`;
@@ -448,6 +541,9 @@ next action, owner/release/authority where routed, and closure.
   denominator, and cannot produce machine `ALLOW`; it is a live measurement
   and a machine-readable seed for the next generation. This exception is not
   silently treated as completeness.
+- The gate verifies the frozen manifest bytes and downstream set equality, not
+  the manager's semantic extraction from Markdown. Independent packet preflight
+  must approve that extraction before the manifest/dispatch revision is frozen.
 - `recurred_after_proven_closure` must bind exact prior closure evidence and
   block while open.
 - `unavailable` must constrain the associated observations consistently and
@@ -455,7 +551,7 @@ next action, owner/release/authority where routed, and closure.
 - Move unverified closure/oracle prose to the repair packet or review report
   unless the tool consumes it.
 
-### 8.2 Changed paths and surfaces
+### Changed paths and surfaces
 
 The declared changed-path set must equal Git exactly.
 
@@ -470,10 +566,11 @@ cannot change validation or blocking. Git verifies path coverage and
 path-to-surface linkage; complete semantic symbol enumeration remains a human
 review judgement and must not be described as machine-proved.
 
-Remove `out_of_scope` if it adds no checked guarantee. If retained, it must be
-disjoint from changed/reviewed paths.
+The v2 schema has no `out_of_scope` field; `additionalProperties: false`
+rejects it. Scope routing is per surface and cannot contradict exact
+changed-path coverage.
 
-### 8.3 No quota and no self-attested saturation
+### No quota and no self-attested saturation
 
 - The schema requires `finding_target_policy: "none"` and rejects unknown
   properties. It explicitly prohibits
@@ -488,7 +585,7 @@ disjoint from changed/reviewed paths.
 - Remove unchecked “all done” stopping booleans.
 - Acceptance is derived from exact set coverage and terminal dispositions.
 
-## 9. Mandatory independent-review repairs
+## Mandatory independent-review repairs
 
 The implementation and its tests must explicitly disposition every finding
 from the independent report:
@@ -512,7 +609,7 @@ from the independent report:
 
 No finding may be marked “fixed” only because its field was renamed.
 
-## 10. Contract-preflight corrections
+## Contract-preflight corrections
 
 The implementation design and tests must preserve these dispositions from
 `docs/development/ai/swarm-results/cfr168-review-recurrence-v2-contract-preflight-claude-20260731/review.md`:
@@ -535,6 +632,21 @@ The implementation design and tests must preserve these dispositions from
 | C-14 | Invalid Git path bytes are rejected before schema validation and JSON-escaped in the result. |
 | C-15 | Direct-parent/per-commit rules, artifact roles, `next_action`, `CLOSED_PROVEN`, and named quota fields are exact. |
 | C-16 | v1 before evidence is pinned to `1cae0225`; the full AI development gate remains required. |
+
+## Contract-rereview corrections
+
+| Finding | Revised contract mechanism |
+|---|---|
+| R-1 | Every prior-v2 authority chain is walked transitively to one of the manager-fixed roots; each topology/write-set/mode/digest/set link is checked. |
+| R-2 | `CLOSED_PROVEN` binds all manifest-mapped closure validations, or the independently accepted injection non-reachability boundary. |
+| R-3 | Artifact validity is role-specific; pinned commits, topology, rooted chains, and candidate ancestry replace an undefined any-ref reachability rule. |
+| R-4 | The sibling review-chain/successor-packet fork is explicit, and off-lineage predecessor records are verified by the rooted role. |
+| R-5 | Timed v2 records clean-before/after status; acceptance requires both clean and retains the mutate/revert provenance limit. |
+| R-6 | Bootstrap records always block and seed a second generation; no other legacy authority root is admitted. |
+| R-7 | Successor predecessor-authority resolution is the named reader of retention parentage, write sets, modes, and record/result digest equality. |
+| R-8 | Frozen bootstrap packets seed obligation, parity/closure, and validation collections explicitly. |
+| R-9 | The manifest is named as the manager discretion boundary and is independently reviewed/frozen before dispatch. |
+| R-10 | Cargo and KGI/KPI port packets are fixed by path/commit/digest; historical in-patch dispatch artifacts stay reviewed repair surfaces. |
 
 ## Scope
 
@@ -613,6 +725,27 @@ old behaviour. Then show v2 blocks:
 23. `DEFECT_INJECTION_ONLY` cannot close on reachability evidence; only a bound,
     independently accepted non-reachability boundary can lead to a later
     `CLOSED_PROVEN` row.
+24. a fabricated prior-v2 record whose chain is unrooted, cyclic, skips a
+    generation, has a malformed retention commit, or changes its exported
+    successor obligations is rejected even if a local ref points at it;
+25. `CLOSED_PROVEN` with an empty closure-validation mapping, a missing mapped
+    result, or a nonpassing mapped result is rejected, with the sole
+    injection-only/non-reachability alternative tested separately;
+26. role-specific artifact resolution accepts each exact pinned bootstrap
+    binding without depending on local refs, while rejecting an object that
+    exists at a role-incompatible commit;
+27. a timed v2 acceptance run with nonempty clean-before or clean-after status
+    is rejected, and the test names the unproved mutate/revert-during-command
+    boundary;
+28. the first bootstrap generation blocks by construction, its retained
+    authority seeds the next generation, and only that rooted second
+    generation can exercise the `ALLOW` path;
+29. both canonical-port fixtures bind the exact Cargo/KGI packet
+    path/source-commit/digest triples, and KGI's historical in-patch
+    `swarm-batches` artifacts remain covered repair surfaces rather than packet
+    authority;
+30. all three bootstrap manifest collections are set-equal to the independently
+    preflighted manager freeze; thinning any one collection is rejected.
 
 Run:
 
@@ -630,7 +763,7 @@ git diff --check
 The unittest commands run from `docs/development/tools`; the remaining commands
 run from the repository root.
 
-## 12. Pre-implementation self-review
+## Pre-implementation self-review
 
 Before editing implementation bytes, return a short written design table that
 maps:
@@ -638,6 +771,8 @@ maps:
 - each F-1 through F-14 finding to one mechanism and one counterexample;
 - each contract-preflight C-1 through C-16 finding to its exact revised clause
   and implementation mechanism;
+- each contract-rereview R-1 through R-10 finding to its exact revised clause,
+  named machine reader, and adversarial counterexample;
 - I1 and I5 to their exact schema rows, semantic rules, and emitted metrics;
 - the repair manifest's predecessor, obligation, parity-claim, and validation
   set anchors;
@@ -665,7 +800,8 @@ Return:
 1. exact base revision, candidate revision/tree, and canonical patch SHA-256;
 2. changed paths and per-path purpose;
 3. the pre-implementation design table;
-4. F-1 through F-14 disposition table with test names;
+4. F-1 through F-14, C-1 through C-16, and R-1 through R-10 disposition tables
+   with test names;
 5. I1/I5 live-experiment fields and derived metrics;
 6. minimal and one realistic v2 record required-leaf counts, reported as
    measurements only, with no target or acceptance threshold;
