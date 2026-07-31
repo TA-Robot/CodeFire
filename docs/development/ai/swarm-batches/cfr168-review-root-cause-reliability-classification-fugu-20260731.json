@@ -1,0 +1,26 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-review-root-cause-reliability-classification-fugu-20260731",
+  "workspace": "/workspace/worktrees/cfr168-p0-canonical",
+  "base_revision": "f916c7fc6f0ce10160d5ec03ec1256f50cef09ae",
+  "max_parallel": {
+    "fugu": 1,
+    "claude": 0,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "review-root-cause-reliability-classification",
+      "role": "reviewer",
+      "tier": "ultra",
+      "provider": "fugu",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-classification-fugu-20260731.md",
+      "depends_on": [],
+      "write_set": [
+        "docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-classification-fugu-20260731/classification.md"
+      ],
+      "expected_commit": true,
+      "timeout": "12h"
+    }
+  ]
+}
