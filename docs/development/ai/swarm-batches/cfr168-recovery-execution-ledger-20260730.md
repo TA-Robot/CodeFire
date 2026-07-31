@@ -2254,4 +2254,9 @@ to live admission, but the currently designed global Rust execution lock
 continues to serialize Cargo until separately reviewed bounded concurrency
 exists. The current disposition index now points all four Rust lines to this
 binding; its SHA-256 is
-`d139b3d6b774217d4d4b1c75fb71853dbf54f42c4a74cf71e667a602e45d571d`.
+`890c5e0b128baa8b0e369afcf8e95079780dfb3315ea4a760b6fb2e7e45da855`.
+
+The index root map now also names pending Upload `446cf4a`, pending Cargo
+`4e5c0e7`, the canonical-port review requirement, and the removed Upload
+precondition on the report-only shared-primitives preflight. It does not
+promote their manager gates to closure.
