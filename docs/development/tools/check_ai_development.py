@@ -85,7 +85,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=repository_root())
     parser.add_argument("--skip-cli", action="store_true", help="Skip local Codex catalog inspection.")
-    parser.add_argument("--timeout", type=float, default=30.0)
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=60.0,
+        help="Per-check timeout in seconds (default: 60).",
+    )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
     root = args.root.resolve()
