@@ -1,44 +1,55 @@
 # CFR-168 Python HTTP Shared-Primitives Adversarial Preflight
 
-Status: blocked pending exact accepted Upload and MR-list bindings
+Status: ready for report-only execution from immutable specifications
 
 Typed packet:
 [`json/cfr168-python-http-shared-primitives-preflight-20260730.json`](json/cfr168-python-http-shared-primitives-preflight-20260730.json)
 
-Freeze base: `c97d6488b6349ae46d4f4887a2630b2f9ff59e02`
+Freeze base: `2c439d8b483c14919633036741af43be221e98cc`
 
-Provider/model when unblocked: Fugu 1.1 Ultra (`fugu-ultra-v1.1`)
+Provider/model: Claude Opus 5 (`claude-opus-5`)
 
 Role: independent architecture reviewer
 
-No `dev-swarm.v1` manifest exists for this task. Do not launch it or begin the
-MR-write closure repair while either predecessor binding remains unbound.
+No `dev-swarm.v1` manifest exists for this task. The report-only preflight may
+run now. The MR-write closure repair remains blocked until the preflight
+commits an exact `READY` decision and the manager binds its commit and digest.
 
 ## Objective
 
-Before another large MR-write implementation, determine whether the accepted
-Doctor/Branch, Upload, and MR-list contracts can share one request/session/
-response/publication lifecycle. Produce one exact `READY` or `BLOCK` report
-whose counterexamples become the implementation oracle.
+Before another large MR-write implementation, determine whether accepted
+Doctor/Branch and MR-list behavior plus the immutable counterexamples from
+rejected Upload, MR-write, and Storage candidates define one compatible
+request/session/response/publication lifecycle. Produce one exact `READY` or
+`BLOCK` report whose counterexamples become the implementation oracle.
 
 This task does not modify product code or approve a candidate. It shifts
 physical ownership, effect, cleanup, authority, response, and mutation
 counterexamples before implementation so the next Claude lane does not
 rediscover them after a multi-thousand-line patch.
 
-## Exact blocked inputs
+Rejecting reports are specifications only. They authorize no product byte.
+Every primitive clause must cite the source report SHA-256, record whether the
+finding is behavior-open, behavior-closed, evidence-unproven, or claim-only,
+and mark a primitive `shape-pending` when its exact implementation still
+depends on an open residual.
 
-| Input | Current evidence | Required binding |
+## Exact bound inputs
+
+| Input | Bound evidence | Authority in this preflight |
 |---|---|---|
-| Doctor + Branch | product `701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714`; report `c57215e243839b224a641251fc9e3bf092f7e116` | fixed scoped input |
-| Upload | candidate `76baff84cb1192e11b26dcc669fb800f7b13fa30`; exact review active | `ACCEPTED_UPLOAD_SHA`, tree, parent, patch digest, report commit and report digest are unbound |
-| MR-list | rejected `38da8988ac8bc1fcdfcb82c62e7aa0d28791500c`; closure repair active | `ACCEPTED_MR_LIST_SHA`, tree, parent, patch digest, report commit and report digest are unbound |
-| MR-write findings | candidate `6dd4527f23135388b53fc5c6d637c4105cc5d659`; rejecting report `b86a782b6ac72cabe684106f969681c5cd56380e` | fixed problem statement; no successor implementation is authorized yet |
+| Doctor + Branch | product `701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714`; accepted report `c57215e243839b224a641251fc9e3bf092f7e116` | fixed scoped product contract |
+| MR-list | candidate `b16404676639336f705feffd9af4857d4a1fcc69`; accepted report `ee6517a`, report SHA-256 `5c952a9a5c162bfbb93522bb644fcba44ce32ddf3628501e6f94308899fe760e` | fixed scoped product contract plus four manager-routed observations |
+| Upload generation 1 | rejected candidate `76baff84cb1192e11b26dcc669fb800f7b13fa30`; report `f835f64`, SHA-256 `7632552eb0ca60addca0d83fe3ba53ead642a7cbee82937b1b7b37754f6cb2cf` | immutable negative cases and closed/open disposition history only |
+| Upload generation 2 | rejected candidate `467b0c27715e424ae18ffb5664da053b55915e2d`; report `8bdc076`, SHA-256 `57d6792106f09c17a1d154aedb5a64d342e5d19c23db7e9963c46061c868c132` | immutable negative cases and closed/open disposition history only |
+| Upload generation 3 | rejected candidate `02e04c7e6458035d9c7d58de4d30b4a12e7cd594`; report `b3de0d7`, SHA-256 `3df1db92d6adcef9d318e23182fb9c62519f6eacb091266ced9616626f64cf1f` | latest immutable Upload specification; retryable cleanup remains `shape-pending` |
+| MR-write | rejected candidate `6dd4527f23135388b53fc5c6d637c4105cc5d659`; report `84175bd`, SHA-256 `214e42fc8f36108f45e17b13e4343bfc2b56cc89b72be5c1258f5b497c9ec6ef` | F1–F7 fixed problem statement; no successor product authority |
+| Storage | rejected candidate `cdcb9bd`; report `8ac6741`, SHA-256 `6438df445b2d05510895fd23f73a4e71ba49238da15b00e86abf1a477b5ab960` | cross-runtime invariant-family counterexamples only; no Rust design import |
 
-The manager may change this packet to `ready` only after both predecessor
-successors have immutable exact-candidate `ACCEPT` reports and every new
-review finding is included. A green worker gate, draft report, predecessor
-acceptance, or manager expectation is not a binding.
+The currently reviewed Upload repair may be inspected only as a hypothesis.
+It cannot freeze a primitive shape or supply an accepted product binding.
+The preflight no longer waits for Upload acceptance because it writes no
+product byte and needs negative specifications, not an integration candidate.
 
 ## Scope
 
@@ -49,7 +60,7 @@ ADR-020, and the Python composition freeze packet.
 
 The only authorized write is:
 
-`docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-fugu-20260730/preflight.md`
+`docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md`
 
 Product code, tests, source documents, issue/lifecycle state, task packets,
 manifests, existing reports, Rust, file transport, packaging, devcontainer,
@@ -145,14 +156,20 @@ deliberate-regression proof.
 
 Return `READY` only when:
 
-- all accepted predecessor identities and reports recompute exactly;
+- the accepted Doctor/Branch and MR-list identities and every specification
+  report commit/SHA-256 recompute exactly;
 - every shared primitive has one compatible ownership/lifetime contract;
+- every clause identifies its source report digest and evidence state;
+- any exact shape depending on the open Upload cleanup residual is explicitly
+  `shape-pending`, while its invariant and rejecting counterexample are fixed;
 - each F1–F7 MR-write finding maps to a production counterexample and expected
   repair seam;
 - every material property has a non-vacuous oracle and deliberate regression;
 - the proposed MR-write product/test/source-doc write set is bounded;
-- no unresolved predecessor finding or incompatible accepted behavior must be
-  guessed by the implementer.
+- no unresolved specification conflict or incompatible accepted behavior must
+  be guessed by the implementer; and
+- the report states explicitly that `READY` authorizes only the MR-write
+  repair packet, not Upload integration or any rejected product bytes.
 
 Return `BLOCK` with exact symbols, revisions, and conflicting semantics if any
 condition is missing. Do not invent a weaker third model to force `READY`.
@@ -164,12 +181,13 @@ condition is missing. Do not invent a weaker third model to force `READY`.
 - Resolve manager-owned product conflicts.
 - Design Python GC, Rust, file transport, packaging, install, or dogfood work.
 - Run broad suites whose result cannot change the preflight decision.
-- Infer future accepted predecessor identities before exact reports exist.
+- Infer a future accepted Upload identity or freeze its pending cleanup shape.
 
 ## Validation
 
-1. Recompute accepted Upload and MR-list parent, head, tree, patch, changed
-   paths, report commit, report SHA-256, and clean-state evidence.
+1. Recompute accepted Doctor/Branch and MR-list identities plus every rejecting
+   specification report commit and SHA-256. Recompute candidate identities
+   only to bind the counterexample subject; never treat them as accepted.
 2. Trace every claimed primitive through the production dispatcher and
    distinguish test seams from live reachability.
 3. Bind every material claim to an independent observable oracle and a
@@ -180,14 +198,16 @@ condition is missing. Do not invent a weaker third model to force `READY`.
 
 ## Handoff
 
-When unblocked, write exactly:
+Write exactly:
 
-`docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-fugu-20260730/preflight.md`
+`docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md`
 
 The report must contain:
 
-- recomputed predecessor identity table;
+- recomputed accepted-input and rejecting-specification identity table;
 - `READY` or `BLOCK`;
+- per-clause report SHA-256, evidence state, and `frozen`/`shape-pending`
+  marker;
 - production call graphs and owner/lifetime table;
 - effect/response timelines;
 - shared primitive decisions and incompatible semantics;

@@ -1,9 +1,9 @@
 {
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "cfr168-python-http-shared-primitives-preflight-20260730",
-  "status": "blocked",
-  "objective": "Before the MR-write closure implementation, independently reconcile the exact accepted Doctor/Branch, Upload, and MR-list request/session/response/publication ownership contracts; bind physical owner/effect/cleanup/authority/response counterexamples and return READY or BLOCK without changing product code.",
-  "base_revision": "c97d6488b6349ae46d4f4887a2630b2f9ff59e02",
+  "status": "ready",
+  "objective": "Before the MR-write closure implementation, independently reconcile accepted Doctor/Branch and MR-list behavior with immutable rejecting Upload, MR-write, and Storage counterexamples; bind report-digested physical owner/effect/cleanup/authority/response specifications and return READY or BLOCK without changing product code or authorizing rejected product bytes.",
+  "base_revision": "2c439d8b483c14919633036741af43be221e98cc",
   "role": "architect",
   "risk": {
     "dimensions": {
@@ -34,11 +34,13 @@
       "docs/development/ai/task-packets/cfr168-python-http-shared-primitives-preflight-20260730.md",
       "docs/development/ai/task-packets/cfr168-python-http-composition-freeze-20260730.md",
       "docs/development/ai/swarm-results/cfr168-python-http-doctor-branch-composition-rereview-20260730/review.md",
-      "docs/development/ai/swarm-batches/cfr168-python-http-upload-zero-residual-rereview-fugu-20260730.md",
-      "docs/development/ai/swarm-results/cfr168-python-http-mr-list-zero-residual-rereview-fugu-20260730/review.md",
-      "docs/development/ai/swarm-batches/cfr168-python-http-mr-list-review-closure-repair-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-mr-list-final-publication-closure-rereview-claude-20260731/review.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-upload-zero-residual-rereview-fugu-20260730/review.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-upload-review-closure-rereview-fugu-20260731/review.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-upload-second-review-closure-rereview-claude-fallback-20260731/review.md",
       "docs/development/ai/swarm-results/cfr168-python-http-mr-mutation-zero-residual-rereview-fugu-20260730/review.md",
-      "docs/development/ai/swarm-batches/cfr168-python-http-mr-write-review-closure-repair-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-rust-storage-zero-residual-rereview-fugu-20260730/review.md",
+      "docs/development/ai/swarm-results/cfr168-review-recursion-root-cause-audit-claude-20260731/audit.md",
       "docs/development/source-architecture.md",
       "docs/development/command-source-trace.md",
       "docs/development/source-data-model-catalog.md",
@@ -46,19 +48,25 @@
       "adr/ADR-020-decision-equivalent-work-budget.md"
     ],
     "evidence_refs": [
-      "freeze-base:c97d6488b6349ae46d4f4887a2630b2f9ff59e02",
+      "freeze-base:2c439d8b483c14919633036741af43be221e98cc",
       "doctor-branch-product:701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714",
       "doctor-branch-accept:c57215e243839b224a641251fc9e3bf092f7e116",
-      "upload-current-candidate:76baff84cb1192e11b26dcc669fb800f7b13fa30",
-      "accepted-upload-sha:UNBOUND",
-      "accepted-upload-report:UNBOUND",
-      "mr-list-rejected-candidate:38da8988ac8bc1fcdfcb82c62e7aa0d28791500c",
-      "accepted-mr-list-sha:UNBOUND",
-      "accepted-mr-list-report:UNBOUND",
+      "accepted-mr-list-sha:b16404676639336f705feffd9af4857d4a1fcc69",
+      "accepted-mr-list-report:ee6517a",
+      "accepted-mr-list-report-sha256:5c952a9a5c162bfbb93522bb644fcba44ce32ddf3628501e6f94308899fe760e",
+      "upload-spec-1-report:f835f64",
+      "upload-spec-1-sha256:7632552eb0ca60addca0d83fe3ba53ead642a7cbee82937b1b7b37754f6cb2cf",
+      "upload-spec-2-report:8bdc076",
+      "upload-spec-2-sha256:57d6792106f09c17a1d154aedb5a64d342e5d19c23db7e9963c46061c868c132",
+      "upload-spec-3-report:b3de0d7",
+      "upload-spec-3-sha256:3df1db92d6adcef9d318e23182fb9c62519f6eacb091266ced9616626f64cf1f",
       "mr-write-rejected-candidate:6dd4527f23135388b53fc5c6d637c4105cc5d659",
-      "mr-write-request-changes-review:b86a782b6ac72cabe684106f969681c5cd56380e",
-      "launch-blocker:accepted-upload-and-mr-list-exact-bindings-required",
-      "manifest-state:none-authorized-while-blocked"
+      "mr-write-request-changes-review:84175bd",
+      "mr-write-review-sha256:214e42fc8f36108f45e17b13e4343bfc2b56cc89b72be5c1258f5b497c9ec6ef",
+      "storage-spec-report:8ac6741",
+      "storage-spec-sha256:6438df445b2d05510895fd23f73a4e71ba49238da15b00e86abf1a477b5ab960",
+      "shape-pending:upload-retryable-cleanup",
+      "launch-ready:report-only-specification-preflight"
     ]
   },
   "scope": {
@@ -81,7 +89,7 @@
       "adr/ADR-020-decision-equivalent-work-budget.md"
     ],
     "write_set": [
-      "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-fugu-20260730/preflight.md"
+      "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md"
     ],
     "disallowed_paths": [
       "codefire",
@@ -100,9 +108,9 @@
       "install.sh"
     ],
     "disallowed_actions": [
-      "Create a dev-swarm manifest or launch the preflight while an accepted Upload or MR-list binding remains UNBOUND",
+      "Treat any rejecting candidate or currently reviewed Upload candidate as accepted product authority",
       "Modify product, tests, source contracts, issue state, lifecycle state, or an existing review report",
-      "Treat a green candidate gate, worker handoff, draft report, or scoped predecessor review as an accepted binding",
+      "Freeze an exact primitive shape that depends on the open Upload cleanup residual rather than marking it shape-pending",
       "Implement the MR-write repair before the preflight report is committed and bound",
       "Approve or integrate any product candidate from this report-only task",
       "Replace an accepted predecessor contract with a weaker third model merely to obtain READY",
@@ -115,13 +123,13 @@
     "Independently accept an implementation candidate or authorize product integration",
     "Compose the Python HTTP product tree or resolve manager-owned product conflicts",
     "Run unrestricted full-suite, Install, Dogfood, Close, or Retrospect work",
-    "Infer future accepted predecessor identities before their exact reports exist"
+    "Infer a future accepted Upload identity or freeze its pending cleanup shape"
   ],
   "invariants": [
     {
-      "id": "accepted-predecessors-only",
-      "statement": "Preflight begins only after exact Upload and MR-list candidate parent, head, tree, patch digest, ACCEPT report commit, and report digest are bound with every finding disposed.",
-      "falsification_test": "Leave one binding UNBOUND, substitute a REQUEST_CHANGES candidate, alter one product byte after review, or omit a report digest; readiness must remain blocked."
+      "id": "report-digested-specifications-only",
+      "statement": "Every primitive clause binds an accepted Doctor/Branch or MR-list contract, or an immutable rejecting-report counterexample by exact report commit and SHA-256; rejected product bytes have no integration authority and unresolved exact shapes remain shape-pending.",
+      "falsification_test": "Omit or alter a report digest, cite a currently reviewed product byte as accepted, freeze the open Upload cleanup shape, or use a rejecting candidate as integration authority; decision must be BLOCK."
     },
     {
       "id": "one-physical-owner-model",
@@ -151,9 +159,9 @@
   ],
   "validation": [
     {
-      "id": "accepted-binding-audit",
-      "command": "Recompute accepted Upload and MR-list parent/head/tree/patch/report identities and all finding dispositions before changing packet status to ready.",
-      "purpose": "Prevent preflight against a moving, rejected, or partially reviewed substitute.",
+      "id": "specification-binding-audit",
+      "command": "Recompute accepted Doctor/Branch and MR-list identities plus every rejecting specification report commit/SHA-256, subject candidate, finding evidence state, and frozen/shape-pending disposition before returning READY or BLOCK.",
+      "purpose": "Prevent preflight against a moving or unbound report while allowing immutable rejecting counterexamples to specify negative cases without authorizing product bytes.",
       "required": true,
       "requires_capability": "git"
     },
