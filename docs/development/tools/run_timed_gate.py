@@ -159,6 +159,7 @@ def run_gate_v2(
     log_path: Path,
     timeout_seconds: float,
     *,
+    result_path: Path,
     drift_threshold_seconds: float = 2.0,
     wall_clock_ns: Callable[[], int] = time.time_ns,
     monotonic_clock_ns: Callable[[], int] = time.monotonic_ns,
@@ -171,9 +172,10 @@ def run_gate_v2(
     index entries whose tag is not `H` are captured too, so an `assume-unchanged`
     or `skip-worktree` bit cannot hide a modification behind an empty status.
 
-    Logs and results are meant to be written outside the source worktree and
-    copied byte-identically into the evidence commit; when the log is inside the
-    derived root the payload says so instead of hiding it.
+    Logs and results are written outside the source worktree and copied
+    byte-identically into the evidence commit.  The required result path and the
+    log path are both classified against the derived root; an in-tree path is
+    emitted as such and cannot satisfy recurrence acceptance.
     """
 
     from recurrence_v2_git import GitRepo
@@ -200,6 +202,11 @@ def run_gate_v2(
         log_inside = True
     except ValueError:
         log_inside = False
+    try:
+        result_path.resolve().relative_to(root.resolve())
+        result_inside = True
+    except ValueError:
+        result_inside = False
     payload["schema"] = "codefire.timed_gate.v2"
     payload["source"] = {
         "git_root": str(root.resolve()),
@@ -215,6 +222,7 @@ def run_gate_v2(
         "index_flagged_entries": list(index_flagged),
         "index_flags_clean": not index_flagged,
         "log_inside_source_worktree": log_inside,
+        "result_inside_source_worktree": result_inside,
         "status_command": "git status --porcelain=v1 -z --untracked-files=all",
         "index_command": "git ls-files -v -z",
     }
@@ -264,12 +272,20 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     runner = run_gate_v2 if args.emit == "v2" else run_gate
     try:
+        if args.emit == "v2" and args.result is None:
+            raise ValueError(
+                "--emit v2 requires --result so the runner can prove that both the "
+                "log and result were staged outside the source worktree"
+            )
+        runner_kwargs = {"drift_threshold_seconds": args.drift_threshold}
+        if args.emit == "v2":
+            runner_kwargs["result_path"] = args.result
         payload = runner(
             args.command,
             args.cwd,
             args.log,
             args.timeout,
-            drift_threshold_seconds=args.drift_threshold,
+            **runner_kwargs,
         )
         if args.result is not None:
             atomic_write_json(args.result, payload)

@@ -29,6 +29,8 @@ from recurrence_v2_model import (
     LIVE_ARM_ANCHOR_SCHEMA,
     MANIFEST_SCHEMA_PATH,
     OBSERVATION_ROLES,
+    PORT_PACKETS,
+    PORT_REQUIRED_REPAIR_PATHS,
     RECORD_SCHEMA_PATH,
     TIMED_SCHEMA,
     TIMED_SCHEMA_PATH,
@@ -44,12 +46,14 @@ from recurrence_v2_model import (
 
 GATE_SOURCE_PATHS = (
     "docs/development/tools/check_review_recurrence.py",
+    "docs/development/tools/run_timed_gate.py",
     "docs/development/tools/recurrence_v2_model.py",
     "docs/development/tools/recurrence_v2_git.py",
     "docs/development/tools/recurrence_v2_topology.py",
     "docs/development/tools/recurrence_v2_authority.py",
     "docs/development/tools/recurrence_v2_evidence.py",
     "docs/development/tools/recurrence_v2_decision.py",
+    "docs/development/tools/recurrence_v2_history.py",
     RECORD_SCHEMA_PATH,
     MANIFEST_SCHEMA_PATH,
     TIMED_SCHEMA_PATH,
@@ -68,6 +72,8 @@ class TimedFacts:
     clean_before: bool
     clean_after: bool
     index_flags_clean: bool
+    log_inside_source_worktree: bool
+    result_inside_source_worktree: bool
     log_bytes: int
     log_sha256: str
 
@@ -81,6 +87,8 @@ class TimedFacts:
             and self.clean_before
             and self.clean_after
             and self.index_flags_clean
+            and not self.log_inside_source_worktree
+            and not self.result_inside_source_worktree
         )
 
 
@@ -383,6 +391,80 @@ def check_reference_integrity(
     return findings
 
 
+def verify_canonical_port_packet(
+    repo: GitRepo,
+    record: RecordModel,
+    artifacts: dict[str, ArtifactRef],
+    arm: str | None,
+    location: str = "record.subject.repair_packet_ref",
+) -> list[Finding]:
+    """Bind a bootstrap port to the contract-fixed historical packet bytes."""
+
+    if record.subject.authority.kind != "legacy_bootstrap_report":
+        return []
+    port = PORT_PACKETS.get(arm) if arm is not None else None
+    if port is None:
+        return [error("canonical-port-arm-unknown", location, repr(arm))]
+    findings: list[Finding] = []
+    packet = artifacts.get(record.subject.repair_packet_ref)
+    if packet is None:
+        return [error("canonical-port-packet-unresolved", location, port.path)]
+    if packet.path != port.path or packet.sha256 != port.sha256:
+        findings.append(
+            error(
+                "canonical-port-packet-identity-mismatch",
+                location,
+                f"{arm} requires {port.path} at digest {port.sha256}",
+            )
+        )
+    try:
+        entry = repo.entry(port.source_commit, port.path.encode("utf-8"))
+        source = repo.blob(port.source_commit, port.path.encode("utf-8"))
+    except GitError as exc:
+        findings.append(error("canonical-port-source-unreadable", location, str(exc)))
+    else:
+        if entry is None or entry.kind != "blob" or entry.mode != BLOB_MODE:
+            findings.append(
+                error(
+                    "canonical-port-source-not-regular-blob",
+                    location,
+                    repr(entry),
+                )
+            )
+        if sha256_bytes(source) != port.sha256:
+            findings.append(
+                error(
+                    "canonical-port-source-digest-mismatch",
+                    location,
+                    f"computed {sha256_bytes(source)}",
+                )
+            )
+    try:
+        predecessor_entry = repo.entry(port.absent_at, port.path.encode("utf-8"))
+    except GitError as exc:
+        findings.append(error("canonical-port-predecessor-unreadable", location, str(exc)))
+    else:
+        if predecessor_entry is not None:
+            findings.append(
+                error(
+                    "canonical-port-packet-not-absent-at-predecessor",
+                    location,
+                    f"{port.path} exists at {port.absent_at}",
+                )
+            )
+    required_paths = PORT_REQUIRED_REPAIR_PATHS.get(arm, frozenset())
+    missing_paths = sorted(required_paths - record.subject.changed_paths)
+    if missing_paths:
+        findings.append(
+            error(
+                "canonical-port-required-repair-paths-missing",
+                "record.subject.changed_paths",
+                repr(missing_paths),
+            )
+        )
+    return findings
+
+
 def load_manifest(
     repo: GitRepo,
     record: RecordModel,
@@ -659,6 +741,12 @@ def bind_timed_validations(
             clean_before=worktree.get("clean_before") is True,
             clean_after=worktree.get("clean_after") is True,
             index_flags_clean=worktree.get("index_flags_clean") is True,
+            log_inside_source_worktree=(
+                worktree.get("log_inside_source_worktree") is True
+            ),
+            result_inside_source_worktree=(
+                worktree.get("result_inside_source_worktree") is True
+            ),
             log_bytes=len(log_bytes),
             log_sha256=log_digest,
         )
@@ -682,53 +770,137 @@ def deciding_gate_identity(validator_root: Path) -> dict[str, Any]:
         "artifacts": [],
     }
     try:
-        revision, _ = repo.head_identity()
+        revision, tree = repo.head_identity()
+        status = repo.worktree_status()
+        index_flags = repo.index_flagged_entries()
     except GitError as exc:
         identity["detail"] = str(exc)
         return identity
     identity["source_revision"] = revision
+    identity["source_tree"] = tree
+    identity["worktree"] = {
+        "status": list(status),
+        "index_flagged_entries": list(index_flags),
+    }
     rows: list[dict[str, Any]] = []
     state = "clean_committed"
     for relative in GATE_SOURCE_PATHS:
         on_disk_path = validator_root / relative
+        if on_disk_path.is_symlink() or not on_disk_path.is_file():
+            rows.append(
+                {
+                    "path": relative,
+                    "mode": None,
+                    "sha256": None,
+                    "committed_sha256": None,
+                }
+            )
+            state = "unavailable"
+            identity["detail"] = f"{relative} is not an on-disk regular file"
+            continue
         try:
             on_disk = sha256_bytes(on_disk_path.read_bytes())
         except OSError as exc:
-            rows.append({"path": relative, "sha256": None, "committed_sha256": None})
+            rows.append(
+                {
+                    "path": relative,
+                    "mode": None,
+                    "sha256": None,
+                    "committed_sha256": None,
+                }
+            )
             state = "unavailable"
             identity["detail"] = str(exc)
             continue
         try:
+            entry = repo.entry(revision, relative.encode("utf-8"))
             committed = sha256_bytes(repo.blob(revision, relative.encode("utf-8")))
         except GitError:
+            entry = None
             committed = None
+            state = "untracked"
+        if entry is not None and (entry.kind != "blob" or entry.mode != BLOB_MODE):
             state = "untracked"
         if committed is not None and committed != on_disk:
             state = "uncommitted_modification"
         rows.append(
-            {"path": relative, "sha256": on_disk, "committed_sha256": committed}
+            {
+                "path": relative,
+                "mode": entry.mode if entry is not None else None,
+                "sha256": on_disk,
+                "committed_sha256": committed,
+            }
         )
+    if state == "clean_committed" and (status or index_flags):
+        state = "uncommitted_worktree"
     identity["artifacts"] = rows
     identity["state"] = state
     return identity
 
 
 def load_live_arm_anchor(
-    root: Path,
+    validator_root: Path,
+    analysed_root: Path,
     arm: str,
     record: RecordModel,
     artifacts: dict[str, ArtifactRef],
+    deciding_gate: dict[str, Any],
 ) -> tuple[dict[str, Any] | None, list[Finding]]:
-    """Consume the future manager-owned live-arm pin, fail-closed today.
+    """Consume a manager-owned live-arm pin from the clean validator source.
 
     The anchor does not exist in the repository yet, so a `--live-arm` run can
     only block.  Nothing here fabricates a manifest identity.
     """
 
     location = LIVE_ARM_ANCHOR_PATH
-    path = root / LIVE_ARM_ANCHOR_PATH
-    if not path.is_file():
+    findings: list[Finding] = []
+    validator_root = validator_root.resolve()
+    analysed_root = analysed_root.resolve()
+    if validator_root == analysed_root:
+        findings.append(
+            error(
+                "live-arm-anchor-from-analysed-repository",
+                location,
+                "the manager anchor must come from a separate clean validator source "
+                "repository, never from the analysed --git-root",
+            )
+        )
+    if deciding_gate.get("state") != "clean_committed":
+        findings.append(
+            error(
+                "live-arm-validator-not-clean-committed",
+                location,
+                f"validator gate identity state is {deciding_gate.get('state')!r}",
+            )
+        )
+    revision = deciding_gate.get("source_revision")
+    if not isinstance(revision, str):
+        findings.append(
+            error(
+                "live-arm-validator-revision-unavailable",
+                location,
+                "the validator gate identity has no committed source revision",
+            )
+        )
+        return None, findings
+    repo = GitRepo(validator_root)
+    try:
+        head, _ = repo.head_identity()
+    except GitError as exc:
+        findings.append(error("live-arm-validator-unreadable", location, str(exc)))
+        return None, findings
+    if head != revision:
+        findings.append(
+            error(
+                "live-arm-validator-head-mismatch",
+                location,
+                f"validator HEAD is {head}, deciding gate binds {revision}",
+            )
+        )
+    path = validator_root / LIVE_ARM_ANCHOR_PATH
+    if path.is_symlink() or not path.is_file():
         return None, [
+            *findings,
             error(
                 "live-arm-anchor-unavailable",
                 location,
@@ -737,11 +909,41 @@ def load_live_arm_anchor(
             )
         ]
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return None, [error("live-arm-anchor-unreadable", location, str(exc))]
+        entry = repo.entry(revision, LIVE_ARM_ANCHOR_PATH.encode("utf-8"))
+        payload = repo.blob(revision, LIVE_ARM_ANCHOR_PATH.encode("utf-8"))
+        on_disk = path.read_bytes()
+    except (GitError, OSError) as exc:
+        return None, [
+            *findings,
+            error("live-arm-anchor-unreadable", location, str(exc)),
+        ]
+    if entry is None or entry.kind != "blob" or entry.mode != BLOB_MODE:
+        findings.append(
+            error(
+                "live-arm-anchor-not-regular-blob",
+                location,
+                f"expected committed mode {BLOB_MODE}, got {entry!r}",
+            )
+        )
+    digest = sha256_bytes(payload)
+    if on_disk != payload:
+        findings.append(
+            error(
+                "live-arm-anchor-uncommitted",
+                location,
+                "on-disk anchor bytes differ from the validator HEAD blob",
+            )
+        )
+    try:
+        raw = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return None, [
+            *findings,
+            error("live-arm-anchor-unreadable", location, str(exc)),
+        ]
     if not isinstance(raw, dict) or raw.get("schema") != LIVE_ARM_ANCHOR_SCHEMA:
         return None, [
+            *findings,
             error(
                 "live-arm-anchor-wrong-schema",
                 location,
@@ -755,9 +957,9 @@ def load_live_arm_anchor(
     )
     if match is None:
         return None, [
+            *findings,
             error("live-arm-not-pinned", location, f"{arm} has no pinned anchor row")
         ]
-    findings: list[Finding] = []
     packet = artifacts.get(record.subject.repair_packet_ref)
     manifest = artifacts.get(record.subject.repair_manifest_ref)
     for label, artifact in (("repair_packet", packet), ("repair_manifest", manifest)):
@@ -788,4 +990,15 @@ def load_live_arm_anchor(
                 "the record's predecessor authority is not the pinned one",
             )
         )
-    return match, findings
+    return (
+        {
+            "anchor": {
+                "validator_commit": revision,
+                "path": LIVE_ARM_ANCHOR_PATH,
+                "mode": entry.mode if entry is not None else None,
+                "sha256": digest,
+            },
+            "arm": match,
+        },
+        findings,
+    )

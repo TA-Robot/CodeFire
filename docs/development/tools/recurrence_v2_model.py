@@ -224,6 +224,18 @@ PORT_PACKETS: dict[str, PortPacket] = {
     ),
 }
 
+PORT_REQUIRED_REPAIR_PATHS: dict[str, frozenset[str]] = {
+    "cargo": frozenset(),
+    "kgi_kpi": frozenset(
+        {
+            "docs/development/ai/swarm-batches/"
+            "development-flow-kgi-kpi-zero-residual-repair-r3-20260731.md",
+            "docs/development/ai/swarm-batches/"
+            "development-flow-kgi-kpi-zero-residual-repair-r4-20260731.md",
+        }
+    ),
+}
+
 # Emitted verbatim in every v2 result.  Each sentence is a limit the gate does
 # not prove; none of them is softened elsewhere in the output.
 PROVENANCE_LIMITS = (
@@ -251,9 +263,14 @@ def error(code: str, location: str, message: str) -> Finding:
 
 
 def path_components_safe(value: str) -> bool:
-    """Reject absolute paths, backslashes and empty/dot/dot-dot components."""
+    """Reject paths unsafe for byte-exact Git subprocess arguments."""
 
-    if not value or value.startswith("/") or "\\" in value:
+    if (
+        not value
+        or value.startswith("/")
+        or "\\" in value
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    ):
         return False
     return all(
         part not in ("", ".", "..") for part in PurePosixPath(value).parts

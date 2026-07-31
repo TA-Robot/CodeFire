@@ -24,6 +24,7 @@ from typing import Any
 from ai_contracts import validate_json_schema
 from recurrence_v2_git import GitError, GitRepo, sha256_bytes
 from recurrence_v2_model import (
+    BLOB_MODE,
     LEGACY_ROOTS,
     RESULT_SCHEMA,
     Authority,
@@ -62,7 +63,7 @@ class ChainResult:
     root_commit: str | None = None
     links: tuple[ChainLink, ...] = ()
     verified_commits: frozenset[str] = frozenset()
-    validator_divergences: tuple[str, ...] = ()
+    validator_divergences: tuple[dict[str, Any], ...] = ()
     depth: int = 0
 
     @property
@@ -266,10 +267,18 @@ def _load_json_blob(
 
 def _check_deciding_gate(
     raw: Any,
+    repo: GitRepo,
+    current_gate: dict[str, Any],
     location: str,
     findings: list[Finding],
 ) -> dict[str, Any]:
-    """A retained link must carry the gate identity that validated it."""
+    """Verify a retained gate identity against committed Git blobs.
+
+    A historical result may name a different known gate revision, but it may
+    not invent its own source set or self-attest digests that Git cannot
+    reproduce.  Semantic migration policy is recorded separately by the chain
+    result; this reader only establishes exact identity.
+    """
 
     if not isinstance(raw, dict):
         findings.append(
@@ -280,25 +289,153 @@ def _check_deciding_gate(
             )
         )
         return {}
-    required = ("state", "source_revision", "artifacts")
+    required = ("state", "source_revision", "source_tree", "artifacts")
     missing = [key for key in required if key not in raw]
     if missing:
         findings.append(
             error("link-deciding-gate-incomplete", location, f"missing {missing}")
         )
         return {}
+    if raw.get("state") != "clean_committed":
+        findings.append(
+            error(
+                "link-deciding-gate-not-clean-committed",
+                location,
+                f"state is {raw.get('state')!r}",
+            )
+        )
+    revision = raw.get("source_revision")
+    if not isinstance(revision, str):
+        findings.append(
+            error("link-deciding-gate-revision-invalid", location, repr(revision))
+        )
+        return {}
+    try:
+        resolved_revision = repo.resolve_commit(revision)
+    except GitError as exc:
+        findings.append(
+            error("link-deciding-gate-revision-unreadable", location, str(exc))
+        )
+        return {}
+    if resolved_revision != revision:
+        findings.append(
+            error(
+                "link-deciding-gate-revision-not-canonical",
+                location,
+                f"resolved {resolved_revision}",
+            )
+        )
+    try:
+        actual_tree = repo.tree_of(revision)
+    except GitError as exc:
+        findings.append(error("link-deciding-gate-tree-unreadable", location, str(exc)))
+        actual_tree = None
+    if raw.get("source_tree") != actual_tree:
+        findings.append(
+            error(
+                "link-deciding-gate-tree-mismatch",
+                f"{location}.source_tree",
+                f"recorded {raw.get('source_tree')!r}, computed {actual_tree!r}",
+            )
+        )
+    rows = raw.get("artifacts")
+    if not isinstance(rows, list) or not rows:
+        findings.append(
+            error(
+                "link-deciding-gate-artifacts-invalid",
+                f"{location}.artifacts",
+                "a nonempty artifact list is required",
+            )
+        )
+        return {}
+    current_rows = current_gate.get("artifacts")
+    current_row_list = current_rows if isinstance(current_rows, list) else []
+    expected_paths = {
+        row.get("path")
+        for row in current_row_list
+        if isinstance(row, dict)
+        and isinstance(row.get("path"), str)
+    }
+    seen: set[str] = set()
+    for index, row in enumerate(rows):
+        where = f"{location}.artifacts[{index}]"
+        if not isinstance(row, dict):
+            findings.append(error("link-gate-artifact-not-object", where, repr(row)))
+            continue
+        path = row.get("path")
+        digest = row.get("sha256")
+        committed_digest = row.get("committed_sha256")
+        mode = row.get("mode")
+        if not isinstance(path, str) or not path_components_safe(path):
+            findings.append(error("link-gate-artifact-path-invalid", where, repr(path)))
+            continue
+        if path in seen:
+            findings.append(error("link-gate-artifact-path-duplicate", where, path))
+            continue
+        seen.add(path)
+        if mode != BLOB_MODE:
+            findings.append(
+                error("link-gate-artifact-mode-invalid", f"{where}.mode", repr(mode))
+            )
+        if digest != committed_digest:
+            findings.append(
+                error(
+                    "link-gate-artifact-working-tree-drift",
+                    where,
+                    "recorded on-disk and committed digests differ",
+                )
+            )
+        try:
+            entry = repo.entry(revision, path.encode("utf-8"))
+            payload = repo.blob(revision, path.encode("utf-8"))
+        except GitError as exc:
+            findings.append(error("link-gate-artifact-unreadable", where, str(exc)))
+            continue
+        if entry is None or entry.kind != "blob" or entry.mode != BLOB_MODE:
+            findings.append(
+                error(
+                    "link-gate-artifact-not-regular-blob",
+                    where,
+                    f"expected {BLOB_MODE} blob, got {entry!r}",
+                )
+            )
+        actual = sha256_bytes(payload)
+        if digest != actual or committed_digest != actual:
+            findings.append(
+                error(
+                    "link-gate-artifact-digest-mismatch",
+                    where,
+                    f"computed {actual}",
+                )
+            )
+    if seen != expected_paths:
+        findings.append(
+            error(
+                "link-deciding-gate-source-set-unknown",
+                f"{location}.artifacts",
+                f"historical-only={sorted(seen - expected_paths)}, "
+                f"current-only={sorted(expected_paths - seen)}; a different source set needs "
+                "an explicit compatibility authorization",
+            )
+        )
     return raw
 
 
 def _gate_fingerprint(identity: dict[str, Any]) -> tuple[str, ...]:
     artifacts = identity.get("artifacts")
     rows = artifacts if isinstance(artifacts, list) else []
-    return tuple(
+    artifact_rows = tuple(
         sorted(
-            f"{row.get('path')}={row.get('sha256')}"
+            f"{row.get('path')}:{row.get('mode')}={row.get('sha256')}"
             for row in rows
             if isinstance(row, dict)
         )
+    )
+    return (
+        f"state={identity.get('state')}",
+        f"source_revision={identity.get('source_revision')}",
+        f"source_tree={identity.get('source_tree')}",
+        *artifact_rows,
     )
 
 
@@ -314,7 +451,7 @@ def resolve_predecessor_authority_chain(
     findings: list[Finding] = []
     links: list[ChainLink] = []
     verified: set[str] = set()
-    divergences: list[str] = []
+    divergences: list[dict[str, Any]] = []
     visited: set[str] = set()
 
     authority = record.subject.authority
@@ -527,15 +664,26 @@ def resolve_predecessor_authority_chain(
             )
         link_gate = _check_deciding_gate(
             prior_result.get("deciding_gate"),
+            repo,
+            deciding_gate,
             f"{current_location}.result.deciding_gate",
             findings,
         )
         if link_gate and _gate_fingerprint(link_gate) != current_gate:
             divergences.append(
-                f"generation {prior.generation} was validated by gate revision "
-                f"{link_gate.get('source_revision')!r}, not the deciding revision "
-                f"{deciding_gate.get('source_revision')!r}; the current revision does not "
-                "semantically re-prove that decision"
+                {
+                    "generation": prior.generation,
+                    "historical_gate_revision": link_gate.get("source_revision"),
+                    "current_gate_revision": deciding_gate.get("source_revision"),
+                    "disposition": "retained_without_semantic_reproof",
+                    "inherits_current_authority": False,
+                    "migration": "current_gate_full_semantic_replay_required",
+                    "note": (
+                        "the exact historical decision remains provenance only and does not "
+                        "silently inherit current authority; the link can enter the current "
+                        "authority chain only after the separate oldest-first semantic replay"
+                    ),
+                }
             )
         link_verified = {
             prior.subject.review_control_commit,

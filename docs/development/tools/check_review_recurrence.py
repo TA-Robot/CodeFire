@@ -36,6 +36,7 @@ from ai_contracts import (
 import recurrence_v2_authority as v2_authority
 import recurrence_v2_decision as v2_decision
 import recurrence_v2_evidence as v2_evidence
+import recurrence_v2_history as v2_history
 import recurrence_v2_model as v2_model
 from recurrence_v2_git import GitError, GitRepo
 from recurrence_v2_topology import scan_interval_paths, verify_generation
@@ -1256,6 +1257,7 @@ def evaluate_v2(
     record_sha256: str,
     *,
     root: Path,
+    validator_root: Path | None = None,
     schema: dict[str, Any] | None,
     manifest_schema: dict[str, Any] | None,
     timed_schema: dict[str, Any] | None,
@@ -1270,6 +1272,8 @@ def evaluate_v2(
     findings: list[Finding] = []
     blockers: list[str] = []
     repo = GitRepo(root)
+    validator_root = root if validator_root is None else validator_root.resolve()
+    canonical_live_roots = legacy_roots is None
 
     # F-10 / C-14: invalid-UTF-8 repository paths are detected before schema
     # validation, from the raw subject, and rendered with backslash escapes so
@@ -1294,10 +1298,12 @@ def evaluate_v2(
         "input_schema": raw.get("schema"),
         "record_sha256": record_sha256,
         "analysed_git_root": str(root),
+        "validator_source_root": str(validator_root),
         "git_verified": verify_git,
         "deciding_gate": deciding_gate,
         "invalid_utf8_paths": list(invalid_paths),
         "live_arm_pin": "unavailable",
+        "live_arm": live_arm,
         "limits": list(v2_model.PROVENANCE_LIMITS),
     }
     if record is None:
@@ -1319,6 +1325,7 @@ def evaluate_v2(
             "topology, authority, evidence or candidate identity proof"
         )
         chain = v2_authority.ChainResult()
+        history = v2_history.HistoryReplay((), (), chain)
         topology = None
         manifest = None
         timed: dict[str, v2_evidence.TimedFacts] = {}
@@ -1333,6 +1340,31 @@ def evaluate_v2(
             legacy_roots=legacy_roots,
         )
         findings.extend(chain_findings)
+        history = v2_history.revalidate_history(
+            repo,
+            chain,
+            schema=schema,
+            manifest_schema=manifest_schema,
+            timed_schema=timed_schema,
+            legacy_roots=(
+                v2_model.LEGACY_ROOTS if legacy_roots is None else legacy_roots
+            ),
+            discovery_valid=not chain_findings,
+            enforce_canonical_ports=canonical_live_roots,
+        )
+        findings.extend(history.findings)
+        chain = history.chain
+        if canonical_live_roots and chain.rooted:
+            if live_arm is None:
+                blockers.append(
+                    "live_arm: every manager-fixed Cargo/KGI authority chain requires an "
+                    "explicit --live-arm and its validator-owned anchor"
+                )
+            elif live_arm != chain.root_arm:
+                blockers.append(
+                    f"live_arm: requested {live_arm!r}, but the rooted authority arm is "
+                    f"{chain.root_arm!r}"
+                )
         view = v2_authority.generation_view(record)
         if view is None:
             findings.append(
@@ -1351,6 +1383,12 @@ def evaluate_v2(
             repo, record, chain, legacy_roots
         )
         findings.extend(artifact_findings)
+        if canonical_live_roots:
+            findings.extend(
+                v2_evidence.verify_canonical_port_packet(
+                    repo, record, artifacts, chain.root_arm
+                )
+            )
         findings.extend(v2_evidence.check_reference_integrity(record, artifacts))
         manifest, manifest_findings = v2_evidence.load_manifest(
             repo, record, artifacts, manifest_schema
@@ -1374,7 +1412,12 @@ def evaluate_v2(
             predecessor_present[derivation.path] = entry is not None
         if live_arm is not None:
             pin, pin_findings = v2_evidence.load_live_arm_anchor(
-                root, live_arm, record, artifacts
+                validator_root,
+                root,
+                live_arm,
+                record,
+                artifacts,
+                deciding_gate,
             )
             findings.extend(pin_findings)
             result["live_arm_pin"] = pin if pin is not None else "unavailable"
@@ -1428,6 +1471,7 @@ def evaluate_v2(
                 "depth": chain.depth,
                 "links": chain.summary(),
                 "validator_identity_divergences": list(chain.validator_divergences),
+                "revalidated_generations": list(history.generations),
             },
             "timed_validations": {
                 validation_id: {
@@ -1438,6 +1482,10 @@ def evaluate_v2(
                     "clean_before": facts.clean_before,
                     "clean_after": facts.clean_after,
                     "index_flags_clean": facts.index_flags_clean,
+                    "log_inside_source_worktree": facts.log_inside_source_worktree,
+                    "result_inside_source_worktree": (
+                        facts.result_inside_source_worktree
+                    ),
                     "log_bytes": facts.log_bytes,
                     "log_sha256": facts.log_sha256,
                     "passing": facts.passing,
@@ -1523,6 +1571,27 @@ def atomic_write(path: Path, payload: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+def validator_owned_path(
+    override: Path | None,
+    validator_root: Path,
+    relative: Path,
+) -> Path:
+    """Resolve a gate input only from the identity-bound validator source.
+
+    The compatibility CLI flags may repeat the canonical path for scripts that
+    already pass them explicitly.  They may not redirect schema authority to
+    the analysed candidate or to an arbitrary file.
+    """
+
+    expected = (validator_root / relative).resolve()
+    if override is not None and override.resolve() != expected:
+        raise ValueError(
+            f"{relative.name} must be loaded from the validator source at {expected}; "
+            f"got {override.resolve()}"
+        )
+    return expected
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     root = (args.git_root or repository_root()).resolve()
@@ -1544,17 +1613,28 @@ def main(argv: list[str] | None = None) -> int:
     schema_name = raw.get("schema")
     try:
         if schema_name == V2_SCHEMA_NAME:
-            schema = load_object((args.schema or root / V2_SCHEMA_PATH).resolve())
+            schema = load_object(
+                validator_owned_path(args.schema, validator_root, V2_SCHEMA_PATH)
+            )
             manifest_schema = load_object(
-                (args.manifest_schema or root / V2_MANIFEST_SCHEMA_PATH).resolve()
+                validator_owned_path(
+                    args.manifest_schema,
+                    validator_root,
+                    V2_MANIFEST_SCHEMA_PATH,
+                )
             )
             timed_schema = load_object(
-                (args.timed_schema or root / V2_TIMED_SCHEMA_PATH).resolve()
+                validator_owned_path(
+                    args.timed_schema,
+                    validator_root,
+                    V2_TIMED_SCHEMA_PATH,
+                )
             )
             result = evaluate_v2(
                 raw,
                 record_sha256,
                 root=root,
+                validator_root=validator_root,
                 schema=schema,
                 manifest_schema=manifest_schema,
                 timed_schema=timed_schema,

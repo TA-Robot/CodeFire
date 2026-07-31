@@ -114,6 +114,7 @@
         "index_flagged_entries",
         "index_flags_clean",
         "log_inside_source_worktree",
+        "result_inside_source_worktree",
         "status_command",
         "index_command"
       ],
@@ -149,6 +150,10 @@
         "log_inside_source_worktree": {
           "type": "boolean",
           "description": "Logs and results are written outside the source worktree and copied byte-identically into the evidence commit, so they do not make the checkout dirty. A true value is emitted rather than hidden."
+        },
+        "result_inside_source_worktree": {
+          "type": "boolean",
+          "description": "True when the requested result path is inside the source worktree. Recurrence acceptance requires false, and the v2 runner refuses to run unless an explicit --result path is supplied."
         },
         "status_command": {
           "const": "git status --porcelain=v1 -z --untracked-files=all"

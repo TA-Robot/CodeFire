@@ -112,8 +112,8 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 4096,
-      "pattern": "^[^/\\\\][^\\\\]*$",
-      "description": "Repository-relative POSIX path. The validator additionally rejects empty, dot, and dot-dot components and any path Git reports with bytes that are not valid UTF-8."
+      "pattern": "^[^/\\\\\\u0000-\\u001F\\u007F][^\\\\\\u0000-\\u001F\\u007F]*$",
+      "description": "Repository-relative POSIX path without control bytes. The validator additionally rejects empty, dot, and dot-dot components and any path Git reports with bytes that are not valid UTF-8."
     },
     "ref_id_list": {
       "type": "array",
