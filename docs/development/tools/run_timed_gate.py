@@ -178,13 +178,17 @@ def run_gate_v2(
     emitted as such and cannot satisfy recurrence acceptance.
     """
 
-    from recurrence_v2_git import GitRepo
+    from recurrence_v2_git import GitError, GitRepo
 
-    probe = GitRepo(cwd.resolve(strict=True))
-    root = Path(probe.toplevel())
-    repo = GitRepo(root)
-    revision, tree = repo.head_identity()
-    status_before = repo.worktree_status()
+    try:
+        probe = GitRepo(cwd.resolve(strict=True))
+        root = Path(probe.toplevel())
+        repo = GitRepo(root)
+        revision, tree = repo.head_identity()
+        status_before = repo.worktree_status()
+        index_flagged_before = repo.index_flagged_entries()
+    except GitError as exc:
+        raise ValueError(f"pre-command Git identity probe failed: {exc}") from exc
     payload = run_gate(
         argv,
         cwd,
@@ -194,8 +198,22 @@ def run_gate_v2(
         wall_clock_ns=wall_clock_ns,
         monotonic_clock_ns=monotonic_clock_ns,
     )
-    status_after = repo.worktree_status()
-    index_flagged = repo.index_flagged_entries()
+    try:
+        status_after = repo.worktree_status()
+    except GitError as exc:
+        status_after = (f"<post-command git status failed: {exc}>",)
+    try:
+        index_flagged_after = repo.index_flagged_entries()
+    except GitError as exc:
+        index_flagged_after = (f"<post-command index probe failed: {exc}>",)
+    index_flagged = tuple(sorted(set(index_flagged_before) | set(index_flagged_after)))
+    try:
+        revision_after, tree_after = repo.head_identity()
+        head_probe_error = None
+    except GitError as exc:
+        revision_after = None
+        tree_after = None
+        head_probe_error = str(exc)
     resolved_log = log_path.resolve()
     try:
         resolved_log.relative_to(root.resolve())
@@ -221,6 +239,14 @@ def run_gate_v2(
         "status_after": list(status_after),
         "index_flagged_entries": list(index_flagged),
         "index_flags_clean": not index_flagged,
+        "head_revision_after": revision_after,
+        "head_tree_after": tree_after,
+        "head_unchanged": (
+            head_probe_error is None
+            and revision_after == revision
+            and tree_after == tree
+        ),
+        "head_probe_error": head_probe_error,
         "log_inside_source_worktree": log_inside,
         "result_inside_source_worktree": result_inside,
         "status_command": "git status --porcelain=v1 -z --untracked-files=all",

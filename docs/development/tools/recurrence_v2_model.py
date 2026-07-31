@@ -269,7 +269,12 @@ def path_components_safe(value: str) -> bool:
         not value
         or value.startswith("/")
         or "\\" in value
-        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+        or any(
+            ord(character) < 32
+            or ord(character) == 127
+            or 0xD800 <= ord(character) <= 0xDFFF
+            for character in value
+        )
     ):
         return False
     return all(

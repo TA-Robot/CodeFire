@@ -1275,6 +1275,51 @@ def evaluate_v2(
     validator_root = root if validator_root is None else validator_root.resolve()
     canonical_live_roots = legacy_roots is None
 
+    def reject_surrogates(value: Any, item_location: str) -> list[Finding]:
+        """Find text that cannot be encoded as UTF-8 before schema traversal.
+
+        Python's JSON decoder accepts escaped lone surrogates. The compact
+        schema evaluator fingerprints unique array items as UTF-8, so the v2
+        boundary must reject these impossible JSON scalar values first and
+        keep the decision structured and fail-closed.
+        """
+
+        if isinstance(value, str):
+            if any(0xD800 <= ord(character) <= 0xDFFF for character in value):
+                return [
+                    Finding(
+                        "error",
+                        "unsafe-json-surrogate",
+                        item_location,
+                        f"text contains a lone surrogate: {value!r}",
+                    )
+                ]
+            return []
+        if isinstance(value, list):
+            nested: list[Finding] = []
+            for index, item in enumerate(value):
+                nested.extend(reject_surrogates(item, f"{item_location}[{index}]"))
+            return nested
+        if isinstance(value, dict):
+            nested = []
+            for key, item in value.items():
+                if any(0xD800 <= ord(character) <= 0xDFFF for character in key):
+                    nested.append(
+                        Finding(
+                            "error",
+                            "unsafe-json-surrogate",
+                            item_location,
+                            f"an object key contains a lone surrogate: {key!r}",
+                        )
+                    )
+                    continue
+                nested.extend(reject_surrogates(item, f"{item_location}.{key}"))
+            return nested
+        return []
+
+    surrogate_findings = reject_surrogates(raw, location)
+    findings.extend(surrogate_findings)
+
     # F-10 / C-14: invalid-UTF-8 repository paths are detected before schema
     # validation, from the raw subject, and rendered with backslash escapes so
     # the structured finding stays JSON-writable.
@@ -1288,7 +1333,7 @@ def evaluate_v2(
         )
         findings.extend(scan_findings)
 
-    if schema is not None:
+    if schema is not None and not surrogate_findings:
         findings.extend(validate_json_schema(raw, schema, location))
     record, parse_findings = v2_model.parse_record(raw, location)
     findings.extend(parse_findings)
@@ -1337,6 +1382,7 @@ def evaluate_v2(
             record,
             schema=schema,
             deciding_gate=deciding_gate,
+            validator_repo=GitRepo(validator_root),
             legacy_roots=legacy_roots,
         )
         findings.extend(chain_findings)
@@ -1351,6 +1397,8 @@ def evaluate_v2(
             ),
             discovery_valid=not chain_findings,
             enforce_canonical_ports=canonical_live_roots,
+            validator_root=validator_root,
+            live_arm=live_arm,
         )
         findings.extend(history.findings)
         chain = history.chain
@@ -1391,7 +1439,7 @@ def evaluate_v2(
             )
         findings.extend(v2_evidence.check_reference_integrity(record, artifacts))
         manifest, manifest_findings = v2_evidence.load_manifest(
-            repo, record, artifacts, manifest_schema
+            repo, record, artifacts, chain, manifest_schema
         )
         findings.extend(manifest_findings)
         timed, timed_findings = v2_evidence.bind_timed_validations(
@@ -1482,6 +1530,7 @@ def evaluate_v2(
                     "clean_before": facts.clean_before,
                     "clean_after": facts.clean_after,
                     "index_flags_clean": facts.index_flags_clean,
+                    "head_unchanged": facts.head_unchanged,
                     "log_inside_source_worktree": facts.log_inside_source_worktree,
                     "result_inside_source_worktree": (
                         facts.result_inside_source_worktree
@@ -1592,6 +1641,33 @@ def validator_owned_path(
     return expected
 
 
+def external_result_path(
+    result: Path | None,
+    analysed_root: Path,
+    validator_root: Path,
+) -> Path:
+    """Require v2 output staging outside both authority-bearing worktrees."""
+
+    if result is None:
+        raise ValueError(
+            "a v2 decision requires --result outside both the analysed and validator "
+            "repositories"
+        )
+    resolved = result.resolve()
+    for label, root in (
+        ("analysed", analysed_root.resolve()),
+        ("validator", validator_root.resolve()),
+    ):
+        try:
+            resolved.relative_to(root)
+        except ValueError:
+            continue
+        raise ValueError(
+            f"the v2 --result path must be outside the {label} repository: {resolved}"
+        )
+    return resolved
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     root = (args.git_root or repository_root()).resolve()
@@ -1613,6 +1689,15 @@ def main(argv: list[str] | None = None) -> int:
     schema_name = raw.get("schema")
     try:
         if schema_name == V2_SCHEMA_NAME:
+            if args.validator_root is None:
+                raise ValueError(
+                    "a v2 decision requires an explicit separate --validator-root"
+                )
+            if validator_root == root:
+                raise ValueError(
+                    "the v2 --validator-root must differ from the analysed --git-root"
+                )
+            result_path = external_result_path(args.result, root, validator_root)
             schema = load_object(
                 validator_owned_path(args.schema, validator_root, V2_SCHEMA_PATH)
             )
@@ -1644,14 +1729,15 @@ def main(argv: list[str] | None = None) -> int:
                 location=record_path.as_posix(),
             )
         else:
+            result_path = args.result
             result = legacy_v1_block(raw, record_sha256)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"Review recurrence gate error: {exc}", file=sys.stderr)
         return 2
     result["record"] = str(record_path)
     integration_allowed = result.get("integration_decision") == "ALLOW"
-    if args.result is not None:
-        atomic_write(args.result, result)
+    if result_path is not None:
+        atomic_write(result_path, result)
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if integration_allowed else 3
 

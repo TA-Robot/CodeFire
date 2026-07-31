@@ -218,6 +218,27 @@ def verify_generation(
                 )
             )
 
+    authored_paths = (
+        view.packet_path,
+        view.manifest_path,
+        view.review_packet_path,
+        view.report_path,
+        *view.evidence_paths,
+        *view.changed_paths,
+    )
+    unsafe_authored = sorted(
+        repr(path) for path in authored_paths if not path_components_safe(path)
+    )
+    if unsafe_authored:
+        findings.append(
+            error(
+                "unsafe-authored-repository-path",
+                f"{location}.subject",
+                f"paths cannot be encoded safely for Git: {unsafe_authored}",
+            )
+        )
+        return None, findings
+
     # Packet commit: direct child of the predecessor, exactly the two packet
     # artifacts, no repair byte.  The admissible manager-control set in this
     # pre-repair window is exactly these two paths.

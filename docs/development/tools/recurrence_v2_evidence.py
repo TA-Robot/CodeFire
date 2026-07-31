@@ -72,6 +72,7 @@ class TimedFacts:
     clean_before: bool
     clean_after: bool
     index_flags_clean: bool
+    head_unchanged: bool
     log_inside_source_worktree: bool
     result_inside_source_worktree: bool
     log_bytes: int
@@ -87,6 +88,7 @@ class TimedFacts:
             and self.clean_before
             and self.clean_after
             and self.index_flags_clean
+            and self.head_unchanged
             and not self.log_inside_source_worktree
             and not self.result_inside_source_worktree
         )
@@ -469,6 +471,7 @@ def load_manifest(
     repo: GitRepo,
     record: RecordModel,
     artifacts: dict[str, ArtifactRef],
+    chain: ChainResult,
     manifest_schema: dict[str, Any] | None,
     location: str = "manifest",
 ) -> tuple[ManifestModel | None, list[Finding]]:
@@ -604,15 +607,28 @@ def load_manifest(
                     f"{obligation_id} maps to {unknown}, which are not in required_validations",
                 )
             )
-        if not mapped and record.subject.authority.kind == "legacy_bootstrap_report":
-            findings.append(
-                error(
-                    "bootstrap-manifest-empty-closure-mapping",
-                    f"{location}.prior_obligations",
-                    f"{obligation_id} has no closure validation; a bootstrap manifest has no "
-                    "predecessor v2 record and therefore no admissible exemption",
-                )
+        if not mapped:
+            predecessor = chain.predecessor_link
+            predecessor_state = (
+                predecessor.obligation_states.get(obligation_id)
+                if predecessor is not None
+                else None
             )
+            if predecessor_state != "DEFECT_INJECTION_ONLY":
+                code = (
+                    "bootstrap-manifest-empty-closure-mapping"
+                    if record.subject.authority.kind == "legacy_bootstrap_report"
+                    else "manifest-empty-closure-mapping-without-injection-predecessor"
+                )
+                findings.append(
+                    error(
+                        code,
+                        f"{location}.prior_obligations",
+                        f"{obligation_id} has no closure validation and the verified "
+                        f"predecessor state is {predecessor_state!r}; only a rooted "
+                        "DEFECT_INJECTION_ONLY predecessor row can authorize an empty mapping",
+                    )
+                )
     return manifest, findings
 
 
@@ -741,6 +757,7 @@ def bind_timed_validations(
             clean_before=worktree.get("clean_before") is True,
             clean_after=worktree.get("clean_after") is True,
             index_flags_clean=worktree.get("index_flags_clean") is True,
+            head_unchanged=worktree.get("head_unchanged") is True,
             log_inside_source_worktree=(
                 worktree.get("log_inside_source_worktree") is True
             ),
@@ -1002,3 +1019,187 @@ def load_live_arm_anchor(
         },
         findings,
     )
+
+
+def verify_retained_live_arm_anchor(
+    validator_root: Path,
+    arm: str,
+    record: RecordModel,
+    artifacts: dict[str, ArtifactRef],
+    retained_result: dict[str, Any],
+    historical_gate: dict[str, Any],
+) -> list[Finding]:
+    """Re-prove a retained generation's manager anchor from validator Git.
+
+    Each generation may have been validated at a different clean validator
+    commit.  Its retained result therefore carries the exact anchor blob and
+    selected arm row used at that time.  The current validator repository must
+    still contain that commit on the ancestry of its current HEAD; candidate
+    Git and a self-authored retained JSON claim are never anchor authority.
+    """
+
+    location = "result.live_arm_pin"
+    findings: list[Finding] = []
+    if retained_result.get("live_arm") != arm:
+        findings.append(
+            error(
+                "retained-live-arm-mismatch",
+                "result.live_arm",
+                f"retained {retained_result.get('live_arm')!r}, rooted arm is {arm!r}",
+            )
+        )
+    pin = retained_result.get("live_arm_pin")
+    if not isinstance(pin, dict):
+        return [
+            *findings,
+            error(
+                "retained-live-arm-pin-unavailable",
+                location,
+                "every retained live generation must bind its validator-owned anchor",
+            ),
+        ]
+    anchor = pin.get("anchor")
+    retained_arm = pin.get("arm")
+    if not isinstance(anchor, dict) or not isinstance(retained_arm, dict):
+        return [
+            *findings,
+            error(
+                "retained-live-arm-pin-incomplete",
+                location,
+                "anchor identity and selected arm row are both required",
+            ),
+        ]
+    revision = historical_gate.get("source_revision")
+    if not isinstance(revision, str):
+        return [
+            *findings,
+            error(
+                "retained-live-arm-gate-revision-unavailable",
+                location,
+                "the retained deciding gate has no canonical source revision",
+            ),
+        ]
+    expected_anchor = {
+        "validator_commit": revision,
+        "path": LIVE_ARM_ANCHOR_PATH,
+        "mode": BLOB_MODE,
+    }
+    for field, expected in expected_anchor.items():
+        if anchor.get(field) != expected:
+            findings.append(
+                error(
+                    "retained-live-arm-anchor-identity-mismatch",
+                    f"{location}.anchor.{field}",
+                    f"retained {anchor.get(field)!r}, expected {expected!r}",
+                )
+            )
+    repo = GitRepo(validator_root.resolve())
+    try:
+        head, _ = repo.head_identity()
+        resolved = repo.resolve_commit(revision)
+        entry = repo.entry(revision, LIVE_ARM_ANCHOR_PATH.encode("utf-8"))
+        payload = repo.blob(revision, LIVE_ARM_ANCHOR_PATH.encode("utf-8"))
+    except GitError as exc:
+        return [
+            *findings,
+            error("retained-live-arm-anchor-unreadable", location, str(exc)),
+        ]
+    if resolved != revision:
+        findings.append(
+            error(
+                "retained-live-arm-validator-revision-not-canonical",
+                location,
+                f"resolved {resolved}",
+            )
+        )
+    if revision != head and not repo.is_ancestor(revision, head):
+        findings.append(
+            error(
+                "retained-live-arm-validator-revision-unrooted",
+                location,
+                f"historical validator commit {revision} is not on current HEAD {head}",
+            )
+        )
+    if entry is None or entry.kind != "blob" or entry.mode != BLOB_MODE:
+        findings.append(
+            error(
+                "retained-live-arm-anchor-not-regular-blob",
+                location,
+                repr(entry),
+            )
+        )
+    digest = sha256_bytes(payload)
+    if anchor.get("sha256") != digest:
+        findings.append(
+            error(
+                "retained-live-arm-anchor-digest-mismatch",
+                f"{location}.anchor.sha256",
+                f"computed {digest}",
+            )
+        )
+    try:
+        raw = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return [
+            *findings,
+            error("retained-live-arm-anchor-not-json", location, str(exc)),
+        ]
+    if not isinstance(raw, dict) or raw.get("schema") != LIVE_ARM_ANCHOR_SCHEMA:
+        return [
+            *findings,
+            error(
+                "retained-live-arm-anchor-wrong-schema",
+                location,
+                f"expected {LIVE_ARM_ANCHOR_SCHEMA}",
+            ),
+        ]
+    rows = raw.get("arms") if isinstance(raw.get("arms"), list) else []
+    match = next(
+        (row for row in rows if isinstance(row, dict) and row.get("arm") == arm),
+        None,
+    )
+    if match is None:
+        return [
+            *findings,
+            error("retained-live-arm-not-pinned", location, f"{arm} has no anchor row"),
+        ]
+    if retained_arm != match:
+        findings.append(
+            error(
+                "retained-live-arm-row-mismatch",
+                f"{location}.arm",
+                "retained arm row differs from the committed historical anchor",
+            )
+        )
+    packet = artifacts.get(record.subject.repair_packet_ref)
+    manifest = artifacts.get(record.subject.repair_manifest_ref)
+    for label, artifact in (("repair_packet", packet), ("repair_manifest", manifest)):
+        pinned = match.get(label)
+        if not isinstance(pinned, dict) or artifact is None:
+            findings.append(
+                error("retained-live-arm-pin-incomplete", location, f"{label} is not pinned")
+            )
+            continue
+        expected = {
+            "commit": artifact.commit,
+            "path": artifact.path,
+            "sha256": artifact.sha256,
+            "mode": BLOB_MODE,
+        }
+        if pinned != expected:
+            findings.append(
+                error(
+                    "retained-live-arm-pin-mismatch",
+                    location,
+                    f"{label} does not equal the retained generation artifact",
+                )
+            )
+    if match.get("predecessor_authority_commit") != record.subject.authority.commit:
+        findings.append(
+            error(
+                "retained-live-arm-authority-mismatch",
+                location,
+                "the retained generation authority is not the historical pinned authority",
+            )
+        )
+    return findings

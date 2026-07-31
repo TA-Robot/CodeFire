@@ -556,7 +556,8 @@ def derive(
             decision.blockers.append(
                 f"record.validations[{validation_id}]: the committed timed v2 result is not a "
                 "pass with exit code zero, no timeout, a complete log and empty clean-before, "
-                "clean-after and index-flag states"
+                "clean-after and index-flag states, unchanged HEAD/tree, and out-of-tree "
+                "log/result staging"
             )
     if manifest is not None:
         missing_results = sorted(

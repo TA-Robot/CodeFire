@@ -17,7 +17,8 @@ not, because they are precisely the obligations a successor is repairing.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Any
 
 from ai_contracts import Finding, validate_json_schema
@@ -28,6 +29,7 @@ from recurrence_v2_evidence import (
     check_reference_integrity,
     load_manifest,
     resolve_artifacts,
+    verify_retained_live_arm_anchor,
     verify_canonical_port_packet,
 )
 from recurrence_v2_git import GitError, GitRepo
@@ -113,6 +115,9 @@ def _check_retained_result_replay(
     *,
     structural_findings: list[Finding],
     decision_blockers: list[str],
+    decision_rows: list[Any],
+    decision_metrics: dict[str, Any],
+    successor_obligation_ids: tuple[str, ...],
 ) -> list[Finding]:
     """Compare authority-relevant result claims with current derived facts."""
 
@@ -130,6 +135,28 @@ def _check_retained_result_replay(
         ("record_sha256", result.get("record_sha256"), link.record_sha256),
         ("review_decision", result.get("review_decision"), record.review_decision),
         ("integration_decision", result.get("integration_decision"), expected_decision),
+        ("record_valid", result.get("record_valid"), not structural_findings),
+        ("finding_count", result.get("finding_count"), len(structural_findings)),
+        (
+            "findings",
+            result.get("findings"),
+            [asdict(finding) for finding in structural_findings],
+        ),
+        ("blockers", result.get("blockers"), list(decision_blockers)),
+        (
+            "rows",
+            result.get("rows"),
+            [
+                {**asdict(row), "reasons": list(row.reasons)}
+                for row in decision_rows
+            ],
+        ),
+        ("metrics", result.get("metrics"), decision_metrics),
+        (
+            "successor_obligation_ids",
+            result.get("successor_obligation_ids"),
+            list(successor_obligation_ids),
+        ),
     )
     for field, actual, expected in checks:
         if actual != expected:
@@ -171,13 +198,17 @@ def revalidate_history(
     legacy_roots: dict[str, LegacyRoot],
     discovery_valid: bool = True,
     enforce_canonical_ports: bool = False,
+    validator_root: Path | None = None,
+    live_arm: str | None = None,
 ) -> HistoryReplay:
     """Replay retained generations oldest-first with a bounded progressive chain."""
 
     findings: list[Finding] = []
     summaries: list[dict[str, Any]] = []
     progressive_links: tuple[ChainLink, ...] = ()
-    progressive_verified: frozenset[str] = frozenset()
+    progressive_verified: frozenset[str] = frozenset(
+        {chain.root_commit} if chain.root_commit is not None else set()
+    )
     prefix_valid = discovery_valid and chain.rooted
 
     for link in reversed(chain.links):
@@ -191,6 +222,7 @@ def revalidate_history(
         findings.extend(load_findings)
         findings.extend(result_load_findings)
         if raw is None or result is None:
+            prefix_valid = False
             continue
 
         local: list[Finding] = []
@@ -200,6 +232,7 @@ def revalidate_history(
         local.extend(parse_findings)
         if record is None:
             findings.extend(_prefixed(local, prefix))
+            prefix_valid = False
             continue
 
         predecessor_chain = ChainResult(
@@ -238,11 +271,31 @@ def revalidate_history(
                     repo, record, artifacts, record.subject.authority.bootstrap_arm
                 )
             )
+            if validator_root is None or live_arm is None:
+                local.append(
+                    error(
+                        "history-live-arm-context-unavailable",
+                        "result.live_arm_pin",
+                        "canonical history replay requires validator_root and live_arm",
+                    )
+                )
+            else:
+                local.extend(
+                    verify_retained_live_arm_anchor(
+                        validator_root,
+                        live_arm,
+                        record,
+                        artifacts,
+                        result,
+                        link.deciding_gate,
+                    )
+                )
         local.extend(check_reference_integrity(record, artifacts, "record"))
         manifest, manifest_findings = load_manifest(
             repo,
             record,
             artifacts,
+            predecessor_chain,
             manifest_schema,
             location="manifest",
         )
@@ -268,6 +321,9 @@ def revalidate_history(
             link,
             structural_findings=local,
             decision_blockers=decision.blockers,
+            decision_rows=decision.rows,
+            decision_metrics=decision.metrics,
+            successor_obligation_ids=decision.successor_obligation_ids,
         )
         local.extend(replay_findings)
         findings.extend(_prefixed(local, prefix))

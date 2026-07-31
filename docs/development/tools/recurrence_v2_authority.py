@@ -445,6 +445,7 @@ def resolve_predecessor_authority_chain(
     *,
     schema: dict[str, Any] | None,
     deciding_gate: dict[str, Any],
+    validator_repo: GitRepo | None = None,
     legacy_roots: dict[str, Any] | None = None,
     location: str = "record.subject.predecessor_authority",
 ) -> tuple[ChainResult, list[Finding]]:
@@ -460,6 +461,7 @@ def resolve_predecessor_authority_chain(
     artifacts = record.artifact_index()
     current_location = location
     current_gate = _gate_fingerprint(deciding_gate)
+    gate_repo = repo if validator_repo is None else validator_repo
 
     depth = 0
     while True:
@@ -664,7 +666,7 @@ def resolve_predecessor_authority_chain(
             )
         link_gate = _check_deciding_gate(
             prior_result.get("deciding_gate"),
-            repo,
+            gate_repo,
             deciding_gate,
             f"{current_location}.result.deciding_gate",
             findings,
@@ -675,9 +677,12 @@ def resolve_predecessor_authority_chain(
                     "generation": prior.generation,
                     "historical_gate_revision": link_gate.get("source_revision"),
                     "current_gate_revision": deciding_gate.get("source_revision"),
-                    "disposition": "retained_without_semantic_reproof",
+                    "disposition": "compatibility_authorized",
+                    "historical_decision_disposition": (
+                        "retained_without_semantic_reproof"
+                    ),
                     "inherits_current_authority": False,
-                    "migration": "current_gate_full_semantic_replay_required",
+                    "migration": "current_gate_full_semantic_replay",
                     "note": (
                         "the exact historical decision remains provenance only and does not "
                         "silently inherit current authority; the link can enter the current "

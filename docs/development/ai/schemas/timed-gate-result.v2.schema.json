@@ -113,6 +113,10 @@
         "status_after",
         "index_flagged_entries",
         "index_flags_clean",
+        "head_revision_after",
+        "head_tree_after",
+        "head_unchanged",
+        "head_probe_error",
         "log_inside_source_worktree",
         "result_inside_source_worktree",
         "status_command",
@@ -142,10 +146,26 @@
           "items": {
             "type": "string"
           },
-          "description": "Every git ls-files -v entry whose tag is not H, rendered as '<tag>\\t<path>'. This covers assume-unchanged (lowercase tags) and skip-worktree (S) and is the stronger exact equivalent of naming those two flags."
+          "description": "The union, before and after execution, of every git ls-files -v entry whose tag is not H, rendered as '<tag>\\t<path>'. This covers assume-unchanged (lowercase tags) and skip-worktree (S), including a flag cleared during execution."
         },
         "index_flags_clean": {
           "type": "boolean"
+        },
+        "head_revision_after": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "head_tree_after": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "head_unchanged": {
+          "type": "boolean",
+          "description": "Derived by comparing canonical HEAD and HEAD^{tree} immediately after execution with the source revision/tree captured before execution. Recurrence acceptance requires true."
+        },
+        "head_probe_error": {
+          "type": ["string", "null"],
+          "description": "Null when the post-command HEAD/tree probe succeeded; otherwise the diagnostic probe failure and head_unchanged is false."
         },
         "log_inside_source_worktree": {
           "type": "boolean",
