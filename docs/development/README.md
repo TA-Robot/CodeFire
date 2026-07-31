@@ -4,7 +4,7 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 ## Current Operating Snapshot
 
-Last audited: 2026-07-30 during CFR-168 recovery.
+Last audited: 2026-07-31 after the experimental AIA-047 recurrence-v2 integration.
 
 - Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
 - CFB detail ledger: 138 total; 135 `fixed`, 3 `investigating`. Open/investigating count: 3.
@@ -15,6 +15,7 @@ Last audited: 2026-07-30 during CFR-168 recovery.
 - RVC-011 / CFR-161 is closed through Install, installed counterexample replay, both real-repository read-only probes, canonical trace-warning verification, and Retrospect. ADR-013 now owns the typed committable decision and non-relaxable safety floor.
 - RVC-039 / CFR-162 is closed through the full lifecycle. ADR-014 makes unresolved text, binary, and semantic merge facts authoritative blockers and makes `merge --continue` the explicit validated resolution boundary.
 - `BATCH-2026-07-review-portfolio-completion` remains frozen. Roots through CFR-167/CFB-134 completed through Retrospect; CFB-133, admitted CFR-168 blockers CFB-136/138, and CFR-168..173 are the 9 active issues. No unrelated Discovery is admitted until the batch completes.
+- AIA-047 recurrence-v2 layers L1.1-L1.5 are complete on the experimental control-plane line integrated at `00ad88562068a6101a7530b84d5f52b0cff559f0`. The independent L1.5 decision used the recorded GPT-5.6/Codex fallback because Claude and Fugu were unavailable. This changes no CodeFire product bytes and proves no live reduction in review recurrence. L1.6 (manager-owned Cargo/KGI manifests plus a committed live-arm anchor in a separate clean validator source) is the next gate; v1 always returns `BLOCK`, and the Fugu blind branch cannot begin before the recorded 2026-08-03 provider window.
 - The base environment still does not expose `cargo` on `PATH`; a durable pinned toolchain/CI identity remains release work.
 
 If any line above changes, update this snapshot and append the reason to `docs/development/history.md`.
@@ -53,9 +54,10 @@ Before starting implementation:
 
 The CFB-120..132, CFR-161, CFR-162, CFR-163/CFB-135, CFR-164, CFR-165/CFR-174/CFR-175, CFR-166/CFB-134, and CFR-167 roots are complete. The active constrained work is:
 
-1. Implement CFR-168 bounded graph/object/HTTP work and stable counters without changing decision semantics.
-2. Burn down architecture, automation, and claim roots in the frozen dependency order; CFB-133 closes with CFR-170.
-3. Run CFR-172/173 experiments only after their safety/contract predecessors, record adopt/narrow/stop outcomes, then perform one portfolio-wide completion audit.
+1. Complete AIA-047 L1.6, then run the required bootstrap `BLOCK` and rooted successor generations; do not claim review-bottleneck improvement before the anchored Cargo/KGI comparison and blind causal audit.
+2. Implement CFR-168 bounded graph/object/HTTP work and stable counters without changing decision semantics.
+3. Burn down architecture, automation, and claim roots in the frozen dependency order; CFB-133 closes with CFR-170.
+4. Run CFR-172/173 experiments only after their safety/contract predecessors, record adopt/narrow/stop outcomes, then perform one portfolio-wide completion audit.
 
 ## Validation Matrix
 

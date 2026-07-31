@@ -25,7 +25,7 @@ Burn-down中に別の問題を見つけた場合の扱い:
 
 ## Current Cycle State
 
-Current known issue count and lifecycle position, audited 2026-07-30 during CFR-168 recovery:
+Current known issue count and lifecycle position, audited 2026-07-31 after the experimental AIA-047 recurrence-v2 integration:
 
 - CFB/CFR product/review issues: 9 open/investigating.
 - CFB detail ledger: 138 total; 135 `fixed`, 3 `investigating`.
@@ -36,6 +36,7 @@ Current known issue count and lifecycle position, audited 2026-07-30 during CFR-
 - RVC-011/CFR-161 completed Discover through Retrospect. Installed unsafe-policy replay fails before writes, both real read-only matrices pass without hash drift, and canonical trace-warning policy returns a typed passed decision with no blockers.
 - CFR-162 completed Discover, Freeze, Plan, Implement, Close, Install, Dogfood, and Retrospect. All unresolved merge classes now block the authoritative decision until an explicit validated continue transition.
 - The 60-review current-source audit classified 6 implemented, 3 accepted non-goals, and 51 residual reviews. The residuals remain mapped exactly once to CFR-163..173. Roots through CFR-167/CFB-134 completed the full lifecycle; CFB-133, admitted CFR-168 blockers CFB-136/138, and CFR-168..173 remain active. `BATCH-2026-07-review-portfolio-completion` remains frozen.
+- AIA-047 L1.1-L1.5 are complete and the exact recurrence-v2 implementation is integrated experimentally at `00ad88562068a6101a7530b84d5f52b0cff559f0`. This is a development-control checkpoint, not CFR-168 product integration or evidence that recurrence, review time, or rework improved. L1.6 remains pending; the normal v1 entry always returns `BLOCK`, no live-arm anchor exists, and the Fugu blind branch is provider-held until at least 2026-08-03.
 - Historical cycle sections were moved to `archive/completed-cycle-ledger.md`. Do not infer current issue counts from historical headings or remaining-count notes.
 - The management hub `docs/development/README.md` is the current-state entry point; update it and append `history.md` when this section changes.
 
@@ -66,6 +67,23 @@ Root execution order:
 | 9 | CFR-171 | RVC-001/019 | machine-readable claim/proof descriptor | frozen |
 | 10 | CFR-172 | RVC-002/009 | bounded read-only adoption/mental-model experiment | frozen |
 | 11 | CFR-173 | RVC-003/004/010 | privacy-preserving product falsification pilot and stop decision | frozen |
+
+### Review-bottleneck control checkpoint
+
+This control-plane work does not advance the product root beyond its existing
+`Implement in progress` state.
+
+| Layer | State at `00ad885` | Next authority |
+|---|---|---|
+| L1.1-L1.5 | complete and integrated experimentally; exact candidate `9e50f04` received independent `ACCEPT_FOR_INTEGRATION` through the recorded GPT-5.6/Codex fallback | none for implementation integration |
+| L1.6 | pending | a separate manager task must freeze both bootstrap manifests and commit the exact live-arm anchor in a clean validator source |
+| L1.7 | blocked on L1.6 | Cargo bootstrap generation must first produce and retain the mandatory v2 `BLOCK`, then a real rooted successor may be evaluated |
+| L1.P / L1.8 | provider-held; earliest recorded Fugu window is 2026-08-03 | blind Fugu classification, comparison/freeze, disagreement adjudication, dated pilot decision, then the KGI arm |
+| L1.9-L1.10 | blocked | comparable anchored arm results, KGI/KPI interpretation, and a manager retain/revise/remove decision |
+
+There is no live effectiveness proof, live `ALLOW`, or permanent AIA-047
+adoption at this checkpoint. The v1 compatibility path always returns
+structured `BLOCK`.
 
 Implemented/non-goal terminal rows:
 

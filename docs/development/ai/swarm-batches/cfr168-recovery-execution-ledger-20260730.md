@@ -2836,3 +2836,33 @@ This routing does not accept either observation or weaken integration
 authority. It limits the next repair delta while keeping owners and release
 conditions visible for a later decision. The candidate and any composition
 that consumes it remain blocked pending a fresh exact acceptance.
+
+## 2026-07-31 17:03 UTC AIA-047 recurrence v2 integrated experimentally
+
+The earlier open-item audit correctly reported that no v2 implementation
+existed at its frozen subject. That statement is now superseded for the
+AIA-047 implementation lane only. Canonical
+`integration/cfr168-p0-canonical` reached
+`00ad88562068a6101a7530b84d5f52b0cff559f0` with the exact experimental v2
+implementation and its independent rereview report.
+
+| Layer / artifact | Exact state |
+|---|---|
+| L1.1-L1.2 | accepted contract `41824afaace1d172ec12f26d98fa0ae306b4ddcd`, packet SHA-256 `e08e736cbdb7f48fc131ed2b542db951fbff32ebe1b29d399bfe83172bdea6f6`, and manager adjudication `f7bfb3c` complete |
+| L1.3 | exact implementation candidate `9e50f04b3d6e53753e40aab57cfbc4a884de5bc8`, tree `56677eb3142e93da650058e67ab2c0779b9e8632`, canonical patch SHA-256 `2c27dad81a8c6148722f161edc1bc4120db268dd3feb635cfed7f9f75f03540b` integrated |
+| L1.4 | recurrence subset 43/43, full AI tool suite 109/109, all seven aggregate AI-development components, and clean diff/status checks passed; the result handoff is `2eeda393c1f3caf58cacb2785f00b634caba9906` |
+| L1.5 | independent GPT-5.6/Codex fallback rereview at `00ad885` returned `ACCEPT_FOR_INTEGRATION` with zero remaining findings; it explicitly does not claim Claude or Fugu review work |
+| L1.6 | **pending**: a separate manager-owned commit must freeze both exact bootstrap manifests and the live-arm anchor in a separate clean validator source |
+
+This checkpoint changes no CodeFire product bytes and does not authorize a
+live arm or permanent process adoption. The normal v1 checker always emits
+structured `BLOCK`; v2 also cannot emit a live `ALLOW` while the L1.6 anchor is
+absent. The first bootstrap generation must itself be retained as `BLOCK`, and
+only a real rooted successor may test the allow path. No recurrence, review
+time, repair time, report time, or trusted-integration improvement is proven.
+
+The blind causal branch remains provider-held. Its earliest recorded Fugu
+window is 2026-08-03; the KGI arm, cross-arm comparison, and manager
+retain/revise/remove decision remain downstream of that evidence. The product
+states and review dispositions elsewhere in this ledger are unchanged by this
+control-plane integration.

@@ -49,8 +49,27 @@ CFR-168 closure.
 | [`development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730`](../development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730/review.md) | `d04ec99` / `268ec0b768a334ad11dbdf57c81245d7b315d7699e34c511e1f782253c178b30` | `REQUEST_CHANGES` | Exact candidate `0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1` closes 15 of 35 bound rows but leaves 20 partially closed. Decision-critical residuals cover self-authorized KGI/cohort arithmetic, non-finite and nanosecond-unsafe values, unverified or escaping evidence, incomplete lineage/supersession/lifecycle graphs, stale/cross-batch semantics, declarative anti-gaming state, and unbounded schema collections. Return all R1–R7 and every partially closed row to the original repair lineage; the next candidate must make the manager and adjacent probes fail closed without crashes before another independent review. |
 | [`development-flow-kgi-kpi-r2-rereview-claude-fallback-20260731`](../development-flow-kgi-kpi-r2-rereview-claude-fallback-20260731/review.md) | `5760c98` / `54a4244a8e563b48b2f086a51433ea858996c08b0104c0309f2c8445ce6706b2` | `REQUEST_CHANGES` | Exact candidate `0944bf3deba9e753132b3f71716b5c009a8fc30f` closes three more bound rows and preserves all fifteen prior closures, but 17 of 20 rows remain partially closed. Thirteen have executable falsifications: self-authorized KGI/cohort values, non-derived arm samples/costs, finite-number gate crashes and JSON underflow, reseal/dangling seals, asymmetric cross-batch supersession and zero heads, backdated validation, padded artifact identity, structural diagnostic overflow, and lifecycle completion by declaration. Original session `34cdf037-…` produced clean successor `753c8db103579d021795d3fe6a97c5d45d4a111a`. Its independent review stopped on Claude provider quota before a report or decision. Neither candidate may authorize a process decision. |
 | [`development-flow-kgi-kpi-r3-rereview-claude-20260731`](../development-flow-kgi-kpi-r3-rereview-claude-20260731/review.md) | `9f094d7` / `23b59e01825e3f66d2d38b754348e3d51457f3c465def578ac99ce52729a204f` | `REQUEST_CHANGES` | Exact candidate `753c8db103579d021795d3fe6a97c5d45d4a111a` genuinely closes all 13 executable round-2 residuals against predecessor-derived and held-out controls while keeping the frozen 55/15 code tables unchanged. It is rejected because `KGI-DEV-004` is still author-declarable with zero findings, evidence completeness improves by citation omission, artifact subjects remain padding-sensitive, lifecycle evidence accepts a policy citation, freshness is active-record-only, and the repair created honest-positive rejection plus semantic-finding suppression. The bounded round-4 packet requires independent oracles and refuses a new framework; authored integration trust and Git merge/rename/shallow-clone seal policy are explicitly routed instead of silently promoted. No process decision or composition may consume this candidate. |
+| [`cfr168-review-recurrence-v2-implementation-rereview-gpt56-20260731`](../cfr168-review-recurrence-v2-implementation-rereview-gpt56-20260731/review.md) | `00ad885` / `75e7ae2853e8538efb9258edc57aa9a945372b8f11d2ef5f53c3aeb75dcd0bf6` | `ACCEPT_FOR_INTEGRATION` | Exact experimental control-plane candidate `9e50f04b3d6e53753e40aab57cfbc4a884de5bc8` is accepted and integrated at `00ad885`; L1.1-L1.5 are complete. This was an independent GPT-5.6/Codex fallback review, not Claude or Fugu work. It authorizes neither a live arm nor permanent adoption: L1.6 manifest/anchor freeze is pending, v1 always returns `BLOCK`, and no recurrence or time/rework improvement has been measured. |
 
-## Current review queue
+## Post-v2 AIA-047 checkpoint
+
+The AIA-047 implementation critical path has advanced beyond the queue
+snapshot below:
+
+| Layer | Current disposition |
+|---|---|
+| L1.1-L1.5 | complete and integrated experimentally at `00ad885` |
+| L1.6 | pending manager-owned Cargo/KGI manifest and live-arm anchor freeze in a separate clean validator source |
+| L1.7 | blocked on L1.6; bootstrap must first produce and retain the mandatory v2 `BLOCK` |
+| L1.P / L1.8 | provider-held until the blind Fugu branch can start no earlier than the recorded 2026-08-03 window |
+| L1.9-L1.10 | blocked; no live effectiveness proof or adoption decision exists |
+
+The queue text below is preserved as the pre-v2-integration product/control
+snapshot. Where it says that AIA-047 implementation review is still pending,
+this checkpoint supersedes that statement only; it does not accept or
+integrate any Cargo, KGI/KPI, Rust, or Python candidate.
+
+## Review queue snapshot before v2 integration
 
 After verified capacity, admit the three conflict-free exact-session resumes
 up to the adaptive provider window; do not serialize them behind a fixed

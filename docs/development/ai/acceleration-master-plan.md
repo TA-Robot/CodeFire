@@ -110,7 +110,7 @@ Exit criteria:
 - Dogfood friction can be converted into a task packet within minutes.
 - negative results are captured instead of lost.
 
-## Stage 5: Trusted Throughput Operating System — Active 2026-07-30
+## Stage 5: Trusted Throughput Operating System — Active 2026-07-31
 
 The first live CFR-168 portfolio demonstrated that safe parallel candidate
 generation is no longer the limiting factor. The measured bottleneck is exact
@@ -207,7 +207,7 @@ Only keep items that remove repeated human/AI overhead, can be checked cheaply, 
 | AIA-043 | Verdict-to-rollover latency | Active measurement/control: capture decision-settled to immutable-report-commit separately from review execution, require the compact exact-review form and one terminal verdict, and bind a prepared repair continuation in the same manager interval. This targets the current period where a decisive rejection exists but downstream repair cannot safely start. |
 | AIA-044 | Enforced Rust execution profile | Project-side fail-closed audit implemented in `../tools/check_rust_execution_profile.py`: it checks live scoped Cargo/rustc/Clippy processes plus durable agent commands for alternate toolchains, private targets/out-dirs, excessive jobs/threads, and incremental builds without printing arbitrary commands. A violation blocks another Rust launch and candidate freeze until acceptance gates are rerun on the shared profile. Preventing the worker from spawning the command inside `dev-swarm` remains foundation work. |
 | AIA-045 | Review terminalization budget | Project-side state detector implemented in `../tools/check_review_terminalization.py`: agent-authored verdict/report-ready signals, later event count, worker liveness, and the exact Git report state distinguish `WAIT`, `INTERVENE`, and `COMPLETE`. Manual intervention preserves the exact session/transcript and resumes report-only rather than starting a competing reviewer. Automatic scheduler checkpoint/nudge remains foundation work. |
-| AIA-047 | Count-free successor-review recurrence gate | v1 is retained only as rejected compatibility/historical input and the normal checker always returns `BLOCK` for it. The v2 repair candidate in `schemas/review-recurrence-control.v2.schema.json`, `schemas/review-recurrence-repair-manifest.v1.schema.json`, `schemas/timed-gate-result.v2.schema.json`, `../tools/check_review_recurrence.py`, `validation-report-template.md`, and `review-recurrence/README.md` binds exact Git topology and artifacts, replays every retained generation under current semantics, requires out-of-tree timed log/result creation, and derives state/action blocking without finding quotas. A live decision also requires a separate clean committed validator root, explicit matching Cargo/KGI arm, and manager-owned committed anchor. No anchor is committed yet, so live `ALLOW` is intentionally unavailable. Machine evidence does not replace human judgement of manifest/surface completeness, oracle semantics, honest execution, authorship, or reviewer independence. Promotion still depends on anchored comparable runs and an independent blind causal audit. |
+| AIA-047 | Count-free successor-review recurrence gate | **Experimental implementation integrated at `00ad885` after independent `ACCEPT_FOR_INTEGRATION` on exact candidate `9e50f04`; L1.1-L1.5 complete.** v1 is retained only as rejected compatibility/historical input and the normal checker always returns `BLOCK`. The v2 schemas, checker, isolated modules, timed runner, template, operating docs, and 109-test tool suite bind exact Git topology and artifacts, replay every retained generation under current semantics, require out-of-tree timed log/result creation, and derive state/action blocking without finding quotas. L1.6 is pending: no manager-owned Cargo/KGI manifest-and-anchor freeze is committed, so live `ALLOW` is intentionally unavailable. No live arm, review-recurrence reduction, time/rework improvement, or permanent adoption is proven. Promotion still depends on the required bootstrap `BLOCK`, a real rooted successor, comparable anchored arms, and the independent blind causal branch whose earliest recorded Fugu window is 2026-08-03. Machine evidence does not replace human judgement of manifest/surface completeness, oracle semantics, honest execution, authorship, or reviewer independence. |
 
 The AIA-021 provenance is intentionally local evidence. It does not claim a trusted/reproducible builder or dependency supply-chain attestation.
 
@@ -231,13 +231,15 @@ Current recommended next items:
    frozen so move-only work does not invalidate active exact reviews.
 8. Promote AIA-033 KGI/KPI changes only from complete event evidence; keep
    unavailable queue/cost fields explicit.
-9. Independently review and commit the v2 gate, then have a separate manager
-   task pin the Cargo and KGI/KPI live-arm anchor in a clean validator source.
-   Run the bootstrap generation as the required `BLOCK`, retain its v2
-   record/result, and evaluate the rooted successor with full historical
-   semantic replay and out-of-tree timed evidence. Compare candidate-created
-   findings, surfaces, review/repair/report time, and generation count before
-   retaining, revising, or removing AIA-047.
+9. Treat `00ad885` as the experimental L1.1-L1.5 checkpoint, not an effectiveness
+   result. Complete L1.6 in a separate manager task by freezing both exact
+   bootstrap manifests and the Cargo/KGI live-arm anchor in a clean validator
+   source. Run the bootstrap generation as the required `BLOCK`, retain its v2
+   record/result, and evaluate a real rooted successor with full historical
+   semantic replay and out-of-tree timed evidence. Run the blind Fugu branch no
+   earlier than its recorded 2026-08-03 provider window, then compare
+   candidate-created findings, surfaces, review/repair/report time, and
+   generation count before retaining, revising, or removing AIA-047.
 
 ## Success Metrics
 

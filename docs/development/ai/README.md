@@ -34,6 +34,24 @@ Do not spawn or delegate implementation work until the task packet has:
 - validation command list;
 - expected handoff format.
 
+## Current AIA-047 checkpoint
+
+The experimental recurrence-v2 implementation is integrated at
+`00ad88562068a6101a7530b84d5f52b0cff559f0`; L1.1-L1.5 are complete. The exact
+implementation candidate `9e50f04b3d6e53753e40aab57cfbc4a884de5bc8`
+received an independent `ACCEPT_FOR_INTEGRATION` through the recorded
+GPT-5.6/Codex fallback because Claude and Fugu were unavailable.
+
+This is not evidence that the review bottleneck improved. L1.6 remains
+pending: no Cargo/KGI bootstrap manifest pair or manager-owned live-arm anchor
+is committed. The v1 compatibility path always returns structured `BLOCK`, no
+live v2 `ALLOW` exists, and the blind Fugu causal branch cannot begin before
+the recorded 2026-08-03 provider window. See
+[`review-recurrence/README.md`](review-recurrence/README.md) for the executable
+contract and
+[`swarm-results/cfr168-review-recurrence-v2-implementation-rereview-gpt56-20260731/review.md`](swarm-results/cfr168-review-recurrence-v2-implementation-rereview-gpt56-20260731/review.md)
+for the bounded integration verdict.
+
 ## Operating Modes
 
 | Mode | Purpose | Primary docs |
@@ -148,7 +166,7 @@ If the agent cannot state these, the work is not ready.
 | `operating-protocol.md` | Task packet shape, review packet shape, parallel-lane rules, and handoff format. |
 | `failure-cookbook.md` | Maps recurring environment, provenance, packet, timeout, JSON, and review failures to safe next actions. |
 | `validation-report-template.md` | Human handoff shape corresponding to the typed review contract; placeholders are never evidence. |
-| `review-recurrence/README.md` | Interim count-free successor-review pilot, record ownership, comparison measures, and promotion/rollback rules. |
+| `review-recurrence/README.md` | Experimental count-free successor-review v2 lifecycle, always-blocked v1 compatibility path, record/anchor ownership, comparison measures, and promotion/rollback rules. |
 | `development-flow-kgi-kpi.md`, `flow-metrics/` | Promoted KGI/KPI definitions, management triggers, and schema-checked active/final measurement records. |
 
 ## Local Tools and Evidence
@@ -169,8 +187,8 @@ If the agent cannot state these, the work is not ready.
 | `../tools/check_swarm_admission.py` | Admits one additional external lane from live memory/swap/disk/PSI/PID pressure, a per-candidate reservation, provider congestion, and conflict ownership without a fixed total-agent cap. |
 | `../tools/check_rust_execution_profile.py` | Audits live Rust processes and agent event logs for private targets, alternate toolchains, excessive jobs/threads, or incremental builds; a violation blocks another Rust launch and candidate freeze. |
 | `../tools/check_review_terminalization.py` | Distinguishes healthy long-running review progress from repeated terminal-verdict/report-ready signals without an immutable report and emits an evidence-preserving intervention decision. |
-| `../tools/check_review_recurrence.py` | Git-binds a successor review, separates prior closure from candidate-created findings, verifies repair-delta/negative-control/terminal evidence, and blocks integration without using a finding-count quota. |
-| `../tools/run_timed_gate.py` | Runs one argv-only gate with monotonic duration, process-group timeout, complete log digest, and wall-clock-discontinuity evidence. |
+| `../tools/check_review_recurrence.py` | Always blocks normal v1 input; for v2, Git-binds rooted generations, replays retained history under current semantics, verifies manifest/surface/evidence/validator authority, and blocks integration without a finding-count quota. |
+| `../tools/run_timed_gate.py` | Runs one argv-only gate with monotonic duration, process-group timeout, complete external log digest, clean/index-state evidence, and post-command source identity. |
 | `../tools/run_ai_role.py` | Codex-specific low-level adapter; validates a typed packet and binds context/base/dirty-state. Dry-run is default and real use requires explicit `--allow-codex`. |
 | `../tools/prepare_historical_eval.py` | Materializes one deterministic historical CFB/CFR candidate input while withholding the evaluator oracle. |
 
