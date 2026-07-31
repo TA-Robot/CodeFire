@@ -25,6 +25,22 @@ separate manager task commits and independently reviews that anchor. This is a
 deliberate fail-closed state, not an instruction to synthesize an anchor from
 the candidate being reviewed.
 
+## Pre-live compatibility breaks
+
+The hardening contract deliberately changes the not-yet-live v2 byte shapes.
+Every derivation now carries separate
+`path_existed_in_predecessor` (a Git tree-entry fact) and
+`locus_existed_in_predecessor` (the reviewer's semantic judgement), while every
+manifest prior-obligation row freezes `origin_generation`. A timed v2 result
+now carries a closed sibling `result` object containing its resolved external
+output path. Live anchors and retained gate results are validated by their own
+registered, closed schemas.
+
+No Cargo/KGI live anchor, v2 live record, or retained v2 live result predates
+these changes. Older experimental v2 JSON bytes are not silently reinterpreted
+as the hardened shape; they must fail the current schema and cannot be
+predecessor authority.
+
 ## Two repositories, two authorities
 
 The checker distinguishes:
@@ -78,22 +94,62 @@ requires `--validator-root` to differ from `--git-root`.
   out-of-scope approval escape.
 - Required commands use `codefire.timed_gate.v2`. Both the live log and result
   must be outside the source worktree, then copied byte-identically into the
-  evidence commit. In-tree log or result paths block acceptance even when the
-  checkout appears clean afterward.
+  evidence commit. Their resolved paths must be distinct. In-tree log or result
+  paths block acceptance even when the checkout appears clean afterward.
 - The timed result must bind the exact candidate revision/tree, clean states
   before and after execution, an unchanged post-command `HEAD`/tree, an empty
-  before/after index-flag union, complete log bytes and digest, a terminal exit
-  code, and the exact frozen argv.
+  before/after index-flag union, internally consistent UTC/monotonic timing,
+  complete log bytes and digest, one consistent terminal outcome, and the exact
+  frozen argv. Summary booleans are recomputed from their detailed fields; they
+  are not independent assertions.
 - `CLOSED_PROVEN` with `NONE` is the only potentially nonblocking state/action
   pair, and only when its separately derived closure proof succeeds. Routing
   never grants integration authority.
 - There is no minimum finding, observation, surface, or obligation count.
 
+## Frozen manifest extraction rule
+
+Live manifest preflight applies the following two-set boundary:
+
+- `parity_closure_claims` is set-equal to every independently reviewed
+  predecessor-parity claim and every held-out or negative-control claim. The
+  review report and the derivation/observation references carry each claim's
+  exact before, after, and mutation evidence.
+- `required_validations` contains only exact argv that run on the clean,
+  unmodified candidate and are required to terminate with exit zero. Broad and
+  focused candidate tests may be included.
+
+Every prior obligation in a bootstrap manifest maps to at least one
+semantically relevant passing timed validation, but a passing validation is
+never sufficient closure by itself. Expected-rejection CLI invocations,
+throwaway-tree mutations, and manual held-out probes remain independent claim
+evidence; they are not rewritten into artificial passing commands. A later
+manager-owned, content-bound harness may be frozen as a validation only when
+the harness's own exit zero means that all expected outcomes were observed.
+This hardening contract asserts no such harness.
+
+Independent manifest preflight must reject an obligation whose claim set or
+passing-validation mapping is semantically incomplete. The machine proves set
+equality and exact bytes; it does not prove that semantic completeness
+judgement.
+
+This rule supersedes the accepted v2 contract's earlier “Prior obligations”
+extraction sentence that derived required validation IDs/argv from both the
+packet Validation table and its independent negative-control table. Accepted
+packet bytes and immutable historical reports remain unchanged. No negative
+row may disappear: every expected-failure or mutation row stays in the frozen
+claim set with exact independent report/derivation/observation evidence, while
+only positive clean-candidate exit-zero argv enter timed required validations.
+The older Cargo/KGI recurrence packets remain semantic extraction sources and
+require new v2 review-control packets after their canonical port candidates
+exist.
+
 ## Human semantic boundary
 
 The gate derives topology, byte identity, set equality, state/action legality,
 and machine-visible closure predicates. It does not prove honest command
-execution, semantic oracle quality, nonzero test selection, complete symbol or
+execution or rule out mutate-and-restore activity during a command. Nor does it
+prove semantic oracle quality, nonzero test selection, complete symbol or
 surface enumeration, the semantic adequacy of a closure oracle, the
 completeness of the frozen manifest, human authorship, or reviewer
 independence. Those remain explicit manager and independent-review judgements.

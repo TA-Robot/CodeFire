@@ -14,9 +14,12 @@ it.
 
 from __future__ import annotations
 
-import json
+import math
+import re
 from dataclasses import dataclass
-from pathlib import Path
+from datetime import datetime, timezone
+from decimal import Decimal
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from ai_contracts import validate_json_schema
@@ -25,6 +28,7 @@ from recurrence_v2_git import GitError, GitRepo, sha256_bytes
 from recurrence_v2_model import (
     BLOB_MODE,
     LEGACY_ROOTS,
+    LIVE_ARM_ANCHOR_SCHEMA_PATH,
     LIVE_ARM_ANCHOR_PATH,
     LIVE_ARM_ANCHOR_SCHEMA,
     MANIFEST_SCHEMA_PATH,
@@ -32,6 +36,7 @@ from recurrence_v2_model import (
     PORT_PACKETS,
     PORT_REQUIRED_REPAIR_PATHS,
     RECORD_SCHEMA_PATH,
+    RESULT_SCHEMA_PATH,
     TIMED_SCHEMA,
     TIMED_SCHEMA_PATH,
     ArtifactRef,
@@ -42,6 +47,7 @@ from recurrence_v2_model import (
     error,
     parse_manifest,
     path_components_safe,
+    strict_decode_json,
 )
 
 GATE_SOURCE_PATHS = (
@@ -56,6 +62,8 @@ GATE_SOURCE_PATHS = (
     "docs/development/tools/recurrence_v2_history.py",
     RECORD_SCHEMA_PATH,
     MANIFEST_SCHEMA_PATH,
+    RESULT_SCHEMA_PATH,
+    LIVE_ARM_ANCHOR_SCHEMA_PATH,
     TIMED_SCHEMA_PATH,
 )
 
@@ -78,6 +86,27 @@ class TimedFacts:
     log_bytes: int
     log_sha256: str
 
+    def as_result(self) -> dict[str, Any]:
+        """Render the exact closed timed-validation row retained by v2 results."""
+
+        return {
+            "result_revision": self.result_revision,
+            "result_tree": self.result_tree,
+            "status": self.status,
+            "exit_code": self.exit_code,
+            "timed_out": self.timed_out,
+            "log_complete": self.log_complete,
+            "clean_before": self.clean_before,
+            "clean_after": self.clean_after,
+            "index_flags_clean": self.index_flags_clean,
+            "head_unchanged": self.head_unchanged,
+            "log_inside_source_worktree": self.log_inside_source_worktree,
+            "result_inside_source_worktree": self.result_inside_source_worktree,
+            "log_bytes": self.log_bytes,
+            "log_sha256": self.log_sha256,
+            "passing": self.passing,
+        }
+
     @property
     def passing(self) -> bool:
         return (
@@ -92,6 +121,113 @@ class TimedFacts:
             and not self.log_inside_source_worktree
             and not self.result_inside_source_worktree
         )
+
+
+_UTC_MICROSECOND = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:"
+    r"[0-9]{2}\.[0-9]{6}Z$"
+)
+_TIMESTAMP_WALL_TOLERANCE_SECONDS = Decimal("0.000002")
+_WALL_MONOTONIC_TOLERANCE_SECONDS = Decimal("0.000000000001")
+
+
+def _finite_number(value: Any) -> bool:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def _parse_utc_microsecond(value: Any) -> datetime | None:
+    if not isinstance(value, str) or _UTC_MICROSECOND.fullmatch(value) is None:
+        return None
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%fZ")
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=timezone.utc)
+
+
+def _decimal_number(value: int | float) -> Decimal:
+    return Decimal(str(value))
+
+
+def _timedelta_seconds(value: Any) -> Decimal:
+    microseconds = (
+        (value.days * 86_400 + value.seconds) * 1_000_000 + value.microseconds
+    )
+    return Decimal(microseconds) / Decimal(1_000_000)
+
+
+def _lexical_absolute_posix_parts(value: Any) -> tuple[str, ...] | None:
+    """Return canonical absolute POSIX components without touching the host FS."""
+
+    if not isinstance(value, str) or not value.startswith("/"):
+        return None
+    if any(
+        character == "\\"
+        or 0xD800 <= ord(character) <= 0xDFFF
+        or ord(character) < 0x20
+        or 0x7F <= ord(character) <= 0x9F
+        for character in value
+    ):
+        return None
+    if value == "/":
+        return ()
+    if value.endswith("/"):
+        return None
+    parts = tuple(value[1:].split("/"))
+    if any(part in {"", ".", ".."} for part in parts):
+        return None
+    if PurePosixPath(value).as_posix() != value:
+        return None
+    return parts
+
+
+def _component_contains(root: tuple[str, ...], candidate: tuple[str, ...]) -> bool:
+    return len(candidate) >= len(root) and candidate[: len(root)] == root
+
+
+def predecessor_path_presence(
+    repo: GitRepo,
+    record: RecordModel,
+    location: str = "record.derivations",
+) -> tuple[dict[str, bool], list[Finding]]:
+    """Read one canonical predecessor tree-entry fact for both gate and replay."""
+
+    present: dict[str, bool] = {}
+    findings: list[Finding] = []
+    for index, derivation in enumerate(record.derivations):
+        item_location = f"{location}[{index}].path"
+        if not path_components_safe(derivation.path):
+            findings.append(
+                error(
+                    "unsafe-derivation-path",
+                    item_location,
+                    repr(derivation.path),
+                )
+            )
+            continue
+        if derivation.path in present:
+            continue
+        try:
+            entry = repo.entry(
+                record.subject.predecessor_candidate_revision,
+                derivation.path.encode("utf-8"),
+            )
+        except (GitError, UnicodeEncodeError) as exc:
+            findings.append(
+                error(
+                    "predecessor-path-probe-failed",
+                    item_location,
+                    str(exc),
+                )
+            )
+            continue
+        present[derivation.path] = entry is not None
+    return present, findings
 
 
 def _permitted_commits(
@@ -494,15 +630,26 @@ def load_manifest(
         )
     except GitError as exc:
         return None, [error("manifest-unreadable", location, str(exc))]
-    try:
-        raw = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        return None, [error("manifest-not-json", location, str(exc))]
-    if manifest_schema is not None:
-        findings.extend(validate_json_schema(raw, manifest_schema, location))
+    raw, decode_findings = strict_decode_json(payload, location)
+    findings.extend(decode_findings)
+    if raw is None or decode_findings:
+        return None, findings
+    if manifest_schema is None:
+        findings.append(
+            error(
+                "manifest-schema-unavailable",
+                location,
+                "the registered repair-manifest schema is required before typed use",
+            )
+        )
+        return None, findings
+    schema_findings = validate_json_schema(raw, manifest_schema, location)
+    findings.extend(schema_findings)
+    if schema_findings:
+        return None, findings
     manifest, parse_findings = parse_manifest(raw, location)
     findings.extend(parse_findings)
-    if manifest is None:
+    if manifest is None or parse_findings:
         return None, findings
     if manifest.generation != record.generation:
         findings.append(
@@ -554,6 +701,7 @@ def load_manifest(
             )
         )
     obligation_map = manifest.obligation_map()
+    manifest_origins = manifest.obligation_origin_map()
     manifest_ids = frozenset(obligation_map)
     record_ids = frozenset(row.id for row in record.prior_obligations)
     if manifest_ids != record_ids:
@@ -565,6 +713,89 @@ def load_manifest(
                 f"record-only={sorted(record_ids - manifest_ids)}",
             )
         )
+    repeated_record_ids = duplicates([row.id for row in record.prior_obligations])
+    if repeated_record_ids:
+        findings.append(
+            error(
+                "duplicate-prior-obligation-id",
+                "record.prior_obligations",
+                repr(repeated_record_ids),
+            )
+        )
+    else:
+        record_origins = {
+            row.id: row.origin_generation for row in record.prior_obligations
+        }
+        for obligation_id, manifest_origin in sorted(manifest_origins.items()):
+            record_origin = record_origins.get(obligation_id)
+            if record_origin is not None and record_origin != manifest_origin:
+                findings.append(
+                    error(
+                        "manifest-record-origin-generation-mismatch",
+                        f"{location}.prior_obligations",
+                        f"{obligation_id} has manifest origin {manifest_origin}, "
+                        f"record origin {record_origin}",
+                    )
+                )
+            if manifest_origin >= manifest.generation:
+                findings.append(
+                    error(
+                        "manifest-obligation-origin-not-prior",
+                        f"{location}.prior_obligations",
+                        f"{obligation_id} origin {manifest_origin} is not before "
+                        f"generation {manifest.generation}",
+                    )
+                )
+    if record.subject.authority.kind == "prior_v2_record":
+        predecessor = chain.predecessor_link
+        predecessor_origins = (
+            predecessor.obligation_origins if predecessor is not None else {}
+        )
+        for obligation_id, manifest_origin in sorted(manifest_origins.items()):
+            predecessor_origin = predecessor_origins.get(obligation_id)
+            if predecessor_origin is None:
+                findings.append(
+                    error(
+                        "manifest-predecessor-origin-unavailable",
+                        f"{location}.prior_obligations",
+                        f"{obligation_id} has no exported origin in the verified predecessor",
+                    )
+                )
+            elif predecessor_origin != manifest_origin:
+                findings.append(
+                    error(
+                        "manifest-predecessor-origin-generation-mismatch",
+                        f"{location}.prior_obligations",
+                        f"{obligation_id} has manifest origin {manifest_origin}, "
+                        f"predecessor origin {predecessor_origin}",
+                    )
+                )
+    elif record.subject.authority.kind == "legacy_bootstrap_report":
+        arm = record.subject.authority.bootstrap_arm
+        fixed_root = LEGACY_ROOTS.get(arm) if isinstance(arm, str) else None
+        if (
+            fixed_root is not None
+            and record.subject.authority.commit == fixed_root.commit
+        ):
+            if record.generation != fixed_root.review_generation:
+                findings.append(
+                    error(
+                        "bootstrap-review-generation-mismatch",
+                        "record.generation",
+                        f"{arm} requires first live review generation "
+                        f"{fixed_root.review_generation}, got {record.generation}",
+                    )
+                )
+            fixed_origins = fixed_root.obligation_origin_map()
+            if manifest_origins != fixed_origins:
+                findings.append(
+                    error(
+                        "bootstrap-manifest-origin-map-mismatch",
+                        f"{location}.prior_obligations",
+                        f"{arm} requires {sorted(fixed_origins.items())}, got "
+                        f"{sorted(manifest_origins.items())}",
+                    )
+                )
     validation_argv = manifest.validation_argv()
     manifest_validations = frozenset(validation_argv)
     record_validations = frozenset(row.id for row in record.validations)
@@ -632,6 +863,261 @@ def load_manifest(
     return manifest, findings
 
 
+def _timed_semantics(
+    payload: dict[str, Any],
+    location: str,
+) -> tuple[dict[str, bool], list[Finding]]:
+    """Recompute every runner summary and validate its frozen relations."""
+
+    findings: list[Finding] = []
+    source = payload["source"]
+    worktree = payload["worktree"]
+    log = payload["log"]
+    result = payload["result"]
+
+    clean_before = worktree["status_before"] == []
+    clean_after = worktree["status_after"] == []
+    index_flags_clean = worktree["index_flagged_entries"] == []
+    for field, actual, expected in (
+        ("clean_before", worktree["clean_before"], clean_before),
+        ("clean_after", worktree["clean_after"], clean_after),
+        ("index_flags_clean", worktree["index_flags_clean"], index_flags_clean),
+    ):
+        if actual != expected:
+            findings.append(
+                error(
+                    f"timed-{field.replace('_', '-')}-inconsistent",
+                    f"{location}.worktree.{field}",
+                    f"declared {actual!r}, recomputed {expected!r}",
+                )
+            )
+
+    revision_after = worktree["head_revision_after"]
+    tree_after = worktree["head_tree_after"]
+    probe_error = worktree["head_probe_error"]
+    probe_shape_valid = (
+        (probe_error is None and revision_after is not None and tree_after is not None)
+        or (probe_error is not None and revision_after is None and tree_after is None)
+    )
+    if not probe_shape_valid:
+        findings.append(
+            error(
+                "timed-head-probe-shape-inconsistent",
+                f"{location}.worktree",
+                "head_probe_error is null iff both post-command identities are present; "
+                "an error requires both identities to be null",
+            )
+        )
+    head_unchanged = (
+        probe_error is None
+        and revision_after == source["revision"]
+        and tree_after == source["tree"]
+    )
+    if worktree["head_unchanged"] != head_unchanged:
+        findings.append(
+            error(
+                "timed-head-unchanged-inconsistent",
+                f"{location}.worktree.head_unchanged",
+                f"declared {worktree['head_unchanged']!r}, recomputed {head_unchanged!r}",
+            )
+        )
+
+    path_values = {
+        "cwd": payload["cwd"],
+        "source.git_root": source["git_root"],
+        "log.path": log["path"],
+        "result.path": result["path"],
+    }
+    path_parts: dict[str, tuple[str, ...]] = {}
+    for field, value in path_values.items():
+        parts = _lexical_absolute_posix_parts(value)
+        if parts is None:
+            findings.append(
+                error(
+                    "timed-path-not-canonical",
+                    f"{location}.{field}",
+                    f"expected one lexical absolute POSIX path, got {value!r}",
+                )
+            )
+        else:
+            path_parts[field] = parts
+
+    if {"cwd", "source.git_root"} <= path_parts.keys() and not _component_contains(
+        path_parts["source.git_root"], path_parts["cwd"]
+    ):
+        findings.append(
+            error(
+                "timed-cwd-outside-source-root",
+                f"{location}.cwd",
+                f"{payload['cwd']!r} is not within {source['git_root']!r}",
+            )
+        )
+
+    log_inside = False
+    if {"log.path", "source.git_root"} <= path_parts.keys():
+        log_inside = _component_contains(
+            path_parts["source.git_root"], path_parts["log.path"]
+        )
+        if worktree["log_inside_source_worktree"] != log_inside:
+            findings.append(
+                error(
+                    "timed-log-placement-inconsistent",
+                    f"{location}.worktree.log_inside_source_worktree",
+                    f"declared {worktree['log_inside_source_worktree']!r}, "
+                    f"recomputed {log_inside!r}",
+                )
+            )
+    result_inside = False
+    if {"result.path", "source.git_root"} <= path_parts.keys():
+        result_inside = _component_contains(
+            path_parts["source.git_root"], path_parts["result.path"]
+        )
+        if worktree["result_inside_source_worktree"] != result_inside:
+            findings.append(
+                error(
+                    "timed-result-placement-inconsistent",
+                    f"{location}.worktree.result_inside_source_worktree",
+                    f"declared {worktree['result_inside_source_worktree']!r}, "
+                    f"recomputed {result_inside!r}",
+                )
+            )
+    if (
+        "log.path" in path_parts
+        and "result.path" in path_parts
+        and path_parts["log.path"] == path_parts["result.path"]
+    ):
+        findings.append(
+            error(
+                "timed-log-result-path-collision",
+                f"{location}.result.path",
+                "log.path and result.path must be distinct",
+            )
+        )
+
+    timeout = payload["timeout_seconds"]
+    duration = payload["duration_seconds"]
+    wall_elapsed = payload["wall_elapsed_seconds"]
+    wall_minus = payload["wall_minus_monotonic_seconds"]
+    threshold = payload["drift_threshold_seconds"]
+    for field, value, positive in (
+        ("timeout_seconds", timeout, True),
+        ("duration_seconds", duration, False),
+        ("drift_threshold_seconds", threshold, False),
+    ):
+        valid = _finite_number(value) and (value > 0 if positive else value >= 0)
+        if not valid:
+            findings.append(
+                error(
+                    "timed-timing-value-invalid",
+                    f"{location}.{field}",
+                    f"{field} must be finite and {'positive' if positive else 'nonnegative'}",
+                )
+            )
+    for field, value in (
+        ("wall_elapsed_seconds", wall_elapsed),
+        ("wall_minus_monotonic_seconds", wall_minus),
+    ):
+        if not _finite_number(value):
+            findings.append(
+                error(
+                    "timed-timing-value-invalid",
+                    f"{location}.{field}",
+                    f"{field} must be finite",
+                )
+            )
+
+    started = _parse_utc_microsecond(payload["started_at"])
+    ended = _parse_utc_microsecond(payload["ended_at"])
+    if started is None:
+        findings.append(
+            error(
+                "timed-timestamp-invalid",
+                f"{location}.started_at",
+                "expected YYYY-MM-DDTHH:MM:SS.ffffffZ with a valid UTC datetime",
+            )
+        )
+    if ended is None:
+        findings.append(
+            error(
+                "timed-timestamp-invalid",
+                f"{location}.ended_at",
+                "expected YYYY-MM-DDTHH:MM:SS.ffffffZ with a valid UTC datetime",
+            )
+        )
+    if started is not None and ended is not None and _finite_number(wall_elapsed):
+        timestamp_elapsed = _timedelta_seconds(ended - started)
+        wall_elapsed_decimal = _decimal_number(wall_elapsed)
+        if (
+            abs(timestamp_elapsed - wall_elapsed_decimal)
+            > _TIMESTAMP_WALL_TOLERANCE_SECONDS
+        ):
+            findings.append(
+                error(
+                    "timed-wall-elapsed-inconsistent",
+                    f"{location}.wall_elapsed_seconds",
+                    f"timestamp delta {timestamp_elapsed!r} differs from "
+                    f"{wall_elapsed!r} beyond {_TIMESTAMP_WALL_TOLERANCE_SECONDS!r}",
+                )
+            )
+    recomputed_wall_minus: Decimal | None = None
+    if _finite_number(wall_elapsed) and _finite_number(duration):
+        recomputed_wall_minus = _decimal_number(wall_elapsed) - _decimal_number(
+            duration
+        )
+        if (
+            not _finite_number(wall_minus)
+            or abs(_decimal_number(wall_minus) - recomputed_wall_minus)
+            > _WALL_MONOTONIC_TOLERANCE_SECONDS
+        ):
+            findings.append(
+                error(
+                    "timed-wall-minus-monotonic-inconsistent",
+                    f"{location}.wall_minus_monotonic_seconds",
+                    f"declared {wall_minus!r}, recomputed {recomputed_wall_minus!r}",
+                )
+            )
+    if recomputed_wall_minus is not None and _finite_number(threshold):
+        discontinuity = abs(recomputed_wall_minus) > _decimal_number(threshold)
+        if payload["wall_clock_discontinuity"] != discontinuity:
+            findings.append(
+                error(
+                    "timed-wall-clock-discontinuity-inconsistent",
+                    f"{location}.wall_clock_discontinuity",
+                    f"declared {payload['wall_clock_discontinuity']!r}, "
+                    f"recomputed {discontinuity!r}",
+                )
+            )
+
+    passed = payload["exit_code"] == 0 and payload["timed_out"] is False
+    if (payload["status"] == "passed") != passed:
+        findings.append(
+            error(
+                "timed-terminal-status-inconsistent",
+                f"{location}.status",
+                "status is passed iff exit_code is zero and timed_out is false",
+            )
+        )
+    if payload["timed_out"] is True and payload["exit_code"] != 124:
+        findings.append(
+            error(
+                "timed-timeout-exit-code-inconsistent",
+                f"{location}.exit_code",
+                "a timed-out runner result must use exit code 124",
+            )
+        )
+    return (
+        {
+            "clean_before": clean_before,
+            "clean_after": clean_after,
+            "index_flags_clean": index_flags_clean,
+            "head_unchanged": head_unchanged,
+            "log_inside_source_worktree": log_inside,
+            "result_inside_source_worktree": result_inside,
+        },
+        findings,
+    )
+
+
 def bind_timed_validations(
     repo: GitRepo,
     record: RecordModel,
@@ -642,8 +1128,18 @@ def bind_timed_validations(
     findings: list[Finding] = []
     facts: dict[str, TimedFacts] = {}
     argv_map = manifest.validation_argv() if manifest is not None else {}
+    duplicate_ids = frozenset(duplicates([row.id for row in record.validations]))
+    if duplicate_ids:
+        findings.append(
+            error(
+                "duplicate-record-validation-id",
+                "record.validations",
+                repr(sorted(duplicate_ids)),
+            )
+        )
     for index, row in enumerate(record.validations):
         location = f"record.validations[{index}]"
+        item_findings: list[Finding] = []
         result_artifact = artifacts.get(row.result_ref)
         log_artifact = artifacts.get(row.log_ref)
         if result_artifact is None or log_artifact is None:
@@ -653,14 +1149,28 @@ def bind_timed_validations(
                 result_artifact.commit, result_artifact.path.encode("utf-8")
             )
             log_bytes = repo.blob(log_artifact.commit, log_artifact.path.encode("utf-8"))
-        except GitError as exc:
+        except (GitError, UnicodeEncodeError) as exc:
             findings.append(error("timed-evidence-unreadable", location, str(exc)))
             continue
-        try:
-            payload = json.loads(result_bytes.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            findings.append(error("timed-result-not-json", location, str(exc)))
+        payload, decode_findings = strict_decode_json(
+            result_bytes, f"{location}.result"
+        )
+        findings.extend(decode_findings)
+        if payload is None or decode_findings:
             continue
+        if timed_schema is None:
+            findings.append(
+                error(
+                    "timed-result-schema-unavailable",
+                    f"{location}.result",
+                    "the registered timed-result schema is required before typed use",
+                )
+            )
+            continue
+        schema_findings = validate_json_schema(
+            payload, timed_schema, f"{location}.result"
+        )
+        findings.extend(schema_findings)
         if not isinstance(payload, dict) or payload.get("schema") != TIMED_SCHEMA:
             findings.append(
                 error(
@@ -671,40 +1181,37 @@ def bind_timed_validations(
                     "a v1 timed result is historical data and cannot satisfy a v2 accept",
                 )
             )
+        if schema_findings or not isinstance(payload, dict) or payload.get("schema") != TIMED_SCHEMA:
             continue
-        if timed_schema is not None:
-            findings.extend(
-                validate_json_schema(payload, timed_schema, f"{location}.result")
-            )
-        source = payload.get("source") if isinstance(payload.get("source"), dict) else {}
-        worktree = (
-            payload.get("worktree") if isinstance(payload.get("worktree"), dict) else {}
+
+        derived, semantic_findings = _timed_semantics(
+            payload, f"{location}.result"
         )
-        log = payload.get("log") if isinstance(payload.get("log"), dict) else {}
-        if source.get("revision") != record.subject.candidate_revision:
-            findings.append(
+        item_findings.extend(semantic_findings)
+        source = payload["source"]
+        log = payload["log"]
+        if source["revision"] != record.subject.candidate_revision:
+            item_findings.append(
                 error(
                     "timed-result-revision-mismatch",
                     f"{location}.result",
-                    f"result was produced at {source.get('revision')!r}, not the bound candidate "
+                    f"result was produced at {source['revision']!r}, not the bound candidate "
                     f"{record.subject.candidate_revision}",
                 )
             )
-        if source.get("tree") != record.subject.candidate_tree:
-            findings.append(
+        if source["tree"] != record.subject.candidate_tree:
+            item_findings.append(
                 error(
                     "timed-result-tree-mismatch",
                     f"{location}.result",
-                    f"result tree {source.get('tree')!r} is not the candidate tree "
+                    f"result tree {source['tree']!r} is not the candidate tree "
                     f"{record.subject.candidate_tree}",
                 )
             )
-        declared_argv = tuple(
-            item for item in payload.get("argv", []) if isinstance(item, str)
-        )
+        declared_argv = tuple(payload["argv"])
         expected_argv = argv_map.get(row.id)
         if expected_argv is not None and declared_argv != expected_argv:
-            findings.append(
+            item_findings.append(
                 error(
                     "timed-result-argv-mismatch",
                     f"{location}.result",
@@ -713,57 +1220,53 @@ def bind_timed_validations(
                 )
             )
         log_digest = sha256_bytes(log_bytes)
-        if log.get("sha256") != log_digest:
-            findings.append(
+        if log["sha256"] != log_digest:
+            item_findings.append(
                 error(
                     "timed-log-digest-mismatch",
                     f"{location}.log_ref",
-                    f"result binds {log.get('sha256')!r}, committed log is {log_digest}",
+                    f"result binds {log['sha256']!r}, committed log is {log_digest}",
                 )
             )
-        if log.get("bytes") != len(log_bytes):
-            findings.append(
+        if log["bytes"] != len(log_bytes):
+            item_findings.append(
                 error(
                     "timed-log-byte-count-mismatch",
                     f"{location}.log_ref",
-                    f"result binds {log.get('bytes')!r}, committed log is {len(log_bytes)}",
+                    f"result binds {log['bytes']!r}, committed log is {len(log_bytes)}",
                 )
             )
         for field, declared, actual in (
-            ("status", row.status, payload.get("status")),
-            ("exit_code", row.exit_code, payload.get("exit_code")),
-            ("timed_out", row.timed_out, payload.get("timed_out")),
-            ("log_complete", row.log_complete, log.get("complete")),
+            ("status", row.status, payload["status"]),
+            ("exit_code", row.exit_code, payload["exit_code"]),
+            ("timed_out", row.timed_out, payload["timed_out"]),
+            ("log_complete", row.log_complete, log["complete"]),
         ):
             if declared != actual:
-                findings.append(
+                item_findings.append(
                     error(
                         "record-timed-evidence-disagreement",
                         f"{location}.{field}",
                         f"record says {declared!r}, committed timed result says {actual!r}",
                     )
                 )
+        findings.extend(item_findings)
+        if item_findings or row.id in duplicate_ids:
+            continue
         facts[row.id] = TimedFacts(
             validation_id=row.id,
-            result_revision=str(source.get("revision")),
-            result_tree=str(source.get("tree")),
-            status=str(payload.get("status")),
-            exit_code=payload.get("exit_code")
-            if isinstance(payload.get("exit_code"), int)
-            and not isinstance(payload.get("exit_code"), bool)
-            else None,
-            timed_out=payload.get("timed_out") is True,
-            log_complete=log.get("complete") is True,
-            clean_before=worktree.get("clean_before") is True,
-            clean_after=worktree.get("clean_after") is True,
-            index_flags_clean=worktree.get("index_flags_clean") is True,
-            head_unchanged=worktree.get("head_unchanged") is True,
-            log_inside_source_worktree=(
-                worktree.get("log_inside_source_worktree") is True
-            ),
-            result_inside_source_worktree=(
-                worktree.get("result_inside_source_worktree") is True
-            ),
+            result_revision=source["revision"],
+            result_tree=source["tree"],
+            status=payload["status"],
+            exit_code=payload["exit_code"],
+            timed_out=payload["timed_out"],
+            log_complete=log["complete"],
+            clean_before=derived["clean_before"],
+            clean_after=derived["clean_after"],
+            index_flags_clean=derived["index_flags_clean"],
+            head_unchanged=derived["head_unchanged"],
+            log_inside_source_worktree=derived["log_inside_source_worktree"],
+            result_inside_source_worktree=derived["result_inside_source_worktree"],
             log_bytes=len(log_bytes),
             log_sha256=log_digest,
         )
@@ -855,6 +1358,62 @@ def deciding_gate_identity(validator_root: Path) -> dict[str, Any]:
     return identity
 
 
+def _decode_live_arm_anchor(
+    payload: bytes,
+    anchor_schema: dict[str, Any] | None,
+    location: str,
+) -> tuple[dict[str, Any] | None, list[Finding]]:
+    """Strictly decode and schema-check an anchor before any row selection."""
+
+    raw, findings = strict_decode_json(payload, location)
+    if raw is None or findings:
+        return None, findings
+    if anchor_schema is None:
+        return None, [
+            error(
+                "live-arm-anchor-schema-unavailable",
+                location,
+                "the registered live-arm-anchor schema is required before typed use",
+            )
+        ]
+    schema_findings = validate_json_schema(raw, anchor_schema, location)
+    if schema_findings:
+        return None, schema_findings
+    if not isinstance(raw, dict) or raw.get("schema") != LIVE_ARM_ANCHOR_SCHEMA:
+        return None, [
+            error(
+                "live-arm-anchor-wrong-schema",
+                location,
+                f"expected {LIVE_ARM_ANCHOR_SCHEMA}",
+            )
+        ]
+    rows = raw["arms"]
+    repeated = duplicates([row["arm"] for row in rows])
+    if repeated:
+        return None, [
+            error(
+                "duplicate-live-arm-anchor-arm",
+                f"{location}.arms",
+                repr(repeated),
+            )
+        ]
+    path_findings: list[Finding] = []
+    for index, row in enumerate(rows):
+        for label in ("repair_packet", "repair_manifest"):
+            value = row[label]["path"]
+            if not path_components_safe(value):
+                path_findings.append(
+                    error(
+                        "unsafe-live-arm-anchor-path",
+                        f"{location}.arms[{index}].{label}.path",
+                        repr(value),
+                    )
+                )
+    if path_findings:
+        return None, path_findings
+    return raw, []
+
+
 def load_live_arm_anchor(
     validator_root: Path,
     analysed_root: Path,
@@ -862,6 +1421,7 @@ def load_live_arm_anchor(
     record: RecordModel,
     artifacts: dict[str, ArtifactRef],
     deciding_gate: dict[str, Any],
+    anchor_schema: dict[str, Any] | None,
 ) -> tuple[dict[str, Any] | None, list[Finding]]:
     """Consume a manager-owned live-arm pin from the clean validator source.
 
@@ -951,37 +1511,33 @@ def load_live_arm_anchor(
                 "on-disk anchor bytes differ from the validator HEAD blob",
             )
         )
-    try:
-        raw = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        return None, [
-            *findings,
-            error("live-arm-anchor-unreadable", location, str(exc)),
-        ]
-    if not isinstance(raw, dict) or raw.get("schema") != LIVE_ARM_ANCHOR_SCHEMA:
-        return None, [
-            *findings,
-            error(
-                "live-arm-anchor-wrong-schema",
-                location,
-                f"expected {LIVE_ARM_ANCHOR_SCHEMA}",
-            )
-        ]
-    rows = raw.get("arms") if isinstance(raw.get("arms"), list) else []
-    match = next(
-        (row for row in rows if isinstance(row, dict) and row.get("arm") == arm),
-        None,
+    raw, anchor_findings = _decode_live_arm_anchor(
+        payload, anchor_schema, location
     )
+    findings.extend(anchor_findings)
+    if raw is None:
+        return None, findings
+    rows = raw["arms"]
+    match = next((row for row in rows if row["arm"] == arm), None)
     if match is None:
         return None, [
             *findings,
             error("live-arm-not-pinned", location, f"{arm} has no pinned anchor row")
         ]
+    if match["generation"] != record.generation:
+        findings.append(
+            error(
+                "live-arm-generation-mismatch",
+                f"{location}.arms",
+                f"anchor pins generation {match['generation']}, record is "
+                f"generation {record.generation}",
+            )
+        )
     packet = artifacts.get(record.subject.repair_packet_ref)
     manifest = artifacts.get(record.subject.repair_manifest_ref)
     for label, artifact in (("repair_packet", packet), ("repair_manifest", manifest)):
-        pinned = match.get(label)
-        if not isinstance(pinned, dict) or artifact is None:
+        pinned = match[label]
+        if artifact is None:
             findings.append(
                 error("live-arm-pin-incomplete", location, f"{label} is not pinned")
             )
@@ -1007,17 +1563,20 @@ def load_live_arm_anchor(
                 "the record's predecessor authority is not the pinned one",
             )
         )
+    if findings:
+        return None, findings
     return (
         {
+            "state": "verified",
             "anchor": {
                 "validator_commit": revision,
                 "path": LIVE_ARM_ANCHOR_PATH,
-                "mode": entry.mode if entry is not None else None,
+                "mode": BLOB_MODE,
                 "sha256": digest,
             },
             "arm": match,
         },
-        findings,
+        [],
     )
 
 
@@ -1028,6 +1587,7 @@ def verify_retained_live_arm_anchor(
     artifacts: dict[str, ArtifactRef],
     retained_result: dict[str, Any],
     historical_gate: dict[str, Any],
+    anchor_schema: dict[str, Any] | None,
 ) -> list[Finding]:
     """Re-prove a retained generation's manager anchor from validator Git.
 
@@ -1056,6 +1616,15 @@ def verify_retained_live_arm_anchor(
                 "retained-live-arm-pin-unavailable",
                 location,
                 "every retained live generation must bind its validator-owned anchor",
+            ),
+        ]
+    if pin.get("state") != "verified":
+        return [
+            *findings,
+            error(
+                "retained-live-arm-pin-unavailable",
+                f"{location}.state",
+                "every retained live generation requires state 'verified'",
             ),
         ]
     anchor = pin.get("anchor")
@@ -1137,32 +1706,28 @@ def verify_retained_live_arm_anchor(
                 f"computed {digest}",
             )
         )
-    try:
-        raw = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        return [
-            *findings,
-            error("retained-live-arm-anchor-not-json", location, str(exc)),
-        ]
-    if not isinstance(raw, dict) or raw.get("schema") != LIVE_ARM_ANCHOR_SCHEMA:
-        return [
-            *findings,
-            error(
-                "retained-live-arm-anchor-wrong-schema",
-                location,
-                f"expected {LIVE_ARM_ANCHOR_SCHEMA}",
-            ),
-        ]
-    rows = raw.get("arms") if isinstance(raw.get("arms"), list) else []
-    match = next(
-        (row for row in rows if isinstance(row, dict) and row.get("arm") == arm),
-        None,
+    raw, anchor_findings = _decode_live_arm_anchor(
+        payload, anchor_schema, f"{location}.historical_anchor"
     )
+    findings.extend(anchor_findings)
+    if raw is None:
+        return findings
+    rows = raw["arms"]
+    match = next((row for row in rows if row["arm"] == arm), None)
     if match is None:
         return [
             *findings,
             error("retained-live-arm-not-pinned", location, f"{arm} has no anchor row"),
         ]
+    if match["generation"] != record.generation:
+        findings.append(
+            error(
+                "retained-live-arm-generation-mismatch",
+                f"{location}.arm.generation",
+                f"anchor pins generation {match['generation']}, retained record is "
+                f"generation {record.generation}",
+            )
+        )
     if retained_arm != match:
         findings.append(
             error(
