@@ -2019,7 +2019,7 @@ Packet `cfr168-review-root-cause-reliability-gate-20260731.md` adds a blind
 reclassification and disagreement-adjudication gate before any template,
 mandatory finding count, repair-delta threshold, or checklist may be adopted.
 Its SHA-256 is
-`f05a616537efa7b068ffbe7545f5bd8ebcd6269191b7023704421edca0df18b1`.
+`cdc07044dde70b33549c7708ad3a7c3635585b3895d649ba89d49bf0a59131da`.
 
 The correction is methodological:
 
@@ -2043,6 +2043,14 @@ rewritten.
 Preferred low-Codex execution is a blind Fugu Ultra 1.1 classifier followed by
 Claude Opus 5 adjudication of disagreements. Both providers remain launch-held
 under their recorded backoffs, and neither has an automatic Codex fallback.
+
+The gate now also binds an analysis-only row form. It requires separate axis
+values and evidence locators, counterevidence, exact reproducer or
+`UNAVAILABLE`, oracle reversal, censoring, and decision relevance. Detailed
+evidence blocks are mandatory for decision-critical, disagreed, reproduced,
+or denominator-sensitive rows. This is not a permanent review template and
+does not reward additional rows; it prevents a long unsupported bullet list
+from masquerading as causal analysis.
 
 ## 2026-07-31 09:57 UTC Fugu terminal-cause correction
 

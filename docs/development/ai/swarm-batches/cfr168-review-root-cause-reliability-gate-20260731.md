@@ -168,6 +168,56 @@ Do not infer this value from severity words such as MUST, HIGH, or BLOCKER.
 | `UNSATISFIABLE_OR_CONTRADICTORY` | The criterion cannot be satisfied as written or conflicts with another bound requirement. |
 | `UNAVAILABLE` | The report does not make the routing basis decidable. |
 
+## Analysis Row Form
+
+This is an audit data form, not a proposed review or repair template. Its
+purpose is to prevent a classifier from satisfying the task with a long list
+of unsupported bullets.
+
+Publish one indexed row per independently testable reported effect. A combined
+report item may use stable sublocators such as `F2/effect-a` and
+`F2/effect-b` only when the effects have different subjects, evidence, or axis
+values. Splitting one effect into wording variants to increase volume is a
+protocol violation.
+
+Every row contains:
+
+| Field | Required content |
+|---|---|
+| `row_id` | stable audit ID; never reused after content freeze |
+| `cohort` | `calibration` or `temporal`; no holdout value is visible during calibration rule formation |
+| `lineage_generation` | surface and predecessor/successor generation |
+| `object_chain` | predecessor candidate/report, repair packet/result, successor candidate/report commits |
+| `finding_locator` | exact report heading/item plus an effect sublocator only when justified above |
+| `effect_statement` | one falsifiable wrong effect or one exact evidence/routing defect; no severity rhetoric |
+| `subject_locator` | exact path/symbol/object and revision |
+| `axis_a` through `axis_f` | one declared value for each orthogonal axis |
+| `axis_evidence_a` through `axis_evidence_f` | exact object, report, packet, command, or reproducer locator supporting each value |
+| `counterevidence_checked` | predecessor/candidate locations or executions that could falsify the selected values |
+| `reproducer` | exact safe command/outcome and candidate identity, or `UNAVAILABLE` with reason |
+| `oracle_reversal` | exact deliberate falsification and result, or `NOT_APPLICABLE`/`UNAVAILABLE` |
+| `censoring` | whether a later exact disposition exists and what remains unknown |
+| `decision_relevance` | which aggregate or intervention card can consume the row; `none` is valid |
+
+An axis value and its evidence must be separate fields. Repeating a report's
+conclusion is not origin proof, a severity word is not effect proof, and an
+unexecuted imagined reproducer is not a reproducer. If one exact locator does
+not decide an axis, record `UNAVAILABLE`; do not fill the cell with general
+project context.
+
+The classification report must first publish a compact raw-row table. It then
+adds a detailed evidence block for:
+
+- every row with a reproduced production effect;
+- every row with any `UNAVAILABLE` value that changes an aggregate;
+- every row that disagrees with the original audit;
+- every unsatisfiable/contradictory or policy-promoted blocker; and
+- every row where splitting or combining effects could change a denominator.
+
+The detailed blocks explain the object comparison or execution sufficiently
+for the adjudicator to repeat it. Requiring detail for decision-critical rows
+does not create credit for producing more rows.
+
 ## Blind Analysis Protocol
 
 1. Reconstruct the 51-row census without opening the existing cause labels.
@@ -267,4 +317,3 @@ leave their worktrees clean. They may run Python reproductions in isolated
 temporary copies. They must not run Cargo/Rust builds, mutate product files,
 edit the audit or frozen pilot, use network calls, or change any project
 policy.
-
