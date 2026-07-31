@@ -225,43 +225,69 @@ Manager-owned integration then records final validation and history updates once
 
 ## Successor Review Recurrence Gate
 
-Use the recurrence gate for review generation 2 or later. It addresses three
-different failure modes without treating them as one undifferentiated
-`REQUEST_CHANGES` loop:
+Use recurrence control v2 for the current successor-review candidate. The v1
+schema and validator remain historical compatibility evidence only: passing a
+v1 record to the normal checker always returns a structured `BLOCK`. Never
+rewrite an accepted packet or historical review document merely to make it v2.
+
+The gate addresses three different failure modes without treating them as one
+undifferentiated `REQUEST_CHANGES` loop:
 
 1. a prior obligation was never actually closed;
 2. the repair introduced a new effect or review surface;
 3. the earlier review, oracle, scope, or communication missed the effect.
 
-Before repair starts, the manager freezes each prior obligation's acceptance
-criterion, authorized repair boundary, production routes, anticipated
-regressions, and forbidden shortcuts in the content-addressed repair packet.
-The implementer may not replace those obligations with self-authored closure
-claims. Unplanned public APIs, state machines, classifiers, or persisted
-shapes require a manager scope decision before integration.
+Before repair starts, the manager commits a Markdown repair packet and
+`review-recurrence-repair-manifest.v1` together. The packet explains each prior
+obligation's acceptance criterion, authorized boundary, production routes,
+anticipated regressions, and forbidden shortcuts. The manifest freezes the
+exact obligation, parity/closure-claim, and required-validation sets. The gate
+proves equality to those sets, but their semantic completeness remains a
+manager and independent-preflight judgement. The implementer may not replace
+them with self-authored closure claims.
 
-The final record binds two packets separately. The repair packet must either
-be a Git ancestor of the candidate or have content-addressed dispatch-event
-evidence showing the branch-external packet was supplied before repair. The
-review packet is read from the exact control revision that parents the
-report-only commit. A post-candidate review prompt therefore cannot masquerade
-as the pre-repair communication contract.
+The v2 record binds repair packet, manifest, candidate, review packet, report,
+timed evidence, and terminal event as exact regular Git blobs at
+role-compatible commits. Git topology separates the pre-repair packet commit,
+candidate, review-control commit, report-only commit, and evidence commit. A
+post-candidate prompt cannot masquerade as the pre-repair contract, and this
+generation's review commits cannot self-author prior closure evidence.
 
-The independent reviewer inspects two sets separately: closure of every prior
-obligation, then every changed path and surface created or modified by the
-repair. Changed-path coverage must equal the Git diff exactly. Observation IDs,
-underlying effect episodes, and review generation are recorded separately so
-reworded duplicates do not look like more defects. A closed obligation needs
-predecessor reproduction, candidate verification, an independent assertion
-boundary, and a killed negative control (or exact evidence that such a
-control is inapplicable).
+The independent reviewer inspects every prior obligation, then every exact
+changed path and its candidate-created surfaces. There is no no-surface or
+out-of-scope escape: each changed path has at least one reviewed surface.
+`referred_to_manager` binds an earlier routing decision and remains blocking.
+Evidence is classified with the v2 evidence-state/next-action vocabulary;
+`CLOSED_PROVEN` with `NONE` is the only potentially nonblocking pair and still
+needs the separately derived closure proof. A new finding cannot be closed in
+the generation that first records it.
 
-There is deliberately no minimum or target finding count. Review stops only
-when the declared obligations, exact changed paths, surfaces, production routes, repair delta,
-negative controls, and unavailable evidence have all been dispositioned.
-Nonblocking adjacent work may be `routed_open`, but only with an owner,
-release condition, and manager authority. Blocking work is never routed into
-an approval.
+There is deliberately no minimum or target finding count. Required validations
+come only from the frozen manifest and must bind committed
+`codefire.timed_gate.v2` results. Run them from the clean candidate with both
+the live log and result outside the source worktree, then copy those bytes
+unchanged into the evidence commit. Acceptance requires the exact candidate
+revision/tree, clean state before and after, no index flags, complete log
+bytes/digest, exact argv, terminal exit, stopped reviewer, zero child
+processes, and committed terminal-event evidence. Mutate-and-restore behavior
+inside the command remains outside this proof.
+
+Authority is progressive. A legacy-bootstrap v2 generation derives
+predecessor completeness as `unavailable`, always blocks, and exists only to
+seed the next generation. A later record must resolve the complete retained v2
+record/result chain to the manager-fixed Cargo or KGI/KPI root. The current
+gate replays every retained generation oldest-first using current schema,
+artifact, manifest, timed-evidence, and decision semantics. Retained results
+are comparison evidence, never trusted predecessor state; replay does not
+claim that older gate implementations were semantically identical.
+
+Run the decision from a clean committed validator checkout. `--git-root` is
+the analysed candidate repository; `--validator-root` is the separate
+manager-controlled source of the gate modules and schemas. Any dirty validator
+state, uncommitted gate byte, index flag, redirected schema path, or validator
+identity mismatch blocks. A manager-fixed chain also requires an explicit
+matching `--live-arm cargo|kgi_kpi` and its committed validator-owned anchor.
+No anchor is currently committed, so neither live arm can yet emit `ALLOW`.
 
 After the reviewer has stopped, all child processes have ended, and the
 report-only commit exists, the manager writes the final JSON record and runs:
@@ -269,14 +295,25 @@ report-only commit exists, the manager writes the final JSON record and runs:
 ```bash
 python3 docs/development/tools/check_review_recurrence.py \
   --record <final-record.json> \
-  --git-root .
+  --git-root <analysed-candidate-repository> \
+  --validator-root <clean-validator-repository> \
+  --live-arm cargo \
+  --result <outside-analysed-source>/recurrence-result.json
 ```
 
-Only `integration_decision: ALLOW` authorizes integration. `request_changes`,
-`block`, incomplete terminalization, unreviewed repair surface, missing
-required gate, mismatched Git identity, and `--no-git-verify` all remain
-`BLOCK`. The interim pilot and measurement rules are in
-`review-recurrence/README.md`.
+Use `--live-arm kgi_kpi` for that arm. Only exit `0` with
+`integration_decision: ALLOW` authorizes integration. v1, bootstrap generation,
+`request_changes`, `block`, incomplete terminalization, unreviewed surfaces,
+scope referrals, missing or in-tree timed evidence, missing live anchor,
+mismatched Git identity, and `--no-git-verify` remain `BLOCK`.
+
+The machine proves topology, bytes, declared set equality, legal state/action
+pairs, and machine-visible closure predicates. Honest execution, semantic
+oracle quality, nonzero selection, complete surface/symbol enumeration,
+manifest completeness, authorship, and reviewer independence remain human
+judgements. Machine `ALLOW` is required evidence, not a substitute for the
+manager's semantic integration decision. Current status and promotion metrics
+are in `review-recurrence/README.md`.
 
 ## Prompt Construction
 
