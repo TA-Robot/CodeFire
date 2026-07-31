@@ -1789,3 +1789,46 @@ during constructor unwind, an idempotent reachable recovery path, and real
 signature-history routes. Candidate `02e04c7` remains excluded from
 integration, and the additive successor will require a fresh independent
 decision.
+
+## 2026-07-31 09:05 UTC KGI/KPI round-2 rejection and exact residual replay
+
+Canonical `5760c98` integrates the independent Claude Opus 5 report for exact
+development-flow candidate
+`0944bf3deba9e753132b3f71716b5c009a8fc30f`. The report-only commit has
+SHA-256
+`54a4244a8e563b48b2f086a51433ea858996c08b0104c0309f2c8445ce6706b2`
+and returns `REQUEST_CHANGES`.
+
+The reviewer independently reproduced 108/108 tests, the frozen 55 semantic
+mutations and 15 structural controls, all 17 declared production probes, all
+seven AI-development gates, and the positive two-batch, real-Git sealed, and
+complete-cohort cases. Candidate `0944bf3` preserves all 15 prior closed rows
+and closes F4, F-S10, and F-S12. Seventeen of the twenty previously partial
+rows remain partial; thirteen have executable falsifications.
+
+The decision-critical residuals are not a request for more checklist bullets:
+
+- the record can select its own improvement threshold, arm samples, costs,
+  throughput, completeness, and zero guardrails rather than deriving them
+  from typed lane/evidence facts;
+- a finite 401-digit numeric value raises instead of producing a stable
+  finding, while a JSON underflow literal can become an accepted exact zero;
+- edited records can be resealed against a later or unreachable commit;
+- `superseded_by` is not symmetrically checked and a batch may have zero
+  authoritative heads;
+- validation can be backdated without disclosure, artifact identity can be
+  split by citation padding, and the published diagnostic bound does not
+  cover structural findings; and
+- lifecycle completion can be declared on an active record using generic
+  events unrelated to the named stages.
+
+The earlier Fugu Ultra 1.1 attempt produced no report or verdict after
+provider/tool failures. Its absence is infrastructure evidence and did not
+authorize any product or process conclusion.
+
+Original implementer session `34cdf037-2326-480e-8353-621713838feb` is
+resumed on the report's exact owner table and acceptance items 9–14. It must
+preserve every independently closed row, reproduce each executable
+counterexample before editing, and return a clean additive candidate for
+another independent review. Candidate `0944bf3` cannot authorize a
+development-process change.
