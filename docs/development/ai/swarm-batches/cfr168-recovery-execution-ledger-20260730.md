@@ -1404,3 +1404,37 @@ below the 6 GiB floor. Provider window, swap, disk, PSI, PID, dependency, and
 write-conflict checks all passed. Resume is the first action after a heavy
 gate releases or Storage reaches measured steady state; the exact session,
 worktree, report, and packet are already bound.
+
+## 2026-07-31 02:17 UTC bottleneck follow-up and MR-list continuation
+
+The disposition index now contains 16 exact independent reports: 3 `ACCEPT`
+and 13 `REQUEST_CHANGES`, an exact-candidate acceptance yield of 18.75%.
+This is not a model score and several reports deliberately review successive
+zero-residual candidates, but it confirms that the critical-path constraint
+is correction yield rather than unoccupied provider capacity.
+
+Two execution-control defects became concrete:
+
+- the active Upload reviewer had run for about 3 hours 15 minutes and had
+  emitted repeated decisive/“report ready” signals for more than 20 minutes,
+  while its exact report path and worktree remained absent/clean. The findings
+  are useful, but downstream repair cannot be bound until an immutable report
+  commit exists. This is the live AIA-043/AIA-045 terminalization bottleneck;
+- Rust HTTP and File Doctor launched private release targets despite the
+  shared low-memory profile. At the snapshot, the shared target was about
+  1.6 GiB, `/tmp/reg-target` about 560 MiB, and the File Doctor target about
+  150 MiB, with three compile streams and one Rust compiler above 1.2 GiB RSS.
+  No healthy near-terminal gate was interrupted, but prompt-only profile
+  guidance is now proven insufficient and is tracked as AIA-044.
+
+Storage had completed its Cargo gates and reached a reasoning/reporting steady
+state, so its bootstrap-only 4 GiB outstanding reservation no longer described
+unreflected load. A fresh count-free admission for the measured 2 GiB Python
+MR-list continuation returned `ALLOW`: projected effective available memory
+`7,950,061,568` bytes, swap zero, memory/I/O full PSI zero, about 841 GiB disk
+free, no conflict owner, and Claude occupancy 2 of the current adaptive window
+3. The manager therefore resumed exact Claude Opus 5 session
+`3dd468cb-d9a9-42be-b266-befde4fba6fd` in its original clean worktree from
+packet `06e519e`; provider PID 1223570 confirmed the same session identity.
+This restores five concurrent external lanes without a fixed global count and
+without opening another implementation fork.
