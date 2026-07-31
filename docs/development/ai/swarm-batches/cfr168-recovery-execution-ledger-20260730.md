@@ -2112,3 +2112,21 @@ packet SHA-256 is
 `e313480bd9b429cd496b8e233eae5b1993845954640b93ff6621d23500477419`;
 the current KGI/KPI composition packet SHA-256 is
 `6360d41d89fb3cd74e4877b43ad9cfba556fc6afe24555eb3475f5c722473c1a`.
+
+## 2026-07-31 10:19 UTC post-reboot candidate revalidation preserved
+
+Manager evidence
+`cfr168-post-reboot-candidate-revalidation-20260731/evidence.md` binds exact
+HEAD/tree/clean-state observations and monotonic gate results for Cargo
+candidate `4e5c0e7`, Upload candidate `446cf4a`, and KGI/KPI candidate
+`753c8db`. Cargo passes 168 AI-tool tests and all seven AI-development
+components; KGI/KPI passes 129 AI-tool tests and all seven components; Upload
+passes 33 focused and 454 broad Python tests, compile, both documentation
+checks, and `git diff --check`.
+
+This is health evidence only. It supplies no independent verdict, closes no
+finding, and changes no integration state. All three exact Claude reviews
+remain pending. Separate provider admission captures show adequate memory,
+swap, disk, PSI, PID, provider-window, and conflict-domain state; their only
+blocker is provider backoff. The evidence SHA-256 is
+`0be5f2a17ac3ccb43c54612595b14be3664531dc8189410dedaccccef2defba7`.
