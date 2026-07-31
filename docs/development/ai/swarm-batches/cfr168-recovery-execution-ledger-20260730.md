@@ -1963,3 +1963,29 @@ preflight may write only
 `cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md`.
 MR-write remains blocked until that report commits literal `READY`; final
 Python composition still requires a separately accepted Upload identity.
+
+## 2026-07-31 09:43 UTC pilot calibration freeze and Claude quota stop
+
+The preregistered review-intervention pilot reached its contamination boundary:
+it recomputed calibration data and froze a 384-line calibration file before
+opening either lineage or temporal holdout. The frozen file has SHA-256
+`4d57c323b7c20015c9cd388c4175c973631a67839d8e3d0cc427e58a7cec87d9`
+at `2026-07-31T09:43:17Z`.
+
+The next Claude call returned provider status 429 and the exact user-facing
+message that the organization had reached its monthly spend limit. The
+structured event labels the rejected window `five_hour`; both facts are
+preserved without choosing between the provider labels.
+
+No holdout was opened, no `pilot.md` was written, no commit was produced, and
+no intervention decision exists. Canonical incident evidence is recorded at
+`cfr168-review-intervention-retroactive-pilot-claude-quota-20260731/incident.md`.
+Its resume contract binds the clean worktree, session, event-log SHA-256
+`af6baeac543f716784c4be65cc9c2bf6b991860c30f8b6f89394427ec586e204`,
+freeze event UUID, and freeze digest. Calibration numbers visible in the log
+must not be adopted before the preregistered holdouts are scored.
+
+Claude is now under provider backoff for new launches. Fugu remains under its
+separate model-refresh/process-creation backoff. There is no automatic Codex
+fallback. Already-running Claude reviews are allowed to reach their own
+terminal provider state so their existing work and logs remain attributable.
