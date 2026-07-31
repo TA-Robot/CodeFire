@@ -1832,3 +1832,42 @@ preserve every independently closed row, reproduce each executable
 counterexample before editing, and return a clean additive candidate for
 another independent review. Candidate `0944bf3` cannot authorize a
 development-process change.
+
+## 2026-07-31 09:08 UTC source-keyed Cargo gate rereview rejection
+
+Canonical `b589864` integrates the independent Claude Opus 5 report for exact
+control candidate `aaa39b61b37df273fe4d57e274ed8e1321e788ad`. Its sole report
+has SHA-256
+`212d391c8fdb23c9178e6f8ddbb68cfc7087a50950049f137d19d342a5e2e259`
+and returns `REQUEST_CHANGES`.
+
+The reviewer reconstructed checkpoint `bfbbc2b` independently. The checkpoint
+ran 148 tests with four failures and eight errors; candidate `aaa39b6` ran
+159/159. Five of the six claimed defect closures are real, and adversarial
+probes refuted the hypothesized source-snapshot, result-forgery, cleanup,
+key-separation, and lock-order escapes. The global Cargo lock remains the
+correct control.
+
+Three local MUST findings prevent using the gate:
+
+- the exec child keeps every `--pass-fds` descriptor except a hard-coded
+  fourteen, while the test asserts only the four descriptors the patch
+  enumerates; it therefore shares the implementation's blind spot instead of
+  checking the complete inherited set;
+- the recorded `unshare_flags` identity omits `--propagation private` even
+  though the real launch uses it; and
+- retention is conservatively re-measured and double-counts normal Cargo
+  hardlinks, but the documentation claims exact reclaimed bytes are charged
+  back through a flow that does not exist.
+
+Four bounded residuals require the same pass: explain that nested user
+namespaces can reacquire capabilities and that kernel mount locking is the
+actual protection; correct the checkpoint/candidate test counts; reject short
+malformed mountinfo lines; and narrow policy-module reuse wording to the file
+and origin checks actually performed.
+
+Original Claude Opus 5 session `f7692f47-4af1-4f84-a186-d57ddd4b083e`
+is resumed on those seven rows. It must keep the five verified closures, all
+ten fail-closed safety classes, and the global lock. No Rust candidate may
+consume this gate until the additive successor receives a fresh independent
+acceptance.
