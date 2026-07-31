@@ -2284,3 +2284,41 @@ reset window has passed and one bounded health probe succeeds. Use one fresh
 session; do not resume a superseded Fugu lane, start a competing classifier,
 or substitute a Codex worker. A scheduler manifest will be bound to the exact
 packet-definition commit separately so its launch base cannot float.
+
+## 2026-07-31 10:51 UTC adjudication and pilot admission separated
+
+Commit `1072934` binds the one-lane Fugu scheduler manifest to packet commit
+`f916c7f`. The manifest SHA-256 is
+`ba6928733a02b170fdeb06159bda1758767ad7fad77d82168884e968213ef20c`;
+`dev-swarm validate` and `dev-swarm plan` resolve exactly one Ultra reviewer,
+Fugu concurrency one, Claude/Codex zero, and a 12-hour runaway limit. It has
+not been started.
+
+The downstream Claude adjudication is now prepared but intentionally
+`blocked`. Its execution ticket SHA-256 is
+`4e77bc9c6fc4f8e6bda6f0beb9ed1fd994b13ecd2223423cbcda4c534abf4b6d`;
+human-readable task-view SHA-256 is
+`983112d4a68a34724d13cba6d6ef16d81ba45da09def10cd0618f0b654f609e5`;
+and typed-packet SHA-256 is
+`2e4ada3b750a9e71c8035fb3d9bd7f09b62f3421c61631d68bd30bb245a7f9ea`.
+No adjudication manifest may exist until the classifier report commit/tree,
+report/freeze digests, exact row/axis disagreement set, reproduced-effect set,
+and routed decision-critical unavailable set are committed into the packet.
+The adjudicator reopens only that finite queue; it receives no target finding
+count and cannot adopt policy.
+
+Manager gate
+`cfr168-review-intervention-pilot-resume-decision-gate-20260731.md`, SHA-256
+`635b3ab821b556c4163f43688524cd2524bf35b644ee7f3d1a9f78feba7f8565`,
+supersedes capacity-only admission for the preserved Claude pilot. Provider
+recovery alone no longer authorizes resume. Blind classification and
+adjudication must first show whether I1, I3, I4, or I5 maps to an
+adjudicated, decision-relevant failure mode. The manager then chooses
+`RESUME_UNCHANGED`, `RESUME_WITH_SEPARATE_SENSITIVITY_REPLAY`,
+`RETIRE_PRESERVED_PILOT`, or `UNAVAILABLE` without changing the calibration
+freeze or opening holdouts prematurely.
+
+Under a constrained Claude window, the three pending product/control-plane
+reviews retain downstream-release priority over this process pilot. This
+prevents sunk analysis cost or an available session from displacing work that
+releases Cargo, Upload, or KGI/KPI integration.

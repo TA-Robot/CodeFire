@@ -1,0 +1,65 @@
+# CFR-168 Review Root-Cause Reliability Disagreement Adjudication
+
+Status: blocked on committed Fugu blind-classification evidence
+
+Typed packet:
+[`json/cfr168-review-root-cause-reliability-adjudication-claude-20260731.json`](json/cfr168-review-root-cause-reliability-adjudication-claude-20260731.json)
+
+Execution ticket:
+[`../swarm-batches/cfr168-review-root-cause-reliability-adjudication-claude-20260731.md`](../swarm-batches/cfr168-review-root-cause-reliability-adjudication-claude-20260731.md)
+
+Reliability gate:
+[`../swarm-batches/cfr168-review-root-cause-reliability-gate-20260731.md`](../swarm-batches/cfr168-review-root-cause-reliability-gate-20260731.md)
+
+Provider/model: Claude / `claude-opus-5`  
+Role: independent reviewer/adjudicator  
+Preparation base: `107293420d35daf861f8d7b751472f86e794c03a`
+
+## Objective
+
+After the Fugu classifier commits, adjudicate its exact disagreement queue,
+all reproduced-production-effect rows, and any routed decision-critical
+unavailable values. Resolve each disputed axis independently from exact
+objects and repeatable evidence without rerunning the whole corpus for finding
+volume.
+
+## Scope
+
+The exact queue, classifier report identity, report digest, freeze digest, and
+row identities are currently unavailable. The manager must bind them into the
+execution ticket and typed packet before changing status to `ready`.
+
+The future only authorized write is:
+
+```text
+docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-adjudication-claude-20260731/adjudication.md
+```
+
+No `dev-swarm.v1` manifest is authorized while this packet is blocked.
+
+## Non-Goals
+
+- Re-review every agreed row or generate a target number of observations.
+- Modify the blind classification, provisional audit, or frozen pilot.
+- Accept, reject, or repair a product candidate.
+- Estimate absolute review recall or precision.
+- Adopt a template, checklist, field count, severity policy, routing policy,
+  or process change.
+- Review development-environment infrastructure.
+
+## Validation
+
+Before admission, bind and recompute the exact classifier commit/tree/report
+SHA-256, freeze SHA-256, queue identity digest, and all required rows. Run the
+complete AI-development gate after updating the packet. The eventual
+report-only worker must run `git diff --check`, `check_ai_contracts.py`, and
+`check_project_docs.py`, commit only the authorized report, and leave a clean
+worktree.
+
+## Handoff
+
+Return the report identity and digest, exact queue completeness proof,
+per-axis adjudications and unavailable values, reproduced-effect dispositions,
+aggregate sensitivity, supported or unsupported experiment cards, temporal
+implications, threats to validity, validation results, and explicit
+non-decisions for every process/template property.

@@ -1,0 +1,207 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "cfr168-review-root-cause-reliability-adjudication-claude-20260731",
+  "status": "blocked",
+  "objective": "Adjudicate only the committed blind classifier's exact row/axis disagreements with the provisional audit, all reproduced-production-effect rows, and all classifier-routed decision-critical unavailable values using exact Git objects and repeatable evidence, then publish aggregate sensitivity without adopting a review template, finding count, checklist, or process change.",
+  "base_revision": "107293420d35daf861f8d7b751472f86e794c03a",
+  "role": "reviewer",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 1,
+      "reversibility": 1,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "cross_subsystem_architecture",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 10,
+    "selected_tier": "ultra",
+    "rationale": "The lane is report-only, but its adjudicated labels determine which review, repair, oracle, routing, or evidence intervention may proceed. It must reconcile conflicting agents and cross-lineage evidence without converting agreement into proof."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-5-project-management-docs"
+    ],
+    "additional_files": [
+      "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-adjudication-claude-20260731.md",
+      "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-gate-20260731.md",
+      "docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-classification-fugu-20260731/classification.md",
+      "docs/development/ai/swarm-results/cfr168-review-recursion-root-cause-audit-claude-20260731/audit.md",
+      "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md",
+      "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md"
+    ],
+    "evidence_refs": [
+      "preparation-base:107293420d35daf861f8d7b751472f86e794c03a",
+      "blocking-input:classifier-report-commit-tree-bytes-sha256",
+      "blocking-input:blind-freeze-bytes-sha256-event-locator",
+      "blocking-input:calibration-row-identity-digest",
+      "blocking-input:all-row-axis-disagreements",
+      "blocking-input:all-reproduced-production-effect-rows",
+      "blocking-input:classifier-routed-decision-critical-unavailable-rows",
+      "provider:claude-opus-5",
+      "fresh-session-required",
+      "codex-fallback:forbidden"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-adjudication-claude-20260731.md",
+      "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-gate-20260731.md",
+      "docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-classification-fugu-20260731/classification.md",
+      "docs/development/ai/swarm-results/cfr168-review-recursion-root-cause-audit-claude-20260731/audit.md",
+      "docs/development/ai/swarm-results/**/review.md",
+      "docs/development/ai/swarm-results/**/result*.md",
+      "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md",
+      "docs/development/ai/swarm-batches/**",
+      "docs/development/ai/task-packets/**",
+      "docs/development/**",
+      "codefire",
+      "tests/**",
+      "crates/**",
+      ".git/**"
+    ],
+    "write_set": [
+      "docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-adjudication-claude-20260731/adjudication.md"
+    ],
+    "disallowed_paths": [
+      "codefire",
+      "tests/**",
+      "crates/**",
+      "Cargo.toml",
+      "Cargo.lock",
+      ".devcontainer/**",
+      "subprojects/**",
+      "install.sh",
+      "docs/development/ai/swarm-results/**/review.md",
+      "docs/development/ai/swarm-results/**/audit.md",
+      "docs/development/ai/swarm-results/**/result*.md",
+      "docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-classification-fugu-20260731/classification.md",
+      "docs/development/ai/swarm-batches/**",
+      "docs/development/ai/task-packets/**",
+      "docs/development/tools/**",
+      "docs/development/code-review-issues/**",
+      "docs/development/bug-issues/**",
+      "docs/development/history.md",
+      "docs/development/todo-checklist.md"
+    ],
+    "disallowed_actions": [
+      "Launch before exact classifier report, freeze, queue, and row identities are committed and digest-bound into this packet",
+      "Resume the provisional-audit author, intervention-pilot, product-review, or implementation session",
+      "Re-review agreed non-reproduced rows to generate additional observations",
+      "Infer origin from report framing, effect from severity, or oracle quality from a test name",
+      "Replace unavailable object, scope, effect, or oracle evidence with project-general narrative",
+      "Rewrite the Fugu classification, provisional audit, frozen pilot, or their aggregates in place",
+      "Run Cargo, Rust builds, Install, Dogfood, Docker, product mutation, issue mutation, or network calls other than the Claude provider request",
+      "Adopt a review template, checklist, finding quota, repair threshold, severity policy, routing policy, or process change",
+      "Use Codex, Fugu, another Claude session, or subagents as a fallback"
+    ]
+  },
+  "non_goals": [
+    "Review or accept a product/control-plane candidate",
+    "Repair any finding discovered during adjudication",
+    "Reclassify the complete agreed corpus",
+    "Estimate absolute review recall or precision",
+    "Choose one primary narrative cause",
+    "Complete or reinterpret the frozen intervention pilot",
+    "Choose a review-template length, detail level, checklist, or item count",
+    "Review development-environment infrastructure"
+  ],
+  "invariants": [
+    {
+      "id": "exact-finite-adjudication-queue",
+      "statement": "The input queue equals the committed classifier's complete set of row/axis disagreements, reproduced-production-effect rows, and routed decision-critical unavailable rows, with stable identities and no volume-driven additions.",
+      "falsification_test": "Omit one required row, add one agreed non-reproduced row without proving identity corruption, or change the queue after examining outcomes; adjudication is incomplete or contaminated."
+    },
+    {
+      "id": "immutable-source-reports",
+      "statement": "The blind classification, its freeze, and the provisional audit remain immutable inputs; adjudicated values are published separately with exact evidence.",
+      "falsification_test": "Edit either source report/freeze, silently replace a source value, or omit the original values from the comparison; postflight rejects the lane."
+    },
+    {
+      "id": "six-axis-independent-decision",
+      "statement": "Every disputed axis is decided separately from exact object, scope, obligation, effect, oracle, or routing evidence, and undecidable values remain UNAVAILABLE.",
+      "falsification_test": "Select one narrative primary cause, copy a report conclusion as evidence, or let one axis automatically determine another; adjudication fails."
+    },
+    {
+      "id": "repeatable-effect-and-oracle-evidence",
+      "statement": "Every reproduced-effect and oracle claim names exact candidate identity, production subject, safe command or static proof, outcome, and counterevidence.",
+      "falsification_test": "Use severity wording, a test name, an imagined reproducer, or an injection-only path as proof of a reproduced production effect; the row remains UNAVAILABLE."
+    },
+    {
+      "id": "report-only-non-adoption",
+      "statement": "The lane changes only its adjudication report and makes conditional causal statements without changing product, candidate dispositions, policy, templates, or lifecycle.",
+      "falsification_test": "Change another path or adopt a process field, checklist, item count, routing rule, or candidate verdict; postflight rejects the lane."
+    }
+  ],
+  "validation": [
+    {
+      "id": "admission-input-integrity",
+      "command": "Before launch, recompute and bind the classifier commit/tree/report bytes/SHA-256, freeze bytes/SHA-256/event locator, row identity digest, exact disagreement set, reproduced-effect set, and routed decision-critical unavailable set.",
+      "purpose": "Prevent adjudication against a moving, incomplete, or manager-selected queue.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "queue-completeness",
+      "command": "Mechanically compare the report's adjudication row set with the bound classifier queue and fail on any missing or unauthorized row.",
+      "purpose": "Keep the task finite and prevent both omission and finding-volume expansion.",
+      "required": true
+    },
+    {
+      "id": "row-evidence-audit",
+      "command": "Validate each queued row has source values, disputed axes, exact evidence, counterevidence, reproducer/oracle disposition, adjudicated values, unavailable reasons, and decision sensitivity.",
+      "purpose": "Prevent bare agreement or a long unsupported bullet list from satisfying adjudication.",
+      "required": true
+    },
+    {
+      "id": "aggregate-sensitivity",
+      "command": "Recompute every decision-relevant aggregate from adjudicated rows with numerator, denominator, and unavailable count, and compare against both source classifications.",
+      "purpose": "Show whether disagreements actually change a proposed intervention.",
+      "required": true
+    },
+    {
+      "id": "ai-contracts",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_ai_contracts.py",
+      "purpose": "Keep the report-only AI control plane structurally valid.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "project-docs",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_project_docs.py",
+      "purpose": "Validate report links and project documentation structure.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "output-scope",
+      "command": "git diff --check; git diff --name-only <launch-revision>..HEAD and git status --porcelain must show only the committed adjudication report and a clean worktree.",
+      "purpose": "Preserve report-only independence.",
+      "required": true,
+      "requires_capability": "git"
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "exact_task_gate_classifier_audit_identities",
+      "input_queue_completeness_and_identity_digest",
+      "per_row_per_axis_source_and_adjudicated_values",
+      "reproducer_oracle_and_counterevidence",
+      "resolved_and_unavailable_dispositions",
+      "corrected_aggregates_with_unavailable",
+      "sensitivity_against_both_source_classifications",
+      "supported_and_unsupported_experiment_cards",
+      "temporal_holdout_implications_without_retuning",
+      "threats_to_validity_and_same_model_family_limitation",
+      "explicit_template_count_checklist_policy_non_decisions",
+      "report_commit_tree_bytes_sha256_and_clean_state"
+    ],
+    "evidence_digest_required": true
+  }
+}
