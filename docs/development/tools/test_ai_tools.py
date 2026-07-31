@@ -63,6 +63,7 @@ from check_review_recurrence import (  # noqa: E402
     evaluate_v2,
     external_result_path,
     legacy_v1_block,
+    load_authority_schema,
     main as run_review_recurrence_gate,
     validate_recurrence_control,
     validator_owned_path,
@@ -83,14 +84,17 @@ from run_ai_role import (  # noqa: E402
     select_codex_cli_adapter,
 )
 import recurrence_v2_authority as v2_authority  # noqa: E402
+import recurrence_v2_evidence as v2_evidence  # noqa: E402
 import recurrence_v2_history as v2_history  # noqa: E402
 from recurrence_v2_evidence import (  # noqa: E402
     TimedFacts,
+    load_manifest,
+    predecessor_path_presence,
     resolve_artifacts,
     verify_canonical_port_packet,
     verify_retained_live_arm_anchor,
 )
-from recurrence_v2_git import PATCH_FLAGS, GitRepo  # noqa: E402
+from recurrence_v2_git import PATCH_FLAGS, GitError, GitRepo  # noqa: E402
 from recurrence_v2_fixture import (  # noqa: E402
     VARIANTS as RECURRENCE_V2_VARIANTS,
     FixtureRepo,
@@ -98,15 +102,20 @@ from recurrence_v2_fixture import (  # noqa: E402
     build_second,
     clean_gate,
     retain_generation,
+    timed_result,
 )
 from recurrence_v2_model import (  # noqa: E402
     LIVE_ARM_ANCHOR_PATH,
     LIVE_ARM_ANCHOR_SCHEMA,
+    AUTHORITY_SCHEMA_IDS,
+    NEXT_ACTIONS,
     PORT_PACKETS,
     PORT_REQUIRED_REPAIR_PATHS,
     ArtifactRef,
     Authority,
+    parse_manifest,
     parse_record,
+    strict_decode_json,
 )
 from run_timed_gate import (  # noqa: E402
     main as run_timed_gate_main,
@@ -894,6 +903,41 @@ class TimedGateTests(unittest.TestCase):
             )
         self.assertEqual(status, 2)
 
+    def test_v2_cli_rejects_invalid_timing_before_subprocess(self) -> None:
+        invalid_timeout = ("NaN", "Infinity", "-Infinity", "1e999", "-1e999", "0", "-1")
+        invalid_threshold = ("NaN", "Infinity", "-Infinity", "1e999", "-1e999", "-1")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for flag, values in (
+                ("--timeout", invalid_timeout),
+                ("--drift-threshold", invalid_threshold),
+            ):
+                for value in values:
+                    with self.subTest(flag=flag, value=value), mock.patch(
+                        "subprocess.Popen"
+                    ) as popen, mock.patch("sys.stderr"):
+                        argv = [
+                            "--emit",
+                            "v2",
+                            "--cwd",
+                            str(root),
+                            "--log",
+                            str(root / "gate.log"),
+                            "--result",
+                            str(root / "gate.result.json"),
+                            "--timeout",
+                            "5",
+                            "--drift-threshold",
+                            "2",
+                            "--",
+                            sys.executable,
+                            "-c",
+                            "pass",
+                        ]
+                        argv[argv.index(flag) + 1] = value
+                        self.assertEqual(run_timed_gate_main(argv), 2)
+                        popen.assert_not_called()
+
 
 class SwarmAdmissionTests(unittest.TestCase):
     def snapshot(self, **overrides: object) -> dict[str, object]:
@@ -1218,6 +1262,14 @@ class ReviewRecurrenceTests(unittest.TestCase):
         cls.v2_timed_schema = load_object(
             ROOT / "docs/development/ai/schemas/timed-gate-result.v2.schema.json"
         )
+        cls.v2_result_schema = load_object(
+            ROOT
+            / "docs/development/ai/schemas/review-recurrence-gate-result.v2.schema.json"
+        )
+        cls.v2_anchor_schema = load_object(
+            ROOT
+            / "docs/development/ai/schemas/review-recurrence-live-arm-anchor.v1.schema.json"
+        )
 
     def evaluate_built_v2(
         self,
@@ -1239,6 +1291,8 @@ class ReviewRecurrenceTests(unittest.TestCase):
             schema=self.v2_schema,
             manifest_schema=self.v2_manifest_schema,
             timed_schema=self.v2_timed_schema,
+            result_schema=self.v2_result_schema,
+            anchor_schema=self.v2_anchor_schema,
             deciding_gate=identity,
             verify_git=verify_git,
             live_arm=live_arm,
@@ -1268,6 +1322,29 @@ class ReviewRecurrenceTests(unittest.TestCase):
             artifact["commit"] = new_evidence
             artifact["sha256"] = repo.blob_digest(new_evidence, artifact["path"])
 
+    def amend_timed_result_raw_number(
+        self,
+        repo: FixtureRepo,
+        built: object,
+        token: str,
+    ) -> None:
+        path = built.paths["timed_result"]
+        payload = (repo.root / path).read_text(encoding="utf-8")
+        needle = '"duration_seconds": 1.0'
+        self.assertIn(needle, payload)
+        repo.write(path, payload.replace(needle, f'"duration_seconds": {token}', 1))
+        old_evidence = built.commits["evidence"]
+        repo.git("add", "--", path)
+        repo.git("commit", "--amend", "-qm", "mutated raw timed evidence")
+        new_evidence = repo.git("rev-parse", "HEAD")
+        built.commits["evidence"] = new_evidence
+        built.record["subject"]["evidence_commit"] = new_evidence
+        for artifact in built.record["artifacts"]:
+            if artifact["commit"] != old_evidence:
+                continue
+            artifact["commit"] = new_evidence
+            artifact["sha256"] = repo.blob_digest(new_evidence, artifact["path"])
+
     def live_anchor(self, built: object) -> dict[str, object]:
         artifacts = {
             artifact["ref_id"]: artifact for artifact in built.record["artifacts"]
@@ -1287,6 +1364,7 @@ class ReviewRecurrenceTests(unittest.TestCase):
             "arms": [
                 {
                     "arm": "cargo",
+                    "generation": built.record["generation"],
                     "repair_packet": pin("packet"),
                     "repair_manifest": pin("manifest"),
                     "predecessor_authority_commit": built.record["subject"][
@@ -1414,6 +1492,11 @@ class ReviewRecurrenceTests(unittest.TestCase):
                     "record_sha256": digest("record", generation),
                     "successor_obligation_ids": [],
                     "deciding_gate": gate,
+                    "live_arm_pin": {
+                        "state": "unavailable",
+                        "anchor": None,
+                        "arm": None,
+                    },
                 },
                 digest("result", generation),
             )
@@ -2392,9 +2475,9 @@ class ReviewRecurrenceTests(unittest.TestCase):
                     "finding_count": 1,
                     "findings": [
                         {
-                            "severity": "error",
+                            "level": "error",
                             "code": "forged-retained-finding",
-                            "location": "result",
+                            "path": "result",
                             "message": "this finding was not derived by replay",
                         }
                     ],
@@ -2696,8 +2779,10 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 codes = {finding["code"] for finding in result["findings"]}
                 if label == "lone-surrogate":
                     self.assertIn("unsafe-json-surrogate", codes)
+                else:
+                    self.assertIn("schema-pattern", codes)
                 self.assertIn("unsafe-authored-repository-path", codes)
-                self.assertIn("unsafe-artifact-path", codes)
+                self.assertNotIn("unsafe-artifact-path", codes)
 
     def test_v2_result_path_must_be_outside_both_repositories(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -2732,11 +2817,53 @@ class ReviewRecurrenceTests(unittest.TestCase):
             for name, mutate, expected_code in (
                 ("exact", lambda _anchor: None, None),
                 (
+                    "missing-generation",
+                    lambda item: item["arms"][0].pop("generation"),
+                    "schema-required",
+                ),
+                (
+                    "wrong-generation",
+                    lambda item: item["arms"][0].__setitem__("generation", 2),
+                    "live-arm-generation-mismatch",
+                ),
+                (
+                    "unknown-arm",
+                    lambda item: item["arms"][0].__setitem__("arm", "unknown"),
+                    "schema-enum",
+                ),
+                (
+                    "extra-top-level",
+                    lambda item: item.__setitem__("authority_override", True),
+                    "schema-additional-property",
+                ),
+                (
+                    "wrong-mode",
+                    lambda item: item["arms"][0]["repair_packet"].__setitem__(
+                        "mode", "100755"
+                    ),
+                    "schema-const",
+                ),
+                (
                     "mismatched-manifest",
                     lambda item: item["arms"][0]["repair_manifest"].__setitem__(
                         "sha256", "0" * 64
                     ),
                     "live-arm-pin-mismatch",
+                ),
+                (
+                    "duplicate-arm",
+                    lambda item: item["arms"].append(
+                        {
+                            **copy.deepcopy(item["arms"][0]),
+                            "repair_manifest": {
+                                **copy.deepcopy(
+                                    item["arms"][0]["repair_manifest"]
+                                ),
+                                "sha256": "0" * 64,
+                            },
+                        }
+                    ),
+                    "duplicate-live-arm-anchor-arm",
                 ),
             ):
                 with self.subTest(name=name):
@@ -2779,6 +2906,43 @@ class ReviewRecurrenceTests(unittest.TestCase):
                         self.assertIn(expected_code, codes)
                         self.assertEqual(result["integration_decision"], "BLOCK")
 
+            validator_root = root / "validator-uncommitted-anchor"
+            validator_root.mkdir()
+            validator = FixtureRepo(validator_root)
+            validator.write(
+                "docs/development/tools/check_review_recurrence.py",
+                "# clean committed validator gate\n",
+            )
+            validator.write(
+                LIVE_ARM_ANCHOR_PATH,
+                json.dumps(anchor, indent=2, sort_keys=True) + "\n",
+            )
+            validator_commit = validator.commit(
+                "pin live arm",
+                [
+                    "docs/development/tools/check_review_recurrence.py",
+                    LIVE_ARM_ANCHOR_PATH,
+                ],
+            )
+            gate = clean_gate(validator, validator_commit)
+            changed_anchor = copy.deepcopy(anchor)
+            changed_anchor["arms"][0]["repair_manifest"]["sha256"] = "0" * 64
+            validator.write(
+                LIVE_ARM_ANCHOR_PATH,
+                json.dumps(changed_anchor, indent=2, sort_keys=True) + "\n",
+            )
+            _, result = self.evaluate_built_v2(
+                analysed,
+                built,
+                gate=gate,
+                live_arm="cargo",
+                validator_root=validator_root,
+            )
+            self.assertIn(
+                "live-arm-anchor-uncommitted",
+                {finding["code"] for finding in result["findings"]},
+            )
+
     def test_v2_retained_live_anchor_rebinds_historical_validator_blob(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -2811,6 +2975,7 @@ class ReviewRecurrenceTests(unittest.TestCase):
             )
             historical_gate = clean_gate(validator, validator_commit)
             valid_pin = {
+                "state": "verified",
                 "anchor": {
                     "validator_commit": validator_commit,
                     "path": LIVE_ARM_ANCHOR_PATH,
@@ -2833,12 +2998,17 @@ class ReviewRecurrenceTests(unittest.TestCase):
                     artifacts,
                     retained_result,
                     historical_gate,
+                    self.v2_anchor_schema,
                 ),
                 [],
             )
 
             missing = copy.deepcopy(retained_result)
-            missing["live_arm_pin"] = "unavailable"
+            missing["live_arm_pin"] = {
+                "state": "unavailable",
+                "anchor": None,
+                "arm": None,
+            }
             missing_findings = verify_retained_live_arm_anchor(
                 validator_root,
                 "cargo",
@@ -2846,6 +3016,7 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 artifacts,
                 missing,
                 historical_gate,
+                self.v2_anchor_schema,
             )
             self.assertIn(
                 "retained-live-arm-pin-unavailable",
@@ -2861,6 +3032,7 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 artifacts,
                 forged,
                 historical_gate,
+                self.v2_anchor_schema,
             )
             self.assertIn(
                 "retained-live-arm-anchor-digest-mismatch",
@@ -2872,7 +3044,10 @@ class ReviewRecurrenceTests(unittest.TestCase):
             ("valid", None, None),
             (
                 "missing-pin",
-                lambda result: result.__setitem__("live_arm_pin", "unavailable"),
+                lambda result: result.__setitem__(
+                    "live_arm_pin",
+                    {"state": "unavailable", "anchor": None, "arm": None},
+                ),
                 "retained-live-arm-pin-unavailable",
             ),
             (
@@ -2973,6 +3148,7 @@ class ReviewRecurrenceTests(unittest.TestCase):
                         GitRepo(analysed_root),
                         record,
                         schema=self.v2_schema,
+                        result_schema=self.v2_result_schema,
                         deciding_gate=current_gate,
                         validator_repo=GitRepo(validator_root),
                         legacy_roots=second.roots,
@@ -2998,6 +3174,8 @@ class ReviewRecurrenceTests(unittest.TestCase):
                         schema=self.v2_schema,
                         manifest_schema=self.v2_manifest_schema,
                         timed_schema=self.v2_timed_schema,
+                        result_schema=self.v2_result_schema,
+                        anchor_schema=self.v2_anchor_schema,
                         legacy_roots=second.roots,
                         enforce_canonical_ports=True,
                         validator_root=validator_root,
@@ -3027,6 +3205,7 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 GitRepo(repo.root),
                 record,
                 schema=self.v2_schema,
+                result_schema=self.v2_result_schema,
                 deciding_gate=gate,
                 validator_repo=GitRepo(repo.root),
                 legacy_roots=second.roots,
@@ -3038,6 +3217,8 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 schema=self.v2_schema,
                 manifest_schema=self.v2_manifest_schema,
                 timed_schema=self.v2_timed_schema,
+                result_schema=self.v2_result_schema,
+                anchor_schema=self.v2_anchor_schema,
                 legacy_roots=second.roots,
             )
             root_commit = first.commits["legacy_root"]
@@ -3259,7 +3440,7 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 minimal["manifest"]["total"],
                 minimal["combined_total"],
             ),
-            (110, 18, 128),
+            (111, 19, 130),
         )
         self.assertEqual(
             (
@@ -3267,7 +3448,7 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 realistic["manifest"]["total"],
                 realistic["combined_total"],
             ),
-            (312, 43, 355),
+            (314, 46, 360),
         )
         self.assertIn("do not prove", realistic["semantic_boundary"])
 
@@ -3339,6 +3520,733 @@ class ReviewRecurrenceTests(unittest.TestCase):
             self.assertNotIn(
                 "canonical-port-required-repair-paths-missing",
                 {finding.code for finding in covered_findings},
+            )
+
+    def test_v2_strict_json_boundary_is_deterministic(self) -> None:
+        cases = (
+            (b'{"generation":1,"generation":2}', "duplicate-json-object-key"),
+            (
+                b'{"artifact":{"sha256":"a","sha256":"b"}}',
+                "duplicate-json-object-key",
+            ),
+            (
+                b'{"claim":{"kind":"parity","kind":"closure"}}',
+                "duplicate-json-object-key",
+            ),
+            (
+                b'{"worktree":{"clean_before":true,"clean_before":false}}',
+                "duplicate-json-object-key",
+            ),
+            (
+                b'{"candidate":{"candidate_tree":"a","candidate_tree":"b"}}',
+                "duplicate-json-object-key",
+            ),
+            (
+                b'{"pin":{"sha256":"a","sha256":"b"}}',
+                "duplicate-json-object-key",
+            ),
+            (b'{"value":NaN}', "non-finite-json-number"),
+            (b'{"value":Infinity}', "non-finite-json-number"),
+            (b'{"value":-Infinity}', "non-finite-json-number"),
+            (b'{"value":1e999}', "non-finite-json-number"),
+            (b'{"value":-1e999}', "non-finite-json-number"),
+            (b'{"value":"\\udcff"}', "unsafe-json-surrogate"),
+            (("1" * 5000).encode("ascii"), "json-number-out-of-range"),
+        )
+        for payload, expected in cases:
+            with self.subTest(expected=expected, payload=payload[:40]):
+                value, findings = strict_decode_json(payload, "boundary")
+                self.assertIsNone(value)
+                self.assertEqual({finding.code for finding in findings}, {expected})
+
+        depth_64 = ("[" * 64 + "0" + "]" * 64).encode("ascii")
+        value, findings = strict_decode_json(depth_64, "boundary")
+        self.assertEqual(findings, [])
+        self.assertIsInstance(value, list)
+
+        depth_65 = ("[" * 65 + "0" + "]" * 65).encode("ascii")
+        value, findings = strict_decode_json(depth_65, "boundary")
+        self.assertIsNone(value)
+        self.assertEqual(
+            {finding.code for finding in findings}, {"json-nesting-too-deep"}
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            record_path = root / "duplicate-record.json"
+            result_path = root / "diagnostic-result.json"
+            record_path.write_bytes(b'{"schema":"x","schema":"y"}')
+            with mock.patch("sys.stdout"):
+                status = run_review_recurrence_gate(
+                    ["--record", str(record_path), "--result", str(result_path)]
+                )
+            self.assertEqual(status, 3)
+            diagnostic = json.loads(result_path.read_text(encoding="utf-8"))
+            self.assertIn(
+                "duplicate-json-object-key",
+                {finding["code"] for finding in diagnostic["findings"]},
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            repo.write("retained.json", b'{"value":1,"value":2}')
+            commit = repo.commit("duplicate retained object", ["retained.json"])
+            retained_findings: list[object] = []
+            loaded = v2_authority._load_json_blob(
+                GitRepo(repo.root),
+                commit,
+                "retained.json",
+                "history.result",
+                retained_findings,
+            )
+            self.assertIsNone(loaded)
+            self.assertIn(
+                "duplicate-json-object-key",
+                {finding.code for finding in retained_findings},
+            )
+
+        for relative, schema_id in AUTHORITY_SCHEMA_IDS.items():
+            with self.subTest(schema=relative), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    '{"$id":' + json.dumps(schema_id) + ',"$id":"forged"}',
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValueError, "duplicate-json-object-key"
+                ):
+                    load_authority_schema(None, root, Path(relative))
+
+    def test_v2_path_fact_is_separate_from_locus_and_manifest_path_is_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            built = build_bootstrap(repo, "byte_identical_locus")
+            derivation = built.record["derivations"][0]
+            derivation["locus_existed_in_predecessor"] = False
+            _, result = self.evaluate_built_v2(repo, built)
+            self.assertEqual(result["finding_count"], 0)
+            coverage = result["metrics"]["i1"]["claim_coverage"]
+            self.assertEqual(len(coverage), 1)
+            self.assertTrue(coverage[0]["path_existed_in_predecessor"])
+            self.assertFalse(coverage[0]["locus_existed_in_predecessor"])
+            self.assertEqual(coverage[0]["locus_path"], "product.txt")
+
+            derivation["path_existed_in_predecessor"] = False
+            _, contradicted = self.evaluate_built_v2(repo, built)
+            self.assertIn(
+                "predecessor-path-existence-contradicted",
+                {finding["code"] for finding in contradicted["findings"]},
+            )
+
+            derivation["path_existed_in_predecessor"] = True
+            derivation["path"] = "README.md"
+            _, mismatched = self.evaluate_built_v2(repo, built)
+            self.assertIn(
+                "manifest-derivation-path-mismatch",
+                {finding["code"] for finding in mismatched["findings"]},
+            )
+
+    def test_v2_shared_path_probe_fails_identically_for_current_and_history(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            built = build_bootstrap(repo)
+            record, parse_findings = parse_record(built.record, "record")
+            self.assertEqual(parse_findings, [])
+            self.assertIsNotNone(record)
+
+            for spelling in (".", "a/./b", "a//b", "a/"):
+                invalid = replace(
+                    record,
+                    derivations=(replace(record.derivations[0], path=spelling),),
+                )
+                current, current_findings = predecessor_path_presence(
+                    GitRepo(repo.root), invalid, "record.derivations"
+                )
+                retained, retained_findings = predecessor_path_presence(
+                    GitRepo(repo.root), invalid, "history.record.derivations"
+                )
+                self.assertEqual(current, {})
+                self.assertEqual(retained, {})
+                self.assertEqual(
+                    {finding.code for finding in current_findings},
+                    {"unsafe-derivation-path"},
+                )
+                self.assertEqual(
+                    {finding.code for finding in retained_findings},
+                    {"unsafe-derivation-path"},
+                )
+
+            failing_repo = mock.Mock()
+            failing_repo.entry.side_effect = GitError("forced tree-entry failure")
+            current, current_findings = predecessor_path_presence(
+                failing_repo, record, "record.derivations"
+            )
+            retained, retained_findings = predecessor_path_presence(
+                failing_repo, record, "history.record.derivations"
+            )
+            self.assertEqual(current, {})
+            self.assertEqual(retained, {})
+            self.assertEqual(
+                {finding.code for finding in current_findings},
+                {"predecessor-path-probe-failed"},
+            )
+            self.assertEqual(
+                {finding.code for finding in retained_findings},
+                {"predecessor-path-probe-failed"},
+            )
+
+    def test_v2_derivation_route_table_and_exact_i1_counts(self) -> None:
+        cases = (
+            ("derivation_complete", "REPAIR_CLAIM"),
+            ("derivation_contradicted", "NONE"),
+            ("derivation_unavailable", "NONE"),
+        )
+        for disposition, action in cases:
+            with self.subTest(disposition=disposition, action=action), tempfile.TemporaryDirectory() as temporary:
+                repo = FixtureRepo(Path(temporary))
+                built = build_bootstrap(repo)
+                row = built.record["derivations"][0]
+                row["disposition"] = disposition
+                row["next_action"] = action
+                if disposition == "derivation_unavailable":
+                    row["evidence"] = {"state": "unavailable", "ref_ids": []}
+                _, result = self.evaluate_built_v2(repo, built)
+                self.assertIn(
+                    "derivation-action-route-mismatch",
+                    {finding["code"] for finding in result["findings"]},
+                )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            built = build_bootstrap(repo)
+            _, result = self.evaluate_built_v2(repo, built)
+            counts = result["metrics"]["i1"]["derivation_next_action_counts"]
+            self.assertEqual(list(counts), list(NEXT_ACTIONS))
+            self.assertEqual(counts["NONE"], 1)
+            self.assertEqual(sum(counts.values()), 1)
+            self.assertEqual(result["metrics"]["i1"]["blocking_derivations"], 0)
+
+    def test_v2_semantic_ids_are_unique_before_indexing(self) -> None:
+        for section, mutate, expected in (
+            (
+                "derivations",
+                lambda row: row.update(locus="different:locus"),
+                "duplicate-record-derivation-claim-id",
+            ),
+            (
+                "validations",
+                lambda row: row.update(status="failed", exit_code=1),
+                "duplicate-record-validation-id",
+            ),
+        ):
+            with self.subTest(section=section), tempfile.TemporaryDirectory() as temporary:
+                repo = FixtureRepo(Path(temporary))
+                built = build_bootstrap(repo)
+                duplicate = copy.deepcopy(built.record[section][0])
+                mutate(duplicate)
+                built.record[section].append(duplicate)
+                _, result = self.evaluate_built_v2(repo, built)
+                self.assertEqual(result["integration_decision"], "BLOCK")
+                self.assertIn(
+                    expected, {finding["code"] for finding in result["findings"]}
+                )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            built = build_bootstrap(repo)
+            manifest = json.loads(
+                subprocess.run(
+                    [
+                        "git",
+                        "show",
+                        f"{built.commits['packet']}:{built.paths['manifest']}",
+                    ],
+                    cwd=repo.root,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout
+            )
+            cases = (
+                (
+                    "prior_obligations",
+                    lambda row: row.update(closure_validation_ids=[]),
+                    "duplicate-manifest-obligation-id",
+                ),
+                (
+                    "parity_closure_claims",
+                    lambda row: row.update(locus_path="README.md"),
+                    "duplicate-manifest-claim-id",
+                ),
+                (
+                    "required_validations",
+                    lambda row: row.update(argv=["different"]),
+                    "duplicate-manifest-validation-id",
+                ),
+            )
+            for section, mutate, expected in cases:
+                with self.subTest(manifest_section=section):
+                    candidate = copy.deepcopy(manifest)
+                    duplicate = copy.deepcopy(candidate[section][0])
+                    mutate(duplicate)
+                    candidate[section].append(duplicate)
+                    parsed, findings = parse_manifest(candidate, "manifest")
+                    self.assertIsNone(parsed)
+                    self.assertIn(expected, {finding.code for finding in findings})
+
+    def test_v2_timed_relations_fail_closed_without_partial_facts(self) -> None:
+        mutations = (
+            (
+                "clean-summary",
+                lambda payload: payload["worktree"].__setitem__("clean_before", False),
+                "timed-clean-before-inconsistent",
+            ),
+            (
+                "head-probe-shape",
+                lambda payload: payload["worktree"].__setitem__(
+                    "head_probe_error", "probe failed"
+                ),
+                "timed-head-probe-shape-inconsistent",
+            ),
+            (
+                "half-head-identity",
+                lambda payload: payload["worktree"].__setitem__(
+                    "head_tree_after", None
+                ),
+                "timed-head-probe-shape-inconsistent",
+            ),
+            (
+                "result-collision",
+                lambda payload: payload["result"].__setitem__(
+                    "path", payload["log"]["path"]
+                ),
+                "timed-log-result-path-collision",
+            ),
+            (
+                "noncanonical-cwd",
+                lambda payload: payload.__setitem__(
+                    "cwd", "/synthetic/checkout/../escape"
+                ),
+                "timed-path-not-canonical",
+            ),
+            (
+                "component-prefix-escape",
+                lambda payload: payload.__setitem__(
+                    "cwd", "/synthetic/checkout-sibling"
+                ),
+                "timed-cwd-outside-source-root",
+            ),
+            (
+                "log-inside-with-false-summary",
+                lambda payload: payload["log"].__setitem__(
+                    "path", "/synthetic/checkout/focused.log"
+                ),
+                "timed-log-placement-inconsistent",
+            ),
+            (
+                "detached-wall",
+                lambda payload: payload.__setitem__("wall_elapsed_seconds", 0.5),
+                "timed-wall-elapsed-inconsistent",
+            ),
+            (
+                "negative-duration",
+                lambda payload: payload.__setitem__("duration_seconds", -1.0),
+                "schema-minimum",
+            ),
+            (
+                "nonpositive-timeout",
+                lambda payload: payload.__setitem__("timeout_seconds", 0.0),
+                "timed-timing-value-invalid",
+            ),
+            (
+                "wall-minus",
+                lambda payload: payload.__setitem__(
+                    "wall_minus_monotonic_seconds", 0.25
+                ),
+                "timed-wall-minus-monotonic-inconsistent",
+            ),
+            (
+                "discontinuity",
+                lambda payload: payload.__setitem__(
+                    "wall_clock_discontinuity", True
+                ),
+                "timed-wall-clock-discontinuity-inconsistent",
+            ),
+            (
+                "terminal",
+                lambda payload: payload.__setitem__("status", "failed"),
+                "timed-terminal-status-inconsistent",
+            ),
+            (
+                "timeout-exit",
+                lambda payload: payload.__setitem__("timed_out", True),
+                "timed-timeout-exit-code-inconsistent",
+            ),
+        )
+        for name, mutate, expected in mutations:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                repo = FixtureRepo(Path(temporary))
+                built = build_bootstrap(repo)
+                self.amend_timed_result(repo, built, mutate)
+                _, result = self.evaluate_built_v2(repo, built)
+                self.assertEqual(result["integration_decision"], "BLOCK")
+                self.assertIn(
+                    expected, {finding["code"] for finding in result["findings"]}
+                )
+                self.assertNotIn("focused", result.get("timed_validations", {}))
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            first = build_bootstrap(repo)
+            self.amend_timed_result(
+                repo,
+                first,
+                lambda payload: payload.__setitem__(
+                    "wall_minus_monotonic_seconds", 0.25
+                ),
+            )
+            gate = clean_gate(repo, first.commits["predecessor"])
+            first_payload, first_result = self.evaluate_built_v2(
+                repo, first, gate=gate
+            )
+            second = build_second(repo, first, first_payload, first_result)
+            _, second_result = self.evaluate_built_v2(repo, second, gate=gate)
+            self.assertEqual(second_result["integration_decision"], "BLOCK")
+            self.assertIn(
+                "timed-wall-minus-monotonic-inconsistent",
+                {finding["code"] for finding in second_result["findings"]},
+            )
+
+    def test_v2_nonfinite_timed_numbers_fail_current_and_retained_decode(self) -> None:
+        for token in ("NaN", "Infinity", "-Infinity", "1e999", "-1e999"):
+            with self.subTest(token=token), tempfile.TemporaryDirectory() as temporary:
+                repo = FixtureRepo(Path(temporary))
+                built = build_bootstrap(repo)
+                self.amend_timed_result_raw_number(repo, built, token)
+                _, result = self.evaluate_built_v2(repo, built)
+                self.assertEqual(result["integration_decision"], "BLOCK")
+                self.assertIn(
+                    "non-finite-json-number",
+                    {finding["code"] for finding in result["findings"]},
+                )
+                self.assertEqual(result.get("timed_validations"), {})
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            first = build_bootstrap(repo)
+            self.amend_timed_result_raw_number(repo, first, "1e999")
+            gate = clean_gate(repo, first.commits["predecessor"])
+            first_payload, first_result = self.evaluate_built_v2(
+                repo, first, gate=gate
+            )
+            second = build_second(repo, first, first_payload, first_result)
+            _, second_result = self.evaluate_built_v2(repo, second, gate=gate)
+            self.assertEqual(second_result["integration_decision"], "BLOCK")
+            self.assertIn(
+                "non-finite-json-number",
+                {finding["code"] for finding in second_result["findings"]},
+            )
+
+    def test_v2_timed_schema_failure_stops_typed_current_and_retained_use(self) -> None:
+        for section in ("source", "worktree", "log", "result"):
+            for invalid in (None, 7):
+                with self.subTest(section=section, invalid=invalid), tempfile.TemporaryDirectory() as temporary:
+                    repo = FixtureRepo(Path(temporary))
+                    built = build_bootstrap(repo)
+                    self.amend_timed_result(
+                        repo,
+                        built,
+                        lambda payload, section=section, invalid=invalid: payload.__setitem__(
+                            section, invalid
+                        ),
+                    )
+                    _, result = self.evaluate_built_v2(repo, built)
+                    self.assertEqual(result["integration_decision"], "BLOCK")
+                    self.assertIn(
+                        "schema-type",
+                        {finding["code"] for finding in result["findings"]},
+                    )
+                    self.assertEqual(result.get("timed_validations"), {})
+
+        for invalid in (None, 7):
+            with self.subTest(argv=invalid), tempfile.TemporaryDirectory() as temporary:
+                repo = FixtureRepo(Path(temporary))
+                first = build_bootstrap(repo)
+                self.amend_timed_result(
+                    repo,
+                    first,
+                    lambda payload, invalid=invalid: payload.__setitem__(
+                        "argv", invalid
+                    ),
+                )
+                gate = clean_gate(repo, first.commits["predecessor"])
+                first_payload, first_result = self.evaluate_built_v2(
+                    repo, first, gate=gate
+                )
+                self.assertEqual(first_result.get("timed_validations"), {})
+                second = build_second(repo, first, first_payload, first_result)
+                _, second_result = self.evaluate_built_v2(repo, second, gate=gate)
+                self.assertEqual(second_result["integration_decision"], "BLOCK")
+                self.assertIn(
+                    "schema-type",
+                    {finding["code"] for finding in second_result["findings"]},
+                )
+
+    def test_v2_timed_tolerance_boundaries_and_signed_wall_jumps(self) -> None:
+        base = timed_result(
+            argv=["true"],
+            revision="a" * 40,
+            tree="b" * 40,
+            log_bytes=b"ok\n",
+        )
+        for micros, should_pass in ((1, True), (2, True), (3, False)):
+            with self.subTest(timestamp_microseconds=micros):
+                payload = copy.deepcopy(base)
+                payload["ended_at"] = (
+                    f"2026-07-31T00:00:01.{micros:06d}Z"
+                )
+                _, findings = v2_evidence._timed_semantics(payload, "timed")
+                codes = {finding.code for finding in findings}
+                self.assertEqual(
+                    "timed-wall-elapsed-inconsistent" not in codes,
+                    should_pass,
+                )
+
+        for delta, should_pass in (
+            (0.0000000000009, True),
+            (0.0000000000010, True),
+            (0.0000000000011, False),
+        ):
+            with self.subTest(wall_minus_delta=delta):
+                payload = copy.deepcopy(base)
+                payload["wall_minus_monotonic_seconds"] = delta
+                _, findings = v2_evidence._timed_semantics(payload, "timed")
+                codes = {finding.code for finding in findings}
+                self.assertEqual(
+                    "timed-wall-minus-monotonic-inconsistent" not in codes,
+                    should_pass,
+                )
+
+        for started, ended, wall_elapsed, wall_minus in (
+            (
+                "2026-07-31T00:00:00.000000Z",
+                "2026-07-31T00:00:03.000000Z",
+                3.0,
+                2.0,
+            ),
+            (
+                "2026-07-31T00:00:01.000000Z",
+                "2026-07-31T00:00:00.000000Z",
+                -1.0,
+                -2.0,
+            ),
+        ):
+            payload = copy.deepcopy(base)
+            payload.update(
+                started_at=started,
+                ended_at=ended,
+                wall_elapsed_seconds=wall_elapsed,
+                wall_minus_monotonic_seconds=wall_minus,
+                drift_threshold_seconds=1.0,
+                wall_clock_discontinuity=True,
+            )
+            _, findings = v2_evidence._timed_semantics(payload, "timed")
+            self.assertEqual(findings, [])
+
+    def test_v2_retained_result_is_closed_and_replays_all_stable_authority(self) -> None:
+        cases = (
+            (
+                "input-schema",
+                lambda result: result.__setitem__("input_schema", "forged.schema"),
+                "schema-const",
+            ),
+            (
+                "git-verified",
+                lambda result: result.__setitem__("git_verified", False),
+                "retained-result-replay-mismatch",
+            ),
+            (
+                "timed-fact",
+                lambda result: result["timed_validations"]["focused"].__setitem__(
+                    "status", "failed"
+                ),
+                "retained-result-replay-mismatch",
+            ),
+            (
+                "authority-root",
+                lambda result: result["authority_chain"].__setitem__(
+                    "root_arm", "kgi_kpi"
+                ),
+                "retained-result-authority-chain-mismatch",
+            ),
+            (
+                "limits",
+                lambda result: result["limits"].__setitem__(0, "forged limit"),
+                "retained-result-replay-mismatch",
+            ),
+            (
+                "unknown-top-level",
+                lambda result: result.__setitem__("authority_override", True),
+                "schema-additional-property",
+            ),
+            (
+                "unknown-deciding-gate",
+                lambda result: result["deciding_gate"].__setitem__(
+                    "authority_override", True
+                ),
+                "schema-additional-property",
+            ),
+        )
+        for name, mutate, expected in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                repo = FixtureRepo(Path(temporary))
+                first = build_bootstrap(repo)
+                gate = clean_gate(repo, first.commits["predecessor"])
+                first_payload, first_result = self.evaluate_built_v2(
+                    repo, first, gate=gate
+                )
+                retained = copy.deepcopy(first_result)
+                mutate(retained)
+                retention, result_payload = retain_generation(
+                    repo, first, first_payload, retained
+                )
+                second = build_second(
+                    repo,
+                    first,
+                    first_payload,
+                    retained,
+                    retention=retention,
+                    result_payload=result_payload,
+                )
+                _, result = self.evaluate_built_v2(repo, second, gate=gate)
+                self.assertEqual(result["integration_decision"], "BLOCK")
+                self.assertIn(
+                    expected, {finding["code"] for finding in result["findings"]}
+                )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            first = build_bootstrap(repo)
+            gate = clean_gate(repo, first.commits["predecessor"])
+            first_payload, first_result = self.evaluate_built_v2(
+                repo, first, gate=gate
+            )
+            relocated = copy.deepcopy(first_result)
+            relocated["deciding_gate"]["source_root"] = "/relocated/validator"
+            retention, result_payload = retain_generation(
+                repo, first, first_payload, relocated
+            )
+            second = build_second(
+                repo,
+                first,
+                first_payload,
+                relocated,
+                retention=retention,
+                result_payload=result_payload,
+            )
+            _, result = self.evaluate_built_v2(repo, second, gate=gate)
+            self.assertEqual(result["integration_decision"], "ALLOW")
+
+    def test_v2_manifest_origins_bind_bootstrap_and_predecessor_authority(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            first = build_bootstrap(repo)
+            record, parse_findings = parse_record(first.record, "record")
+            self.assertEqual(parse_findings, [])
+            self.assertIsNotNone(record)
+            manifest = json.loads(
+                subprocess.run(
+                    [
+                        "git",
+                        "show",
+                        f"{first.commits['packet']}:{first.paths['manifest']}",
+                    ],
+                    cwd=repo.root,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout
+            )
+            manifest["prior_obligations"][0]["origin_generation"] = 1
+            blob_repo = mock.Mock()
+            blob_repo.blob.return_value = (
+                json.dumps(manifest, sort_keys=True).encode("utf-8")
+            )
+            loaded, findings = load_manifest(
+                blob_repo,
+                record,
+                record.artifact_index(),
+                v2_authority.ChainResult(
+                    rooted=True,
+                    root_arm="cargo",
+                    root_commit=first.commits["legacy_root"],
+                    depth=1,
+                ),
+                self.v2_manifest_schema,
+            )
+            self.assertIsNotNone(loaded)
+            self.assertIn(
+                "manifest-record-origin-generation-mismatch",
+                {finding.code for finding in findings},
+            )
+            self.assertIn(
+                "bootstrap-manifest-origin-map-mismatch",
+                {finding.code for finding in findings},
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            first = build_bootstrap(repo)
+            gate = clean_gate(repo, first.commits["predecessor"])
+            first_payload, first_result = self.evaluate_built_v2(
+                repo, first, gate=gate
+            )
+            second = build_second(repo, first, first_payload, first_result)
+            second.record["prior_obligations"][0]["origin_generation"] = 1
+            record, parse_findings = parse_record(second.record, "record")
+            self.assertEqual(parse_findings, [])
+            self.assertIsNotNone(record)
+            chain, chain_findings = v2_authority.resolve_predecessor_authority_chain(
+                GitRepo(repo.root),
+                record,
+                schema=self.v2_schema,
+                result_schema=self.v2_result_schema,
+                deciding_gate=gate,
+                validator_repo=GitRepo(repo.root),
+                legacy_roots=second.roots,
+            )
+            self.assertEqual(chain_findings, [])
+            manifest = json.loads(
+                subprocess.run(
+                    [
+                        "git",
+                        "show",
+                        f"{second.commits['packet']}:{second.paths['manifest']}",
+                    ],
+                    cwd=repo.root,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout
+            )
+            manifest["prior_obligations"][1]["origin_generation"] = 1
+            blob_repo = mock.Mock()
+            blob_repo.blob.return_value = (
+                json.dumps(manifest, sort_keys=True).encode("utf-8")
+            )
+            loaded, findings = load_manifest(
+                blob_repo,
+                record,
+                record.artifact_index(),
+                chain,
+                self.v2_manifest_schema,
+            )
+            self.assertIsNotNone(loaded)
+            self.assertIn(
+                "manifest-predecessor-origin-generation-mismatch",
+                {finding.code for finding in findings},
             )
 
 

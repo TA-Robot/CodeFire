@@ -229,6 +229,7 @@ def timed_result(
             "sha256": sha256_text(log_bytes),
             "complete": True,
         },
+        "result": {"path": "/synthetic/results/focused.result.json"},
         "limits": [
             "A command that mutates and restores bytes during its own execution stays "
             "outside this provenance proof."
@@ -271,6 +272,8 @@ def build_bootstrap(repo: FixtureRepo, variant: str = "standard") -> Built:
             commit=legacy_commit,
             report_path=LEGACY_REPORT_PATH,
             report_sha256=legacy_digest,
+            review_generation=1,
+            obligation_origins=(("OBL-1", 0),),
         )
     }
 
@@ -300,7 +303,11 @@ def build_bootstrap(repo: FixtureRepo, variant: str = "standard") -> Built:
             "repair_packet_sha256": repo.digest(PACKET_PATH),
             "finding_target_policy": "none",
             "prior_obligations": [
-                {"obligation_id": "OBL-1", "closure_validation_ids": ["focused"]}
+                {
+                    "obligation_id": "OBL-1",
+                    "origin_generation": 0,
+                    "closure_validation_ids": ["focused"],
+                }
             ],
             "parity_closure_claims": [
                 {
@@ -545,6 +552,9 @@ def build_bootstrap(repo: FixtureRepo, variant: str = "standard") -> Built:
                 "claim_id": "CLAIM-1",
                 "path": "product.txt",
                 "locus": "product.txt:final_fence",
+                "path_existed_in_predecessor": (
+                    variant == "byte_identical_locus"
+                ),
                 "locus_existed_in_predecessor": variant == "byte_identical_locus",
                 "predecessor_behaviour": "the locus is absent from the predecessor tree",
                 "candidate_behaviour": "the candidate introduces the repaired fence",
@@ -673,9 +683,14 @@ def build_second(
         "repair_packet_sha256": repo.digest(SECOND_PACKET_PATH),
         "finding_target_policy": "none",
         "prior_obligations": [
-            {"obligation_id": "NF-1", "closure_validation_ids": ["focused"]},
+            {
+                "obligation_id": "NF-1",
+                "origin_generation": 1,
+                "closure_validation_ids": ["focused"],
+            },
             {
                 "obligation_id": "OBL-1",
+                "origin_generation": 0,
                 "closure_validation_ids": (
                     [] if injection_empty_mapping else ["focused"]
                 ),
@@ -868,6 +883,7 @@ def build_second(
                 "claim_id": "CLAIM-2",
                 "path": "product.txt",
                 "locus": "product.txt:final_fence",
+                "path_existed_in_predecessor": True,
                 "locus_existed_in_predecessor": True,
                 "predecessor_behaviour": (
                     "the predecessor releases the fence before the terminal check"
