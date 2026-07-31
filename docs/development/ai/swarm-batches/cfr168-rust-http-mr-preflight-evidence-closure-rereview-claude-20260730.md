@@ -206,6 +206,10 @@ R-1--R-5 as `CLOSED`/`OPEN`, R-6/R-7 as `ROUTED_OPEN` plus route-contract
 `PASS`/`FAIL`, production reachability, all mutation results, commands,
 unavailable evidence, and integration overlap.
 
+Use the compact exact-independent-review section in
+`docs/development/ai/validation-report-template.md`; add detail only when an
+evidence row cannot preserve the required meaning.
+
 Overall `ACCEPT` requires all nine local rows closed, both routing contracts
 truthful, every mutation killed, exact identity/scope/validation agreement,
 and no material unowned finding. It accepts only this local candidate and

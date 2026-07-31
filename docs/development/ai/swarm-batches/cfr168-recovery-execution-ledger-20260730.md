@@ -1267,3 +1267,10 @@ blob bytes and SHA-256. Wrong role, missing report, extra path, dirty state,
 moving HEAD, merge, or wrong base remains `BLOCK`. Verdict interpretation is
 deliberately not automated, so scheduler success can never become `ACCEPT`
 without reading the exact immutable report.
+
+The validation report template now has a compact exact-review form. It binds
+identity, required finding disposition, owner/effect/fence, mutation,
+content-addressed validation, integration overlap, unavailable evidence, and
+one terminal `OVERALL_VERDICT` line. Prepared File Doctor and Rust HTTP
+reviews require this form. This targets report synthesis and manager parsing
+time rather than reducing any counterexample, mutation, or gate requirement.

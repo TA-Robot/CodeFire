@@ -155,6 +155,10 @@ dispositions, inherited residual matrix, production reachability, mutation
 evidence, commands/results, debug/release parity, unavailable evidence,
 integration overlap, and one literal verdict.
 
+Use the compact exact-independent-review section in
+`docs/development/ai/validation-report-template.md`; add detail only when an
+evidence row cannot preserve the required meaning.
+
 `ACCEPT` requires exact identity/scope, production-reachable non-vacuous proof
 for N1--N3, all eight inherited residuals still closed, required independent
 gates green, truthful docs, and zero new same-root Must/Should/Note. Otherwise
