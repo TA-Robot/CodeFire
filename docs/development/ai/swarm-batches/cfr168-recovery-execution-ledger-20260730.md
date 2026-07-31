@@ -2523,3 +2523,42 @@ All AI contract, project-document, acceleration-document, runtime/tool, and
 complete AI-development gates pass. The Fugu blind-calibration manifest still
 resolves one Ultra reviewer at exact pre-audit base `c258cbf…`; no provider
 was launched.
+
+## 2026-07-31 11:43 UTC causal evidence form normalized before freeze
+
+Commit `0b5cb15b12e06a046a374ada0f8ff63ad71ed43d` prevents the detailed
+causal audit from degenerating into repeated long prose. It separates:
+
+- one normalized row per predecessor/review/repair/successor generation,
+  including declared scope, five independent prior-method flags, exact repair
+  delta, validation provenance, and censoring; and
+- one row per independently testable effect, including exact report locator,
+  subject, invariant family, seven causal axes, counterevidence, reproducer,
+  oracle reversal, and decision relevance.
+
+The normalized form permits descriptive tests of whether observed prior-scope
+misses cluster by review method and whether the exact same invariant recurs
+across surfaces. Method flags and repair size remain covariates, not causes;
+narratively similar findings do not count as one invariant without exact
+falsifiable wording/evidence.
+
+The current reliability-gate SHA-256 is
+`f7358fe91f9bc922574ca5a60b0f8bf12ccd5f84821a12048367504506d324ed`.
+Classifier execution-ticket/typed-packet SHA-256 values are
+`f1a3942c860bf5b483260edf0607fa33ea1aaf7227a8956262a6e3905193ad10`
+and
+`e58de541a66ba155d7dfffd03b26159553623da6eb096e44789c537446f8bb84`.
+Comparator execution-ticket/typed-packet SHA-256 values are
+`be0614069167f924b6add3ec39921ba8352636ab632ad0bd6a6aea31425116c1`
+and
+`c1fbccb30f82bfc35f18f4acda698a5f0e36d0383d84993e55805b41cf0dc707`.
+Adjudication execution-ticket/typed-packet SHA-256 values are
+`e0db927a2637238b651cbe0597d43f5ab7b9393ba30a157187eb68cf39baa19a`
+and
+`77f69ba8997e1af935febe8b8cf30057d966ea2fd1887ab307d2e0d371bc26c7`.
+The pilot-resume gate SHA-256 is
+`656af08c2afd11ab3f306065b5d1da488b1210b70230833686826275f1f38f24`.
+
+The full AI-development gate and the exact Fugu manifest validate/plan both
+pass. The analysis method is now frozen for provider launch; no further field
+is added from an observed classification outcome.
