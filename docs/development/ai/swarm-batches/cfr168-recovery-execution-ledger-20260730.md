@@ -2444,3 +2444,32 @@ therefore exposed six line-ending whitespace warnings only at commit time.
 Commit `c88f0fa…` removes them. Future mixed tracked/untracked documentation
 changes must stage intended files before the final diff check so the final
 gate covers the actual commit set.
+
+## 2026-07-31 11:36 UTC fourth Claude lane prepared but not admitted
+
+Commit `bf4fa8f31f61689809f25f3e23acadc879ee1741` binds the already
+specified Python HTTP shared-primitives architecture preflight to one
+report-only Claude Opus 5 scheduler manifest. The task packet, typed packet,
+and manifest SHA-256 values are respectively
+`49d681bf5839e62032a2ad2b2896b3446c17148c5f4f2ab7c8980cda342e8f4a`,
+`a25cb4809aca37c065f1aa4bdcfd760e44d89b4e9fd8df0bb45e5f5d7abe9d5c`,
+and
+`2fef398567d2a8b4597141361d45969238bcd01f06e8c0cb7f5f62ef1a8cb802`.
+
+`dev-swarm validate` and `dev-swarm plan` resolve exact freeze base
+`2c439d8b483c14919633036741af43be221e98cc`, one Claude Ultra architect,
+Fugu/Codex zero, one report write path, and an eight-hour runaway limit. The
+manifest has not been initialized or started.
+
+Logical readiness is not launch admission. The packet now requires:
+
+1. a successful bounded Claude health probe after provider backoff;
+2. priority for exact Cargo, Upload, and KGI/KPI review resumes;
+3. a live provider-window decision at the actual number of Claude lanes;
+4. a live `check_swarm_admission.py` result and conflict check; and
+5. proof that no competing shared-primitives session exists.
+
+This creates useful fourth-lane work only when capacity is genuinely idle. It
+does not widen the adaptive provider window, consume Codex fallback, accept
+Upload, authorize rejected product bytes, or allow MR-write implementation
+before a committed `READY` preflight.
