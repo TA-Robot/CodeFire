@@ -227,6 +227,8 @@ new v2 review-control packets after their canonical port candidates exist.
   schema/generation plumbing requires it
 - `docs/development/tools/check_review_recurrence.py` only if canonical schema
   loading/plumbing requires it
+- `docs/development/tools/check_ai_contracts.py` only to register the new
+  canonical live-anchor schema in the repository schema registry
 - `docs/development/tools/test_ai_tools.py`
 - `docs/development/ai/review-recurrence/README.md`
 - one implementation result under
