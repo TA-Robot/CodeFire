@@ -118,6 +118,15 @@ NEXT_ACTIONS = (
     "NONE",
 )
 
+# F1h is distinct from the evidence-state routing table below. A derivation's
+# disposition has exactly one admissible action, and every action except NONE
+# is visible and blocking in I1 coverage.
+DERIVATION_ROUTES: dict[str, str] = {
+    "derivation_complete": "NONE",
+    "derivation_contradicted": "REPAIR_CLAIM",
+    "derivation_unavailable": "RUN_CLOSURE_EVIDENCE",
+}
+
 # I5: routing decides the kind of successor work, never integration authority.
 STATE_ROUTES: dict[str, frozenset[str]] = {
     "DEFECT_REPRODUCED": frozenset({"PRODUCT_REPAIR"}),
