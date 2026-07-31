@@ -72,7 +72,7 @@ The blind classifier runs at exact snapshot
 - the provisional root-cause audit does not exist; and
 - the three temporal reports below do not exist.
 
-The classifier receives the report-universe boundary and the six-axis rubric,
+The classifier receives the report-universe boundary and the seven-axis rubric,
 but it is **not** told the provisional audit's 51-row result. It reconstructs
 the effect census from stable report locators and publishes the observed row
 count as an outcome. A later count difference is reconciled by effect identity;
@@ -183,6 +183,25 @@ Do not infer this value from severity words such as MUST, HIGH, or BLOCKER.
 | `UNSATISFIABLE_OR_CONTRADICTORY` | The criterion cannot be satisfied as written or conflicts with another bound requirement. |
 | `UNAVAILABLE` | The report does not make the routing basis decidable. |
 
+### G. Pre-repair hazard coverage
+
+This axis applies to an effect classified `INTRODUCED_BY_REPAIR`. It records
+only what immutable artifacts bound before implementation; it does not infer
+foreseeability from a later finding.
+
+| Value | Meaning |
+|---|---|
+| `EXACT_HAZARD_AND_ORACLE_BOUND` | The concrete failure mode and a falsifying oracle were both required before implementation. |
+| `EXACT_HAZARD_BOUND_ORACLE_MISSING` | The concrete failure mode was named, but no adequate falsifying oracle was required. |
+| `GOVERNING_INVARIANT_ONLY` | A governing invariant was bound, but this concrete repair hazard was not named. |
+| `NO_RELEVANT_PRE_REPAIR_BOUND` | No relevant hazard, invariant, or oracle was bound before implementation. |
+| `NOT_REPAIR_INTRODUCED` | Axis A is not `INTRODUCED_BY_REPAIR`. |
+| `UNAVAILABLE` | Exact pre-repair artifacts or chronology do not decide coverage. |
+
+The last two uncovered-hazard values identify possible subjects for a later
+blind premortem experiment. They do not prove that a premortem would have
+predicted the effect.
+
 ## Analysis Row Form
 
 This is an audit data form, not a proposed review or repair template. Its
@@ -206,8 +225,8 @@ Every row contains:
 | `finding_locator` | exact report heading/item plus an effect sublocator only when justified above |
 | `effect_statement` | one falsifiable wrong effect or one exact evidence/routing defect; no severity rhetoric |
 | `subject_locator` | exact path/symbol/object and revision |
-| `axis_a` through `axis_f` | one declared value for each orthogonal axis |
-| `axis_evidence_a` through `axis_evidence_f` | exact object, report, packet, command, or reproducer locator supporting each value |
+| `axis_a` through `axis_g` | one declared value for each orthogonal axis |
+| `axis_evidence_a` through `axis_evidence_g` | exact object, report, packet, command, or reproducer locator supporting each value |
 | `counterevidence_checked` | predecessor/candidate locations or executions that could falsify the selected values |
 | `reproducer` | exact safe command/outcome and candidate identity, or `UNAVAILABLE` with reason |
 | `oracle_reversal` | exact deliberate falsification and result, or `NOT_APPLICABLE`/`UNAVAILABLE` |
@@ -238,7 +257,7 @@ does not create credit for producing more rows.
 1. A Fugu blind-calibration session starts at exact pre-audit snapshot
    `c258cbf…`, is not told an expected effect-row count, and cannot see the
    provisional or temporal reports.
-2. It reconstructs the successor-effect census, classifies all six axes,
+2. It reconstructs the successor-effect census, classifies all seven axes,
    publishes raw rows before aggregates, commits the report, and emits a
    deterministic row-identity digest.
 3. A **fresh Fugu comparison session** receives the immutable blind report and
@@ -283,8 +302,9 @@ denominator, and `UNAVAILABLE`.
 7. evidence-only or injection-only blockers;
 8. oracle failures by effect-evidence state;
 9. policy-promoted or unsatisfiable successor generations;
-10. agreement and disagreement with the original audit, per axis;
-11. temporal-check stability.
+10. pre-repair hazard and oracle coverage among repair-introduced effects;
+11. agreement and disagreement with the original audit, per axis;
+12. temporal-check stability.
 
 Do not publish a "review precision" percentage from withdrawal text. A
 precision claim requires independent disposition of sampled findings as true
@@ -301,6 +321,8 @@ one universal remedy.
 |---|---|
 | Severe reproduced effects are mostly pre-existing and within prior scope | Compare review methods on hidden historical candidates. |
 | Severe reproduced effects are mostly introduced by repair | Compare bounded repair/design-review strategies and diff-scoped review. |
+| Repair-introduced effects often lack a pre-bound hazard or oracle | Run a blind historical premortem comparison; measure later-effect capture, noise, duplication, and implementer/reviewer burden before adopting it. |
+| Repair-introduced effects were explicitly pre-bound but still recur | Test implementation traceability and whether the required oracle actually falsifies the hazard; more brainstorming is not the supported first remedy. |
 | Exact bound obligations are commonly weakened or left open | Test requirement-to-plan-to-test traceability and communication handoff. |
 | Evidence-only or policy-promoted blockers drive whole generations | Test evidence/routing vocabulary without relaxing integration authority. |
 | Oracles pass deliberate falsifications | Test only the implicated oracle properties, individually. |
@@ -312,8 +334,8 @@ experiments; it may not collapse them into "make review more exhaustive".
 
 ## Process-Change Gate
 
-No review template, mandatory finding count, repair-delta threshold, severity
-vocabulary, or checklist is adopted until:
+No review template, mandatory finding count, repair-delta threshold,
+premortem requirement, severity vocabulary, or checklist is adopted until:
 
 1. blind row reconciliation is complete without count-based grading;
 2. every decision-critical disagreement and every reproduced-effect row is

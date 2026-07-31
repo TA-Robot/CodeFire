@@ -32,7 +32,7 @@ Do not create a `dev-swarm.v1` manifest while any value is unbound.
 Using a fresh session, compare the immutable blind calibration with the
 provisional audit without changing either source. Reconcile effect-row
 identity before comparing causal labels. Then content-freeze the comparison
-and apply the unchanged six-axis rubric to the three temporal reports.
+and apply the unchanged seven-axis rubric to the three temporal reports.
 
 This task decides what evidence enters the later Claude adjudication queue. It
 does not decide the final causal class or any process intervention.
@@ -54,7 +54,7 @@ report locator and independently testable effect:
 | `PROVISIONAL_ONLY` | Provisional row has no blind counterpart. |
 | `SPLIT_DIFFERENCE` | One source separates effects that the other combines. |
 | `MERGE_DIFFERENCE` | One source combines effects with different subjects, evidence, or axis values. |
-| `NON_COMPARABLE` | The provisional narrative has no six-axis effect-row equivalent. |
+| `NON_COMPARABLE` | The provisional narrative has no seven-axis effect-row equivalent. |
 | `UNAVAILABLE` | Exact source locators do not decide the relation. |
 
 For every non-exact relation, state:
@@ -71,7 +71,7 @@ Do not add, split, delete, or relabel a blind row in its source report.
 
 For every exact or semantic row match:
 
-1. map the provisional audit's evidence and taxonomy to axes A through F;
+1. map the provisional audit's evidence and taxonomy to axes A through G;
 2. record `AGREE`, `DISAGREE`, `NON_COMPARABLE`, or `UNAVAILABLE` separately
    for every axis;
 3. preserve both original values and exact evidence locators;
@@ -80,7 +80,10 @@ For every exact or semantic row match:
 
 The provisional audit's narrative "primary cause" never overrides the blind
 orthogonal axes. Agreement between agents is not proof. A provisional class
-with no six-axis equivalent remains `NON_COMPARABLE`.
+with no seven-axis equivalent remains `NON_COMPARABLE`. In particular,
+`PREDICTABLE_REPAIR_HAZARD_NOT_PREMORTEMED` must be mapped from exact
+pre-repair artifacts to axis G; its hindsight wording is not evidence that a
+blind premortem would have predicted the effect.
 
 ## Comparison Freeze
 
@@ -169,7 +172,7 @@ The report contains:
 10. threats to validity and censoring;
 11. conditional evidence statements only; and
 12. explicit non-decisions for template shape, detail count, finding count,
-    checklist, routing policy, and process adoption.
+    checklist, premortem requirement, routing policy, and process adoption.
 
 The report may conclude that the sources cannot be reconciled or that the
 evidence is insufficient.

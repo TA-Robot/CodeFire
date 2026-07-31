@@ -47,7 +47,7 @@ Adjudicate only the finite queue produced by the fresh comparator:
 
 Resolve each item from exact Git objects, prior declared scope, repair wording,
 candidate implementation, executed safe reproducer, and closure-oracle
-falsification where feasible. Preserve all six axes independently. Do not
+falsification where feasible. Preserve all seven axes independently. Do not
 choose one narrative primary cause and do not redo the entire corpus merely to
 generate more observations.
 
@@ -111,7 +111,7 @@ The report contains:
 10. temporal-holdout implications without category retuning;
 11. threats to validity, including same-model-family audit/adjudication; and
 12. explicit non-decisions for template shape, item count, checklist,
-    severity/routing policy, and process adoption.
+    premortem requirement, severity/routing policy, and process adoption.
 
 The report may conclude that the evidence is insufficient.
 
@@ -141,7 +141,8 @@ It cannot:
 
 - accept or reject any product candidate;
 - declare absolute review recall or precision;
-- adopt a review/repair template, field, item count, or checklist;
+- adopt a review/repair template, field, item count, checklist, or premortem
+  requirement;
 - change the frozen pilot;
 - mandate one universal remedy; or
 - close the review-reliability question by agent agreement alone.

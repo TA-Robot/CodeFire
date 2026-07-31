@@ -62,7 +62,7 @@ because its prior calibration consumed time or money.
 | Frozen pilot intervention | Resume relevance requires | Does not establish |
 |---|---|---|
 | I1 predecessor re-derivation | adjudicated pre-existing effects whose exact prior scope/detectability remains decision-relevant | absolute review recall |
-| I3 repair-delta sweep | adjudicated repair-introduced effects or evidence that new surfaces materially drive rework | one universal line-count threshold |
+| I3 repair-delta sweep | adjudicated repair-introduced effects plus exact pre-repair hazard/oracle coverage; uncovered hazards only justify testing a blind premortem, not adopting one | one universal line-count threshold or hindsight proof that a premortem would predict the effect |
 | I4 E1–E9 oracle admissibility | adjudicated oracle failures or closure claims that survive deliberate falsification | a nine-item mandatory checklist |
 | I5 evidence/routing separation | adjudicated evidence-only, policy-promoted, contradictory, or non-blocking routing rows | permission to weaken integration authority |
 
@@ -110,6 +110,7 @@ experiment. It cannot adopt:
 - a finding quota;
 - a checklist length;
 - a template shape or mandatory detail count;
+- a mandatory repair premortem;
 - a repair-delta threshold;
 - a severity or routing policy; or
 - a universal review method.

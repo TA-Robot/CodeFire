@@ -18,7 +18,7 @@ Role: independent corpus comparator
 
 After the blind calibration is committed and digest-bound, use a fresh session
 to reconcile its immutable effect rows with the provisional audit, compare all
-six axes, content-freeze that comparison, and only then apply the unchanged
+seven axes, content-freeze that comparison, and only then apply the unchanged
 rubric to three later reports.
 
 The provisional audit's 51-row census is comparison input, not a target. A
@@ -48,8 +48,8 @@ No `dev-swarm.v1` manifest is authorized while this packet is blocked.
 - Adjudicate conflicting evidence.
 - Accept, reject, or repair a product candidate.
 - Estimate absolute review recall or precision.
-- Adopt a review template, checklist, field count, routing rule, or process
-  change.
+- Adopt a review template, checklist, field count, premortem requirement,
+  routing rule, or process change.
 
 ## Validation
 

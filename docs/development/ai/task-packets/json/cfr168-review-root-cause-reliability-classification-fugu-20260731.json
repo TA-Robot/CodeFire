@@ -2,7 +2,7 @@
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "cfr168-review-root-cause-reliability-classification-fugu-20260731",
   "status": "ready",
-  "objective": "At the exact pre-audit CFR-168 snapshot, blindly reconstruct the finite successor-finding census without being told an expected effect-row count, classify every independently testable observed effect on six orthogonal evidence axes, and publish an immutable calibration report for a different comparison session without adopting a review template, finding count, checklist, or process change.",
+  "objective": "At the exact pre-audit CFR-168 snapshot, blindly reconstruct the finite successor-finding census without being told an expected effect-row count, classify every independently testable observed effect on seven orthogonal evidence axes including objective pre-repair hazard coverage, and publish an immutable calibration report for a different comparison session without adopting a review template, finding count, checklist, premortem, or process change.",
   "base_revision": "c258cbfc061b14905554c9d319b350d2da7f771b",
   "role": "reviewer",
   "risk": {
@@ -95,7 +95,7 @@
       "Infer effect evidence from severity wording or oracle quality from a test name",
       "Replace unavailable evidence with project-general narrative or a guessed value",
       "Run Cargo, Rust builds, Install, Dogfood, Docker, product mutation, issue mutation, or network calls other than the Fugu provider request",
-      "Adopt a review template, checklist, finding quota, repair threshold, severity policy, routing policy, or process change",
+      "Adopt a review template, checklist, finding quota, repair threshold, premortem requirement, severity policy, routing policy, or process change",
       "Use Codex, Claude, another Fugu session, another worktree, or a newer repository checkout as a fallback or subagent"
     ]
   },
@@ -105,7 +105,7 @@
     "Estimate absolute review recall or precision",
     "Choose one primary narrative cause",
     "Complete or reinterpret the frozen intervention pilot",
-    "Choose a review-template length, detail level, checklist, or item count",
+      "Choose a review-template length, detail level, checklist, item count, or premortem requirement",
     "Review development-environment infrastructure"
   ],
   "invariants": [
@@ -120,9 +120,9 @@
       "falsification_test": "Seek an expected count, split wording variants, merge effects with different subjects/evidence, omit a stable observed effect, or add a finding not present in the snapshot report universe; census validation fails."
     },
     {
-      "id": "six-orthogonal-evidence-axes",
-      "statement": "Every row independently records code origin, prior-review detectability, repair-contract handling, effect evidence, closure-oracle quality, and review routing, with a separate exact evidence field for each axis.",
-      "falsification_test": "Use one narrative primary cause, copy report framing as origin proof, use severity as effect proof, or fill an undecidable axis without UNAVAILABLE; classification fails."
+      "id": "seven-orthogonal-evidence-axes",
+      "statement": "Every row independently records code origin, prior-review detectability, repair-contract handling, effect evidence, closure-oracle quality, review routing, and pre-repair hazard coverage, with a separate exact evidence field for each axis.",
+      "falsification_test": "Use one narrative primary cause, copy report framing as origin proof, use severity as effect proof, infer hazard foreseeability from hindsight, or fill an undecidable axis without UNAVAILABLE; classification fails."
     },
     {
       "id": "decision-critical-detail",
@@ -156,7 +156,7 @@
     },
     {
       "id": "raw-row-and-axis-audit",
-      "command": "Validate one stable row per independently testable effect, all required row fields, six axis values/evidence fields, counterevidence, reproducer/oracle disposition, censoring, and decision relevance before aggregates.",
+      "command": "Validate one stable row per independently testable effect, all required row fields, seven axis values/evidence fields, counterevidence, reproducer/oracle disposition, censoring, and decision relevance before aggregates.",
       "purpose": "Prevent a long unsupported bullet list or one primary-cause narrative from satisfying the task.",
       "required": true
     },
@@ -188,14 +188,14 @@
       "snapshot_and_excluded_path_proof",
       "raw_calibration_rows",
       "raw_row_count_and_identity_digest",
-      "six_axis_evidence_fields",
+      "seven_axis_evidence_fields",
       "decision_critical_detailed_blocks",
       "per_axis_aggregates_with_unavailable",
       "reproduced_effect_rows",
       "decision_critical_unavailable_rows",
       "row_inclusion_and_exclusion_disputes",
       "threats_to_validity_and_censoring",
-      "explicit_template_count_checklist_and_policy_non_decisions",
+      "explicit_template_count_checklist_premortem_and_policy_non_decisions",
       "report_commit_tree_sha256_and_clean_state"
     ],
     "evidence_digest_required": true

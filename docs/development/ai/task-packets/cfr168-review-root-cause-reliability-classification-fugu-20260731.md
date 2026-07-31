@@ -18,7 +18,7 @@ Blind base: `c258cbfc061b14905554c9d319b350d2da7f771b`
 ## Objective
 
 At the exact pre-audit snapshot, reconstruct the finite observed
-successor-finding corpus and classify it on six independent evidence axes.
+successor-finding corpus and classify it on seven independent evidence axes.
 The number of effect rows is an outcome, not an input. Publish one immutable
 blind report before a different session is allowed to see the provisional
 audit or temporal reports.
@@ -64,10 +64,10 @@ report.
 
 The analysis row form in the reliability gate is evidence capture for this
 causal study only. This task cannot adopt a review template, checklist,
-finding quota, minimum detail level, severity policy, routing policy, or
-candidate disposition. Any later process proposal must map to an adjudicated
-failure mode and survive a bounded live experiment measuring capture, noise,
-duplication, false positives, and author/reviewer burden.
+finding quota, minimum detail level, premortem requirement, severity policy,
+routing policy, or candidate disposition. Any later process proposal must map
+to an adjudicated failure mode and survive a bounded live experiment measuring
+capture, noise, duplication, false positives, and author/reviewer burden.
 
 ## Validation
 

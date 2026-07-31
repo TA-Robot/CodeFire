@@ -104,7 +104,7 @@
       "Replace unavailable object, scope, effect, or oracle evidence with project-general narrative",
       "Rewrite either Fugu report, the provisional audit, frozen pilot, or their aggregates in place",
       "Run Cargo, Rust builds, Install, Dogfood, Docker, product mutation, issue mutation, or network calls other than the Claude provider request",
-      "Adopt a review template, checklist, finding quota, repair threshold, severity policy, routing policy, or process change",
+      "Adopt a review template, checklist, finding quota, repair threshold, premortem requirement, severity policy, routing policy, or process change",
       "Use Codex, Fugu, another Claude session, or subagents as a fallback"
     ]
   },
@@ -115,7 +115,7 @@
     "Estimate absolute review recall or precision",
     "Choose one primary narrative cause",
     "Complete or reinterpret the frozen intervention pilot",
-    "Choose a review-template length, detail level, checklist, or item count",
+      "Choose a review-template length, detail level, checklist, item count, or premortem requirement",
     "Review development-environment infrastructure"
   ],
   "invariants": [
@@ -130,9 +130,9 @@
       "falsification_test": "Edit any source report/freeze, silently replace a source value, or omit the original values from the adjudication comparison; postflight rejects the lane."
     },
     {
-      "id": "six-axis-independent-decision",
-      "statement": "Every disputed axis is decided separately from exact object, scope, obligation, effect, oracle, or routing evidence, and undecidable values remain UNAVAILABLE.",
-      "falsification_test": "Select one narrative primary cause, copy a report conclusion as evidence, or let one axis automatically determine another; adjudication fails."
+      "id": "seven-axis-independent-decision",
+      "statement": "Every disputed axis is decided separately from exact object, scope, obligation, effect, oracle, routing, or pre-repair hazard-binding evidence, and undecidable values remain UNAVAILABLE.",
+      "falsification_test": "Select one narrative primary cause, copy a report conclusion as evidence, infer hazard foreseeability from hindsight, or let one axis automatically determine another; adjudication fails."
     },
     {
       "id": "repeatable-effect-and-oracle-evidence",
@@ -205,7 +205,7 @@
       "supported_and_unsupported_experiment_cards",
       "temporal_holdout_implications_without_retuning",
       "threats_to_validity_and_same_model_family_limitation",
-      "explicit_template_count_checklist_policy_non_decisions",
+      "explicit_template_count_checklist_premortem_policy_non_decisions",
       "report_commit_tree_bytes_sha256_and_clean_state"
     ],
     "evidence_digest_required": true

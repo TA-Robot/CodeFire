@@ -2,7 +2,7 @@
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "cfr168-review-root-cause-reliability-comparison-fugu-20260731",
   "status": "blocked",
-  "objective": "In a fresh session, reconcile the committed blind-calibration effect rows with the provisional audit without using row-count equality as a coverage oracle, compare all six axes, freeze the comparison, apply the unchanged rubric to three temporal reports, and publish the exact adjudication queue without adopting a review template, count, checklist, or process change.",
+  "objective": "In a fresh session, reconcile the committed blind-calibration effect rows with the provisional audit without using row-count equality as a coverage oracle, compare all seven axes including objective pre-repair hazard coverage, freeze the comparison, apply the unchanged rubric to three temporal reports, and publish the exact adjudication queue without adopting a review template, count, checklist, premortem, or process change.",
   "base_revision": "2eaf8f39ad4744a5fb65685b1cc4d93cdb44b706",
   "role": "reviewer",
   "risk": {
@@ -97,7 +97,7 @@
       "Retune a row rule, category, evidence threshold, or unavailable rule after temporal access",
       "Replace unavailable row identity or axis evidence with project-general narrative",
       "Run Cargo, Rust builds, Install, Dogfood, Docker, product mutation, issue mutation, or network calls other than the Fugu provider request",
-      "Adopt a review template, checklist, finding quota, repair threshold, severity policy, routing policy, or process change",
+      "Adopt a review template, checklist, finding quota, repair threshold, premortem requirement, severity policy, routing policy, or process change",
       "Use Codex, Claude, another Fugu session, or subagents as a fallback"
     ]
   },
@@ -109,7 +109,7 @@
     "Estimate absolute review recall or precision",
     "Choose one primary narrative cause",
     "Complete or reinterpret the frozen intervention pilot",
-    "Choose a review-template length, detail level, checklist, or item count",
+    "Choose a review-template length, detail level, checklist, item count, or premortem requirement",
     "Review development-environment infrastructure"
   ],
   "invariants": [
@@ -124,9 +124,9 @@
       "falsification_test": "Call a blind count wrong because it differs from 51, force splits or merges to equalize counts, or leave a source row unmapped without an explicit relation; comparison fails."
     },
     {
-      "id": "six-axis-independent-comparison",
-      "statement": "Every matched row records source values and AGREE, DISAGREE, NON_COMPARABLE, or UNAVAILABLE separately for all six axes.",
-      "falsification_test": "Let one narrative primary cause substitute for six axes or convert agent agreement into evidence; comparison fails."
+      "id": "seven-axis-independent-comparison",
+      "statement": "Every matched row records source values and AGREE, DISAGREE, NON_COMPARABLE, or UNAVAILABLE separately for all seven axes.",
+      "falsification_test": "Let one narrative primary cause substitute for seven axes, infer hazard foreseeability from hindsight, or convert agent agreement into evidence; comparison fails."
     },
     {
       "id": "comparison-freeze-before-temporal",
@@ -210,7 +210,7 @@
       "unchanged_temporal_rows_and_stability",
       "exact_adjudication_queue_and_identity_digest",
       "threats_to_validity_and_censoring",
-      "explicit_template_count_checklist_policy_non_decisions",
+      "explicit_template_count_checklist_premortem_policy_non_decisions",
       "report_commit_tree_bytes_sha256_and_clean_state"
     ],
     "evidence_digest_required": true

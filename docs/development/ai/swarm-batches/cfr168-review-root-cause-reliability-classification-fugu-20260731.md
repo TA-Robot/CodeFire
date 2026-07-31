@@ -36,14 +36,15 @@ Use a fresh session. Do not resume any earlier Fugu review or audit session.
 ## Objective
 
 Reconstruct every independently testable effect first reported in a successor
-review generation, then classify it on six independent evidence axes:
+review generation, then classify it on seven independent evidence axes:
 
 1. code origin;
 2. detectability in the immediately prior declared review scope;
 3. handling of an exact repair obligation;
 4. strength of effect evidence;
 5. closure-oracle quality; and
-6. review-routing state.
+6. review-routing state; and
+7. pre-repair hazard coverage.
 
 Do not assume that review omission is the cause. Do not choose one narrative
 primary cause. Do not propose a finding count, checklist, review-template
@@ -143,8 +144,27 @@ review scope miss". It does not establish absolute recall.
 | `UNSATISFIABLE_OR_CONTRADICTORY` | The criterion cannot be satisfied as written or conflicts with another bound requirement. |
 | `UNAVAILABLE` | The report does not make the routing basis decidable. |
 
+### G. Pre-repair hazard coverage
+
+Apply this axis to an effect classified `INTRODUCED_BY_REPAIR`. It records
+what the immutable pre-repair report, packet, plan, or required oracle actually
+contained; it does not claim that an unnamed hazard was foreseeable.
+
+| Value | Meaning |
+|---|---|
+| `EXACT_HAZARD_AND_ORACLE_BOUND` | Before implementation, the concrete failure mode and a falsifying oracle were both required. |
+| `EXACT_HAZARD_BOUND_ORACLE_MISSING` | The concrete failure mode was named, but no adequate falsifying oracle was required. |
+| `GOVERNING_INVARIANT_ONLY` | A governing invariant was bound, but this concrete repair hazard was not named. |
+| `NO_RELEVANT_PRE_REPAIR_BOUND` | No relevant hazard, invariant, or oracle was bound before implementation. |
+| `NOT_REPAIR_INTRODUCED` | Axis A is not `INTRODUCED_BY_REPAIR`. |
+| `UNAVAILABLE` | The exact pre-repair artifacts or chronology do not decide coverage. |
+
+`GOVERNING_INVARIANT_ONLY` and `NO_RELEVANT_PRE_REPAIR_BOUND` do not prove
+that a premortem would have predicted the later effect. They only identify
+eligible historical subjects for a later blind premortem comparison.
+
 Do not infer origin from report framing, effect evidence from severity words,
-or oracle quality from a test name.
+oracle quality from a test name, or hazard foreseeability from hindsight.
 
 ## Required Analysis Row
 
@@ -158,8 +178,8 @@ Publish a compact raw table first. Every row contains:
 | `finding_locator` | exact successor report heading/item and effect sublocator when justified |
 | `effect_statement` | one falsifiable wrong effect or exact evidence/routing defect |
 | `subject_locator` | exact path/symbol/object and revision |
-| `axis_a` through `axis_f` | one declared rubric value for every axis |
-| `axis_evidence_a` through `axis_evidence_f` | exact object, report, packet, command, or reproducer supporting that axis |
+| `axis_a` through `axis_g` | one declared rubric value for every axis |
+| `axis_evidence_a` through `axis_evidence_g` | exact object, report, packet, command, or reproducer supporting that axis |
 | `counterevidence_checked` | exact evidence that could falsify the selected values |
 | `reproducer` | safe command/outcome and candidate identity, or `UNAVAILABLE` with reason |
 | `oracle_reversal` | deliberate falsification and result, or `NOT_APPLICABLE`/`UNAVAILABLE` |
@@ -216,8 +236,8 @@ The report contains:
 8. every decision-critical unavailable row;
 9. threats to validity and right-censoring;
 10. conditional statements supported by this calibration only; and
-11. explicit non-decisions for template length, finding count, checklist, and
-    process adoption.
+11. explicit non-decisions for template length, finding count, checklist,
+    premortem requirement, and process adoption.
 
 Do not open or compare a provisional audit. Do not inspect or classify a
 temporal holdout. Those are separate-session tasks.

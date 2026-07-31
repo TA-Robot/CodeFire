@@ -124,6 +124,8 @@ and intervention choice for:
 - defects pre-existing inside an earlier review's declared scope;
 - defects introduced by a repair;
 - exact obligations weakened, restated, or left open;
+- repair-introduced effects whose concrete hazard and falsifying oracle were
+  or were not bound before implementation;
 - closure oracles that pass deliberate falsification;
 - evidence-only, injection-only, policy-promoted, contradictory, or routable
   findings; and
