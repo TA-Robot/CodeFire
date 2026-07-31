@@ -23,6 +23,10 @@ from ai_contracts import (
     validate_json_schema,
 )
 from probe_validation_capabilities import CAPABILITY_IDS
+from recurrence_v2_model import (
+    strict_decode_json,
+    validate_schema_definition_identity,
+)
 
 
 SCHEMAS = {
@@ -32,6 +36,8 @@ SCHEMAS = {
     "docs/development/ai/schemas/review-recurrence-control.v1.schema.json": "https://codefire.dev/schemas/ai/review-recurrence-control.v1.schema.json",
     "docs/development/ai/schemas/review-recurrence-control.v2.schema.json": "https://codefire.dev/schemas/ai/review-recurrence-control.v2.schema.json",
     "docs/development/ai/schemas/review-recurrence-repair-manifest.v1.schema.json": "https://codefire.dev/schemas/ai/review-recurrence-repair-manifest.v1.schema.json",
+    "docs/development/ai/schemas/review-recurrence-gate-result.v2.schema.json": "https://codefire.dev/schemas/ai/review-recurrence-gate-result.v2.schema.json",
+    "docs/development/ai/schemas/review-recurrence-live-arm-anchor.v1.schema.json": "https://codefire.dev/schemas/ai/review-recurrence-live-arm-anchor.v1.schema.json",
     "docs/development/ai/schemas/timed-gate-result.v2.schema.json": "https://codefire.dev/schemas/ai/timed-gate-result.v2.schema.json",
     "docs/development/ai/schemas/development-flow-record.v1.schema.json": "https://codefire.dev/schemas/ai/development-flow-record.v1.schema.json",
 }
@@ -51,13 +57,40 @@ def read_object(root: Path, relative: str, findings: list[Finding]) -> dict | No
     return None
 
 
+def read_schema_definition(
+    root: Path,
+    relative: str,
+    expected_id: str,
+    findings: list[Finding],
+) -> dict | None:
+    """Strict-decode a validator-owned schema before registry use."""
+
+    try:
+        payload = (root / relative).read_bytes()
+    except FileNotFoundError:
+        findings.append(Finding("error", "missing-file", relative, "file is missing"))
+        return None
+    except OSError as exc:
+        findings.append(Finding("error", "schema-unreadable", relative, str(exc)))
+        return None
+    value, decode_findings = strict_decode_json(payload, relative)
+    findings.extend(decode_findings)
+    if value is None:
+        return None
+    identity_findings = validate_schema_definition_identity(
+        value,
+        expected_id,
+        relative,
+    )
+    findings.extend(identity_findings)
+    return value if isinstance(value, dict) and not identity_findings else None
+
+
 def run(root: Path, extra_tasks: list[Path], extra_reviews: list[Path]) -> list[Finding]:
     findings: list[Finding] = []
     loaded_schemas: dict[str, dict] = {}
     for relative, schema_id in SCHEMAS.items():
-        data = read_object(root, relative, findings)
-        if data is not None and data.get("$id") != schema_id:
-            findings.append(Finding("error", "wrong-schema-id", relative, f"expected {schema_id}"))
+        data = read_schema_definition(root, relative, schema_id, findings)
         if data is not None:
             loaded_schemas[relative] = data
 
