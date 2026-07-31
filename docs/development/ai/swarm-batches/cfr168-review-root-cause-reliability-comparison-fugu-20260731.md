@@ -1,10 +1,10 @@
 # CFR-168 Review Root-Cause Reliability Comparison And Temporal Check
 
-Status: blocked on committed blind-calibration report and exact digest  
-Owner: portfolio manager  
-Provider/model: Fugu / `fugu-ultra-v1.1`  
-Role: independent corpus comparator  
-Codex fallback: forbidden  
+Status: blocked on committed blind-calibration report and exact digest
+Owner: portfolio manager
+Provider/model: Fugu / `fugu-ultra-v1.1`
+Role: independent corpus comparator
+Codex fallback: forbidden
 Product/process mutation: forbidden
 
 ## Admission Inputs

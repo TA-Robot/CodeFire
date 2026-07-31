@@ -11,7 +11,7 @@ Execution ticket:
 Reliability gate:
 [`../swarm-batches/cfr168-review-root-cause-reliability-gate-20260731.md`](../swarm-batches/cfr168-review-root-cause-reliability-gate-20260731.md)
 
-Provider/model: Fugu / `fugu-ultra-v1.1`  
+Provider/model: Fugu / `fugu-ultra-v1.1`
 Role: independent corpus comparator
 
 ## Objective
