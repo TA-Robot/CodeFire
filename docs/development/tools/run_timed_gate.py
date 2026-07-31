@@ -322,6 +322,36 @@ def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     os.replace(temporary, path)
 
 
+def _bind_signed_timing_values(argv: list[str]) -> list[str]:
+    """Keep signed/non-finite timing tokens attached to their CLI option.
+
+    ``argparse`` recognizes ordinary negative decimals as values, but treats
+    strings such as ``-Infinity`` and negative exponent-overflow controls as
+    new options. Binding only the two timing options, and stopping at the
+    command separator, lets the runner's finite-value preflight reject those
+    controls without changing the child command argv.
+    """
+
+    bound: list[str] = []
+    index = 0
+    while index < len(argv):
+        item = argv[index]
+        if item == "--":
+            bound.extend(argv[index:])
+            break
+        if (
+            item in {"--timeout", "--drift-threshold"}
+            and index + 1 < len(argv)
+            and argv[index + 1] != "--"
+        ):
+            bound.append(f"{item}={argv[index + 1]}")
+            index += 2
+            continue
+        bound.append(item)
+        index += 1
+    return bound
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run one argv gate and emit monotonic, digest-bound JSON evidence."
@@ -342,7 +372,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         ),
     )
     parser.add_argument("command", nargs=argparse.REMAINDER)
-    args = parser.parse_args(argv)
+    args = parser.parse_args(_bind_signed_timing_values(argv))
     if args.command[:1] == ["--"]:
         args.command = args.command[1:]
     if not args.command:
