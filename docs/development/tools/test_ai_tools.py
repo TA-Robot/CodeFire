@@ -83,8 +83,10 @@ from run_ai_role import (  # noqa: E402
     select_codex_cli_adapter,
 )
 import recurrence_v2_authority as v2_authority  # noqa: E402
+import recurrence_v2_history as v2_history  # noqa: E402
 from recurrence_v2_evidence import (  # noqa: E402
     TimedFacts,
+    resolve_artifacts,
     verify_canonical_port_packet,
     verify_retained_live_arm_anchor,
 )
@@ -2540,6 +2542,16 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 "retained_without_semantic_reproof",
             )
             self.assertFalse(divergence["inherits_current_authority"])
+            self.assertEqual(
+                divergence["migration"], "current_gate_full_semantic_replay"
+            )
+            replay = migrated_result["authority_chain"][
+                "revalidated_generations"
+            ][0]
+            self.assertTrue(replay["current_gate_structurally_valid"])
+            self.assertEqual(
+                replay["current_gate_replayed_integration_decision"], "BLOCK"
+            )
 
     def test_v2_schema_authority_cannot_be_redirected_to_candidate(self) -> None:
         canonical = validator_owned_path(None, ROOT, Path("schema.json"))
@@ -2854,6 +2866,234 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 "retained-live-arm-anchor-digest-mismatch",
                 {finding.code for finding in forged_findings},
             )
+
+    def test_v2_history_replay_enforces_retained_live_anchor(self) -> None:
+        cases = (
+            ("valid", None, None),
+            (
+                "missing-pin",
+                lambda result: result.__setitem__("live_arm_pin", "unavailable"),
+                "retained-live-arm-pin-unavailable",
+            ),
+            (
+                "forged-digest",
+                lambda result: result["live_arm_pin"]["anchor"].__setitem__(
+                    "sha256", "0" * 64
+                ),
+                "retained-live-arm-anchor-digest-mismatch",
+            ),
+            ("validator-ancestry", None, "retained-live-arm-validator-revision-unrooted"),
+        )
+        for name, mutate_result, expected_code in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                analysed_root = root / "analysed"
+                validator_root = root / "validator"
+                analysed_root.mkdir()
+                validator_root.mkdir()
+                analysed = FixtureRepo(analysed_root)
+                validator = FixtureRepo(validator_root)
+                first = build_bootstrap(analysed)
+                anchor_payload = self.live_anchor(first)
+                validator.write("README.md", "validator base\n")
+                validator.commit("validator base", ["README.md"])
+                validator.write(
+                    "docs/development/tools/check_review_recurrence.py",
+                    "# historical validator gate\n",
+                )
+                validator.write(
+                    LIVE_ARM_ANCHOR_PATH,
+                    json.dumps(anchor_payload, indent=2, sort_keys=True) + "\n",
+                )
+                historical_revision = validator.commit(
+                    "historical validator anchor",
+                    [
+                        "docs/development/tools/check_review_recurrence.py",
+                        LIVE_ARM_ANCHOR_PATH,
+                    ],
+                )
+                historical_gate = clean_gate(validator, historical_revision)
+                first_payload, first_result = self.evaluate_built_v2(
+                    analysed,
+                    first,
+                    gate=historical_gate,
+                    live_arm="cargo",
+                    validator_root=validator_root,
+                )
+                self.assertEqual(first_result["finding_count"], 0)
+                retained_result = copy.deepcopy(first_result)
+                if mutate_result is not None:
+                    mutate_result(retained_result)
+                retention, result_payload = retain_generation(
+                    analysed, first, first_payload, retained_result
+                )
+                second = build_second(
+                    analysed,
+                    first,
+                    first_payload,
+                    retained_result,
+                    retention=retention,
+                    result_payload=result_payload,
+                )
+
+                current_gate = historical_gate
+                if name == "validator-ancestry":
+                    validator_root_commit = validator.git(
+                        "rev-list", "--max-parents=0", historical_revision
+                    )
+                    validator.git(
+                        "checkout",
+                        "-q",
+                        "-b",
+                        "current-validator",
+                        validator_root_commit,
+                    )
+                    validator.write(
+                        "docs/development/tools/check_review_recurrence.py",
+                        "# unrelated current validator gate\n",
+                    )
+                    validator.write(
+                        LIVE_ARM_ANCHOR_PATH,
+                        json.dumps(anchor_payload, indent=2, sort_keys=True) + "\n",
+                    )
+                    current_revision = validator.commit(
+                        "unrelated current validator",
+                        [
+                            "docs/development/tools/check_review_recurrence.py",
+                            LIVE_ARM_ANCHOR_PATH,
+                        ],
+                    )
+                    current_gate = clean_gate(validator, current_revision)
+
+                record, parse_findings = parse_record(second.record, "record")
+                self.assertEqual(parse_findings, [])
+                self.assertIsNotNone(record)
+                chain, chain_findings = (
+                    v2_authority.resolve_predecessor_authority_chain(
+                        GitRepo(analysed_root),
+                        record,
+                        schema=self.v2_schema,
+                        deciding_gate=current_gate,
+                        validator_repo=GitRepo(validator_root),
+                        legacy_roots=second.roots,
+                    )
+                )
+                self.assertEqual(chain_findings, [])
+                self.assertEqual(
+                    chain.links[0].deciding_gate["source_revision"],
+                    historical_revision,
+                )
+                if name == "validator-ancestry":
+                    self.assertFalse(
+                        GitRepo(validator_root).is_ancestor(
+                            historical_revision, current_gate["source_revision"]
+                        )
+                    )
+                with mock.patch.object(
+                    v2_history, "verify_canonical_port_packet", return_value=[]
+                ):
+                    replay = v2_history.revalidate_history(
+                        GitRepo(analysed_root),
+                        chain,
+                        schema=self.v2_schema,
+                        manifest_schema=self.v2_manifest_schema,
+                        timed_schema=self.v2_timed_schema,
+                        legacy_roots=second.roots,
+                        enforce_canonical_ports=True,
+                        validator_root=validator_root,
+                        live_arm="cargo",
+                    )
+                codes = {finding.code for finding in replay.findings}
+                if expected_code is None:
+                    self.assertEqual(codes, set())
+                    self.assertTrue(replay.chain.rooted)
+                else:
+                    self.assertIn(expected_code, codes)
+                    self.assertFalse(replay.chain.rooted)
+
+    def test_v2_replayed_chain_keeps_legacy_root_for_prior_evidence_roles(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            first = build_bootstrap(repo)
+            gate = clean_gate(repo, first.commits["predecessor"])
+            first_payload, first_result = self.evaluate_built_v2(
+                repo, first, gate=gate
+            )
+            second = build_second(repo, first, first_payload, first_result)
+            record, parse_findings = parse_record(second.record, "record")
+            self.assertEqual(parse_findings, [])
+            self.assertIsNotNone(record)
+            chain, chain_findings = v2_authority.resolve_predecessor_authority_chain(
+                GitRepo(repo.root),
+                record,
+                schema=self.v2_schema,
+                deciding_gate=gate,
+                validator_repo=GitRepo(repo.root),
+                legacy_roots=second.roots,
+            )
+            self.assertEqual(chain_findings, [])
+            replay = v2_history.revalidate_history(
+                GitRepo(repo.root),
+                chain,
+                schema=self.v2_schema,
+                manifest_schema=self.v2_manifest_schema,
+                timed_schema=self.v2_timed_schema,
+                legacy_roots=second.roots,
+            )
+            root_commit = first.commits["legacy_root"]
+            self.assertTrue(replay.chain.rooted)
+            self.assertIn(root_commit, replay.chain.verified_commits)
+
+            root_path = first.paths["legacy_report"]
+            foreign_base = repo.git("rev-list", "--max-parents=0", root_commit)
+            repo.git("checkout", "-q", "-b", "foreign-evidence", foreign_base)
+            repo.write("foreign-evidence.txt", "unverified evidence\n")
+            foreign_commit = repo.commit(
+                "unverified evidence", ["foreign-evidence.txt"]
+            )
+            for role in ("prior_closure_evidence", "non_reachability_evidence"):
+                with self.subTest(role=role):
+                    permitted = ArtifactRef(
+                        ref_id=f"legacy-{role}",
+                        role=role,
+                        commit=root_commit,
+                        path=root_path,
+                        sha256=repo.blob_digest(root_commit, root_path),
+                        mode="100644",
+                    )
+                    permitted_record = replace(
+                        record, artifacts=(*record.artifacts, permitted)
+                    )
+                    _, permitted_findings = resolve_artifacts(
+                        GitRepo(repo.root),
+                        permitted_record,
+                        replay.chain,
+                        second.roots,
+                    )
+                    self.assertEqual(permitted_findings, [])
+
+                    rejected = replace(
+                        permitted,
+                        ref_id=f"foreign-{role}",
+                        commit=foreign_commit,
+                        path="foreign-evidence.txt",
+                        sha256=repo.blob_digest(
+                            foreign_commit, "foreign-evidence.txt"
+                        ),
+                    )
+                    rejected_record = replace(
+                        record, artifacts=(*record.artifacts, rejected)
+                    )
+                    _, rejected_findings = resolve_artifacts(
+                        GitRepo(repo.root),
+                        rejected_record,
+                        replay.chain,
+                        second.roots,
+                    )
+                    self.assertIn(
+                        "artifact-not-on-ancestry-or-verified-generation",
+                        {finding.code for finding in rejected_findings},
+                    )
 
     def test_v2_timed_result_rejects_wrong_tree_and_v1_schema(self) -> None:
         mutations = (
