@@ -1059,15 +1059,22 @@ def _timed_semantics(
                     f"{wall_elapsed!r} beyond {_TIMESTAMP_WALL_TOLERANCE_SECONDS!r}",
                 )
             )
-    recomputed_wall_minus: Decimal | None = None
+    recomputed_wall_minus: float | None = None
     if _finite_number(wall_elapsed) and _finite_number(duration):
-        recomputed_wall_minus = _decimal_number(wall_elapsed) - _decimal_number(
-            duration
-        )
+        recomputed_wall_minus = wall_elapsed - duration
+        within_wall_minus_tolerance = False
+        if _finite_number(wall_minus):
+            within_wall_minus_tolerance = (
+                wall_minus == recomputed_wall_minus
+                or abs(
+                    _decimal_number(wall_minus)
+                    - _decimal_number(recomputed_wall_minus)
+                )
+                <= _WALL_MONOTONIC_TOLERANCE_SECONDS
+            )
         if (
             not _finite_number(wall_minus)
-            or abs(_decimal_number(wall_minus) - recomputed_wall_minus)
-            > _WALL_MONOTONIC_TOLERANCE_SECONDS
+            or not within_wall_minus_tolerance
         ):
             findings.append(
                 error(
@@ -1077,7 +1084,7 @@ def _timed_semantics(
                 )
             )
     if recomputed_wall_minus is not None and _finite_number(threshold):
-        discontinuity = abs(recomputed_wall_minus) > _decimal_number(threshold)
+        discontinuity = abs(recomputed_wall_minus) > threshold
         if payload["wall_clock_discontinuity"] != discontinuity:
             findings.append(
                 error(
