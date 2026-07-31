@@ -78,10 +78,12 @@ the effect census from stable report locators and publishes the observed row
 count as an outcome. A later count difference is reconciled by effect identity;
 numerical equality is neither a coverage oracle nor a success criterion.
 
-Use only the snapshot tree plus exact candidate/predecessor objects named by
-snapshot-visible reports, packets, and results. Access to newer refs, commits,
-worktrees, the provisional audit, or the interrupted pilot invalidates the
-blind calibration.
+Use only the scheduler-injected execution envelope/ticket, the snapshot tree,
+and exact candidate/predecessor objects named by snapshot-visible reports,
+packets, and results. The injected control text contains the rubric but no
+provisional labels or expected effect-row count. Any other access to newer
+refs, commits, paths, worktrees, the provisional audit, or the interrupted
+pilot invalidates the blind calibration.
 
 Before accepting the blind report, the manager preserves the complete Fugu
 event-log digest and audits tool calls for access to another worktree, a newer

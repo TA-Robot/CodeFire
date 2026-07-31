@@ -25,11 +25,14 @@ snapshot:
 - the later Upload, KGI/KPI, and Cargo reports do not exist; and
 - exactly 21 `review.md` files exist below the result tree.
 
-Do not inspect another branch, tag, reflog entry, worktree, or commit newer
-than the exact snapshot. Candidate and predecessor objects named by the
-snapshot reports and their snapshot-visible packets may be inspected even
-when they are not ancestors of the snapshot. No commit, path, or conclusion
-learned from a newer management artifact may enter calibration.
+The scheduler injects this exact execution envelope and ticket as the sole
+post-snapshot control input; they contain the rubric but no provisional labels
+or expected effect-row count. Do not otherwise inspect another branch, tag,
+reflog entry, worktree, path, or commit newer than the exact snapshot.
+Candidate and predecessor objects named by the snapshot reports and their
+snapshot-visible packets may be inspected even when they are not ancestors of
+the snapshot. No conclusion learned from another newer management artifact
+may enter calibration.
 
 Use a fresh session. Do not resume any earlier Fugu review or audit session.
 

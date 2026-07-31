@@ -86,6 +86,12 @@ newer files from the checked-out tree but is not an OS-level or object-store
 sandbox. A worker could still contaminate calibration by deliberately reading
 a newer ref, commit, reflog entry, or another worktree.
 
+`dev-swarm` reads the current task ticket before launch and injects its text
+into the worker prompt. That exact envelope/ticket is the sole intentional
+post-snapshot control input; it carries the rubric and prohibitions but no
+provisional labels or expected effect-row count. It does not authorize tool
+access to its current canonical path or to any other newer artifact.
+
 Accordingly, acceptance additionally requires:
 
 1. the exact `c258cbf…` launch base;
