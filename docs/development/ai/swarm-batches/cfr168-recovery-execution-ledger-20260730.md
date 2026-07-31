@@ -1364,3 +1364,43 @@ avg10 `0.07`, memory and I/O full PSI avg10 `0.00`, zero swap, and about
 Therefore CPU, disk, swap, and provider-window capacity are not current
 bottlenecks. The temporary memory block is intentional burst protection, not
 a return to a fixed session cap.
+
+## 2026-07-31 02:10 UTC MR-list exact rejection and closure rollover
+
+The fresh Claude Opus 5 reviewer terminated normally with report-only commit
+`0aa0d3d0bfbaafcc9d67bccdc90207810a60fe4b`. Manager recomputation proved:
+
+- exact report task base `8143f437342cf7bf11322d82f6ca63ab888382e8`;
+- one additive commit and no merge;
+- exact write set containing only
+  `cfr168-python-http-mr-list-review-closure-rereview-claude-20260730/review.md`;
+- clean checkout and report tree
+  `4514e38ebc122421612136c009e596dd8df633c2`;
+- report blob SHA-256
+  `dc4f66ba9649e4333980996c6f83d7f28b0f5f4bd165683adac55bf6d9704b2e`;
+- report patch SHA-256
+  `2848022a51e55fc449dafacacb3349ca4177387eb9b1176d6616d60a0403d7ce`;
+  and
+- scheduler collection `all_passed=true`.
+
+Canonical integrated only the immutable report as `909978c`. The decision is
+`REQUEST_CHANGES`: all seven inherited findings are closed, but F1--F3 prove
+post-fence fallible teardown, a filesystem error discarded behind an older
+prepared `200`, and an inert publishability guard that permits success with
+retained debt. The zero-residual successor also owns the review's write-only
+cleanup evidence and silent defensive over-release observations.
+
+The exact original implementer branch remained clean at reviewed candidate
+`4930d25178be11e064060487f8c254802b09868d`, with Claude session
+`3dd468cb-d9a9-42be-b266-befde4fba6fd`. The manager appended the immutable
+report as `6ee3646` and counterexample-first closure packet
+`06e519e`, integrated packet-only in canonical as `6ab6383`. No new
+implementation session or repository-orientation cost is needed.
+
+Immediate continuation was correctly held by adaptive admission: with active
+Rust gates and Storage's not-yet-reflected 4 GiB reservation, even a measured
+2 GiB MR-list reservation projected only `4,081,827,840` bytes available,
+below the 6 GiB floor. Provider window, swap, disk, PSI, PID, dependency, and
+write-conflict checks all passed. Resume is the first action after a heavy
+gate releases or Storage reaches measured steady state; the exact session,
+worktree, report, and packet are already bound.
