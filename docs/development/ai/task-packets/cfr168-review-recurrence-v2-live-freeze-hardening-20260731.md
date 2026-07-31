@@ -9,7 +9,7 @@ Base revision: `00ad88562068a6101a7530b84d5f52b0cff559f0`.
 
 ## Why this repair exists
 
-The first Cargo/KGI live-manifest extraction audit found six defects before a
+The first Cargo/KGI live-manifest extraction audit found eight defects before a
 manager-owned live anchor was written:
 
 1. `derivations[].locus_existed_in_predecessor` describes symbol/locus
@@ -36,7 +36,19 @@ manager-owned live anchor was written:
    manifest surrogate inside a `uniqueItems` array reaches
    `canonical_json_bytes(...).encode("utf-8")` and raises
    `UnicodeEncodeError` instead of returning a structured `BLOCK`.
-6. `live-arm-anchor.v1.json` has a documented shape, but no registered JSON
+6. Timed v2 evidence carries both detailed Git probe fields and summary
+   booleans, but the gate trusts the booleans without re-deriving them. A
+   committed result can say `clean_before: true` beside a non-empty dirty
+   status, claim clean index flags beside flagged entries, or claim unchanged
+   HEAD beside different after identities and a probe error, and still reach
+   `ALLOW`. The result-output path is not retained, so its claimed outside-tree
+   placement cannot be recomputed either.
+7. Every v2 raw JSON reader uses ordinary `json.loads`, so duplicate object
+   member names are silently last-write-wins before schema, digest-field, or
+   cross-field checks see them. A raw record, manifest, timed result, retained
+   result, or anchor can therefore carry two conflicting `generation`,
+   `sha256`, `kind`, or summary fields while the gate validates only the last.
+8. `live-arm-anchor.v1.json` has a documented shape, but no registered JSON
    Schema. The loader checks the top-level schema string and selected pin
    fields only. It does not reject duplicate arm rows or enforce the documented
    generation pin. Committing live manager authority on that surface would make
@@ -156,6 +168,56 @@ result string, current anchor pin path, and retained historical anchor. Each
 must return structured `BLOCK` without an uncaught exception or partial
 result.
 
+### F1e — derive timed-evidence summaries from their detailed fields
+
+- Recompute and require:
+  - `clean_before == (status_before == [])`;
+  - `clean_after == (status_after == [])`;
+  - `index_flags_clean == (index_flagged_entries == [])`;
+  - `head_unchanged` iff the after revision/tree equal the captured source
+    revision/tree and `head_probe_error` is null.
+- Extend timed-gate v2 output with the requested result path, emitted in a
+  closed schema shape. Require cwd, Git root, log path, and result path to be
+  absolute normalized paths; cwd must be within the declared Git root, while
+  log and result must be outside it. Recompute both inside/outside summary
+  booleans from those paths rather than trusting them.
+- Preserve exact candidate revision/tree, argv, committed log bytes/digest,
+  terminal status, timeout, exit-code, and unchanged-post-command checks.
+- Apply the same consistency checks under current-gate semantic replay of
+  retained generations. A historical self-contradiction is a structural
+  blocker, not compatibility-authorized provenance.
+- State the remaining trust boundary honestly: internal consistency and
+  committed identity do not prove that an author actually ran the command or
+  that mutate-and-restore did not occur during it.
+
+Required counterexamples independently falsify each boolean/detail pair,
+provide a non-null probe error with `head_unchanged: true`, move cwd outside the
+declared root, put log/result paths inside the root while setting the booleans
+false, and replay an inconsistent retained timed result. Every case must return
+structured `BLOCK`; a real runner-produced external-path result must remain
+passing.
+
+### F1f — reject duplicate raw JSON object member names
+
+- Use one reusable strict v2 JSON decoder that rejects a repeated member name
+  before normal object construction. Ordinary `json.loads` last-write-wins
+  behaviour is not an admissible authority boundary.
+- Apply it to the current record and every committed current/historical record,
+  result, manifest, timed result, and live anchor consumed by authority walk or
+  semantic replay.
+- Return a deterministic structured `duplicate-json-object-key` finding (or a
+  CLI input error before a record model exists) naming the duplicated member
+  safely. Do not continue with either value and do not emit a partial retained
+  authority chain.
+- Keep this distinct from F1c: F1c rejects repeated semantic IDs across array
+  objects; F1f rejects repeated member names inside one raw JSON object.
+
+Required counterexamples duplicate a top-level generation and separately a
+nested artifact digest, manifest claim kind, timed cleanliness boolean,
+retained-result candidate field, and anchor pin digest. Each raw byte sequence
+must fail deterministically before the conflicting value can influence a
+decision.
+
 ### F2 — make live anchor authority schema-exact
 
 - Add and register
@@ -208,15 +270,25 @@ set rule:
   passing validation mapping is semantically incomplete. The machine still
   proves set equality, not semantic completeness.
 
-This adjudication supersedes no immutable historical packet or report. The
-old Cargo/KGI recurrence packets remain semantic extraction sources and need
-new v2 review-control packets after their canonical port candidates exist.
+This F3 adjudication **supersedes the operating extraction rule** in the
+accepted v2 contract §“Prior obligations” that said required validation
+IDs/argv are derived from both the packet Validation table and its independent
+negative-control table. The accepted packet's bytes and every immutable
+historical report remain unchanged, but the two collections are no longer
+conflated: every expected-failure/mutation row is preserved in the frozen
+claim set and must bind exact independent report/derivation/observation
+evidence; only positive, clean-candidate, exit-zero argv enter timed required
+validations. This is a non-weakening replacement, not permission to omit a
+negative-control row. The old Cargo/KGI recurrence packets remain semantic
+extraction sources and need new v2 review-control packets after their canonical
+port candidates exist.
 
 ## Allowed write set
 
 - `docs/development/ai/schemas/review-recurrence-control.v2.schema.json`
 - `docs/development/ai/schemas/review-recurrence-repair-manifest.v1.schema.json`
 - `docs/development/ai/schemas/review-recurrence-live-arm-anchor.v1.schema.json`
+- `docs/development/ai/schemas/timed-gate-result.v2.schema.json`
 - `docs/development/ai/schemas/README.md`
 - `docs/development/tools/recurrence_v2_model.py`
 - `docs/development/tools/recurrence_v2_authority.py`
@@ -227,6 +299,8 @@ new v2 review-control packets after their canonical port candidates exist.
   schema/generation plumbing requires it
 - `docs/development/tools/check_review_recurrence.py` only if canonical schema
   loading/plumbing requires it
+- `docs/development/tools/run_timed_gate.py` only to emit the new bound result
+  path and preserve internally derived path/cleanliness/HEAD summaries
 - `docs/development/tools/check_ai_contracts.py` only to register the new
   canonical live-anchor schema in the repository schema registry
 - `docs/development/tools/test_ai_tools.py`
