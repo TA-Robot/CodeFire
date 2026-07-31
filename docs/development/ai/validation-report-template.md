@@ -98,7 +98,9 @@ committed successor contract and stays excluded from local/global closure.
 
 Failed, flaky, interrupted, truncated, different-tree, different-argv,
 different-environment, or mutable-name-only evidence is never `PASS` or a
-cache hit.
+cache hit. Prefer `docs/development/tools/run_timed_gate.py`; report its
+monotonic duration and wall-clock-discontinuity field rather than shell wall
+time.
 
 ## 7. New findings and integration overlap
 

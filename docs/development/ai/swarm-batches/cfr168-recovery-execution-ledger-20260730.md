@@ -1274,3 +1274,27 @@ content-addressed validation, integration overlap, unavailable evidence, and
 one terminal `OVERALL_VERDICT` line. Prepared File Doctor and Rust HTTP
 reviews require this form. This targets report synthesis and manager parsing
 time rather than reducing any counterexample, mutation, or gate requirement.
+
+## 2026-07-31 01:38 UTC wall-clock discontinuity and monotonic gate evidence
+
+The host/container wall clock advanced by roughly 4 hours 50 minutes during
+active validation while process-monotonic time remained continuous. Concrete
+evidence exposed the KPI hazard:
+
+- the Upload reviewer selected 13 legacy tests; unittest reported 13/13 in
+  202.701 seconds, while a `date +%s%3N` wrapper reported 16,319.902 seconds;
+- the MR-list reviewer broad gate reported 507/507 in 407.631 seconds, while
+  shell `time` reported 275 minutes 28.791 seconds; and
+- `timeout`-controlled agent processes remained healthy because their
+  enforcement uses monotonic elapsed time.
+
+No gate was rerun merely to make the wall duration look plausible. Gate
+result/count and internal monotonic duration remain evidence; wall-derived
+lead-time intervals crossing this event are unavailable until reconciled.
+
+`docs/development/tools/run_timed_gate.py` now runs one argv without a shell,
+uses a new process group and monotonic timeout/duration, binds complete log
+bytes/SHA-256, writes optional JSON atomically, and reports wall-minus-
+monotonic drift explicitly. A two-second drift threshold prevents wall time,
+mtime, or provider timestamps from silently contaminating gate and flow KPI
+durations.

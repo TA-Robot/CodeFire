@@ -57,6 +57,7 @@ from run_ai_role import (  # noqa: E402
     resolve_packet_manifest,
     select_codex_cli_adapter,
 )
+from run_timed_gate import run_gate, timing_evidence  # noqa: E402
 from run_dogfood_smoke import smoke_commands, validate_result  # noqa: E402
 from suggest_validation import parse_porcelain_paths, suggestions  # noqa: E402
 from validate_ai_runtime import strict_config_probe  # noqa: E402
@@ -782,6 +783,42 @@ class CandidateIdentityTests(unittest.TestCase):
             self.assertEqual(
                 identity["manifest"]["unmatched_write_set"], ["missing-report.md"]
             )
+
+
+class TimedGateTests(unittest.TestCase):
+    def test_gate_uses_monotonic_duration_and_binds_complete_log(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            log = root / "gate.log"
+            result = run_gate(
+                [sys.executable, "-c", "print('gate-ok')"],
+                root,
+                log,
+                5,
+            )
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual(result["exit_code"], 0)
+            self.assertEqual(result["duration_source"], "time.monotonic_ns")
+            self.assertGreaterEqual(result["duration_seconds"], 0)
+            self.assertEqual(log.read_text(encoding="utf-8"), "gate-ok\n")
+            self.assertEqual(result["log"]["bytes"], len(b"gate-ok\n"))
+            self.assertEqual(
+                result["log"]["sha256"], hashlib.sha256(b"gate-ok\n").hexdigest()
+            )
+            self.assertTrue(result["log"]["complete"])
+
+    def test_wall_clock_jump_is_explicit_and_not_the_duration(self) -> None:
+        result = timing_evidence(
+            1_000_000_000,
+            11_000_000_000,
+            20_000_000_000,
+            22_000_000_000,
+            drift_threshold_seconds=2.0,
+        )
+        self.assertEqual(result["duration_seconds"], 2.0)
+        self.assertEqual(result["wall_elapsed_seconds"], 10.0)
+        self.assertEqual(result["wall_minus_monotonic_seconds"], 8.0)
+        self.assertTrue(result["wall_clock_discontinuity"])
 
 
 class FocusedTestMapTests(unittest.TestCase):

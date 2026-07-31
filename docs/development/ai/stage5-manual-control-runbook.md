@@ -233,6 +233,24 @@ The key includes exact tree, declared non-Git input digests, validation ID and
 argv, selected environment contract, toolchain/binary provenance, and
 fixture/corpus version.
 
+Run long gates without a shell and measure them from a monotonic clock:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  docs/development/tools/run_timed_gate.py \
+  --cwd "$WORKTREE" \
+  --timeout 3600 \
+  --log "$LOG" \
+  --result "$RESULT_JSON" \
+  -- python3 -m unittest discover -s tests -p 'test_python_*.py'
+```
+
+The result binds argv, cwd, monotonic duration, timeout outcome, complete log
+bytes/SHA-256, wall timestamps, and wall-minus-monotonic drift. Any drift
+beyond two seconds is an explicit clock discontinuity; never replace the
+monotonic duration with `date`, shell `time`, filesystem mtime, or provider
+wall timestamps.
+
 Reuse is allowed only when the task packet explicitly permits a deterministic
 focused gate and every key byte matches. Never reuse:
 

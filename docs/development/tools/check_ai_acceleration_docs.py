@@ -34,6 +34,7 @@ REQUIRED_AI_FILES = [
     "docs/development/tools/prepare_historical_eval.py",
     "docs/development/tools/build_source_bound_rust.py",
     "docs/development/tools/capture_candidate_identity.py",
+    "docs/development/tools/run_timed_gate.py",
     "docs/development/exploration/README.md",
     ".codex/config.toml",
     ".codex/agents/medium.toml",
