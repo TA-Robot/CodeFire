@@ -1,0 +1,26 @@
+{
+  "schema": "dev-swarm.v1",
+  "batch_id": "cfr168-python-http-upload-review-closure-rereview-fugu-20260731-r1",
+  "workspace": "/workspace/worktrees/cfr168-python-http-upload-review-closure-rereview-fugu-base",
+  "base_revision": "a27aac25d657ed375669c34b47e0a676e7178352",
+  "max_parallel": {
+    "fugu": 1,
+    "claude": 0,
+    "codex": 0
+  },
+  "tasks": [
+    {
+      "id": "python-http-upload-review-closure-rereview-r1",
+      "role": "reviewer",
+      "tier": "ultra",
+      "provider": "fugu",
+      "ticket": "docs/development/ai/swarm-batches/cfr168-python-http-upload-review-closure-rereview-fugu-20260731.md",
+      "depends_on": [],
+      "write_set": [
+        "docs/development/ai/swarm-results/cfr168-python-http-upload-review-closure-rereview-fugu-20260731/review.md"
+      ],
+      "expected_commit": true,
+      "timeout": "12h"
+    }
+  ]
+}
