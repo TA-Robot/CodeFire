@@ -9,21 +9,21 @@ Product mutation: forbidden
 
 ## Objective
 
-Compose the independently accepted source-keyed Cargo-gate implementation and
-the independently accepted development-flow KGI/KPI implementation onto one
-fresh canonical control-plane head without losing either contract.
+Port the independently accepted development-flow KGI/KPI implementation onto
+an already accepted, integrated source-keyed Cargo-gate canonical head without
+losing either contract.
 
-This is a semantic port, not a branch merge. The two candidate lineages
-diverged from different historical canonical bases and overlap in five files.
-Separate acceptance of both candidates will not constitute acceptance of their
-composition.
+This is a semantic port, not a branch merge. The historical Cargo and KGI/KPI
+lineages diverged from different canonical bases and overlap in five files.
+Acceptance of the Cargo canonical port and the KGI/KPI source candidate will
+not constitute acceptance of their composition.
 
 ## Scope
 
-- Port only the accepted control-plane behavior in the two exact source
-  ranges.
-- Resolve the 31-path union and the five overlapping paths from a fresh
-  canonical worktree.
+- Port the accepted KGI/KPI source range onto the accepted Cargo-enabled
+  canonical head.
+- Resolve the KGI/KPI 17-path range and its five collisions with the
+  already-integrated Cargo contract.
 - Preserve both executable contract families, their tests, current canonical
   incident evidence, and current routing policy.
 - Produce one exact composition candidate, one result, and one independent
@@ -46,26 +46,29 @@ Do not launch this task until both rows are satisfied:
 
 | Input | Exact candidate | Required evidence |
 |---|---|---|
-| Source-keyed Cargo gate | `4e5c0e7f058cd406cb7a183ecda8b3a07f3ee912` | Fresh exact independent `ACCEPT`; current reviewer session `d089c8ae-8364-49af-bcd1-b9bf4b741ea1` has no report because Claude quota interrupted it. |
+| Canonical source-keyed Cargo port | blocked packet `cfr168-source-keyed-cargo-canonical-port-20260731.md` | Exact port commit is integrated into canonical after its own fresh `ACCEPT`. Candidate `4e5c0e7` acceptance alone is insufficient. |
 | Development-flow KGI/KPI | `753c8db103579d021795d3fe6a97c5d45d4a111a` | Fresh exact independent `ACCEPT`; current reviewer session `60548555-ff29-4fd9-9360-2820a663ee54` has no report because Claude quota interrupted it. |
 
-If either candidate receives `REQUEST_CHANGES`, this packet stays blocked and
-must be rebound to its accepted successor. Do not compose a rejected candidate
-for convenience.
+If the KGI/KPI candidate receives `REQUEST_CHANGES`, this packet stays blocked
+and must be rebound to its accepted successor. If the Cargo canonical port is
+rejected, repair and accept that port first. Do not compose rejected work for
+convenience.
 
 ## Exact Source Ranges
 
-After both acceptance reports are canonical, create a fresh worktree from the
-then-current canonical head and use these ranges only as source material:
+After both admission rows are canonical, create a fresh worktree from the
+then-current Cargo-enabled canonical head. Use the KGI/KPI range as port source
+and the Cargo range only as a protected-contract reference:
 
 ```text
-Cargo gate: 893cbcad2b1f2a8455a5c256246c8110d3fcbdd6..4e5c0e7f058cd406cb7a183ecda8b3a07f3ee912
-KGI/KPI:    9dd0da4f2ae55742ee51c1671aab6308994de24c..753c8db103579d021795d3fe6a97c5d45d4a111a
+Protected Cargo reference: 893cbcad2b1f2a8455a5c256246c8110d3fcbdd6..4e5c0e7f058cd406cb7a183ecda8b3a07f3ee912
+KGI/KPI port source:       9dd0da4f2ae55742ee51c1671aab6308994de24c..753c8db103579d021795d3fe6a97c5d45d4a111a
 ```
 
-Do not cherry-pick either complete history. Both histories contain stale
-management-document versions relative to canonical, and a whole-branch merge
-would make unrelated ancestry look like reviewed composition evidence.
+Do not cherry-pick the KGI/KPI history or replace files with source blobs.
+Its history contains stale management-document versions relative to canonical,
+and a whole-branch merge would make unrelated ancestry look like reviewed
+composition evidence.
 
 ## Collision Inventory
 
@@ -86,7 +89,8 @@ markers is not sufficient.
 
 ### Cargo-owned non-overlap
 
-Port the accepted Cargo-gate behavior from:
+These paths are protected by the earlier canonical Cargo port. Do not modify
+them in this KGI/KPI composition:
 
 ```text
 docs/development/ai/failure-cookbook.md
@@ -144,11 +148,12 @@ forbidden.
 
 ### `test_ai_tools.py`
 
-Mechanically extract every test method added by each accepted source range.
-Every name must still exist exactly once after composition and every method
-must execute. Do not use a total test-count threshold as a substitute: the
-base counts differ, and a duplicated or silently dropped test can leave a
-plausible total.
+Mechanically extract every test method added by the accepted KGI/KPI source
+range and snapshot every Cargo source-gate test present on the accepted
+canonical base. Every name must still exist exactly once after composition
+and every method must execute. Do not use a total test-count threshold as a
+substitute: the base counts differ, and a duplicated or silently dropped test
+can leave a plausible total.
 
 Additionally run the source-gate test classes and the development-flow
 contract test classes separately so a zero-selection or discovery omission
@@ -200,8 +205,8 @@ git diff --check
 
 Also:
 
-1. compare the mechanically extracted test-name sets from both accepted ranges
-   with the composed tree;
+1. compare the mechanically extracted KGI/KPI test-name set and the protected
+   canonical Cargo test-name snapshot with the composed tree;
 2. run each accepted candidate's manager counterexample/probe set against the
    composition;
 3. demonstrate at least one deliberate source-gate regression and one
@@ -214,7 +219,8 @@ No Cargo or Rust command is authorized by this composition task.
 
 ## Write Boundary
 
-The implementer may change only the 31-path union above plus:
+The implementer may change only the 17 KGI/KPI source-range paths (the five
+overlap paths plus the twelve KGI/KPI-owned non-overlap paths) plus:
 
 ```text
 docs/development/ai/swarm-results/cfr168-control-plane-composition-claude-20260731/result.md
@@ -234,8 +240,8 @@ Only the exact reviewer verdict `ACCEPT` authorizes manager integration.
 
 The implementer returns:
 
-- canonical base, both accepted source identities, composed HEAD, branch, and
-  clean-worktree proof;
+- Cargo-enabled canonical base, accepted Cargo-port identity, accepted KGI/KPI
+  source identity, composed HEAD, branch, and clean-worktree proof;
 - exact changed paths and a five-file overlap disposition;
 - mechanically compared source-test-name and composed-test-name sets;
 - every validation command, return code, monotonic duration, complete-log

@@ -2083,11 +2083,32 @@ later be integrated as two blind branch merges:
 - five paths overlap: the AI README, acceleration plan, history,
   `ai_contracts.py`, and `test_ai_tools.py`.
 
-Blocked packet `cfr168-control-plane-composition-20260731.md` freezes a
+The initial version of blocked packet
+`cfr168-control-plane-composition-20260731.md` froze a
 31-path semantic-port contract before either review returns. It requires both
 exact candidates to receive fresh `ACCEPT`, starts from then-current canonical
 instead of either stale branch history, preserves every test name from both
 ranges, runs both counterexample families and deliberate regressions, and
 requires a fresh exact composition review. It authorizes no product or Rust
-mutation and has no Codex worker fallback. The packet SHA-256 is
+mutation and has no Codex worker fallback. That superseded initial packet's
+SHA-256 was
 `6c356cdccf9bd8e8559aca85cec1ecb7570f95e41e860af81a36b4b99ddb8cb9`.
+
+The initial packet coupled Cargo-gate integration to KGI/KPI acceptance. That
+would unnecessarily hold every Rust candidate behind the independent
+development-flow review. Before either packet became executable, the manager
+split the dependency:
+
+1. `cfr168-source-keyed-cargo-canonical-port-20260731.md` ports and freshly
+   reviews accepted Cargo candidate `4e5c0e7` first; its accepted integration
+   releases source-keyed Rust validation immediately.
+2. `cfr168-control-plane-composition-20260731.md` then ports accepted KGI/KPI
+   candidate `753c8db` onto the Cargo-enabled canonical head and proves that
+   the five overlapping files preserve both contracts.
+
+Neither packet is admitted by worker-green evidence, and both remain blocked
+on their exact missing independent decisions. The current Cargo canonical-port
+packet SHA-256 is
+`e313480bd9b429cd496b8e233eae5b1993845954640b93ff6621d23500477419`;
+the current KGI/KPI composition packet SHA-256 is
+`6360d41d89fb3cd74e4877b43ad9cfba556fc6afe24555eb3475f5c722473c1a`.
