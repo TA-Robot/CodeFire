@@ -1871,3 +1871,65 @@ is resumed on those seven rows. It must keep the five verified closures, all
 ten fail-closed safety classes, and the global lock. No Rust candidate may
 consume this gate until the additive successor receives a fresh independent
 acceptance.
+
+## 2026-07-31 09:19 UTC evidence-first review-recursion audit
+
+Canonical `abfee6e` integrates the report-only root-cause audit captured
+against historical task base `c258cbf`. The 1,281-line audit has SHA-256
+`2392450e957c8437b323ded492fc7597dc77f5147b74f3056c97c0efd9329780`
+and reconstructs all 22 candidate commits and 21 then-indexed reports from Git
+objects.
+
+The evidence does not support treating simple review omission as the sole or
+dominant bottleneck. Across 51 successor findings:
+
+- repair-introduced regressions are primary for 16/51;
+- initial review scope misses are primary for 12/51;
+- bound findings not closed are primary for 8/51;
+- oracle defects appear as primary or contributor in 24/51, but none of the
+  17 findings with a reproduced production effect is oracle-primary; and
+- 14 of those 17 reproduced-effect findings are repair-introduced or initial
+  scope misses.
+
+The audit therefore identifies an interaction loop: bounded recall on very
+large shared surfaces, median successor deltas above two thousand insertions
+that add new state machines/owners/classifiers, and a zero-residual criterion
+that sometimes promotes claim-only or unsatisfiable rows into mandatory
+product repairs. Reviews remain high precision: only four withdrawal-like
+instances were found among 143 findings. Provider choice did not show a signal
+in this corpus.
+
+The audit explicitly refuses to choose a review-item count or template depth.
+It proposes seven interventions and requires retroactive measurement of
+later-finding capture, noise, duplication, evidence burden, false positives,
+and unavailable rows before adoption.
+
+## 2026-07-31 09:22 UTC preregistered review-intervention pilot
+
+Canonical `cdaee6a` freezes the report-only comparison packet
+`cfr168-review-intervention-retroactive-pilot-20260731.md`, SHA-256
+`3d2f8b16c13349738a587b149d635fd65691a2472ca2a6b8c0d43191a338dd39`.
+It evaluates the first four interventions in causal order:
+
+1. repair-delta boundary curve, without preselecting a round number;
+2. predecessor-behavior re-derivation;
+3. oracle admissibility E1–E9, scored per property rather than as one
+   checklist total; and
+4. evidence-state versus verdict/routing-state separation.
+
+To reduce corpus overfitting, the packet pre-registers Python MR-write and
+Rust File Doctor as score-only lineage holdouts using a deterministic
+SHA-256 selection seeded by canonical task base `abfee6e`. The audit had
+already seen those lineages, so this is not claimed as fully blind.
+
+Three reports absent from the audit snapshot form a stronger temporal
+holdout and cannot tune any threshold or rule: Upload `02e04c7` at
+`b3de0d7`, KGI/KPI `0944bf3` at `5760c98`, and source-keyed Cargo gate
+`aaa39b6` at `b589864`.
+
+Fresh Claude Opus 5 session
+`cfr168-review-intervention-retroactive-pilot-claude-20260731` is active on
+the exact packet. It may write only its pilot report. No intervention,
+template shape, checklist length, process threshold, product integration, or
+issue closure is authorized before the report is independently checked and a
+manager decision is recorded.
