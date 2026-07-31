@@ -9,7 +9,7 @@ Base revision: `00ad88562068a6101a7530b84d5f52b0cff559f0`.
 
 ## Why this repair exists
 
-The first Cargo/KGI live-manifest extraction audit found eight defects before a
+The first Cargo/KGI live-manifest extraction audit found nine defects before a
 manager-owned live anchor was written:
 
 1. `derivations[].locus_existed_in_predecessor` describes symbol/locus
@@ -48,7 +48,11 @@ manager-owned live anchor was written:
    cross-field checks see them. A raw record, manifest, timed result, retained
    result, or anchor can therefore carry two conflicting `generation`,
    `sha256`, `kind`, or summary fields while the gate validates only the last.
-8. `live-arm-anchor.v1.json` has a documented shape, but no registered JSON
+8. Python's default JSON decoder also admits non-standard `NaN`, `Infinity`,
+   and `-Infinity`. The compact schema evaluator treats them as numbers and
+   comparisons such as `minimum` do not reject `NaN`, allowing non-finite timed
+   durations or thresholds into committed evidence.
+9. `live-arm-anchor.v1.json` has a documented shape, but no registered JSON
    Schema. The loader checks the top-level schema string and selected pin
    fields only. It does not reject duplicate arm rows or enforce the documented
    generation pin. Committing live manager authority on that surface would make
@@ -197,11 +201,15 @@ false, and replay an inconsistent retained timed result. Every case must return
 structured `BLOCK`; a real runner-produced external-path result must remain
 passing.
 
-### F1f — reject duplicate raw JSON object member names
+### F1f — use a strict deterministic JSON authority boundary
 
 - Use one reusable strict v2 JSON decoder that rejects a repeated member name
   before normal object construction. Ordinary `json.loads` last-write-wins
   behaviour is not an admissible authority boundary.
+- Reject non-standard non-finite numeric constants (`NaN`, `Infinity`, and
+  `-Infinity`) at decode time with a structured `non-finite-json-number`
+  finding/error. Schema number checks are not a substitute because comparison
+  against `NaN` is false in both directions.
 - Apply it to the current record and every committed current/historical record,
   result, manifest, timed result, and live anchor consumed by authority walk or
   semantic replay.
@@ -216,7 +224,9 @@ Required counterexamples duplicate a top-level generation and separately a
 nested artifact digest, manifest claim kind, timed cleanliness boolean,
 retained-result candidate field, and anchor pin digest. Each raw byte sequence
 must fail deterministically before the conflicting value can influence a
-decision.
+decision. Separate current and retained timed-result controls inject all three
+non-finite constants into duration/threshold fields and must also fail before
+schema/decision use.
 
 ### F2 — make live anchor authority schema-exact
 
