@@ -2473,3 +2473,53 @@ This creates useful fourth-lane work only when capacity is genuinely idle. It
 does not widen the adaptive provider window, consume Codex fallback, accept
 Upload, authorize rejected product bytes, or allow MR-write implementation
 before a committed `READY` preflight.
+
+## 2026-07-31 11:40 UTC repair-premortem hypothesis made measurable
+
+Commit `c3ca44060cc35afdd943b64c228c9849852f0cf9` corrects one remaining
+gap before the blind classifier launches. Code origin could identify an effect
+introduced by repair, but the prior six axes did not separately measure
+whether the immutable pre-repair packet had named that exact hazard, named
+only its governing invariant, or required a falsifying oracle.
+
+The classifier, comparator, and adjudicator now preserve a seventh independent
+axis, pre-repair hazard coverage:
+
+- exact hazard and oracle both bound;
+- exact hazard bound but adequate oracle absent;
+- governing invariant only;
+- no relevant pre-repair bound;
+- not repair-introduced; or
+- unavailable.
+
+This is an artifact comparison, not a hindsight foreseeability label.
+Uncovered hazards identify eligible historical subjects for a later blind
+premortem experiment; they do not justify a mandatory premortem. The causal
+decision map requires that experiment to report later-effect capture, noise,
+duplication, false positives, and implementer/reviewer burden. If the exact
+hazard was already bound and still recurred, implementation traceability and
+oracle strength take priority over more brainstorming.
+
+The revised reliability gate SHA-256 is
+`f09940f94d9d06b9a962d1fd9b1554a9e9f633ebfc1d8060f659aa457e70fac9`.
+Blind execution-ticket and typed-packet SHA-256 values are
+`1936e3ddd5a65c3c2892e1eae022a5b93303f7698f13c4f79ed9b378926ca62a`
+and
+`6b29601753e51c9f9afd79f7da60f1a498c6c1ee22dd6e08892a14991eb86cb3`.
+Comparison execution-ticket and typed-packet SHA-256 values are
+`f09e8e9be1a3a76f4f2da92e8ef65fa8a439b97524626bf546110085447b158c`
+and
+`ed35dae7cdc2a74c28a87f535c0cae68df3d86a935c77af072b4a381748dea8c`.
+Adjudication execution-ticket and typed-packet SHA-256 values are
+`4547c4d72437444b39403c3b3b28c6c6dc66fa2499e1b3969e4cf61621aaa697`
+and
+`e9d8147277296900c5fda6538a00aa6cc506fe1e9065e8e3a1830ce1f984f5e5`.
+The pilot-resume and general causal-gate SHA-256 values are
+`d649c3d92f59cbdcf4f05462d704c94fc6806c9fe1f86e5c0fd8b58c980acf19`
+and
+`fa7e32c08addad8fc919b4ae05a87b4d05a6e2d13608e2f2e5663416a7c01f70`.
+
+All AI contract, project-document, acceleration-document, runtime/tool, and
+complete AI-development gates pass. The Fugu blind-calibration manifest still
+resolves one Ultra reviewer at exact pre-audit base `c258cbf…`; no provider
+was launched.
