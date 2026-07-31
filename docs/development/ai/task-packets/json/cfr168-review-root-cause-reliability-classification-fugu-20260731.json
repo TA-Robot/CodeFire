@@ -1,0 +1,219 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "cfr168-review-root-cause-reliability-classification-fugu-20260731",
+  "status": "ready",
+  "objective": "Blindly reconstruct the finite CFR-168 successor-finding census, classify every independently testable observed effect on six orthogonal evidence axes before opening the provisional audit labels, freeze that calibration, compare every disagreement, apply unchanged rules to the temporal holdout, and publish evidence for later adjudication without adopting a review template, finding count, checklist, or process change.",
+  "base_revision": "f259e9488e9676af331b2fed45d15209feec0e7b",
+  "role": "reviewer",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 1,
+      "reversibility": 1,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "cross_subsystem_architecture",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 10,
+    "selected_tier": "ultra",
+    "rationale": "The lane is report-only, but its causal labels control whether later experiments target review scope, repair regressions, communication, oracles, routing, or evidence. A contaminated or shallow classification would amplify the wrong process change across every future lane."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-5-project-management-docs"
+    ],
+    "additional_files": [
+      "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-classification-fugu-20260731.md",
+      "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-gate-20260731.md",
+      "docs/development/ai/swarm-results/cfr168-review-recursion-root-cause-audit-claude-20260731/audit.md",
+      "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md",
+      "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-fugu-quota-review-interruptions-20260731/incident.md",
+      "docs/development/ai/swarm-results/cfr168-claude-quota-review-interruptions-20260731/incident.md",
+      "docs/development/ai/swarm-batches/cfr168-review-intervention-retroactive-pilot-20260731.md",
+      "docs/development/ai/swarm-results/cfr168-review-intervention-retroactive-pilot-claude-quota-20260731/incident.md"
+    ],
+    "evidence_refs": [
+      "task-base:f259e9488e9676af331b2fed45d15209feec0e7b",
+      "task-tree:143ff061ada99533d587b9eb77c4f8811282535d",
+      "reliability-gate-sha256:cdc07044dde70b33549c7708ad3a7c3635585b3895d649ba89d49bf0a59131da",
+      "provisional-audit-sha256:2392450e957c8437b323ded492fc7597dc77f5147b74f3056c97c0efd9329780",
+      "review-index-sha256:890c5e0b128baa8b0e369afcf8e95079780dfb3315ea4a760b6fb2e7e45da855",
+      "recovery-ledger-sha256:73ad5ce65606ae53189796a74babc6c5dccf7bda7588adea53440a5d66764beb",
+      "calibration-reports:21",
+      "candidate-generations:22",
+      "observed-successor-findings:51-not-a-quota",
+      "blind-freeze:/tmp/cfr168-review-root-cause-blind-freeze.md",
+      "provider:fugu-ultra-v1.1",
+      "provider-health-probe-required-before-launch",
+      "codex-fallback:forbidden"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-classification-fugu-20260731.md",
+      "docs/development/ai/swarm-batches/cfr168-review-root-cause-reliability-gate-20260731.md",
+      "docs/development/ai/swarm-results/**/review.md",
+      "docs/development/ai/swarm-results/**/audit.md",
+      "docs/development/ai/swarm-results/**/candidate.md",
+      "docs/development/ai/swarm-results/**/result*.md",
+      "docs/development/ai/swarm-results/cfr168-review-disposition-index-20260730/index.md",
+      "docs/development/ai/swarm-batches/**",
+      "docs/development/ai/task-packets/**",
+      "docs/development/tools/**",
+      "docs/development/**",
+      "codefire",
+      "tests/**",
+      "crates/**",
+      ".git/**"
+    ],
+    "write_set": [
+      "docs/development/ai/swarm-results/cfr168-review-root-cause-reliability-classification-fugu-20260731/classification.md"
+    ],
+    "disallowed_paths": [
+      "codefire",
+      "tests/**",
+      "crates/**",
+      "Cargo.toml",
+      "Cargo.lock",
+      ".devcontainer/**",
+      "subprojects/**",
+      "install.sh",
+      "docs/development/ai/swarm-results/**/review.md",
+      "docs/development/ai/swarm-results/**/audit.md",
+      "docs/development/ai/swarm-results/**/candidate.md",
+      "docs/development/ai/swarm-results/**/result*.md",
+      "docs/development/ai/swarm-batches/**",
+      "docs/development/ai/task-packets/**",
+      "docs/development/tools/**",
+      "docs/development/code-review-issues/**",
+      "docs/development/bug-issues/**",
+      "docs/development/history.md",
+      "docs/development/todo-checklist.md"
+    ],
+    "disallowed_actions": [
+      "Open the provisional audit's per-finding labels, aggregates, interventions, or conclusions before the blind calibration file is content-frozen and digest-emitted",
+      "Open temporal holdout reports before calibration and provisional-audit comparison are frozen",
+      "Treat 51 as a requested count, split one effect for volume, or combine effects with different evidence or axis values",
+      "Infer review omission from a later finding without exact predecessor scope and origin evidence",
+      "Infer effect evidence from severity wording or oracle quality from a test name",
+      "Replace unavailable evidence with project-general narrative or a guessed value",
+      "Run Cargo, Rust builds, Install, Dogfood, Docker, product mutation, issue mutation, or network calls other than the Fugu provider request",
+      "Adopt a review template, checklist, finding quota, repair threshold, severity policy, routing policy, or process change",
+      "Use Codex, Claude, or another Fugu session as a fallback or subagent"
+    ]
+  },
+  "non_goals": [
+    "Review or accept a product/control-plane candidate",
+    "Repair any finding discovered during classification",
+    "Estimate absolute review recall or precision",
+    "Choose one primary narrative cause",
+    "Complete or reinterpret the frozen intervention pilot",
+    "Choose a review-template length, detail level, checklist, or item count",
+    "Review development-environment infrastructure"
+  ],
+  "invariants": [
+    {
+      "id": "blind-calibration-boundary",
+      "statement": "Calibration rows, all six axis values, evidence locators, rules, unavailable values, and aggregates are content-frozen with a byte count and SHA-256 in the event log before provisional labels are opened.",
+      "falsification_test": "Find any audit-label access before the freeze event, a changed freeze digest afterward, or a classification value added from the provisional audit; the lane is contaminated and must restart."
+    },
+    {
+      "id": "finite-census-not-quota",
+      "statement": "Rows correspond to independently testable effects with stable report locators in the exact observed successor corpus; output volume earns no credit.",
+      "falsification_test": "Split wording variants, merge effects with different subjects/evidence, omit a stable observed effect, or add a finding not present in the frozen report universe; census validation fails."
+    },
+    {
+      "id": "six-orthogonal-evidence-axes",
+      "statement": "Every row independently records code origin, prior-review detectability, repair-contract handling, effect evidence, closure-oracle quality, and review routing, with a separate exact evidence field for each axis.",
+      "falsification_test": "Use one narrative primary cause, copy report framing as origin proof, use severity as effect proof, or fill an undecidable axis without UNAVAILABLE; classification fails."
+    },
+    {
+      "id": "decision-critical-detail",
+      "statement": "Every reproduced effect, decision-changing unavailable, provisional-audit disagreement, policy/contradiction row, and denominator-sensitive split has a repeatable detailed evidence block.",
+      "falsification_test": "Leave one such row as a bare table assertion without object comparison, command/outcome, counterevidence, or unavailable reason; report is incomplete."
+    },
+    {
+      "id": "unchanged-temporal-check",
+      "statement": "The three later reports are classified only after calibration/comparison freeze, using unchanged categories and evidence thresholds.",
+      "falsification_test": "Retune a category, add a rule, change an unavailable threshold, or revise calibration after reading a temporal row; temporal evidence is invalid."
+    },
+    {
+      "id": "report-only-non-adoption",
+      "statement": "The lane changes only its classification report and makes conditional evidence statements without changing policy or candidate dispositions.",
+      "falsification_test": "Change any product, test, packet, report, ledger, index, schema, tool, issue, lifecycle, template, or process rule; postflight rejects the lane."
+    }
+  ],
+  "validation": [
+    {
+      "id": "exact-input-integrity",
+      "command": "Recompute task base/tree and SHA-256 for the reliability gate, provisional audit, disposition index, and recovery ledger before classification.",
+      "purpose": "Prevent blind comparison against moving or substituted management evidence.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "blind-freeze-integrity",
+      "command": "Write /tmp/cfr168-review-root-cause-blind-freeze.md before audit-label access, emit its byte count and SHA-256 in one event-log tool result, and verify the digest again before final report.",
+      "purpose": "Make contamination and post-hoc retuning detectable.",
+      "required": true
+    },
+    {
+      "id": "raw-row-and-axis-audit",
+      "command": "Validate one stable row per independently testable effect, all required row fields, six axis values/evidence fields, counterevidence, reproducer/oracle disposition, censoring, and decision relevance before aggregates.",
+      "purpose": "Prevent a long unsupported bullet list or one primary-cause narrative from satisfying the task.",
+      "required": true
+    },
+    {
+      "id": "temporal-holdout-audit",
+      "command": "After calibration/comparison freeze, classify b3de0d7/02e04c7, 5760c98/0944bf3, and b589864/aaa39b6 under unchanged rules and report every unavailable value.",
+      "purpose": "Check whether calibration conclusions survive later evidence without tuning.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "ai-contracts",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_ai_contracts.py",
+      "purpose": "Keep the report-only AI control plane structurally valid.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "project-docs",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 docs/development/tools/check_project_docs.py",
+      "purpose": "Validate report links and project documentation structure.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "output-scope",
+      "command": "git diff --check; git diff --name-only <launch-revision>..HEAD and git status --porcelain must show only the committed classification report and a clean worktree.",
+      "purpose": "Preserve report-only independence.",
+      "required": true,
+      "requires_capability": "git"
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "exact_task_and_evidence_identities",
+      "blind_freeze_bytes_sha256_and_event_locator",
+      "raw_calibration_rows",
+      "six_axis_evidence_fields",
+      "decision_critical_detailed_blocks",
+      "per_axis_aggregates_with_unavailable",
+      "provisional_audit_agreement_disagreement_matrix",
+      "reproduced_effect_and_disagreement_adjudication_queue",
+      "unchanged_temporal_holdout_result",
+      "threats_to_validity_and_censoring",
+      "explicit_template_count_checklist_and_policy_non_decisions",
+      "report_commit_tree_sha256_and_clean_state"
+    ],
+    "evidence_digest_required": true
+  }
+}

@@ -2260,3 +2260,27 @@ The index root map now also names pending Upload `446cf4a`, pending Cargo
 `4e5c0e7`, the canonical-port review requirement, and the removed Upload
 precondition on the report-only shared-primitives preflight. It does not
 promote their manager gates to closure.
+
+## 2026-07-31 10:45 UTC blind Fugu causal classifier prepared
+
+The fresh report-only Fugu Ultra 1.1 blind-classification lane is now defined
+without launching a provider. Its execution ticket SHA-256 is
+`1ab52b36e7f64ff576dd8eff9dd704f11781c6f1f1e0faf0a48ca7b1f96f30c7`;
+its human-readable task view SHA-256 is
+`64470d7deeb42a23703a9eb316ad81015f6878ae54c3daa8835ded8849f42c5d`;
+and its typed packet SHA-256 is
+`076361fb80e1610163251a2842369d4c4346aa80293dfa86a940ebe293c08c95`.
+
+The packet binds the 51 observed successor findings as a finite historical
+census, not an output quota. It requires one evidence-rich analysis row per
+independently testable effect, six orthogonal causal axes, a digest-bound blind
+freeze before provisional labels are opened, row-level disagreement review,
+and an unchanged temporal holdout. It explicitly cannot adopt a template,
+checklist, item count, routing policy, candidate disposition, or product
+change.
+
+This lane remains provider-held. Do not launch it until the displayed Fugu
+reset window has passed and one bounded health probe succeeds. Use one fresh
+session; do not resume a superseded Fugu lane, start a competing classifier,
+or substitute a Codex worker. A scheduler manifest will be bound to the exact
+packet-definition commit separately so its launch base cannot float.
