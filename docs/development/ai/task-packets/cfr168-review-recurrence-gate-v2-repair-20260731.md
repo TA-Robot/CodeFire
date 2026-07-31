@@ -1,8 +1,8 @@
 # CFR-168 Review Recurrence Gate v2 Repair
 
-Status: pre-implementation contract draft; implementation is forbidden until
-the manager records the independent contract-preflight disposition and freezes
-the dispatch revision.
+Status: contract revision after independent preflight
+`102fc12`; implementation remains forbidden until the same contract reviewer
+accepts the exact revised packet and the manager freezes its dispatch revision.
 
 Provider/model for implementation: Claude Code / `claude-opus-5`.
 
@@ -11,12 +11,15 @@ Provider/model for implementation: Claude Code / `claude-opus-5`.
 Replace the rejected AIA-047 v1 authorization surface with a smaller,
 evidence-bound v2 pilot gate that:
 
-1. cannot narrow the reviewed repair interval past the predecessor candidate;
-2. proves that the repair packet existed before the first repair change;
-3. binds validation, report, route-authority, and terminal evidence to exact
+1. cannot narrow the reviewed repair interval past the exact candidate bound by
+   the predecessor generation's committed authority artifact;
+2. proves that, in the presented Git topology, the repair packet/manifest
+   commit is the direct parent of the first repair commit and carries no repair
+   byte;
+3. binds validation, report, routing/scope-decision, and terminal evidence to exact
    regular-file Git blobs;
-4. forces every changed path to have a reviewed surface or an explicit
-   evidence-backed `no_surface_change` disposition;
+4. forces every changed path to have at least one reviewed surface with an
+   explicit scope disposition;
 5. runs the two interventions supported by the historical replay as live
    experiments:
    - I1: predecessor-behaviour **derivation**, not merely a differential;
@@ -39,18 +42,33 @@ Read these exact repository artifacts before changing anything:
   - candidate tree `9c0a46a2c27ed3d54f3e1aa475df8ab655caad3a`;
 - independent adversarial review:
   - `docs/development/ai/swarm-results/cfr168-review-recurrence-gate-independent-review-claude-20260731/review.md`;
+  - canonical commit `2bec22419c25882a81d029046ccf4cd7ba6d8df0`,
+    mode `100644`, SHA-256
+    `02bc2030728fd2c471237dd1a5da8eca268c07836c7d5c494bb73b2050ffb05b`;
   - verdict `REQUEST_CHANGES`;
-  - 51 executable counterexamples, comprising 39 expected `BLOCK` results
-    and 12 expected false `ALLOW` results, with no probe surprises;
+  - the report's exact probe tally is 39 `BLOCK` as expected and 12 `ALLOW`
+    as expected, with `unexpected=0`; only the bypasses the report identifies
+    by finding/reproducer are treated as false `ALLOW` cases;
 - root-cause audit:
   - `docs/development/ai/swarm-results/cfr168-review-recursion-root-cause-audit-claude-20260731/audit.md`;
+  - report commit `abfee6ef25f27af35790138404ce6f144b3244da`,
+    mode `100644`, SHA-256
+    `2392450e957c8437b323ded492fc7597dc77f5147b74f3056c97c0efd9329780`;
 - preregistered historical replay:
   - packet
     `docs/development/ai/swarm-batches/cfr168-review-intervention-retroactive-pilot-20260731.md`;
   - result
     `docs/development/ai/swarm-results/cfr168-review-intervention-retroactive-pilot-claude-20260731/pilot.md`;
+  - canonical commit `94f2ab4b67a6c679434e72fb73d9ec9ffee6b1ba`,
+    mode `100644`;
   - result SHA-256
     `527b800cd29384ff5f2a1e213e27226eb794e10d247329a088d85679994ab553`.
+- independent contract preflight:
+  - `docs/development/ai/swarm-results/cfr168-review-recurrence-v2-contract-preflight-claude-20260731/review.md`;
+  - canonical commit `102fc1232b9a5140c72be94b8add51b5a58c5634`,
+    mode `100644`, SHA-256
+    `ccd5585c79acb19e7c412b336e40930dd984ea4e26217486f659a1132f6bec0b`;
+  - verdict `REQUEST_CHANGES`; C-1 through C-16 are dispositioned in §10.
 
 The replay decisions are inputs, not optional suggestions:
 
@@ -70,6 +88,19 @@ repair.
 - Add a new schema identifier and file:
   `codefire.review_recurrence_control.v2` /
   `docs/development/ai/schemas/review-recurrence-control.v2.schema.json`.
+- Add a compact pre-repair manifest:
+  `codefire.review_recurrence_repair_manifest.v1` /
+  `docs/development/ai/schemas/review-recurrence-repair-manifest.v1.schema.json`.
+  It is the machine-readable anchor for predecessor authority, prior-obligation
+  IDs, parity/closure claims, and required validation IDs/argv; prose remains
+  in the Markdown repair packet.
+- Extend the timed runner with a new, compatibility-distinct
+  `codefire.timed_gate.v2` result that binds canonical source revision and tree.
+  Keep v1 evidence readable as historical data, but v1 timed results cannot
+  satisfy a v2 recurrence `accept`.
+- Register all new schema `$id` values in
+  `docs/development/tools/check_ai_contracts.py`; its only permitted change is
+  the corresponding `SCHEMAS` entries and tests required for them.
 - Keep the v1 schema as historical evidence. Do not silently widen or rewrite
   its shape.
 - The normal gate entry point must authorize only v2. A v1 record must return a
@@ -84,96 +115,160 @@ repair.
 
 ## 4. Exact Git chronology
 
-### 4.1 Candidate interval
+### 4.1 Predecessor authority and candidate interval
 
-Do not retain an independently author-chosen `base_revision`.
+There is no independently author-chosen `base_revision`. The subject identifies
+`predecessor_candidate_revision`, `candidate_revision`, and one exact
+`predecessor_authority` artifact.
 
-The subject must identify:
+The authority is one of:
 
-- `predecessor_candidate_revision`: exact candidate reviewed in generation
-  `N-1`;
-- `candidate_revision`: exact candidate for generation `N`.
+1. a committed v2 record whose bound `candidate_revision` is the predecessor
+   and whose generation is exactly `N-1`; or
+2. for the bootstrap live runs only, a legacy report-only commit whose sole
+   parent is the predecessor, whose write set is exactly the report path, and
+   whose report blob matches the declared mode and SHA-256.
 
-The tool must:
+The tool resolves the authority before accepting the predecessor field and
+requires exact equality. It then computes tree, patch, numstat, binary paths,
+changed paths, and all coverage over exactly
+`predecessor_candidate_revision..candidate_revision`. A later ancestor cannot
+be substituted merely because it is on candidate ancestry.
 
-1. resolve both to canonical commits;
-2. require the predecessor to be an ancestor of the candidate;
-3. compute tree, patch, numstat, binary paths, changed paths, and every repair
-   coverage obligation over exactly
-   `predecessor_candidate_revision..candidate_revision`;
-4. provide no second field that can silently narrow this interval.
+The two allowed bootstrap bindings are manager-fixed here:
 
-### 4.2 Repair packet precedes repair
+| Arm | Predecessor candidate | Legacy report commit | Report path | SHA-256 |
+|---|---|---|---|---|
+| Cargo | `4e5c0e7f058cd406cb7a183ecda8b3a07f3ee912` | `130878d321f6be166f554ac2c68a59e2b36afa88` | `docs/development/ai/swarm-results/aia-source-keyed-cargo-gate-second-closure-rereview-claude-20260731/review.md` | `aad067b2b8feb80830c41db1608dd31f0e7e7d7ca1f37ab01d040336f788b4fd` |
+| KGI/KPI | `753c8db103579d021795d3fe6a97c5d45d4a111a` | `12f9d0b5c30ce2695ec6c96e5876703efd7b0d90` | `docs/development/ai/swarm-results/development-flow-kgi-kpi-r3-rereview-claude-20260731/review.md` | `23b59e01825e3f66d2d38b754348e3d51457f3c465def578ac99ce52729a204f` |
 
-The v2 pilot supports only an on-ancestry, Git-verifiable repair packet.
-Remove `dispatch_event_attested` from the v2 `ALLOW` surface. A branch-external
-or timestamp-only assertion must produce `BLOCK`.
+Both report blobs must be mode `100644`. No other legacy bootstrap may
+produce `ALLOW` without a new manager contract and independent preflight.
 
-The tool must verify all of the following:
+### 4.2 Repair packet and manifest precede the presented repair
 
-1. the repair packet is a mode `100644` blob in the task-packet namespace;
-2. its declared SHA-256 equals the exact blob bytes;
-3. its revision lies on candidate ancestry;
-4. if the packet revision is at or before the predecessor, the same packet
-   blob is present at the predecessor;
-5. if the packet revision is after the predecessor, every commit through and
-   including that packet revision changes only the exact repair packet path or
-   explicitly enumerated manager-control paths;
-6. the first candidate/product/test change occurs strictly after the packet
-   revision;
-7. a packet committed together with a repair byte fails.
-
-The implementation may express this with an explicit
-`first_repair_commit`/`repair_start_parent` identity or derive it from the
-per-commit write sets. Whichever representation is chosen must be
-machine-checked and covered by counterexamples.
-
-### 4.3 Review and evidence ordering
-
-Use one explicit, testable order:
+The v2 `ALLOW` surface supports one topology only:
 
 ```text
-predecessor
-  -> repair packet / repair commits
+predecessor candidate
+  -> packet commit: exactly {Markdown repair packet, JSON repair manifest}
+  -> one or more repair commits
   -> candidate
+```
+
+The packet commit is the direct child of the predecessor. The two packet paths
+are mode `100644` and are in `docs/development/ai/task-packets/`. The manifest
+binds the exact Markdown packet digest; the direct-child two-path write set
+binds the manifest to the same packet commit without a circular digest. The
+admissible manager-control path set in this pre-repair window is therefore
+exactly those two paths; it is not
+`CONTROL_PATH_PREFIXES`, and it contains no candidate repair path.
+
+The manifest is compact and `additionalProperties: false`. It contains exactly
+the schema/manifest identity, generation, predecessor authority reference,
+predecessor candidate revision, Markdown packet path/digest,
+`finding_target_policy: "none"`, unique prior-obligation IDs, unique
+parity/closure claim rows, and unique required validation IDs with argv. The
+recurrence record must be set-equal to those three manifest collections; the
+manifest does not contain author-transcribed outcomes or semantic closure
+prose.
+
+The Git-derived `repair_surface` is:
+
+```text
+changed_paths(predecessor, candidate)
+  - {repair_packet_path, repair_manifest_path}
+```
+
+It must be non-empty. Every commit after the packet commit through the
+candidate is inspected separately; it may not rewrite either packet artifact,
+and its paths must be within the derived repair surface. This definition
+applies equally to product, test, schema, tool, and documentation repairs.
+There is no product/control taxonomy and no unspecified manager-control prefix.
+
+`dispatch_event_attested`, branch-external packets, timestamp-only assertions,
+and a packet committed with a repair byte cannot produce v2 `ALLOW`.
+
+This proves topology in the history presented to the gate: the packet commit
+is an ancestor and direct predecessor of the repair series. Git does not prove
+when text was authored and cannot detect a rewritten history that presents a
+different topology. Documentation and results must state that boundary.
+
+The existing Cargo `74cd37d5` and KGI/KPI `9ca01d9a` candidates remain
+immutable and off-lineage from their packets. After v2 is accepted, each live
+arm requires a transparent canonical port: branch from the manager-fixed
+predecessor above, commit the byte-identical historical repair packet plus a
+new manifest, apply the already-reviewed repair patch without other byte
+changes, and recompute all candidate/review identities. The port attests its
+presented topology; it must not be described as proof of the original lane's
+authorship time.
+
+### 4.3 Review, evidence, record, and result ordering
+
+Use this exact order:
+
+```text
+candidate
   -> review-control commit
   -> report-only commit
   -> evidence commit
-  -> manager record
+  -> evaluate uncommitted record and result
+  -> record/result retention commit
 ```
 
-- The review-control commit must be a direct child of the candidate and change
-  exactly the review packet path.
-- The report commit must be a direct child of review control and change exactly
-  the report path.
-- The evidence commit must be a direct child of the report and change exactly
-  the evidence paths declared by the record.
-- The manager record is evaluated after the evidence commit. It need not be
-  present in an earlier commit to authorize its own creation.
-- Repair packet, review packet, report, timed-gate result, timed-gate log,
-  route authority, terminal event evidence, and any other authority-bearing
-  artifact must be mode `100644`; symlinks and other modes fail.
-- Do not allow review control to rewrite the gate, schema, shared contract
-  helpers, tests, or other product/development bytes.
-- Direct-parent rules are preferred to net-diff assertions. If any multi-commit
-  interval remains, inspect every commit write set so mutate/revert history
-  cannot disappear.
+- Review control is a direct child of the candidate and changes exactly one
+  mode-`100644` review-packet path.
+- The report is a direct child of review control and changes exactly one
+  mode-`100644` report path.
+- Evidence is a direct child of the report and changes exactly the
+  mode-`100644` artifact-reference paths declared by the record under
+  `docs/development/ai/review-recurrence/evidence/<control_id>/`.
+- At evaluation time, `--record` is deliberately an uncommitted input. The gate
+  emits its canonical record SHA-256 in the v2 result.
+- Before a manager cites the decision, a direct child of the evidence commit
+  must add exactly the byte-identical record and result under
+  `docs/development/ai/review-recurrence/records/` and
+  `docs/development/ai/review-recurrence/results/`. Both must be mode `100644`;
+  the committed record digest must equal the digest emitted by the result.
+- Direct-parent relations above are mandatory. Every other multi-commit
+  interval, including the repair series, is checked commit by commit; a net
+  diff alone is insufficient.
+
+The common artifact-reference definition applies structurally to predecessor
+authority, repair packet/manifest, review packet, report, timed result/log,
+terminal event evidence, prior-closure evidence, non-reachability evidence,
+and routing/scope decision artifacts. Each such referenced blob must be mode
+`100644`; symlinks and all other modes fail. Review control cannot rewrite the
+gate, schema, helpers, tests, or any path other than its exact packet.
 
 ## 5. Evidence-bound validations
 
 Every required validation must reference:
 
-- a committed `codefire.timed_gate.v1` result JSON blob;
+- a committed `codefire.timed_gate.v2` result JSON blob;
 - the committed log blob for that result;
 - exact result/log paths and SHA-256 digests;
-- expected argv or a stable gate identifier plus argv;
+- the stable validation ID and exact argv frozen in the pre-repair manifest;
 - expected exit code and status;
 - terminal/timeout state.
 
+`run_timed_gate.py` must derive, rather than accept as an unchecked string, the
+Git root containing its cwd, canonical `HEAD` revision, and `HEAD^{tree}` and
+emit them in v2. Required acceptance validations run against a clean checkout
+of the exact candidate; the recurrence tool requires the timed result's
+revision/tree to equal the bound candidate. This closes a result borrowed from
+another worktree. The generic runner does not prove that a test selector chose
+a nonzero corpus; validation-specific selection claims remain report evidence
+unless a dedicated parser verifies them, and v2 must not claim otherwise.
+
 The tool must load the exact Git blobs at the evidence commit and require:
 
-- result schema is `codefire.timed_gate.v1`;
+- result schema is `codefire.timed_gate.v2`;
 - the result blob digest matches;
+- its source revision/tree equal the candidate;
+- validation IDs and argv are set-equal to the required validations in the
+  Git-bound repair manifest; neither the record nor reviewer may add, omit, or
+  weaken a required validation;
 - its `status`, `exit_code`, `timed_out`, and `log.complete` agree with the
   recurrence record;
 - its log digest and byte count equal the committed log blob;
@@ -182,14 +277,28 @@ The tool must load the exact Git blobs at the evidence commit and require:
 - a fabricated digest string, missing blob, mutable worktree-only file,
   symlink, edited timed result, or edited log fails closed.
 
-Do not claim that this proves a command executed honestly. It proves that the
-manager record, timed result, and retained bytes agree. Document that boundary
-exactly.
+`cwd` and `log.path` remain machine-specific absolute paths; they are
+diagnostic only. The committed log is linked by its digest and byte count.
+Do not claim that the result proves honest execution, semantic oracle quality,
+or nonzero test selection. It proves that the record, manifest, exact
+candidate identity, timed result, and retained bytes agree.
 
 All other evidence and authority references must be structured Git artifact
-references, not non-empty strings. At minimum bind exact revision, path,
-SHA-256, and regular-file mode. The implementation may reuse one common
-artifact-reference definition.
+references, not non-empty strings. The common definition binds role, exact
+revision, path, SHA-256, and mode `100644`. The validator derives the permitted
+revision from the role:
+
+- packet/manifest evidence resolves at the packet commit on candidate ancestry;
+- candidate evidence resolves at the candidate;
+- review/report/evidence artifacts resolve at their exact §4.3 commit;
+- a prior v2 record resolves at its retained record commit;
+- the two legacy bootstrap reports resolve only at the exact commits fixed in
+  §4.1;
+- routing or scope-decision artifacts resolve at or before the candidate on
+  its ancestry and never inside review control, report, or evidence commits.
+
+Object existence or a dangling/throwaway-branch commit is insufficient.
+Reachability and the role-to-revision relationship are verified.
 
 ## 6. I1 live experiment: predecessor derivation
 
@@ -197,15 +306,17 @@ The historical replay showed that the decisive cases can be byte-identical
 between predecessor and candidate. A diff-only check therefore does not
 discharge I1.
 
-For each reviewed repair surface whose locus existed in the predecessor, the
-record must bind a reviewer-authored predecessor derivation:
+The pre-repair manifest freezes the exact parity/closure claims to which I1
+applies. The record's derivation rows must be set-equal to those claim IDs;
+surface count does not create additional I1 obligations. For each claim, the
+record binds a reviewer-authored predecessor derivation:
 
 - exact path and stable symbol/locus identifier;
 - whether the locus existed in the predecessor tree;
 - predecessor behaviour derived from that tree;
 - candidate behaviour asserted for the same locus;
 - exact evidence references or a recorded `unavailable` state;
-- disposition/next action.
+- disposition and `next_action`.
 
 For a genuinely new locus, the record still states
 `locus_existed_in_predecessor: false`; the tool must verify path existence
@@ -214,27 +325,37 @@ symbol claim.
 
 An `accept` record fails when:
 
-- a reviewed existing locus has no predecessor derivation;
+- a manifest parity/closure claim has no predecessor derivation;
 - an asserted predecessor path contradicts the predecessor tree;
 - the derivation evidence is unavailable;
-- a prior obligation or changed surface lacks the required derivation
+- a prior obligation that declares a parity/closure claim lacks its derivation
   disposition.
 
 Do not require a synthetic byte difference. Do not claim that prose semantics
-were machine-proved. The live pilot must emit I1 coverage and unavailable
-counts derived from rows.
+were machine-proved. The live pilot emits:
+
+- derivation-row coverage over manifest claims;
+- unavailable-row count retained in the denominator;
+- changed-surface coverage as a separate diagnostic.
+
+These measure row presence and artifact binding, not derivation quality or
+historical capture. `unavailable` remains fail-closed for v2 `ALLOW`. The
+Cargo/KGI live arms are Python-side control tooling; no Rust arm may use v2
+`ALLOW` until a predecessor build is available. That is the explicit
+fail-closed consequence of the replay's five unavailable Rust rows, not an
+inference that I1 was validated on Rust.
 
 ## 7. I5 live experiment: evidence state vs next action
 
 Do not overload a free `blocking` boolean. Use separate, enumerated fields for:
 
 1. what the reviewer established (`evidence_state`);
-2. what work should happen next (`next_action` or `routing_state`);
+2. what work should happen next (`next_action`);
 3. whether the item currently blocks integration, derived by the validator
-   from state, closure, and exact authority rather than copied from an
+   from those exact enums and proven closure rather than copied from an
    unchecked boolean.
 
-The evidence vocabulary must represent at least:
+The evidence vocabulary is exactly:
 
 - `DEFECT_REPRODUCED`;
 - `DEFECT_SOURCE_PROVEN` for source-proven findings from a lane that executed
@@ -246,22 +367,30 @@ The evidence vocabulary must represent at least:
 - `CLAIM_FALSE`;
 - `SCOPE_BOUNDARY`;
 - `REQUIREMENT_UNSATISFIABLE`;
-- an exact closed/no-defect state where needed for prior obligations.
+- `CLOSED_PROVEN`.
 
-The next-action vocabulary must distinguish at least:
+The `next_action` vocabulary is exactly:
 
-- product repair;
-- evidence/reversal execution;
-- oracle repair;
-- claim/document repair;
-- manager scope/requirement decision;
-- no further action after proven closure.
+- `PRODUCT_REPAIR`;
+- `RUN_CLOSURE_EVIDENCE`;
+- `REPAIR_ORACLE`;
+- `REPAIR_CLAIM`;
+- `DOCUMENT_NON_REACHABILITY`;
+- `MANAGER_SCOPE_DECISION`;
+- `MANAGER_REQUIREMENT_DECISION`;
+- `NONE`.
 
 Required authority rules:
 
-- `DEFECT_REPRODUCED` and `DEFECT_SOURCE_PROVEN` block integration while open.
-- `DEFECT_INJECTION_ONLY` blocks unless exact, independently reviewable
-  reachability evidence closes it; a prose assertion is insufficient.
+- `CLOSED_PROVEN` with `next_action: NONE` is the only nonblocking state.
+- Every other evidence state blocks machine `ALLOW`; routing changes the kind of
+  successor work, never integration authority.
+- `DEFECT_REPRODUCED` and `DEFECT_SOURCE_PROVEN` route to product repair.
+- `DEFECT_INJECTION_ONLY` blocks unless an exact, independently reviewable
+  **non-reachability** boundary is committed and bound. The validator proves
+  artifact identity only, not the semantic non-existence claim; after an
+  independent reviewer accepts that boundary, the item is recorded as
+  `CLOSED_PROVEN`, not silently de-blocked while retaining the defect state.
 - `CLOSURE_UNPROVEN` is not a product defect, but never authorizes integration;
   it routes to executing the missing closure evidence.
 - `ORACLE_VACUOUS` routes to oracle repair, not product repair, and remains
@@ -269,16 +398,26 @@ Required authority rules:
 - `CLAIM_FALSE` routes to the exact claim repair and remains blocking until it
   is closed.
 - `REQUIREMENT_UNSATISFIABLE` routes to a manager criterion decision and
-  remains blocking until that exact decision is committed.
-- `SCOPE_BOUNDARY` may be routed only through an exact committed manager
-  authority artifact with owner and release condition.
+  remains blocking until a later reviewed criterion produces
+  `CLOSED_PROVEN`.
+- `SCOPE_BOUNDARY` routes to a manager decision and remains blocking at this
+  machine gate. An owner, release condition, or pre-candidate authority
+  artifact is retained for routing evidence only and cannot change the v2
+  blocking derivation. Git binds its bytes and ancestry but cannot attest
+  human authorship.
 - Do not add `ACCEPT_WITH_NOTES`.
 - Classification and routing may reduce unnecessary *product-repair
   generations*; they must not reduce integration evidence.
 
-The result must emit counts by evidence state and next action so the Cargo and
-KGI live experiments can measure whether routing changes generations. Authors
-must not transcribe those counts into the input.
+The result emits counts by evidence state and `next_action`, plus a derived
+record-level `product_repair_required` boolean. Across the Cargo/KGI live arms,
+the manager measures **product-repair generations avoided**: generations whose
+denominator includes every reviewed generation, whose numerator has no
+`PRODUCT_REPAIR` action, and whose unavailable count is reported separately.
+This is deliberately not the replay's `6 / 18` candidate-generation-removal
+metric and must not be compared as though it were. The gate preserves
+integration evidence even when it avoids sending claim/oracle/scope work back
+through a product-repair lane. Authors transcribe none of these outcomes.
 
 ## 8. Obligations, recurrence, and changed-path coverage
 
@@ -288,6 +427,27 @@ Retain only fields needed to establish identity, generation, continuity,
 before/after evidence, negative-control state where required, evidence state,
 next action, owner/release/authority where routed, and closure.
 
+- The pre-repair manifest's prior-obligation IDs must be set-equal to the
+  predecessor v2 record's emitted `successor_obligation_ids`: every prior
+  obligation plus every new finding from that record, including items then
+  recorded closed so a later recurrence remains visible. Omission, addition,
+  or an extra ID fails. Continuity is derived: an item that was
+  `CLOSED_PROVEN` and is nonclosed now is
+  `recurred_after_proven_closure`; an item that remained nonclosed is
+  `continuous_open`. The author cannot choose a weaker label.
+- For the two bootstrap arms, the manifest derives its IDs from the exact
+  frozen inventories in:
+  - Cargo packet commit
+    `0304c0e1ee835336d779e16bd6a4c96096662242`, SHA-256
+    `db0d58cc45ae214306f325f1047dfa1783be7aba21ce067b4a8840b252ad999c`;
+  - KGI/KPI packet commit
+    `8437a8e006465576a288c6db167f4a0c5f5c30e0`, SHA-256
+    `4b5e6603ccc759510d6ed7f482c8b6a5f42fa19340742d3feccdd82f38bab83c`.
+- Legacy Markdown completeness is not machine-decidable. A bootstrap record
+  carries `predecessor_obligation_completeness: unavailable`, retains it in the
+  denominator, and cannot produce machine `ALLOW`; it is a live measurement
+  and a machine-readable seed for the next generation. This exception is not
+  silently treated as completeness.
 - `recurred_after_proven_closure` must bind exact prior closure evidence and
   block while open.
 - `unavailable` must constrain the associated observations consistently and
@@ -299,25 +459,31 @@ next action, owner/release/authority where routed, and closure.
 
 The declared changed-path set must equal Git exactly.
 
-Each changed path must have exactly one path-level disposition:
+Every changed path, including packet, test, schema, tool, and documentation
+paths, has disposition `reviewed` and one or more linked surface rows for that
+same path. There is no `no_surface_change` escape. Every surface row belongs
+to exactly one path, and a surface cannot cover another path.
 
-- `reviewed`, with one or more linked surface rows for that same path; or
-- `no_surface_change`, with a non-empty justification and exact evidence.
-
-Every surface row belongs to exactly one changed path. A single surface may not
-cover unrelated paths. Public API, state machine, classifier, persisted shape,
-and other authority-relevant surface kinds require an exact scope
-disposition. A self-selected kind may not bypass that disposition; add
-cross-checkable signals where practical and state the human-judgement boundary
-where not.
+Every surface row, regardless of its self-declared kind, must carry the same
+exact scope disposition and evidence fields. `kind` is diagnostic only and
+cannot change validation or blocking. Git verifies path coverage and
+path-to-surface linkage; complete semantic symbol enumeration remains a human
+review judgement and must not be described as machine-proved.
 
 Remove `out_of_scope` if it adds no checked guarantee. If retained, it must be
 disjoint from changed/reviewed paths.
 
 ### 8.3 No quota and no self-attested saturation
 
-- No minimum, target, or proxy target for findings, observations, surfaces,
-  obligations, or checklist rows.
+- The schema requires `finding_target_policy: "none"` and rejects unknown
+  properties. It explicitly prohibits
+  `target_finding_count`, `minimum_findings`, `expected_findings`,
+  `target_observations`, `minimum_surfaces`, and `minimum_obligations`.
+  Semantic proxy detection beyond those named fields remains an independent
+  review judgement.
+- There is no minimum or target for findings, observations, surfaces,
+  obligations, or checklist rows. The one-or-more-surface-per-changed-path
+  relation is exact Git coverage, not a quota.
 - Remove author-transcribed `outcomes`; derive them in output.
 - Remove unchecked “all done” stopping booleans.
 - Acceptance is derived from exact set coverage and terminal dispositions.
@@ -329,29 +495,57 @@ from the independent report:
 
 | Finding | Required disposition |
 |---|---|
-| F-1 base narrowing | Remove free base; exact predecessor interval. |
-| F-2 post-repair packet | Verify packet precedes first repair change. |
+| F-1 base narrowing | Resolve predecessor from prior authority; exact interval equality. |
+| F-2 post-repair packet | Direct-parent packet/manifest topology; state Git rewrite boundary. |
 | F-3 fake dispatch event | No dispatch-attested v2 `ALLOW`. |
-| F-4 fake evidence/log digests | Exact committed result/log/artifact binding. |
-| F-5 dead severity/blocking | Derive blocking; exact routing authority. |
-| F-6 dead continuity | Enforce recurrence-after-proven-closure. |
-| F-7 one surface covers many paths | Per-path surface or evidenced no-surface row. |
+| F-4 fake evidence/log digests | Candidate-bound timed v2 result plus exact committed result/log/artifact bytes. |
+| F-5 dead severity/blocking | `CLOSED_PROVEN` is the only nonblocking state; routing never authorizes. |
+| F-6 dead continuity | Prior-obligation set equality and recurrence-after-proven-closure evidence. |
+| F-7 one surface covers many paths | At least one scope-dispositioned surface for every exact changed path; no no-surface escape. |
 | F-8 control rewrites gate | Exact direct-child review-packet-only control. |
-| F-9 impossible/undocumented ordering | Explicit report/evidence/record sequence. |
-| F-10 invalid UTF-8 Git path | Structured fail-closed finding, not a codec traceback. |
+| F-9 impossible/undocumented ordering | Exact review/report/evidence/evaluate/retention sequence and namespaces. |
+| F-10 invalid UTF-8 Git path | Detect before schema validation and JSON-escape offending bytes in a structured finding. |
 | F-11 symlink report/packets | Require mode `100644` for all authority artifacts. |
-| F-12 mutate/revert control chain | Direct child or per-commit write-set verification. |
+| F-12 mutate/revert control chain | Direct children for control chain; mandatory per-commit inspection for every other interval. |
 | F-13 contradictory unavailable/out-of-scope | Enforce consistency or remove field. |
 | F-14 self-referential patch fixture | Pin a known byte-level patch digest fixture. |
 
 No finding may be marked “fixed” only because its field was renamed.
+
+## 10. Contract-preflight corrections
+
+The implementation design and tests must preserve these dispositions from
+`docs/development/ai/swarm-results/cfr168-review-recurrence-v2-contract-preflight-claude-20260731/review.md`:
+
+| Finding | Revised contract mechanism |
+|---|---|
+| C-1 | Predecessor comes from a prior v2 record or one of two exact legacy report-only commits; equality is mandatory. |
+| C-2 | Packet commit changes exactly two named artifacts; admissible extra manager-control set is empty; repair surface is Git-derived. |
+| C-3 | Timed v2 derives candidate revision/tree; validation set comes from the manifest; artifact roles enforce reachability. |
+| C-4 | Only `CLOSED_PROVEN`/`NONE` is nonblocking; no routing or review-chain authority can create machine `ALLOW`. |
+| C-5 | `no_surface_change` is removed; every changed path has a scope-dispositioned surface, with `kind` diagnostic only. |
+| C-6 | Prior-obligation IDs are set-equal to prior v2 authority; legacy completeness remains explicit unavailable and blocks bootstrap `ALLOW`. |
+| C-7 | Uncommitted evaluation input is digested; record/result retention commit and three namespaces are explicit. |
+| C-8 | Injection-only closure requires an independently accepted non-reachability boundary; the tool attests only its bytes/role. |
+| C-9 | I5 measures product-repair generations avoided and is explicitly incomparable to replay `6 / 18`. |
+| C-10 | I1 is manifest parity/closure-claim scoped; Rust unavailable is fail-closed; output is row coverage. |
+| C-11 | Claims are limited to topology in presented history; rewritten authorship chronology is outside evidence. |
+| C-12 | Governing review/audit/replay artifacts have exact revisions, modes, and digests; probe tally is quoted verbatim. |
+| C-13 | Timed v2 schema/runner and `check_ai_contracts.py` registration are in scope. |
+| C-14 | Invalid Git path bytes are rejected before schema validation and JSON-escaped in the result. |
+| C-15 | Direct-parent/per-commit rules, artifact roles, `next_action`, `CLOSED_PROVEN`, and named quota fields are exact. |
+| C-16 | v1 before evidence is pinned to `1cae0225`; the full AI development gate remains required. |
 
 ## Scope
 
 Expected implementation surfaces:
 
 - `docs/development/ai/schemas/review-recurrence-control.v2.schema.json`;
+- `docs/development/ai/schemas/review-recurrence-repair-manifest.v1.schema.json`;
+- `docs/development/ai/schemas/timed-gate-result.v2.schema.json`;
 - `docs/development/tools/check_review_recurrence.py`;
+- `docs/development/tools/run_timed_gate.py`;
+- `docs/development/tools/check_ai_contracts.py`, limited to schema registration;
 - `docs/development/tools/test_ai_tools.py`;
 - `docs/development/ai/schemas/README.md`;
 - `docs/development/ai/review-recurrence/README.md`;
@@ -360,8 +554,9 @@ Expected implementation surfaces:
 - `docs/development/ai/acceleration-master-plan.md`;
 - directly related fixtures under `docs/development/ai/fixtures/` if needed.
 
-The v1 schema may be documented as rejected/deprecated but its bytes remain
-unchanged.
+The recurrence-control v1 schema and historical timed-gate v1 result shape may
+be documented as rejected/deprecated inputs but their existing bytes and
+meaning remain unchanged.
 
 ## Non-Goals
 
@@ -378,20 +573,28 @@ reason and affected consumers instead of widening scope silently.
 
 ## Validation
 
-Start by turning the independent report's bypasses into failing tests. At
-minimum, demonstrate old-v1 false behaviour or an equivalent fixture, then
-show v2 blocks:
+Start by turning the independent report's bypasses into failing tests.
+Demonstrate v1's before behaviour at exact rejected revision
+`1cae0225e488ff918389700a7de0f94e9fd067b3` or in an explicitly labelled
+synthetic v1 fixture; deleting v1 authorization at HEAD is not evidence of its
+old behaviour. Then show v2 blocks:
 
-1. base moved forward past a risky commit;
+1. an interval narrowed to a later ancestor that does not equal the candidate
+   resolved from predecessor authority;
 2. repair packet committed at/after the repair;
 3. branch-external fake dispatch digest;
-4. fabricated timed result or log digest;
-5. block/high defect routed with a free boolean or string authority;
-6. recurrence-after-proven-closure without closure evidence;
-7. two changed paths with only one path's surface;
+4. fabricated timed result/log, wrong candidate revision/tree, or omitted
+   manifest-required validation;
+5. any non-`CLOSED_PROVEN` state, including `SCOPE_BOUNDARY`, routed with a free
+   boolean/string/self-authored review-chain authority;
+6. omitted prior obligation, relabelled continuity, or recurrence after proven
+   closure without closure evidence;
+7. two changed paths with only one path's surface, or an attempted
+   `no_surface_change` property;
 8. review control that rewrites the gate/schema;
-9. missing or out-of-order evidence commit;
-10. invalid-UTF-8 Git path;
+9. missing/out-of-order evidence or a record/result retention mismatch;
+10. invalid-UTF-8 Git path detected before schema validation and rendered as an
+    escaped structured finding;
 11. symlink packet/report/evidence;
 12. mutate/revert intermediate control history;
 13. contradictory unavailable/out-of-scope state;
@@ -401,7 +604,15 @@ show v2 blocks:
     misclassifying it as reproduced;
 17. `CLOSURE_UNPROVEN` cannot produce `ALLOW`;
 18. author-transcribed outcome/count fields are rejected;
-19. no finding-count target or proxy appears in schema, tool, or tests.
+19. `finding_target_policy` is exactly `none`, named quota fields are rejected,
+    and the independent reviewer searches for semantic proxies;
+20. a v1 timed result or a v2 result from another tree is rejected;
+21. a bootstrap record with unavailable predecessor-obligation completeness
+    cannot produce `ALLOW`;
+22. an artifact in a dangling or role-incompatible commit is rejected;
+23. `DEFECT_INJECTION_ONLY` cannot close on reachability evidence; only a bound,
+    independently accepted non-reachability boundary can lead to a later
+    `CLOSED_PROVEN` row.
 
 Run:
 
@@ -425,12 +636,23 @@ Before editing implementation bytes, return a short written design table that
 maps:
 
 - each F-1 through F-14 finding to one mechanism and one counterexample;
+- each contract-preflight C-1 through C-16 finding to its exact revised clause
+  and implementation mechanism;
 - I1 and I5 to their exact schema rows, semantic rules, and emitted metrics;
+- the repair manifest's predecessor, obligation, parity-claim, and validation
+  set anchors;
 - every input field to either a validator consumer or a stated
   human-judgement purpose;
 - every authority-bearing artifact to its chronology, mode, digest, and
   reader;
 - all fields removed from v1 and why.
+
+Before implementation, estimate the minimal and one realistic v2 required-leaf
+counts, compare them with v1's measured 76-minimal / approximately-320-realistic
+shape, and separate machine-verified from human-judgement leaves. These are
+measurements with no acceptance threshold; if the design is unexpectedly
+larger, stop for manager adjudication rather than hiding the burden until
+handoff.
 
 Look specifically for contradictions between predecessor identity, packet
 chronology, report-only commits, and evidence retention. Resolve them before
@@ -450,7 +672,8 @@ Return:
 7. exact validation commands, exit codes, and retained log/result paths;
 8. known human-judgement and provenance limits;
 9. clean/dirty worktree status;
-10. one commit containing only this repair.
+10. small, bounded commits separating schema/tool, tests, and documentation,
+    with no unrelated change and a clean final worktree.
 
 Do not claim the review bottleneck is solved. The candidate must pass a separate
 Claude Opus 5 adversarial review and then the Cargo/KGI live comparison before
