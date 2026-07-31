@@ -2070,3 +2070,24 @@ already integrated Claude reports, so none will be resumed. Fugu remains
 closed to new work until the displayed reset has passed and one bounded health
 probe succeeds. The next real Fugu work is a fresh blind root-cause
 classification session. No automatic Codex fallback is authorized.
+
+## 2026-07-31 10:07 UTC control-plane composition collision frozen
+
+The exact source-keyed Cargo-gate candidate `4e5c0e7` and KGI/KPI candidate
+`753c8db` are both clean and independently awaiting the Claude reviews stopped
+by quota. A manager preflight found that their accepted implementations cannot
+later be integrated as two blind branch merges:
+
+- the Cargo source range changes 19 paths;
+- the KGI/KPI source range changes 17 paths; and
+- five paths overlap: the AI README, acceleration plan, history,
+  `ai_contracts.py`, and `test_ai_tools.py`.
+
+Blocked packet `cfr168-control-plane-composition-20260731.md` freezes a
+31-path semantic-port contract before either review returns. It requires both
+exact candidates to receive fresh `ACCEPT`, starts from then-current canonical
+instead of either stale branch history, preserves every test name from both
+ranges, runs both counterexample families and deliberate regressions, and
+requires a fresh exact composition review. It authorizes no product or Rust
+mutation and has no Codex worker fallback. The packet SHA-256 is
+`6c356cdccf9bd8e8559aca85cec1ecb7570f95e41e860af81a36b4b99ddb8cb9`.
