@@ -27,15 +27,39 @@ from recurrence_v2_model import LegacyRoot
 CLEAN_GATE: dict[str, Any] = {
     "source_root": "/synthetic/validator",
     "source_revision": "f" * 40,
+    "source_tree": "e" * 40,
     "state": "clean_committed",
     "artifacts": [
         {
             "path": "docs/development/tools/check_review_recurrence.py",
+            "mode": "100644",
             "sha256": "a" * 64,
             "committed_sha256": "a" * 64,
         }
     ],
 }
+
+
+def clean_gate(repo: "FixtureRepo", revision: str) -> dict[str, Any]:
+    """Return a gate identity backed by an exact synthetic Git blob."""
+
+    entry = repo.git("ls-tree", revision, "--", GATE_PATH).split()
+    if len(entry) < 3:
+        raise ValueError(f"synthetic gate is absent at {revision}")
+    return {
+        "source_root": str(repo.root),
+        "source_revision": revision,
+        "source_tree": repo.git("rev-parse", f"{revision}^{{tree}}"),
+        "state": "clean_committed",
+        "artifacts": [
+            {
+                "path": GATE_PATH,
+                "mode": entry[0],
+                "sha256": repo.blob_digest(revision, GATE_PATH),
+                "committed_sha256": repo.blob_digest(revision, GATE_PATH),
+            }
+        ],
+    }
 
 VARIANTS = (
     "standard",
@@ -185,6 +209,7 @@ def timed_result(
             "index_flagged_entries": [] if index_flags_clean else ["S\tproduct.txt"],
             "index_flags_clean": index_flags_clean,
             "log_inside_source_worktree": False,
+            "result_inside_source_worktree": False,
             "status_command": "git status --porcelain=v1 -z --untracked-files=all",
             "index_command": "git ls-files -v -z",
         },
