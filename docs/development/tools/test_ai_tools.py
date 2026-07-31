@@ -61,6 +61,7 @@ from check_review_terminalization import (  # noqa: E402
 from measure_recurrence_v2_burden import SHAPES, measure  # noqa: E402
 from check_review_recurrence import (  # noqa: E402
     evaluate_v2,
+    external_result_path,
     legacy_v1_block,
     main as run_review_recurrence_gate,
     validate_recurrence_control,
@@ -82,7 +83,12 @@ from run_ai_role import (  # noqa: E402
     select_codex_cli_adapter,
 )
 import recurrence_v2_authority as v2_authority  # noqa: E402
-from recurrence_v2_evidence import TimedFacts  # noqa: E402
+from recurrence_v2_evidence import (  # noqa: E402
+    TimedFacts,
+    verify_canonical_port_packet,
+    verify_retained_live_arm_anchor,
+)
+from recurrence_v2_git import PATCH_FLAGS, GitRepo  # noqa: E402
 from recurrence_v2_fixture import (  # noqa: E402
     VARIANTS as RECURRENCE_V2_VARIANTS,
     FixtureRepo,
@@ -95,6 +101,7 @@ from recurrence_v2_model import (  # noqa: E402
     LIVE_ARM_ANCHOR_PATH,
     LIVE_ARM_ANCHOR_SCHEMA,
     PORT_PACKETS,
+    PORT_REQUIRED_REPAIR_PATHS,
     ArtifactRef,
     Authority,
     parse_record,
@@ -1965,13 +1972,21 @@ class ReviewRecurrenceTests(unittest.TestCase):
             "extra_packet_path": "packet-commit-write-set-mismatch",
             "mutate_revert": "repair-commit-rewrites-packet",
             "control_rewrites_gate": "review-control-write-set-mismatch",
+            "symlink_packet": "packet-artifact-not-a-regular-blob",
             "symlink_report": "report-not-a-regular-blob",
+            "symlink_evidence": "evidence-not-a-regular-blob",
             "evidence_out_of_order": "evidence-not-direct-child",
             "invalid_utf8": "invalid-utf8-git-path",
             "nonlinear_repair": "repair-series-not-linear",
             "executable_report": "report-not-a-regular-blob",
+            "manifest_thin_prior": "prior-obligation-set-mismatch",
+            "manifest_thin_claim": "derivation-claim-set-mismatch",
+            "manifest_thin_validation": "required-validation-set-mismatch",
         }
-        self.assertEqual(set(expected) | {"standard"}, set(RECURRENCE_V2_VARIANTS))
+        self.assertEqual(
+            set(expected) | {"standard", "byte_identical_locus"},
+            set(RECURRENCE_V2_VARIANTS),
+        )
         for variant, expected_code in expected.items():
             with self.subTest(variant=variant), tempfile.TemporaryDirectory() as temporary:
                 repo = FixtureRepo(Path(temporary))
@@ -2025,6 +2040,128 @@ class ReviewRecurrenceTests(unittest.TestCase):
                     {finding["code"] for finding in result["findings"]},
                 )
 
+    def test_v2_rejects_narrowed_interval_and_author_transcribed_shortcuts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            built = build_bootstrap(repo)
+            original = copy.deepcopy(built.record)
+            mutations = (
+                (
+                    "narrowed-predecessor-interval",
+                    lambda record: record["subject"].update(
+                        predecessor_candidate_revision=built.commits["packet"]
+                    ),
+                    {"legacy-root-predecessor-mismatch"},
+                ),
+                (
+                    "branch-external-fake-dispatch",
+                    lambda record: record["subject"].update(
+                        repair_dispatch_event_ref="fake-dispatch",
+                        repair_dispatch_event_sha256="0" * 64,
+                    ),
+                    {"schema-additional-property"},
+                ),
+                (
+                    "no-surface-change-shortcut",
+                    lambda record: record["path_reviews"][0].update(
+                        no_surface_change=True
+                    ),
+                    {"schema-additional-property"},
+                ),
+                (
+                    "author-transcribed-outcomes",
+                    lambda record: record.update(
+                        outcomes={"integration_ready": True, "finding_count": 0}
+                    ),
+                    {"schema-additional-property"},
+                ),
+                (
+                    "finding-target-policy-not-none",
+                    lambda record: record.update(finding_target_policy="at_least_one"),
+                    {"schema-const"},
+                ),
+                (
+                    "manifest-required-validation-omitted",
+                    lambda record: record["validations"].clear(),
+                    {
+                        "required-validation-set-mismatch",
+                        "manifest-required-validation-unbound",
+                    },
+                ),
+                (
+                    "author-relabelled-continuity",
+                    lambda record: record["prior_obligations"][0].update(
+                        continuity="continuous_open"
+                    ),
+                    {"schema-additional-property"},
+                ),
+            )
+            for name, mutate, expected_codes in mutations:
+                with self.subTest(name=name):
+                    built.record = copy.deepcopy(original)
+                    mutate(built.record)
+                    _, result = self.evaluate_built_v2(repo, built)
+                    codes = {finding["code"] for finding in result["findings"]}
+                    self.assertEqual(result["integration_decision"], "BLOCK")
+                    self.assertTrue(expected_codes <= codes, (name, codes))
+
+    def test_v2_byte_identical_locus_still_requires_i1_derivation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            built = build_bootstrap(repo, "byte_identical_locus")
+            before = subprocess.run(
+                ["git", "show", f"{built.commits['predecessor']}:product.txt"],
+                cwd=repo.root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            after = subprocess.run(
+                ["git", "show", f"{built.commits['candidate']}:product.txt"],
+                cwd=repo.root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertEqual(before.splitlines()[0], after.splitlines()[0])
+            built.record["derivations"].clear()
+            _, result = self.evaluate_built_v2(repo, built)
+            self.assertEqual(result["integration_decision"], "BLOCK")
+            self.assertIn(
+                "derivation-claim-set-mismatch",
+                {finding["code"] for finding in result["findings"]},
+            )
+
+    def test_v2_canonical_patch_flags_and_fixture_digest_are_pinned(self) -> None:
+        self.assertEqual(
+            PATCH_FLAGS,
+            (
+                "--no-ext-diff",
+                "--no-textconv",
+                "--no-renames",
+                "--no-color",
+                "-U3",
+                "--inter-hunk-context=0",
+                "--src-prefix=a/",
+                "--dst-prefix=b/",
+                "--binary",
+                "--full-index",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            repo.write("product.txt", "before\n")
+            predecessor = repo.commit("base", ["product.txt"])
+            repo.write("product.txt", "after\n")
+            candidate = repo.commit("candidate", ["product.txt"])
+            expected = "50a19ad12629068d0a767ee77c8eafc315421c6dee52e702c40d3c42f57385a1"
+            self.assertEqual(repo.patch_digest(predecessor, candidate), expected)
+            repo.git("config", "diff.algorithm", "histogram")
+            self.assertEqual(
+                repo.patch_digest(predecessor, candidate),
+                expected,
+            )
+
     def test_v2_routing_states_never_become_integration_authority(self) -> None:
         mutations = (
             (
@@ -2076,6 +2213,129 @@ class ReviewRecurrenceTests(unittest.TestCase):
             self.assertEqual(row["evidence_state"], "DEFECT_SOURCE_PROVEN")
             self.assertTrue(row["blocking"])
 
+    def test_v2_relabelled_origin_and_recurrence_after_closure_are_derived(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            first = build_bootstrap(repo)
+            first.record["prior_obligations"][0].update(
+                evidence_state="CLOSED_PROVEN",
+                next_action="NONE",
+            )
+            gate = clean_gate(repo, first.commits["predecessor"])
+            first_payload, first_result = self.evaluate_built_v2(
+                repo, first, gate=gate
+            )
+            self.assertEqual(first_result["finding_count"], 0)
+            second = build_second(repo, first, first_payload, first_result)
+            original = copy.deepcopy(second.record)
+
+            second.record["prior_obligations"][0]["origin_generation"] = 1
+            _, relabelled = self.evaluate_built_v2(repo, second, gate=gate)
+            self.assertIn(
+                "origin-generation-mismatch",
+                {finding["code"] for finding in relabelled["findings"]},
+            )
+
+            second.record = copy.deepcopy(original)
+            second.record["prior_obligations"][0].update(
+                evidence_state="DEFECT_REPRODUCED",
+                next_action="PRODUCT_REPAIR",
+                closure_evidence_ref=None,
+            )
+            _, recurrence = self.evaluate_built_v2(repo, second, gate=gate)
+            recurrence_row = next(
+                row for row in recurrence["rows"] if row["row_id"] == "OBL-1"
+            )
+            self.assertEqual(
+                recurrence_row["continuity"], "recurred_after_proven_closure"
+            )
+            self.assertIn(
+                "recurrence-without-prior-closure-evidence",
+                {finding["code"] for finding in recurrence["findings"]},
+            )
+            self.assertEqual(recurrence["integration_decision"], "BLOCK")
+
+    def test_v2_injection_only_empty_mapping_needs_prior_bound_boundary(self) -> None:
+        cases = (
+            (False, True, "empty-closure-mapping-without-injection-predecessor"),
+            (True, False, "injection-closure-without-non-reachability-boundary"),
+            (True, True, None),
+        )
+        for predecessor_injection, bind_boundary, expected_code in cases:
+            name = f"injection={predecessor_injection},boundary={bind_boundary}"
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                repo = FixtureRepo(Path(temporary))
+                first = build_bootstrap(repo)
+                if predecessor_injection:
+                    first.record["prior_obligations"][0].update(
+                        evidence_state="DEFECT_INJECTION_ONLY",
+                        next_action="DOCUMENT_NON_REACHABILITY",
+                    )
+                gate = clean_gate(repo, first.commits["predecessor"])
+                first_payload, first_result = self.evaluate_built_v2(
+                    repo, first, gate=gate
+                )
+                self.assertEqual(first_result["finding_count"], 0)
+                second = build_second(
+                    repo,
+                    first,
+                    first_payload,
+                    first_result,
+                    injection_empty_mapping=True,
+                    bind_non_reachability=bind_boundary,
+                )
+                _, result = self.evaluate_built_v2(repo, second, gate=gate)
+                codes = {finding["code"] for finding in result["findings"]}
+                if expected_code is None:
+                    self.assertEqual(codes, set())
+                    self.assertEqual(result["integration_decision"], "ALLOW")
+                    row = next(
+                        row for row in result["rows"] if row["row_id"] == "OBL-1"
+                    )
+                    self.assertTrue(row["closure_proven"])
+                else:
+                    self.assertIn(expected_code, codes)
+                    self.assertEqual(result["integration_decision"], "BLOCK")
+
+    def test_v2_closed_proven_rejects_missing_and_nonpassing_mapped_results(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            first = build_bootstrap(repo)
+            gate = clean_gate(repo, first.commits["predecessor"])
+            first_payload, first_result = self.evaluate_built_v2(
+                repo, first, gate=gate
+            )
+            second = build_second(repo, first, first_payload, first_result)
+            second.record["validations"].clear()
+            _, missing = self.evaluate_built_v2(repo, second, gate=gate)
+            self.assertIn(
+                "closure-validation-missing",
+                {finding["code"] for finding in missing["findings"]},
+            )
+            self.assertEqual(missing["integration_decision"], "BLOCK")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            first = build_bootstrap(repo)
+            gate = clean_gate(repo, first.commits["predecessor"])
+            first_payload, first_result = self.evaluate_built_v2(
+                repo, first, gate=gate
+            )
+            second = build_second(repo, first, first_payload, first_result)
+
+            def fail(payload: dict[str, object]) -> None:
+                payload["status"] = "failed"
+                payload["exit_code"] = 1
+
+            self.amend_timed_result(repo, second, fail)
+            second.record["validations"][0].update(status="failed", exit_code=1)
+            _, failing = self.evaluate_built_v2(repo, second, gate=gate)
+            self.assertIn(
+                "closure-validation-not-passing",
+                {finding["code"] for finding in failing["findings"]},
+            )
+            self.assertEqual(failing["integration_decision"], "BLOCK")
+
     def test_v2_history_replays_prior_timed_evidence_not_retained_claims(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repo = FixtureRepo(Path(temporary))
@@ -2111,6 +2371,85 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 {finding["code"] for finding in result["findings"]},
             )
             self.assertFalse(result["authority_chain"]["rooted"])
+
+    def test_v2_history_rejects_self_contradictory_retained_result(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            first = build_bootstrap(repo)
+            gate = clean_gate(repo, first.commits["predecessor"])
+            first_payload, first_result = self.evaluate_built_v2(
+                repo, first, gate=gate
+            )
+            retention, result_payload = retain_generation(
+                repo,
+                first,
+                first_payload,
+                first_result,
+                result_mutation={
+                    "record_valid": False,
+                    "finding_count": 1,
+                    "findings": [
+                        {
+                            "severity": "error",
+                            "code": "forged-retained-finding",
+                            "location": "result",
+                            "message": "this finding was not derived by replay",
+                        }
+                    ],
+                },
+            )
+            second = build_second(
+                repo,
+                first,
+                first_payload,
+                first_result,
+                retention=retention,
+                result_payload=result_payload,
+            )
+            _, result = self.evaluate_built_v2(repo, second, gate=gate)
+            self.assertEqual(result["integration_decision"], "BLOCK")
+            replay_mismatches = [
+                finding
+                for finding in result["findings"]
+                if finding["code"] == "retained-result-replay-mismatch"
+            ]
+            self.assertEqual(
+                {finding["path"].rsplit(".", 1)[-1] for finding in replay_mismatches},
+                {"record_valid", "finding_count", "findings"},
+            )
+            self.assertFalse(result["authority_chain"]["rooted"])
+
+    def test_v2_prior_export_tamper_blocks_even_with_local_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = FixtureRepo(Path(temporary))
+            first = build_bootstrap(repo)
+            gate = clean_gate(repo, first.commits["predecessor"])
+            first_payload, first_result = self.evaluate_built_v2(
+                repo, first, gate=gate
+            )
+            retention, result_payload = retain_generation(
+                repo,
+                first,
+                first_payload,
+                first_result,
+                result_mutation={"successor_obligation_ids": ["FORGED-LOCAL"]},
+            )
+            repo.git("branch", "forged-local-ref", retention)
+            self.assertEqual(repo.git("rev-parse", "forged-local-ref"), retention)
+            second = build_second(
+                repo,
+                first,
+                first_payload,
+                first_result,
+                retention=retention,
+                result_payload=result_payload,
+            )
+            _, result = self.evaluate_built_v2(repo, second, gate=gate)
+            self.assertEqual(result["integration_decision"], "BLOCK")
+            self.assertIn(
+                "exported-successor-obligations-tampered",
+                {finding["code"] for finding in result["findings"]},
+            )
 
     def test_v2_retention_commit_must_contain_exactly_record_and_result(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -2194,7 +2533,11 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 "validator_identity_divergences"
             ][0]
             self.assertEqual(
-                divergence["disposition"], "retained_without_semantic_reproof"
+                divergence["disposition"], "compatibility_authorized"
+            )
+            self.assertEqual(
+                divergence["historical_decision_disposition"],
+                "retained_without_semantic_reproof",
             )
             self.assertFalse(divergence["inherits_current_authority"])
 
@@ -2238,6 +2581,7 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 clean_before=payload["worktree"]["clean_before"],
                 clean_after=payload["worktree"]["clean_after"],
                 index_flags_clean=payload["worktree"]["index_flags_clean"],
+                head_unchanged=payload["worktree"]["head_unchanged"],
                 log_inside_source_worktree=payload["worktree"][
                     "log_inside_source_worktree"
                 ],
@@ -2249,16 +2593,119 @@ class ReviewRecurrenceTests(unittest.TestCase):
             )
             self.assertFalse(facts.passing)
 
-    def test_v2_malformed_control_path_returns_structured_block(self) -> None:
+    def test_v2_timed_runner_tracks_head_switch_and_transient_index_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo_root = root / "repo"
+            repo_root.mkdir()
+            repo = FixtureRepo(repo_root)
+            repo.write("tracked.txt", "base\n")
+            repo.commit("base", ["tracked.txt"])
+            repo.write("tracked.txt", "head\n")
+            repo.commit("head", ["tracked.txt"])
+            payload = run_gate_v2(
+                ["git", "checkout", "-q", "HEAD^"],
+                repo.root,
+                root / "head-switch.log",
+                10,
+                result_path=root / "head-switch.result.json",
+            )
+            self.assertTrue(payload["worktree"]["clean_before"])
+            self.assertTrue(payload["worktree"]["clean_after"])
+            self.assertFalse(payload["worktree"]["head_unchanged"])
+            self.assertNotEqual(
+                payload["source"]["revision"],
+                payload["worktree"]["head_revision_after"],
+            )
+            self.assertTrue(
+                any("mutates and restores" in limit for limit in payload["limits"])
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo_root = root / "repo"
+            repo_root.mkdir()
+            repo = FixtureRepo(repo_root)
+            repo.write("tracked.txt", "tracked\n")
+            repo.commit("tracked", ["tracked.txt"])
+            repo.git("update-index", "--skip-worktree", "tracked.txt")
+            payload = run_gate_v2(
+                ["git", "update-index", "--no-skip-worktree", "tracked.txt"],
+                repo.root,
+                root / "index-union.log",
+                10,
+                result_path=root / "index-union.result.json",
+            )
+            self.assertTrue(payload["worktree"]["clean_before"])
+            self.assertTrue(payload["worktree"]["clean_after"])
+            self.assertFalse(payload["worktree"]["index_flags_clean"])
+            self.assertTrue(payload["worktree"]["index_flagged_entries"])
+            self.assertTrue(repo.git("ls-files", "-v", "tracked.txt").startswith("H "))
+
+    def test_v2_dirty_before_and_after_timed_evidence_blocks_rooted_allow(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repo = FixtureRepo(Path(temporary))
-            built = build_bootstrap(repo)
-            built.record["artifacts"][0]["path"] = "bad\x00path"
-            _, result = self.evaluate_built_v2(repo, built)
+            first = build_bootstrap(repo)
+            gate = clean_gate(repo, first.commits["predecessor"])
+            first_payload, first_result = self.evaluate_built_v2(
+                repo, first, gate=gate
+            )
+            second = build_second(repo, first, first_payload, first_result)
+
+            def dirty(payload: dict[str, object]) -> None:
+                worktree = payload["worktree"]
+                worktree["clean_before"] = False
+                worktree["status_before"] = [" M product.txt"]
+                worktree["clean_after"] = False
+                worktree["status_after"] = ["?? scratch.tmp"]
+
+            self.amend_timed_result(repo, second, dirty)
+            _, result = self.evaluate_built_v2(repo, second, gate=gate)
             self.assertEqual(result["integration_decision"], "BLOCK")
             self.assertIn(
-                "unsafe-artifact-path",
+                "closure-validation-not-passing",
                 {finding["code"] for finding in result["findings"]},
+            )
+            self.assertTrue(
+                any("clean-before" in blocker for blocker in result["blockers"])
+            )
+
+    def test_v2_malformed_control_path_returns_structured_block(self) -> None:
+        for label, malformed in (
+            ("nul", "bad\x00path"),
+            ("lone-surrogate", "bad\udcffpath"),
+        ):
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temporary:
+                repo = FixtureRepo(Path(temporary))
+                built = build_bootstrap(repo)
+                built.record["artifacts"][0]["path"] = malformed
+                _, result = self.evaluate_built_v2(repo, built)
+                self.assertEqual(result["integration_decision"], "BLOCK")
+                codes = {finding["code"] for finding in result["findings"]}
+                if label == "lone-surrogate":
+                    self.assertIn("unsafe-json-surrogate", codes)
+                self.assertIn("unsafe-authored-repository-path", codes)
+                self.assertIn("unsafe-artifact-path", codes)
+
+    def test_v2_result_path_must_be_outside_both_repositories(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            analysed = root / "analysed"
+            validator = root / "validator"
+            analysed.mkdir()
+            validator.mkdir()
+
+            with self.assertRaisesRegex(ValueError, "requires --result"):
+                external_result_path(None, analysed, validator)
+            with self.assertRaisesRegex(ValueError, "outside the analysed"):
+                external_result_path(analysed / "result.json", analysed, validator)
+            with self.assertRaisesRegex(ValueError, "outside the validator"):
+                external_result_path(validator / "result.json", analysed, validator)
+
+            outside = root / "staging" / "result.json"
+            self.assertEqual(
+                external_result_path(outside, analysed, validator),
+                outside.resolve(),
             )
 
     def test_v2_live_anchor_requires_exact_separate_clean_validator_pin(self) -> None:
@@ -2320,12 +2767,112 @@ class ReviewRecurrenceTests(unittest.TestCase):
                         self.assertIn(expected_code, codes)
                         self.assertEqual(result["integration_decision"], "BLOCK")
 
+    def test_v2_retained_live_anchor_rebinds_historical_validator_blob(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            analysed_root = root / "analysed"
+            validator_root = root / "validator"
+            analysed_root.mkdir()
+            validator_root.mkdir()
+            analysed = FixtureRepo(analysed_root)
+            validator = FixtureRepo(validator_root)
+            built = build_bootstrap(analysed)
+            record, parse_findings = parse_record(built.record, "record")
+            self.assertEqual(parse_findings, [])
+            self.assertIsNotNone(record)
+            artifacts = record.artifact_index()
+            anchor_payload = self.live_anchor(built)
+            validator.write(
+                "docs/development/tools/check_review_recurrence.py",
+                "# historical clean validator\n",
+            )
+            validator.write(
+                LIVE_ARM_ANCHOR_PATH,
+                json.dumps(anchor_payload, indent=2, sort_keys=True) + "\n",
+            )
+            validator_commit = validator.commit(
+                "historical validator anchor",
+                [
+                    "docs/development/tools/check_review_recurrence.py",
+                    LIVE_ARM_ANCHOR_PATH,
+                ],
+            )
+            historical_gate = clean_gate(validator, validator_commit)
+            valid_pin = {
+                "anchor": {
+                    "validator_commit": validator_commit,
+                    "path": LIVE_ARM_ANCHOR_PATH,
+                    "mode": "100644",
+                    "sha256": validator.blob_digest(
+                        validator_commit, LIVE_ARM_ANCHOR_PATH
+                    ),
+                },
+                "arm": anchor_payload["arms"][0],
+            }
+            retained_result = {
+                "live_arm": "cargo",
+                "live_arm_pin": valid_pin,
+            }
+            self.assertEqual(
+                verify_retained_live_arm_anchor(
+                    validator_root,
+                    "cargo",
+                    record,
+                    artifacts,
+                    retained_result,
+                    historical_gate,
+                ),
+                [],
+            )
+
+            missing = copy.deepcopy(retained_result)
+            missing["live_arm_pin"] = "unavailable"
+            missing_findings = verify_retained_live_arm_anchor(
+                validator_root,
+                "cargo",
+                record,
+                artifacts,
+                missing,
+                historical_gate,
+            )
+            self.assertIn(
+                "retained-live-arm-pin-unavailable",
+                {finding.code for finding in missing_findings},
+            )
+
+            forged = copy.deepcopy(retained_result)
+            forged["live_arm_pin"]["anchor"]["sha256"] = "0" * 64
+            forged_findings = verify_retained_live_arm_anchor(
+                validator_root,
+                "cargo",
+                record,
+                artifacts,
+                forged,
+                historical_gate,
+            )
+            self.assertIn(
+                "retained-live-arm-anchor-digest-mismatch",
+                {finding.code for finding in forged_findings},
+            )
+
     def test_v2_timed_result_rejects_wrong_tree_and_v1_schema(self) -> None:
         mutations = (
+            (
+                "wrong-revision",
+                lambda payload: payload["source"].__setitem__(
+                    "revision", "0" * 40
+                ),
+                "timed-result-revision-mismatch",
+            ),
             (
                 "wrong-tree",
                 lambda payload: payload["source"].__setitem__("tree", "0" * 40),
                 "timed-result-tree-mismatch",
+            ),
+            (
+                "fabricated-log-binding",
+                lambda payload: payload["log"].__setitem__("sha256", "0" * 64),
+                "timed-log-digest-mismatch",
             ),
             (
                 "v1-result",
@@ -2413,6 +2960,13 @@ class ReviewRecurrenceTests(unittest.TestCase):
             )
             unrooted = build_second(repo, first, first_payload, first_result)
             unrooted.roots = {}
+            repo.git(
+                "branch", "unrooted-local-ref", unrooted.commits["retention"]
+            )
+            self.assertEqual(
+                repo.git("rev-parse", "unrooted-local-ref"),
+                unrooted.commits["retention"],
+            )
             _, result = self.evaluate_built_v2(repo, unrooted, gate=gate)
             self.assertEqual(result["integration_decision"], "BLOCK")
             codes = {finding["code"] for finding in result["findings"]}
@@ -2494,6 +3048,58 @@ class ReviewRecurrenceTests(unittest.TestCase):
                     capture_output=True,
                 )
                 self.assertNotEqual(absent.returncode, 0)
+
+        required = frozenset(
+            {
+                "docs/development/ai/swarm-batches/"
+                "development-flow-kgi-kpi-zero-residual-repair-r3-20260731.md",
+                "docs/development/ai/swarm-batches/"
+                "development-flow-kgi-kpi-zero-residual-repair-r4-20260731.md",
+            }
+        )
+        self.assertEqual(PORT_REQUIRED_REPAIR_PATHS["kgi_kpi"], required)
+        self.assertTrue(
+            all(path.startswith("docs/development/ai/swarm-batches/") for path in required)
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = build_bootstrap(FixtureRepo(Path(temporary)))
+            record, parse_findings = parse_record(fixture.record, "record")
+            self.assertEqual(parse_findings, [])
+            self.assertIsNotNone(record)
+            port = PORT_PACKETS["kgi_kpi"]
+            subject = replace(
+                record.subject,
+                changed_paths=frozenset(),
+                authority=replace(record.subject.authority, bootstrap_arm="kgi_kpi"),
+            )
+            narrowed = replace(record, subject=subject)
+            packet = ArtifactRef(
+                ref_id=narrowed.subject.repair_packet_ref,
+                role="repair_packet",
+                commit=port.source_commit,
+                path=port.path,
+                sha256=port.sha256,
+                mode="100644",
+            )
+            findings = verify_canonical_port_packet(
+                GitRepo(ROOT), narrowed, {packet.ref_id: packet}, "kgi_kpi"
+            )
+            self.assertIn(
+                "canonical-port-required-repair-paths-missing",
+                {finding.code for finding in findings},
+            )
+            covered = replace(
+                narrowed,
+                subject=replace(narrowed.subject, changed_paths=required),
+            )
+            covered_findings = verify_canonical_port_packet(
+                GitRepo(ROOT), covered, {packet.ref_id: packet}, "kgi_kpi"
+            )
+            self.assertNotIn(
+                "canonical-port-required-repair-paths-missing",
+                {finding.code for finding in covered_findings},
+            )
 
 
 class FocusedTestMapTests(unittest.TestCase):

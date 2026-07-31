@@ -67,11 +67,17 @@ VARIANTS = (
     "extra_packet_path",
     "mutate_revert",
     "control_rewrites_gate",
+    "symlink_packet",
     "symlink_report",
+    "symlink_evidence",
     "evidence_out_of_order",
     "invalid_utf8",
     "nonlinear_repair",
     "executable_report",
+    "manifest_thin_prior",
+    "manifest_thin_claim",
+    "manifest_thin_validation",
+    "byte_identical_locus",
 )
 
 
@@ -208,6 +214,10 @@ def timed_result(
             "status_after": [] if clean_after else ["?? scratch.tmp"],
             "index_flagged_entries": [] if index_flags_clean else ["S\tproduct.txt"],
             "index_flags_clean": index_flags_clean,
+            "head_revision_after": revision,
+            "head_tree_after": tree,
+            "head_unchanged": True,
+            "head_probe_error": None,
             "log_inside_source_worktree": False,
             "result_inside_source_worktree": False,
             "status_command": "git status --porcelain=v1 -z --untracked-files=all",
@@ -245,7 +255,11 @@ def build_bootstrap(repo: FixtureRepo, variant: str = "standard") -> Built:
     control_id = "cfr168-v2-gen1"
     repo.write("README.md", "base\n")
     repo.write(GATE_PATH, "# synthetic gate stand-in\n")
-    predecessor = repo.commit("predecessor candidate", ["README.md", GATE_PATH])
+    predecessor_paths = ["README.md", GATE_PATH]
+    if variant == "byte_identical_locus":
+        repo.write("product.txt", "stable locus\nbefore repair\n")
+        predecessor_paths.append("product.txt")
+    predecessor = repo.commit("predecessor candidate", predecessor_paths)
 
     repo.write(LEGACY_REPORT_PATH, "legacy rereview REQUEST_CHANGES\n")
     legacy_commit = repo.commit("legacy report", [LEGACY_REPORT_PATH])
@@ -267,6 +281,9 @@ def build_bootstrap(repo: FixtureRepo, variant: str = "standard") -> Built:
 
     def write_packet_set() -> str:
         repo.write(PACKET_PATH, "# Synthetic repair packet\n")
+        if variant == "symlink_packet":
+            (repo.root / PACKET_PATH).unlink()
+            (repo.root / PACKET_PATH).symlink_to("../../../../README.md")
         if variant == "extra_packet_path":
             repo.write(packet_paths[2], "# extra manager control artifact\n")
         manifest = {
@@ -295,6 +312,12 @@ def build_bootstrap(repo: FixtureRepo, variant: str = "standard") -> Built:
             ],
             "required_validations": [{"validation_id": "focused", "argv": ARGV}],
         }
+        if variant == "manifest_thin_prior":
+            manifest["prior_obligations"].clear()
+        elif variant == "manifest_thin_claim":
+            manifest["parity_closure_claims"].clear()
+        elif variant == "manifest_thin_validation":
+            manifest["required_validations"].clear()
         repo.write(MANIFEST_PATH, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
         return repo.commit("repair packet and manifest", packet_paths)
 
@@ -318,7 +341,14 @@ def build_bootstrap(repo: FixtureRepo, variant: str = "standard") -> Built:
             repo.write("product\udcff.txt".encode("utf-8", "surrogateescape").decode(
                 "utf-8", "surrogateescape"
             ), "repaired\n")
-        repo.write("product.txt", "repaired\n")
+        repo.write(
+            "product.txt",
+            (
+                "stable locus\nafter repair\n"
+                if variant == "byte_identical_locus"
+                else "repaired\n"
+            ),
+        )
         candidate = repo.commit("repair", ["."])
         if variant == "nonlinear_repair":
             repo.git("checkout", "-q", "-b", "side", packet_commit)
@@ -357,6 +387,9 @@ def build_bootstrap(repo: FixtureRepo, variant: str = "standard") -> Built:
         repo.git("checkout", "-q", control_commit)
         repo.git("checkout", "-q", "-b", "evidence-first")
     repo.write(log_path, log_bytes)
+    if variant == "symlink_evidence":
+        (repo.root / log_path).unlink()
+        (repo.root / log_path).symlink_to(repo.root / "README.md")
     repo.write(
         result_path,
         json.dumps(
@@ -512,7 +545,7 @@ def build_bootstrap(repo: FixtureRepo, variant: str = "standard") -> Built:
                 "claim_id": "CLAIM-1",
                 "path": "product.txt",
                 "locus": "product.txt:final_fence",
-                "locus_existed_in_predecessor": False,
+                "locus_existed_in_predecessor": variant == "byte_identical_locus",
                 "predecessor_behaviour": "the locus is absent from the predecessor tree",
                 "candidate_behaviour": "the candidate introduces the repaired fence",
                 "evidence": {"state": "available", "ref_ids": ["report"]},
@@ -612,6 +645,8 @@ def build_second(
     retention: str | None = None,
     result_payload: str | None = None,
     generation: int = 2,
+    injection_empty_mapping: bool = False,
+    bind_non_reachability: bool = False,
 ) -> Built:
     """The rooted second generation, where machine ALLOW first becomes reachable."""
 
@@ -639,7 +674,12 @@ def build_second(
         "finding_target_policy": "none",
         "prior_obligations": [
             {"obligation_id": "NF-1", "closure_validation_ids": ["focused"]},
-            {"obligation_id": "OBL-1", "closure_validation_ids": ["focused"]},
+            {
+                "obligation_id": "OBL-1",
+                "closure_validation_ids": (
+                    [] if injection_empty_mapping else ["focused"]
+                ),
+            },
         ],
         "parity_closure_claims": [
             {
@@ -857,6 +897,20 @@ def build_second(
         },
         "review_decision": "accept",
     }
+    if bind_non_reachability:
+        prior_report = next(
+            item for item in first.record["artifacts"] if item["ref_id"] == "report"
+        )
+        record["artifacts"].append(
+            artifact(
+                "non-reachability",
+                "non_reachability_evidence",
+                prior_report["commit"],
+                prior_report["path"],
+                prior_report["sha256"],
+            )
+        )
+        record["prior_obligations"][0]["non_reachability_ref"] = "non-reachability"
     return Built(
         record=record,
         roots=first.roots,
