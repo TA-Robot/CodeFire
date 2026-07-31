@@ -2130,3 +2130,20 @@ remain pending. Separate provider admission captures show adequate memory,
 swap, disk, PSI, PID, provider-window, and conflict-domain state; their only
 blocker is provider backoff. The evidence SHA-256 is
 `0be5f2a17ac3ccb43c54612595b14be3664531dc8189410dedaccccef2defba7`.
+
+## 2026-07-31 10:24 UTC development bottleneck causal gate frozen
+
+`cfr168-development-bottleneck-causal-gate-20260731.md` prevents the manager
+from promoting one retrospective audit directly into process policy. It
+separates observed delay, causal attribution, later replication, and measured
+intervention effect; uses trusted integration rather than activity or finding
+volume as the outcome; and preserves review/repair causes as independent
+hypotheses under the existing blind reliability gate.
+
+The gate also removes the superseded Fugu model-list attribution from future
+provider decisions, defines falsifiable cards for the source-keyed Cargo gate,
+dependency splitting, terminalization, manager queue, gate reuse, provider
+readiness, resource retention, and shared-primitives preflight, and requires
+raw queue/service/rework/burden/guardrail evidence before adoption. No fixed
+finding count or template depth is selected. The packet SHA-256 is
+`351697911abdcbb09a242b2ef3338a638daa0de1a057ec52df617d81bd8583b9`.
