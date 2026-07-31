@@ -2119,7 +2119,7 @@ on their exact missing independent decisions. The current Cargo canonical-port
 packet SHA-256 is
 `2116274a375d135433fe5bbacc7b40cd2395ccffbed0e4000c4c98ee15ca5f7b`;
 the current KGI/KPI composition packet SHA-256 is
-`6360d41d89fb3cd74e4877b43ad9cfba556fc6afe24555eb3475f5c722473c1a`.
+`ac9b2c01a9d3b0ee44957d04912b59f0ba8a229deb7698321e946cc15f587e77`.
 
 ## 2026-07-31 10:19 UTC post-reboot candidate revalidation preserved
 
@@ -2191,3 +2191,22 @@ This preflight does not review or accept `4e5c0e7` and does not admit port
 execution. It exists so the eventual implementer and reviewer compare exact
 machine-derived sets rather than generating a large prose checklist from
 memory.
+
+## 2026-07-31 10:34 UTC KGI/KPI composition inputs mechanically frozen
+
+Read-only preflight
+`cfr168-kgi-kpi-control-plane-composition-preflight-20260731/evidence.md`
+binds the exact KGI/KPI source range, 17 path states, six current canonical
+collisions, and normalized source/Cargo test-name sets. Its SHA-256 is
+`07e7fb0eb43550c3f496a9c9427e65cb956edf695349f575fe5494b36ed0f910`.
+
+The KGI/KPI candidate adds 87 unique test names relative to its base, none of
+which collides with the Cargo candidate's added set. The source-candidate
+union contains 255 names at this snapshot, but the future composition must
+prove set inclusion and nonzero execution rather than an exact total. The
+preflight predates the Cargo canonical port, so every blob, collision, and
+test set remains mandatory to recompute after both independent decisions.
+
+This evidence neither accepts `753c8db` nor starts composition. It reduces
+future ambiguity without turning a large manually generated checklist into a
+quality metric.

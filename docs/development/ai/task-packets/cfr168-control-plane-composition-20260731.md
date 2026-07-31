@@ -70,6 +70,25 @@ Its history contains stale management-document versions relative to canonical,
 and a whole-branch merge would make unrelated ancestry look like reviewed
 composition evidence.
 
+## Manager Preflight
+
+Read-only evidence
+`docs/development/ai/swarm-results/cfr168-kgi-kpi-control-plane-composition-preflight-20260731/evidence.md`
+at SHA-256
+`07e7fb0eb43550c3f496a9c9427e65cb956edf695349f575fe5494b36ed0f910`
+binds the KGI/KPI patch/path census, current canonical collisions, and
+normalized test-name sets.
+
+The KGI/KPI source adds 87 unique test names relative to its base; none
+collides with the Cargo candidate's added set. The source-candidate union has
+255 names at the preflight snapshot, but that number is not the composition
+criterion. Preserve the accepted Cargo-port set, the 87-name KGI/KPI addition,
+and later canonical tests exactly once, and execute both families.
+
+The preflight predates the accepted Cargo canonical port. Recompute every blob
+and name set after both admission rows are satisfied. Do not update the
+preflight to fit the result or use its comparison snapshot as a port base.
+
 ## Collision Inventory
 
 The Cargo range changes 19 paths. The KGI/KPI range changes 17 paths. Their
