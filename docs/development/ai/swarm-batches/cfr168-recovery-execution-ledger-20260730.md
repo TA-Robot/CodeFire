@@ -2322,3 +2322,51 @@ Under a constrained Claude window, the three pending product/control-plane
 reviews retain downstream-release priority over this process pilot. This
 prevents sunk analysis cost or an available session from displacing work that
 releases Cargo, Upload, or KGI/KPI integration.
+
+## 2026-07-31 11:16 UTC exact resumes and Python composition inputs reverified
+
+The three quota-stopped Claude review subjects remain clean and unchanged:
+
+| Subject | HEAD | Tree | Session | Event-log bytes / SHA-256 |
+|---|---|---|---|---|
+| source-keyed Cargo gate | `4e5c0e7f058cd406cb7a183ecda8b3a07f3ee912` | `6417400cb7b5a3507f85f38d66c0573992ad4007` | `d089c8ae-8364-49af-bcd1-b9bf4b741ea1` | `947871` / `8a371375000054393df3b00253ab7e2e56aa5a4ad21822d01b36cd333abcad1c` |
+| Python Upload | `446cf4a97b63e46d011a03083ef59354b9d68178` | `3ac8fa8bc5aa38a1f137fd523db8285980d69692` | `239dd18d-bdd7-4828-b503-336e02ba752a` | `836088` / `5fbad76e50a70e3992ef52dcf6dc8d1cf1c3b6800fad2743f14ba179a88efb1d` |
+| KGI/KPI | `753c8db103579d021795d3fe6a97c5d45d4a111a` | `213e16a033aeb2e8eb3599be4ffe725b1d7ad344` | `60548555-ff29-4fd9-9360-2820a663ee54` | `840799` / `22816356a2026d88f9eb8695aa8d4913929d5993bc5bdfe3ba5110960402632f` |
+
+All three saved-session lookups resolve to those exact agent/worktree pairs
+and none has an authorized report. At `11:16 UTC`, `MemAvailable` was
+`11,880,532 KiB`, swap use `2,060 KiB`, `/workspace` availability
+`902,255,611,904` bytes, and memory/I/O full PSI avg10 were both zero. The
+candidate and resource state is ready; Claude provider backoff remains the
+only admission blocker before the structured `12:30 UTC` reset surface is
+verified. One bounded, no-tools, no-session-persistence Opus 5 health probe is
+scheduled for `12:31 UTC`; it does not automatically resume a worker and has
+no retry loop.
+
+Mechanical evidence
+`cfr168-python-http-upload-mr-list-composition-preflight-20260731/evidence.md`,
+SHA-256
+`5059b135925eed5587021b44fa4518f054486ce5b95db56fa1a6fd3b2f6e1e7f`,
+ports only allowed product/test/source-doc ranges into a transient scratch
+tree:
+
+1. pending Upload reference range `cb13da0..446cf4a` applies cleanly to
+   accepted Doctor+Branch scaffold `701469f`, preserves all 33 Upload tests,
+   and passes 65 focused plus 486 Python-pattern tests;
+2. accepted MR-list range `701469f..b164046` then applies cleanly, preserves
+   all 49 MR-list tests, and the combined tree passes 114 focused plus 535
+   Python-pattern tests and both source/project documentation checks; and
+3. the scratch worktree was deleted after its exact trees, patches, results,
+   logs, durations, and SHA-256 values were bound.
+
+This is compatibility and future-port evidence only. Upload remains
+unaccepted, the four MR-list observations remain routed, the shared-primitives
+preflight is absent, MR-write is absent, and the speculative tree cannot be
+integrated. If Upload is rejected, no byte from this preflight is reusable as
+product authority.
+
+The active issue inventory also recomputes consistently across detail files,
+summary ledgers, and `issue-root-cause-map.json`: three CFB
+(`CFB-133/136/138`) plus six CFR (`CFR-168..173`), nine total. No issue status
+changed. The current disposition-index SHA-256 is
+`e9f5b3891a33802507d8ba67305d7725f1c9f6fde57890a38d6404bb478ce4f8`.
