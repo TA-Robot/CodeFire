@@ -2793,3 +2793,46 @@ effective memory was `6,299,856,896` bytes, below the
 `6,442,450,944`-byte floor. Swap, pressure, disk, PID, provider, and conflict
 checks all passed. The repair retains first-new-slot priority; no active lane
 was stopped to make room.
+
+## 2026-07-31 12:51 UTC KGI/KPI round-3 review completed without corpus retuning
+
+Original reviewer session `60548555-ff29-4fd9-9360-2820a663ee54`
+completed cleanly. Its sole 814-line report was copied unchanged as canonical
+commit `9f094d7`; original report commit `12f9d0b` has tree `fba0c13…`,
+report bytes `63,420`, and SHA-256
+`23b59e01825e3f66d2d38b754348e3d51457f3c465def578ac99ce52729a204f`.
+The exact decision on `753c8db…` is `REQUEST_CHANGES`.
+
+This generation is also not reducible to one review-process label. The
+reviewer imported the predecessor implementation from `0944bf3…`,
+independently rebuilt every one of the 13 executable round-2 residuals, and
+showed that each now rejects on `753c8db…` with the frozen 55 semantic / 15
+structural tables byte-identical. The implementer therefore closed the known
+counterexamples without retuning their list.
+
+The remaining decision failure is a generalization gap: `KGI-DEV-004` still
+reaches `achieved` when two zero guardrails cite an unrelated validation event
+that names them with author-written `measurement:` strings. Other inherited
+rows were narrowed but remain open. Separately, diff-scoped review found four
+candidate-created defects, including rejection of two honest deliverables in
+one commit and structural-finding floods that suppress the semantic layer.
+Several positive/negative tests share the production digest helper or disable
+repository verification, so claim-to-oracle independence is a contributor.
+
+The bounded round-4 packet
+`cfr168-development-flow-kgi-kpi-r4-repair-20260731.md`, SHA-256
+`bbd6ef472903079238f24ad92bf567a9143fdbd1874975d5364ddd4eea8964ad`,
+therefore requires:
+
+- exact pre-edit reproduction and held-out positive/negative controls;
+- one A1–A8 owner matrix instead of a finding quota;
+- a structural stop if closure needs a new public API, persisted concept,
+  state machine, classifier, or decision engine;
+- preservation replay of all 13 proven closures; and
+- explicit routing, rather than silent promotion, of authored integration
+  trust and Git merge/rename/shallow-clone seal policy.
+
+This routing does not accept either observation or weaken integration
+authority. It limits the next repair delta while keeping owners and release
+conditions visible for a later decision. The candidate and any composition
+that consumes it remain blocked pending a fresh exact acceptance.

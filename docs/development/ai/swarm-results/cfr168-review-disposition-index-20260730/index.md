@@ -48,6 +48,7 @@ CFR-168 closure.
 | [`development-flow-kgi-kpi-independent-review-claude-20260730`](../development-flow-kgi-kpi-independent-review-claude-20260730/review.md) | `b307b47` / `02a0d259c55121379f07c2c1d893d4a29dd546b16e6f237659a5081c60fd3336` | `REQUEST_CHANGES` | First repair candidate `0ae583e` passes its official gates but fails eight manager counterexamples. Exact report-only Fugu Ultra 1.1 rereview session `019fb62e-…` is active after count-free light admission passed with 12,889,415,680 projected available bytes and Fugu occupancy 0/4. The shared-primitives successor packet remains `blocked` until that exact report is bound. |
 | [`development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730`](../development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730/review.md) | `d04ec99` / `268ec0b768a334ad11dbdf57c81245d7b315d7699e34c511e1f782253c178b30` | `REQUEST_CHANGES` | Exact candidate `0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1` closes 15 of 35 bound rows but leaves 20 partially closed. Decision-critical residuals cover self-authorized KGI/cohort arithmetic, non-finite and nanosecond-unsafe values, unverified or escaping evidence, incomplete lineage/supersession/lifecycle graphs, stale/cross-batch semantics, declarative anti-gaming state, and unbounded schema collections. Return all R1–R7 and every partially closed row to the original repair lineage; the next candidate must make the manager and adjacent probes fail closed without crashes before another independent review. |
 | [`development-flow-kgi-kpi-r2-rereview-claude-fallback-20260731`](../development-flow-kgi-kpi-r2-rereview-claude-fallback-20260731/review.md) | `5760c98` / `54a4244a8e563b48b2f086a51433ea858996c08b0104c0309f2c8445ce6706b2` | `REQUEST_CHANGES` | Exact candidate `0944bf3deba9e753132b3f71716b5c009a8fc30f` closes three more bound rows and preserves all fifteen prior closures, but 17 of 20 rows remain partially closed. Thirteen have executable falsifications: self-authorized KGI/cohort values, non-derived arm samples/costs, finite-number gate crashes and JSON underflow, reseal/dangling seals, asymmetric cross-batch supersession and zero heads, backdated validation, padded artifact identity, structural diagnostic overflow, and lifecycle completion by declaration. Original session `34cdf037-…` produced clean successor `753c8db103579d021795d3fe6a97c5d45d4a111a`. Its independent review stopped on Claude provider quota before a report or decision. Neither candidate may authorize a process decision. |
+| [`development-flow-kgi-kpi-r3-rereview-claude-20260731`](../development-flow-kgi-kpi-r3-rereview-claude-20260731/review.md) | `9f094d7` / `23b59e01825e3f66d2d38b754348e3d51457f3c465def578ac99ce52729a204f` | `REQUEST_CHANGES` | Exact candidate `753c8db103579d021795d3fe6a97c5d45d4a111a` genuinely closes all 13 executable round-2 residuals against predecessor-derived and held-out controls while keeping the frozen 55/15 code tables unchanged. It is rejected because `KGI-DEV-004` is still author-declarable with zero findings, evidence completeness improves by citation omission, artifact subjects remain padding-sensitive, lifecycle evidence accepts a policy citation, freshness is active-record-only, and the repair created honest-positive rejection plus semantic-finding suppression. The bounded round-4 packet requires independent oracles and refuses a new framework; authored integration trust and Git merge/rename/shallow-clone seal policy are explicitly routed instead of silently promoted. No process decision or composition may consume this candidate. |
 
 ## Current review queue
 
@@ -72,8 +73,13 @@ downstream release rather than list position:
    order to scaffold `701469f` and pass 535 composed Python tests. This reduces
    a future port's input ambiguity but supplies no decision or integration
    authority; discard the speculative tree if the Upload review rejects it.
-3. Resume KGI/KPI reviewer session `60548555-…` on clean candidate `753c8db`.
-   Its green manager/worker gates and absent report are not decision evidence.
+3. Return the finite A1–A8 decision-critical set from the committed KGI/KPI
+   round-3 report to original implementer session `34cdf037-…`. Reviewer
+   session `60548555-…` is complete and rejects `753c8db`. The round-4 packet
+   preserves all 13 proven closures, requires predecessor/held-out reversals,
+   forbids new public decision machinery, and explicitly routes two larger
+   policy questions rather than converting every COULD observation into this
+   repair.
 4. Preserve accepted MR-list candidate `b164046` as an exact input while
    routing its four non-blocking observations into the shared-primitives /
    POST-precedence successor. Rust HTTP `92fc810` and File Doctor `cd130e5`

@@ -47,7 +47,7 @@ Do not launch this task until both rows are satisfied:
 | Input | Exact candidate | Required evidence |
 |---|---|---|
 | Canonical source-keyed Cargo port | blocked packet `cfr168-source-keyed-cargo-canonical-port-20260731.md` | Exact port commit is integrated into canonical after its own fresh `ACCEPT`. Candidate `4e5c0e7` acceptance alone is insufficient. |
-| Development-flow KGI/KPI | `753c8db103579d021795d3fe6a97c5d45d4a111a` | Fresh exact independent `ACCEPT`; current reviewer session `60548555-ff29-4fd9-9360-2820a663ee54` has no report because Claude quota interrupted it. |
+| Development-flow KGI/KPI | `753c8db103579d021795d3fe6a97c5d45d4a111a` | Exact round-3 review `12f9d0b` returned `REQUEST_CHANGES`; a bounded original-session successor and fresh exact `ACCEPT` are required. |
 
 If the KGI/KPI candidate receives `REQUEST_CHANGES`, this packet stays blocked
 and must be rebound to its accepted successor. If the Cargo canonical port is
