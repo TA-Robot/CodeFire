@@ -1933,3 +1933,33 @@ the exact packet. It may write only its pilot report. No intervention,
 template shape, checklist length, process threshold, product integration, or
 issue closure is authorized before the report is independently checked and a
 manager decision is recorded.
+
+## 2026-07-31 09:37 UTC shared-primitives dependency inversion removed
+
+Canonical `8929a98` changes the existing Python HTTP shared-primitives
+preflight from `blocked` to `ready` without authorizing any product byte. The
+change implements the independently supported conclusion from both throughput
+and review-recursion audits: a report-only negative-contract preflight does
+not require an accepted Upload implementation.
+
+The packet now binds:
+
+- accepted Doctor/Branch `701469f` and accepted MR-list `b164046`;
+- three chronological Upload rejecting reports (`f835f64`, `8bdc076`,
+  `b3de0d7`) with exact SHA-256 identities;
+- MR-write rejecting report `84175bd`; and
+- Storage rejecting report `8ac6741` only for cross-runtime invariant-family
+  counterexamples.
+
+Rejecting reports are specifications, not product authority. Every primitive
+clause must cite its source report digest and evidence state. The Upload
+retryable-cleanup implementation shape remains `shape-pending`; the invariant
+and negative case are fixed, but no currently reviewed Upload byte may freeze
+the shape.
+
+The provider is routed to Claude Opus 5 because the recent Fugu lanes failed
+before producing reports and the provider remains under backoff. The
+preflight may write only
+`cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md`.
+MR-write remains blocked until that report commits literal `READY`; final
+Python composition still requires a separately accepted Upload identity.
