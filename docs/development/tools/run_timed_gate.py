@@ -6,20 +6,65 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import signal
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 
 def utc_timestamp(wall_ns: int) -> str:
-    return datetime.fromtimestamp(wall_ns / 1_000_000_000, timezone.utc).isoformat(
-        timespec="microseconds"
-    ).replace("+00:00", "Z")
+    """Render one wall-clock sample in the frozen UTC microsecond form.
+
+    Splitting seconds from nanoseconds avoids routing an epoch nanosecond value
+    through a binary float before the six emitted fractional digits are fixed.
+    Nanoseconds below the represented microsecond are deliberately truncated;
+    replay allows the corresponding two-microsecond endpoint error budget.
+    """
+
+    seconds, nanoseconds = divmod(wall_ns, 1_000_000_000)
+    value = datetime.fromtimestamp(seconds, timezone.utc) + timedelta(
+        microseconds=nanoseconds // 1_000
+    )
+    return (
+        f"{value.year:04d}-{value.month:02d}-{value.day:02d}T"
+        f"{value.hour:02d}:{value.minute:02d}:{value.second:02d}."
+        f"{value.microsecond:06d}Z"
+    )
+
+
+def validate_timing_inputs(
+    timeout_seconds: float,
+    drift_threshold_seconds: float,
+) -> None:
+    """Reject timing controls before any command (or v2 Git probe) starts."""
+
+    try:
+        timeout_finite = math.isfinite(timeout_seconds)
+    except (TypeError, OverflowError):
+        timeout_finite = False
+    if (
+        isinstance(timeout_seconds, bool)
+        or not isinstance(timeout_seconds, (int, float))
+        or not timeout_finite
+        or timeout_seconds <= 0
+    ):
+        raise ValueError("timeout must be finite and positive")
+    try:
+        threshold_finite = math.isfinite(drift_threshold_seconds)
+    except (TypeError, OverflowError):
+        threshold_finite = False
+    if (
+        isinstance(drift_threshold_seconds, bool)
+        or not isinstance(drift_threshold_seconds, (int, float))
+        or not threshold_finite
+        or drift_threshold_seconds < 0
+    ):
+        raise ValueError("drift threshold must be finite and nonnegative")
 
 
 def sha256_file(path: Path) -> tuple[int, str]:
@@ -40,9 +85,16 @@ def timing_evidence(
     *,
     drift_threshold_seconds: float,
 ) -> dict[str, Any]:
+    validate_timing_inputs(1.0, drift_threshold_seconds)
     wall_seconds = (end_wall_ns - start_wall_ns) / 1_000_000_000
     monotonic_seconds = (end_monotonic_ns - start_monotonic_ns) / 1_000_000_000
     drift_seconds = wall_seconds - monotonic_seconds
+    if not math.isfinite(wall_seconds):
+        raise ValueError("wall elapsed duration must be finite")
+    if not math.isfinite(monotonic_seconds) or monotonic_seconds < 0:
+        raise ValueError("monotonic duration must be finite and nonnegative")
+    if not math.isfinite(drift_seconds):
+        raise ValueError("wall-minus-monotonic duration must be finite")
     return {
         "started_at": utc_timestamp(start_wall_ns),
         "ended_at": utc_timestamp(end_wall_ns),
@@ -84,8 +136,7 @@ def run_gate(
 ) -> dict[str, Any]:
     if not argv:
         raise ValueError("gate argv must not be empty")
-    if timeout_seconds <= 0:
-        raise ValueError("timeout must be positive")
+    validate_timing_inputs(timeout_seconds, drift_threshold_seconds)
     cwd = cwd.resolve(strict=True)
     if not cwd.is_dir():
         raise ValueError(f"gate cwd is not a directory: {cwd}")
@@ -147,9 +198,9 @@ TIMED_V2_LIMITS = (
     "This result does not prove honest execution, semantic oracle quality, or that a "
     "test selector chose a nonzero corpus; a validation-specific selection claim remains "
     "report evidence unless a dedicated parser verifies it.",
-    "cwd, source.git_root and log.path are machine-specific absolute paths and are "
-    "diagnostic only; identity is carried by source.revision, source.tree and the log "
-    "digest with its byte count.",
+    "cwd, source.git_root, log.path and result.path are machine-specific absolute paths "
+    "and are diagnostic only; identity is carried by source.revision, source.tree and "
+    "the log digest with its byte count.",
 )
 
 
@@ -180,9 +231,14 @@ def run_gate_v2(
 
     from recurrence_v2_git import GitError, GitRepo
 
+    validate_timing_inputs(timeout_seconds, drift_threshold_seconds)
+    resolved_log = log_path.resolve()
+    resolved_result = result_path.resolve()
+    if resolved_log == resolved_result:
+        raise ValueError("v2 log and result paths must be distinct")
     try:
         probe = GitRepo(cwd.resolve(strict=True))
-        root = Path(probe.toplevel())
+        root = Path(probe.toplevel()).resolve(strict=True)
         repo = GitRepo(root)
         revision, tree = repo.head_identity()
         status_before = repo.worktree_status()
@@ -192,7 +248,7 @@ def run_gate_v2(
     payload = run_gate(
         argv,
         cwd,
-        log_path,
+        resolved_log,
         timeout_seconds,
         drift_threshold_seconds=drift_threshold_seconds,
         wall_clock_ns=wall_clock_ns,
@@ -214,20 +270,19 @@ def run_gate_v2(
         revision_after = None
         tree_after = None
         head_probe_error = str(exc)
-    resolved_log = log_path.resolve()
     try:
-        resolved_log.relative_to(root.resolve())
+        resolved_log.relative_to(root)
         log_inside = True
     except ValueError:
         log_inside = False
     try:
-        result_path.resolve().relative_to(root.resolve())
+        resolved_result.relative_to(root)
         result_inside = True
     except ValueError:
         result_inside = False
     payload["schema"] = "codefire.timed_gate.v2"
     payload["source"] = {
-        "git_root": str(root.resolve()),
+        "git_root": str(root),
         "revision": revision,
         "tree": tree,
         "derived": "git -C <cwd> rev-parse --show-toplevel HEAD HEAD^{tree}",
@@ -252,6 +307,7 @@ def run_gate_v2(
         "status_command": "git status --porcelain=v1 -z --untracked-files=all",
         "index_command": "git ls-files -v -z",
     }
+    payload["result"] = {"path": str(resolved_result)}
     payload["limits"] = list(TIMED_V2_LIMITS)
     return payload
 
