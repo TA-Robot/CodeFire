@@ -1989,3 +1989,22 @@ Claude is now under provider backoff for new launches. Fugu remains under its
 separate model-refresh/process-creation backoff. There is no automatic Codex
 fallback. Already-running Claude reviews are allowed to reach their own
 terminal provider state so their existing work and logs remain attributable.
+
+## 2026-07-31 09:46 UTC three active reviews stopped at the same Claude quota boundary
+
+The Upload `446cf4a`, source-keyed Cargo gate `4e5c0e7`, and KGI/KPI
+`753c8db` independent reviews each later reached the same provider 429. All
+three worktrees remain clean at their exact candidate heads. None contains its
+authorized report path or a review commit.
+
+Canonical incident
+`cfr168-claude-quota-review-interruptions-20260731/incident.md` binds every
+session, worktree, event-log byte length/SHA-256, rejected-event UUID, exact
+candidate, and absent report. The structured provider reset epoch is
+`2026-07-31T12:30:00Z`, but the user-facing message says monthly spend limit;
+the reset is not assumed to restore monthly capacity.
+
+All three decisions remain absent. No candidate gains integration authority.
+Resume must use the same exact session/worktree after verified capacity,
+without launching a competing reviewer. The now-ready shared-primitives
+preflight is also launch-held by provider backoff.
