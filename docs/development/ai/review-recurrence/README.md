@@ -19,15 +19,17 @@ and planned new surfaces. The final record uses
 
 ## Ownership and sequence
 
-1. The manager content-addresses the repair packet before implementation.
+1. The manager content-addresses the repair packet before implementation. Its
+   commit either precedes the candidate in Git ancestry or its pre-start
+   dispatch event is content-addressed.
 2. The implementer returns one exact candidate and identifies every actual
    surface added by the repair, including anything not forecast.
 3. An independent report-only reviewer checks prior closure and repair-created
    surface as separate passes. It records observations, effect episodes, and
    causal classes without a finding-count target.
 4. The manager waits for terminal worker/process state, recomputes candidate,
-   control-overlay, task-packet, report, patch, path, tree, numstat, and digest
-   identity, then writes the final record.
+   control-overlay, separate repair/review packets, report, patch, path, tree,
+   numstat, and digest identity, then writes the final record.
 5. `check_review_recurrence.py` emits the integration decision. A structurally
    valid `request_changes` record is still `BLOCK`, and schema-only validation
    never authorizes integration.

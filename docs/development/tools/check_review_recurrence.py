@@ -677,6 +677,16 @@ def verify_git_subject(
             .decode()
             .strip()
         )
+        repair_packet_revision = (
+            git_output(
+                root,
+                "rev-parse",
+                "--verify",
+                f"{subject.get('repair_packet_revision')}^{{commit}}",
+            )
+            .decode()
+            .strip()
+        )
         report_commit = (
             git_output(
                 root,
@@ -760,12 +770,34 @@ def verify_git_subject(
         if report_path in actual_control_paths:
             raise ValueError("report path was already changed by review control")
         report_bytes = git_output(root, "show", f"{report_commit}:{report_path}")
-        task_path = subject.get("task_packet_path")
-        if not repository_path_valid(task_path):
-            raise ValueError(f"unsafe task packet path: {task_path!r}")
-        if not task_path.startswith("docs/development/ai/task-packets/"):
-            raise ValueError("task packet path is outside the task-packet namespace")
-        task_bytes = git_output(root, "show", f"{control}:{task_path}")
+        repair_packet_path = subject.get("repair_packet_path")
+        if not repository_path_valid(repair_packet_path):
+            raise ValueError(f"unsafe repair packet path: {repair_packet_path!r}")
+        if not repair_packet_path.startswith(
+            "docs/development/ai/task-packets/"
+        ):
+            raise ValueError(
+                "repair packet path is outside the task-packet namespace"
+            )
+        repair_packet_bytes = git_output(
+            root,
+            "show",
+            f"{repair_packet_revision}:{repair_packet_path}",
+        )
+        review_packet_path = subject.get("review_packet_path")
+        if not repository_path_valid(review_packet_path):
+            raise ValueError(f"unsafe review packet path: {review_packet_path!r}")
+        if not review_packet_path.startswith(
+            "docs/development/ai/task-packets/"
+        ):
+            raise ValueError(
+                "review packet path is outside the task-packet namespace"
+            )
+        review_packet_bytes = git_output(
+            root,
+            "show",
+            f"{control}:{review_packet_path}",
+        )
         report_changed = {
             value.decode("utf-8", errors="surrogateescape")
             for value in git_output(
@@ -798,14 +830,68 @@ def verify_git_subject(
             f"{location}.report_sha256",
             f"computed {report_sha}",
         )
-    task_sha = hashlib.sha256(task_bytes).hexdigest()
-    if subject.get("task_packet_sha256") != task_sha:
+    if subject.get("repair_packet_revision") != repair_packet_revision:
         add(
             findings,
-            "task-packet-digest-mismatch",
-            f"{location}.task_packet_sha256",
-            f"computed {task_sha}",
+            "repair-packet-revision-not-canonical",
+            f"{location}.repair_packet_revision",
+            f"resolved {repair_packet_revision}",
         )
+    repair_packet_sha = hashlib.sha256(repair_packet_bytes).hexdigest()
+    if subject.get("repair_packet_sha256") != repair_packet_sha:
+        add(
+            findings,
+            "repair-packet-digest-mismatch",
+            f"{location}.repair_packet_sha256",
+            f"computed {repair_packet_sha}",
+        )
+    review_packet_sha = hashlib.sha256(review_packet_bytes).hexdigest()
+    if subject.get("review_packet_sha256") != review_packet_sha:
+        add(
+            findings,
+            "review-packet-digest-mismatch",
+            f"{location}.review_packet_sha256",
+            f"computed {review_packet_sha}",
+        )
+    repair_timing = subject.get("repair_packet_timing")
+    repair_is_ancestor = subprocess.run(
+        [
+            "git",
+            "merge-base",
+            "--is-ancestor",
+            repair_packet_revision,
+            candidate,
+        ],
+        cwd=root,
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    ).returncode == 0
+    dispatch_ref = subject.get("repair_dispatch_event_ref")
+    dispatch_sha = subject.get("repair_dispatch_event_sha256")
+    if repair_timing == "ancestor_of_candidate":
+        if not repair_is_ancestor:
+            add(
+                findings,
+                "repair-packet-does-not-precede-candidate",
+                f"{location}.repair_packet_revision",
+                "declared ancestor timing is false",
+            )
+        if dispatch_ref is not None or dispatch_sha is not None:
+            add(
+                findings,
+                "ancestor-timing-has-dispatch-attestation",
+                f"{location}.repair_packet_timing",
+                "ancestor timing does not use external dispatch evidence",
+            )
+    elif repair_timing == "dispatch_event_attested":
+        if not nonempty(dispatch_ref) or not nonempty(dispatch_sha):
+            add(
+                findings,
+                "repair-dispatch-attestation-incomplete",
+                f"{location}.repair_packet_timing",
+                "branch-external pre-repair packets need an event reference and digest",
+            )
     if report_changed != {report_path}:
         add(
             findings,

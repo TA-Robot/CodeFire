@@ -140,7 +140,9 @@ or fill a quota.
 ### Before the repair
 
 The manager, not the implementer, freezes one closure contract for every prior
-obligation in the content-addressed repair packet:
+obligation in the content-addressed repair packet. The final record binds this
+pre-repair packet separately from the successor review packet; Git ancestry or
+a content-addressed dispatch event must establish that it preceded repair:
 
 | Obligation ID | Exact acceptance criterion | Authorized boundary | Required live routes | Anticipated regressions | Forbidden shortcuts |
 |---|---|---|---|---|---|

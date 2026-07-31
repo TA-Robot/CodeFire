@@ -108,9 +108,16 @@
       "additionalProperties": false,
       "required": [
         "review_id",
-        "task_packet_id",
-        "task_packet_path",
-        "task_packet_sha256",
+        "repair_packet_id",
+        "repair_packet_path",
+        "repair_packet_revision",
+        "repair_packet_sha256",
+        "repair_packet_timing",
+        "repair_dispatch_event_ref",
+        "repair_dispatch_event_sha256",
+        "review_packet_id",
+        "review_packet_path",
+        "review_packet_sha256",
         "base_revision",
         "candidate_revision",
         "candidate_tree",
@@ -129,15 +136,42 @@
           "type": "string",
           "minLength": 1
         },
-        "task_packet_id": {
+        "repair_packet_id": {
           "type": "string",
           "minLength": 1
         },
-        "task_packet_path": {
+        "repair_packet_path": {
           "type": "string",
           "minLength": 1
         },
-        "task_packet_sha256": {
+        "repair_packet_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repair_packet_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "repair_packet_timing": {
+          "enum": [
+            "ancestor_of_candidate",
+            "dispatch_event_attested"
+          ]
+        },
+        "repair_dispatch_event_ref": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "repair_dispatch_event_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "review_packet_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_packet_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_packet_sha256": {
           "$ref": "#/$defs/sha256"
         },
         "base_revision": {

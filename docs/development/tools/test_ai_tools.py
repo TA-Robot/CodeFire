@@ -1161,9 +1161,20 @@ class ReviewRecurrenceTests(unittest.TestCase):
             "generation": 2,
             "subject": {
                 "review_id": "review-002",
-                "task_packet_id": "repair-001",
-                "task_packet_path": "docs/development/ai/task-packets/repair.md",
-                "task_packet_sha256": digest,
+                "repair_packet_id": "repair-001",
+                "repair_packet_path": (
+                    "docs/development/ai/task-packets/repair.md"
+                ),
+                "repair_packet_revision": "repair-packet-commit",
+                "repair_packet_sha256": digest,
+                "repair_packet_timing": "ancestor_of_candidate",
+                "repair_dispatch_event_ref": None,
+                "repair_dispatch_event_sha256": None,
+                "review_packet_id": "review-packet-002",
+                "review_packet_path": (
+                    "docs/development/ai/task-packets/review.md"
+                ),
+                "review_packet_sha256": digest,
                 "base_revision": "base",
                 "candidate_revision": "candidate",
                 "candidate_tree": "tree",
@@ -1440,16 +1451,32 @@ class ReviewRecurrenceTests(unittest.TestCase):
             (root / "README.md").write_text("base\n", encoding="utf-8")
             git("add", "README.md")
             git("commit", "-qm", "base")
-            base = git("rev-parse", "HEAD")
+            initial_base = git("rev-parse", "HEAD")
+            repair_packet_path = Path(
+                "docs/development/ai/task-packets/repair.md"
+            )
+            (root / repair_packet_path).parent.mkdir(parents=True)
+            (root / repair_packet_path).write_text(
+                "repair packet\n",
+                encoding="utf-8",
+            )
+            git("add", repair_packet_path.as_posix())
+            git("commit", "-qm", "repair contract")
+            repair_packet_revision = git("rev-parse", "HEAD")
+            base = repair_packet_revision
             (root / "product.txt").write_text("candidate\n", encoding="utf-8")
             git("add", "product.txt")
             git("commit", "-qm", "candidate")
             candidate = git("rev-parse", "HEAD")
 
-            task_path = Path("docs/development/ai/task-packets/repair.md")
-            (root / task_path).parent.mkdir(parents=True)
-            (root / task_path).write_text("repair packet\n", encoding="utf-8")
-            git("add", task_path.as_posix())
+            review_packet_path = Path(
+                "docs/development/ai/task-packets/review.md"
+            )
+            (root / review_packet_path).write_text(
+                "review packet\n",
+                encoding="utf-8",
+            )
+            git("add", review_packet_path.as_posix())
             git("commit", "-qm", "review control")
             control = git("rev-parse", "HEAD")
             control_patch, control_paths, _, _ = canonical_git_patch(
@@ -1466,6 +1493,7 @@ class ReviewRecurrenceTests(unittest.TestCase):
             git("add", report_path.as_posix())
             git("commit", "-qm", "review report")
             report = git("rev-parse", "HEAD")
+            review_branch = git("branch", "--show-current")
 
             patch, paths, resolved_base, resolved_candidate = canonical_git_patch(
                 root,
@@ -1475,9 +1503,17 @@ class ReviewRecurrenceTests(unittest.TestCase):
             record = self.record()
             record["subject"].update(
                 {
-                    "task_packet_path": task_path.as_posix(),
-                    "task_packet_sha256": hashlib.sha256(
-                        (root / task_path).read_bytes()
+                    "repair_packet_path": repair_packet_path.as_posix(),
+                    "repair_packet_revision": repair_packet_revision,
+                    "repair_packet_sha256": hashlib.sha256(
+                        (root / repair_packet_path).read_bytes()
+                    ).hexdigest(),
+                    "repair_packet_timing": "ancestor_of_candidate",
+                    "repair_dispatch_event_ref": None,
+                    "repair_dispatch_event_sha256": None,
+                    "review_packet_path": review_packet_path.as_posix(),
+                    "review_packet_sha256": hashlib.sha256(
+                        (root / review_packet_path).read_bytes()
                     ).hexdigest(),
                     "base_revision": resolved_base,
                     "candidate_revision": resolved_candidate,
@@ -1508,6 +1544,54 @@ class ReviewRecurrenceTests(unittest.TestCase):
             )
             self.assertEqual(findings, [])
 
+            git("checkout", "-q", "-b", "external-contract", initial_base)
+            (root / repair_packet_path).parent.mkdir(parents=True)
+            (root / repair_packet_path).write_text(
+                "repair packet\n",
+                encoding="utf-8",
+            )
+            git("add", repair_packet_path.as_posix())
+            git("commit", "-qm", "external repair contract")
+            external_contract = git("rev-parse", "HEAD")
+            git("checkout", "-q", review_branch)
+
+            record["subject"]["repair_packet_revision"] = external_contract
+            self.assertIn(
+                "repair-packet-does-not-precede-candidate",
+                {
+                    finding.code
+                    for finding in validate_recurrence_control(
+                        record,
+                        schema=self.schema,
+                        root=root,
+                        verify_git=True,
+                    )
+                },
+            )
+            record["subject"]["repair_packet_timing"] = (
+                "dispatch_event_attested"
+            )
+            record["subject"]["repair_dispatch_event_ref"] = (
+                "events:repair-dispatch"
+            )
+            record["subject"]["repair_dispatch_event_sha256"] = "b" * 64
+            self.assertEqual(
+                validate_recurrence_control(
+                    record,
+                    schema=self.schema,
+                    root=root,
+                    verify_git=True,
+                ),
+                [],
+            )
+            record["subject"]["repair_packet_revision"] = (
+                repair_packet_revision
+            )
+            record["subject"]["repair_packet_timing"] = (
+                "ancestor_of_candidate"
+            )
+            record["subject"]["repair_dispatch_event_ref"] = None
+            record["subject"]["repair_dispatch_event_sha256"] = None
             record["repair_delta"]["inserted_lines"] = 2
             self.assertIn(
                 "repair-delta-mismatch",

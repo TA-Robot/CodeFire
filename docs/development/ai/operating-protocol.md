@@ -240,6 +240,13 @@ The implementer may not replace those obligations with self-authored closure
 claims. Unplanned public APIs, state machines, classifiers, or persisted
 shapes require a manager scope decision before integration.
 
+The final record binds two packets separately. The repair packet must either
+be a Git ancestor of the candidate or have content-addressed dispatch-event
+evidence showing the branch-external packet was supplied before repair. The
+review packet is read from the exact control revision that parents the
+report-only commit. A post-candidate review prompt therefore cannot masquerade
+as the pre-repair communication contract.
+
 The independent reviewer inspects two sets separately: closure of every prior
 obligation, then every surface created by the repair. Observation IDs,
 underlying effect episodes, and review generation are recorded separately so
