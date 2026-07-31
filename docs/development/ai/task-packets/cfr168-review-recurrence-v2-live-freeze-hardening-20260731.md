@@ -9,7 +9,7 @@ Base revision: `00ad88562068a6101a7530b84d5f52b0cff559f0`.
 
 ## Why this repair exists
 
-The first Cargo/KGI live-manifest extraction audit found five defects before a
+The first Cargo/KGI live-manifest extraction audit found six defects before a
 manager-owned live anchor was written:
 
 1. `derivations[].locus_existed_in_predecessor` describes symbol/locus
@@ -31,7 +31,12 @@ manager-owned live anchor was written:
    content pass schema validation and are silently collapsed by dictionaries.
    Record derivation and validation IDs have the same gap; duplicate timed
    validation rows can overwrite one another by ID.
-5. `live-arm-anchor.v1.json` has a documented shape, but no registered JSON
+5. The current-record entry point rejects escaped lone surrogates before JSON
+   Schema traversal, but manifest and retained-history loaders do not. A
+   manifest surrogate inside a `uniqueItems` array reaches
+   `canonical_json_bytes(...).encode("utf-8")` and raises
+   `UnicodeEncodeError` instead of returning a structured `BLOCK`.
+6. `live-arm-anchor.v1.json` has a documented shape, but no registered JSON
    Schema. The loader checks the top-level schema string and selected pin
    fields only. It does not reject duplicate arm rows or enforce the documented
    generation pin. Committing live manager authority on that surface would make
@@ -129,6 +134,27 @@ paths; two required validations sharing an ID but different argv; two record
 validation rows sharing an ID where only the later row passes; and two record
 derivations sharing an ID with different dispositions. None may be hidden by
 last-write-wins behaviour.
+
+### F1d — keep every v2 JSON boundary structured on unsafe text
+
+- Factor the existing recursive lone-surrogate rejection into one reusable v2
+  boundary helper; do not leave current-record and committed-artifact readers
+  with divergent behaviour.
+- Apply it before JSON Schema traversal to the current record, every retained
+  record replay, every repair manifest, every timed-result artifact, and both
+  current and retained live-anchor blobs.
+- Return a deterministic `unsafe-json-surrogate` structural finding with an
+  escaped/repr-safe location and message. Never interpolate the raw surrogate
+  into terminal output.
+- Preserve raw-byte digest and UTF-8 decoding checks. This control is in
+  addition to invalid repository-path byte detection; the two boundaries are
+  not interchangeable.
+
+Required counterexamples place an escaped lone surrogate separately in a
+manifest claim path, required-validation argv, retained record array, timed
+result string, current anchor pin path, and retained historical anchor. Each
+must return structured `BLOCK` without an uncaught exception or partial
+result.
 
 ### F2 — make live anchor authority schema-exact
 
