@@ -1617,3 +1617,96 @@ fixed-limit subject-plus-one axes, explicit debug/release process gates, and
 the rule that a required shared-parser change leaves R9 open. Final Storage
 resume remains blocked until the source-keyed guard is committed, ported,
 machine-bound, and freshly admitted.
+
+## 2026-07-31 03:47 UTC Upload terminal candidate and credential-safe rereview
+
+The exact resumed Claude Opus 5 implementation session
+`7baa1275-0ee2-476a-af46-1907386ebceb` terminated naturally with clean
+candidate `467b0c27715e424ae18ffb5664da053b55915e2d`, tree
+`3b129b9e41ae45defe4d6e7c43da04b016f07404`. Manager recomputation fixed:
+
+- continuation base and merge base
+  `b19c4346c0437ed28bdfe2fb6af1dd466abe9f8b`;
+- three additive commits, no merges, and empty porcelain;
+- exact binary patch SHA-256
+  `a71ea9276361cd426c0eecbf06c900034b5129849df281c8b8f881ffa0f63dc1`;
+- implementer result blob `7100966bf76b1ada44d797e8787eb8377a18f6fd`
+  and SHA-256
+  `a36149570fafcb7e38cc838738796b8e2b8c49095bab2325e1b136a3e31cb361`;
+- focused Upload 29/29, neighboring owner 59/59, broad Python 450/450,
+  selected legacy 13/13, source-doc, project-doc, and patch-hygiene passes.
+
+The worker claims closure of the completed-quarantine ledger/deadline escape,
+caller-owned projection failure, reusable root proof, and nine missing
+reversals. These are implementer claims only. Canonical `6eb370d` and
+`153c37c` bind the manager candidate card, fresh report-only Fugu Ultra 1.1
+ticket, and original launch manifest.
+
+The first scheduler attempt stopped before provider dispatch with return code
+3 because the manager worktree did not contain a credential and its launch
+environment did not name the existing external
+`/workspace/project/fugu-api`. It created no Fugu session, no report, no task
+commit, and left the generated task worktree clean at its launch revision.
+Canonical `c3a6cb3` preserves the exact state/log digests, cause, and retry
+contract. No secret was copied into a worktree or log.
+
+Canonical `8597451` registers a new batch/task identity on top of that
+incident. A fresh count-free `light` admission at
+`2026-07-31T03:47:13.564766Z` returned `ALLOW`:
+
+- projected available memory `10,334,683,136` bytes after a 2 GiB
+  reservation;
+- swap use and memory/I/O full PSI zero;
+- workspace available bytes `902,823,243,776`;
+- Fugu occupancy one in adaptive window four; and
+- no provider backoff or write/build conflict.
+
+The retry exports only
+`FUGU_API_KEY_FILE=/workspace/project/fugu-api` to the scheduler process.
+Fresh Fugu Ultra 1.1 session
+`019fb648-a2cb-7ae2-ab60-d0514671c933` is active under manager/task/provider
+PIDs `1496834` / `1497118` / `1497189`. Its sole authorized repository write
+is
+`cfr168-python-http-upload-review-closure-rereview-fugu-20260731/review.md`.
+The initial provider-ready failure therefore became durable AIA-042 evidence
+without weakening credential isolation or substituting a different model.
+
+## 2026-07-31 03:49 UTC source-keyed Cargo guard pre-integration audit
+
+The first source-keyed Cargo guard was held before commit and before any Rust
+candidate consumed it. An independent adversarial audit found ten mandatory
+closure classes:
+
+1. source mutate-build-restore TOCTOU and persistent namespace poisoning;
+2. post-gate aggregate growth above the 32 GiB budget and stale,
+   record-trusting allocation totals;
+3. path-based ephemeral cleanup races and incomplete-removal false success;
+4. log/result paths able to target linked-worktree Git metadata;
+5. toolchain binding by name without exact executable/version/digest or
+   compiler-wrapper control;
+6. arbitrary/fake test-summary text able to satisfy the nonzero-test rule;
+7. incomplete durable `BLOCK` journaling and missing file/directory fsync;
+8. admitted source-mutating `fmt`, `clippy --fix`, and `doc --open` forms;
+9. indirect Rust dispatch and live shared-root profile-audit bypasses; and
+10. non-finite timeout values able to defeat bounded waits.
+
+The speed-related audit also rejected permanent global one-lane execution as
+an unexplained end state, identified a future lock-order cycle, and showed
+that full-HEAD namespace keys would rebuild several GiB for docs-only
+changes.
+
+The repair direction is now fixed: exact tool binaries are content/version
+bound; Cargo executes only inside an available `unshare -Urnm` namespace
+whose exact candidate root is bind-remounted read-only; evidence uses a
+dedicated root and bounded pinned file descriptors; registry usage is
+measured from the filesystem under one lock order; cleanup atomically
+quarantines the exact inode before descriptor-relative deletion; actual
+post-gate budget and source drift block/invalidate reuse; artifact identity is
+separated from full candidate evidence identity; and different source keys
+move to resource-token concurrency after the conservative bootstrap.
+
+File Doctor, Rust HTTP, File ancestry, and Storage remain held until the
+repaired guard is committed, its Python adversarial suite and independent
+rereview pass, and File Doctor reproduces nonzero exact-candidate debug and
+release evidence. This is a correctness quarantine, not idle provider or
+fixed-agent-count waiting.
