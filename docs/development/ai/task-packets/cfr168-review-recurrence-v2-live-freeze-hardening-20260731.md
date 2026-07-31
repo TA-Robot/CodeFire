@@ -9,7 +9,7 @@ Base revision: `00ad88562068a6101a7530b84d5f52b0cff559f0`.
 
 ## Why this repair exists
 
-The first Cargo/KGI live-manifest extraction audit found four defects before a
+The first Cargo/KGI live-manifest extraction audit found five defects before a
 manager-owned live anchor was written:
 
 1. `derivations[].locus_existed_in_predecessor` describes symbol/locus
@@ -26,7 +26,12 @@ manager-owned live anchor was written:
    record to compare, a bootstrap author may assign any origin below the
    current generation, and the incorrect value is then inherited by every
    successor.
-4. `live-arm-anchor.v1.json` has a documented shape, but no registered JSON
+4. JSON Schema `uniqueItems` does not make object key fields unique. Manifest
+   obligation, claim, and validation rows with the same ID but different
+   content pass schema validation and are silently collapsed by dictionaries.
+   Record derivation and validation IDs have the same gap; duplicate timed
+   validation rows can overwrite one another by ID.
+5. `live-arm-anchor.v1.json` has a documented shape, but no registered JSON
    Schema. The loader checks the top-level schema string and selected pin
    fields only. It does not reject duplicate arm rows or enforce the documented
    generation pin. Committing live manager authority on that surface would make
@@ -45,7 +50,15 @@ can never be the sole evidence for an independent negative-control claim.
 No live anchor, v2 live record, or v2 retained live result exists at the base,
 so the record-schema addition below has no live authority to migrate.
 
-## Required changes
+## Objective
+
+Make the first Cargo/KGI live freeze structurally unambiguous: bind path facts
+separately from locus judgements, bind derivations and obligation origins to
+the frozen manifest, reject conflicting semantic keys, validate live manager
+anchors as closed committed data, and state exactly where independent
+negative-control evidence belongs.
+
+## Scope
 
 ### F1 — separate path fact from locus judgement
 
@@ -57,6 +70,11 @@ so the record-schema addition below has no live authority to migrate.
 - Require every record derivation's `path` to equal the matching frozen
   manifest claim's `locus_path`. A mismatched path is structural failure even
   when both paths exist and the evidence is otherwise well formed.
+- Join each derivation to the frozen claim rather than treating `claim_id` as
+  the whole claim. Emit the manifest-owned `kind`, `obligation_id`, and
+  `locus_path` in deterministic I1 result coverage so `kind` is not parsed and
+  discarded. `kind` remains a manager/reviewer semantic classification; the
+  gate must not pretend it can infer parity from prose.
 - Continue binding `path`, `locus`, predecessor behaviour, candidate behaviour,
   disposition, action, and exact evidence references.
 - Document the pre-live schema break explicitly. Do not silently reinterpret
@@ -80,15 +98,37 @@ existing path must fail with a dedicated manifest/derivation path mismatch.
   exported origin. For a legacy bootstrap, the independently preflighted
   manifest is the machine authority.
 - Preserve `origin_generation < generation`.
+- Extend the manager-fixed legacy-root authority with the exact first live
+  review generation (`cargo: 3`, `kgi_kpi: 4`) and reject a bootstrap record or
+  manifest at another generation.
 - The first live Cargo manifest must bind `R1` to origin 1 and `R2`–`R5` to
   origin 2 at review generation 3. The first live KGI/KPI manifest must bind
-  the frozen A rows and routed rows to the generation stated by its exact
-  inventory at review generation 4; independent manifest preflight owns that
-  extraction.
+  `A1-SUBJECT`, `A2-DENOM`, `A3-D1`, `A3-D5`, `A4-STAGE`, and `A8-C6` to
+  origin 2 and the other fourteen frozen rows to origin 3 at review generation
+  4. Encode these exact maps in the manager-fixed bootstrap authority as well
+  as the independently reviewed manifests; a manager typo must fail closed.
 
 Required counterexamples: bootstrap record origin differs from its manifest;
 successor manifest origin differs from its predecessor record; a consistent
 rooted chain retains the original origin.
+
+### F1c — enforce semantic-key uniqueness before dictionary conversion
+
+- Reject duplicate `obligation_id`, `claim_id`, and `validation_id` keys in a
+  manifest even when the complete JSON objects differ.
+- Reject duplicate record derivation `claim_id` and validation `id` keys before
+  any dictionary or timed-fact conversion. Preserve the existing duplicate
+  checks for artifact refs, prior/new row IDs, path reviews, and surface IDs.
+- Reject duplicate anchor `arm` keys under F2.
+- Emit deterministic dedicated structural findings that name the duplicated
+  keys. Do not rely only on JSON Schema `uniqueItems` for object arrays.
+
+Required counterexamples: two closure mappings for one obligation with
+different validation sets; two claims sharing an ID but pointing to different
+paths; two required validations sharing an ID but different argv; two record
+validation rows sharing an ID where only the later row passes; and two record
+derivations sharing an ID with different dispositions. None may be hidden by
+last-write-wins behaviour.
 
 ### F2 — make live anchor authority schema-exact
 
@@ -153,6 +193,7 @@ new v2 review-control packets after their canonical port candidates exist.
 - `docs/development/ai/schemas/review-recurrence-live-arm-anchor.v1.schema.json`
 - `docs/development/ai/schemas/README.md`
 - `docs/development/tools/recurrence_v2_model.py`
+- `docs/development/tools/recurrence_v2_authority.py`
 - `docs/development/tools/recurrence_v2_decision.py`
 - `docs/development/tools/recurrence_v2_evidence.py`
 - `docs/development/tools/recurrence_v2_fixture.py`
@@ -167,7 +208,7 @@ new v2 review-control packets after their canonical port candidates exist.
 
 Any additional path requires a manager scope decision before editing.
 
-## Non-goals
+## Non-Goals
 
 - Do not author Cargo/KGI manifests, canonical ports, anchors, live records, or
   results in this repair.
