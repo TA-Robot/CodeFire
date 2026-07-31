@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """Gate a successor review without using a finding-count target.
 
-The record keeps report observations, effect episodes, generation
-opportunities, repair-created surface, validation terminality, and routing
-separate.  It is a manager-side integration gate: a structurally valid
-REQUEST_CHANGES record still returns BLOCK for integration.
+The normal entry point authorizes only `codefire.review_recurrence_control.v2`.
+A v1 record returns a structured `BLOCK`: the rejected v1 authorization path is
+not retained here.  `validate_recurrence_control` and the v1 schema stay
+byte-intact as historical evidence of the rejected shape, and v1's own
+before behaviour is demonstrated in an explicitly labelled synthetic fixture
+rather than by deleting it.
+
+v2 keeps parse, Git derivation, chronology verification, authority resolution,
+evidence binding, decision and rendering in separate modules; this file owns the
+CLI and the rendering of one result document.  A structurally valid record, a
+routing decision, or `CLOSURE_UNPROVEN` never becomes an approval.
 """
 
 from __future__ import annotations
@@ -26,6 +33,12 @@ from ai_contracts import (
     repository_path_valid,
     validate_json_schema,
 )
+import recurrence_v2_authority as v2_authority
+import recurrence_v2_decision as v2_decision
+import recurrence_v2_evidence as v2_evidence
+import recurrence_v2_model as v2_model
+from recurrence_v2_git import GitError, GitRepo
+from recurrence_v2_topology import scan_interval_paths, verify_generation
 
 
 SCHEMA_NAME = "codefire.review_recurrence_control.v1"
@@ -33,6 +46,12 @@ RESULT_SCHEMA = "codefire.review_recurrence_gate_result.v1"
 SCHEMA_PATH = Path(
     "docs/development/ai/schemas/review-recurrence-control.v1.schema.json"
 )
+V2_SCHEMA_NAME = v2_model.RECORD_SCHEMA
+V2_RESULT_SCHEMA = v2_model.RESULT_SCHEMA
+V2_SCHEMA_PATH = Path(v2_model.RECORD_SCHEMA_PATH)
+V2_MANIFEST_SCHEMA_PATH = Path(v2_model.MANIFEST_SCHEMA_PATH)
+V2_TIMED_SCHEMA_PATH = Path(v2_model.TIMED_SCHEMA_PATH)
+REJECTED_V1_CANDIDATE = "1cae0225e488ff918389700a7de0f94e9fd067b3"
 EXPANSIVE_SURFACE_KINDS = {
     "public_api",
     "state_machine",
@@ -1232,17 +1251,263 @@ def validate_recurrence_control(
     return findings
 
 
+def evaluate_v2(
+    raw: dict[str, Any],
+    record_sha256: str,
+    *,
+    root: Path,
+    schema: dict[str, Any] | None,
+    manifest_schema: dict[str, Any] | None,
+    timed_schema: dict[str, Any] | None,
+    deciding_gate: dict[str, Any],
+    verify_git: bool,
+    live_arm: str | None,
+    legacy_roots: dict[str, Any] | None = None,
+    location: str = "record",
+) -> dict[str, Any]:
+    """Verify and decide one v2 record, then render one result document."""
+
+    findings: list[Finding] = []
+    blockers: list[str] = []
+    repo = GitRepo(root)
+
+    # F-10 / C-14: invalid-UTF-8 repository paths are detected before schema
+    # validation, from the raw subject, and rendered with backslash escapes so
+    # the structured finding stays JSON-writable.
+    invalid_paths: tuple[str, ...] = ()
+    subject_raw = raw.get("subject") if isinstance(raw.get("subject"), dict) else {}
+    predecessor = subject_raw.get("predecessor_candidate_revision")
+    candidate = subject_raw.get("candidate_revision")
+    if verify_git and isinstance(predecessor, str) and isinstance(candidate, str):
+        invalid_paths, scan_findings = scan_interval_paths(
+            repo, predecessor, candidate, location
+        )
+        findings.extend(scan_findings)
+
+    if schema is not None:
+        findings.extend(validate_json_schema(raw, schema, location))
+    record, parse_findings = v2_model.parse_record(raw, location)
+    findings.extend(parse_findings)
+
+    result: dict[str, Any] = {
+        "schema": V2_RESULT_SCHEMA,
+        "input_schema": raw.get("schema"),
+        "record_sha256": record_sha256,
+        "analysed_git_root": str(root),
+        "git_verified": verify_git,
+        "deciding_gate": deciding_gate,
+        "invalid_utf8_paths": list(invalid_paths),
+        "live_arm_pin": "unavailable",
+        "limits": list(v2_model.PROVENANCE_LIMITS),
+    }
+    if record is None:
+        result.update(
+            {
+                "record_valid": False,
+                "review_decision": raw.get("review_decision"),
+                "integration_decision": "BLOCK",
+                "blockers": ["the record could not be parsed into the v2 model"],
+                "findings": [asdict(finding) for finding in findings],
+                "finding_count": len(findings),
+            }
+        )
+        return result
+
+    if not verify_git:
+        blockers.append(
+            "--no-git-verify is diagnostic only: without Git verification the gate has no "
+            "topology, authority, evidence or candidate identity proof"
+        )
+        chain = v2_authority.ChainResult()
+        topology = None
+        manifest = None
+        timed: dict[str, v2_evidence.TimedFacts] = {}
+        artifacts: dict[str, v2_model.ArtifactRef] = record.artifact_index()
+        predecessor_present: dict[str, bool] = {}
+    else:
+        chain, chain_findings = v2_authority.resolve_predecessor_authority_chain(
+            repo,
+            record,
+            schema=schema,
+            deciding_gate=deciding_gate,
+            legacy_roots=legacy_roots,
+        )
+        findings.extend(chain_findings)
+        view = v2_authority.generation_view(record)
+        if view is None:
+            findings.append(
+                v2_model.error(
+                    "subject-artifact-reference-unresolved",
+                    f"{location}.subject",
+                    "the packet, manifest, review-packet and report references must resolve in "
+                    "the artifacts table",
+                )
+            )
+            topology = None
+        else:
+            topology, topology_findings = verify_generation(repo, view, location)
+            findings.extend(topology_findings)
+        artifacts, artifact_findings = v2_evidence.resolve_artifacts(
+            repo, record, chain, legacy_roots
+        )
+        findings.extend(artifact_findings)
+        findings.extend(v2_evidence.check_reference_integrity(record, artifacts))
+        manifest, manifest_findings = v2_evidence.load_manifest(
+            repo, record, artifacts, manifest_schema
+        )
+        findings.extend(manifest_findings)
+        timed, timed_findings = v2_evidence.bind_timed_validations(
+            repo, record, manifest, artifacts, timed_schema
+        )
+        findings.extend(timed_findings)
+        predecessor_present = {}
+        for derivation in record.derivations:
+            if not v2_model.path_components_safe(derivation.path):
+                continue
+            try:
+                entry = repo.entry(
+                    record.subject.predecessor_candidate_revision,
+                    derivation.path.encode("utf-8"),
+                )
+            except GitError:
+                continue
+            predecessor_present[derivation.path] = entry is not None
+        if live_arm is not None:
+            pin, pin_findings = v2_evidence.load_live_arm_anchor(
+                root, live_arm, record, artifacts
+            )
+            findings.extend(pin_findings)
+            result["live_arm_pin"] = pin if pin is not None else "unavailable"
+
+    decision = v2_decision.derive(
+        record,
+        manifest=manifest,
+        chain=chain,
+        timed=timed,
+        topology=topology,
+        predecessor_path_present=predecessor_present,
+    )
+    findings.extend(decision.findings)
+    blockers.extend(decision.blockers)
+    if deciding_gate.get("state") != "clean_committed":
+        blockers.append(
+            "deciding_gate: the validator artifacts do not match a clean committed revision "
+            f"(state {deciding_gate.get('state')!r}), so this decision is not reproducible"
+        )
+    if live_arm is not None and result["live_arm_pin"] == "unavailable":
+        blockers.append(
+            "live_arm_pin: no manager-owned live-arm anchor is pinned, so no live arm is "
+            "authorized"
+        )
+
+    errors = [finding for finding in findings if finding.level == "error"]
+    allowed = (
+        verify_git
+        and not errors
+        and not blockers
+        and record.review_decision == "accept"
+    )
+    result.update(
+        {
+            "control_id": record.control_id,
+            "generation": record.generation,
+            "candidate": {
+                "predecessor_candidate_revision": (
+                    record.subject.predecessor_candidate_revision
+                ),
+                "candidate_revision": record.subject.candidate_revision,
+                "candidate_tree": record.subject.candidate_tree,
+                "patch_sha256": record.subject.patch_sha256,
+                "changed_paths": sorted(record.subject.changed_paths),
+            },
+            "authority_chain": {
+                "kind": record.subject.authority.kind,
+                "rooted": chain.rooted,
+                "root_arm": chain.root_arm,
+                "root_commit": chain.root_commit,
+                "depth": chain.depth,
+                "links": chain.summary(),
+                "validator_identity_divergences": list(chain.validator_divergences),
+            },
+            "timed_validations": {
+                validation_id: {
+                    "status": facts.status,
+                    "exit_code": facts.exit_code,
+                    "timed_out": facts.timed_out,
+                    "log_complete": facts.log_complete,
+                    "clean_before": facts.clean_before,
+                    "clean_after": facts.clean_after,
+                    "index_flags_clean": facts.index_flags_clean,
+                    "log_bytes": facts.log_bytes,
+                    "log_sha256": facts.log_sha256,
+                    "passing": facts.passing,
+                }
+                for validation_id, facts in sorted(timed.items())
+            },
+            "rows": [asdict(row) for row in decision.rows],
+            "metrics": decision.metrics,
+            "successor_obligation_ids": list(decision.successor_obligation_ids),
+            "record_valid": not errors,
+            "review_decision": record.review_decision,
+            "integration_decision": "ALLOW" if allowed else "BLOCK",
+            "blockers": blockers,
+            "findings": [asdict(finding) for finding in findings],
+            "finding_count": len(findings),
+        }
+    )
+    return result
+
+
+def legacy_v1_block(raw: dict[str, Any], record_sha256: str) -> dict[str, Any]:
+    """A v1 record is historical data; the normal gate never authorizes it."""
+
+    finding = Finding(
+        "error",
+        "v1-record-not-authorized",
+        "record.schema",
+        f"{raw.get('schema')!r} is the rejected AIA-047 v1 authorization surface "
+        f"(rejected candidate {REJECTED_V1_CANDIDATE}); only {V2_SCHEMA_NAME} can be "
+        "authorized, and v1 evidence remains readable as historical data only",
+    )
+    return {
+        "schema": V2_RESULT_SCHEMA,
+        "input_schema": raw.get("schema"),
+        "record_sha256": record_sha256,
+        "record_valid": False,
+        "git_verified": False,
+        "review_decision": raw.get("review_decision"),
+        "integration_decision": "BLOCK",
+        "blockers": [
+            "record.schema: the rejected v1 authorization path is not retained in this gate"
+        ],
+        "findings": [asdict(finding)],
+        "finding_count": 1,
+        "limits": list(v2_model.PROVENANCE_LIMITS),
+    }
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Validate one successor-review recurrence record and gate "
+            "Validate one successor-review recurrence v2 record and gate "
             "integration without a finding-count target."
         )
     )
     parser.add_argument("--record", type=Path, required=True)
     parser.add_argument("--schema", type=Path)
+    parser.add_argument("--manifest-schema", type=Path)
+    parser.add_argument("--timed-schema", type=Path)
     parser.add_argument("--git-root", type=Path)
+    parser.add_argument(
+        "--validator-root",
+        type=Path,
+        help=(
+            "repository holding this gate's own source, deliberately distinct from the "
+            "analysed --git-root"
+        ),
+    )
     parser.add_argument("--no-git-verify", action="store_true")
+    parser.add_argument("--live-arm", choices=sorted(v2_model.LEGACY_ROOTS))
     parser.add_argument("--result", type=Path)
     return parser.parse_args(argv)
 
@@ -1261,35 +1526,50 @@ def atomic_write(path: Path, payload: dict[str, Any]) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     root = (args.git_root or repository_root()).resolve()
-    schema_path = (args.schema or root / SCHEMA_PATH).resolve()
+    validator_root = (args.validator_root or repository_root()).resolve()
+    record_path = args.record.resolve()
     try:
-        record = load_object(args.record.resolve())
-        schema = load_object(schema_path)
-        findings = validate_recurrence_control(
-            record,
-            schema=schema,
-            root=root,
-            verify_git=not args.no_git_verify,
-            location=args.record.as_posix(),
-        )
+        # The record is deliberately an uncommitted input at evaluation time, so
+        # the gate digests the exact bytes it read and emits them for the later
+        # retention commit to match.
+        payload = record_path.read_bytes()
+        record_sha256 = hashlib.sha256(payload).hexdigest()
+        raw = json.loads(payload.decode("utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError("record root must be a JSON object")
+    except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"Review recurrence gate error: {exc}", file=sys.stderr)
+        return 2
+
+    schema_name = raw.get("schema")
+    try:
+        if schema_name == V2_SCHEMA_NAME:
+            schema = load_object((args.schema or root / V2_SCHEMA_PATH).resolve())
+            manifest_schema = load_object(
+                (args.manifest_schema or root / V2_MANIFEST_SCHEMA_PATH).resolve()
+            )
+            timed_schema = load_object(
+                (args.timed_schema or root / V2_TIMED_SCHEMA_PATH).resolve()
+            )
+            result = evaluate_v2(
+                raw,
+                record_sha256,
+                root=root,
+                schema=schema,
+                manifest_schema=manifest_schema,
+                timed_schema=timed_schema,
+                deciding_gate=v2_evidence.deciding_gate_identity(validator_root),
+                verify_git=not args.no_git_verify,
+                live_arm=args.live_arm,
+                location=record_path.as_posix(),
+            )
+        else:
+            result = legacy_v1_block(raw, record_sha256)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"Review recurrence gate error: {exc}", file=sys.stderr)
         return 2
-    errors = [finding for finding in findings if finding.level == "error"]
-    git_verified = not args.no_git_verify
-    integration_allowed = (
-        git_verified and not errors and record.get("review_decision") == "accept"
-    )
-    result = {
-        "schema": RESULT_SCHEMA,
-        "record": str(args.record.resolve()),
-        "record_valid": not errors,
-        "git_verified": git_verified,
-        "review_decision": record.get("review_decision"),
-        "integration_decision": "ALLOW" if integration_allowed else "BLOCK",
-        "finding_count": len(findings),
-        "findings": [asdict(finding) for finding in findings],
-    }
+    result["record"] = str(record_path)
+    integration_allowed = result.get("integration_decision") == "ALLOW"
     if args.result is not None:
         atomic_write(args.result, result)
     print(json.dumps(result, indent=2, sort_keys=True))

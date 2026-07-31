@@ -140,6 +140,88 @@ def run_gate(
     }
 
 
+TIMED_V2_LIMITS = (
+    "A command that mutates and restores bytes during its own execution stays outside "
+    "this provenance proof, even when clean-before, clean-after and the index-flag set "
+    "are all empty.",
+    "This result does not prove honest execution, semantic oracle quality, or that a "
+    "test selector chose a nonzero corpus; a validation-specific selection claim remains "
+    "report evidence unless a dedicated parser verifies it.",
+    "cwd, source.git_root and log.path are machine-specific absolute paths and are "
+    "diagnostic only; identity is carried by source.revision, source.tree and the log "
+    "digest with its byte count.",
+)
+
+
+def run_gate_v2(
+    argv: list[str],
+    cwd: Path,
+    log_path: Path,
+    timeout_seconds: float,
+    *,
+    drift_threshold_seconds: float = 2.0,
+    wall_clock_ns: Callable[[], int] = time.time_ns,
+    monotonic_clock_ns: Callable[[], int] = time.monotonic_ns,
+) -> dict[str, Any]:
+    """Run one gate and bind it to a derived, clean source identity.
+
+    The Git root containing `cwd`, the canonical `HEAD` revision and the `HEAD`
+    tree are derived here rather than accepted as strings.  The porcelain status
+    is captured immediately before and immediately after the command, and the
+    index entries whose tag is not `H` are captured too, so an `assume-unchanged`
+    or `skip-worktree` bit cannot hide a modification behind an empty status.
+
+    Logs and results are meant to be written outside the source worktree and
+    copied byte-identically into the evidence commit; when the log is inside the
+    derived root the payload says so instead of hiding it.
+    """
+
+    from recurrence_v2_git import GitRepo
+
+    probe = GitRepo(cwd.resolve(strict=True))
+    root = Path(probe.toplevel())
+    repo = GitRepo(root)
+    revision, tree = repo.head_identity()
+    status_before = repo.worktree_status()
+    payload = run_gate(
+        argv,
+        cwd,
+        log_path,
+        timeout_seconds,
+        drift_threshold_seconds=drift_threshold_seconds,
+        wall_clock_ns=wall_clock_ns,
+        monotonic_clock_ns=monotonic_clock_ns,
+    )
+    status_after = repo.worktree_status()
+    index_flagged = repo.index_flagged_entries()
+    resolved_log = log_path.resolve()
+    try:
+        resolved_log.relative_to(root.resolve())
+        log_inside = True
+    except ValueError:
+        log_inside = False
+    payload["schema"] = "codefire.timed_gate.v2"
+    payload["source"] = {
+        "git_root": str(root.resolve()),
+        "revision": revision,
+        "tree": tree,
+        "derived": "git -C <cwd> rev-parse --show-toplevel HEAD HEAD^{tree}",
+    }
+    payload["worktree"] = {
+        "clean_before": not status_before,
+        "clean_after": not status_after,
+        "status_before": list(status_before),
+        "status_after": list(status_after),
+        "index_flagged_entries": list(index_flagged),
+        "index_flags_clean": not index_flagged,
+        "log_inside_source_worktree": log_inside,
+        "status_command": "git status --porcelain=v1 -z --untracked-files=all",
+        "index_command": "git ls-files -v -z",
+    }
+    payload["limits"] = list(TIMED_V2_LIMITS)
+    return payload
+
+
 def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     path = path.resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -159,6 +241,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--result", type=Path)
     parser.add_argument("--timeout", type=float, required=True)
     parser.add_argument("--drift-threshold", type=float, default=2.0)
+    parser.add_argument(
+        "--emit",
+        choices=("v1", "v2"),
+        default="v1",
+        help=(
+            "v1 keeps the historical result shape; v2 additionally derives the source "
+            "revision/tree and the clean-before, clean-after and index-flag states that a "
+            "recurrence v2 acceptance requires"
+        ),
+    )
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
     if args.command[:1] == ["--"]:
@@ -170,8 +262,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
+    runner = run_gate_v2 if args.emit == "v2" else run_gate
     try:
-        payload = run_gate(
+        payload = runner(
             args.command,
             args.cwd,
             args.log,
