@@ -35,6 +35,8 @@ REQUIRED_AI_FILES = [
     "docs/development/tools/build_source_bound_rust.py",
     "docs/development/tools/capture_candidate_identity.py",
     "docs/development/tools/check_swarm_admission.py",
+    "docs/development/tools/check_rust_execution_profile.py",
+    "docs/development/tools/check_review_terminalization.py",
     "docs/development/tools/run_timed_gate.py",
     "docs/development/exploration/README.md",
     ".codex/config.toml",

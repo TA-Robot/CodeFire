@@ -47,6 +47,16 @@ from check_swarm_admission import (  # noqa: E402
     DEFAULT_THRESHOLDS,
     evaluate_admission,
 )
+from check_rust_execution_profile import (  # noqa: E402
+    DEFAULT_PROFILE,
+    audit_recorded_command,
+    build_result as build_rust_profile_result,
+    evaluate_process,
+)
+from check_review_terminalization import (  # noqa: E402
+    agent_texts,
+    evaluate_terminalization,
+)
 from build_source_bound_rust import (  # noqa: E402
     BINARY_PATH,
     build_source_manifest,
@@ -918,6 +928,216 @@ class SwarmAdmissionTests(unittest.TestCase):
             set(result["blockers"]),
             {"cpu-pressure", "memory-pressure", "io-pressure"},
         )
+
+
+class RustExecutionProfileTests(unittest.TestCase):
+    def observation(self) -> dict[str, object]:
+        target = DEFAULT_PROFILE["target_dir"]
+        rustup = DEFAULT_PROFILE["rustup_home"]
+        return {
+            "pid": 101,
+            "tool": "rustc",
+            "cwd": "/workspace/worktrees/candidate",
+            "argv": [
+                f"{rustup}/toolchains/1.97.0/bin/rustc",
+                "--out-dir",
+                f"{target}/debug/deps",
+            ],
+            "environment": {
+                "RUSTUP_HOME": DEFAULT_PROFILE["rustup_home"],
+                "CARGO_HOME": DEFAULT_PROFILE["cargo_home"],
+                "CARGO_TARGET_DIR": target,
+                "CARGO_BUILD_JOBS": "2",
+                "RUST_TEST_THREADS": "2",
+                "CARGO_INCREMENTAL": "0",
+            },
+        }
+
+    def test_shared_low_memory_process_passes(self) -> None:
+        self.assertEqual(evaluate_process(self.observation()), [])
+
+    def test_private_target_and_toolchain_are_blocked(self) -> None:
+        observation = self.observation()
+        observation["argv"] = [
+            "/tmp/codefire-rustup/rustup/toolchains/stable/bin/rustc",
+            "--out-dir",
+            "/tmp/private-target/release/deps",
+        ]
+        environment = dict(observation["environment"])  # type: ignore[arg-type]
+        environment["RUSTUP_HOME"] = "/tmp/codefire-rustup/rustup"
+        environment["CARGO_TARGET_DIR"] = "/tmp/private-target"
+        environment["CARGO_BUILD_JOBS"] = "8"
+        observation["environment"] = environment
+        codes = {
+            finding["code"] for finding in evaluate_process(observation)
+        }
+        self.assertEqual(
+            codes,
+            {
+                "wrong-rustup-home",
+                "wrong-target-dir",
+                "unsafe-build-jobs",
+                "wrong-toolchain-executable",
+                "private-out-dir",
+            },
+        )
+
+    def test_recorded_explicit_override_is_durable_postflight_evidence(
+        self,
+    ) -> None:
+        command = (
+            "export RUSTUP_HOME=/tmp/rustup; "
+            "CARGO_TARGET_DIR=target/release-review "
+            "CARGO_BUILD_JOBS=7 cargo test --release"
+        )
+        codes = {
+            finding["code"]
+            for finding in audit_recorded_command(
+                command, cwd=Path("/workspace/worktrees/candidate")
+            )
+        }
+        self.assertEqual(
+            codes,
+            {
+                "recorded-wrong-rustup-home",
+                "recorded-wrong-target-dir",
+                "recorded-unsafe-build-jobs",
+            },
+        )
+
+    def test_recorded_violations_are_grouped_without_losing_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            events = Path(temporary) / "events.jsonl"
+            events.write_text(
+                "\n".join(
+                    json.dumps(
+                        {
+                            "type": "item.completed",
+                            "item": {
+                                "type": "command_execution",
+                                "command": (
+                                    f"CARGO_TARGET_DIR=/tmp/private-{index} "
+                                    "cargo test"
+                                ),
+                            },
+                        }
+                    )
+                    for index in (1, 2)
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            result = build_rust_profile_result(
+                [],
+                event_paths=[events],
+                event_cwd=Path("/workspace/worktrees/candidate"),
+            )
+        self.assertEqual(result["decision"], "BLOCK")
+        self.assertEqual(result["recorded_commands_scanned"], 2)
+        self.assertEqual(result["recorded_violation_commands"], 2)
+        self.assertEqual(
+            sum(item["count"] for item in result["recorded_violations"]),
+            2,
+        )
+
+
+class ReviewTerminalizationTests(unittest.TestCase):
+    def report(self, state: str = "missing") -> dict[str, object]:
+        return {
+            "state": state,
+            "path": "/repo/result/review.md",
+            "bytes": 0,
+            "sha256": None,
+        }
+
+    def evaluate(
+        self,
+        texts: list[str],
+        *,
+        report_state: str = "missing",
+        worker_alive: bool | None = True,
+    ) -> dict[str, object]:
+        return evaluate_terminalization(
+            texts,
+            report=self.report(report_state),
+            worker_alive=worker_alive,
+            max_ready_signals=3,
+            max_events_after_ready=4,
+            max_events_after_verdict=8,
+        )
+
+    def test_long_review_with_unique_progress_remains_active(self) -> None:
+        result = self.evaluate(
+            [
+                "I reproduced one counterexample.",
+                "I am running the focused gate.",
+                "The gate passed; now tracing the final owner.",
+            ]
+        )
+        self.assertEqual(result["decision"], "WAIT")
+        self.assertEqual(result["state"], "active")
+
+    def test_repeated_ready_without_report_requires_intervention(self) -> None:
+        result = self.evaluate(
+            [
+                "Decision is REQUEST_CHANGES.",
+                "The decisive report is ready.",
+                "Checking one more route.",
+                "The report content is fixed.",
+                "Checking one more timing.",
+                "I am writing the complete report now.",
+                "Checking one more name.",
+                "Checking one more boundary.",
+            ]
+        )
+        self.assertEqual(result["decision"], "INTERVENE")
+        self.assertEqual(result["state"], "terminalization-stalled")
+
+    def test_committed_report_is_complete(self) -> None:
+        result = self.evaluate(
+            ["The report is ready."],
+            report_state="committed",
+            worker_alive=False,
+        )
+        self.assertEqual(result["decision"], "COMPLETE")
+        self.assertEqual(result["state"], "complete")
+
+    def test_committed_report_with_live_worker_requires_collection(self) -> None:
+        result = self.evaluate(
+            ["The report is ready.", "Rerunning the broad gate again."],
+            report_state="committed",
+            worker_alive=True,
+        )
+        self.assertEqual(result["decision"], "INTERVENE")
+        self.assertEqual(result["state"], "report-committed-worker-live")
+
+    def test_command_output_does_not_create_agent_ready_signal(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            events = Path(temporary) / "events.jsonl"
+            events.write_text(
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {
+                            "type": "command_execution",
+                            "aggregated_output": "The report is ready.",
+                        },
+                    }
+                )
+                + "\n"
+                + json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {
+                            "type": "agent_message",
+                            "text": "Still gathering evidence.",
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(agent_texts(events), ["Still gathering evidence."])
 
 
 class FocusedTestMapTests(unittest.TestCase):
