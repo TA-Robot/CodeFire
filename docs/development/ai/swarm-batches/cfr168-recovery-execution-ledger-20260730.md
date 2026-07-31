@@ -2746,3 +2746,50 @@ SHA-256 values are respectively
 `a25cb4809aca37c065f1aa4bdcfd760e44d89b4e9fd8df0bb45e5f5d7abe9d5c`,
 and
 `e95c2a27fd88fa17065e3ea33c5c15b63d70355cff2913ca5fc9f4ac1765aa91`.
+
+## 2026-07-31 12:44 UTC Cargo second-closure review completed and causally split
+
+Original reviewer session `d089c8ae-8364-49af-bcd1-b9bf4b741ea1`
+completed cleanly. Its sole report was copied without modification as
+canonical commit `22d35e6`; the original report commit is `130878d`, the
+report has 49,965 bytes and SHA-256
+`aad067b2b8feb80830c41db1608dd31f0e7e7d7ca1f37ab01d040336f788b4fd`,
+and the decision is `REQUEST_CHANGES`.
+
+The result is not evidence for a generic “review missed things” conclusion.
+Six of seven inherited findings are independently closed against oracles the
+reviewer first proved non-vacuous on the predecessor. The remaining inherited
+finding has two different components:
+
+- the prior review's 12-failure checkpoint observation was contaminated by a
+  non-Git archive; the implementer correctly reconstructed 10 genuine
+  failures in a real Git worktree; and
+- the prior review explicitly measured predecessor candidate `aaa39b6` at
+  159 tests, while the repair measured its own successor at 168, but committed
+  `history.md` with a third value, 161, and claimed that the count was
+  corrected.
+
+The second component is therefore provisionally classified
+`BOUND_FINDING_NOT_CLOSED + REPAIR_INTRODUCED_REGRESSION`, with missing
+claim-to-oracle verification. It is not presently classified as an initial
+review omission or primarily as communication ambiguity. Four further NITs
+are charged to the repair; one adjacent parser NIT is byte-identical across
+checkpoint, predecessor, and candidate and is routed separately. This single
+episode does not establish the project's dominant cause.
+
+Exact original-session repair packet
+`cfr168-source-keyed-cargo-third-closure-repair-20260731.md` binds a finite
+R1–R5 owner table, a detailed per-row evidence structure, explicit negative
+controls, and no finding quota. Its SHA-256 is
+`7464f158cc04373af2cb5e0eacb37212233d920dc9233bf220e553361a43adc7`.
+It preserves the valid challenge to the prior review, forbids the
+pre-existing parser scope expansion, and requires a mechanical
+count-consistency control rather than another prose-only correction.
+
+The first post-review admission check did not launch that repair. Claude had
+three active lanes inside a window of four, but after three conservative
+1-GiB outstanding reservations plus the candidate reservation, projected
+effective memory was `6,299,856,896` bytes, below the
+`6,442,450,944`-byte floor. Swap, pressure, disk, PID, provider, and conflict
+checks all passed. The repair retains first-new-slot priority; no active lane
+was stopped to make room.
