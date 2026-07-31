@@ -204,11 +204,14 @@ historical anchor, and validator-owned schema. Each must return structured
 - Validate the runner-owned timing model rather than accepting internally
   contradictory diagnostics: timeout must be positive; monotonic duration and
   drift threshold must be finite and nonnegative; start/end timestamps must be
-  parseable and ordered; wall elapsed must agree with those timestamps within
-  their represented precision; `wall_minus_monotonic_seconds` must equal wall
-  elapsed minus monotonic duration within a documented finite tolerance; and
+  parseable; their signed difference must agree with signed wall elapsed within
+  their represented precision with absolute tolerance `0.000002` seconds;
+  `wall_minus_monotonic_seconds` must equal wall elapsed minus monotonic
+  duration with absolute tolerance `1e-12` seconds; and
   `wall_clock_discontinuity` must equal whether the absolute delta exceeds the
-  threshold.
+  threshold. Do not require wall timestamps to be ordered: a genuine backward
+  wall-clock jump is admissible when these signed relations are consistent and
+  the discontinuity flag is true.
 - Require terminal fields to describe one outcome:
   `status == "passed"` iff `exit_code == 0` and `timed_out == false`, and a
   timed-out result must use the runner's exit code `124`. Preserve the closed
@@ -226,10 +229,13 @@ Required counterexamples independently falsify each boolean/detail pair,
 provide a non-null probe error with `head_unchanged: true`, move cwd outside the
 declared root, put log/result paths inside the root while setting the booleans
 false, make log and result the same path, use negative timeout/duration/drift
-values, falsify the wall-minus/discontinuity relations, reverse or detach the
-timestamps, contradict status/exit/timed-out fields, and replay an inconsistent
-retained timed result. Every case must return structured `BLOCK`; a real
-runner-produced external-path result must remain passing.
+values, falsify the wall-minus/discontinuity relations, detach the timestamps,
+contradict status/exit/timed-out fields, and replay an inconsistent
+retained timed result. Detached/relation-inconsistent timestamps must block;
+consistent forward and backward wall-clock jumps must both pass their timing
+relation checks. Add boundary tests at each frozen tolerance, immediately below
+it, and immediately above it. Every real runner-produced external-path result
+must remain passing.
 
 ### F1f — use a strict deterministic JSON authority boundary
 
