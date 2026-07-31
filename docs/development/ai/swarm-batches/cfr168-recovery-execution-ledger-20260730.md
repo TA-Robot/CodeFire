@@ -1710,3 +1710,50 @@ repaired guard is committed, its Python adversarial suite and independent
 rereview pass, and File Doctor reproduces nonzero exact-candidate debug and
 release evidence. This is a correctness quarantine, not idle provider or
 fixed-agent-count waiting.
+
+## 2026-07-31 07:31 UTC open-execution audit and three terminal reviews
+
+Canonical `f20798e` integrates a frozen execution audit captured at
+`664f907`. Its machine-readable inventory records three in-scope issues,
+29 unique open execution items, 18 then-committed review dispositions, and
+six then-absent report outputs. All declared evidence paths existed at that
+snapshot, all six pending paths were absent, and the AI-contract and
+project-document gates passed. The artifact is intentionally historical:
+the three reports below now exist and supersede its pending-output facts
+without rewriting the frozen audit.
+
+The three long-running independent lanes terminated normally and their sole
+report writes are canonical:
+
+| Subject | Report integration / SHA-256 | Decision | Current disposition |
+|---|---|---|---|
+| Python Upload `467b0c27715e424ae18ffb5664da053b55915e2d` | `8bdc076` / `57d6792106f09c17a1d154aedb5a64d342e5d19c23db7e9963c46061c868c132` | `REQUEST_CHANGES` | completed-quarantine ownership and publication-proof reuse are closed; retryable release ownership and pre-allocation reversal evidence remain open |
+| Python MR-list `b16404676639336f705feffd9af4857d4a1fcc69` | `ee6517a` / `5c952a9a5c162bfbb93522bb644fcba44ce32ddf3628501e6f94308899fe760e` | `ACCEPT` | preserve as an exact composition input; do not integrate alone; route all four informational observations under the manager's zero-residual objective |
+| Development-flow KGI/KPI `0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1` | `d04ec99` / `268ec0b768a334ad11dbdf57c81245d7b315d7699e34c511e1f782253c178b30` | `REQUEST_CHANGES` | 15 of 35 bound rows are closed and 20 remain partially closed across seven residual owner groups |
+
+Upload returns to original Claude Opus 5 session `7baa1275-…` for a minimal
+additive HIGH-2/MEDIUM-4 repair. The release operation must preserve claim
+and owner state across pre-effect failure, reconcile post-effect failure,
+and reach zero debt exactly once on retry. The ordered projection must expose
+a production pre-allocation boundary so removing either its claim or the
+source temporary dimension fails before `list(self.documents)` allocates.
+
+MR-list acceptance does not relax successor work. Its report identifies
+redundant retained state, unbounded per-fault text, inherited POST response
+displacement that is weaker than GET, and one imprecise source-contract
+clause. Those four rows are routed into the shared-primitives and POST
+successor before any Upload/MR-write composition adopts the protocol.
+
+The KGI/KPI repair must close every partially closed row, including exact
+non-finite/nanosecond-safe arithmetic, independently recomputed KGI/cohort
+targets, byte-verified contained evidence, immutable final-record binding,
+acyclic connected candidate and supersession graphs, complete terminal
+lifecycle evidence, per-batch freshness, evidence-derived anti-gaming state,
+and bounded schema collections. Existing green official gates are not
+decision evidence until the manager and adjacent production counterexamples
+fail closed without crashes.
+
+After integrating these reports, the canonical aggregate is 21 independent
+reports: four `ACCEPT` and seventeen `REQUEST_CHANGES`. Nineteen are product
+reports and two are development-control reports. No issue, Install, Dogfood,
+Close, capability, or final KGI decision is authorized by this update.
