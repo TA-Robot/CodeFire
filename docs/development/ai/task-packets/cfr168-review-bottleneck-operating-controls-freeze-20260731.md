@@ -2,13 +2,27 @@
 
 Status: `DRAFT_FOR_INDEPENDENT_PREFLIGHT`
 
-Authority: contract proposal only. This packet does not authorize implementation,
-integration, a live recurrence arm, process adoption, or a claim that review
-throughput improved.
+Authority: detailed P0-P2 implementation proposal only. Stable lifecycle,
+review/actionability, and measurement policy lives in
+`docs/development/project-management.md`,
+`docs/development/ai/operating-protocol.md`,
+`docs/development/ai/development-flow-kgi-kpi.md`. This packet must conform to
+those canonical documents and does not override them or independently authorize
+implementation, integration, a live recurrence arm, process adoption, or a
+claim that review throughput improved.
+
+`docs/development/ai/validation-report-template.md` mirrors the human artifact
+shape only; it does not own policy or adjudication authority.
 
 Owner: CodeFire development manager.
 
 Base revision: `f951f9a4ea0b208f08baef6c931d90284b46e1a6`.
+
+Governance baseline: `3baa2afbcfe2adaa6c4604d3ed632ba6a363ea73`
+(tree `b4831e9f81da2be677083395e8fa4b217db2c5bd`). The base revision above
+remains the proposed implementation subject; this later exact governance commit
+owns lifecycle/review/measurement semantics for any future packet preflight or
+implementation authorization.
 
 Supersedes draft: commit `914beee70f0e067a407cb13a1eeb918911379042`,
 tree `143bc765da3975f54ae8980b9792d6ba4acb27b8`, packet SHA-256
@@ -21,8 +35,9 @@ implementation-variance adjudication, and review-preference/overcorrection
 measurement.
 
 Lifecycle position: Discover complete for the eight process-readiness questions;
-Freeze and Plan are proposed here. Implement, Validate, Close, Install, Dogfood,
-and Retrospect remain unauthorized.
+Freeze and Plan are proposed here. Implement, Validate, Candidate Freeze,
+Review/Adjudication, Repair/Rereview, Integrate/source acceptance, Install,
+Dogfood/Evaluate, final Close, and Retrospect remain unauthorized.
 
 ## 1. Discover: evidence and disposition
 
@@ -129,6 +144,10 @@ infrastructure only; it includes no CodeFire product behavior.
 
 ### 3.1 Identity and chronology
 
+- Each packet inherits the applicable `AGENTS.md` and canonical repository
+  invariants at its base revision. Omission from packet prose cannot waive them
+  or become accepted variance; an authorization-relevant omission follows the
+  additive `contract_omission` path.
 - Every candidate, packet, report, validation, event record, result, and
   validator source is identified by full commit, tree where applicable, path,
   mode, and SHA-256. A branch name or mutable filename is never identity.
@@ -278,10 +297,20 @@ direct path join. It does not pretend the machine already checks the matrix.
 
 ### 4.2 Impact assessment, then two-stage finding adjudication before repair
 
-Every post-candidate review observation receives a canonical impact row before
-an actionability disposition. Every axis is present even when its value is
-`not_applicable`, `unknown`, or `unavailable`; omission is not equivalent to no
-impact.
+Every post-candidate review observation receives a compact canonical impact
+screen before an actionability disposition. The screen covers every axis as
+`affected`, `unaffected`, or `unknown`, with exact evidence/reason, must-fix
+candidates, and the proposed disposition. It escalates to the full expanded
+row below for a proposed `required_correction`, accepted variance,
+dispute/reopen, high or material impact, or acceptance-critical unknown. A true
+duplicate may bind its canonical expanded row; an evidenced invalid,
+out-of-scope, or nonblocking observation may terminate with the complete compact
+screen and manager disposition. Every axis is present at either depth;
+`not_applicable`, `unknown`, or `unavailable` requires a reason, and omission is
+not equivalent to no impact. This risk-proportional depth prevents the control
+itself from becoming a review-volume bottleneck.
+
+The full expanded row uses these rules:
 
 | Impact field | Frozen P0 rule |
 |---|---|
@@ -336,8 +365,18 @@ When the impact gate permits adjudication (`complete` or an evidence-backed
 | `accepted_implementation_variance` | The implementation differs from a reviewer-preferred design but satisfies the same frozen requirements/invariants with equivalent observable behavior and required evidence. | No correction. Bind an active manager decision for the locus so preference alone cannot reopen it. |
 | `nonblocking_improvement` | A concrete improvement has value, but no current frozen acceptance criterion makes it mandatory. | Does not block or trigger current repair. Route to a separately admitted future issue/packet if the manager chooses. |
 | `out_of_scope` | The observation lies outside the frozen candidate/review scope and proves no violation of an in-scope invariant or changed-path obligation. | Does not block this scope. It cannot hide an unreviewed changed path, cross-cutting invariant, or reachable candidate effect. |
-| `duplicate` | The same effect, obligation, or decision locus is already represented by a canonical observation/decision. | Reference the canonical ID; create no new repair, vote, denominator unit, or successor obligation. |
+| `duplicate` | The same effect, obligation, or decision locus is already represented by a canonical observation/decision. | Reference the canonical ID; create no new unique effect/finding/issue/repair, recurrence unit, vote, or successor obligation. Retain the observation for workload/churn/actionability-distribution metrics. |
 | `invalid_or_unsubstantiated` | The claim is contradicted, non-reproducible, evidence-free, or too underspecified to decide against the exact candidate. | Does not block. Retain the claim/evidence and reason; materially new evidence may create a later observation. |
+
+Disposition precedence is fixed: pending acceptance-critical impact leaves
+actionability null; a true no-new-effect/evidence restatement delegates as
+`duplicate`; a disproved/underspecified claim is
+`invalid_or_unsubstantiated`; a wholly external observation with no in-scope or
+cross-cutting effect is `out_of_scope`; a proved hard trigger is
+`required_correction`; proved equivalent behavior/evidence is
+`accepted_implementation_variance`; otherwise a concrete optional benefit is
+`nonblocking_improvement`. A duplicate inherits the canonical effect's active
+decision/closure state and cannot erase a required correction.
 
 This first stage answers **whether correction is required** from the complete
 impact row and hard-trigger decisions. It is not a severity ranking, cost
@@ -354,6 +393,13 @@ Only when stage A is `required_correction` does stage B require exactly one
 | `contract_omission` | The accepted packet did not specify the rule needed to close the required correction. | Freeze an additive packet/amendment, its hazard, authorized boundary, oracle, and rereview scope. Do not edit the accepted packet. |
 | `implementation_nonconformance` | The candidate violates an already frozen clause. | Bind the clause, smallest repair boundary, regression test, and exact delta review. No scope expansion. |
 | `repair_introduced_regression` | The repair created a new reachable effect or invalidated an oracle/claim. | Create a successor obligation with production route, before/after evidence, hazard, falsifier, and inherited-surface rereview. |
+
+The causal class records governance origin rather than every technical root
+cause. Apply this exact precedence: no pre-candidate binding rule means
+`contract_omission`; otherwise a newly failing effect created by the preceding
+repair delta means `repair_introduced_regression`, even though it also violates
+the frozen rule; all other initial-candidate or non-repair-origin violations of
+an existing clause are `implementation_nonconformance`.
 
 For all five non-correction dispositions,
 `required_correction_causal_class` is exactly null and no repair episode is
@@ -401,6 +447,12 @@ materially_new_evidence
 new_counterexample
 prefrozen_metric_regression
 ```
+
+`materially_new_evidence` is relative to the active decision record, not the
+artifact's wall-clock creation. Evidence that predates the decision qualifies
+only when exact manager evidence proves it was omitted or misbound in the prior
+adjudication and can change a frozen outcome; a new interpretation or wording
+without that proof is not a reopen trigger.
 
 A later contrary observation without one of those triggers and exact evidence
 is retained as preference churn and cannot reopen the locus. A contrary
@@ -474,9 +526,12 @@ P0 produces:
 5. a manager decision that either accepts the exact candidate or freezes the
    next repair packet before mutation.
 
-P0 acceptance requires zero unresolved production, bypass, contract-conformance,
-or unowned scope finding; zero acceptance-critical unknown impact; zero
-unadjudicated impact/actionability or `required_correction`; one active manager
+P0 acceptance requires zero unresolved production,
+reproducible fail-open/contract-escape, contract-conformance, or unowned scope
+finding; zero acceptance-critical unknown impact; zero unadjudicated
+impact/actionability and zero open/unclosed `required_correction` on the exact
+current candidate; historical required-correction observations remain immutable
+with separate repair/closure refs; one active manager
 decision for every high-impact, disputed, or variance-reversal locus; and no
 repair authorized for a non-correction disposition. Every impact category and
 affected-set field is present, and no hard must-fix trigger is offset by cost,
@@ -766,21 +821,28 @@ The closed finding-adjudication schema contains:
   finding, effect episode, and decision-locus identities;
 - observed facts, immutable evidence refs, counterexample state/ref, finding and
   impact owners, proposer, and manager adjudicator;
+- derived `assessment_depth` using `compact` or `expanded`, plus the expansion
+  trigger; every observation has the closed compact screen, while expanded
+  detail is conditionally required for required-correction proposals, accepted
+  variance, dispute/reopen, high/material impact, or acceptance-critical
+  unknown;
 - `impact_assessment_state` using exactly `complete`,
   `blocked_pending_impact_investigation`, or
   `routed_noncritical_investigation`;
-- frozen requirement/invariant/KGI/KPI/quality-guardrail refs and one typed
-  impact state/evidence set for each;
-- affected users, workflows, surfaces/symbols, and accountable owners, with an
-  evidence-backed reason for every empty set;
-- a closed `observable_impact_categories` object containing all ten P0 category
-  keys, each with impact state, observable effect, criterion, evidence refs,
-  and explicit `not_applicable`/`unknown` reason;
-- typed reachability/likelihood, blast-radius set, severity/materiality,
-  reversibility/recovery cost, recurrence likelihood, and evidence
-  confidence/reproducibility/availability fields;
-- typed repair-cost basis, repair-regression hazards, alternatives, workaround
-  limits, and evidence state, none of which is an actionability score;
+- compact frozen-outcome, affected-entity, all-ten-category,
+  reachability/likelihood, blast-radius, severity/materiality,
+  reversibility/recovery, recurrence, evidence-quality, and repair-tradeoff
+  screens, each explicitly `affected`, `unaffected`, or `unknown` with evidence
+  and a reason;
+- for `expanded`, frozen requirement/invariant/KGI/KPI/quality-guardrail refs
+  and detailed typed impact state/evidence for each; affected users, workflows,
+  surfaces/symbols, and owners; all ten P0 category objects; typed
+  reachability/likelihood, blast radius, severity/materiality,
+  reversibility/recovery, recurrence, evidence quality, repair cost/hazards,
+  alternatives, and workaround limits;
+- for compact-terminal duplicate, invalid/unsubstantiated, out-of-scope, or
+  nonblocking observations, the canonical ref/proof/reason and manager
+  disposition, with null expanded object, causal class, and repair authority;
 - exact hard must-fix trigger decisions and per-axis disposition rationale;
 - reviewer impact proposal plus a distinct manager impact adjudication for
   high-impact, disputed, or variance-reversal cases, with separate actors,
@@ -806,7 +868,9 @@ The closed finding-adjudication schema contains:
 
 The v2.1 checker derives:
 
-- all ten impact-category keys and all other axes are present; omitted axes,
+- all ten compact impact-category keys and all other compact axes are present
+  for every observation; the expanded object is present exactly when its risk
+  trigger requires it; omitted axes,
   unknown members, duplicate keys, weighted totals, actionability scores,
   weights, vote totals, and checklist-percentage decision fields fail closed;
 - each `not_applicable`, `unknown`, and `unavailable` state has an exact reason
@@ -844,6 +908,11 @@ The v2.1 checker derives:
   the prior decision and trigger; and
 - retained replay compares the complete adjudication, active-decision, reopen,
   and supersession state, not just counts.
+
+The checker may derive/prefill Git identity, changed-path coverage, common
+frozen refs, and unchanged compact axes, but authored review/manager evidence
+remains required for semantic impact, equivalence, actionability, and reopen
+judgements. Prefill cannot turn an unknown into unaffected.
 
 Readability, split, naming, abstraction, layering, or style observations fail
 closed as **blocking claims** unless they bind one of the three admissible bases:
@@ -920,7 +989,7 @@ or unbiased judgement. Those remain explicit human acceptance statements.
 | 4 | P2 | Add v2.1 manifest/control/result joins, the closed impact/actionability contract, P1 record binding, provenance binding, and full retained replay. | Current/retained impact, adjudication, join, provenance, and anti-pendulum counterexamples; positive controls; full tests; and fresh exact report-only review. |
 | 5 | Live experiment | Independently preflight Cargo/KGI manifests, commit manager-owned anchors, and run required bootstrap/successor generations. | Anchored exact results for both arms, raw P1 records, and no false closure. |
 | 6 | Evaluation | Run blind causal/provider review and compare eligible cohorts with all unavailable values and costs. | Dated `keep`, `change`, `stop`, or `experiment` decision. |
-| 7 | Lifecycle close | Synchronize issues/maps/history, then Close, Install/Dogfood where applicable, and Retrospect on one exact integrated revision. | Standard lifecycle evidence; no speed claim without the evaluation gate. |
+| 7 | Lifecycle completion | Integrate/source-accept the exact candidate; where applicable bind/Install the artifact and Dogfood/Evaluate frozen workflows, otherwise record the manager's evidence-backed `not_applicable` decision; then synchronize issue/map/history evidence for final Close and Retrospect. | Standard lifecycle evidence on one exact integrated revision and applicable artifact; no final Close before required Dogfood/Evaluate and no speed claim without the evaluation gate. |
 
 P0 does not wait for P1 implementation. P1 and P2 use separate write owners and
 compose only after focused review. Heavy full suites are serialized. No Cargo,
@@ -1010,7 +1079,7 @@ under that prefix; the implementation packet must list exact files.
 ## 9. Required counterexamples and positive controls
 
 The following cases are mandatory because they correspond to the eight observed
-readiness gaps and their known bypass classes. They are not a finding, impact,
+readiness gaps and their known fail-open/contract-escape classes. They are not a finding, impact,
 field, or test quota.
 
 ### 9.1 P0 report/process cases
@@ -1191,7 +1260,7 @@ row. A passing positive fixture does not substitute for a deliberate mutation.
 There is no fixed unresolved-finding search count. Contract preflight stops when
 the three bounded roles examine the same exact bytes, all raised items have a
 disposition, and all three report zero unresolved authorization-changing choice,
-contradiction, bypass class, or unowned test surface. A later observation first
+contradiction, reproducible fail-open/contract-escape behavior, or unowned test surface. A later observation first
 receives the complete impact assessment and unknown-evidence route, then one
 actionability disposition. Only `required_correction` receives
 `contract_omission`, `implementation_nonconformance`, or
