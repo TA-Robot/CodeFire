@@ -21,6 +21,7 @@ from recurrence_v2_authority import ChainResult
 from recurrence_v2_evidence import TimedFacts
 from recurrence_v2_model import (
     EVIDENCE_STATES,
+    DERIVATION_ROUTES,
     MANAGER_DECISION_ACTIONS,
     NEXT_ACTIONS,
     NONBLOCKING_PAIR,
@@ -301,6 +302,14 @@ def derive(
     link = chain.predecessor_link
     predecessor_states = dict(link.obligation_states) if link is not None else {}
     predecessor_origins = dict(link.obligation_origins) if link is not None else {}
+    manifest_origins = (
+        {
+            obligation.obligation_id: obligation.origin_generation
+            for obligation in manifest.obligations
+        }
+        if manifest is not None
+        else {}
+    )
     state_counts = {state: 0 for state in EVIDENCE_STATES}
     action_counts = {action: 0 for action in NEXT_ACTIONS}
     unavailable_rows = 0
@@ -351,6 +360,16 @@ def derive(
             )
         continuity = "not_applicable"
         if section == "prior_obligations":
+            manifest_origin = manifest_origins.get(row.id)
+            if manifest_origin is not None and row.origin_generation != manifest_origin:
+                findings.append(
+                    error(
+                        "manifest-origin-generation-mismatch",
+                        f"{where}.origin_generation",
+                        f"record places {row.id} at generation {row.origin_generation}, "
+                        f"manifest binds generation {manifest_origin}",
+                    )
+                )
             predecessor_state = predecessor_states.get(row.id)
             if predecessor_state is None:
                 continuity = "predecessor_state_unavailable"
@@ -465,18 +484,89 @@ def derive(
 
     # I1: manifest-claim scoped predecessor derivation.
     unavailable_derivations = 0
+    derivation_action_counts = {action: 0 for action in NEXT_ACTIONS}
+    claim_coverage: list[dict[str, Any]] = []
+    repeated_derivations = duplicates(
+        [derivation.claim_id for derivation in record.derivations]
+    )
+    if repeated_derivations:
+        findings.append(
+            error(
+                "duplicate-derivation-claim-id",
+                "record.derivations",
+                repr(repeated_derivations),
+            )
+        )
+    manifest_claims = (
+        {claim.claim_id: claim for claim in manifest.claims}
+        if manifest is not None
+        else {}
+    )
     for index, derivation in enumerate(record.derivations):
         where = f"record.derivations[{index}]"
         present = predecessor_path_present.get(derivation.path)
-        if present is not None and present != derivation.locus_existed_in_predecessor:
+        if present is not None and present != derivation.path_existed_in_predecessor:
             findings.append(
                 error(
-                    "predecessor-locus-existence-contradicted",
-                    f"{where}.locus_existed_in_predecessor",
+                    "predecessor-path-existence-contradicted",
+                    f"{where}.path_existed_in_predecessor",
                     f"{derivation.path} "
                     + ("exists" if present else "does not exist")
                     + " in the predecessor tree",
                 )
+            )
+        expected_action = DERIVATION_ROUTES.get(derivation.disposition)
+        if expected_action is None:
+            findings.append(
+                error(
+                    "unknown-derivation-disposition",
+                    f"{where}.disposition",
+                    repr(derivation.disposition),
+                )
+            )
+        elif derivation.next_action != expected_action:
+            findings.append(
+                error(
+                    "derivation-action-route-mismatch",
+                    f"{where}.next_action",
+                    f"{derivation.disposition} routes to {expected_action}, not "
+                    f"{derivation.next_action!r}",
+                )
+            )
+        if derivation.next_action in derivation_action_counts:
+            derivation_action_counts[derivation.next_action] += 1
+        claim = manifest_claims.get(derivation.claim_id)
+        if claim is not None:
+            if derivation.path != claim.locus_path:
+                findings.append(
+                    error(
+                        "manifest-derivation-path-mismatch",
+                        f"{where}.path",
+                        f"derivation path {derivation.path!r} does not equal frozen "
+                        f"manifest locus_path {claim.locus_path!r}",
+                    )
+                )
+            claim_coverage.append(
+                {
+                    "claim_id": claim.claim_id,
+                    "kind": claim.kind,
+                    "obligation_id": claim.obligation_id,
+                    "locus_path": claim.locus_path,
+                    "derivation_path": derivation.path,
+                    "locus": derivation.locus,
+                    "path_existed_in_predecessor": (
+                        derivation.path_existed_in_predecessor
+                    ),
+                    "locus_existed_in_predecessor": (
+                        derivation.locus_existed_in_predecessor
+                    ),
+                    "predecessor_behaviour": derivation.predecessor_behaviour,
+                    "candidate_behaviour": derivation.candidate_behaviour,
+                    "evidence_state": derivation.evidence_state,
+                    "evidence_ref_ids": sorted(derivation.evidence_ref_ids),
+                    "disposition": derivation.disposition,
+                    "next_action": derivation.next_action,
+                }
             )
         if derivation.evidence_state == "unavailable":
             unavailable_derivations += 1
@@ -520,6 +610,11 @@ def derive(
         if derivation.disposition == "derivation_contradicted":
             decision.blockers.append(
                 f"{where}: derivation {derivation.claim_id} contradicts the predecessor behaviour"
+            )
+        if derivation.next_action != "NONE":
+            decision.blockers.append(
+                f"{where}: derivation {derivation.claim_id} routes to "
+                f"{derivation.next_action}; only NONE is nonblocking"
             )
     if manifest is not None:
         derivation_by_claim = {row.claim_id: row for row in record.derivations}
@@ -600,6 +695,13 @@ def derive(
             "manifest_claims": len(manifest.claims) if manifest is not None else None,
             "derivation_rows": len(record.derivations),
             "rows_unavailable": unavailable_derivations,
+            "claim_coverage": sorted(
+                claim_coverage, key=lambda row: str(row["claim_id"])
+            ),
+            "derivation_next_action_counts": derivation_action_counts,
+            "blocking_derivations": sum(
+                1 for row in record.derivations if row.next_action != "NONE"
+            ),
             "changed_surface_coverage": {
                 "changed_paths": len(record.subject.changed_paths),
                 "paths_with_surface": sum(

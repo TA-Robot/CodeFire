@@ -17,7 +17,6 @@ substitute for this walk: nothing here resolves a branch or tag.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -25,6 +24,7 @@ from ai_contracts import validate_json_schema
 from recurrence_v2_git import GitError, GitRepo, sha256_bytes
 from recurrence_v2_model import (
     BLOB_MODE,
+    AUTHORITY_SCHEMA_IDS,
     LEGACY_ROOTS,
     RESULT_SCHEMA,
     Authority,
@@ -33,6 +33,9 @@ from recurrence_v2_model import (
     error,
     parse_record,
     path_components_safe,
+    strict_decode_json,
+    validate_schema_definition_identity,
+    validate_live_arm_pin_semantics,
 )
 from recurrence_v2_topology import GenerationView, verify_generation, verify_retention
 
@@ -131,6 +134,9 @@ def verify_legacy_root(
     artifacts: dict[str, Any],
     location: str,
     roots: dict[str, Any] | None = None,
+    *,
+    generation: int,
+    obligation_origins: dict[str, int],
 ) -> tuple[bool, list[Finding]]:
     """Verify one manager-fixed bootstrap root by its pinned identity.
 
@@ -167,6 +173,25 @@ def verify_legacy_root(
                 "legacy-root-predecessor-mismatch",
                 f"{location}.commit",
                 f"arm {root.arm} pins predecessor {root.predecessor_candidate}",
+            )
+        )
+    if generation != root.review_generation:
+        findings.append(
+            error(
+                "legacy-root-review-generation-mismatch",
+                location,
+                f"arm {root.arm} requires first live review generation "
+                f"{root.review_generation}, got {generation}",
+            )
+        )
+    expected_origins = dict(root.obligation_origins)
+    if obligation_origins != expected_origins:
+        findings.append(
+            error(
+                "legacy-root-obligation-origin-map-mismatch",
+                location,
+                f"record origins {sorted(obligation_origins.items())}, manager-fixed "
+                f"origins {sorted(expected_origins.items())}",
             )
         )
     try:
@@ -257,10 +282,9 @@ def _load_json_blob(
             error("retained-artifact-not-a-regular-blob", location, repr(entry))
         )
         return None
-    try:
-        parsed = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        findings.append(error("retained-artifact-not-json", location, str(exc)))
+    parsed, decode_findings = strict_decode_json(payload, location)
+    findings.extend(decode_findings)
+    if parsed is None:
         return None
     return parsed, sha256_bytes(payload)
 
@@ -408,6 +432,16 @@ def _check_deciding_gate(
                     f"computed {actual}",
                 )
             )
+        expected_schema_id = AUTHORITY_SCHEMA_IDS.get(path)
+        if expected_schema_id is not None:
+            schema_blob, schema_findings = strict_decode_json(payload, where)
+            findings.extend(schema_findings)
+            if schema_blob is not None and not schema_findings:
+                findings.extend(
+                    validate_schema_definition_identity(
+                        schema_blob, expected_schema_id, where
+                    )
+                )
     if seen != expected_paths:
         findings.append(
             error(
@@ -444,6 +478,7 @@ def resolve_predecessor_authority_chain(
     record: RecordModel,
     *,
     schema: dict[str, Any] | None,
+    result_schema: dict[str, Any] | None = None,
     deciding_gate: dict[str, Any],
     validator_repo: GitRepo | None = None,
     legacy_roots: dict[str, Any] | None = None,
@@ -456,6 +491,7 @@ def resolve_predecessor_authority_chain(
     visited: set[str] = set()
 
     authority = record.subject.authority
+    current_record = record
     generation = record.generation
     predecessor_candidate = record.subject.predecessor_candidate_revision
     artifacts = record.artifact_index()
@@ -494,6 +530,11 @@ def resolve_predecessor_authority_chain(
                 artifacts,
                 current_location,
                 legacy_roots,
+                generation=generation,
+                obligation_origins={
+                    row.id: row.origin_generation
+                    for row in current_record.prior_obligations
+                },
             )
             findings.extend(root_findings)
             if rooted:
@@ -577,16 +618,31 @@ def resolve_predecessor_authority_chain(
                 )
             )
         if schema is not None:
-            findings.extend(
-                validate_json_schema(
-                    prior_raw, schema, f"{current_location}.record"
-                )
+            schema_findings = validate_json_schema(
+                prior_raw, schema, f"{current_location}.record"
             )
+            findings.extend(schema_findings)
+            if schema_findings:
+                return ChainResult(depth=depth), findings
         prior, parse_findings = parse_record(prior_raw, f"{current_location}.record")
         findings.extend(parse_findings)
         if prior is None:
             return ChainResult(depth=depth), findings
 
+        if result_schema is not None:
+            result_schema_findings = validate_json_schema(
+                prior_result, result_schema, f"{current_location}.result"
+            )
+            findings.extend(result_schema_findings)
+            if result_schema_findings:
+                return ChainResult(depth=depth), findings
+        pin_findings = validate_live_arm_pin_semantics(
+            prior_result.get("live_arm_pin") if isinstance(prior_result, dict) else None,
+            f"{current_location}.result.live_arm_pin",
+        )
+        findings.extend(pin_findings)
+        if pin_findings:
+            return ChainResult(depth=depth), findings
         if not isinstance(prior_result, dict) or prior_result.get("schema") != RESULT_SCHEMA:
             findings.append(
                 error(
@@ -721,6 +777,7 @@ def resolve_predecessor_authority_chain(
             )
         )
         authority = prior.subject.authority
+        current_record = prior
         generation = prior.generation
         predecessor_candidate = prior.subject.predecessor_candidate_revision
         artifacts = prior.artifact_index()

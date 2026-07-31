@@ -16,7 +16,6 @@ not, because they are precisely the obligations a successor is repairing.
 
 from __future__ import annotations
 
-import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -28,13 +27,24 @@ from recurrence_v2_evidence import (
     bind_timed_validations,
     check_reference_integrity,
     load_manifest,
+    predecessor_path_presence,
     resolve_artifacts,
     verify_retained_live_arm_anchor,
     verify_canonical_port_packet,
 )
 from recurrence_v2_git import GitError, GitRepo
-from recurrence_v2_model import LegacyRoot, RecordModel, error, parse_record, path_components_safe
-from recurrence_v2_topology import verify_generation
+from recurrence_v2_model import (
+    LegacyRoot,
+    PROVENANCE_LIMITS,
+    RECORD_SCHEMA,
+    RecordModel,
+    error,
+    parse_record,
+    path_components_safe,
+    strict_decode_json,
+    validate_live_arm_pin_semantics,
+)
+from recurrence_v2_topology import scan_interval_paths, verify_generation
 
 
 @dataclass(frozen=True)
@@ -63,49 +73,14 @@ def _load_json_blob(
         payload = repo.blob(commit, path.encode("utf-8"))
     except GitError as exc:
         return None, [error("history-artifact-unreadable", location, str(exc))]
-    try:
-        raw = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        return None, [error("history-artifact-not-json", location, str(exc))]
+    raw, decode_findings = strict_decode_json(payload, location)
+    if decode_findings:
+        return None, decode_findings
     if not isinstance(raw, dict):
         return None, [
             error("history-artifact-not-object", location, type(raw).__name__)
         ]
     return raw, []
-
-
-def _predecessor_path_presence(
-    repo: GitRepo,
-    record: RecordModel,
-) -> tuple[dict[str, bool], list[Finding]]:
-    present: dict[str, bool] = {}
-    findings: list[Finding] = []
-    for index, derivation in enumerate(record.derivations):
-        if not path_components_safe(derivation.path):
-            findings.append(
-                error(
-                    "history-derivation-path-invalid",
-                    f"record.derivations[{index}].path",
-                    repr(derivation.path),
-                )
-            )
-            continue
-        try:
-            entry = repo.entry(
-                record.subject.predecessor_candidate_revision,
-                derivation.path.encode("utf-8"),
-            )
-        except GitError as exc:
-            findings.append(
-                error(
-                    "history-derivation-predecessor-unreadable",
-                    f"record.derivations[{index}].path",
-                    str(exc),
-                )
-            )
-            continue
-        present[derivation.path] = entry is not None
-    return present, findings
 
 
 def _check_retained_result_replay(
@@ -118,6 +93,10 @@ def _check_retained_result_replay(
     decision_rows: list[Any],
     decision_metrics: dict[str, Any],
     successor_obligation_ids: tuple[str, ...],
+    timed: dict[str, Any],
+    predecessor_chain: ChainResult,
+    invalid_utf8_paths: tuple[str, ...],
+    live_arm: str | None,
 ) -> list[Finding]:
     """Compare authority-relevant result claims with current derived facts."""
 
@@ -130,6 +109,9 @@ def _check_retained_result_replay(
         else "BLOCK"
     )
     checks = (
+        ("schema", result.get("schema"), "codefire.review_recurrence_gate_result.v2"),
+        ("input_schema", result.get("input_schema"), RECORD_SCHEMA),
+        ("git_verified", result.get("git_verified"), True),
         ("control_id", result.get("control_id"), record.control_id),
         ("generation", result.get("generation"), record.generation),
         ("record_sha256", result.get("record_sha256"), link.record_sha256),
@@ -157,6 +139,21 @@ def _check_retained_result_replay(
             result.get("successor_obligation_ids"),
             list(successor_obligation_ids),
         ),
+        (
+            "timed_validations",
+            result.get("timed_validations"),
+            {
+                validation_id: facts.as_result()
+                for validation_id, facts in sorted(timed.items())
+            },
+        ),
+        (
+            "invalid_utf8_paths",
+            result.get("invalid_utf8_paths"),
+            list(invalid_utf8_paths),
+        ),
+        ("live_arm", result.get("live_arm"), live_arm),
+        ("limits", result.get("limits"), list(PROVENANCE_LIMITS)),
     )
     for field, actual, expected in checks:
         if actual != expected:
@@ -185,6 +182,65 @@ def _check_retained_result_replay(
                 "retained candidate identity does not equal the replayed record",
             )
         )
+    authority = result.get("authority_chain")
+    if not isinstance(authority, dict):
+        findings.append(
+            error(
+                "retained-result-authority-chain-invalid",
+                "result.authority_chain",
+                type(authority).__name__,
+            )
+        )
+        return findings
+
+    def gate_without_source_root(value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        return {key: item for key, item in value.items() if key != "source_root"}
+
+    def stable_links(value: Any) -> Any:
+        if not isinstance(value, list):
+            return value
+        normalized: list[Any] = []
+        for row in value:
+            if not isinstance(row, dict):
+                normalized.append(row)
+                continue
+            normalized.append(
+                {
+                    **row,
+                    "deciding_gate": gate_without_source_root(
+                        row.get("deciding_gate")
+                    ),
+                }
+            )
+        return normalized
+
+    expected_authority = {
+        "kind": record.subject.authority.kind,
+        "rooted": predecessor_chain.rooted,
+        "root_arm": predecessor_chain.root_arm,
+        "root_commit": predecessor_chain.root_commit,
+        "depth": predecessor_chain.depth,
+        "links": stable_links(predecessor_chain.summary()),
+    }
+    actual_authority = {
+        "kind": authority.get("kind"),
+        "rooted": authority.get("rooted"),
+        "root_arm": authority.get("root_arm"),
+        "root_commit": authority.get("root_commit"),
+        "depth": authority.get("depth"),
+        "links": stable_links(authority.get("links")),
+    }
+    if actual_authority != expected_authority:
+        findings.append(
+            error(
+                "retained-result-authority-chain-mismatch",
+                "result.authority_chain",
+                f"retained {actual_authority!r}, replay derives "
+                f"{expected_authority!r}",
+            )
+        )
     return findings
 
 
@@ -195,6 +251,8 @@ def revalidate_history(
     schema: dict[str, Any] | None,
     manifest_schema: dict[str, Any] | None,
     timed_schema: dict[str, Any] | None,
+    result_schema: dict[str, Any] | None = None,
+    anchor_schema: dict[str, Any] | None = None,
     legacy_roots: dict[str, LegacyRoot],
     discovery_valid: bool = True,
     enforce_canonical_ports: bool = False,
@@ -227,7 +285,29 @@ def revalidate_history(
 
         local: list[Finding] = []
         if schema is not None:
-            local.extend(validate_json_schema(raw, schema, "record"))
+            record_schema_findings = validate_json_schema(raw, schema, "record")
+            local.extend(record_schema_findings)
+            if record_schema_findings:
+                findings.extend(_prefixed(local, prefix))
+                prefix_valid = False
+                continue
+        if result_schema is not None:
+            result_schema_findings = validate_json_schema(
+                result, result_schema, "result"
+            )
+            local.extend(result_schema_findings)
+            if result_schema_findings:
+                findings.extend(_prefixed(local, prefix))
+                prefix_valid = False
+                continue
+        pin_semantic_findings = validate_live_arm_pin_semantics(
+            result.get("live_arm_pin"), "result.live_arm_pin"
+        )
+        local.extend(pin_semantic_findings)
+        if pin_semantic_findings:
+            findings.extend(_prefixed(local, prefix))
+            prefix_valid = False
+            continue
         record, parse_findings = parse_record(raw, "record")
         local.extend(parse_findings)
         if record is None:
@@ -244,6 +324,13 @@ def revalidate_history(
             validator_divergences=chain.validator_divergences,
             depth=len(progressive_links) + 1,
         )
+        invalid_utf8_paths, interval_findings = scan_interval_paths(
+            repo,
+            record.subject.predecessor_candidate_revision,
+            record.subject.candidate_revision,
+            "record",
+        )
+        local.extend(interval_findings)
         view = generation_view(record)
         topology = None
         if view is None:
@@ -288,6 +375,7 @@ def revalidate_history(
                         artifacts,
                         result,
                         link.deciding_gate,
+                        anchor_schema,
                     )
                 )
         local.extend(check_reference_integrity(record, artifacts, "record"))
@@ -304,7 +392,7 @@ def revalidate_history(
             repo, record, manifest, artifacts, timed_schema
         )
         local.extend(timed_findings)
-        predecessor_present, path_findings = _predecessor_path_presence(repo, record)
+        predecessor_present, path_findings = predecessor_path_presence(repo, record)
         local.extend(path_findings)
         decision = derive(
             record,
@@ -324,6 +412,10 @@ def revalidate_history(
             decision_rows=decision.rows,
             decision_metrics=decision.metrics,
             successor_obligation_ids=decision.successor_obligation_ids,
+            timed=timed,
+            predecessor_chain=predecessor_chain,
+            invalid_utf8_paths=invalid_utf8_paths,
+            live_arm=live_arm,
         )
         local.extend(replay_findings)
         findings.extend(_prefixed(local, prefix))

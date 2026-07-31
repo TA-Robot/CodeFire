@@ -52,6 +52,8 @@ V2_RESULT_SCHEMA = v2_model.RESULT_SCHEMA
 V2_SCHEMA_PATH = Path(v2_model.RECORD_SCHEMA_PATH)
 V2_MANIFEST_SCHEMA_PATH = Path(v2_model.MANIFEST_SCHEMA_PATH)
 V2_TIMED_SCHEMA_PATH = Path(v2_model.TIMED_SCHEMA_PATH)
+V2_RESULT_SCHEMA_PATH = Path(v2_model.RESULT_SCHEMA_PATH)
+V2_ANCHOR_SCHEMA_PATH = Path(v2_model.LIVE_ARM_ANCHOR_SCHEMA_PATH)
 REJECTED_V1_CANDIDATE = "1cae0225e488ff918389700a7de0f94e9fd067b3"
 EXPANSIVE_SURFACE_KINDS = {
     "public_api",
@@ -72,6 +74,43 @@ STOPPING_CONDITIONS = (
     "negative_controls_checked",
     "unavailable_evidence_explicit",
 )
+
+
+def v2_raw_repository_path_findings(
+    raw: Any,
+    location: str,
+) -> list[Finding]:
+    """Check authored path scalars without constructing a typed v2 model."""
+
+    if not isinstance(raw, dict):
+        return []
+    candidates: list[tuple[str, Any]] = []
+    subject = raw.get("subject")
+    if isinstance(subject, dict):
+        changed = subject.get("changed_paths")
+        if isinstance(changed, list):
+            candidates.extend(
+                (f"{location}.subject.changed_paths[{index}]", value)
+                for index, value in enumerate(changed)
+            )
+    for section in ("artifacts", "path_reviews", "derivations"):
+        rows = raw.get(section)
+        if not isinstance(rows, list):
+            continue
+        for index, row in enumerate(rows):
+            if isinstance(row, dict):
+                candidates.append(
+                    (f"{location}.{section}[{index}].path", row.get("path"))
+                )
+    return [
+        v2_model.error(
+            "unsafe-authored-repository-path",
+            item_location,
+            repr(value),
+        )
+        for item_location, value in candidates
+        if isinstance(value, str) and not v2_model.path_components_safe(value)
+    ]
 
 
 def repository_root() -> Path:
@@ -1253,7 +1292,7 @@ def validate_recurrence_control(
 
 
 def evaluate_v2(
-    raw: dict[str, Any],
+    raw: Any,
     record_sha256: str,
     *,
     root: Path,
@@ -1261,6 +1300,8 @@ def evaluate_v2(
     schema: dict[str, Any] | None,
     manifest_schema: dict[str, Any] | None,
     timed_schema: dict[str, Any] | None,
+    result_schema: dict[str, Any] | None = None,
+    anchor_schema: dict[str, Any] | None = None,
     deciding_gate: dict[str, Any],
     verify_git: bool,
     live_arm: str | None,
@@ -1275,50 +1316,70 @@ def evaluate_v2(
     validator_root = root if validator_root is None else validator_root.resolve()
     canonical_live_roots = legacy_roots is None
 
-    def reject_surrogates(value: Any, item_location: str) -> list[Finding]:
-        """Find text that cannot be encoded as UTF-8 before schema traversal.
+    try:
+        raw_round_trip = json.dumps(
+            raw, ensure_ascii=True, sort_keys=False, separators=(",", ":")
+        )
+    except (TypeError, ValueError, RecursionError) as exc:
+        boundary_findings = [
+            v2_model.error("record-json-boundary-invalid", location, repr(exc))
+        ]
+    else:
+        _, boundary_findings = v2_model.strict_decode_json(raw_round_trip, location)
+    findings.extend(boundary_findings)
+    findings.extend(v2_raw_repository_path_findings(raw, location))
 
-        Python's JSON decoder accepts escaped lone surrogates. The compact
-        schema evaluator fingerprints unique array items as UTF-8, so the v2
-        boundary must reject these impossible JSON scalar values first and
-        keep the decision structured and fail-closed.
-        """
+    if not isinstance(raw, dict):
+        findings.append(
+            v2_model.error("record-not-an-object", location, type(raw).__name__)
+        )
 
-        if isinstance(value, str):
-            if any(0xD800 <= ord(character) <= 0xDFFF for character in value):
-                return [
-                    Finding(
-                        "error",
-                        "unsafe-json-surrogate",
-                        item_location,
-                        f"text contains a lone surrogate: {value!r}",
-                    )
-                ]
-            return []
-        if isinstance(value, list):
-            nested: list[Finding] = []
-            for index, item in enumerate(value):
-                nested.extend(reject_surrogates(item, f"{item_location}[{index}]"))
-            return nested
-        if isinstance(value, dict):
-            nested = []
-            for key, item in value.items():
-                if any(0xD800 <= ord(character) <= 0xDFFF for character in key):
-                    nested.append(
-                        Finding(
-                            "error",
-                            "unsafe-json-surrogate",
-                            item_location,
-                            f"an object key contains a lone surrogate: {key!r}",
-                        )
-                    )
-                    continue
-                nested.extend(reject_surrogates(item, f"{item_location}.{key}"))
-            return nested
-        return []
+    schema_findings: list[Finding] = []
+    if schema is not None and not boundary_findings and isinstance(raw, dict):
+        schema_findings = validate_json_schema(raw, schema, location)
+        findings.extend(schema_findings)
 
-    surrogate_findings = reject_surrogates(raw, location)
-    findings.extend(surrogate_findings)
+    if findings:
+        raw_dict = raw if isinstance(raw, dict) else {}
+        subject_value = raw_dict.get("subject")
+        subject_dict = subject_value if isinstance(subject_value, dict) else {}
+        predecessor_value = subject_dict.get("predecessor_candidate_revision")
+        candidate_value = subject_dict.get("candidate_revision")
+        if (
+            not boundary_findings
+            and verify_git
+            and isinstance(predecessor_value, str)
+            and isinstance(candidate_value, str)
+        ):
+            _, independent_path_findings = scan_interval_paths(
+                repo, predecessor_value, candidate_value, location
+            )
+            findings.extend(independent_path_findings)
+        return {
+            "schema": V2_RESULT_SCHEMA,
+            "input_schema": raw_dict.get("schema"),
+            "record_sha256": record_sha256,
+            "analysed_git_root": str(root),
+            "validator_source_root": str(validator_root),
+            "git_verified": False,
+            "deciding_gate": deciding_gate,
+            "invalid_utf8_paths": [],
+            "live_arm_pin": {
+                "state": "unavailable",
+                "anchor": None,
+                "arm": None,
+            },
+            "live_arm": live_arm,
+            "limits": list(v2_model.PROVENANCE_LIMITS),
+            "record_valid": False,
+            "review_decision": raw_dict.get("review_decision"),
+            "integration_decision": "BLOCK",
+            "blockers": [
+                "the record failed its strict JSON or registered schema boundary"
+            ],
+            "findings": [asdict(finding) for finding in findings],
+            "finding_count": len(findings),
+        }
 
     # F-10 / C-14: invalid-UTF-8 repository paths are detected before schema
     # validation, from the raw subject, and rendered with backslash escapes so
@@ -1333,8 +1394,6 @@ def evaluate_v2(
         )
         findings.extend(scan_findings)
 
-    if schema is not None and not surrogate_findings:
-        findings.extend(validate_json_schema(raw, schema, location))
     record, parse_findings = v2_model.parse_record(raw, location)
     findings.extend(parse_findings)
 
@@ -1347,11 +1406,11 @@ def evaluate_v2(
         "git_verified": verify_git,
         "deciding_gate": deciding_gate,
         "invalid_utf8_paths": list(invalid_paths),
-        "live_arm_pin": "unavailable",
+        "live_arm_pin": {"state": "unavailable", "anchor": None, "arm": None},
         "live_arm": live_arm,
         "limits": list(v2_model.PROVENANCE_LIMITS),
     }
-    if record is None:
+    if record is None or parse_findings:
         result.update(
             {
                 "record_valid": False,
@@ -1381,6 +1440,7 @@ def evaluate_v2(
             repo,
             record,
             schema=schema,
+            result_schema=result_schema,
             deciding_gate=deciding_gate,
             validator_repo=GitRepo(validator_root),
             legacy_roots=legacy_roots,
@@ -1392,6 +1452,8 @@ def evaluate_v2(
             schema=schema,
             manifest_schema=manifest_schema,
             timed_schema=timed_schema,
+            result_schema=result_schema,
+            anchor_schema=anchor_schema,
             legacy_roots=(
                 v2_model.LEGACY_ROOTS if legacy_roots is None else legacy_roots
             ),
@@ -1446,18 +1508,10 @@ def evaluate_v2(
             repo, record, manifest, artifacts, timed_schema
         )
         findings.extend(timed_findings)
-        predecessor_present = {}
-        for derivation in record.derivations:
-            if not v2_model.path_components_safe(derivation.path):
-                continue
-            try:
-                entry = repo.entry(
-                    record.subject.predecessor_candidate_revision,
-                    derivation.path.encode("utf-8"),
-                )
-            except GitError:
-                continue
-            predecessor_present[derivation.path] = entry is not None
+        predecessor_present, predecessor_findings = (
+            v2_evidence.predecessor_path_presence(repo, record)
+        )
+        findings.extend(predecessor_findings)
         if live_arm is not None:
             pin, pin_findings = v2_evidence.load_live_arm_anchor(
                 validator_root,
@@ -1466,9 +1520,17 @@ def evaluate_v2(
                 record,
                 artifacts,
                 deciding_gate,
+                anchor_schema,
             )
             findings.extend(pin_findings)
-            result["live_arm_pin"] = pin if pin is not None else "unavailable"
+            if pin is not None:
+                result["live_arm_pin"] = pin
+
+    findings.extend(
+        v2_model.validate_live_arm_pin_semantics(
+            result.get("live_arm_pin"), "result.live_arm_pin"
+        )
+    )
 
     decision = v2_decision.derive(
         record,
@@ -1485,7 +1547,7 @@ def evaluate_v2(
             "deciding_gate: the validator artifacts do not match a clean committed revision "
             f"(state {deciding_gate.get('state')!r}), so this decision is not reproducible"
         )
-    if live_arm is not None and result["live_arm_pin"] == "unavailable":
+    if live_arm is not None and result["live_arm_pin"]["state"] == "unavailable":
         blockers.append(
             "live_arm_pin: no manager-owned live-arm anchor is pinned, so no live arm is "
             "authorized"
@@ -1522,26 +1584,13 @@ def evaluate_v2(
                 "revalidated_generations": list(history.generations),
             },
             "timed_validations": {
-                validation_id: {
-                    "status": facts.status,
-                    "exit_code": facts.exit_code,
-                    "timed_out": facts.timed_out,
-                    "log_complete": facts.log_complete,
-                    "clean_before": facts.clean_before,
-                    "clean_after": facts.clean_after,
-                    "index_flags_clean": facts.index_flags_clean,
-                    "head_unchanged": facts.head_unchanged,
-                    "log_inside_source_worktree": facts.log_inside_source_worktree,
-                    "result_inside_source_worktree": (
-                        facts.result_inside_source_worktree
-                    ),
-                    "log_bytes": facts.log_bytes,
-                    "log_sha256": facts.log_sha256,
-                    "passing": facts.passing,
-                }
+                validation_id: facts.as_result()
                 for validation_id, facts in sorted(timed.items())
             },
-            "rows": [asdict(row) for row in decision.rows],
+            "rows": [
+                {**asdict(row), "reasons": list(row.reasons)}
+                for row in decision.rows
+            ],
             "metrics": decision.metrics,
             "successor_obligation_ids": list(decision.successor_obligation_ids),
             "record_valid": not errors,
@@ -1552,6 +1601,22 @@ def evaluate_v2(
             "finding_count": len(findings),
         }
     )
+    if result_schema is not None:
+        rendered_findings = validate_json_schema(result, result_schema, "result")
+        if rendered_findings:
+            findings.extend(rendered_findings)
+            blockers.append(
+                "result: the assembled v2 decision does not satisfy its closed schema"
+            )
+            result.update(
+                {
+                    "record_valid": False,
+                    "integration_decision": "BLOCK",
+                    "blockers": blockers,
+                    "findings": [asdict(finding) for finding in findings],
+                    "finding_count": len(findings),
+                }
+            )
     return result
 
 
@@ -1594,6 +1659,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--schema", type=Path)
     parser.add_argument("--manifest-schema", type=Path)
     parser.add_argument("--timed-schema", type=Path)
+    parser.add_argument("--result-schema", type=Path)
+    parser.add_argument("--anchor-schema", type=Path)
     parser.add_argument("--git-root", type=Path)
     parser.add_argument(
         "--validator-root",
@@ -1668,6 +1735,35 @@ def external_result_path(
     return resolved
 
 
+def load_authority_schema(
+    override: Path | None,
+    validator_root: Path,
+    relative: Path,
+) -> dict[str, Any]:
+    """Strictly load one identity-bound recurrence authority schema."""
+
+    path = validator_owned_path(override, validator_root, relative)
+    payload = path.read_bytes()
+    raw, findings = v2_model.strict_decode_json(payload, path.as_posix())
+    expected_id = v2_model.AUTHORITY_SCHEMA_IDS.get(relative.as_posix())
+    if expected_id is None:
+        raise ValueError(f"unregistered recurrence authority schema: {relative}")
+    if not findings:
+        findings.extend(
+            v2_model.validate_schema_definition_identity(
+                raw, expected_id, path.as_posix()
+            )
+        )
+    if findings:
+        rendered = "; ".join(
+            f"{finding.code} at {finding.path}: {finding.message}"
+            for finding in findings
+        )
+        raise ValueError(rendered)
+    assert isinstance(raw, dict)
+    return raw
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     root = (args.git_root or repository_root()).resolve()
@@ -1679,12 +1775,39 @@ def main(argv: list[str] | None = None) -> int:
         # retention commit to match.
         payload = record_path.read_bytes()
         record_sha256 = hashlib.sha256(payload).hexdigest()
-        raw = json.loads(payload.decode("utf-8"))
-        if not isinstance(raw, dict):
-            raise ValueError("record root must be a JSON object")
-    except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
+        raw, record_boundary_findings = v2_model.strict_decode_json(
+            payload, record_path.as_posix()
+        )
+    except OSError as exc:
         print(f"Review recurrence gate error: {exc}", file=sys.stderr)
         return 2
+
+    if record_boundary_findings or not isinstance(raw, dict):
+        boundary_rows = list(record_boundary_findings)
+        if not isinstance(raw, dict) and not boundary_rows:
+            boundary_rows.append(
+                v2_model.error(
+                    "record-not-an-object", record_path.as_posix(), type(raw).__name__
+                )
+            )
+        result = {
+            "schema": V2_RESULT_SCHEMA,
+            "input_schema": None,
+            "record_sha256": record_sha256,
+            "git_verified": False,
+            "record_valid": False,
+            "review_decision": None,
+            "integration_decision": "BLOCK",
+            "blockers": ["the record failed the strict JSON authority boundary"],
+            "findings": [asdict(finding) for finding in boundary_rows],
+            "finding_count": len(boundary_rows),
+            "limits": list(v2_model.PROVENANCE_LIMITS),
+            "record": str(record_path),
+        }
+        if args.result is not None:
+            atomic_write(args.result, result)
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 3
 
     schema_name = raw.get("schema")
     try:
@@ -1698,22 +1821,20 @@ def main(argv: list[str] | None = None) -> int:
                     "the v2 --validator-root must differ from the analysed --git-root"
                 )
             result_path = external_result_path(args.result, root, validator_root)
-            schema = load_object(
-                validator_owned_path(args.schema, validator_root, V2_SCHEMA_PATH)
+            schema = load_authority_schema(
+                args.schema, validator_root, V2_SCHEMA_PATH
             )
-            manifest_schema = load_object(
-                validator_owned_path(
-                    args.manifest_schema,
-                    validator_root,
-                    V2_MANIFEST_SCHEMA_PATH,
-                )
+            manifest_schema = load_authority_schema(
+                args.manifest_schema, validator_root, V2_MANIFEST_SCHEMA_PATH
             )
-            timed_schema = load_object(
-                validator_owned_path(
-                    args.timed_schema,
-                    validator_root,
-                    V2_TIMED_SCHEMA_PATH,
-                )
+            timed_schema = load_authority_schema(
+                args.timed_schema, validator_root, V2_TIMED_SCHEMA_PATH
+            )
+            result_schema = load_authority_schema(
+                args.result_schema, validator_root, V2_RESULT_SCHEMA_PATH
+            )
+            anchor_schema = load_authority_schema(
+                args.anchor_schema, validator_root, V2_ANCHOR_SCHEMA_PATH
             )
             result = evaluate_v2(
                 raw,
@@ -1723,6 +1844,8 @@ def main(argv: list[str] | None = None) -> int:
                 schema=schema,
                 manifest_schema=manifest_schema,
                 timed_schema=timed_schema,
+                result_schema=result_schema,
+                anchor_schema=anchor_schema,
                 deciding_gate=v2_evidence.deciding_gate_identity(validator_root),
                 verify_git=not args.no_git_verify,
                 live_arm=args.live_arm,
