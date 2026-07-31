@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codefire.dev/schemas/ai/review-recurrence-repair-manifest.v1.schema.json",
+  "title": "CodeFire pre-repair review recurrence manifest v1",
+  "description": "Compact machine-readable anchor committed with the Markdown repair packet, in the same two-path packet commit, before the presented repair. It is the manager's discretion boundary: the recurrence gate proves the record is set-equal to these collections and cannot prove the manager chose a complete set. Prose stays in the Markdown packet. The manifest carries no author-transcribed outcome, no semantic closure claim, and no exemption assertion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "manifest_id",
+    "generation",
+    "predecessor_candidate_revision",
+    "predecessor_authority",
+    "repair_packet_path",
+    "repair_packet_sha256",
+    "finding_target_policy",
+    "prior_obligations",
+    "parity_closure_claims",
+    "required_validations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "codefire.review_recurrence_repair_manifest.v1"
+    },
+    "manifest_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "predecessor_candidate_revision": {
+      "$ref": "#/$defs/commit"
+    },
+    "predecessor_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "bootstrap_arm", "commit"],
+      "properties": {
+        "kind": {
+          "enum": ["prior_v2_record", "legacy_bootstrap_report"]
+        },
+        "bootstrap_arm": {
+          "type": ["string", "null"],
+          "enum": ["cargo", "kgi_kpi", null]
+        },
+        "commit": {
+          "$ref": "#/$defs/commit"
+        }
+      }
+    },
+    "repair_packet_path": {
+      "$ref": "#/$defs/repository_path"
+    },
+    "repair_packet_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "finding_target_policy": {
+      "const": "none"
+    },
+    "prior_obligations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["obligation_id", "closure_validation_ids"],
+        "properties": {
+          "obligation_id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "closure_validation_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/identifier"
+            },
+            "description": "Every ID must exist in required_validations. An empty list is admissible only when the predecessor v2 record reached by the rooted authority chain holds this obligation in DEFECT_INJECTION_ONLY; a bootstrap manifest has no such record, so every bootstrap row must be non-empty."
+          }
+        }
+      }
+    },
+    "parity_closure_claims": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "kind", "obligation_id", "locus_path"],
+        "properties": {
+          "claim_id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "kind": {
+            "enum": ["parity", "closure"]
+          },
+          "obligation_id": {
+            "type": ["string", "null"],
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "locus_path": {
+            "$ref": "#/$defs/repository_path"
+          }
+        }
+      }
+    },
+    "required_validations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["validation_id", "argv"],
+        "properties": {
+          "validation_id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "argv": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "repository_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^/\\\\][^\\\\]*$"
+    }
+  }
+}

@@ -1,0 +1,578 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codefire.dev/schemas/ai/review-recurrence-control.v2.schema.json",
+  "title": "CodeFire successor review recurrence control record v2 (experimental)",
+  "description": "Evidence-bound successor-review record. Every reference is a row in the artifacts table and is used elsewhere by ref_id only. Schema validity is not integration authority: only check_review_recurrence.py can emit integration_decision ALLOW, and it derives every outcome, count, continuity, and blocking state instead of accepting an authored one.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "control_id",
+    "generation",
+    "finding_target_policy",
+    "predecessor_obligation_completeness",
+    "subject",
+    "artifacts",
+    "path_reviews",
+    "prior_obligations",
+    "new_findings",
+    "derivations",
+    "validations",
+    "terminalization",
+    "review_decision"
+  ],
+  "properties": {
+    "schema": {
+      "const": "codefire.review_recurrence_control.v2"
+    },
+    "control_id": {
+      "$ref": "#/$defs/identifier",
+      "description": "Also the evidence namespace segment: docs/development/ai/review-recurrence/evidence/<control_id>/."
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "finding_target_policy": {
+      "const": "none",
+      "description": "There is no finding, observation, surface, obligation, or checklist target. target_finding_count, minimum_findings, expected_findings, target_observations, minimum_surfaces, and minimum_obligations are rejected by additionalProperties."
+    },
+    "predecessor_obligation_completeness": {
+      "enum": ["verified", "unavailable"],
+      "description": "Derived and cross-checked: unavailable for a legacy bootstrap authority, verified for a prior v2 record. unavailable stays in the denominator and cannot produce ALLOW."
+    },
+    "subject": {
+      "$ref": "#/$defs/subject"
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "path_reviews": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/path_review"
+      }
+    },
+    "prior_obligations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/prior_obligation"
+      }
+    },
+    "new_findings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/new_finding"
+      }
+    },
+    "derivations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/derivation"
+      }
+    },
+    "validations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/validation"
+      }
+    },
+    "terminalization": {
+      "$ref": "#/$defs/terminalization"
+    },
+    "review_decision": {
+      "enum": ["accept", "request_changes", "block"]
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "repository_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^/\\\\][^\\\\]*$",
+      "description": "Repository-relative POSIX path. The validator additionally rejects empty, dot, and dot-dot components and any path Git reports with bytes that are not valid UTF-8."
+    },
+    "ref_id_list": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "nullable_ref_id": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "artifact_role": {
+      "enum": [
+        "repair_packet",
+        "repair_manifest",
+        "candidate_artifact",
+        "review_packet",
+        "report",
+        "timed_result",
+        "timed_log",
+        "terminal_event_evidence",
+        "prior_v2_record",
+        "prior_v2_result",
+        "legacy_bootstrap_report",
+        "routing_scope_decision",
+        "prior_closure_evidence",
+        "non_reachability_evidence"
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref_id", "role", "commit", "path", "sha256", "mode"],
+      "properties": {
+        "ref_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "role": {
+          "$ref": "#/$defs/artifact_role"
+        },
+        "commit": {
+          "$ref": "#/$defs/commit"
+        },
+        "path": {
+          "$ref": "#/$defs/repository_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mode": {
+          "const": "100644",
+          "description": "Symlinks, trees, gitlinks, and executable blobs are rejected. The validator reads the mode from git ls-tree and requires this exact value."
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "predecessor_candidate_revision",
+        "candidate_revision",
+        "candidate_tree",
+        "patch_sha256",
+        "changed_paths",
+        "repair_packet_commit",
+        "review_control_commit",
+        "report_commit",
+        "evidence_commit",
+        "repair_packet_ref",
+        "repair_manifest_ref",
+        "review_packet_ref",
+        "report_ref",
+        "predecessor_authority"
+      ],
+      "properties": {
+        "predecessor_candidate_revision": {
+          "$ref": "#/$defs/commit",
+          "description": "Bound by the resolved predecessor authority. There is no author-chosen base revision."
+        },
+        "candidate_revision": {
+          "$ref": "#/$defs/commit"
+        },
+        "candidate_tree": {
+          "$ref": "#/$defs/commit"
+        },
+        "patch_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "changed_paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_path"
+          }
+        },
+        "repair_packet_commit": {
+          "$ref": "#/$defs/commit"
+        },
+        "review_control_commit": {
+          "$ref": "#/$defs/commit"
+        },
+        "report_commit": {
+          "$ref": "#/$defs/commit"
+        },
+        "evidence_commit": {
+          "$ref": "#/$defs/commit"
+        },
+        "repair_packet_ref": {
+          "$ref": "#/$defs/identifier"
+        },
+        "repair_manifest_ref": {
+          "$ref": "#/$defs/identifier"
+        },
+        "review_packet_ref": {
+          "$ref": "#/$defs/identifier"
+        },
+        "report_ref": {
+          "$ref": "#/$defs/identifier"
+        },
+        "predecessor_authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "bootstrap_arm", "commit", "artifact_refs"],
+          "properties": {
+            "kind": {
+              "enum": ["prior_v2_record", "legacy_bootstrap_report"]
+            },
+            "bootstrap_arm": {
+              "type": ["string", "null"],
+              "enum": ["cargo", "kgi_kpi", null]
+            },
+            "commit": {
+              "$ref": "#/$defs/commit"
+            },
+            "artifact_refs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 2,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/identifier"
+              }
+            }
+          }
+        }
+      }
+    },
+    "path_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "disposition", "surfaces"],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/repository_path"
+        },
+        "disposition": {
+          "const": "reviewed",
+          "description": "There is no no_surface_change escape and no out_of_scope property."
+        },
+        "surfaces": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/surface"
+          }
+        }
+      }
+    },
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "surface_id",
+        "kind",
+        "scope_disposition",
+        "evidence_ref_ids",
+        "scope_routing_ref"
+      ],
+      "properties": {
+        "surface_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Diagnostic only. It cannot change validation or blocking. A surface has no path of its own: it belongs to exactly the path review that contains it and cannot cover another path."
+        },
+        "scope_disposition": {
+          "enum": ["reviewed_in_scope", "referred_to_manager"],
+          "description": "referred_to_manager requires a bound routing_scope_decision artifact and blocks integration by itself, so a scope referral can never become a silent out-of-scope escape."
+        },
+        "evidence_ref_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "scope_routing_ref": {
+          "$ref": "#/$defs/nullable_ref_id",
+          "description": "Non-null exactly when scope_disposition is referred_to_manager; role routing_scope_decision, resolvable at or before the candidate and never inside this review's own control, report, or evidence commits."
+        }
+      }
+    },
+    "evidence_state": {
+      "enum": [
+        "DEFECT_REPRODUCED",
+        "DEFECT_SOURCE_PROVEN",
+        "DEFECT_INJECTION_ONLY",
+        "CLOSURE_UNPROVEN",
+        "ORACLE_VACUOUS",
+        "CLAIM_FALSE",
+        "SCOPE_BOUNDARY",
+        "REQUIREMENT_UNSATISFIABLE",
+        "CLOSED_PROVEN"
+      ]
+    },
+    "next_action": {
+      "enum": [
+        "PRODUCT_REPAIR",
+        "RUN_CLOSURE_EVIDENCE",
+        "REPAIR_ORACLE",
+        "REPAIR_CLAIM",
+        "DOCUMENT_NON_REACHABILITY",
+        "MANAGER_SCOPE_DECISION",
+        "MANAGER_REQUIREMENT_DECISION",
+        "NONE"
+      ]
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "before_ref_ids",
+        "after_ref_ids",
+        "negative_control",
+        "negative_control_ref_ids"
+      ],
+      "properties": {
+        "before_ref_ids": {
+          "$ref": "#/$defs/ref_id_list"
+        },
+        "after_ref_ids": {
+          "$ref": "#/$defs/ref_id_list"
+        },
+        "negative_control": {
+          "enum": ["killed", "survived", "not_applicable", "unavailable"]
+        },
+        "negative_control_ref_ids": {
+          "$ref": "#/$defs/ref_id_list"
+        }
+      }
+    },
+    "prior_obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "origin_generation",
+        "evidence_state",
+        "next_action",
+        "closure_evidence_ref",
+        "non_reachability_ref",
+        "routing_decision_ref",
+        "observations"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "origin_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_state": {
+          "$ref": "#/$defs/evidence_state"
+        },
+        "next_action": {
+          "$ref": "#/$defs/next_action"
+        },
+        "closure_evidence_ref": {
+          "$ref": "#/$defs/nullable_ref_id",
+          "description": "Required exactly when derived continuity is recurred_after_proven_closure."
+        },
+        "non_reachability_ref": {
+          "$ref": "#/$defs/nullable_ref_id",
+          "description": "Only for the injection-only closure alternative, whose admissibility comes from the predecessor record's state, never from this record or the manifest."
+        },
+        "routing_decision_ref": {
+          "$ref": "#/$defs/nullable_ref_id",
+          "description": "Required exactly for MANAGER_SCOPE_DECISION and MANAGER_REQUIREMENT_DECISION. Retained for routing evidence only; it cannot change the derived blocking state."
+        },
+        "observations": {
+          "$ref": "#/$defs/observations"
+        }
+      }
+    },
+    "new_finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "evidence_state",
+        "next_action",
+        "routing_decision_ref",
+        "observations"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "evidence_state": {
+          "$ref": "#/$defs/evidence_state",
+          "description": "CLOSED_PROVEN is rejected: a finding with no pre-repair manifest mapping cannot be closed in the same generation."
+        },
+        "next_action": {
+          "$ref": "#/$defs/next_action"
+        },
+        "routing_decision_ref": {
+          "$ref": "#/$defs/nullable_ref_id"
+        },
+        "observations": {
+          "$ref": "#/$defs/observations"
+        }
+      }
+    },
+    "derivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "path",
+        "locus",
+        "locus_existed_in_predecessor",
+        "predecessor_behaviour",
+        "candidate_behaviour",
+        "evidence",
+        "disposition",
+        "next_action"
+      ],
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "path": {
+          "$ref": "#/$defs/repository_path"
+        },
+        "locus": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "description": "Stable symbol or locus identifier. Human judgement: Git decides path existence, not symbol identity, and the validator does not claim otherwise."
+        },
+        "locus_existed_in_predecessor": {
+          "type": "boolean"
+        },
+        "predecessor_behaviour": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "description": "Reviewer-authored derivation from the predecessor tree. Not machine-proved."
+        },
+        "candidate_behaviour": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "ref_ids"],
+          "properties": {
+            "state": {
+              "enum": ["available", "unavailable"],
+              "description": "unavailable requires an empty reference list, stays in the denominator, and is fail-closed for ALLOW."
+            },
+            "ref_ids": {
+              "$ref": "#/$defs/ref_id_list"
+            }
+          }
+        },
+        "disposition": {
+          "enum": [
+            "derivation_complete",
+            "derivation_contradicted",
+            "derivation_unavailable"
+          ]
+        },
+        "next_action": {
+          "$ref": "#/$defs/next_action"
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "result_ref",
+        "log_ref",
+        "status",
+        "exit_code",
+        "timed_out",
+        "log_complete"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier",
+          "description": "Set-equal to the frozen manifest's required validation IDs. Neither the record nor the reviewer may add, omit, or weaken one."
+        },
+        "result_ref": {
+          "$ref": "#/$defs/identifier"
+        },
+        "log_ref": {
+          "$ref": "#/$defs/identifier"
+        },
+        "status": {
+          "enum": ["passed", "failed", "timeout", "unavailable"]
+        },
+        "exit_code": {
+          "type": ["integer", "null"]
+        },
+        "timed_out": {
+          "type": "boolean"
+        },
+        "log_complete": {
+          "type": "boolean"
+        }
+      }
+    },
+    "terminalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "worker_alive",
+        "child_processes_active",
+        "event_evidence_ref"
+      ],
+      "properties": {
+        "state": {
+          "enum": ["complete", "active", "stalled", "unavailable"]
+        },
+        "worker_alive": {
+          "type": "boolean"
+        },
+        "child_processes_active": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event_evidence_ref": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    }
+  }
+}

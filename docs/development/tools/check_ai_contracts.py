@@ -30,6 +30,9 @@ SCHEMAS = {
     "docs/development/ai/schemas/context-manifest.v1.schema.json": "https://codefire.dev/schemas/ai/context-manifest.v1.schema.json",
     "docs/development/ai/schemas/review-packet.v1.schema.json": "https://codefire.dev/schemas/ai/review-packet.v1.schema.json",
     "docs/development/ai/schemas/review-recurrence-control.v1.schema.json": "https://codefire.dev/schemas/ai/review-recurrence-control.v1.schema.json",
+    "docs/development/ai/schemas/review-recurrence-control.v2.schema.json": "https://codefire.dev/schemas/ai/review-recurrence-control.v2.schema.json",
+    "docs/development/ai/schemas/review-recurrence-repair-manifest.v1.schema.json": "https://codefire.dev/schemas/ai/review-recurrence-repair-manifest.v1.schema.json",
+    "docs/development/ai/schemas/timed-gate-result.v2.schema.json": "https://codefire.dev/schemas/ai/timed-gate-result.v2.schema.json",
     "docs/development/ai/schemas/development-flow-record.v1.schema.json": "https://codefire.dev/schemas/ai/development-flow-record.v1.schema.json",
 }
 

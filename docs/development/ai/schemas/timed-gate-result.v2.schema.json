@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codefire.dev/schemas/ai/timed-gate-result.v2.schema.json",
+  "title": "CodeFire timed gate result v2",
+  "description": "Compatibility-distinct successor to codefire.timed_gate.v1. The runner derives the Git root containing its cwd, the canonical HEAD revision and HEAD tree, the porcelain status immediately before and after the command, and the index entries whose tag is not H. It proves that the record, the committed candidate identity, the clean-before and clean-after states, the timed result and the retained bytes agree. It does not prove honest execution, semantic oracle quality, nonzero test selection, or the absence of mutate-and-restore activity inside the command.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "argv",
+    "cwd",
+    "timeout_seconds",
+    "timed_out",
+    "exit_code",
+    "status",
+    "started_at",
+    "ended_at",
+    "duration_seconds",
+    "duration_source",
+    "wall_elapsed_seconds",
+    "wall_minus_monotonic_seconds",
+    "wall_clock_discontinuity",
+    "drift_threshold_seconds",
+    "source",
+    "worktree",
+    "log",
+    "limits"
+  ],
+  "properties": {
+    "schema": {
+      "const": "codefire.timed_gate.v2"
+    },
+    "argv": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "cwd": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Machine-specific absolute path. Diagnostic only."
+    },
+    "timeout_seconds": {
+      "type": "number"
+    },
+    "timed_out": {
+      "type": "boolean"
+    },
+    "exit_code": {
+      "type": "integer"
+    },
+    "status": {
+      "enum": ["passed", "failed"]
+    },
+    "started_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ended_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "duration_seconds": {
+      "type": "number"
+    },
+    "duration_source": {
+      "const": "time.monotonic_ns"
+    },
+    "wall_elapsed_seconds": {
+      "type": "number"
+    },
+    "wall_minus_monotonic_seconds": {
+      "type": "number"
+    },
+    "wall_clock_discontinuity": {
+      "type": "boolean"
+    },
+    "drift_threshold_seconds": {
+      "type": "number"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["git_root", "revision", "tree", "derived"],
+      "properties": {
+        "git_root": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Machine-specific absolute path of the Git root containing cwd. Diagnostic only; identity is carried by revision and tree."
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "tree": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "derived": {
+          "const": "git -C <cwd> rev-parse --show-toplevel HEAD HEAD^{tree}"
+        }
+      }
+    },
+    "worktree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clean_before",
+        "clean_after",
+        "status_before",
+        "status_after",
+        "index_flagged_entries",
+        "index_flags_clean",
+        "log_inside_source_worktree",
+        "status_command",
+        "index_command"
+      ],
+      "properties": {
+        "clean_before": {
+          "type": "boolean"
+        },
+        "clean_after": {
+          "type": "boolean"
+        },
+        "status_before": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status_after": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "index_flagged_entries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Every git ls-files -v entry whose tag is not H, rendered as '<tag>\\t<path>'. This covers assume-unchanged (lowercase tags) and skip-worktree (S) and is the stronger exact equivalent of naming those two flags."
+        },
+        "index_flags_clean": {
+          "type": "boolean"
+        },
+        "log_inside_source_worktree": {
+          "type": "boolean",
+          "description": "Logs and results are written outside the source worktree and copied byte-identically into the evidence commit, so they do not make the checkout dirty. A true value is emitted rather than hidden."
+        },
+        "status_command": {
+          "const": "git status --porcelain=v1 -z --untracked-files=all"
+        },
+        "index_command": {
+          "const": "git ls-files -v -z"
+        }
+      }
+    },
+    "log": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "bytes", "sha256", "complete"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Machine-specific absolute path. Diagnostic only; the committed log is linked by digest and byte count."
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "complete": {
+          "type": "boolean"
+        }
+      }
+    },
+    "limits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
