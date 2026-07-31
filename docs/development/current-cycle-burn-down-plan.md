@@ -8,12 +8,18 @@
 
 1. Discover: algorithm dogfoodとCodeFire source reviewでissue batchを作る。
 2. Freeze: batch範囲を凍結し、修正対象issue IDを確定する。
-3. Plan: symptomではなく共有invariant/root cause単位で実装計画を作る。
-4. Implement: root causeを修正し、focused regressionとworkspace gateを通す。
-5. Close: detail issue、summary ledger、root-cause map、historyを同期する。
-6. Install: 検証済みsourceからdogfood対象binaryをinstallまたは選択する。
-7. Dogfood: 修正版をalgorithm projectへ適用し、再現確認と通常workflowを実行する。
-8. Retrospect: 新規issueまたは「新規issueなし」を記録してから次のDiscoverへ進む。
+3. Plan / risk-based Preflight: symptomではなく共有invariant/root cause単位で実装計画を作り、必要なcontractだけをmutation前に独立challengeする。
+4. Implement / Validate / Candidate Freeze: bounded root fix、focused/broad gate、exact candidate identityを固定する。
+5. Review / Adjudicate / Repair: risk-based independent reviewの全observationをimpact/actionability判定し、required correctionだけをbounded repair/rereviewする。
+6. Integrate / source acceptance: manager-owned canonical revisionへ統合し、focused post-integration gateでsource acceptanceを確立する。これはfinal Closeではない。
+7. Install / Dogfood / Evaluate: scopeに適用されるartifactと実workflowを検証する。docs/process-onlyで不要な場合もmanagerがscope/evidence/reasonを伴う`not_applicable`を記録する。
+8. Evidence synchronization: required checks、raw event/metric、Install/Dogfood/Evaluate結果をdetail issueとcurrent docs/historyへ同期する。この時点ではissue statusをterminalへ変えない。
+9. Final Close: 上記evidenceを満たした後だけdetail status、summary ledger、root-cause mapをterminal stateへ同期する。
+10. Retrospect: `keep` / `change` / `stop` / `experiment`と次の別admission候補を記録してから次のDiscoverへ進む。
+
+以下のcompleted sectionに残る旧`Close -> Install -> Dogfood`表記は、その時点の
+historical evidenceであり、今後のoperator順序ではない。証拠修正なしに書き換えず、
+新規・active workは上の現行順序だけに従う。
 
 Burn-down中に別の問題を見つけた場合の扱い:
 
@@ -25,7 +31,7 @@ Burn-down中に別の問題を見つけた場合の扱い:
 
 ## Current Cycle State
 
-Current known issue count and lifecycle position, audited 2026-07-31 after the experimental AIA-047 recurrence-v2 integration:
+Current known issue count and lifecycle position, audited 2026-07-31 after the AIA-047 governance-authority audit:
 
 - CFB/CFR product/review issues: 9 open/investigating.
 - CFB detail ledger: 138 total; 135 `fixed`, 3 `investigating`.
@@ -36,7 +42,7 @@ Current known issue count and lifecycle position, audited 2026-07-31 after the e
 - RVC-011/CFR-161 completed Discover through Retrospect. Installed unsafe-policy replay fails before writes, both real read-only matrices pass without hash drift, and canonical trace-warning policy returns a typed passed decision with no blockers.
 - CFR-162 completed Discover, Freeze, Plan, Implement, Close, Install, Dogfood, and Retrospect. All unresolved merge classes now block the authoritative decision until an explicit validated continue transition.
 - The 60-review current-source audit classified 6 implemented, 3 accepted non-goals, and 51 residual reviews. The residuals remain mapped exactly once to CFR-163..173. Roots through CFR-167/CFB-134 completed the full lifecycle; CFB-133, admitted CFR-168 blockers CFB-136/138, and CFR-168..173 remain active. `BATCH-2026-07-review-portfolio-completion` remains frozen.
-- AIA-047 L1.1-L1.5 are complete and the exact recurrence-v2 implementation is integrated experimentally at `00ad88562068a6101a7530b84d5f52b0cff559f0`. This is a development-control checkpoint, not CFR-168 product integration or evidence that recurrence, review time, or rework improved. L1.6 remains pending; the normal v1 entry always returns `BLOCK`, no live-arm anchor exists, and the Fugu blind branch is provider-held until at least 2026-08-03.
+- AIA-047 preserves the historical fact that L1.1-L1.5 were recorded complete at the experimental foundation integrated at `00ad88562068a6101a7530b84d5f52b0cff559f0`. A later authority audit reopened L1.5 hardening; that hardening is in progress and has no integrated implementation candidate. L1.6 is blocked on independent hardening acceptance; the normal v1 entry always returns `BLOCK`, no live-arm anchor or live v2 `ALLOW` exists, and the Fugu blind branch is provider-held until at least 2026-08-03. This is not CFR-168 product integration or evidence that recurrence, review time, or rework improved.
 - Historical cycle sections were moved to `archive/completed-cycle-ledger.md`. Do not infer current issue counts from historical headings or remaining-count notes.
 - The management hub `docs/development/README.md` is the current-state entry point; update it and append `history.md` when this section changes.
 
@@ -73,10 +79,11 @@ Root execution order:
 This control-plane work does not advance the product root beyond its existing
 `Implement in progress` state.
 
-| Layer | State at `00ad885` | Next authority |
+| Layer | Current state | Next authority |
 |---|---|---|
-| L1.1-L1.5 | complete and integrated experimentally; exact candidate `9e50f04` received independent `ACCEPT_FOR_INTEGRATION` through the recorded GPT-5.6/Codex fallback | none for implementation integration |
-| L1.6 | pending | a separate manager task must freeze both bootstrap manifests and commit the exact live-arm anchor in a clean validator source |
+| `00ad885` foundation | historical L1.1-L1.5 experimental checkpoint; exact candidate `9e50f04` received independent `ACCEPT_FOR_INTEGRATION` through the recorded GPT-5.6/Codex fallback | preserve as foundation evidence; do not reinterpret it as current authority hardening or effectiveness proof |
+| L1.5 authority hardening | reopened and in progress; accepted contract and manager implementation authorization exist, but no hardening implementation candidate is integrated | complete bounded implementation and fresh exact rereview |
+| L1.6 | blocked on accepted authority hardening | only after hardening acceptance may a manager freeze both bootstrap manifests and commit the exact live-arm anchor in a clean validator source |
 | L1.7 | blocked on L1.6 | Cargo bootstrap generation must first produce and retain the mandatory v2 `BLOCK`, then a real rooted successor may be evaluated |
 | L1.P / L1.8 | provider-held; earliest recorded Fugu window is 2026-08-03 | blind Fugu classification, comparison/freeze, disagreement adjudication, dated pilot decision, then the KGI arm |
 | L1.9-L1.10 | blocked | comparable anchored arm results, KGI/KPI interpretation, and a manager retain/revise/remove decision |

@@ -66,7 +66,7 @@ invent a baseline.
 |---|---|
 | `MET-FLOW-012` | First-pass gate rate: required gates passing on their first exact-candidate run / required gates run |
 | `MET-FLOW-013` | Flaky gate rate: gates whose result changes without an intended source/environment change / gates run |
-| `MET-FLOW-014` | Rework ratio: post-rejection evidence-producing repair/retest seconds / total evidence-producing seconds, only when both paired interval sets are complete; otherwise unavailable |
+| `MET-FLOW-014` | Rework ratio: post-rejection repair/retest lane-seconds / all evidence-producing lane-seconds. Both are derived only from complete paired same-boot evidence-active intervals: union overlaps within each lane, then sum the per-lane unions; concurrent lanes remain separate lane-seconds. Missing class/endpoints, cross-clock/boot pairs, or otherwise incomplete applicable intervals make the ratio unavailable. |
 | `MET-FLOW-015` | Reviewer correction rate: cohort-eligible packets with at least one adjudicated `required_correction` / reviewed eligible packets; also report `contract_omission`, `implementation_nonconformance`, and `repair_introduced_regression` raw counts and unavailable causal adjudications |
 | `MET-FLOW-016` | Integration conflict count and resolution seconds per accepted package |
 | `MET-FLOW-027` | Required evidence completeness: resolved required evidence / required evidence |
@@ -192,6 +192,16 @@ a 40-minute mechanical docs edit.
 - Pair wait and active-repair endpoints by stable interval ID. Per-reason wait
   unions may overlap; total wait is the union across intervals, not a sum of
   reason totals.
+- For `MET-FLOW-014`, every evidence-active interval has a stable pair ID, lane,
+  same monotonic clock/boot identity, and an activity class that distinguishes
+  post-rejection repair/retest from other evidence production. Compute the
+  denominator by unioning all evidence-active intervals within each lane and
+  summing those lane durations. Compute the numerator the same way after
+  selecting post-rejection repair/retest intervals. Overlap inside one lane is
+  never double-counted; simultaneous work in distinct lanes is summed as
+  lane-seconds, never collapsed into a cross-lane elapsed-time union. A missing
+  endpoint/class, cross-clock or cross-boot pair, or incomplete applicable lane
+  makes the metric unavailable rather than zero or a partial favorable ratio.
 - Freeze `review_lineage_id` before round 1 and preserve it across rejection,
   repair, packet rename, and rebuilt candidates. A separately reviewed scope
   split must carry inherited obligations and the predecessor lineage.

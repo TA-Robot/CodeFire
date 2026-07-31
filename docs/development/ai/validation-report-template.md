@@ -140,6 +140,12 @@ nonblocking observation may terminate after the compact screen and manager
 disposition. This two-depth shape reduces review service time without omitting
 an axis or treating unknown as neutral.
 
+Every compact impact axis uses exactly `affected`, `unaffected`,
+`not_applicable`, or `unknown`. `not_applicable` requires an axis-specific
+reason. Evidence availability is separate and uses `available`, `partial`, or
+`unavailable`; unavailable evidence never implies `unaffected` or
+`not_applicable`.
+
 When combined with the compact exact review above, place the reviewer blocks
 before its Decision section and single `OVERALL_VERDICT`. The manager block
 below is a later, separate artifact; it is not appended to the reviewer report.
@@ -169,16 +175,16 @@ Identity and evidence:
 - evidence refs: <immutable refs>
 
 Compact impact screen (required for every observation):
-- frozen outcomes: <affected/unaffected/unknown + exact refs/evidence>
-- affected entities: users=<affected/unaffected/unknown>; workflows=<...>; surfaces=<...>; owners=<...> — <refs/reason>
-- impact categories: correctness=<affected/unaffected/unknown>; state=<...>; data=<...>; authority=<...>; api_compatibility=<...>; operations=<...>; performance=<...>; resource=<...>; maintainability=<...>; development_flow=<...> — <refs/reasons>
-- reachability/likelihood: <affected/unaffected/unknown + route/basis>
-- blast radius: <affected/unaffected/unknown + boundaries>
-- severity/materiality: <affected/unaffected/unknown + preliminary value/criterion>
-- reversibility/recovery: <affected/unaffected/unknown + owner/steps>
-- recurrence: <affected/unaffected/unknown + prior IDs>
+- frozen outcomes: <affected/unaffected/not_applicable/unknown + exact refs/evidence>
+- affected entities: users=<affected/unaffected/not_applicable/unknown>; workflows=<...>; surfaces=<...>; owners=<...> — <refs/reason>
+- impact categories: correctness=<affected/unaffected/not_applicable/unknown>; state=<...>; data=<...>; authority=<...>; api_compatibility=<...>; operations=<...>; performance=<...>; resource=<...>; maintainability=<...>; development_flow=<...> — <refs/reasons>
+- reachability/likelihood: <affected/unaffected/not_applicable/unknown + route/basis>
+- blast radius: <affected/unaffected/not_applicable/unknown + boundaries>
+- severity/materiality: <affected/unaffected/not_applicable/unknown + preliminary value/criterion>
+- reversibility/recovery: <affected/unaffected/not_applicable/unknown + owner/steps>
+- recurrence: <affected/unaffected/not_applicable/unknown + prior IDs>
 - evidence quality: <available/partial/unavailable + reproducibility/limitations>
-- repair tradeoffs/hazards: <affected/unaffected/unknown + refs; cannot offset must-fix>
+- repair tradeoffs/hazards: <affected/unaffected/not_applicable/unknown + refs; cannot offset must-fix>
 - must_fix_candidates: <MF IDs/none/unknown + evidence>
 - acceptance_critical_unknown: <yes/no + evidence>
 - proposed disposition: <six values or null_pending_impact + evidence>
@@ -272,7 +278,7 @@ Repair and rereview authority:
 Stable decision locus:
 - active decision_id / subject scope / effective candidate: <values>
 - decision: <disposition and supported equivalence/correction basis>
-- permitted reopen triggers: <subset of frozen_requirement_changed, materially_new_evidence, new_counterexample, prefrozen_metric_regression>
+- permitted reopen triggers: <fixed non-suppressible set: frozen_requirement_changed, materially_new_evidence, new_counterexample, prefrozen_metric_regression; record current applicability/evidence separately, never a subset>
 - reopen evidence/ref: <exact evidence or null; materially new means new to the active decision record, with proved prior omission/misbinding if the artifact predates it>
 - supersedes_decision_ids: <IDs or empty>
 - reopen result: not_requested | rejected_preference_churn | admitted_for_manager_adjudication

@@ -62,9 +62,10 @@ L1.5 authority hardening is reopened and in progress rather than complete. The
 canonical branch contains the accepted hardening contract and manager
 implementation authorization, but no hardening implementation candidate is yet
 integrated there. This is also not evidence that the review bottleneck improved.
-L1.6 remains pending: no Cargo/KGI bootstrap manifest pair or manager-owned
-live-arm anchor is committed. The v1 compatibility path always returns
-structured `BLOCK`, no live v2 `ALLOW` exists, and the blind Fugu causal branch
+L1.6 remains blocked on independent acceptance of that hardening: no Cargo/KGI
+bootstrap manifest pair or manager-owned live-arm anchor is committed. The v1
+compatibility path always returns structured `BLOCK`, no live v2 `ALLOW`
+exists, and the blind Fugu causal branch
 cannot begin before the recorded 2026-08-03 provider window. See
 [`review-recurrence/README.md`](review-recurrence/README.md) for the executable
 contract and
@@ -100,12 +101,19 @@ For a new task:
 8. Run the risk-selected independent review and bind it to task/patch digests.
 9. Assess impact and adjudicate actionability; repair/rereview only
    `required_correction` within a manager-frozen boundary.
-10. Integrate the source-accepted candidate, then complete applicable
-    Install, Dogfood/Evaluate, final Close, and Retrospect stages from
-    `../project-management.md`.
-11. Run `python3 docs/development/tools/check_ai_development.py` when the AI system or strategy changed.
-12. Record only the applicable raw lane/candidate/review/gate events required by `development-flow-kgi-kpi.md`; do not manufacture non-applicable KPI events.
-13. Update canonical docs and history with the result.
+10. Integrate the exact candidate and pass focused post-integration checks to
+    establish source acceptance; do not mark the issue finally closed.
+11. Run all required checks, including
+    `python3 docs/development/tools/check_ai_development.py` when the AI system
+    or strategy changed.
+12. Complete applicable Install and Dogfood/Evaluate, or bind the manager's
+    evidence-backed `not_applicable` decision for a docs/process-only scope.
+13. Capture applicable raw lane/candidate/review/gate/install/evaluation events
+    from `development-flow-kgi-kpi.md`, then synchronize evidence into the issue,
+    current docs, and append-only history without manufacturing non-applicable
+    events or prematurely terminalizing issue status.
+14. Perform final Close only after that evidence synchronization, then
+    Retrospect under `../project-management.md`.
 
 For a batch:
 

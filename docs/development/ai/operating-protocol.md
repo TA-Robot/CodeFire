@@ -266,8 +266,8 @@ migration rather than a prose-only downgrade.
 
 Severity records the magnitude of an observed effect as `critical`, `high`,
 `moderate`, `low`, `none`, or `unknown`. It never directly says "fix". Before
-actionability, record all of these axes with exact evidence or an explicit
-`unknown`, `unavailable`, or `not_applicable` rationale:
+actionability, record all of these axes with exact evidence and one compact
+impact state from `affected`, `unaffected`, `not_applicable`, or `unknown`:
 
 - effects on frozen requirements, invariants, acceptance criteria, KGI/KPI and
   binding quality guardrails;
@@ -280,8 +280,14 @@ actionability, record all of these axes with exact evidence or an explicit
 - evidence confidence, reproducibility and availability; and
 - repair cost, alternatives, repair-regression hazards and recovery tradeoffs.
 
+Impact state and evidence availability are independent. `not_applicable`
+requires evidence showing why the axis does not apply. Evidence availability is
+recorded separately as `available`, `partial`, or `unavailable`; an unavailable
+observation never becomes `unaffected` or `not_applicable` by default.
+
 Use risk-proportional depth. Every observation gets a compact screen covering
-every axis as affected, unaffected, or unknown with evidence. Expand the full
+every axis as affected, unaffected, not applicable, or unknown with evidence.
+Expand the full
 typed values/rationales only for a proposed required correction, accepted
 variance, disputed/reopened locus, high or material impact, or
 acceptance-critical unknown. A true duplicate may reference the canonical full
@@ -383,11 +389,14 @@ silently reinterpret or rewrite accepted v1 bytes.
 
 Every disputed implementation choice has a stable `decision_locus_id` and at
 most one active manager decision for the subject/scope. An
-`accepted_implementation_variance` has no wall-clock expiry and may reopen only
-for `frozen_requirement_changed`, `materially_new_evidence`,
-`new_counterexample`, or `prefrozen_metric_regression`, each with exact
-evidence. A later reviewer, model, wording, or preference alone is retained as
-preference churn and cannot reopen it. A valid trigger creates an explicit new
+`accepted_implementation_variance` has no wall-clock expiry. Its admissible
+reopen-trigger set is fixed and non-suppressible:
+`frozen_requirement_changed`, `materially_new_evidence`,
+`new_counterexample`, and `prefrozen_metric_regression`. A decision may record
+which triggers currently have applicable evidence, but no manager, template, or
+record may remove any of the four routes for later evidence. A later reviewer,
+model, wording, or preference alone is retained as preference churn and cannot
+reopen it. A valid trigger with exact evidence creates an explicit new
 adjudication and supersession; it does not silently overwrite the earlier
 decision.
 
