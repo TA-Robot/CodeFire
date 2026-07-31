@@ -64,6 +64,26 @@ and review-method evidence. Cherry-picking or merging the stale history would
 overwrite or conflict with that evidence and would not prove the combined
 tree.
 
+## Manager Preflight
+
+Read-only evidence
+`docs/development/ai/swarm-results/cfr168-source-keyed-cargo-canonical-port-preflight-20260731/evidence.md`
+at SHA-256
+`90449137903e2b15f0fd780cee7a3e9809cb54e7d1b7da18cce885282579ba34`
+binds the source-range patch digest, path status, comparison-snapshot blob
+collisions, and normalized test-name-set digests.
+
+At canonical snapshot `9c1eefd`, only the File Doctor and Rust HTTP packet
+paths had diverged from the historical base among the 19 source-range paths.
+The source candidate has 104 test names absent from the historical base and
+replaces one permissive shared-root test with separate fail-closed and admitted
+source-keyed cases.
+
+These are preflight observations, not frozen port outputs. Recompute every
+path blob and test-name set from the then-current canonical base after
+admission. A changed observation requires explicit disposition; it does not
+authorize editing the preflight or copying a candidate blob wholesale.
+
 ## Exact Write Set
 
 ```text
@@ -186,4 +206,3 @@ The reviewer returns:
 - explicit disposition of every accepted source-gate invariant;
 - severity-ordered findings with reproduced or object-level evidence; and
 - report commit, report SHA-256, and clean-worktree proof.
-

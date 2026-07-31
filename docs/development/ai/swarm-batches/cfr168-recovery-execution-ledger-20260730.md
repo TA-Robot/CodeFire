@@ -2109,7 +2109,7 @@ split the dependency:
 Neither packet is admitted by worker-green evidence, and both remain blocked
 on their exact missing independent decisions. The current Cargo canonical-port
 packet SHA-256 is
-`e313480bd9b429cd496b8e233eae5b1993845954640b93ff6621d23500477419`;
+`2116274a375d135433fe5bbacc7b40cd2395ccffbed0e4000c4c98ee15ca5f7b`;
 the current KGI/KPI composition packet SHA-256 is
 `6360d41d89fb3cd74e4877b43ad9cfba556fc6afe24555eb3475f5c722473c1a`.
 
@@ -2160,3 +2160,26 @@ constrained window, Cargo `4e5c0e7` precedes Upload `446cf4a` and KGI/KPI
 This is a downstream-release tie-break, not a fixed one-lane cap or a review
 quality judgment. The updated disposition-index SHA-256 is
 `5f5a1f5e3b20385bcb163380f4235b7dbbe4561825d5451da4d3110cacd77991`.
+
+## 2026-07-31 10:30 UTC Cargo canonical-port inputs mechanically frozen
+
+Read-only preflight
+`cfr168-source-keyed-cargo-canonical-port-preflight-20260731/evidence.md`
+binds exact source/candidate/canonical trees, the binary source-range digest,
+all 19 path states, the two current canonical blob collisions, and normalized
+test-name-set digests. Its SHA-256 is
+`90449137903e2b15f0fd780cee7a3e9809cb54e7d1b7da18cce885282579ba34`.
+
+At comparison head `9c1eefd`, 17 source-range paths still matched the
+historical base state and only the File Doctor and Rust HTTP review packets
+had diverged. The candidate adds 104 unique test names, removes one permissive
+shared-root test name, and replaces its behavior with separate unkeyed-block
+and source-keyed-pass cases. These finite counts describe the exact Git
+range; they are not quality quotas. The future accepted port must recompute
+all sets from then-current canonical and prove set preservation rather than a
+plausible total count.
+
+This preflight does not review or accept `4e5c0e7` and does not admit port
+execution. It exists so the eventual implementer and reviewer compare exact
+machine-derived sets rather than generating a large prose checklist from
+memory.
