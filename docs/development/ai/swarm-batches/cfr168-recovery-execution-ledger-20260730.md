@@ -1485,3 +1485,79 @@ The manager therefore resumed exact Claude Opus 5 session
 provider PID `1318933`. This is a fourth concurrent Claude lane admitted from
 measured pressure rather than a fixed global count. It closes the review to
 repair idle gap without paying for another implementation orientation.
+
+## 2026-07-31 03:06 UTC Storage rejection rollover and source-target quarantine
+
+The Storage Fugu reviewer had already emitted repeated report-ready and
+verdict signals without a durable report. AIA-045 classified the exact
+session as `INTERVENE`: 179 agent-text events, 149 events after the first
+ready signal, 135 after the first verdict signal, seven ready signals, five
+verdict signals, a live worker, and no report path. The manager stopped only
+the looping process group after confirming that no useful Cargo command was
+active, then resumed the same Fugu Ultra 1.1 session
+`019fb5e4-1fc2-7572-a3f6-06231f25ade7` in report-only mode.
+
+That exact session committed only
+`cfr168-rust-storage-zero-residual-rereview-fugu-20260730/review.md` as
+`71222e1cec1b0dc10003845428abfb611ba8bf71`. Manager recomputation fixed:
+
+- reviewed candidate `cdcb9bdefe7d25a118a9dc14171864d75f5ad304`;
+- report task base `844e4a319e458e6be2507ab8b166640a74d98c85`;
+- report tree `d43b5a1da31aba03943cdfe6c38c17fd5438511b`;
+- report blob `cd0ffc8458d8240ac7a0215a365cf32b5b91e7da`;
+- report size `54,661` bytes and SHA-256
+  `6438df445b2d05510895fd23f73a4e71ba49238da15b00e86abf1a477b5ab960`;
+- one additive report-only commit, no merge, clean checkout, and exact
+  write-set containment; and
+- one machine-stable `OVERALL_VERDICT: REQUEST_CHANGES`.
+
+The report contains six High, seven Medium, and one zero-residual
+release-blocking finding. All F1 through F9 remain open. The material roots
+are phantom EOF graph nodes and missing local edges, release-build
+visitor-versus-Store error erasure, publication failure recorded as
+`Complete`, a post-flush finish error that can append a second JSON document,
+omitted traversal/authority/pre-ledger owners, nonportable path/formula
+contracts, structurally undercounted JSON fields, blanket URL/path
+projections, non-exhaustive text-dependent terminal classification, missing
+final parent/path authority, and incomplete writer/channel reversals.
+
+Canonical integrated only the immutable report as `8ac6741`. The original
+Claude lineage carries the report as `9b5f4ea` and the counterexample-first
+R1--R14 closure packet as
+`926b179f2dcad8d4fabbeebaf8547f34a50b0c1b`. Exact original implementer
+session `c28925df-d4bc-4994-b905-73aaaf2425e5` remains recoverable. Resume is
+held for the source-bound target guard and Cargo conflict preflight, not for a
+provider slot or a new implementation orientation.
+
+The disposition index now contains 18 exact independent reports: 3 `ACCEPT`
+and 15 `REQUEST_CHANGES`, an exact-candidate acceptance yield of 16.67%.
+Again this is a flow-yield measure, not a model score.
+
+During File Doctor manager revalidation, the configured shared debug target
+returned exit zero in 0.267 seconds with **zero selected tests** and 794
+filtered tests. The binary's test list belonged to a different Rust HTTP
+worktree even though the command ran from exact File Doctor candidate
+`cd130e544af0476162be153db58a0a840b75b134`. A release invocation rebuilt the
+candidate and passed 16 `live_file_doctor` tests in 550.765 monotonic seconds,
+but that filter did not cover the required NOTE-1/NOTE-2 cases. The manager
+preserved both content-addressed logs, stopped the held parent before gate 03,
+and kept the candidate `BLOCK`.
+
+This is stronger than the earlier AIA-044 profile defect: one global
+`CARGO_TARGET_DIR` can silently reuse a fresh artifact from a different
+worktree when Cargo's dependency metadata does not bind the active source
+root strongly enough for this workflow. Exit code and target path alone are
+not evidence. The new source-target control must:
+
+- bind candidate tree plus tracked/untracked Cargo/crate/config/toolchain
+  inputs to a source key;
+- serialize inspection/cleanup/build ownership under one lock;
+- reject or safely rebuild a target whose provenance names another worktree;
+- reject zero selected tests when a nonzero focused set is required; and
+- attach the source key, argv, toolchain, nonzero count, duration, and complete
+  log digest to every reusable result.
+
+File Doctor, Rust HTTP, File ancestry, and Storage reviewer/repair launches
+remain held until this control is implemented and the affected exact gates
+are rerun. This quarantine prevents fast false acceptance; it does not restore
+a fixed Rust-lane count.
