@@ -9,7 +9,7 @@ Base revision: `00ad88562068a6101a7530b84d5f52b0cff559f0`.
 
 ## Why this repair exists
 
-The first Cargo/KGI live-manifest extraction audit found nine defects before a
+The first Cargo/KGI live-manifest extraction audit found ten defects before a
 manager-owned live anchor was written:
 
 1. `derivations[].locus_existed_in_predecessor` describes symbol/locus
@@ -57,6 +57,13 @@ manager-owned live anchor was written:
    fields only. It does not reject duplicate arm rows or enforce the documented
    generation pin. Committing live manager authority on that surface would make
    malformed or ambiguous anchors admissible.
+10. Retained-result replay compares a hand-picked subset of the committed
+    result and silently ignores authority-bearing fields including
+    `git_verified`, `input_schema`, `timed_validations`, and
+    `authority_chain`. Mutating any of those fields in a retained generation
+    currently leaves a successor at `ALLOW`. Unknown result fields are also
+    ignored, so the replay contract can drift without a deliberate schema or
+    compatibility decision.
 
 The same audit exposed an operating ambiguity, which this packet resolves
 without weakening evidence: the frozen Cargo/KGI tables include destructive or
@@ -88,6 +95,11 @@ negative-control evidence belongs.
   about the stable symbol/locus. The gate must not claim to infer it from Git.
 - Compare Git tree-entry presence only with
   `path_existed_in_predecessor`.
+- Require claim/derivation repository paths to use one canonical safe spelling
+  before either current evaluation or retained replay. Reject absolute paths,
+  dot/dot-dot components, empty components, repeated/trailing separators, and
+  spellings normalized by `PurePosixPath` such as `a/./b`; do not silently skip
+  the Git fact check when a current path is unsafe.
 - Require every record derivation's `path` to equal the matching frozen
   manifest claim's `locus_path`. A mismatched path is structural failure even
   when both paths exist and the evidence is otherwise well formed.
@@ -109,6 +121,9 @@ finding. Flipping the path boolean must produce
 `predecessor-path-existence-contradicted`. A byte-identical pre-existing locus
 must still require an I1 derivation. Repointing the derivation to an unrelated
 existing path must fail with a dedicated manifest/derivation path mismatch.
+Equal manifest/derivation spellings `.`, `a/./b`, `a//b`, and `a/` must each
+fail identically in the current generation and retained replay rather than
+bypassing current tree-entry verification.
 
 ### F1b — bind bootstrap obligation origins
 
@@ -157,8 +172,9 @@ last-write-wins behaviour.
   boundary helper; do not leave current-record and committed-artifact readers
   with divergent behaviour.
 - Apply it before JSON Schema traversal to the current record, every retained
-  record replay, every repair manifest, every timed-result artifact, and both
-  current and retained live-anchor blobs.
+  record replay, every current or retained gate-result replay, every repair
+  manifest, every timed-result artifact, both current and retained live-anchor
+  blobs, and every validator-owned JSON Schema blob consumed as authority.
 - Return a deterministic `unsafe-json-surrogate` structural finding with an
   escaped/repr-safe location and message. Never interpolate the raw surrogate
   into terminal output.
@@ -168,9 +184,9 @@ last-write-wins behaviour.
 
 Required counterexamples place an escaped lone surrogate separately in a
 manifest claim path, required-validation argv, retained record array, timed
-result string, current anchor pin path, and retained historical anchor. Each
-must return structured `BLOCK` without an uncaught exception or partial
-result.
+result string, retained gate result, current anchor pin path, retained
+historical anchor, and validator-owned schema. Each must return structured
+`BLOCK` without an uncaught exception or partial result.
 
 ### F1e — derive timed-evidence summaries from their detailed fields
 
@@ -183,8 +199,20 @@ result.
 - Extend timed-gate v2 output with the requested result path, emitted in a
   closed schema shape. Require cwd, Git root, log path, and result path to be
   absolute normalized paths; cwd must be within the declared Git root, while
-  log and result must be outside it. Recompute both inside/outside summary
-  booleans from those paths rather than trusting them.
+  log and result must be distinct and outside it. Recompute both inside/outside
+  summary booleans from those paths rather than trusting them.
+- Validate the runner-owned timing model rather than accepting internally
+  contradictory diagnostics: timeout must be positive; monotonic duration and
+  drift threshold must be finite and nonnegative; start/end timestamps must be
+  parseable and ordered; wall elapsed must agree with those timestamps within
+  their represented precision; `wall_minus_monotonic_seconds` must equal wall
+  elapsed minus monotonic duration within a documented finite tolerance; and
+  `wall_clock_discontinuity` must equal whether the absolute delta exceeds the
+  threshold.
+- Require terminal fields to describe one outcome:
+  `status == "passed"` iff `exit_code == 0` and `timed_out == false`, and a
+  timed-out result must use the runner's exit code `124`. Preserve the closed
+  status enum for every other failure outcome.
 - Preserve exact candidate revision/tree, argv, committed log bytes/digest,
   terminal status, timeout, exit-code, and unchanged-post-command checks.
 - Apply the same consistency checks under current-gate semantic replay of
@@ -197,9 +225,11 @@ result.
 Required counterexamples independently falsify each boolean/detail pair,
 provide a non-null probe error with `head_unchanged: true`, move cwd outside the
 declared root, put log/result paths inside the root while setting the booleans
-false, and replay an inconsistent retained timed result. Every case must return
-structured `BLOCK`; a real runner-produced external-path result must remain
-passing.
+false, make log and result the same path, use negative timeout/duration/drift
+values, falsify the wall-minus/discontinuity relations, reverse or detach the
+timestamps, contradict status/exit/timed-out fields, and replay an inconsistent
+retained timed result. Every case must return structured `BLOCK`; a real
+runner-produced external-path result must remain passing.
 
 ### F1f — use a strict deterministic JSON authority boundary
 
@@ -207,12 +237,19 @@ passing.
   before normal object construction. Ordinary `json.loads` last-write-wins
   behaviour is not an admissible authority boundary.
 - Reject non-standard non-finite numeric constants (`NaN`, `Infinity`, and
-  `-Infinity`) at decode time with a structured `non-finite-json-number`
-  finding/error. Schema number checks are not a substitute because comparison
-  against `NaN` is false in both directions.
+  `-Infinity`) and every otherwise-standard numeric token that decodes to a
+  non-finite value (including exponent overflow such as `1e999` and `-1e999`)
+  with a structured `non-finite-json-number` finding/error. A strict
+  `parse_constant` hook alone is insufficient; recursively reject every
+  decoded non-finite float. Schema number checks are not a substitute because
+  comparisons against `NaN` and infinities do not provide the required
+  deterministic boundary.
 - Apply it to the current record and every committed current/historical record,
   result, manifest, timed result, and live anchor consumed by authority walk or
-  semantic replay.
+  semantic replay. Apply the same decoder to every current or historical
+  record, manifest, timed-result, and live-anchor JSON Schema blob loaded as
+  deciding-gate authority; content-addressing a schema does not make ambiguous
+  JSON member semantics safe.
 - Return a deterministic structured `duplicate-json-object-key` finding (or a
   CLI input error before a record model exists) naming the duplicated member
   safely. Do not continue with either value and do not emit a partial retained
@@ -225,8 +262,42 @@ nested artifact digest, manifest claim kind, timed cleanliness boolean,
 retained-result candidate field, and anchor pin digest. Each raw byte sequence
 must fail deterministically before the conflicting value can influence a
 decision. Separate current and retained timed-result controls inject all three
-non-finite constants into duration/threshold fields and must also fail before
-schema/decision use.
+named non-finite constants and both exponent-overflow forms into
+duration/threshold fields and must also fail before schema/decision use.
+Duplicate members and non-finite constraints inside each validator-owned JSON
+Schema must likewise fail during schema registration or gate loading rather
+than being parsed last-write-wins.
+
+### F1g — make retained-result replay complete and closed
+
+- Define one explicit retained-result replay contract. Do not maintain a
+  drifting allowlist of a few convenient fields while ignoring the rest of the
+  committed decision result.
+- Reject unknown top-level and authority-bearing nested result fields unless a
+  versioned compatibility decision explicitly classifies them as diagnostic.
+  List every deliberately excluded machine-local diagnostic field; an omission
+  is not an exclusion policy.
+- Recompute and compare every path-independent decision or authority field,
+  including result/input schema identities, record digest, `git_verified`,
+  control/generation, candidate identity, the exact timed-validation facts,
+  rows, metrics, successor obligations, record validity, review and integration
+  decisions, blockers, findings/count, and the complete rooted authority-chain
+  meaning (`kind`, root arm/commit, depth, and links).
+- Fields whose value necessarily changes with the replay location, such as an
+  analysed local root path, may be excluded only by name and rationale. Fields
+  checked by a separate exact historical authority operation—deciding-gate
+  identity, live-arm pin/blob, and invalid-path interval evidence—must be named
+  and linked to that check, not silently skipped.
+- Apply the same closed-shape and semantic replay rule at every retained
+  generation. A result produced by an older deciding gate remains immutable,
+  but current authorization must fail closed if its authority-bearing claim is
+  false under the current contract.
+
+Required counterexamples independently mutate retained `git_verified`,
+`input_schema`, one timed validation fact, the authority root/arm/link set, and
+an otherwise unknown authority-looking member. Each must block a successor.
+Machine-local diagnostic paths may differ only where the contract explicitly
+permits them, while an unmodified retained result must still replay cleanly.
 
 ### F2 — make live anchor authority schema-exact
 
@@ -305,10 +376,10 @@ port candidates exist.
 - `docs/development/tools/recurrence_v2_decision.py`
 - `docs/development/tools/recurrence_v2_evidence.py`
 - `docs/development/tools/recurrence_v2_fixture.py`
-- `docs/development/tools/recurrence_v2_history.py` only if retained-anchor
-  schema/generation plumbing requires it
-- `docs/development/tools/check_review_recurrence.py` only if canonical schema
-  loading/plumbing requires it
+- `docs/development/tools/recurrence_v2_history.py` for retained-anchor and
+  complete retained-result semantic replay
+- `docs/development/tools/check_review_recurrence.py` for canonical schema
+  loading, strict authority decoding, and result/replay plumbing
 - `docs/development/tools/run_timed_gate.py` only to emit the new bound result
   path and preserve internally derived path/cleanliness/HEAD summaries
 - `docs/development/tools/check_ai_contracts.py` only to register the new
