@@ -99,8 +99,8 @@ added to one another unless the provider definitions are demonstrably comparable
 | `MET-FLOW-019` | Checkpoint coverage | Mutated lanes with a durable checkpoint / mutated lanes |
 | `MET-FLOW-020` | Workspace bytes | Measure before/after every heavy gate |
 | `MET-FLOW-021` | Cargo target bytes | One shared target; reproducible cache only |
-| `MET-FLOW-022` | Minimum host `MemAvailable` | Do not start heavy work below 6 GiB |
-| `MET-FLOW-023` | Maximum swap used | Do not start heavy work above 2 GiB used |
+| `MET-FLOW-022` | Minimum projected effective `MemAvailable` after candidate reservation | Do not launch any lane below 6 GiB |
+| `MET-FLOW-023` | Maximum swap used | Do not launch any lane above 2 GiB used |
 | `MET-FLOW-026` | Lost user/source work | Target zero |
 | `MET-AI-070` | Lost user work | Target zero |
 | `MET-AI-071` | Unauthorized mutation | Target zero |

@@ -21,8 +21,8 @@ Stage 5 controls:
 - make an older v1-only binary reject a v2 manifest instead of silently
   ignoring safety controls;
 - schedule ready tasks by critical-path length when explicitly enabled;
-- enforce one total external-lane semaphore and a nested heavy-work
-  semaphore;
+- enforce machine-wide adaptive admission from resource reservations,
+  host/cgroup pressure, provider congestion windows, and conflict ownership;
 - emit durable stale-signal and checkpoint-due events without timing out or
   killing useful work;
 - adopt an exact manually resumed second-agent invocation after host/manager
@@ -36,10 +36,13 @@ No CodeFire product file needs to change.
 1. Long-running agents are expected. Elapsed time alone is not failure.
 2. A progress warning is advisory; it must never imply cancellation,
    acceptance, integration, or timeout.
-3. The recovery envelope remains four external sessions total and at most two
-   heavy jobs until measured resource evidence supports a change.
-4. Heavy work consumes one total-session permit and one heavy permit.
-5. Existing provider limits remain conjunctive with resource limits.
+3. There is no fixed total-session or universal heavy-job count. Each launch
+   reserves a measured resource estimate and must preserve the host floors.
+4. A heavy task may be blocked by memory/CPU/I/O pressure or a shared build
+   conflict even when an independent light task remains admissible.
+5. Provider congestion windows remain conjunctive with resource admission.
+   They grow one lane at a time on clean evidence and contract after
+   backpressure.
 6. Hedge/replacement lineage records provenance only. It does not select a
    winner or bypass exact-revision review.
 7. Active candidates with overlapping write sets remain isolated in separate
@@ -53,10 +56,7 @@ No CodeFire product file needs to change.
   "schema": "dev-swarm.v2",
   "scheduling": {
     "ready_order": "critical_path",
-    "resource_limits": {
-      "light": 4,
-      "heavy": 2
-    },
+    "admission_profile": "adaptive-host-v1",
     "progress_events": {
       "signal_stale_seconds": 900,
       "checkpoint_due_seconds": 2700
@@ -64,7 +64,7 @@ No CodeFire product file needs to change.
   },
   "tasks": [
     {
-      "resource_class": "heavy",
+      "resource_class": "rust-heavy",
       "execution_profile": "rust-shared-low-memory-v1",
       "progress_events": {
         "checkpoint_due_seconds": 2700
@@ -106,6 +106,8 @@ Compatibility rules:
   missing `resource_class` means `light`, missing `execution_profile` keeps
   the inherited environment, missing progress thresholds disables age
   events, and missing lineage leaves the task unrelated;
+- `admission_profile` resolves through a foundation-owned allowlist; a
+  manifest cannot inject arbitrary thresholds or claim capacity;
 - a hedge must have no task dependency and its exact revision must equal the
   batch base;
 - a continuation is opt-in, implementer-only, and must begin at its declared
@@ -124,10 +126,36 @@ shared target directory, bounded Cargo/test jobs, and incremental-build
 policy already used by the recovery envelope. Reject an unknown profile or a
 resolved cache path outside the configured workspace cache.
 
-The profile makes build reuse and resource limits part of task identity
+The profile makes build reuse and resource reservation part of task identity
 instead of prompt advice. Terminal cleanup removes an inactive task-local
 target, but never blindly cleans the shared target. Shared-cache retention is
 size/age based and runs only when no matching Cargo process is active.
+
+### Adaptive admission profile
+
+`adaptive-host-v1` has no total-session counter. Before each launch it
+captures host and cgroup memory, swap, workspace disk, CPU/memory/I/O PSI,
+effective CPU count, PID headroom, current provider window/backoff, and
+physical conflict ownership. Current work is already included in those live
+measurements; the decision subtracts the candidate reservation plus any
+recently admitted reservation not yet reflected in live pressure. Release
+that outstanding reservation only after the lane reaches measured steady
+state or terminates, so burst launches cannot reuse the same apparent
+headroom.
+
+Bootstrap reservations are 2 GiB for `light`, 3 GiB for `python-heavy`, and
+4 GiB for `rust-heavy`. They are safety estimates, not concurrency limits.
+Replace each estimate with comparable-lane peak p95 times 1.5 when enough
+trusted samples exist. The initial floors match the recovered host envelope:
+6 GiB projected effective available memory, at most 2 GiB swap used, and at
+least 100 GiB workspace free, plus bounded PSI and PID pressure.
+
+The provider values in `provider-routing-matrix.json` are initial congestion
+windows. External Fugu/Claude windows use additive probe growth after clean
+completion and freeze/contract on 429/529, quota, authentication, or retry
+storm evidence. Codex remains one cost-controlled manager lane. Resource,
+provider, dependency, review-WIP, and conflict decisions are recorded
+separately so one cannot masquerade as another.
 
 ### Priority and capacity
 
@@ -141,11 +169,13 @@ length(task) =
 
 With `ready_order=critical_path`, order ready tasks by descending length,
 existing topological index, then task ID. If the first task cannot acquire its
-provider or resource permits, continue scanning so an independently runnable
-lower-priority task can use the remaining capacity.
+provider window or pass resource admission, continue scanning so an
+independently runnable lower-priority task can use the remaining capacity.
 
-Count both scheduler-managed and adopted live tasks. Provider, total-session,
-and heavy limits must all pass before launch.
+Count both scheduler-managed and adopted live tasks in the provider window
+and conflict board. The fresh resource snapshot, candidate reservation,
+provider window/backoff, dependency state, and conflict ownership must all
+pass before launch; total external-session count is not an input.
 
 ### Review rollover and shadow integration train
 
@@ -159,7 +189,7 @@ review automatically when:
 - every changed path is inside the declared write set;
 - no required focused validation is missing or stale;
 - the requested reviewer is independent of the candidate run; and
-- global provider/resource permits are available.
+- global provider-window and resource-admission checks pass.
 
 Automatic enqueueing is not automatic acceptance. A `REQUEST_CHANGES` result
 returns the surface to Freeze with immutable findings; `ACCEPT` enters a
@@ -320,7 +350,8 @@ Selections are validated atomically. Adoption requires:
 - the invocation is a resume and began after `needs_attention`;
 - provider, agent, workspace, worktree, branch, and launch ancestry match;
 - a live PID also matches its kernel start identity;
-- combined adopted work fits all provider/resource semaphores.
+- combined adopted work fits the adaptive provider/resource/conflict
+  envelope.
 
 The manager polls the durable invocation record; it cannot `waitpid()` a
 non-child. A disappeared PID without a completed record returns the task to
@@ -357,13 +388,17 @@ Unknown future versions remain warning-only.
 Scheduler coverage:
 
 - old manifests preserve current behavior;
-- invalid resource classes/limits fail;
+- invalid resource classes or admission profiles fail;
 - unknown execution profiles and cache paths outside the configured root fail;
 - the Rust profile binds one shared target and bounded build/test concurrency
   into state, launch environment, and validation-cache identity;
 - terminal cleanup reclaims an inactive private target but never an active or
   shared target;
-- `light=2, heavy=1` permits one heavy plus one light but not two heavy jobs;
+- projected memory below the floor blocks a candidate even with few sessions,
+  while a fifth disjoint light lane passes when resources and provider window
+  remain healthy;
+- memory, CPU, I/O, swap, disk, PID, provider-backoff, and conflict-domain
+  failures each block independently;
 - critical-path priority wins a constrained permit;
 - provider limits remain active;
 - exact candidate-ready events enqueue an independent review once and bind all
@@ -453,7 +488,7 @@ Rollback order:
 1. finish or reconcile adopted runs;
 2. remove adoption;
 3. stop emitting new scheduling/progress/lineage fields;
-4. remove event and semaphore support;
+4. remove event and adaptive-admission support;
 5. remove `run.json` publication last;
 6. if fully reverting state, remove only `run.json` after retaining evidence
    and rewrite `VERSION` to 1.
@@ -470,9 +505,10 @@ foundation repository's usable Git metadata, then execute the fourteen
 independently reviewable implementation partitions above, each with its
 black-box tests, followed by the separate documentation commit.
 
-Until then, the active recovery uses the same rules manually: four external
-sessions, at most two heavy lanes, 45-minute durable checkpoints, exact
-candidate/report binding, and a coordinator-owned ready queue.
+Until then, the active recovery uses the same rules manually: per-candidate
+adaptive admission with no fixed total count, provider congestion windows,
+45-minute durable checkpoints, exact candidate/report binding, and a
+coordinator-owned ready queue.
 `dev-swarm.v1` manifests must not contain any proposed Stage 5 field: the
 current binary preserves unknown fields without enforcing their semantics, so
 such a manifest could validate while its intended safety control is inert.

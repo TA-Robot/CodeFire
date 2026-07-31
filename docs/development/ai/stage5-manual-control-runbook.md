@@ -19,7 +19,7 @@ manager authority.
 | per-batch provider limit | implemented | reconcile across all batches on one board | machine-wide portfolio limit |
 | declared write-set conflict within one batch | implemented | inspect cross-batch conflict domains and postflight actual paths | global lease plus actual-path enforcement |
 | process status/collect/reconcile | implemented | bind PID/session/worktree/HEAD and trusted checkpoint | atomic run state and adopt |
-| total/heavy resource limit | not implemented | manager owns total 4/heavy 2 leases | global semaphore |
+| host/provider admission | not implemented | manager evaluates each candidate from resource reservation, PSI, provider window, and conflict ownership; no fixed total count | global adaptive admission controller |
 | critical-path ready ordering | not implemented | manager orders the portfolio queue | scheduler ordering |
 | progress/checkpoint events | not implemented | ledger every signal/checkpoint and queue reason | append-only events |
 | candidate admissibility/card | not implemented | manager recomputes exact identity and evidence | typed candidate event/card |
@@ -71,9 +71,9 @@ Maintain one current table in the recovery execution ledger:
 | base/head/tree | exact Git subjects |
 | last trusted signal | timestamp plus evidence reference |
 | last durable checkpoint | commit/report/log prefix and timestamp |
-| queue reason | provider, heavy lease, review, gate, dependency, manager, conflict, or none |
+| queue reason | provider backoff/window, resource admission, review, gate, dependency, manager, conflict, or none |
 | review-ready time | timestamp or not ready |
-| total/heavy lease | owner and release condition |
+| resource reservation/admission | class, reserved bytes, exact decision evidence, and release condition |
 | next exact command | one executable action, not prose |
 
 Before every launch and after every terminal collection:
@@ -86,16 +86,52 @@ du -sb /workspace/worktrees
 df -B1 /workspace
 ```
 
-Manual floors remain:
+Before launching one more lane, count that provider's live external sessions
+and run:
 
-- at most four external sessions;
-- at most two heavy lanes;
-- `MemAvailable >= 6 GiB`;
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  docs/development/tools/check_swarm_admission.py \
+  --resource-class light \
+  --provider fugu \
+  --provider-active 1 \
+  --provider-window 4 \
+  --outstanding-reservation-gib 0 \
+  --result "$ADMISSION_JSON"
+```
+
+There is no fixed total external-session count and no universal two-heavy
+limit. Current work is already reflected in live resource pressure. The
+candidate adds a bootstrap reservation of 2 GiB for `light`, 3 GiB for
+`python-heavy`, or 4 GiB for `rust-heavy`; replace these with measured
+comparable-lane p95 times 1.5 when enough samples exist. Admission requires:
+
+`--outstanding-reservation-gib` must include recently admitted reservations
+whose processes have not yet reached steady state. Release each outstanding
+reservation only after its load is visible in the live snapshot or the lane
+terminates; this prevents burst launches from all observing the same free
+memory.
+
+- projected effective `MemAvailable >= 6 GiB`;
 - swap used `<= 2 GiB`;
-- workspace filesystem available `>= 100 GiB`.
+- workspace filesystem available `>= 100 GiB`;
+- memory full PSI avg10 `<= 0.5`, I/O full PSI avg10 `<= 5`, and CPU some
+  PSI avg10 `<= 25`;
+- at least 512 cgroup PIDs when the PID limit is finite;
+- a free adaptive provider-window permit with no active backoff; and
+- no overlapping writer, integration owner, or exclusive/shared-build
+  conflict.
 
-Do not start another heavy lane below a floor. Do not stop a healthy
-long-running lane solely because elapsed time is large.
+Fugu 4 and Claude 2 are initial provider congestion windows, not global or
+physical caps. Grow an external-provider window by one after clean evidence;
+on 429/529, quota, authentication, or retry-storm evidence, freeze launches
+and return to the last stable window. Codex remains one manager lane for
+cost, not host-capacity, reasons.
+
+Do not launch after `BLOCK`, and do not stop a healthy long-running lane
+solely because elapsed time is large. A queued Rust lane can remain blocked
+despite ample bytes when concurrent Cargo/linker work owns the same build
+conflict domain; an independent light review need not wait for that lock.
 
 ## Candidate-ready card
 
@@ -292,7 +328,8 @@ At minimum record:
 - provider wait, gate wait, review wait, manager wait, dependency wait, and
   conflict time;
 - review round, finding recurrence, rework LOC/time/cost;
-- total/heavy occupancy, memory/swap/disk minima, restart/recovery/lost work;
+- provider-window occupancy, candidate reservation, admission decision/reason,
+  PSI and memory/swap/disk minima, restart/recovery/lost work;
 - validation cache hit/miss and avoided seconds; and
 - exact evidence completeness.
 

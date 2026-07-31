@@ -158,6 +158,12 @@ one.
 
 ## Hard WIP and quality controls
 
+Superseded for launch admission on 2026-07-31: the two numeric occupancy
+limits below were incident-recovery guards, not measured capacity. Current
+control uses `check_swarm_admission.py`, candidate reservations, adaptive
+provider windows, PSI, and conflict ownership with no fixed total-session
+count. The remaining quality/WIP controls still apply.
+
 - External sessions: at most four; heavy work: at most two.
 - One writer per conflict domain.
 - Review-waiting candidates: no more than available independent review

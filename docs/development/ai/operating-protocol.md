@@ -169,9 +169,15 @@ Each validation evidence row must carry the task packet's `validation_id`, exact
 
 Parallelism is safe only when lanes have non-overlapping write sets or a manager owns final integration.
 
-For multi-hour batches, use the external `dev-swarm` scheduler. It binds the base revision, task tickets, DAG,
-write sets, provider concurrency, expected commits, and optional machine-readable review decision. Its default
-limits are Fugu 4, Claude 2, Codex 1. It creates an integration branch but never merges main automatically.
+For multi-hour batches, use the external `dev-swarm` scheduler. It binds the
+base revision, task tickets, DAG, write sets, provider concurrency, expected
+commits, and optional machine-readable review decision. Fugu 4, Claude 2,
+and Codex 1 are initial provider windows; they do not add up to a global
+session cap. External Fugu/Claude windows adapt one lane at a time from clean
+completion or provider-backpressure evidence, while Codex remains one
+cost-controlled manager lane. The manual portfolio separately runs
+`check_swarm_admission.py` for host resources and conflict ownership. The
+scheduler creates an integration branch but never merges main automatically.
 
 | Lane | Writes allowed | Conflict risk |
 |---|---|---|

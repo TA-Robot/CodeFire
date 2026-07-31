@@ -72,6 +72,14 @@
     "claude": 2,
     "codex": 1
   },
+  "concurrency_control": {
+    "mode": "adaptive_window",
+    "concurrency_values_are": "initial_provider_windows_not_global_session_caps",
+    "total_session_cap": null,
+    "increase": "one_lane_after_clean_provider_and_resource_evidence",
+    "decrease": "freeze_launches_on_backpressure_then_reduce_to_last_stable_window",
+    "admission_tool": "docs/development/tools/check_swarm_admission.py"
+  },
   "fallback": {
     "automatic_codex_fallback": false,
     "fugu_to_claude_requires_explicit_allow": true,

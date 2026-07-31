@@ -34,6 +34,7 @@ REQUIRED_AI_FILES = [
     "docs/development/tools/prepare_historical_eval.py",
     "docs/development/tools/build_source_bound_rust.py",
     "docs/development/tools/capture_candidate_identity.py",
+    "docs/development/tools/check_swarm_admission.py",
     "docs/development/tools/run_timed_gate.py",
     "docs/development/exploration/README.md",
     ".codex/config.toml",
@@ -310,6 +311,49 @@ def check_provider_routing(root: Path, findings: list[Finding]) -> None:
                 findings.append(Finding("error", "bad-provider-concurrency", relative_path, f"{provider} must be a positive integer"))
         if isinstance(concurrency.get("codex"), int) and concurrency["codex"] != 1:
             findings.append(Finding("error", "codex-concurrency-not-one", relative_path, "Codex control plane must stay at one lane"))
+    concurrency_control = data.get("concurrency_control")
+    if not isinstance(concurrency_control, dict):
+        findings.append(
+            Finding(
+                "error",
+                "missing-concurrency-control",
+                relative_path,
+                "adaptive concurrency_control is required",
+            )
+        )
+    else:
+        if concurrency_control.get("mode") != "adaptive_window":
+            findings.append(
+                Finding(
+                    "error",
+                    "fixed-provider-concurrency",
+                    relative_path,
+                    "provider concurrency must use adaptive_window",
+                )
+            )
+        if concurrency_control.get("total_session_cap") is not None:
+            findings.append(
+                Finding(
+                    "error",
+                    "fixed-total-session-cap",
+                    relative_path,
+                    "total_session_cap must stay null",
+                )
+            )
+        admission_tool = concurrency_control.get("admission_tool")
+        if (
+            not isinstance(admission_tool, str)
+            or not admission_tool
+            or not (root / admission_tool).is_file()
+        ):
+            findings.append(
+                Finding(
+                    "error",
+                    "missing-admission-tool",
+                    relative_path,
+                    "concurrency_control must reference the admission tool",
+                )
+            )
     fallback = data.get("fallback")
     if not isinstance(fallback, dict) or fallback.get("automatic_codex_fallback") is not False:
         findings.append(Finding("error", "automatic-codex-fallback", relative_path, "automatic Codex fallback must be false"))

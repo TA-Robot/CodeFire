@@ -87,8 +87,19 @@ The scheduler rejects dependency cycles, unknown dependencies, overlapping paral
 main paths that intersect a task write set. Each task gets a distinct provider branch, worktree, session, and
 log. Dependency branches seed later worktrees. A failed review result blocks integration.
 
-Default concurrency is Fugu 4, Claude 2, Codex 1. Raising it requires evidence that write sets remain disjoint
-and the provider quota supports the increased rate.
+Fugu 4, Claude 2, and Codex 1 are initial provider congestion windows, not a
+four-session global cap and not claims about machine capacity. The portfolio
+manager may increase an external Fugu or Claude window one lane at a time
+after clean provider and resource evidence. A 429/529, quota response, retry
+storm, or authentication outage freezes new launches for that provider and
+reduces the window to the last stable value before a later probe. Codex stays
+at one control-plane lane to preserve the Low-Codex cost policy.
+
+Every launch also passes
+`docs/development/tools/check_swarm_admission.py`. That check projects the
+candidate's memory reservation against the host/cgroup floor and evaluates
+swap, disk, PSI, PID headroom, provider backoff, and physical conflict
+ownership. It deliberately has no total-session counter.
 
 ## Escalation
 

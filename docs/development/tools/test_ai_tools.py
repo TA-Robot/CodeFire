@@ -42,6 +42,11 @@ from check_ai_acceleration_docs import (  # noqa: E402
     check_dev_swarm_v1_stage5_fields,
     check_live_routing_smoke,
 )
+from check_swarm_admission import (  # noqa: E402
+    DEFAULT_RESERVATIONS,
+    DEFAULT_THRESHOLDS,
+    evaluate_admission,
+)
 from build_source_bound_rust import (  # noqa: E402
     BINARY_PATH,
     build_source_manifest,
@@ -819,6 +824,100 @@ class TimedGateTests(unittest.TestCase):
         self.assertEqual(result["wall_elapsed_seconds"], 10.0)
         self.assertEqual(result["wall_minus_monotonic_seconds"], 8.0)
         self.assertTrue(result["wall_clock_discontinuity"])
+
+
+class SwarmAdmissionTests(unittest.TestCase):
+    def snapshot(self, **overrides: object) -> dict[str, object]:
+        snapshot: dict[str, object] = {
+            "effective_available_bytes": 12 * 1024**3,
+            "swap_used_bytes": 0,
+            "disk_available_bytes": 800 * 1024**3,
+            "pids_headroom": 20_000,
+            "psi": {
+                "cpu": {"some": {"avg10": 0.0}},
+                "memory": {"full": {"avg10": 0.0}},
+                "io": {"full": {"avg10": 0.0}},
+            },
+        }
+        snapshot.update(overrides)
+        return snapshot
+
+    def assess(
+        self, snapshot: dict[str, object], **overrides: object
+    ) -> dict[str, object]:
+        arguments: dict[str, object] = {
+            "resource_class": "light",
+            "reservation_bytes": DEFAULT_RESERVATIONS["light"],
+            "provider": "fugu",
+            "provider_active": 1,
+            "provider_window": 4,
+        }
+        arguments.update(overrides)
+        return evaluate_admission(snapshot, **arguments)  # type: ignore[arg-type]
+
+    def test_allows_another_lane_without_a_total_session_count(self) -> None:
+        result = self.assess(self.snapshot())
+        self.assertEqual(result["decision"], "ALLOW")
+        self.assertEqual(
+            result["basis"],
+            "resource-and-provider-window; no fixed total session cap",
+        )
+        self.assertNotIn(
+            "total-sessions", [item["id"] for item in result["checks"]]
+        )
+
+    def test_blocks_projected_memory_floor(self) -> None:
+        result = self.assess(
+            self.snapshot(
+                effective_available_bytes=(
+                    DEFAULT_THRESHOLDS["available_after_bytes"]
+                    + DEFAULT_RESERVATIONS["light"]
+                    - 1
+                )
+            )
+        )
+        self.assertEqual(result["decision"], "BLOCK")
+        self.assertIn("projected-memory-floor", result["blockers"])
+
+    def test_pending_launch_reservation_is_not_double_admitted(self) -> None:
+        result = self.assess(
+            self.snapshot(),
+            outstanding_reservation_bytes=4 * 1024**3 + 1,
+        )
+        self.assertEqual(result["decision"], "BLOCK")
+        self.assertIn("projected-memory-floor", result["blockers"])
+
+    def test_provider_backoff_window_and_conflict_are_independent_blocks(
+        self,
+    ) -> None:
+        result = self.assess(
+            self.snapshot(),
+            provider_active=4,
+            provider_window=4,
+            provider_backoff=True,
+            conflict_reasons=["shared Cargo target has an active exclusive build"],
+        )
+        self.assertEqual(result["decision"], "BLOCK")
+        self.assertEqual(
+            set(result["blockers"]),
+            {"provider-window", "provider-backoff", "conflict-domain"},
+        )
+
+    def test_pressure_blocks_even_with_free_bytes(self) -> None:
+        snapshot = self.snapshot()
+        snapshot["psi"] = {
+            "cpu": {"some": {"avg10": DEFAULT_THRESHOLDS["cpu_some_avg10"] + 0.1}},
+            "memory": {
+                "full": {"avg10": DEFAULT_THRESHOLDS["memory_full_avg10"] + 0.1}
+            },
+            "io": {"full": {"avg10": DEFAULT_THRESHOLDS["io_full_avg10"] + 0.1}},
+        }
+        result = self.assess(snapshot)
+        self.assertEqual(result["decision"], "BLOCK")
+        self.assertEqual(
+            set(result["blockers"]),
+            {"cpu-pressure", "memory-pressure", "io-pressure"},
+        )
 
 
 class FocusedTestMapTests(unittest.TestCase):
