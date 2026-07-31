@@ -1298,3 +1298,49 @@ bytes/SHA-256, writes optional JSON atomically, and reports wall-minus-
 monotonic drift explicitly. A two-second drift threshold prevents wall time,
 mtime, or provider timestamps from silently contaminating gate and flow KPI
 durations.
+
+## 2026-07-31 01:55 UTC fixed occupancy cap superseded
+
+The four-external/two-heavy values recorded earlier in this ledger were
+incident-recovery guards after host memory and disk exhaustion. They were not
+derived from a saturation experiment and are no longer launch limits. At the
+supersession audit the host exposed:
+
+- 14 effective CPUs with no cgroup CPU quota;
+- no cgroup memory ceiling, `13,540,003,840` bytes effective available
+  memory, and zero swap use;
+- CPU some PSI avg10 `0.36`, memory full PSI avg10 `0.00`, and I/O full PSI
+  avg10 `0.00`;
+- `903,601,012,736` bytes free on the workspace filesystem; and
+- 23,168 cgroup PIDs of headroom.
+
+Four external lanes were live: three Claude Opus 5 and one Fugu 1.1 Ultra.
+The three healthy Claude lanes already disproved treating the routing
+matrix's initial Claude window of two as a physical limit. Historical 529
+retry evidence still requires provider backpressure control.
+
+`docs/development/tools/check_swarm_admission.py` now evaluates each candidate
+from its reservation, any recently admitted outstanding reservations,
+projected effective memory, swap, disk, CPU/memory/I/O PSI, PID headroom,
+provider window/backoff, and conflict ownership. It has no total-session
+input. Initial Fugu/Claude values are provider congestion windows that grow
+one lane at a time on clean evidence and contract after backpressure; Codex
+remains one manager lane for cost control.
+
+The exact Storage rereview candidate
+`cdcb9bdefe7d25a118a9dc14171864d75f5ad304` passed `rust-heavy` admission
+with a 4 GiB reservation: projected available memory was
+`9,245,036,544` bytes, Fugu occupancy was 1/4, and every pressure/floor check
+passed. The first scheduler launch created no commit or candidate change and
+exited in five seconds because its manager environment did not inherit
+`SAKANA_API_KEY`; this is provider-readiness plumbing, not capacity
+backpressure.
+
+The manager then reused the exact clean agent/worktree and inherited the
+already-active key without printing it. Storage review session
+`019fb5e4-1fc2-7572-a3f6-06231f25ade7` is live under Fugu
+`fugu-ultra-v1.1` (provider PID 1151557). This is the fifth simultaneous
+external lane and the first concrete execution after removing the arbitrary
+total-four and single-Fugu queues. A sixth burst launch remains subject to
+the outstanding 4 GiB reservation until Storage reaches measured steady
+state; the same apparent free memory cannot be admitted twice.
