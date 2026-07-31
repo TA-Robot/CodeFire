@@ -1344,3 +1344,23 @@ external lane and the first concrete execution after removing the arbitrary
 total-four and single-Fugu queues. A sixth burst launch remains subject to
 the outstanding 4 GiB reservation until Storage reaches measured steady
 state; the same apparent free memory cannot be admitted twice.
+
+## 2026-07-31 02:02 UTC current bottleneck audit
+
+The active bottleneck is trusted correction flow, not raw agent count or
+provider permits.
+
+| Rank | Bottleneck | Direct evidence | Control |
+|---|---|---|---|
+| 1 | Review-to-repair recurrence on the Python critical path | Upload and MR-list focused/broad gates are green, but independent production probes found new request-ledger/deadline, final-fence, error-origin, prepared-owner, and success-with-debt defects. Upload acceptance blocks MR-write and Python composition; MR-list acceptance blocks the same train. | Freeze the immutable reports, generate one counterexample-first closure packet per shared root, and resume the exact original implementer session/worktree. Do not create another local owner fork. |
+| 2 | Shared lifecycle primitives are still duplicated across routes | Upload and MR-list independently reproduced the same classes of request-ledger, response-owner, cleanup, and post-fence failures despite route-local tests. | Bind the shared-primitives preflight before MR-write, then extract stable request/session/authority/response/cleanup owners after accepted composition. |
+| 3 | Verdict-to-report/rollover latency | Both active reviewers settled `REQUEST_CHANGES` before their required evidence matrices and immutable report commits were complete. Until the commit exists, the manager cannot bind a safe repair continuation. | Use the compact exact-review template, one terminal verdict line, manager-computed identity, and prebuilt blocked repair/review tickets; measure decision-settled to report-commit time separately from review time. |
+| 4 | Rust validation conflict and launch ramp | File Doctor and Rust HTTP are simultaneously running Cargo gates, while Storage has a newly admitted 4 GiB reservation. The next light launch projects only `5,715,308,544` bytes available, below the 6 GiB floor, until Storage load reaches steady state. | Keep Cargo at two jobs/two test threads with one shared target; release the outstanding reservation only from measured load or termination, then re-evaluate File ancestry. |
+| 5 | External scheduler readiness/recovery seams | Storage's first scheduler launch exited in five seconds because `SAKANA_API_KEY` was absent from the manager environment although an active Fugu lane had it. `dev-swarm.v1` retained a terminal failed state and could not adopt the clean manual exact-session restart. | Foundation repair must provide secret-preserving provider readiness inheritance, typed preflight failure, clean retry, and exact manual-run adoption. Until foundation Git provenance is restored, record the manual PID/session and never expose the key. |
+
+The 02:02 resource snapshot shows 14 CPUs, load1/CPU `0.282`, CPU some PSI
+avg10 `0.07`, memory and I/O full PSI avg10 `0.00`, zero swap, and about
+841 GiB workspace free. Fugu occupancy is 2/4 with no provider backoff.
+Therefore CPU, disk, swap, and provider-window capacity are not current
+bottlenecks. The temporary memory block is intentional burst protection, not
+a return to a fixed session cap.
