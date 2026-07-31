@@ -551,6 +551,7 @@
         "path",
         "symbol",
         "kind",
+        "change_type",
         "required_by",
         "planned",
         "plan_ref",
@@ -575,6 +576,13 @@
             "private_symbol",
             "test_or_oracle",
             "claim"
+          ]
+        },
+        "change_type": {
+          "enum": [
+            "added",
+            "modified",
+            "deleted"
           ]
         },
         "required_by": {
@@ -605,6 +613,57 @@
         }
       }
     },
+    "changedPathCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "required_by",
+        "review_focus",
+        "disposition",
+        "evidence_refs"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_by": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "review_focus": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "disposition": {
+          "enum": [
+            "reviewed",
+            "blocked",
+            "unreviewed"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
     "repairDelta": {
       "type": "object",
       "additionalProperties": false,
@@ -612,7 +671,8 @@
         "inserted_lines",
         "deleted_lines",
         "binary_paths",
-        "new_surfaces",
+        "changed_path_coverage",
+        "changed_surfaces",
         "scope_expansion",
         "scope_authority",
         "scope_rationale"
@@ -629,8 +689,16 @@
         "binary_paths": {
           "$ref": "#/$defs/stringArray"
         },
-        "new_surfaces": {
+        "changed_path_coverage": {
           "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/changedPathCoverage"
+          }
+        },
+        "changed_surfaces": {
+          "type": "array",
+          "minItems": 1,
           "items": {
             "$ref": "#/$defs/newSurface"
           }

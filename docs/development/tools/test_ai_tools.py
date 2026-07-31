@@ -1256,11 +1256,23 @@ class ReviewRecurrenceTests(unittest.TestCase):
                 "inserted_lines": 1,
                 "deleted_lines": 0,
                 "binary_paths": [],
-                "new_surfaces": [
+                "changed_path_coverage": [
+                    {
+                        "path": "product.txt",
+                        "required_by": ["F-001"],
+                        "review_focus": [
+                            "owner, effect, fence, and repair-created behavior"
+                        ],
+                        "disposition": "reviewed",
+                        "evidence_refs": ["review:product-path"],
+                    }
+                ],
+                "changed_surfaces": [
                     {
                         "path": "product.txt",
                         "symbol": "final_fence",
                         "kind": "private_symbol",
+                        "change_type": "modified",
                         "required_by": "F-001",
                         "planned": True,
                         "plan_ref": "repair-001#authorized-change",
@@ -1389,12 +1401,22 @@ class ReviewRecurrenceTests(unittest.TestCase):
 
     def test_unplanned_surface_needs_an_explicit_scope_decision(self) -> None:
         record = self.record()
-        surface = record["repair_delta"]["new_surfaces"][0]
+        surface = record["repair_delta"]["changed_surfaces"][0]
         surface["planned"] = False
         surface["plan_ref"] = None
         record["outcomes"]["unplanned_surfaces"] = 1
         self.assertIn(
             "unplanned-surface-without-scope-decision",
+            self.codes(record),
+        )
+
+    def test_accept_rejects_unreviewed_changed_path(self) -> None:
+        record = self.record()
+        record["repair_delta"]["changed_path_coverage"][0]["disposition"] = (
+            "unreviewed"
+        )
+        self.assertIn(
+            "accept-with-unreviewed-repair-path",
             self.codes(record),
         )
 
@@ -1544,6 +1566,21 @@ class ReviewRecurrenceTests(unittest.TestCase):
             )
             self.assertEqual(findings, [])
 
+            coverage = record["repair_delta"]["changed_path_coverage"]
+            record["repair_delta"]["changed_path_coverage"] = []
+            self.assertIn(
+                "repair-path-coverage-mismatch",
+                {
+                    finding.code
+                    for finding in validate_recurrence_control(
+                        record,
+                        schema=self.schema,
+                        root=root,
+                        verify_git=True,
+                    )
+                },
+            )
+            record["repair_delta"]["changed_path_coverage"] = coverage
             git("checkout", "-q", "-b", "external-contract", initial_base)
             (root / repair_packet_path).parent.mkdir(parents=True)
             (root / repair_packet_path).write_text(

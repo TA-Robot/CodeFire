@@ -162,6 +162,13 @@ as a distinct pass:
 |---|---|---|---:|---|---|---|---|
 | <ID> | <this report's observation> | <underlying effect> | <n> | reproduced / justified N/A | verified / open | killed / justified N/A | CLOSED / OPEN / ROUTED_OPEN / UNAVAILABLE |
 
+| Exact changed path | Required by | Review focus | Evidence | Disposition |
+|---|---|---|---|---|
+| <Git-derived path> | <one or more prior obligation IDs> | <behavior, oracle, claim, boundary> | <counterexample/test/source> | REVIEWED / BLOCKED / UNREVIEWED |
+
+The changed-path rows must equal the canonical Git changed-path set; omission
+or an extra row blocks integration.
+
 | Actual repair surface | Required by | Planned? | Kind | Review evidence | Disposition |
 |---|---|---|---|---|---|
 | <path:symbol/claim> | <obligation ID> | yes + plan ref / no | public API / state machine / classifier / persisted shape / private symbol / oracle / claim | <counterexample, test, source> | REVIEWED / BLOCKED / UNREVIEWED |

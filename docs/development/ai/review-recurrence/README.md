@@ -22,10 +22,11 @@ and planned new surfaces. The final record uses
 1. The manager content-addresses the repair packet before implementation. Its
    commit either precedes the candidate in Git ancestry or its pre-start
    dispatch event is content-addressed.
-2. The implementer returns one exact candidate and identifies every actual
-   surface added by the repair, including anything not forecast.
+2. The implementer returns one exact candidate and identifies every changed
+   path and actual surface added or modified by the repair, including anything
+   not forecast. The manager recomputes exact changed-path coverage from Git.
 3. An independent report-only reviewer checks prior closure and repair-created
-   surface as separate passes. It records observations, effect episodes, and
+   path/surface as separate passes. It records observations, effect episodes, and
    causal classes without a finding-count target.
 4. The manager waits for terminal worker/process state, recomputes candidate,
    control-overlay, separate repair/review packets, report, patch, path, tree,

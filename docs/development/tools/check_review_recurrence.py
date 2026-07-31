@@ -371,15 +371,65 @@ def validate_repair_delta(
     if not isinstance(delta, dict):
         return 0
     location = "record.repair_delta"
-    surfaces = delta.get("new_surfaces")
-    unique_field(surfaces, "symbol", f"{location}.new_surfaces", findings)
+    path_rows = delta.get("changed_path_coverage")
+    covered_paths = unique_field(
+        path_rows,
+        "path",
+        f"{location}.changed_path_coverage",
+        findings,
+    )
+    if isinstance(path_rows, list):
+        for index, row in enumerate(path_rows):
+            if not isinstance(row, dict):
+                continue
+            row_location = f"{location}.changed_path_coverage[{index}]"
+            if not repository_path_valid(row.get("path")):
+                add(
+                    findings,
+                    "unsafe-covered-path",
+                    f"{row_location}.path",
+                    repr(row.get("path")),
+                )
+            for required_by in row.get("required_by", []):
+                if required_by not in finding_ids:
+                    add(
+                        findings,
+                        "covered-path-without-prior-owner",
+                        f"{row_location}.required_by",
+                        repr(required_by),
+                    )
+    surfaces = delta.get("changed_surfaces")
+    surface_keys: set[tuple[str, str]] = set()
     expansive = False
     unplanned = 0
     if isinstance(surfaces, list):
         for index, surface in enumerate(surfaces):
             if not isinstance(surface, dict):
                 continue
-            surface_location = f"{location}.new_surfaces[{index}]"
+            surface_location = f"{location}.changed_surfaces[{index}]"
+            surface_key = (surface.get("path"), surface.get("symbol"))
+            if surface_key in surface_keys:
+                add(
+                    findings,
+                    "duplicate-changed-surface",
+                    surface_location,
+                    repr(surface_key),
+                )
+            surface_keys.add(surface_key)
+            if not repository_path_valid(surface.get("path")):
+                add(
+                    findings,
+                    "unsafe-surface-path",
+                    f"{surface_location}.path",
+                    repr(surface.get("path")),
+                )
+            elif surface.get("path") not in covered_paths:
+                add(
+                    findings,
+                    "surface-path-without-path-coverage",
+                    f"{surface_location}.path",
+                    repr(surface.get("path")),
+                )
             required_by = surface.get("required_by")
             if required_by not in finding_ids:
                 add(
@@ -665,6 +715,22 @@ def verify_git_subject(
             f"{location}.changed_paths",
             f"declared-only={sorted(declared_paths - changed)}, actual-only={sorted(changed - declared_paths)}",
         )
+    if isinstance(repair_delta, dict):
+        coverage_rows = repair_delta.get("changed_path_coverage")
+        covered_paths = {
+            row.get("path")
+            for row in (
+                coverage_rows if isinstance(coverage_rows, list) else []
+            )
+            if isinstance(row, dict) and isinstance(row.get("path"), str)
+        }
+        if covered_paths != changed:
+            add(
+                findings,
+                "repair-path-coverage-mismatch",
+                "record.repair_delta.changed_path_coverage",
+                f"declared-only={sorted(covered_paths - changed)}, actual-only={sorted(changed - covered_paths)}",
+            )
     try:
         tree = git_output(root, "rev-parse", f"{candidate}^{{tree}}").decode().strip()
         control = (
@@ -1031,7 +1097,7 @@ def validate_recurrence_control(
         )
     unplanned_surfaces = validate_repair_delta(
         record.get("repair_delta"),
-        prior_ids | new_ids,
+        prior_ids,
         findings,
     )
     validate_validations(record.get("validations"), findings)
@@ -1091,9 +1157,24 @@ def validate_recurrence_control(
             if isinstance(record.get("repair_delta"), dict)
             else {}
         )
+        for index, coverage in enumerate(
+            repair_delta.get("changed_path_coverage")
+            if isinstance(repair_delta.get("changed_path_coverage"), list)
+            else []
+        ):
+            if (
+                isinstance(coverage, dict)
+                and coverage.get("disposition") != "reviewed"
+            ):
+                add(
+                    findings,
+                    "accept-with-unreviewed-repair-path",
+                    f"record.repair_delta.changed_path_coverage[{index}]",
+                    str(coverage.get("path")),
+                )
         for index, surface in enumerate(
-            repair_delta.get("new_surfaces")
-            if isinstance(repair_delta.get("new_surfaces"), list)
+            repair_delta.get("changed_surfaces")
+            if isinstance(repair_delta.get("changed_surfaces"), list)
             else []
         ):
             if (
@@ -1103,7 +1184,7 @@ def validate_recurrence_control(
                 add(
                     findings,
                     "accept-with-unreviewed-repair-surface",
-                    f"record.repair_delta.new_surfaces[{index}]",
+                    f"record.repair_delta.changed_surfaces[{index}]",
                     str(surface.get("symbol")),
                 )
         if repair_delta.get("scope_expansion") == "blocked":

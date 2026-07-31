@@ -248,7 +248,8 @@ report-only commit. A post-candidate review prompt therefore cannot masquerade
 as the pre-repair communication contract.
 
 The independent reviewer inspects two sets separately: closure of every prior
-obligation, then every surface created by the repair. Observation IDs,
+obligation, then every changed path and surface created or modified by the
+repair. Changed-path coverage must equal the Git diff exactly. Observation IDs,
 underlying effect episodes, and review generation are recorded separately so
 reworded duplicates do not look like more defects. A closed obligation needs
 predecessor reproduction, candidate verification, an independent assertion
@@ -256,7 +257,7 @@ boundary, and a killed negative control (or exact evidence that such a
 control is inapplicable).
 
 There is deliberately no minimum or target finding count. Review stops only
-when the declared obligations, surfaces, production routes, repair delta,
+when the declared obligations, exact changed paths, surfaces, production routes, repair delta,
 negative controls, and unavailable evidence have all been dispositioned.
 Nonblocking adjacent work may be `routed_open`, but only with an owner,
 release condition, and manager authority. Blocking work is never routed into
