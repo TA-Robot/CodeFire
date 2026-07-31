@@ -133,6 +133,26 @@ solely because elapsed time is large. A queued Rust lane can remain blocked
 despite ample bytes when concurrent Cargo/linker work owns the same build
 conflict domain; an independent light review need not wait for that lock.
 
+Before another Rust launch and again before freezing any Rust candidate,
+audit both the live process tree and the worker's durable event log:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  docs/development/tools/check_rust_execution_profile.py \
+  --scope-root /workspace/worktrees \
+  --events "$AGENT_EVENTS_JSONL" \
+  --event-cwd "$AGENT_WORKTREE" \
+  --result "$RUST_PROFILE_AUDIT_JSON"
+```
+
+`BLOCK` means no additional Rust lane and no candidate-ready claim. Do not
+kill a healthy near-terminal compiler merely to make the snapshot green.
+Let it finish, preserve its evidence, remove only inactive reproducible
+private targets, and rerun every acceptance gate whose event log used the
+wrong profile through the shared toolchain/target. This makes a worker's
+explicit override durable postflight evidence instead of losing it when the
+process exits.
+
 ## Candidate-ready card
 
 Before review, the manager creates:
@@ -210,6 +230,28 @@ Review preparation target is 100%. Candidate-ready to review-start target is
 p50 10 minutes and p95 30 minutes. Never change the bound candidate after
 review starts. A missing helper is not an identity mismatch—the reviewer can
 reconstruct the command—but it is avoidable manager/reviewer time.
+
+While a reviewer is live, evaluate terminalization from agent-authored
+signals rather than elapsed time alone:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  docs/development/tools/check_review_terminalization.py \
+  --events "$REVIEW_EVENTS_JSONL" \
+  --report "$REVIEW_WORKTREE/$DECLARED_REPORT" \
+  --git-root "$REVIEW_WORKTREE" \
+  --pid "$REVIEW_PROVIDER_PID" \
+  --result "$TERMINALIZATION_JSON"
+```
+
+`WAIT` preserves a healthy long review. `INTERVENE` is limited to a committed
+report with a worker still expanding evidence, a present but uncommitted
+report, a terminal process without its report, or repeated verdict/report-ready
+signals followed by continued agent events and no artifact. Preserve the
+transcript and exact session, allow active child commands and log filters to
+flush, then collect the committed report or resume that same session with a
+compact report-only closure prompt. Never start a competing reviewer or
+transcribe its mutable reasoning into a manager-authored verdict.
 
 After the scheduler and reviewer are terminal, verify a report-only handoff
 with the same tool:

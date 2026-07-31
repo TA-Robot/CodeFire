@@ -165,6 +165,10 @@ If the agent cannot state these, the work is not ready.
 | `../tools/probe_validation_capabilities.py` | Reports available validators and distinguishes binary presence from a revalidated clean-HEAD provenance artifact. |
 | `../tools/build_source_bound_rust.py` | Builds the release Rust CLI and writes canonical provenance only when Cargo/crates/`.cargo`/toolchain inputs are clean against HEAD and unchanged across the build. |
 | `../tools/run_dogfood_smoke.py` | Runs bounded dogfood status checks read-only by default; `scan` and `verify` require explicit `--allow-mutation`. |
+| `../tools/check_swarm_admission.py` | Admits one additional external lane from live memory/swap/disk/PSI/PID pressure, a per-candidate reservation, provider congestion, and conflict ownership without a fixed total-agent cap. |
+| `../tools/check_rust_execution_profile.py` | Audits live Rust processes and agent event logs for private targets, alternate toolchains, excessive jobs/threads, or incremental builds; a violation blocks another Rust launch and candidate freeze. |
+| `../tools/check_review_terminalization.py` | Distinguishes healthy long-running review progress from repeated terminal-verdict/report-ready signals without an immutable report and emits an evidence-preserving intervention decision. |
+| `../tools/run_timed_gate.py` | Runs one argv-only gate with monotonic duration, process-group timeout, complete log digest, and wall-clock-discontinuity evidence. |
 | `../tools/run_ai_role.py` | Codex-specific low-level adapter; validates a typed packet and binds context/base/dirty-state. Dry-run is default and real use requires explicit `--allow-codex`. |
 | `../tools/prepare_historical_eval.py` | Materializes one deterministic historical CFB/CFR candidate input while withholding the evaluator oracle. |
 
