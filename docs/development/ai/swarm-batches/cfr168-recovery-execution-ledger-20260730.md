@@ -1438,3 +1438,50 @@ free, no conflict owner, and Claude occupancy 2 of the current adaptive window
 packet `06e519e`; provider PID 1223570 confirmed the same session identity.
 This restores five concurrent external lanes without a fixed global count and
 without opening another implementation fork.
+
+## 2026-07-31 02:42 UTC Upload rejection rollover and fourth Claude admission
+
+The Upload Fugu reviewer committed its immutable report as
+`35983261e1abd32045e1ff6cbd7dd7dfff5e806d` on exact task base
+`de63a148c199ade7a05d3d7b68b60ef6af0d576a`. Manager recomputation fixed:
+
+- exact reviewed candidate
+  `76baff84cb1192e11b26dcc669fb800f7b13fa30`;
+- report tree `c95ec4ef04cbcc1da8bbd8a6762807b8555783ca`;
+- report blob `1fd3de9b48e04d29b56f36d79584a0a03c22bcff`;
+- report SHA-256
+  `7632552eb0ca60addca0d83fe3ba53ead642a7cbee82937b1b7b37754f6cb2cf`;
+- report patch SHA-256
+  `30529b8c321329323bfb30799a129905de679206742e8cde1f6778116dc4aa0`;
+- one additive report-only commit, clean checkout, and exact write-set
+  containment.
+
+The decision is `REQUEST_CHANGES`. BLOCKER-1 proves completed-quarantine
+recovery silently replaces the HTTP request ledger/deadline. HIGH-2 proves
+caller-owned sealed validation cannot acquire its ordered projection.
+HIGH-3 proves the publication-root proof can be consumed twice before revoke.
+MEDIUM-4 proves the projection/coverage/layout-poll reversal evidence is
+absent or vacuous. The disposition index now contains 17 exact reports:
+3 `ACCEPT` and 14 `REQUEST_CHANGES` (17.65% exact-candidate acceptance yield).
+
+The reviewer continued after its report commit. AIA-045 classified the
+committed-report/live-worker state as an intervention, the manager preserved
+the exact session and transcript, allowed active child output to flush, and
+stopped the scheduler without creating a competing reviewer. This converted
+the earlier verdict-to-report loop into a durable repair input.
+
+The original implementer lineage now carries the report as `fe7cf943` and the
+counterexample-first repair packet as
+`b19c4346c0437ed28bdfe2fb6af1dd466abe9f8b`; canonical registered the packet
+as `e3df2a3`. A fresh count-free `python-heavy` admission with the measured
+2 GiB reservation returned `ALLOW` at `2026-07-31T02:41:41Z`: projected
+available memory was `10,185,891,840` bytes, swap use and memory/I/O full PSI
+were zero, workspace free space was `903,168,794,624` bytes, Claude occupancy
+was 3 in an adaptive window of 4, and no provider backoff or write conflict
+was present.
+
+The manager therefore resumed exact Claude Opus 5 session
+`7baa1275-0ee2-476a-af46-1907386ebceb` in the original clean worktree at
+provider PID `1318933`. This is a fourth concurrent Claude lane admitted from
+measured pressure rather than a fixed global count. It closes the review to
+repair idle gap without paying for another implementation orientation.
