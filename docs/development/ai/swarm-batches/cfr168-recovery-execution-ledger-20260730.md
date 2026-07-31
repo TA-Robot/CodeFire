@@ -2672,3 +2672,45 @@ Current SHA-256 values are:
 JSON parsing, AI contracts, all seven AI-development subgates, and the exact
 one-lane Fugu Ultra manifest validate/plan pass at `c258cbf…`. No provider or
 product lane was launched.
+
+## 2026-07-31 12:12 UTC causal telemetry gap audited without choosing a remedy
+
+The review-recursion diagnosis is not derivable from the current KGI/KPI
+record. At canonical head `5f2db5a…`, the only flow record is anchored to
+source revision `dd993cc…` and contains 7 lanes, 29 measurement rows, and 15
+events. It has no value for review lead time, reviewer correction rate, or
+rework ratio, and its event set has neither `review_start` nor
+`review_decision`.
+
+The pending exact KGI/KPI candidate `753c8db…` strengthens shape, semantic,
+provenance, and anti-gaming controls and expands the exemplar to 44
+measurement rows and 22 events. It still records reviewer correction as a
+packet-level binary rate. Neither the canonical nor pending schema can
+represent:
+
+- a predecessor/review/repair/successor generation chain;
+- a continuous effect episode versus another report observation of that same
+  still-open effect;
+- code origin, prior-scope detectability, repair-contract handling, effect
+  evidence, oracle quality, routing state, or pre-repair hazard coverage; or
+- proven continuity, proven closure and recurrence, or denominator-changing
+  identity uncertainty.
+
+Therefore a high correction rate can establish that rework exists but cannot
+choose among review omission, repair-introduced regression, unclosed or
+weakened requirements, oracle failure, routing/policy behavior, or unavailable
+evidence. Report length, bullet count, finding count, and number of review
+generations are likewise not causal substitutes. The current provisional
+management action attached to correction rate must not be treated as a
+root-cause decision.
+
+No schema field, mandatory template row, finding quota, premortem rule, or
+review-depth target is added from this audit. The purpose-built blind
+classification, fresh comparison, temporal check, and disagreement
+adjudication remain the evidence-producing path. Only after their episode-,
+observation-, and generation-level results are reconciled may a separate
+telemetry change propose the minimum fields that map to a demonstrated
+decision need. Automatic provider/gate/review/manager/resource capture remains
+the distinct AIA-033 foundation task; retrospective hand classification must
+stay identified as such rather than becoming a fabricated measured event
+stream.
