@@ -9,7 +9,7 @@ Base revision: `00ad88562068a6101a7530b84d5f52b0cff559f0`.
 
 ## Why this repair exists
 
-The first Cargo/KGI live-manifest extraction audit found eleven defects before a
+The first Cargo/KGI live-manifest extraction audit found twelve defects before a
 manager-owned live anchor was written:
 
 1. `derivations[].locus_existed_in_predecessor` describes symbol/locus
@@ -69,6 +69,11 @@ manager-owned live anchor was written:
     `REPAIR_CLAIM`, or a manager action and still reach `ALLOW` with no visible
     repair requirement. The explicit action surface is therefore disconnected
     from the closed decision model.
+12. Some committed artifacts are consumed after JSON Schema has already found
+    the shape invalid. A timed result with scalar or null `argv`, for example,
+    reaches an unchecked iteration and raises `TypeError` instead of returning
+    structured `BLOCK`. Schema findings currently do not reliably prevent
+    partial typed facts from entering later decision code.
 
 The same audit exposed an operating ambiguity, which this packet resolves
 without weakening evidence: the frozen Cargo/KGI tables include destructive or
@@ -219,10 +224,12 @@ historical anchor, and validator-owned schema. Each must return structured
   trusting them. This is an explicit pre-live timed-v2 shape break and must be
   documented with the record/manifest shape breaks.
 - Validate the runner-owned timing model rather than accepting internally
-  contradictory diagnostics: timeout must be positive; monotonic duration and
-  drift threshold must be finite and nonnegative; start/end timestamps must be
-  parseable; their signed difference must agree with signed wall elapsed within
-  their represented precision with absolute tolerance `0.000002` seconds;
+  contradictory diagnostics: timeout must be finite and positive; monotonic
+  duration and drift threshold must be finite and nonnegative; the runner must
+  reject invalid timeout/threshold CLI values before starting a subprocess;
+  start/end timestamps must be parseable; their signed difference must agree
+  with signed wall elapsed within their represented precision with absolute
+  tolerance `0.000002` seconds;
   `wall_minus_monotonic_seconds` must equal wall elapsed minus monotonic
   duration with absolute tolerance `1e-12` seconds; and
   `wall_clock_discontinuity` must equal whether the absolute delta exceeds the
@@ -248,13 +255,15 @@ surviving after hashes, omit only one after hash without an error, move cwd
 outside the declared root, put log/result paths inside the root while setting
 the booleans false, make log and result the same path, use negative
 timeout/duration/drift values, falsify the wall-minus/discontinuity relations,
-detach the timestamps,
-contradict status/exit/timed-out fields, and replay an inconsistent
-retained timed result. Detached/relation-inconsistent timestamps must block;
+detach the timestamps, contradict status/exit/timed-out fields, and replay an
+inconsistent retained timed result. Detached/relation-inconsistent timestamps
+must block;
 consistent forward and backward wall-clock jumps must both pass their timing
 relation checks. Add boundary tests at each frozen tolerance, immediately below
 it, and immediately above it. Every real runner-produced external-path result
-must remain passing.
+must remain passing. Named non-finite and exponent-overflow timeout/threshold
+CLI values must fail before command execution; equivalent committed-result
+mutations must return a structured `BLOCK`.
 
 ### F1f — use a strict deterministic JSON authority boundary
 
@@ -357,6 +366,30 @@ Required counterexamples pair `derivation_complete` with each non-`NONE`
 action, pair contradicted/unavailable dispositions with `NONE`, and mutate a
 retained result's emitted derivation action/count. Every mismatch must block;
 the complete/`NONE` positive fixture must remain passing.
+
+### F1i — stop typed consumption after schema failure
+
+- At every v2 record, manifest, timed-result, live-anchor, retained-result, and
+  validator-schema boundary, separate decode, schema validation, typed parse,
+  and decision use. If schema validation fails, retain the structured findings
+  but do not consume the invalid value as a typed model or emit partial facts
+  from it.
+- Typed parsers must still be total over their declared input boundary: a wrong
+  scalar, null, or malformed nested object returns deterministic findings and
+  never an uncaught `TypeError`, `AttributeError`, `KeyError`, encoding error,
+  or partial authority chain.
+- In particular, timed validation binding must not construct `TimedFacts`,
+  argv equality, path summaries, or log claims from a schema-invalid result.
+  Current evaluation and retained replay use the same rule.
+- Preserve useful independent findings when safe, but do not trade fail-closed
+  execution for cascades produced from invalid assumed types.
+
+Required counterexamples replace timed `argv` with a number and null, and
+replace each nested `source`, `worktree`, `log`, and `result` object with a
+wrong scalar/null in current and retained evidence. Add representative
+malformed record, manifest, anchor, retained-result, and validator-schema
+shapes. Every case must terminate with structured `BLOCK`, no traceback, and
+no `TimedFacts` for the invalid artifact.
 
 ### F2 — make live anchor authority schema-exact
 
