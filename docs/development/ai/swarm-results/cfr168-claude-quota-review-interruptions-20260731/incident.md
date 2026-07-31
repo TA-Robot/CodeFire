@@ -113,7 +113,10 @@ state and create a new incident analysis.
 
 ## Routing
 
-Claude is under provider backoff for new launches. Fugu remains under its
-separate model-refresh/process-creation backoff. Codex fallback is not
-authorized. The report-only shared-primitives preflight is logically `ready`
-but its provider launch is held by this backoff.
+Claude is under provider backoff for new launches. A subsequent direct audit
+of the four Fugu JSONL logs corrected Fugu's separate cause to a provider usage
+limit with the displayed retry time `Aug 3rd, 2026 12:00 AM` (timezone
+unspecified); see
+`cfr168-fugu-quota-review-interruptions-20260731/incident.md`. Codex fallback
+is not authorized. The report-only shared-primitives preflight is logically
+`ready` but its provider launch is held by provider backoff.

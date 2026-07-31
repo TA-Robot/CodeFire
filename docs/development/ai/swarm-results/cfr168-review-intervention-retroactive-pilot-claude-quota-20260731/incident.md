@@ -100,7 +100,10 @@ When Claude capacity returns:
 If the freeze digest cannot be reproduced, restart the entire pilot from its
 task base. Do not continue from a reconstructed or edited calibration.
 
-Fugu and Codex are not authorized fallbacks for this incident. Fugu remains
-under separate infrastructure backoff, and the low-Codex policy reserves
-Codex for control-plane integration and conflicting evidence rather than
-provider-quota substitution.
+Fugu and Codex are not authorized fallbacks for this incident. A subsequent
+direct audit of the four Fugu JSONL logs identifies Fugu's separate backoff as
+a provider usage limit with the displayed retry time
+`Aug 3rd, 2026 12:00 AM` (timezone unspecified); see
+`cfr168-fugu-quota-review-interruptions-20260731/incident.md`. The low-Codex
+policy reserves Codex for control-plane integration and conflicting evidence
+rather than provider-quota substitution.

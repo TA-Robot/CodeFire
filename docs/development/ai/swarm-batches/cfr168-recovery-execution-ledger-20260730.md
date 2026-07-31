@@ -1985,10 +1985,12 @@ Its resume contract binds the clean worktree, session, event-log SHA-256
 freeze event UUID, and freeze digest. Calibration numbers visible in the log
 must not be adopted before the preregistered holdouts are scored.
 
-Claude is now under provider backoff for new launches. Fugu remains under its
-separate model-refresh/process-creation backoff. There is no automatic Codex
-fallback. Already-running Claude reviews are allowed to reach their own
-terminal provider state so their existing work and logs remain attributable.
+Claude is now under provider backoff for new launches. At this point Fugu was
+also held under a separately reported infrastructure backoff; the later direct
+event-log correction at 09:57 UTC identifies its actual terminal cause as a
+provider usage limit. There is no automatic Codex fallback. Already-running
+Claude reviews are allowed to reach their own terminal provider state so their
+existing work and logs remain attributable.
 
 ## 2026-07-31 09:46 UTC three active reviews stopped at the same Claude quota boundary
 
@@ -2041,3 +2043,30 @@ rewritten.
 Preferred low-Codex execution is a blind Fugu Ultra 1.1 classifier followed by
 Claude Opus 5 adjudication of disagreements. Both providers remain launch-held
 under their recorded backoffs, and neither has an automatic Codex fallback.
+
+## 2026-07-31 09:57 UTC Fugu terminal-cause correction
+
+Canonical incident
+`cfr168-fugu-quota-review-interruptions-20260731/incident.md` replaces the
+manager's earlier model-refresh/process-creation attribution with direct
+event-log evidence from all four affected Fugu lanes. Its SHA-256 is
+`6a3494c10fbdb369cc5436cfe2477d23339e252c9a4184310b3a981c146d64e2`.
+
+Every complete JSONL log has the same top-level terminal cause:
+
+```text
+You've hit your usage limit. Try again at Aug 3rd, 2026 12:00 AM.
+```
+
+The displayed time has no timezone and is not converted into a guaranteed
+reset instant. The four lanes completed 64, 198, 66, and 44 command executions
+before termination. Apparent searches for model-manager or process-creation
+errors were matches inside repository text or agent reasoning, not top-level
+runtime errors. The wrapper is verified to bind Codex CLI transport to Sakana
+API, `SAKANA_API_KEY`, and `fugu-ultra-v1.1`; the secret was not printed.
+
+All four worktrees are clean and all four sessions are superseded by the
+already integrated Claude reports, so none will be resumed. Fugu remains
+closed to new work until the displayed reset has passed and one bounded health
+probe succeeds. The next real Fugu work is a fresh blind root-cause
+classification session. No automatic Codex fallback is authorized.
