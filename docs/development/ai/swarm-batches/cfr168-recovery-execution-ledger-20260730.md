@@ -2562,3 +2562,24 @@ The pilot-resume gate SHA-256 is
 The full AI-development gate and the exact Fugu manifest validate/plan both
 pass. The analysis method is now frozen for provider launch; no further field
 is added from an observed classification outcome.
+
+## 2026-07-31 11:46 UTC blind snapshot physically rehearsed
+
+Commit `65ca34d34627d2bf0fe5813ca6f3efc178498dc8` records the detached
+snapshot preflight at
+`cfr168-review-root-cause-blind-snapshot-preflight-20260731/evidence.md`,
+SHA-256
+`c4a0cd2b33579cf9873f9ae59c9ffd49a23630c0e1e9ecbb449be08efea8d8bb`.
+
+The temporary `c258cbf…` worktree was clean, contained exactly 21
+`review.md` paths with sorted content/path manifest SHA-256
+`53f364d58adc3b7aae9d24af55b220cb2279bdeb81c797451ff3d50117d4afaf`,
+and lacked the provisional audit plus all three temporal report paths. All 22
+manager-reconstructed candidate commits resolved, then the temporary worktree
+was removed and pruned.
+
+The preflight also preserves the limit: a Git worktree shares the object
+database and is not a security sandbox. The complete Fugu event log must still
+show no newer-ref, reflog, other-worktree, provisional-audit, temporal-report,
+or pilot access before the blind report can enter comparison. No provider was
+launched.
