@@ -1561,3 +1561,59 @@ File Doctor, Rust HTTP, File ancestry, and Storage reviewer/repair launches
 remain held until this control is implemented and the affected exact gates
 are rerun. This quarantine prevents fast false acceptance; it does not restore
 a fixed Rust-lane count.
+
+## 2026-07-31 03:28 UTC blocked-Rust backfill and MR-list reviewer rollover
+
+The source-target quarantine did not turn the coordinator into a waiting
+lane. Two non-Cargo critical-path reviews were admitted into the released
+provider capacity.
+
+The prepared development-flow KGI/KPI Fugu rereview passed manifest
+validation and count-free `light` admission:
+
+- projected available memory `12,889,415,680` bytes after its 1 GiB
+  reservation;
+- swap use, memory full PSI, and I/O full PSI all zero;
+- `903,697,518,592` workspace bytes free;
+- Fugu occupancy zero in the current adaptive window four; and
+- no provider backoff or write/build conflict.
+
+`dev-swarm` started exact report-only Fugu Ultra 1.1 session
+`019fb62e-deb1-7193-9efb-c39b024aab6e` against candidate `0ae583e`.
+The review writes only
+`development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730/review.md`;
+the eight manager counterexamples and all original Must/Should/Could rows are
+bound inputs. This uses a Fugu slot while Rust product validation is blocked
+and consumes no additional Codex implementation lane.
+
+The MR-list exact original implementer session terminated naturally after
+producing clean candidate
+`b16404676639336f705feffd9af4857d4a1fcc69`. Its final evidence includes:
+
+- 512/512 full Python tests;
+- three independent 49/49 focused runs;
+- the affected 16/16 CLI set;
+- a 228-test full CLI run whose only two failures require absent Cargo/Rust;
+  both failures reproduce unchanged on the exact review base; and
+- exact candidate tree, log/result digests, and empty porcelain.
+
+Canonical `1096ef7` and `8ffd0f0` bind the candidate card, fresh report-only
+Claude Opus 5 ticket, and manifest. Count-free `python-heavy` admission
+conservatively retained the KGI/KPI 1 GiB outstanding reservation and still
+returned `ALLOW`: projected available memory `10,733,461,504` bytes, swap and
+full PSI zero, about 842 GiB free, Claude occupancy two in adaptive window
+four, and no conflict. Fresh reviewer session
+`220f8ff1-1c65-4424-be46-4e1ccf279c8c` is active. The implementer session is
+not reused for review.
+
+The Storage closure packet also passed a separate manager audit before
+resume. That audit caught one nonexistent candidate-parent SHA, an
+under-authorized final authority path, a missing real-process test path, and
+overbroad directory-shaped Store/test grants. No provider was started.
+Canonical `c79224d` preserves the original packet as an audit record while
+correcting the parent and reducing authorization to eleven exact paths.
+Canonical `3bea053` binds the full report/control/session identities, required
+fixed-limit subject-plus-one axes, explicit debug/release process gates, and
+the rule that a required shared-parser change leaves R9 open. Final Storage
+resume remains blocked until the source-keyed guard is committed, ported,
+machine-bound, and freshly admitted.
