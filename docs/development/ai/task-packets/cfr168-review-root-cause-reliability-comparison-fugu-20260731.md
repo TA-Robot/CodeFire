@@ -17,20 +17,21 @@ Role: independent corpus comparator
 ## Objective
 
 After the blind calibration is committed and digest-bound, use a fresh session
-to reconcile its immutable effect rows with the provisional audit, compare all
-seven axes, content-freeze that comparison, and only then apply the unchanged
-rubric to three later reports.
+to reconcile its immutable effect episodes and observation rows with the
+provisional audit, compare all seven axes, content-freeze that comparison, and
+only then apply the unchanged rubric and episode rules to three later reports.
 
-The provisional audit's 51-row census is comparison input, not a target. A
-different blind count must be explained by exact effect identity rather than
-graded by numerical equality.
+The provisional audit's 51-row census is comparison input, not a target.
+Different blind episode or observation counts must be explained by exact
+effect and closure identity rather than graded by numerical equality.
 
 ## Scope
 
-The blind report identity, generation-chain count/digest, effect-row count and
-row-identity digest, reproduced-effect set, decision-critical-unavailable set,
-and comparison base are currently unavailable. The manager must bind them into
-the execution ticket and typed packet before changing status to `ready`.
+The blind report identity, generation-chain count/digest, effect-episode
+count/digest, observation-row count/digest, reproduced-effect set,
+decision-critical-unavailable row/episode set, and comparison base are currently
+unavailable. The manager must bind them into the execution ticket and typed
+packet before changing status to `ready`.
 
 The future only authorized write is:
 
@@ -54,17 +55,19 @@ No `dev-swarm.v1` manifest is authorized while this packet is blocked.
 ## Validation
 
 Before admission, bind and recompute the blind report commit/tree/path,
-byte count, SHA-256, generation-chain count/digest, effect-row count and
-row-identity digest, reproduced-effect set, decision-critical-unavailable set,
-and exact comparison base. The eventual
+byte count, SHA-256, generation-chain count/digest, effect-episode count/digest,
+observation-row count/digest, reproduced-effect set,
+decision-critical-unavailable row/episode set, and exact comparison base. The
+eventual
 report-only worker must run `git diff --check`, `check_ai_contracts.py`, and
 `check_project_docs.py`, commit only the authorized report, and leave a clean
 worktree.
 
 ## Handoff
 
-Return exact report identity and digest, full generation-chain and effect-row
-reconciliation, per-axis comparison, comparison-freeze identity, unchanged
-temporal results, exact adjudication queue and digest, unavailable values,
+Return exact report identity and digest, full generation-chain, effect-episode,
+and observation-row reconciliation, per-axis comparison, comparison-freeze
+identity, unchanged temporal results, exact adjudication queue and digest,
+observation-/episode-/generation-level sensitivity, unavailable values,
 threats to validity, validation results, and explicit non-decisions for all
 process/template properties.

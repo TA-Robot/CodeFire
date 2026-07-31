@@ -16,7 +16,8 @@ Product/process mutation: forbidden
 | Snapshot committed at | `2026-07-31T08:37:14+00:00` |
 | Review discovery | `git ls-tree -r --name-only HEAD docs/development/ai/swarm-results \| grep '/review\\.md$'` |
 | Review files at snapshot | 21 |
-| Expected successor-effect rows | deliberately unbound |
+| Expected effect episodes | deliberately unbound |
+| Expected observation rows | deliberately unbound |
 
 Run in the worktree created from the exact calibration snapshot. At that
 snapshot:
@@ -27,8 +28,9 @@ snapshot:
 
 The scheduler injects this exact execution envelope and ticket as the sole
 post-snapshot control input; they contain the rubric but no provisional labels
-or expected effect-row count. Do not otherwise inspect another branch, tag,
-reflog entry, worktree, path, or commit newer than the exact snapshot.
+or expected effect-episode/observation-row count. Do not otherwise inspect
+another branch, tag, reflog entry, worktree, path, or commit newer than the
+exact snapshot.
 Candidate and predecessor objects named by the snapshot reports and their
 snapshot-visible packets may be inspected even when they are not ancestors of
 the snapshot. No conclusion learned from another newer management artifact
@@ -69,13 +71,14 @@ successor effects is not supplied to this lane.
   evidence, or axis values.
 - Do not split wording variants, severity restatements, or repeated evidence.
 - Do not merge independently testable effects.
-- Publish the observed row count and every inclusion/exclusion dispute.
+- Publish the observed episode and observation-row counts plus every
+  inclusion/exclusion/identity dispute.
 
-There is no expected row count to hit. A later, different session will
-reconcile row identities against another analyst's census. It will not edit
-this report.
+There is no expected episode or row count to hit. A later, different session
+will reconcile episode and row identities against another analyst's census.
+It will not edit this report.
 
-## Six-Axis Rubric
+## Seven-Axis Rubric
 
 Assign every axis independently. An axis value and its evidence are separate
 fields. Use `UNAVAILABLE` when exact evidence does not decide a value.
@@ -169,11 +172,27 @@ eligible historical subjects for a later blind premortem comparison.
 Do not infer origin from report framing, effect evidence from severity words,
 oracle quality from a test name, or hazard foreseeability from hindsight.
 
-## Required Analysis Row
+## Required Normalized Analysis
 
-Publish a normalized generation-chain table before effect rows so evidence
-shared by several findings is recorded once rather than repeated as shallow
-prose:
+Use three units: one generation chain per predecessor/review/repair/successor
+transition, one continuous effect episode per exact subject and falsifiable
+wrong effect until proven closure, and one observation row per report
+occurrence in one generation. A repeated unresolved effect is not a new
+episode. A recurrence after exact proven closure is a new linked episode.
+Similar invariant wording on different subjects is not the same episode.
+Record `UNAVAILABLE` rather than forcing an uncertain merge or split.
+
+Apply these identity sanity checks:
+
+| Evidence pattern | Required result |
+|---|---|
+| Same subject/effect is demonstrated in two generations with unchanged implicated blobs or repeatable failing behavior | one episode, two observations, second `CONTINUING_WITH_PROVEN_PERSISTENCE` |
+| A repair claims closure, but no exact evidence decides the intermediate state before the same effect reappears | episode relation `UNAVAILABLE`, not an assumed continuation or recurrence |
+| Exact source/reproducer evidence proves the effect absent in an intermediate candidate and it is later reproduced again | two linked episodes, later `NEW_EPISODE_AFTER_PROVEN_CLOSURE` |
+| The same invariant wording applies to a different subject | separate episodes sharing an `invariant_family` only |
+
+Publish a normalized generation-chain table first so evidence shared by
+several findings is recorded once rather than repeated as shallow prose:
 
 | Field | Required content |
 |---|---|
@@ -190,12 +209,40 @@ prose:
 Method flags and repair size are explanatory covariates. Do not call either a
 cause from this retrospective corpus.
 
-Then publish a compact effect-row table. Every row contains:
+Then publish a compact effect-episode table:
+
+| Field | Required content |
+|---|---|
+| `episode_id` | stable identity for one continuous subject/effect episode |
+| `effect_identity` | exact subject plus falsifiable effect used to decide sameness |
+| `first_proven_present` | earliest exact object/evidence, or `UNAVAILABLE` |
+| `onset_origin` | `PREEXISTING_AT_CORPUS_ENTRY`, `INTRODUCED_IN_CHAIN:<chain_id>`, `NO_PRODUCT_DEFECT_ASSERTED`, or `UNAVAILABLE`, with exact object comparison |
+| `first_observation` | exact first observation row/report in this corpus |
+| `prior_episode` | linked prior episode and proven closure for recurrence, otherwise `NONE`/`UNAVAILABLE` |
+| `closure_state` | `OPEN` only when the latest eligible object proves the effect remains, `PROVEN_CLOSED` with exact closure evidence, `RIGHT_CENSORED` when no eligible later observation exists, or `UNAVAILABLE` when available evidence cannot decide |
+| `observation_rows` | ordered row IDs assigned to the episode |
+| `invariant_family` | cross-episode family with exact invariant evidence, or `UNAVAILABLE` |
+
+A claimed repair, generic passing gate, or verdict is not closure proof.
+Episode identity requires the same falsifiable effect and subject plus exact
+object, source, or reproducer evidence of continuity. Absence of closure proof
+alone is not persistence proof; use `UNAVAILABLE` when neither continuity nor
+closure is established.
+
+Axes A through G remain local to each observation's immediately preceding
+generation transition. They do not replace episode onset: an effect introduced
+in an earlier chain may correctly be `PREEXISTING_IN_PREDECESSOR` in a later
+continuing observation. Use `onset_origin` for unique-episode incidence and
+the local axes for repeated detection/closure opportunities.
+
+Then publish a compact observation-row table. Every row contains:
 
 | Field | Required content |
 |---|---|
 | `row_id` | stable calibration ID, never reused |
 | `chain_id` | exact normalized generation-chain row |
+| `episode_id` | exact effect-episode row, or `UNAVAILABLE` with an identity dispute |
+| `episode_relation` | `FIRST_OBSERVED_IN_EPISODE`, `CONTINUING_WITH_PROVEN_PERSISTENCE`, `NEW_EPISODE_AFTER_PROVEN_CLOSURE`, or `UNAVAILABLE`; absence of closure proof alone yields `UNAVAILABLE` |
 | `lineage_generation` | surface and predecessor/successor generation |
 | `finding_locator` | exact successor report heading/item and effect sublocator when justified |
 | `effect_statement` | one falsifiable wrong effect or exact evidence/routing defect |
@@ -214,7 +261,7 @@ Add a detailed evidence block for:
 - every `REPRODUCED_PRODUCTION_EFFECT`;
 - every decision-changing `UNAVAILABLE`;
 - every policy-promoted or contradictory row;
-- every row whose split/merge choice changes a denominator; and
+- every row whose split/merge/episode-link choice changes a denominator; and
 - every row where predecessor scope or origin is disputed by the source
   objects.
 
@@ -252,16 +299,19 @@ The report contains:
    absent at `HEAD`;
 2. the 21 discovered report paths and content digests;
 3. the normalized generation-chain table and method/delta evidence;
-4. reconstruction rules and every row inclusion/exclusion dispute;
-5. the complete raw effect-row table with every required field;
-6. decision-critical detailed evidence blocks;
-7. per-axis aggregates with numerator, denominator, and unavailable count;
-8. prior-method and exact invariant-recurrence descriptive measures;
-9. the exact set of reproduced-effect rows;
-10. every decision-critical unavailable row;
-11. threats to validity and right-censoring;
-12. conditional statements supported by this calibration only; and
-13. explicit non-decisions for template length, finding count, checklist,
+4. the normalized effect-episode table and exact identity/closure rules;
+5. reconstruction rules and every row or episode inclusion/exclusion dispute;
+6. the complete raw observation-row table with every required field;
+7. decision-critical detailed evidence blocks;
+8. observation-, episode-, and generation-level aggregates with numerator,
+   denominator, and unavailable count;
+9. prior-method and distinct-episode invariant-recurrence descriptive
+   measures;
+10. the exact set of reproduced-effect rows;
+11. every decision-critical unavailable row or episode identity;
+12. threats to validity and right-censoring;
+13. conditional statements supported by this calibration only; and
+14. explicit non-decisions for template length, finding count, checklist,
     premortem requirement, and process adoption.
 
 Do not open or compare a provisional audit. Do not inspect or classify a
@@ -284,10 +334,11 @@ Commit only the classification report and leave the worktree clean. Return:
 
 - report commit/tree/path/byte count/SHA-256;
 - generation-chain count and deterministic chain-identity digest;
-- raw effect-row count and deterministic row-identity digest;
+- effect-episode count and deterministic episode-identity digest;
+- raw observation-row count and deterministic row-identity digest;
 - per-axis unavailable counts;
 - reproduced-effect row set;
-- decision-critical unavailable row set;
+- decision-critical unavailable row and episode-identity sets;
 - all inclusion/exclusion disputes;
 - validation results; and
 - confirmation that no provisional or temporal artifact was opened.

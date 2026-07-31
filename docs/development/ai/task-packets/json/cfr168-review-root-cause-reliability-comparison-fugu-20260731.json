@@ -2,7 +2,7 @@
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "cfr168-review-root-cause-reliability-comparison-fugu-20260731",
   "status": "blocked",
-  "objective": "In a fresh session, reconcile the committed blind-calibration effect rows with the provisional audit without using row-count equality as a coverage oracle, compare all seven axes including objective pre-repair hazard coverage, freeze the comparison, apply the unchanged rubric to three temporal reports, and publish the exact adjudication queue without adopting a review template, count, checklist, premortem, or process change.",
+  "objective": "In a fresh session, reconcile the committed blind-calibration effect episodes and observation rows with the provisional audit without using count equality as a coverage oracle, compare all seven axes including objective pre-repair hazard coverage, freeze the comparison, apply the unchanged episode rules and rubric to three temporal reports, and publish the exact adjudication queue without adopting a review template, count, checklist, premortem, or process change.",
   "base_revision": "2eaf8f39ad4744a5fb65685b1cc4d93cdb44b706",
   "role": "reviewer",
   "risk": {
@@ -37,9 +37,10 @@
       "preparation-base:2eaf8f39ad4744a5fb65685b1cc4d93cdb44b706",
       "blocking-input:blind-report-commit-tree-bytes-sha256",
       "blocking-input:blind-generation-chain-count-and-identity-digest",
-      "blocking-input:blind-effect-row-count-and-identity-digest",
+      "blocking-input:blind-effect-episode-count-and-identity-digest",
+      "blocking-input:blind-observation-row-count-and-identity-digest",
       "blocking-input:blind-reproduced-effect-row-set",
-      "blocking-input:blind-decision-critical-unavailable-row-set",
+      "blocking-input:blind-decision-critical-unavailable-row-and-episode-set",
       "comparison-count-equality:not-a-coverage-oracle",
       "comparison-freeze-required-before-temporal-access",
       "provider:fugu-ultra-v1.1",
@@ -90,13 +91,13 @@
       "docs/development/todo-checklist.md"
     ],
     "disallowed_actions": [
-      "Launch before the exact blind report, row identities, row sets, and comparison base are committed and digest-bound",
+      "Launch before the exact blind report, episode/row identities, sets, and comparison base are committed and digest-bound",
       "Resume the blind-classifier, provisional-audit author, intervention-pilot, product-review, or implementation session",
       "Treat equality with 51, or any other row count, as proof of coverage or decomposition quality",
       "Edit, split, merge, delete, or relabel a row in the immutable blind report or provisional audit",
-      "Open a temporal report before the complete row reconciliation and per-axis comparison are content-frozen and digest-emitted",
-      "Retune a row rule, category, evidence threshold, or unavailable rule after temporal access",
-      "Replace unavailable row identity or axis evidence with project-general narrative",
+      "Open a temporal report before the complete episode/row reconciliation and per-axis comparison are content-frozen and digest-emitted",
+      "Retune an episode or row rule, category, evidence threshold, or unavailable rule after temporal access",
+      "Replace unavailable episode/row identity, closure, or axis evidence with project-general narrative",
       "Run Cargo, Rust builds, Install, Dogfood, Docker, product mutation, issue mutation, or network calls other than the Fugu provider request",
       "Adopt a review template, checklist, finding quota, repair threshold, premortem requirement, severity policy, routing policy, or process change",
       "Use Codex, Claude, another Fugu session, or subagents as a fallback"
@@ -105,7 +106,7 @@
   "non_goals": [
     "Review or accept a product/control-plane candidate",
     "Repair any finding",
-    "Adjudicate conflicting row identities or axis evidence",
+    "Adjudicate conflicting episode/row identities, closure, or axis evidence",
     "Reclassify the blind source report in place",
     "Estimate absolute review recall or precision",
     "Choose one primary narrative cause",
@@ -116,18 +117,18 @@
   "invariants": [
     {
       "id": "immutable-source-reports",
-      "statement": "The blind calibration and provisional audit remain immutable inputs; row reconciliation and axis comparison are published separately with both source values preserved.",
+      "statement": "The blind calibration and provisional audit remain immutable inputs; episode/row reconciliation and axis comparison are published separately with both source values preserved.",
       "falsification_test": "Edit either source, silently replace a value, or omit an original value or locator from a disputed comparison; postflight rejects the lane."
     },
     {
       "id": "effect-identity-before-count",
-      "statement": "Every row-count difference is reconciled by exact report locator, falsifiable effect, subject, evidence, and axis values before any coverage statement.",
-      "falsification_test": "Call a blind count wrong because it differs from 51, force splits or merges to equalize counts, or leave a source row unmapped without an explicit relation; comparison fails."
+      "statement": "Every episode- or row-count difference is reconciled by exact report locator, falsifiable effect, subject, continuous closure evidence, and axis values before any coverage statement.",
+      "falsification_test": "Call a blind count wrong because it differs from 51, force episode or row splits/merges to equalize counts, treat a repair claim as proven closure, or leave a source observation unmapped without an explicit relation; comparison fails."
     },
     {
       "id": "generation-chain-before-effect-comparison",
-      "statement": "The blind generation-chain identities, prior-method flags, repair contract/delta, validation provenance, and censoring are verified before effect rows are compared, and exact invariant families are reconciled separately from narrative similarity.",
-      "falsification_test": "Compare effect rows against different predecessor/successor chains, collapse method flags, infer cause from delta size, or merge different invariants by wording similarity; comparison fails."
+      "statement": "The blind generation-chain identities, prior-method flags, repair contract/delta, validation provenance, and censoring are verified before episodes and observation rows are compared, and exact invariant families are reconciled separately from narrative similarity.",
+      "falsification_test": "Compare episodes or rows against different predecessor/successor chains, collapse method flags, infer cause from delta size, treat a repair claim as closure, or merge different invariants by wording similarity; comparison fails."
     },
     {
       "id": "seven-axis-independent-comparison",
@@ -136,13 +137,13 @@
     },
     {
       "id": "comparison-freeze-before-temporal",
-      "statement": "The normalized row map, rules, per-axis comparison, disagreements, unavailable values, and aggregates are digest-frozen before any temporal report is opened.",
+      "statement": "The normalized episode/row map, identity and closure rules, per-axis comparison, disagreements, unavailable values, and observation-/episode-/generation-level aggregates are digest-frozen before any temporal report is opened.",
       "falsification_test": "Open a temporal report first, change the freeze after temporal access, or retune a rule from temporal outcomes; temporal evidence is invalid."
     },
     {
       "id": "finite-adjudication-queue",
-      "statement": "The queue contains exactly decision-relevant row/axis disagreements, reproduced effects, decision-critical unavailable values, policy/contradiction rows, and denominator-changing split/merge decisions.",
-      "falsification_test": "Omit a required item or add agreed non-decision-critical rows for volume; queue completeness fails."
+      "statement": "The queue contains exactly decision-relevant episode identity/closure and row/axis disagreements, every multi-observation episode link or proven-closure/new-episode relation that changes an episode denominator, reproduced effects, decision-critical unavailable values, policy/contradiction rows, and other denominator-changing split/merge decisions.",
+      "falsification_test": "Omit a denominator-changing episode decision or another required item, or add agreed non-decision-critical rows for volume; queue completeness fails."
     },
     {
       "id": "report-only-non-adoption",
@@ -153,15 +154,15 @@
   "validation": [
     {
       "id": "admission-input-integrity",
-      "command": "Before launch, bind and recompute the blind report commit/tree/path/bytes/SHA-256, generation-chain count/digest, effect-row count/digest, reproduced-effect set, decision-critical-unavailable set, and exact comparison base.",
+      "command": "Before launch, bind and recompute the blind report commit/tree/path/bytes/SHA-256, generation-chain count/digest, effect-episode count/digest, observation-row count/digest, reproduced-effect set, decision-critical-unavailable row/episode set, and exact comparison base.",
       "purpose": "Prevent comparison against a moving, incomplete, or substituted blind source.",
       "required": true,
       "requires_capability": "git"
     },
     {
       "id": "row-reconciliation-completeness",
-      "command": "Mechanically verify every blind and provisional row appears in exactly one declared relation and every normalized row has both source locators or an explicit one-sided reason.",
-      "purpose": "Prevent numerical count matching from hiding omissions, duplicate mappings, or unjustified splits.",
+      "command": "Mechanically verify every blind episode/row and provisional finding appears in exactly one declared relation and every normalized episode/row has both source locators or an explicit one-sided or unavailable reason.",
+      "purpose": "Prevent numerical count matching from hiding omissions, duplicate mappings, unjustified splits, or repeated unresolved effects.",
       "required": true
     },
     {
@@ -179,7 +180,7 @@
     },
     {
       "id": "queue-completeness",
-      "command": "Mechanically compare the published adjudication queue against all required disagreement, reproduced-effect, unavailable, policy/contradiction, and denominator-sensitive inputs.",
+      "command": "Mechanically compare the published adjudication queue against all required episode links/closures, disagreements, reproduced-effect, unavailable, policy/contradiction, and denominator-sensitive inputs.",
       "purpose": "Keep later adjudication finite without losing decision-relevant evidence.",
       "required": true
     },
@@ -208,12 +209,12 @@
   "handoff": {
     "required_outputs": [
       "exact_task_blind_audit_temporal_identities",
-      "blind_chain_and_row_identity_digest_verification",
-      "complete_generation_chain_and_row_identity_reconciliation",
+      "blind_chain_episode_and_row_identity_digest_verification",
+      "complete_generation_chain_episode_and_row_identity_reconciliation",
       "per_row_per_axis_source_comparison",
       "comparison_freeze_bytes_sha256_event_locator",
-      "aggregates_with_numerator_denominator_unavailable",
-      "unchanged_temporal_rows_and_stability",
+      "observation_episode_generation_aggregates_with_unavailable",
+      "unchanged_temporal_episodes_rows_and_stability",
       "exact_adjudication_queue_and_identity_digest",
       "threats_to_validity_and_censoring",
       "explicit_template_count_checklist_premortem_policy_non_decisions",

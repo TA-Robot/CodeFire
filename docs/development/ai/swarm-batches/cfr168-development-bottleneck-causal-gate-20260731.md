@@ -123,6 +123,8 @@ and intervention choice for:
 
 - defects pre-existing inside an earlier review's declared scope;
 - defects introduced by a repair;
+- one effect persisting across multiple reports/generations versus distinct
+  new effect episodes or recurrence after proven closure;
 - exact obligations weakened, restated, or left open;
 - repair-introduced effects whose concrete hazard and falsifying oracle were
   or were not bound before implementation;
@@ -133,7 +135,9 @@ and intervention choice for:
 
 None is currently allowed to collapse into the label "review omission". The
 existing 51-row audit is an observed-successor-finding census, not an absolute
-defect denominator.
+defect denominator. Report observations, continuous effect episodes, and
+generation opportunities remain separate units; a repeatedly reported open
+effect cannot vote several times as several independent defects.
 
 ### Non-review mechanisms
 
@@ -302,6 +306,12 @@ Every live intervention reports raw subjects before aggregates:
 No single composite "developer productivity" score is permitted. It would hide
 a faster but less trustworthy path.
 
+For review effects, every aggregate additionally names whether its unit is a
+report observation, unique continuous effect episode, or generation
+opportunity. If the supported intervention changes with that unit, retain all
+results and return `INSUFFICIENT_EVIDENCE` until episode identity/closure is
+resolved.
+
 ## Decision Labels
 
 For every intervention return exactly one:
@@ -339,9 +349,9 @@ Until this gate has decision-grade evidence:
 
 No permanent development-process change is justified by this gate until:
 
-1. the review reliability blind calibration, fresh-session row/axis
-   comparison, temporal check, and disagreement adjudication are complete for
-   review/repair hypotheses;
+1. the review reliability blind calibration, fresh-session
+   episode/row/axis comparison, temporal check, and disagreement adjudication
+   are complete for review/repair hypotheses;
 2. the intervention has a complete preregistered eligible cohort or explicitly
    returns `INSUFFICIENT_EVIDENCE`;
 3. every target and guardrail is reported with raw numerator, denominator, and

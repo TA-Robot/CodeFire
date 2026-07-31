@@ -48,7 +48,8 @@ was:
 53f364d58adc3b7aae9d24af55b220cb2279bdeb81c797451ff3d50117d4afaf
 ```
 
-This binds the report universe, not an expected effect-row count.
+This binds the report universe, not an expected effect-episode or observation
+row count.
 
 ## Exclusion proof
 
@@ -89,8 +90,9 @@ a newer ref, commit, reflog entry, or another worktree.
 `dev-swarm` reads the current task ticket before launch and injects its text
 into the worker prompt. That exact envelope/ticket is the sole intentional
 post-snapshot control input; it carries the rubric and prohibitions but no
-provisional labels or expected effect-row count. It does not authorize tool
-access to its current canonical path or to any other newer artifact.
+provisional labels or expected effect-episode/observation-row count. It does
+not authorize tool access to its current canonical path or to any other newer
+artifact.
 
 Accordingly, acceptance additionally requires:
 

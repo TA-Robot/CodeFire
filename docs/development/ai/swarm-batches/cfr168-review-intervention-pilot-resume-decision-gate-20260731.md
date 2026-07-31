@@ -40,14 +40,14 @@ launch a competing pilot.
 The manager first requires:
 
 1. the committed Fugu blind-calibration report, normalized generation-chain
-   and effect-row identity digests, and proof that its pre-audit snapshot
-   excluded the provisional and temporal reports;
-2. the committed fresh-session Fugu row reconciliation, per-axis comparison,
-   comparison freeze, and unchanged temporal check;
-3. the committed Claude adjudication of every decision-relevant row/axis
-   disagreement, reproduced production effect, routed decision-critical
-   unavailable value, policy/contradiction row, and denominator-changing
-   split/merge;
+   effect-episode and observation-row identity digests, and proof that its
+   pre-audit snapshot excluded the provisional and temporal reports;
+2. the committed fresh-session Fugu episode/row reconciliation, per-axis
+   comparison, comparison freeze, and unchanged temporal check;
+3. the committed Claude adjudication of every decision-relevant episode
+   identity/closure or row/axis disagreement, reproduced production effect,
+   routed decision-critical unavailable value, policy/contradiction row, and
+   denominator-changing split/merge;
 4. aggregate sensitivity against both immutable source classifications;
 5. a mapping from pilot interventions I1/I3/I4/I5 to the adjudicated causal
    classes they could actually test; and
@@ -68,7 +68,9 @@ because its prior calibration consumed time or money.
 | I5 evidence/routing separation | adjudicated evidence-only, policy-promoted, contradictory, or non-blocking routing rows | permission to weaken integration authority |
 
 Multiple rows may support multiple interventions. A row count alone cannot
-make an intervention relevant.
+make an intervention relevant. Repeated observations of one still-open effect
+do not become independent evidence for an intervention; compare
+observation-, unique-episode-, and generation-level results.
 
 ## Decision
 
@@ -85,10 +87,10 @@ in the preregistered order.
 ### `RESUME_WITH_SEPARATE_SENSITIVITY_REPLAY`
 
 Allowed when the frozen pilot remains interpretable but adjudication changes
-one or more causal labels or denominators. Finish the frozen holdout protocol
-unchanged first. Then run a separately identified replay over only the
-affected rows; do not edit the frozen calibration or collapse the two
-analyses.
+one or more causal labels, episode links, or denominators. Finish the frozen
+holdout protocol unchanged first. Then run a separately identified replay
+over only the affected rows/episodes; do not edit the frozen calibration or
+collapse the two analyses.
 
 ### `RETIRE_PRESERVED_PILOT`
 
@@ -105,8 +107,9 @@ choose among the above. Do not resume by default.
 
 ## Process-Change Boundary
 
-Completing a retroactive pilot can only return evidence for a later small live
-experiment. It cannot adopt:
+Completing a retroactive pilot can only return evidence for a later bounded
+live experiment with a preregistered eligible cohort and stopping rule. It
+cannot adopt:
 
 - a finding quota;
 - a checklist length;
@@ -128,6 +131,7 @@ Before any pilot continuation, append one dated decision record naming:
 
 - classifier, comparator, and adjudication commits/digests;
 - the exact supported causal classes;
+- observation-, effect-episode-, and generation-level sensitivity;
 - per-intervention relevance;
 - selected decision above and falsifier;
 - product-review priority/admission evidence;

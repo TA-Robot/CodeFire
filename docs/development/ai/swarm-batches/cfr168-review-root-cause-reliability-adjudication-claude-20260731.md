@@ -21,11 +21,14 @@ Before launch, the manager must update this ticket and its typed packet with:
 
 - exact classifier report commit and tree;
 - report byte count and SHA-256;
-- calibration generation-chain and effect-row digests or deterministic
-  identity lists;
+- calibration generation-chain, effect-episode, and observation-row digests
+  or deterministic identity lists;
 - exact comparator report commit, tree, byte count, and SHA-256;
 - comparison-freeze byte count, SHA-256, and event locator;
-- normalized row-map and adjudication-queue identity digests;
+- normalized episode/row-map and adjudication-queue identity digests;
+- all decision-relevant effect-episode identity or closure disagreements;
+- every multi-observation episode link, proven-closure/new-episode relation,
+  and episode-identity unavailable that changes an episode denominator;
 - all decision-relevant row/axis disagreements;
 - all rows marked `REPRODUCED_PRODUCTION_EFFECT`;
 - every decision-critical `UNAVAILABLE` row routed by the comparator;
@@ -41,8 +44,12 @@ Adjudicate only the finite queue produced by the fresh comparator:
 
 1. every decision-relevant row/axis disagreement between the immutable blind
    report and provisional audit;
-2. every row classified as a reproduced production effect; and
-3. every comparator-routed unavailable, policy/contradiction, or
+2. every decision-relevant episode identity or closure disagreement;
+3. every multi-observation episode link, proven-closure/new-episode relation,
+   or identity-unavailable that changes an episode denominator, whether or not
+   the source narratives appear consistent;
+4. every row classified as a reproduced production effect; and
+5. every comparator-routed unavailable, policy/contradiction, or
    denominator-changing split/merge whose resolution could change an
    intervention decision.
 
@@ -63,7 +70,7 @@ Fugu rows and comparison report remain immutable inputs: the adjudicator may
 select a final value or `UNAVAILABLE`, but may not rewrite either Fugu report
 or either freeze.
 
-For each queued row:
+For each queued row or episode dispute:
 
 1. restate the exact disagreement or reproduced-effect claim;
 2. inspect both sides' cited evidence, not their conclusion text;
@@ -73,8 +80,9 @@ For each queued row:
    feasible;
 6. deliberately falsify the claimed closure oracle where feasible;
 7. record evidence that would overturn the adjudication;
-8. decide each disputed axis separately; and
-9. state whether the decision changes any aggregate or intervention card.
+8. decide each disputed episode link, closure claim, and axis separately; and
+9. state whether the decision changes any observation-, episode-, or
+   generation-level aggregate or intervention card.
 
 If object identity, production reachability, scope, obligation wording, or an
 oracle cannot be decided, return `UNAVAILABLE`. Project-general reasoning,
@@ -86,7 +94,9 @@ The queue size is determined entirely by the committed comparator output.
 There is no requested finding count, minimum number of disagreements, or
 credit for adding bullets. Do not reopen agreed, non-reproduced,
 non-decision-critical rows unless exact evidence proves that the row identity
-itself is corrupt; route such corruption separately without expanding the
+itself is corrupt. Complete denominator-changing episode-link/closure review
+is required because those items define the unit of analysis; it is not a
+sample-size target. Route other corruption separately without expanding the
 adjudication opportunistically.
 
 ## Required Output
@@ -101,12 +111,14 @@ The report contains:
 
 1. exact task/gate/classifier/comparator/audit identities and SHA-256 values;
 2. the immutable input queue and completeness proof;
-3. one evidence block per queued row;
-4. per-axis Fugu value, provisional-audit value, adjudicated value, and
+3. one evidence block per queued row or episode dispute;
+4. per-episode identity/closure disposition and per-axis Fugu value,
+   provisional-audit value, adjudicated value, and
    evidence;
 5. reproducer/oracle command, exact subject, outcome, and counterevidence;
 6. unresolved values with specific missing evidence;
-7. corrected aggregates with numerator, denominator, and unavailable count;
+7. corrected observation-, episode-, and generation-level aggregates with
+   numerator, denominator, and unavailable count;
 8. sensitivity against both the Fugu and provisional-audit aggregates;
 9. conditional causal statements and supported next experiments;
 10. temporal-holdout implications without category retuning;
@@ -134,6 +146,7 @@ state, templates, or process policy.
 This report can:
 
 - replace a disputed axis value for the later causal decision;
+- resolve or leave unavailable a disputed episode identity or closure;
 - mark a value unresolved;
 - identify which intervention experiment is or is not supported; and
 - require a sensitivity replay.
@@ -149,9 +162,10 @@ It cannot:
 - close the review-reliability question by agent agreement alone.
 
 Any proposed process field must still map one-to-one to an adjudicated failure
-mode and pass a bounded live experiment for capture, noise, duplication,
-false positives, author burden, reviewer burden, and trusted-integration
-effect.
+mode and pass a bounded live experiment with a preregistered eligible cohort
+and stopping rule for capture, noise, duplication, false positives, author
+burden, reviewer burden, and trusted-integration effect. A fixed item count or
+post-outcome stopping decision is not admissible.
 
 ## Validation And Handoff
 
@@ -167,6 +181,7 @@ Commit only the adjudication report and leave the worktree clean. Return:
 
 - report commit/tree/path/byte count/SHA-256;
 - exact input queue count and identity digest;
+- episode identity/closure dispositions;
 - per-axis resolved/disagreed/unavailable counts;
 - reproduced-effect dispositions;
 - aggregate sensitivity;

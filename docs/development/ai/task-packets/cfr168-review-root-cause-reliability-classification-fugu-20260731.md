@@ -19,9 +19,10 @@ Blind base: `c258cbfc061b14905554c9d319b350d2da7f771b`
 
 At the exact pre-audit snapshot, reconstruct the finite observed
 successor-finding corpus and classify it on seven independent evidence axes.
-The number of effect rows is an outcome, not an input. Publish one immutable
-blind report before a different session is allowed to see the provisional
-audit or temporal reports.
+The number of observation rows and continuous effect episodes are outcomes,
+not inputs. Separate report occurrences from the same effect persisting across
+generations. Publish one immutable blind report before a different session is
+allowed to see the provisional audit or temporal reports.
 
 This task tests whether snapshot-visible evidence supports review-scope
 omission, repair-introduced defects, unmet or weakened repair obligations,
@@ -57,10 +58,11 @@ development-environment file may change.
 
 ## Non-Adoption
 
-No expected successor-effect count is supplied to the classifier. It receives
-no credit for extra bullets and may not split one effect for volume. A later
-fresh session will reconcile stable row identities without editing this
-report.
+No expected successor-effect episode or observation count is supplied to the
+classifier. It receives no credit for extra bullets, may not split one effect
+for volume, and may not count a continuing open effect as a new episode. A
+later fresh session will reconcile stable episode and row identities without
+editing this report.
 
 The analysis row form in the reliability gate is evidence capture for this
 causal study only. This task cannot adopt a review template, checklist,
@@ -86,12 +88,13 @@ classification report.
 ## Handoff
 
 Return the exact report commit, tree, path, byte count, and SHA-256;
-generation-chain count/digest and method flags; raw effect-row count and
-row-identity digest; per-axis aggregates and unavailable counts; exact
-invariant recurrence; reproduced-effect and decision-critical-unavailable row
-sets; all inclusion/exclusion disputes; all threats to validity and censoring;
-every validation result; and explicit non-decisions for template length,
-finding count, checklist, premortem, and process adoption.
+generation-chain count/digest and method flags; effect-episode count/digest;
+raw observation-row count/digest; observation-, episode-, and generation-level
+aggregates and unavailable counts; exact distinct-episode invariant
+recurrence; reproduced-effect and decision-critical-unavailable row/episode
+sets; all inclusion/exclusion and identity disputes; all threats to validity
+and censoring; every validation result; and explicit non-decisions for
+template length, finding count, checklist, premortem, and process adoption.
 
 ## Launch Hold
 

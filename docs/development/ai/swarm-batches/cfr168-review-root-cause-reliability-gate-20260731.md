@@ -74,16 +74,17 @@ The blind classifier runs at exact snapshot
 
 The classifier receives the report-universe boundary and the seven-axis rubric,
 but it is **not** told the provisional audit's 51-row result. It reconstructs
-the effect census from stable report locators and publishes the observed row
-count as an outcome. A later count difference is reconciled by effect identity;
-numerical equality is neither a coverage oracle nor a success criterion.
+the effect census from stable report locators and publishes both continuous
+episode count and observation-row count as outcomes. A later count difference
+is reconciled by effect and closure identity; numerical equality is neither a
+coverage oracle nor a success criterion.
 
 Use only the scheduler-injected execution envelope/ticket, the snapshot tree,
 and exact candidate/predecessor objects named by snapshot-visible reports,
 packets, and results. The injected control text contains the rubric but no
-provisional labels or expected effect-row count. Any other access to newer
-refs, commits, paths, worktrees, the provisional audit, or the interrupted
-pilot invalidates the blind calibration.
+provisional labels or expected effect-episode/observation-row count. Any other
+access to newer refs, commits, paths, worktrees, the provisional audit, or the
+interrupted pilot invalidates the blind calibration.
 
 Before accepting the blind report, the manager preserves the complete Fugu
 event-log digest and audits tool calls for access to another worktree, a newer
@@ -95,9 +96,9 @@ reasonable.
 ### Temporal check
 
 After the immutable blind report is committed and a fresh comparator has
-content-frozen its row reconciliation and per-axis audit comparison, apply the
-unchanged classification rules to the reports that were absent from the audit
-snapshot:
+content-frozen its episode/row reconciliation and per-axis audit comparison,
+apply the unchanged classification rules to the reports that were absent from
+the audit snapshot:
 
 | Subject | Report commit | Candidate |
 |---|---|---|
@@ -210,15 +211,42 @@ This is an audit data form, not a proposed review or repair template. Its
 purpose is to prevent a classifier from satisfying the task with a long list
 of unsupported bullets.
 
-Publish one indexed row per independently testable reported effect. A combined
-report item may use stable sublocators such as `F2/effect-a` and
-`F2/effect-b` only when the effects have different subjects, evidence, or axis
-values. Splitting one effect into wording variants to increase volume is a
-protocol violation.
+Publish one indexed observation row per independently testable reported
+effect. A combined report item may use stable sublocators such as
+`F2/effect-a` and `F2/effect-b` only when the effects have different subjects,
+evidence, or axis values. Splitting one effect into wording variants to
+increase volume is a protocol violation.
 
-Publish one normalized generation-chain table before effect rows so evidence
-shared by several findings is not copied into dozens of shallow paragraphs.
-Each chain contains:
+Use three normalized units so a repeatedly reported, still-open effect is not
+miscounted as several independent defects:
+
+1. a generation chain is one predecessor/review/repair/successor transition;
+2. an effect episode is one continuous falsifiable wrong effect on the same
+   subject, from earliest proven presence until proven closure or censoring;
+3. an observation row is one report's occurrence of that episode in one
+   generation.
+
+The same effect and subject remain one episode across wording changes only
+when exact object, source, or reproducer evidence establishes continuity. A
+repair claim, passing unrelated gate, or verdict text is not closure proof,
+but absence of closure proof is not persistence proof either. Recurrence after
+proven closure starts a new linked episode. The same invariant on a different
+subject is a separate episode linked only by `invariant_family`. When neither
+continuity nor closure can be decided, record `UNAVAILABLE`; do not force a
+merge or split to improve a denominator.
+
+Apply these identity sanity checks:
+
+| Evidence pattern | Required result |
+|---|---|
+| Same subject/effect is demonstrated in two generations with unchanged implicated blobs or repeatable failing behavior | one episode, two observations, second `CONTINUING_WITH_PROVEN_PERSISTENCE` |
+| A repair claims closure, but no exact evidence decides the intermediate state before the same effect reappears | episode relation `UNAVAILABLE`, not an assumed continuation or recurrence |
+| Exact source/reproducer evidence proves the effect absent in an intermediate candidate and it is later reproduced again | two linked episodes, later `NEW_EPISODE_AFTER_PROVEN_CLOSURE` |
+| The same invariant wording applies to a different subject | separate episodes sharing an `invariant_family` only |
+
+Publish one normalized generation-chain table first so evidence shared by
+several findings is not copied into dozens of shallow paragraphs. Each chain
+contains:
 
 | Field | Required content |
 |---|---|
@@ -236,13 +264,29 @@ Method flags and delta size are explanatory covariates, not causes. Do not
 infer that source-only review or a large repair caused a later effect without
 a controlled comparison.
 
-Every row contains:
+Publish a compact effect-episode table next:
+
+| Field | Required content |
+|---|---|
+| `episode_id` | stable identity for one continuous subject/effect episode |
+| `effect_identity` | exact subject plus falsifiable effect used to decide sameness |
+| `first_proven_present` | earliest exact object/evidence, or `UNAVAILABLE` |
+| `onset_origin` | `PREEXISTING_AT_CORPUS_ENTRY`, `INTRODUCED_IN_CHAIN:<chain_id>`, `NO_PRODUCT_DEFECT_ASSERTED`, or `UNAVAILABLE`, with exact object comparison |
+| `first_observation` | exact first observation row/report in this corpus |
+| `prior_episode` | linked prior episode plus proven closure when this is a recurrence, otherwise `NONE`/`UNAVAILABLE` |
+| `closure_state` | `OPEN` only when the latest eligible object proves the effect remains, `PROVEN_CLOSED` with exact closure evidence, `RIGHT_CENSORED` when no eligible later observation exists, or `UNAVAILABLE` when available evidence cannot decide |
+| `observation_rows` | ordered row IDs assigned to this episode |
+| `invariant_family` | cross-episode family plus exact invariant evidence, or `UNAVAILABLE` |
+
+Every observation row contains:
 
 | Field | Required content |
 |---|---|
 | `row_id` | stable audit ID; never reused after content freeze |
 | `cohort` | `calibration` or `temporal`; no holdout value is visible during calibration rule formation |
 | `chain_id` | exact generation-chain row; do not repeat shared chain prose |
+| `episode_id` | exact effect-episode row, or `UNAVAILABLE` with an identity dispute |
+| `episode_relation` | `FIRST_OBSERVED_IN_EPISODE`, `CONTINUING_WITH_PROVEN_PERSISTENCE`, `NEW_EPISODE_AFTER_PROVEN_CLOSURE`, or `UNAVAILABLE`; absence of closure proof alone yields `UNAVAILABLE` |
 | `lineage_generation` | surface and predecessor/successor generation |
 | `finding_locator` | exact report heading/item plus an effect sublocator only when justified above |
 | `effect_statement` | one falsifiable wrong effect or one exact evidence/routing defect; no severity rhetoric |
@@ -256,20 +300,28 @@ Every row contains:
 | `censoring` | whether a later exact disposition exists and what remains unknown |
 | `decision_relevance` | which aggregate or intervention card can consume the row; `none` is valid |
 
+Axes A through G remain local to the observation row's immediately preceding
+generation transition. They do not overwrite episode onset. An effect can be
+introduced in one earlier chain and be `PREEXISTING_IN_PREDECESSOR` in a later
+continuing observation. Episode-onset measures use `onset_origin`; repeated
+detection or closure opportunities use the local row axes.
+
 An axis value and its evidence must be separate fields. Repeating a report's
 conclusion is not origin proof, a severity word is not effect proof, and an
 unexecuted imagined reproducer is not a reproducer. If one exact locator does
 not decide an axis, record `UNAVAILABLE`; do not fill the cell with general
 project context.
 
-The classification report must first publish a compact raw-row table. It then
-adds a detailed evidence block for:
+The classification report must publish compact chain, episode, and raw
+observation tables before prose aggregates. It then adds a detailed evidence
+block for:
 
 - every row with a reproduced production effect;
 - every row with any `UNAVAILABLE` value that changes an aggregate;
 - in the comparator report, every row that disagrees with the original audit;
 - every unsatisfiable/contradictory or policy-promoted blocker; and
-- every row where splitting or combining effects could change a denominator.
+- every row where splitting, combining, or linking episodes could change a
+  denominator.
 
 The detailed blocks explain the object comparison or execution sufficiently
 for the adjudicator to repeat it. Requiring detail for decision-critical rows
@@ -278,25 +330,26 @@ does not create credit for producing more rows.
 ## Blind Analysis Protocol
 
 1. A Fugu blind-calibration session starts at exact pre-audit snapshot
-   `c258cbf…`, is not told an expected effect-row count, and cannot see the
-   provisional or temporal reports.
+   `c258cbf…`, is not told an expected effect-episode or observation-row
+   count, and cannot see the provisional or temporal reports.
 2. It reconstructs the successor-effect census, classifies all seven axes,
-   publishes normalized generation chains and raw effect rows before
-   aggregates, commits the report, and emits deterministic chain- and
-   row-identity digests.
+   publishes normalized generation chains, effect episodes, and raw
+   observation rows before aggregates, commits the report, and emits
+   deterministic chain-, episode-, and row-identity digests.
 3. A **fresh Fugu comparison session** receives the immutable blind report and
-   provisional audit. It reconciles every row by exact effect identity before
-   comparing any count or axis.
+   provisional audit. It reconciles every episode and row by exact
+   effect/closure identity before comparing any count or axis.
 4. The comparator records every exact/semantic match, one-sided row,
    split/merge difference, non-comparable claim, and unavailable relation. It
    does not edit either source.
-5. The comparator content-freezes the normalized row map, comparison rules,
-   per-axis disagreements, unavailable values, and aggregates.
+5. The comparator content-freezes the normalized episode/row map, comparison
+   rules, per-axis disagreements, unavailable values, and aggregates.
 6. Only after that freeze does the comparator apply the unchanged rubric to
    the three temporal reports.
 7. A fresh Claude session adjudicates only the exact decision-relevant queue:
-   row/axis disagreements, reproduced effects, decision-critical unavailable
-   values, policy/contradiction rows, and denominator-changing splits/merges.
+   episode identity/closure and row/axis disagreements, reproduced effects,
+   decision-critical unavailable values, policy/contradiction rows, and
+   denominator-changing splits/merges.
 
 Preferred low-Codex routing after provider recovery:
 
@@ -314,23 +367,34 @@ Claude session.
 
 ## Required Measures
 
-Publish raw rows before aggregates. For each aggregate include numerator,
-denominator, and `UNAVAILABLE`.
+Publish raw rows before aggregates. Every measure declares whether its unit is
+an observation row, unique effect episode, or generation opportunity. For
+every applicable causal measure publish both observation-weighted and
+episode-weighted numerator, denominator, and `UNAVAILABLE`; publish the
+generation-level result when the question is whether another successor was
+required. A conclusion that changes with the unit of analysis is sensitivity
+evidence, not a process decision.
 
-1. observed prior-review scope misses;
-2. repair-introduced defects;
-3. exact bound obligations not closed;
-4. weakened/restated obligations;
-5. criteria changed after repair;
-6. reproduced production effects by code origin and detectability;
-7. evidence-only or injection-only blockers;
-8. oracle failures by effect-evidence state;
-9. policy-promoted or unsatisfiable successor generations;
-10. pre-repair hazard and oracle coverage among repair-introduced effects;
-11. observed scope misses by prior-method flags, without causal wording;
-12. exact same-invariant recurrence across surfaces;
-13. agreement and disagreement with the original audit, per axis;
-14. temporal-check stability.
+1. unique effect episodes, observations per episode, and identity unavailable;
+2. first-observed versus continuing prior-review scope misses;
+3. repair-introduced episode onsets from `onset_origin` versus continuing
+   unresolved observations from `episode_relation` and local transition axes;
+4. exact bound obligations not closed;
+5. weakened/restated obligations;
+6. criteria changed after repair;
+7. reproduced production effects by code origin and detectability;
+8. evidence-only or injection-only blockers;
+9. oracle failures by effect-evidence state;
+10. policy-promoted or unsatisfiable successor generations;
+11. pre-repair hazard and oracle coverage among repair-introduced episode
+    onsets;
+12. observed scope misses by prior-method flags, without causal wording;
+13. exact same-invariant recurrence across distinct episodes and surfaces;
+14. successor generations driven by only new episodes, only continuing
+    episodes, or a mixture;
+15. agreement and disagreement with the original audit, per axis and episode
+    identity;
+16. temporal-check stability.
 
 Do not publish a "review precision" percentage from withdrawal text. A
 precision claim requires independent disposition of sampled findings as true
@@ -345,6 +409,8 @@ one universal remedy.
 
 | Evidence pattern | Supported next experiment |
 |---|---|
+| A small number of episodes persists through many observation rows or generations | Test closure traceability, oracle strength, and terminalization before broadening initial review. |
+| Most successor generations contain new episodes rather than continuing ones | Use axes A/B/G to choose between a review-method and repair-design experiment. |
 | Severe reproduced effects are mostly pre-existing and within prior scope | Compare review methods on hidden historical candidates. |
 | Severe reproduced effects are mostly introduced by repair | Compare bounded repair/design-review strategies and diff-scoped review. |
 | Repair-introduced effects often lack a pre-bound hazard or oracle | Run a blind historical premortem comparison; measure later-effect capture, noise, duplication, and implementer/reviewer burden before adopting it. |
@@ -357,21 +423,33 @@ one universal remedy.
 
 Multiple patterns may hold. The output may recommend multiple bounded
 experiments; it may not collapse them into "make review more exhaustive".
+If observation-weighted and episode-weighted conclusions disagree, preserve
+both and route the identity/closure disagreement before choosing an
+intervention.
 
 ## Process-Change Gate
 
 No review template, mandatory finding count, repair-delta threshold,
 premortem requirement, severity vocabulary, or checklist is adopted until:
 
-1. blind row reconciliation is complete without count-based grading;
+1. blind episode and row reconciliation is complete without count-based
+   grading;
 2. every decision-critical disagreement and every reproduced-effect row is
-   adjudicated or explicitly `UNAVAILABLE`;
+   adjudicated or explicitly `UNAVAILABLE`, together with every
+   denominator-changing episode link or closure decision;
 3. the temporal check is reported without retuning;
 4. the existing intervention pilot completes or is explicitly retired;
 5. any changed root-cause labels receive a sensitivity replay;
 6. proposed fields map one-to-one to a measured failure mode; and
-7. a small live experiment reports capture, noise, duplication, author burden,
-   reviewer burden, and false positives.
+7. a bounded live experiment preregisters its eligible cohort and stopping
+   rule, then reports capture, noise, duplication, author burden, reviewer
+   burden, and false positives.
+
+Neither 100 observations nor an unspecified "small sample" is a valid default.
+Prefer every eligible transition from one canonical freeze through terminal
+composition. If that cohort is too small or too censored to distinguish the
+decision, return `INSUFFICIENT_EVIDENCE` and preserve raw results rather than
+extending or stopping after seeing a favorable outcome.
 
 The result may legitimately be "insufficient evidence to change the process".
 
