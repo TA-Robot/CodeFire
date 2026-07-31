@@ -479,6 +479,31 @@ negative-control row. The old Cargo/KGI recurrence packets remain semantic
 extraction sources and need new v2 review-control packets after their canonical
 port candidates exist.
 
+## Independent-preflight stopping rule
+
+This packet does not use a finding quota. Implementation becomes authorized
+only after all three bounded checks target the same exact commit and packet
+SHA-256:
+
+1. the primary contract reviewer finds no unresolved contradiction, missing
+   cross-field rule, scope conflict, or implementer choice that can change
+   authorization;
+2. the adversarial reviewer has exercised the existing implementation at each
+   claimed boundary and finds no remaining reproducible bypass/crash class that
+   the packet leaves unspecified; and
+3. the implementation-feasibility reviewer confirms that every requirement has
+   an owning allowed path, dependency order, and reusable or explicitly new
+   counterexample test surface.
+
+Every raised item must be mapped to a packet clause, explicitly dispositioned
+as a truthful non-goal/trust boundary, or kept unresolved. A reviewer merely
+running out of findings is not acceptance. Conversely, once all three checks
+report zero unresolved items on the same bytes, the manager records the exact
+dispositions and starts implementation; another arbitrary review round is not
+required. Any later implementation finding is classified as contract omission,
+implementation nonconformance, or repair-introduced regression before rework,
+so the process can measure which stage caused the recurrence.
+
 ## Allowed write set
 
 - `docs/development/ai/schemas/review-recurrence-control.v2.schema.json`
