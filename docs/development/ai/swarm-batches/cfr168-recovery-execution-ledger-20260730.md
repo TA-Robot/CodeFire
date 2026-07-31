@@ -2583,3 +2583,29 @@ database and is not a security sandbox. The complete Fugu event log must still
 show no newer-ref, reflog, other-worktree, provisional-audit, temporal-report,
 or pilot access before the blind report can enter comparison. No provider was
 launched.
+
+## 2026-07-31 11:49 UTC blind control-input boundary corrected
+
+Commit `cefb87d1f4c9f7a6b55c7dfa860fd2497873e714` resolves a contract
+contradiction discovered before launch. `dev-swarm` checks out the historical
+`c258cbf…` snapshot but injects the current execution envelope and task ticket
+into the worker prompt. The earlier wording prohibited every post-snapshot
+management artifact and therefore made a conforming scheduler launch
+impossible.
+
+The exact injected envelope/ticket is now the sole post-snapshot control
+input. It carries the frozen rubric and prohibitions, but no provisional
+labels or expected effect-row count. It does not authorize the worker to open
+the current ticket path, another current path, a newer ref or commit, another
+worktree, the provisional audit, a temporal report, or a pilot artifact.
+Those accesses still invalidate calibration and remain subject to complete
+event-log review.
+
+The revised classifier execution ticket, reliability gate, and snapshot
+preflight SHA-256 values are respectively
+`0ba2021f6141816034aca1d2ce88e443ed8472602c7823e5c1c860faf4ab4203`,
+`7e85af65619b3b77d2a685d177522f94a5bd992a3ce34b2977a802828526209f`,
+and
+`7307d4024f08e9c7e4d3a8262a90208f3c94a8692e3ebd41dfce5751e255e5fe`.
+The complete AI-development gate and the one-lane Fugu Ultra manifest
+validate/plan pass at exact base `c258cbf…`; no provider was launched.
