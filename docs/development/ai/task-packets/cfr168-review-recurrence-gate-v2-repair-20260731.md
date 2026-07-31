@@ -6,7 +6,7 @@ the dispatch revision.
 
 Provider/model for implementation: Claude Code / `claude-opus-5`.
 
-## 1. Objective
+## Objective
 
 Replace the rejected AIA-047 v1 authorization surface with a smaller,
 evidence-bound v2 pilot gate that:
@@ -346,7 +346,7 @@ from the independent report:
 
 No finding may be marked “fixed” only because its field was renamed.
 
-## 10. Scope
+## Scope
 
 Expected implementation surfaces:
 
@@ -363,6 +363,8 @@ Expected implementation surfaces:
 The v1 schema may be documented as rejected/deprecated but its bytes remain
 unchanged.
 
+## Non-Goals
+
 Do not change:
 
 - CodeFire product code, Rust crates, Python CLI, storage, HTTP, Cargo, KGI/KPI
@@ -374,7 +376,7 @@ Do not change:
 If a shared helper change is genuinely necessary, stop and return the exact
 reason and affected consumers instead of widening scope silently.
 
-## 11. Required counterexamples and validation
+## Validation
 
 Start by turning the independent report's bypasses into failing tests. At
 minimum, demonstrate old-v1 false behaviour or an equivalent fixture, then
@@ -434,7 +436,7 @@ Look specifically for contradictions between predecessor identity, packet
 chronology, report-only commits, and evidence retention. Resolve them before
 coding; do not defer them to the final independent review.
 
-## 13. Return contract
+## Handoff
 
 Return:
 
