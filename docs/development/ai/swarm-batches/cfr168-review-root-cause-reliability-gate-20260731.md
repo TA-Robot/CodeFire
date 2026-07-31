@@ -214,17 +214,38 @@ report item may use stable sublocators such as `F2/effect-a` and
 values. Splitting one effect into wording variants to increase volume is a
 protocol violation.
 
+Publish one normalized generation-chain table before effect rows so evidence
+shared by several findings is not copied into dozens of shallow paragraphs.
+Each chain contains:
+
+| Field | Required content |
+|---|---|
+| `chain_id` | stable surface/generation ID |
+| `predecessor_identity` | exact candidate and independent report commit |
+| `declared_review_scope` | exact prior scope locator |
+| `prior_method_flags` | separate `yes`/`no`/`UNAVAILABLE` plus evidence for static inspection, existing-gate execution, targeted reproducer, deliberate oracle reversal, and verified production entry |
+| `repair_contract` | exact repair packet/plan commit and bound obligation locators |
+| `repair_delta` | exact candidate range, changed product/test paths, and insertion/deletion counts; no size threshold |
+| `implementer_validation` | exact gates, selected subjects, results, and provenance |
+| `successor_identity` | exact candidate and independent report commit |
+| `chain_censoring` | terminal decision or exact missing successor evidence |
+
+Method flags and delta size are explanatory covariates, not causes. Do not
+infer that source-only review or a large repair caused a later effect without
+a controlled comparison.
+
 Every row contains:
 
 | Field | Required content |
 |---|---|
 | `row_id` | stable audit ID; never reused after content freeze |
 | `cohort` | `calibration` or `temporal`; no holdout value is visible during calibration rule formation |
+| `chain_id` | exact generation-chain row; do not repeat shared chain prose |
 | `lineage_generation` | surface and predecessor/successor generation |
-| `object_chain` | predecessor candidate/report, repair packet/result, successor candidate/report commits |
 | `finding_locator` | exact report heading/item plus an effect sublocator only when justified above |
 | `effect_statement` | one falsifiable wrong effect or one exact evidence/routing defect; no severity rhetoric |
 | `subject_locator` | exact path/symbol/object and revision |
+| `invariant_family` | stable family key plus exact violated-invariant wording/evidence; `UNAVAILABLE` is valid |
 | `axis_a` through `axis_g` | one declared value for each orthogonal axis |
 | `axis_evidence_a` through `axis_evidence_g` | exact object, report, packet, command, or reproducer locator supporting each value |
 | `counterevidence_checked` | predecessor/candidate locations or executions that could falsify the selected values |
@@ -258,8 +279,9 @@ does not create credit for producing more rows.
    `c258cbf…`, is not told an expected effect-row count, and cannot see the
    provisional or temporal reports.
 2. It reconstructs the successor-effect census, classifies all seven axes,
-   publishes raw rows before aggregates, commits the report, and emits a
-   deterministic row-identity digest.
+   publishes normalized generation chains and raw effect rows before
+   aggregates, commits the report, and emits deterministic chain- and
+   row-identity digests.
 3. A **fresh Fugu comparison session** receives the immutable blind report and
    provisional audit. It reconciles every row by exact effect identity before
    comparing any count or axis.
@@ -303,8 +325,10 @@ denominator, and `UNAVAILABLE`.
 8. oracle failures by effect-evidence state;
 9. policy-promoted or unsatisfiable successor generations;
 10. pre-repair hazard and oracle coverage among repair-introduced effects;
-11. agreement and disagreement with the original audit, per axis;
-12. temporal-check stability.
+11. observed scope misses by prior-method flags, without causal wording;
+12. exact same-invariant recurrence across surfaces;
+13. agreement and disagreement with the original audit, per axis;
+14. temporal-check stability.
 
 Do not publish a "review precision" percentage from withdrawal text. A
 precision claim requires independent disposition of sampled findings as true

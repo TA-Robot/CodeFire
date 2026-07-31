@@ -39,7 +39,7 @@
     "evidence_refs": [
       "preparation-base:107293420d35daf861f8d7b751472f86e794c03a",
       "blocking-input:classifier-report-commit-tree-bytes-sha256",
-      "blocking-input:calibration-row-identity-digest",
+      "blocking-input:calibration-generation-chain-and-effect-row-identity-digests",
       "blocking-input:comparator-report-commit-tree-bytes-sha256",
       "blocking-input:comparison-freeze-bytes-sha256-event-locator",
       "blocking-input:normalized-row-map-and-queue-digests",

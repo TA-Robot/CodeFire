@@ -27,10 +27,10 @@ graded by numerical equality.
 
 ## Scope
 
-The blind report identity, row count, row-identity digest, reproduced-effect
-set, decision-critical-unavailable set, and comparison base are currently
-unavailable. The manager must bind them into the execution ticket and typed
-packet before changing status to `ready`.
+The blind report identity, generation-chain count/digest, effect-row count and
+row-identity digest, reproduced-effect set, decision-critical-unavailable set,
+and comparison base are currently unavailable. The manager must bind them into
+the execution ticket and typed packet before changing status to `ready`.
 
 The future only authorized write is:
 
@@ -54,16 +54,17 @@ No `dev-swarm.v1` manifest is authorized while this packet is blocked.
 ## Validation
 
 Before admission, bind and recompute the blind report commit/tree/path,
-byte count, SHA-256, row count, row-identity digest, reproduced-effect set,
-decision-critical-unavailable set, and exact comparison base. The eventual
+byte count, SHA-256, generation-chain count/digest, effect-row count and
+row-identity digest, reproduced-effect set, decision-critical-unavailable set,
+and exact comparison base. The eventual
 report-only worker must run `git diff --check`, `check_ai_contracts.py`, and
 `check_project_docs.py`, commit only the authorized report, and leave a clean
 worktree.
 
 ## Handoff
 
-Return exact report identity and digest, full row reconciliation, per-axis
-comparison, comparison-freeze identity, unchanged temporal results, exact
-adjudication queue and digest, unavailable values, threats to validity,
-validation results, and explicit non-decisions for all process/template
-properties.
+Return exact report identity and digest, full generation-chain and effect-row
+reconciliation, per-axis comparison, comparison-freeze identity, unchanged
+temporal results, exact adjudication queue and digest, unavailable values,
+threats to validity, validation results, and explicit non-decisions for all
+process/template properties.

@@ -13,8 +13,9 @@ Do not launch until the manager binds all of these values:
 
 - blind-calibration report commit and tree;
 - report path, byte count, and SHA-256;
+- generation-chain count and deterministic chain-identity digest;
 - deterministic blind row-identity digest;
-- blind row count;
+- blind effect-row count;
 - blind reproduced-effect row set;
 - blind decision-critical-unavailable row set; and
 - the exact comparison base containing the immutable blind report.
@@ -30,9 +31,10 @@ Do not create a `dev-swarm.v1` manifest while any value is unbound.
 ## Objective
 
 Using a fresh session, compare the immutable blind calibration with the
-provisional audit without changing either source. Reconcile effect-row
-identity before comparing causal labels. Then content-freeze the comparison
-and apply the unchanged seven-axis rubric to the three temporal reports.
+provisional audit without changing either source. Reconcile normalized
+generation chains and effect-row identity before comparing causal labels.
+Then content-freeze the comparison and apply the unchanged seven-axis rubric
+to the three temporal reports.
 
 This task decides what evidence enters the later Claude adjudication queue. It
 does not decide the final causal class or any process intervention.
@@ -89,7 +91,7 @@ blind premortem would have predicted the effect.
 
 Before opening any temporal report:
 
-1. finish the complete row-identity reconciliation;
+1. finish the complete generation-chain and row-identity reconciliation;
 2. finish the per-axis comparison;
 3. freeze the normalized row map, comparison rules, disagreements,
    unavailable values, and aggregate sensitivity in
@@ -161,8 +163,8 @@ or network calls other than the Fugu provider request.
 The report contains:
 
 1. exact task, blind-report, provisional-audit, and temporal identities;
-2. blind row-identity digest verification;
-3. complete row-identity reconciliation;
+2. blind chain- and row-identity digest verification;
+3. complete generation-chain and row-identity reconciliation;
 4. per-row/per-axis comparison with both source values and evidence;
 5. comparison-freeze byte count, SHA-256, and event locator;
 6. raw comparison aggregates with numerator, denominator, and unavailable;

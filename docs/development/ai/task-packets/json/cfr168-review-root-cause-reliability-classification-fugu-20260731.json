@@ -2,7 +2,7 @@
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "cfr168-review-root-cause-reliability-classification-fugu-20260731",
   "status": "ready",
-  "objective": "At the exact pre-audit CFR-168 snapshot, blindly reconstruct the finite successor-finding census without being told an expected effect-row count, classify every independently testable observed effect on seven orthogonal evidence axes including objective pre-repair hazard coverage, and publish an immutable calibration report for a different comparison session without adopting a review template, finding count, checklist, premortem, or process change.",
+  "objective": "At the exact pre-audit CFR-168 snapshot, blindly reconstruct normalized generation chains and the finite successor-effect census without being told an expected effect-row count, classify every independently testable observed effect on seven orthogonal evidence axes including objective pre-repair hazard coverage, and publish immutable evidence for a different comparison session without adopting a review template, finding count, checklist, premortem, or process change.",
   "base_revision": "c258cbfc061b14905554c9d319b350d2da7f771b",
   "role": "reviewer",
   "risk": {
@@ -120,6 +120,11 @@
       "falsification_test": "Seek an expected count, split wording variants, merge effects with different subjects/evidence, omit a stable observed effect, or add a finding not present in the snapshot report universe; census validation fails."
     },
     {
+      "id": "normalized-chain-and-effect-evidence",
+      "statement": "Shared predecessor scope, review-method flags, repair contract/delta, validation provenance, successor identity, and censoring are recorded once per generation chain; effect rows bind that chain and one exact invariant family without repeating evidence for volume.",
+      "falsification_test": "Repeat shallow chain prose per finding, omit separate method flags or their locators, infer causation from method/delta alone, or group narratively similar but non-identical invariants; analysis fails."
+    },
+    {
       "id": "seven-orthogonal-evidence-axes",
       "statement": "Every row independently records code origin, prior-review detectability, repair-contract handling, effect evidence, closure-oracle quality, review routing, and pre-repair hazard coverage, with a separate exact evidence field for each axis.",
       "falsification_test": "Use one narrative primary cause, copy report framing as origin proof, use severity as effect proof, infer hazard foreseeability from hindsight, or fill an undecidable axis without UNAVAILABLE; classification fails."
@@ -131,8 +136,8 @@
     },
     {
       "id": "immutable-separate-session-output",
-      "statement": "The committed calibration report contains the complete raw row set, rubric application, evidence, aggregates, and row-identity digest and is never edited by the later comparison session.",
-      "falsification_test": "Leave the calibration in a temporary-only file, omit stable row identities, or permit the comparison session to amend this report; the separation boundary fails."
+      "statement": "The committed calibration report contains complete normalized generation chains, raw effect rows, rubric application, evidence, aggregates, and chain/row identity digests and is never edited by the later comparison session.",
+      "falsification_test": "Leave calibration in a temporary-only file, omit stable chain or row identities, or permit the comparison session to amend this report; the separation boundary fails."
     },
     {
       "id": "report-only-non-adoption",
@@ -150,13 +155,13 @@
     },
     {
       "id": "row-identity-integrity",
-      "command": "Publish the complete raw row set in the committed report and compute a deterministic digest over ordered row_id, object_chain, finding_locator, effect_statement, and subject_locator fields.",
+      "command": "Publish the complete generation-chain and effect-row sets in the committed report; compute deterministic digests over ordered chain_id/predecessor/repair/successor identities and ordered row_id/chain_id/finding_locator/effect_statement/subject_locator/invariant_family fields.",
       "purpose": "Give the later comparison session an immutable row universe without supplying this lane an expected count.",
       "required": true
     },
     {
       "id": "raw-row-and-axis-audit",
-      "command": "Validate one stable row per independently testable effect, all required row fields, seven axis values/evidence fields, counterevidence, reproducer/oracle disposition, censoring, and decision relevance before aggregates.",
+      "command": "Validate every normalized generation chain and one stable row per independently testable effect, including invariant family, all required row fields, seven axis values/evidence fields, counterevidence, reproducer/oracle disposition, censoring, and decision relevance before aggregates.",
       "purpose": "Prevent a long unsupported bullet list or one primary-cause narrative from satisfying the task.",
       "required": true
     },
@@ -186,11 +191,14 @@
     "required_outputs": [
       "exact_task_and_evidence_identities",
       "snapshot_and_excluded_path_proof",
-      "raw_calibration_rows",
-      "raw_row_count_and_identity_digest",
+      "normalized_generation_chains_and_method_flags",
+      "chain_count_and_identity_digest",
+      "raw_calibration_effect_rows",
+      "raw_effect_row_count_and_identity_digest",
       "seven_axis_evidence_fields",
       "decision_critical_detailed_blocks",
       "per_axis_aggregates_with_unavailable",
+      "prior_method_and_exact_invariant_recurrence_measures",
       "reproduced_effect_rows",
       "decision_critical_unavailable_rows",
       "row_inclusion_and_exclusion_disputes",

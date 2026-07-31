@@ -85,12 +85,13 @@ classification report.
 
 ## Handoff
 
-Return the exact report commit, tree, path, byte count, and SHA-256; raw row
-count and row-identity digest; per-axis aggregates and unavailable counts;
-reproduced-effect and decision-critical-unavailable row sets; all
-inclusion/exclusion disputes; all threats to validity and censoring; every
-validation result; and explicit non-decisions for template length, finding
-count, checklist, and process adoption.
+Return the exact report commit, tree, path, byte count, and SHA-256;
+generation-chain count/digest and method flags; raw effect-row count and
+row-identity digest; per-axis aggregates and unavailable counts; exact
+invariant recurrence; reproduced-effect and decision-critical-unavailable row
+sets; all inclusion/exclusion disputes; all threats to validity and censoring;
+every validation result; and explicit non-decisions for template length,
+finding count, checklist, premortem, and process adoption.
 
 ## Launch Hold
 

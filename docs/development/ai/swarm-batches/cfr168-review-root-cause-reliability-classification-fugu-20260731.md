@@ -168,16 +168,36 @@ oracle quality from a test name, or hazard foreseeability from hindsight.
 
 ## Required Analysis Row
 
-Publish a compact raw table first. Every row contains:
+Publish a normalized generation-chain table before effect rows so evidence
+shared by several findings is recorded once rather than repeated as shallow
+prose:
+
+| Field | Required content |
+|---|---|
+| `chain_id` | stable surface/generation ID |
+| `predecessor_identity` | exact candidate and independent report commit |
+| `declared_review_scope` | exact prior scope locator |
+| `prior_method_flags` | separate `yes`/`no`/`UNAVAILABLE` plus evidence for static inspection, existing-gate execution, targeted reproducer, deliberate oracle reversal, and verified production entry |
+| `repair_contract` | exact packet/plan commit and bound obligation locators |
+| `repair_delta` | exact range, changed product/test paths, and insertion/deletion counts; no size threshold |
+| `implementer_validation` | exact gates, selected subjects, results, and provenance |
+| `successor_identity` | exact candidate and independent report commit |
+| `chain_censoring` | terminal decision or exact missing successor evidence |
+
+Method flags and repair size are explanatory covariates. Do not call either a
+cause from this retrospective corpus.
+
+Then publish a compact effect-row table. Every row contains:
 
 | Field | Required content |
 |---|---|
 | `row_id` | stable calibration ID, never reused |
+| `chain_id` | exact normalized generation-chain row |
 | `lineage_generation` | surface and predecessor/successor generation |
-| `object_chain` | predecessor candidate/report, repair packet/result, successor candidate/report commits |
 | `finding_locator` | exact successor report heading/item and effect sublocator when justified |
 | `effect_statement` | one falsifiable wrong effect or exact evidence/routing defect |
 | `subject_locator` | exact path/symbol/object and revision |
+| `invariant_family` | stable family key plus exact violated-invariant wording/evidence; `UNAVAILABLE` is valid |
 | `axis_a` through `axis_g` | one declared rubric value for every axis |
 | `axis_evidence_a` through `axis_evidence_g` | exact object, report, packet, command, or reproducer supporting that axis |
 | `counterevidence_checked` | exact evidence that could falsify the selected values |
@@ -228,15 +248,17 @@ The report contains:
 1. exact snapshot/tree identity and proof that the excluded artifacts are
    absent at `HEAD`;
 2. the 21 discovered report paths and content digests;
-3. reconstruction rules and every row inclusion/exclusion dispute;
-4. the complete raw row table with every required field;
-5. decision-critical detailed evidence blocks;
-6. per-axis aggregates with numerator, denominator, and unavailable count;
-7. the exact set of reproduced-effect rows;
-8. every decision-critical unavailable row;
-9. threats to validity and right-censoring;
-10. conditional statements supported by this calibration only; and
-11. explicit non-decisions for template length, finding count, checklist,
+3. the normalized generation-chain table and method/delta evidence;
+4. reconstruction rules and every row inclusion/exclusion dispute;
+5. the complete raw effect-row table with every required field;
+6. decision-critical detailed evidence blocks;
+7. per-axis aggregates with numerator, denominator, and unavailable count;
+8. prior-method and exact invariant-recurrence descriptive measures;
+9. the exact set of reproduced-effect rows;
+10. every decision-critical unavailable row;
+11. threats to validity and right-censoring;
+12. conditional statements supported by this calibration only; and
+13. explicit non-decisions for template length, finding count, checklist,
     premortem requirement, and process adoption.
 
 Do not open or compare a provisional audit. Do not inspect or classify a
@@ -258,7 +280,8 @@ report, record the exact failure; do not import newer checker or policy files.
 Commit only the classification report and leave the worktree clean. Return:
 
 - report commit/tree/path/byte count/SHA-256;
-- raw row count and deterministic row-identity digest;
+- generation-chain count and deterministic chain-identity digest;
+- raw effect-row count and deterministic row-identity digest;
 - per-axis unavailable counts;
 - reproduced-effect row set;
 - decision-critical unavailable row set;

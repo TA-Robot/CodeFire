@@ -36,7 +36,8 @@
     "evidence_refs": [
       "preparation-base:2eaf8f39ad4744a5fb65685b1cc4d93cdb44b706",
       "blocking-input:blind-report-commit-tree-bytes-sha256",
-      "blocking-input:blind-row-count-and-identity-digest",
+      "blocking-input:blind-generation-chain-count-and-identity-digest",
+      "blocking-input:blind-effect-row-count-and-identity-digest",
       "blocking-input:blind-reproduced-effect-row-set",
       "blocking-input:blind-decision-critical-unavailable-row-set",
       "comparison-count-equality:not-a-coverage-oracle",
@@ -124,6 +125,11 @@
       "falsification_test": "Call a blind count wrong because it differs from 51, force splits or merges to equalize counts, or leave a source row unmapped without an explicit relation; comparison fails."
     },
     {
+      "id": "generation-chain-before-effect-comparison",
+      "statement": "The blind generation-chain identities, prior-method flags, repair contract/delta, validation provenance, and censoring are verified before effect rows are compared, and exact invariant families are reconciled separately from narrative similarity.",
+      "falsification_test": "Compare effect rows against different predecessor/successor chains, collapse method flags, infer cause from delta size, or merge different invariants by wording similarity; comparison fails."
+    },
+    {
       "id": "seven-axis-independent-comparison",
       "statement": "Every matched row records source values and AGREE, DISAGREE, NON_COMPARABLE, or UNAVAILABLE separately for all seven axes.",
       "falsification_test": "Let one narrative primary cause substitute for seven axes, infer hazard foreseeability from hindsight, or convert agent agreement into evidence; comparison fails."
@@ -147,7 +153,7 @@
   "validation": [
     {
       "id": "admission-input-integrity",
-      "command": "Before launch, bind and recompute the blind report commit/tree/path/bytes/SHA-256, row count and identity digest, reproduced-effect set, decision-critical-unavailable set, and exact comparison base.",
+      "command": "Before launch, bind and recompute the blind report commit/tree/path/bytes/SHA-256, generation-chain count/digest, effect-row count/digest, reproduced-effect set, decision-critical-unavailable set, and exact comparison base.",
       "purpose": "Prevent comparison against a moving, incomplete, or substituted blind source.",
       "required": true,
       "requires_capability": "git"
@@ -202,8 +208,8 @@
   "handoff": {
     "required_outputs": [
       "exact_task_blind_audit_temporal_identities",
-      "blind_row_identity_digest_verification",
-      "complete_row_identity_reconciliation",
+      "blind_chain_and_row_identity_digest_verification",
+      "complete_generation_chain_and_row_identity_reconciliation",
       "per_row_per_axis_source_comparison",
       "comparison_freeze_bytes_sha256_event_locator",
       "aggregates_with_numerator_denominator_unavailable",

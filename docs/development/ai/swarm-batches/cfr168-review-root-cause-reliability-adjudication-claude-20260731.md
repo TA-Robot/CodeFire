@@ -21,7 +21,8 @@ Before launch, the manager must update this ticket and its typed packet with:
 
 - exact classifier report commit and tree;
 - report byte count and SHA-256;
-- calibration row-set digest or deterministic row identity list;
+- calibration generation-chain and effect-row digests or deterministic
+  identity lists;
 - exact comparator report commit, tree, byte count, and SHA-256;
 - comparison-freeze byte count, SHA-256, and event locator;
 - normalized row-map and adjudication-queue identity digests;

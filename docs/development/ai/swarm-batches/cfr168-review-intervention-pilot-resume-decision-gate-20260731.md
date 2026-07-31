@@ -39,8 +39,9 @@ launch a competing pilot.
 
 The manager first requires:
 
-1. the committed Fugu blind-calibration report, row-identity digest, and proof
-   that its pre-audit snapshot excluded the provisional and temporal reports;
+1. the committed Fugu blind-calibration report, normalized generation-chain
+   and effect-row identity digests, and proof that its pre-audit snapshot
+   excluded the provisional and temporal reports;
 2. the committed fresh-session Fugu row reconciliation, per-axis comparison,
    comparison freeze, and unchanged temporal check;
 3. the committed Claude adjudication of every decision-relevant row/axis
