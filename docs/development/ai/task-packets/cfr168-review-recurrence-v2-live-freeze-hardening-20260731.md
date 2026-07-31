@@ -122,6 +122,18 @@ negative-control evidence belongs.
   `locus_path` in deterministic I1 result coverage so `kind` is not parsed and
   discarded. `kind` remains a manager/reviewer semantic classification; the
   gate must not pretend it can infer parity from prose.
+- Emit exact `metrics.i1.claim_coverage`, sorted ascending by ASCII `claim_id`.
+  Each closed row contains, in schema, `claim_id`, manifest-owned `kind`,
+  nullable `obligation_id`, manifest-owned `locus_path`, `derivation_path`,
+  `locus`, both path/locus predecessor booleans, predecessor and candidate
+  behaviour, `evidence_state`, lexicographically sorted `evidence_ref_ids`,
+  `disposition`, and `next_action`. Also emit
+  `metrics.i1.derivation_next_action_counts` with keys `PRODUCT_REPAIR`,
+  `RUN_CLOSURE_EVIDENCE`, `REPAIR_ORACLE`, `REPAIR_CLAIM`,
+  `DOCUMENT_NON_REACHABILITY`, `MANAGER_SCOPE_DECISION`,
+  `MANAGER_REQUIREMENT_DECISION`, and `NONE` (including zeros), plus integer
+  `metrics.i1.blocking_derivations` equal to the number of coverage rows whose
+  action is not `NONE`.
 - Continue binding `path`, `locus`, predecessor behaviour, candidate behaviour,
   disposition, action, and exact evidence references.
 - Document the pre-live schema break explicitly. Do not silently reinterpret
@@ -155,9 +167,11 @@ must likewise block both paths with the same finding semantics.
 - The first live Cargo manifest must bind `R1` to origin 1 and `R2`–`R5` to
   origin 2 at review generation 3. The first live KGI/KPI manifest must bind
   `A1-SUBJECT`, `A2-DENOM`, `A3-D1`, `A3-D5`, `A4-STAGE`, and `A8-C6` to
-  origin 2 and the other fourteen frozen rows to origin 3 at review generation
-  4. Encode these exact maps in the manager-fixed bootstrap authority as well
-  as the independently reviewed manifests; a manager typo must fail closed.
+  origin 2 and exactly `A1-PREREQ`, `A3-N1`, `A5-SCOPE`, `A5-ECHO`, `A6-N2`,
+  `A6-N4`, `A7-C1`, `A7-C2`, `A7-C3`, `A7-C4`, `A8-C5`, `R1C-C-TRUST`,
+  `N3-MERGE-SEAL`, and `P1-RENAME-SHALLOW` to origin 3 at review generation 4.
+  Encode these exact maps in the manager-fixed bootstrap authority as well as
+  the independently reviewed manifests; a manager typo must fail closed.
 
 Required counterexamples: bootstrap record origin differs from its manifest;
 successor manifest origin differs from its predecessor record; a consistent
@@ -223,6 +237,19 @@ historical anchor, and validator-owned schema. Each must return structured
   Recompute both inside/outside summary booleans from those paths rather than
   trusting them. This is an explicit pre-live timed-v2 shape break and must be
   documented with the record/manifest shape breaks.
+- Freeze timestamps to the runner's exact UTC representation
+  `YYYY-MM-DDTHH:MM:SS.ffffffZ`: four-digit year, six fractional digits, literal
+  `Z`, and a value accepted by Python's UTC `datetime` parser (so invalid dates
+  and leap-second `:60` are rejected). Do not accept alternate offsets,
+  fractional precision, or timezone-free strings in committed evidence.
+- Use filesystem-independent lexical POSIX path checks during evidence replay.
+  An accepted path is `/` or begins `/` and has no empty, `.`, `..`, backslash,
+  control, surrogate, repeated-separator, or trailing-separator component;
+  `PurePosixPath(value).as_posix()` must equal the original spelling.
+  Containment is component-prefix containment, not string prefix and not a
+  fresh filesystem `resolve()`. `cwd` may equal or descend from Git root;
+  log/result must not equal or descend from it and must differ from each other.
+  The runner resolves its live paths before emitting this lexical form.
 - Validate the runner-owned timing model rather than accepting internally
   contradictory diagnostics: timeout must be finite and positive; monotonic
   duration and drift threshold must be finite and nonnegative; the runner must
@@ -257,13 +284,14 @@ the booleans false, make log and result the same path, use negative
 timeout/duration/drift values, falsify the wall-minus/discontinuity relations,
 detach the timestamps, contradict status/exit/timed-out fields, and replay an
 inconsistent retained timed result. Detached/relation-inconsistent timestamps
-must block;
-consistent forward and backward wall-clock jumps must both pass their timing
-relation checks. Add boundary tests at each frozen tolerance, immediately below
-it, and immediately above it. Every real runner-produced external-path result
-must remain passing. Named non-finite and exponent-overflow timeout/threshold
-CLI values must fail before command execution; equivalent committed-result
-mutations must return a structured `BLOCK`.
+must block; alternate timestamp forms and lexically noncanonical or
+component-prefix-escaping paths must block. Consistent forward and backward
+wall-clock jumps must both pass their timing relation checks. Add boundary tests
+at each frozen tolerance, immediately below it, and immediately above it. Every
+real runner-produced external-path result must remain passing. Named non-finite
+and exponent-overflow timeout/threshold CLI values must fail before command
+execution; equivalent committed-result mutations must return a structured
+`BLOCK`.
 
 ### F1f — use a strict deterministic JSON authority boundary
 
@@ -321,6 +349,17 @@ boundaries.
   retention-authoritative parsed v2 results, is closed at every object level,
   models all stable and explicitly gate-relative fields named below, and may
   admit only the known optional CLI-added machine-local `record` path.
+- Replace the result's string/object `live_arm_pin` union with one closed object
+  that the compact schema evaluator can validate without `oneOf`:
+  `{"state":"unavailable","anchor":null,"arm":null}` when no verified pin
+  exists, or `{"state":"verified","anchor":{...},"arm":{...}}` when it
+  does. `anchor` and `arm` each use the supported object-or-null type; semantic
+  validation enforces unavailable iff both are null and verified iff both
+  closed objects are present. The closed anchor object has exactly
+  `validator_commit`, `path`, `mode`, and `sha256`; the closed arm object has
+  exactly `arm`, `generation`, `predecessor_authority_commit`, `repair_packet`,
+  and `repair_manifest`, using F2's exact artifact-pin shape. No other
+  state/combination is admissible.
 - Validate a fully assembled current parsed-v2 result before it can authorize
   `ALLOW`, and validate every retained result before semantic replay. A result
   from an unparseable input may still be emitted as diagnostic `BLOCK`, but it
