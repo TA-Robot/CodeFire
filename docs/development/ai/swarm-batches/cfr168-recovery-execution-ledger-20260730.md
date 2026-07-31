@@ -2714,3 +2714,35 @@ decision need. Automatic provider/gate/review/manager/resource capture remains
 the distinct AIA-033 foundation task; retrospective hand classification must
 stay identified as such rather than becoming a fabricated measured event
 stream.
+
+## 2026-07-31 12:37 UTC shared-primitives launch stopped on control-input mismatch
+
+After the bounded Claude health probe and all three priority review resumes
+passed live admission, the optional shared-primitives manifest also passed
+`dev-swarm validate`, `plan`, and a fourth-lane resource/provider decision.
+The launched worktree correctly checked out evidence base `2c439d8…`, but the
+agent then reopened the task packet at that snapshot. That historical copy
+still required Fugu, an accepted Upload input, a different output path, and no
+launch. The current manager-injected task ticket had superseded those
+requirements, but did not explicitly forbid reopening the snapshot-local
+copy.
+
+The manager stopped only that optional batch before any repository write.
+Session `9e473bb7-9785-4061-bb20-747044c1e35e` ended with event-log bytes
+`72,920` and SHA-256
+`1d526c129c165150a2f8a4545b468ea089bb8a64d2541568164c337b8acb2a41`.
+The worktree remains clean at exact commit `2c439d8…`; both old and new report
+paths are absent. Cargo, Upload, and KGI/KPI review resumes were not stopped.
+
+This is a scheduler/ticket input-boundary failure, not a provider or model
+failure. A replacement batch must inject an explicit sole-control-input rule:
+the evidence worktree remains historical, its local packet/JSON must not be
+opened, and only the exact scheduler envelope plus injected current ticket may
+cross the snapshot boundary. The stopped batch is not resumed.
+
+The replacement injected ticket, unchanged typed packet, and `v2` manifest
+SHA-256 values are respectively
+`9743c69696168cc77a9f17f000544154b488c48dfe4cda37b305291c449fe791`,
+`a25cb4809aca37c065f1aa4bdcfd760e44d89b4e9fd8df0bb45e5f5d7abe9d5c`,
+and
+`e95c2a27fd88fa17065e3ea33c5c15b63d70355cff2913ca5fc9f4ac1765aa91`.

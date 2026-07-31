@@ -11,9 +11,26 @@ Provider/model: Claude Opus 5 (`claude-opus-5`)
 
 Role: independent architecture reviewer
 
-No `dev-swarm.v1` manifest exists for this task. The report-only preflight may
-run now. The MR-write closure repair remains blocked until the preflight
-commits an exact `READY` decision and the manager binds its commit and digest.
+## Execution-control boundary
+
+Evidence remains frozen at `2c439d8…`, but the exact scheduler envelope and
+the ticket text injected by
+`cfr168-python-http-shared-primitives-preflight-claude-v2-20260731.json` are
+the sole post-snapshot control input for this run.
+
+The assigned worktree intentionally checks out the evidence snapshot. The
+snapshot-local file at this same path and its linked JSON packet are older,
+blocked Fugu instructions with a different output path. Do not open, quote,
+or follow those snapshot-local copies. Do not substitute another current
+path, ref, worktree, or management file. Use the injected envelope/ticket and
+only the exact Git objects and report identities named below.
+
+The first Claude manifest was stopped clean before any write because its
+ticket did not state this boundary and the agent reopened the historical
+snapshot-local packet. It is superseded for launch purposes. The report-only
+preflight may run through the `v2` manifest after live admission. The MR-write
+closure repair remains blocked until the preflight commits an exact `READY`
+decision and the manager binds its commit and digest.
 
 ## Objective
 
