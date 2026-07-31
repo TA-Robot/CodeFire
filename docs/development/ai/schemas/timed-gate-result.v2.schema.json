@@ -24,6 +24,7 @@
     "source",
     "worktree",
     "log",
+    "result",
     "limits"
   ],
   "properties": {
@@ -40,10 +41,13 @@
     "cwd": {
       "type": "string",
       "minLength": 1,
+      "pattern": "^/(?:[^/\\\\\\u0000-\\u001F\\u007F]+/)*[^/\\\\\\u0000-\\u001F\\u007F]*$",
       "description": "Machine-specific absolute path. Diagnostic only."
     },
     "timeout_seconds": {
-      "type": "number"
+      "type": "number",
+      "minimum": 0,
+      "description": "Runtime semantic validation additionally requires a finite value greater than zero."
     },
     "timed_out": {
       "type": "boolean"
@@ -56,14 +60,15 @@
     },
     "started_at": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
     },
     "ended_at": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
     },
     "duration_seconds": {
-      "type": "number"
+      "type": "number",
+      "minimum": 0
     },
     "duration_source": {
       "const": "time.monotonic_ns"
@@ -78,7 +83,8 @@
       "type": "boolean"
     },
     "drift_threshold_seconds": {
-      "type": "number"
+      "type": "number",
+      "minimum": 0
     },
     "source": {
       "type": "object",
@@ -88,6 +94,7 @@
         "git_root": {
           "type": "string",
           "minLength": 1,
+          "pattern": "^/(?:[^/\\\\\\u0000-\\u001F\\u007F]+/)*[^/\\\\\\u0000-\\u001F\\u007F]*$",
           "description": "Machine-specific absolute path of the Git root containing cwd. Diagnostic only; identity is carried by revision and tree."
         },
         "revision": {
@@ -191,6 +198,7 @@
         "path": {
           "type": "string",
           "minLength": 1,
+          "pattern": "^/(?:[^/\\\\\\u0000-\\u001F\\u007F]+/)*[^/\\\\\\u0000-\\u001F\\u007F]*$",
           "description": "Machine-specific absolute path. Diagnostic only; the committed log is linked by digest and byte count."
         },
         "bytes": {
@@ -203,6 +211,19 @@
         },
         "complete": {
           "type": "boolean"
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^/(?:[^/\\\\\\u0000-\\u001F\\u007F]+/)*[^/\\\\\\u0000-\\u001F\\u007F]*$",
+          "description": "Resolved machine-specific absolute output path. Runtime replay requires it to be distinct from the log and lexically outside source.git_root."
         }
       }
     },

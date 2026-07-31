@@ -11,6 +11,8 @@ here reads or rewrites it.
 
 from __future__ import annotations
 
+import json
+import math
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
@@ -31,7 +33,37 @@ RECORD_SCHEMA_PATH = (
 MANIFEST_SCHEMA_PATH = (
     "docs/development/ai/schemas/review-recurrence-repair-manifest.v1.schema.json"
 )
+RESULT_SCHEMA_PATH = (
+    "docs/development/ai/schemas/review-recurrence-gate-result.v2.schema.json"
+)
+LIVE_ARM_ANCHOR_SCHEMA_PATH = (
+    "docs/development/ai/schemas/review-recurrence-live-arm-anchor.v1.schema.json"
+)
 TIMED_SCHEMA_PATH = "docs/development/ai/schemas/timed-gate-result.v2.schema.json"
+
+AUTHORITY_SCHEMA_IDS: dict[str, str] = {
+    RECORD_SCHEMA_PATH: (
+        "https://codefire.dev/schemas/ai/"
+        "review-recurrence-control.v2.schema.json"
+    ),
+    MANIFEST_SCHEMA_PATH: (
+        "https://codefire.dev/schemas/ai/"
+        "review-recurrence-repair-manifest.v1.schema.json"
+    ),
+    RESULT_SCHEMA_PATH: (
+        "https://codefire.dev/schemas/ai/"
+        "review-recurrence-gate-result.v2.schema.json"
+    ),
+    LIVE_ARM_ANCHOR_SCHEMA_PATH: (
+        "https://codefire.dev/schemas/ai/"
+        "review-recurrence-live-arm-anchor.v1.schema.json"
+    ),
+    TIMED_SCHEMA_PATH: (
+        "https://codefire.dev/schemas/ai/timed-gate-result.v2.schema.json"
+    ),
+}
+
+MAX_JSON_CONTAINER_DEPTH = 64
 
 # N-3 extension point.  The anchor does not exist yet: a separate manager task
 # must pin each live arm's exact manifest identity before a live arm runs.
@@ -155,6 +187,13 @@ class LegacyRoot:
     commit: str
     report_path: str
     report_sha256: str
+    review_generation: int
+    obligation_origins: tuple[tuple[str, int], ...]
+
+    def obligation_origin_map(self) -> dict[str, int]:
+        """Return a fresh lookup without exposing mutable manager authority."""
+
+        return dict(self.obligation_origins)
 
 
 LEGACY_ROOTS: dict[str, LegacyRoot] = {
@@ -170,6 +209,14 @@ LEGACY_ROOTS: dict[str, LegacyRoot] = {
         report_sha256=(
             "aad067b2b8feb80830c41db1608dd31f0e7e7d7ca1f37ab01d040336f788b4fd"
         ),
+        review_generation=3,
+        obligation_origins=(
+            ("R1", 1),
+            ("R2", 2),
+            ("R3", 2),
+            ("R4", 2),
+            ("R5", 2),
+        ),
     ),
     "kgi_kpi": LegacyRoot(
         arm="kgi_kpi",
@@ -181,6 +228,29 @@ LEGACY_ROOTS: dict[str, LegacyRoot] = {
         ),
         report_sha256=(
             "23b59e01825e3f66d2d38b754348e3d51457f3c465def578ac99ce52729a204f"
+        ),
+        review_generation=4,
+        obligation_origins=(
+            ("A1-PREREQ", 3),
+            ("A1-SUBJECT", 2),
+            ("A2-DENOM", 2),
+            ("A3-D1", 2),
+            ("A3-D5", 2),
+            ("A3-N1", 3),
+            ("A4-STAGE", 2),
+            ("A5-ECHO", 3),
+            ("A5-SCOPE", 3),
+            ("A6-N2", 3),
+            ("A6-N4", 3),
+            ("A7-C1", 3),
+            ("A7-C2", 3),
+            ("A7-C3", 3),
+            ("A7-C4", 3),
+            ("A8-C5", 3),
+            ("A8-C6", 2),
+            ("N3-MERGE-SEAL", 3),
+            ("P1-RENAME-SHALLOW", 3),
+            ("R1C-C-TRUST", 3),
         ),
     ),
 }
@@ -262,11 +332,276 @@ def error(code: str, location: str, message: str) -> Finding:
     return Finding("error", code, location, message)
 
 
+class _DuplicateJSONObjectKey(ValueError):
+    def __init__(self, key: str) -> None:
+        super().__init__(key)
+        self.key = key
+
+
+class _NonFiniteJSONNumber(ValueError):
+    def __init__(self, token: str) -> None:
+        super().__init__(token)
+        self.token = token
+
+
+class _JSONNumberOutOfRange(ValueError):
+    pass
+
+
+def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise _DuplicateJSONObjectKey(key)
+        value[key] = item
+    return value
+
+
+def _strict_float(token: str) -> float:
+    try:
+        value = float(token)
+    except (OverflowError, ValueError) as exc:
+        raise _JSONNumberOutOfRange from exc
+    if not math.isfinite(value):
+        raise _NonFiniteJSONNumber(token)
+    return value
+
+
+def _strict_integer(token: str) -> int:
+    try:
+        return int(token)
+    except (OverflowError, ValueError) as exc:
+        raise _JSONNumberOutOfRange from exc
+
+
+def _reject_json_constant(token: str) -> Any:
+    raise _NonFiniteJSONNumber(token)
+
+
+def _decoded_boundary_findings(value: Any, location: str) -> list[Finding]:
+    """Check decoded text and container depth without recursive Python calls."""
+
+    findings: list[Finding] = []
+    initial_depth = 1 if isinstance(value, (dict, list)) else 0
+    pending: list[tuple[Any, str, int]] = [(value, location, initial_depth)]
+    while pending:
+        item, item_location, depth = pending.pop()
+        if isinstance(item, (dict, list)) and depth > MAX_JSON_CONTAINER_DEPTH:
+            return [
+                error(
+                    "json-nesting-too-deep",
+                    item_location,
+                    f"container depth exceeds {MAX_JSON_CONTAINER_DEPTH}",
+                )
+            ]
+        if isinstance(item, str):
+            if any(0xD800 <= ord(character) <= 0xDFFF for character in item):
+                findings.append(
+                    error(
+                        "unsafe-json-surrogate",
+                        item_location,
+                        f"text contains a lone surrogate: {item!r}",
+                    )
+                )
+            continue
+        if isinstance(item, float):
+            # The parse hook rejects these. Keep a second, total boundary check
+            # so a future decoder change cannot silently widen authority.
+            if not math.isfinite(item):
+                findings.append(
+                    error(
+                        "non-finite-json-number",
+                        item_location,
+                        "decoded JSON number is not finite",
+                    )
+                )
+            continue
+        if isinstance(item, list):
+            child_depth = depth + 1
+            pending.extend(
+                (child, f"{item_location}[{index}]", child_depth)
+                for index, child in reversed(tuple(enumerate(item)))
+            )
+            continue
+        if isinstance(item, dict):
+            child_depth = depth + 1
+            for key, child in reversed(tuple(item.items())):
+                key_location = f"{item_location}[{key!r}]"
+                if any(0xD800 <= ord(character) <= 0xDFFF for character in key):
+                    findings.append(
+                        error(
+                            "unsafe-json-surrogate",
+                            item_location,
+                            f"an object key contains a lone surrogate: {key!r}",
+                        )
+                    )
+                pending.append((child, key_location, child_depth))
+    return findings
+
+
+def strict_decode_json(
+    payload: bytes | str,
+    location: str,
+) -> tuple[Any | None, list[Finding]]:
+    """Decode one v2 authority JSON boundary without throwing.
+
+    This is the public decoder for current and retained records, manifests,
+    timed results, gate results, live anchors, and their validator-owned schema
+    blobs. It accepts exact UTF-8 bytes or already-decoded text. Repeated object
+    members, non-finite numbers, unsupported integer magnitude, lone
+    surrogates, and container depth above 64 are rejected before typed use.
+    """
+
+    if isinstance(payload, bytes):
+        try:
+            text = payload.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            return None, [
+                error(
+                    "invalid-json-utf8",
+                    location,
+                    f"JSON is not valid UTF-8 at byte {exc.start}",
+                )
+            ]
+    elif isinstance(payload, str):
+        text = payload
+    else:
+        return None, [
+            error(
+                "invalid-json-input-type",
+                location,
+                f"expected bytes or str, got {type(payload).__name__}",
+            )
+        ]
+    try:
+        value = json.loads(
+            text,
+            object_pairs_hook=_strict_object,
+            parse_constant=_reject_json_constant,
+            parse_float=_strict_float,
+            parse_int=_strict_integer,
+        )
+    except _DuplicateJSONObjectKey as exc:
+        return None, [
+            error(
+                "duplicate-json-object-key",
+                location,
+                f"object member {exc.key!r} appears more than once",
+            )
+        ]
+    except _NonFiniteJSONNumber as exc:
+        return None, [
+            error(
+                "non-finite-json-number",
+                location,
+                f"JSON numeric token {exc.token!r} is not finite",
+            )
+        ]
+    except _JSONNumberOutOfRange:
+        return None, [
+            error(
+                "json-number-out-of-range",
+                location,
+                "JSON number is outside the supported decoder range",
+            )
+        ]
+    except RecursionError:
+        return None, [
+            error(
+                "json-nesting-too-deep",
+                location,
+                f"container depth exceeds {MAX_JSON_CONTAINER_DEPTH}",
+            )
+        ]
+    except json.JSONDecodeError as exc:
+        return None, [
+            error(
+                "invalid-json",
+                location,
+                f"{exc.msg} at line {exc.lineno} column {exc.colno}",
+            )
+        ]
+    except (OverflowError, ValueError):
+        # Python's integer digit guard and decoder numeric failures are
+        # deliberately normalized instead of escaping as implementation detail.
+        return None, [
+            error(
+                "json-number-out-of-range",
+                location,
+                "JSON number is outside the supported decoder range",
+            )
+        ]
+    boundary_findings = _decoded_boundary_findings(value, location)
+    return (None, boundary_findings) if boundary_findings else (value, [])
+
+
+def validate_schema_definition_identity(
+    value: Any,
+    expected_id: str,
+    location: str,
+) -> list[Finding]:
+    """Apply the existing schema-registry object and exact-ID checks.
+
+    This intentionally is not recursive JSON Schema meta-validation. Runtime
+    artifacts are validated by the compact evaluator after their schema blob
+    has passed the strict decoder and this identity boundary.
+    """
+
+    if not isinstance(value, dict):
+        return [
+            error(
+                "schema-definition-not-an-object",
+                location,
+                f"expected object, got {type(value).__name__}",
+            )
+        ]
+    if value.get("$id") != expected_id:
+        return [
+            error(
+                "wrong-schema-id",
+                location,
+                f"expected {expected_id}, got {value.get('$id')!r}",
+            )
+        ]
+    return []
+
+
+def validate_live_arm_pin_semantics(
+    value: Any,
+    location: str,
+) -> list[Finding]:
+    """Enforce the closed result pin's state/null cross-field contract."""
+
+    if not isinstance(value, dict):
+        return [
+            error(
+                "live-arm-pin-not-an-object",
+                location,
+                f"expected object, got {type(value).__name__}",
+            )
+        ]
+    state = value.get("state")
+    anchor = value.get("anchor")
+    arm = value.get("arm")
+    if state == "unavailable" and anchor is None and arm is None:
+        return []
+    if state == "verified" and isinstance(anchor, dict) and isinstance(arm, dict):
+        return []
+    return [
+        error(
+            "live-arm-pin-state-inconsistent",
+            location,
+            "unavailable requires null anchor and arm; verified requires both objects",
+        )
+    ]
+
+
 def path_components_safe(value: str) -> bool:
-    """Reject paths unsafe for byte-exact Git subprocess arguments."""
+    """Accept one canonical repository-relative lexical POSIX spelling."""
 
     if (
-        not value
+        not isinstance(value, str)
+        or not value
         or value.startswith("/")
         or "\\" in value
         or any(
@@ -277,8 +612,10 @@ def path_components_safe(value: str) -> bool:
         )
     ):
         return False
-    return all(
-        part not in ("", ".", "..") for part in PurePosixPath(value).parts
+    parts = value.split("/")
+    return (
+        all(part not in ("", ".", "..") for part in parts)
+        and PurePosixPath(value).as_posix() == value
     )
 
 
@@ -342,6 +679,7 @@ class DerivationRow:
     claim_id: str
     path: str
     locus: str
+    path_existed_in_predecessor: bool
     locus_existed_in_predecessor: bool
     predecessor_behaviour: str
     candidate_behaviour: str
@@ -431,6 +769,7 @@ class RecordModel:
 @dataclass(frozen=True)
 class ManifestObligation:
     obligation_id: str
+    origin_generation: int
     closure_validation_ids: frozenset[str]
 
 
@@ -465,6 +804,9 @@ class ManifestModel:
     def obligation_map(self) -> dict[str, frozenset[str]]:
         return {row.obligation_id: row.closure_validation_ids for row in self.obligations}
 
+    def obligation_origin_map(self) -> dict[str, int]:
+        return {row.obligation_id: row.origin_generation for row in self.obligations}
+
     def validation_argv(self) -> dict[str, tuple[str, ...]]:
         return {row.validation_id: row.argv for row in self.validations}
 
@@ -495,6 +837,25 @@ def _observations(raw: Any) -> Observations:
         negative_control=_str(data.get("negative_control")),
         negative_control_ref_ids=_tuple(data.get("negative_control_ref_ids")),
     )
+
+
+def _array_items(
+    raw: dict[str, Any],
+    key: str,
+    location: str,
+    findings: list[Finding],
+) -> list[Any]:
+    value = raw.get(key)
+    if not isinstance(value, list):
+        findings.append(
+            error(
+                "record-array-invalid",
+                f"{location}.{key}",
+                f"expected array, got {type(value).__name__}",
+            )
+        )
+        return []
+    return value
 
 
 def parse_record(
@@ -555,9 +916,7 @@ def parse_record(
         authority=authority,
     )
     artifacts: list[ArtifactRef] = []
-    for index, item in enumerate(
-        raw.get("artifacts") if isinstance(raw.get("artifacts"), list) else []
-    ):
+    for index, item in enumerate(_array_items(raw, "artifacts", location, findings)):
         if not isinstance(item, dict):
             findings.append(
                 error("artifact-not-an-object", f"{location}.artifacts[{index}]", "")
@@ -575,7 +934,7 @@ def parse_record(
         )
     path_reviews: list[PathReview] = []
     for index, item in enumerate(
-        raw.get("path_reviews") if isinstance(raw.get("path_reviews"), list) else []
+        _array_items(raw, "path_reviews", location, findings)
     ):
         if not isinstance(item, dict):
             findings.append(
@@ -583,10 +942,25 @@ def parse_record(
             )
             continue
         surfaces: list[Surface] = []
-        for surface in (
-            item.get("surfaces") if isinstance(item.get("surfaces"), list) else []
-        ):
+        raw_surfaces = item.get("surfaces")
+        if not isinstance(raw_surfaces, list):
+            findings.append(
+                error(
+                    "path-review-surfaces-invalid",
+                    f"{location}.path_reviews[{index}].surfaces",
+                    f"expected array, got {type(raw_surfaces).__name__}",
+                )
+            )
+            raw_surfaces = []
+        for surface_index, surface in enumerate(raw_surfaces):
             if not isinstance(surface, dict):
+                findings.append(
+                    error(
+                        "surface-not-an-object",
+                        f"{location}.path_reviews[{index}].surfaces[{surface_index}]",
+                        f"got {type(surface).__name__}",
+                    )
+                )
                 continue
             surfaces.append(
                 Surface(
@@ -605,12 +979,17 @@ def parse_record(
             )
         )
     obligations: list[ObligationRow] = []
-    for item in (
-        raw.get("prior_obligations")
-        if isinstance(raw.get("prior_obligations"), list)
-        else []
+    for index, item in enumerate(
+        _array_items(raw, "prior_obligations", location, findings)
     ):
         if not isinstance(item, dict):
+            findings.append(
+                error(
+                    "prior-obligation-not-an-object",
+                    f"{location}.prior_obligations[{index}]",
+                    f"got {type(item).__name__}",
+                )
+            )
             continue
         obligations.append(
             ObligationRow(
@@ -625,10 +1004,17 @@ def parse_record(
             )
         )
     new_findings: list[FindingRow] = []
-    for item in (
-        raw.get("new_findings") if isinstance(raw.get("new_findings"), list) else []
+    for index, item in enumerate(
+        _array_items(raw, "new_findings", location, findings)
     ):
         if not isinstance(item, dict):
+            findings.append(
+                error(
+                    "new-finding-not-an-object",
+                    f"{location}.new_findings[{index}]",
+                    f"got {type(item).__name__}",
+                )
+            )
             continue
         new_findings.append(
             FindingRow(
@@ -640,17 +1026,38 @@ def parse_record(
             )
         )
     derivations: list[DerivationRow] = []
-    for item in (
-        raw.get("derivations") if isinstance(raw.get("derivations"), list) else []
+    for index, item in enumerate(
+        _array_items(raw, "derivations", location, findings)
     ):
         if not isinstance(item, dict):
+            findings.append(
+                error(
+                    "derivation-not-an-object",
+                    f"{location}.derivations[{index}]",
+                    f"got {type(item).__name__}",
+                )
+            )
             continue
-        evidence = item.get("evidence") if isinstance(item.get("evidence"), dict) else {}
+        raw_evidence = item.get("evidence")
+        if not isinstance(raw_evidence, dict):
+            findings.append(
+                error(
+                    "derivation-evidence-not-an-object",
+                    f"{location}.derivations[{index}].evidence",
+                    f"got {type(raw_evidence).__name__}",
+                )
+            )
+            raw_evidence = {}
+        evidence = raw_evidence
         derivations.append(
             DerivationRow(
                 claim_id=_str(item.get("claim_id")),
                 path=_str(item.get("path")),
                 locus=_str(item.get("locus")),
+                path_existed_in_predecessor=item.get(
+                    "path_existed_in_predecessor"
+                )
+                is True,
                 locus_existed_in_predecessor=item.get("locus_existed_in_predecessor")
                 is True,
                 predecessor_behaviour=_str(item.get("predecessor_behaviour")),
@@ -662,10 +1069,17 @@ def parse_record(
             )
         )
     validations: list[ValidationRow] = []
-    for item in (
-        raw.get("validations") if isinstance(raw.get("validations"), list) else []
+    for index, item in enumerate(
+        _array_items(raw, "validations", location, findings)
     ):
         if not isinstance(item, dict):
+            findings.append(
+                error(
+                    "validation-not-an-object",
+                    f"{location}.validations[{index}]",
+                    f"got {type(item).__name__}",
+                )
+            )
             continue
         exit_code = item.get("exit_code")
         validations.append(
@@ -681,11 +1095,17 @@ def parse_record(
                 log_complete=item.get("log_complete") is True,
             )
         )
-    terminal_raw = (
-        raw.get("terminalization")
-        if isinstance(raw.get("terminalization"), dict)
-        else {}
-    )
+    terminal_value = raw.get("terminalization")
+    if not isinstance(terminal_value, dict):
+        findings.append(
+            error(
+                "terminalization-not-an-object",
+                f"{location}.terminalization",
+                f"got {type(terminal_value).__name__}",
+            )
+        )
+        terminal_value = {}
+    terminal_raw = terminal_value
     record = RecordModel(
         control_id=_str(raw.get("control_id")),
         generation=_int(raw.get("generation")),
@@ -707,7 +1127,25 @@ def parse_record(
             event_evidence_ref=_str(terminal_raw.get("event_evidence_ref")),
         ),
     )
-    return record, findings
+    repeated_derivations = duplicates([row.claim_id for row in record.derivations])
+    if repeated_derivations:
+        findings.append(
+            error(
+                "duplicate-record-derivation-claim-id",
+                f"{location}.derivations",
+                repr(repeated_derivations),
+            )
+        )
+    repeated_validations = duplicates([row.id for row in record.validations])
+    if repeated_validations:
+        findings.append(
+            error(
+                "duplicate-record-validation-id",
+                f"{location}.validations",
+                repr(repeated_validations),
+            )
+        )
+    return (None, findings) if findings else (record, [])
 
 
 def parse_manifest(
@@ -726,49 +1164,79 @@ def parse_manifest(
             )
         )
         return None, findings
-    authority = (
-        raw.get("predecessor_authority")
-        if isinstance(raw.get("predecessor_authority"), dict)
-        else {}
-    )
-    obligations = tuple(
-        ManifestObligation(
-            obligation_id=_str(item.get("obligation_id")),
-            closure_validation_ids=frozenset(_tuple(item.get("closure_validation_ids"))),
+    authority_value = raw.get("predecessor_authority")
+    if not isinstance(authority_value, dict):
+        findings.append(
+            error(
+                "manifest-authority-not-an-object",
+                f"{location}.predecessor_authority",
+                f"got {type(authority_value).__name__}",
+            )
         )
-        for item in (
-            raw.get("prior_obligations")
-            if isinstance(raw.get("prior_obligations"), list)
-            else []
+        authority_value = {}
+    authority = authority_value
+    obligation_rows = _array_items(raw, "prior_obligations", location, findings)
+    obligations_list: list[ManifestObligation] = []
+    for index, item in enumerate(obligation_rows):
+        if not isinstance(item, dict):
+            findings.append(
+                error(
+                    "manifest-obligation-not-an-object",
+                    f"{location}.prior_obligations[{index}]",
+                    f"got {type(item).__name__}",
+                )
+            )
+            continue
+        obligations_list.append(
+            ManifestObligation(
+                obligation_id=_str(item.get("obligation_id")),
+                origin_generation=_int(item.get("origin_generation")),
+                closure_validation_ids=frozenset(
+                    _tuple(item.get("closure_validation_ids"))
+                ),
+            )
         )
-        if isinstance(item, dict)
-    )
-    claims = tuple(
-        ManifestClaim(
-            claim_id=_str(item.get("claim_id")),
-            kind=_str(item.get("kind")),
-            obligation_id=_opt_str(item.get("obligation_id")),
-            locus_path=_str(item.get("locus_path")),
+    obligations = tuple(obligations_list)
+    claim_rows = _array_items(raw, "parity_closure_claims", location, findings)
+    claims_list: list[ManifestClaim] = []
+    for index, item in enumerate(claim_rows):
+        if not isinstance(item, dict):
+            findings.append(
+                error(
+                    "manifest-claim-not-an-object",
+                    f"{location}.parity_closure_claims[{index}]",
+                    f"got {type(item).__name__}",
+                )
+            )
+            continue
+        claims_list.append(
+            ManifestClaim(
+                claim_id=_str(item.get("claim_id")),
+                kind=_str(item.get("kind")),
+                obligation_id=_opt_str(item.get("obligation_id")),
+                locus_path=_str(item.get("locus_path")),
+            )
         )
-        for item in (
-            raw.get("parity_closure_claims")
-            if isinstance(raw.get("parity_closure_claims"), list)
-            else []
+    claims = tuple(claims_list)
+    validation_rows = _array_items(raw, "required_validations", location, findings)
+    validations_list: list[ManifestValidation] = []
+    for index, item in enumerate(validation_rows):
+        if not isinstance(item, dict):
+            findings.append(
+                error(
+                    "manifest-validation-not-an-object",
+                    f"{location}.required_validations[{index}]",
+                    f"got {type(item).__name__}",
+                )
+            )
+            continue
+        validations_list.append(
+            ManifestValidation(
+                validation_id=_str(item.get("validation_id")),
+                argv=_tuple(item.get("argv")),
+            )
         )
-        if isinstance(item, dict)
-    )
-    validations = tuple(
-        ManifestValidation(
-            validation_id=_str(item.get("validation_id")),
-            argv=_tuple(item.get("argv")),
-        )
-        for item in (
-            raw.get("required_validations")
-            if isinstance(raw.get("required_validations"), list)
-            else []
-        )
-        if isinstance(item, dict)
-    )
+    validations = tuple(validations_list)
     manifest = ManifestModel(
         manifest_id=_str(raw.get("manifest_id")),
         generation=_int(raw.get("generation")),
@@ -784,7 +1252,26 @@ def parse_manifest(
         claims=claims,
         validations=validations,
     )
-    return manifest, findings
+    for code, item_location, repeated in (
+        (
+            "duplicate-manifest-obligation-id",
+            f"{location}.prior_obligations",
+            duplicates([row.obligation_id for row in manifest.obligations]),
+        ),
+        (
+            "duplicate-manifest-claim-id",
+            f"{location}.parity_closure_claims",
+            duplicates([row.claim_id for row in manifest.claims]),
+        ),
+        (
+            "duplicate-manifest-validation-id",
+            f"{location}.required_validations",
+            duplicates([row.validation_id for row in manifest.validations]),
+        ),
+    ):
+        if repeated:
+            findings.append(error(code, item_location, repr(repeated)))
+    return (None, findings) if findings else (manifest, [])
 
 
 def duplicates(values: tuple[str, ...] | list[str]) -> list[str]:

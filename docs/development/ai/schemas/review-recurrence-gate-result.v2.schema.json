@@ -1,0 +1,955 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codefire.dev/schemas/ai/review-recurrence-gate-result.v2.schema.json",
+  "title": "CodeFire review recurrence gate result v2",
+  "description": "Closed retention-authoritative result for a successfully parsed recurrence-v2 record. Machine-local path fields remain named and closed; semantic replay deliberately excludes only analysed_git_root, validator_source_root, record, and deciding_gate.source_root while rechecking every stable authority and decision field.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "input_schema",
+    "record_sha256",
+    "analysed_git_root",
+    "validator_source_root",
+    "git_verified",
+    "deciding_gate",
+    "invalid_utf8_paths",
+    "live_arm_pin",
+    "live_arm",
+    "limits",
+    "control_id",
+    "generation",
+    "candidate",
+    "authority_chain",
+    "timed_validations",
+    "rows",
+    "metrics",
+    "successor_obligation_ids",
+    "record_valid",
+    "review_decision",
+    "integration_decision",
+    "blockers",
+    "findings",
+    "finding_count"
+  ],
+  "properties": {
+    "schema": {
+      "const": "codefire.review_recurrence_gate_result.v2"
+    },
+    "input_schema": {
+      "const": "codefire.review_recurrence_control.v2"
+    },
+    "record_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "analysed_git_root": {
+      "$ref": "#/$defs/absolute_path"
+    },
+    "validator_source_root": {
+      "$ref": "#/$defs/absolute_path"
+    },
+    "record": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Known optional CLI-added machine-local input path; it is never retained authority."
+    },
+    "git_verified": {
+      "type": "boolean"
+    },
+    "deciding_gate": {
+      "$ref": "#/$defs/deciding_gate"
+    },
+    "invalid_utf8_paths": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "live_arm_pin": {
+      "$ref": "#/$defs/live_arm_pin"
+    },
+    "live_arm": {
+      "type": ["string", "null"],
+      "enum": ["cargo", "kgi_kpi", null]
+    },
+    "limits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "control_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "authority_chain": {
+      "$ref": "#/$defs/authority_chain"
+    },
+    "timed_validations": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/timed_validation"
+      }
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/row"
+      }
+    },
+    "metrics": {
+      "$ref": "#/$defs/metrics"
+    },
+    "successor_obligation_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "record_valid": {
+      "type": "boolean"
+    },
+    "review_decision": {
+      "enum": ["accept", "request_changes", "block"]
+    },
+    "integration_decision": {
+      "enum": ["ALLOW", "BLOCK"]
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "finding_count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "repository_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^/\\\\\\u0000-\\u001F\\u007F][^\\\\\\u0000-\\u001F\\u007F]*$"
+    },
+    "absolute_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^/"
+    },
+    "nullable_commit": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "nullable_sha256": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact_pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "path", "sha256", "mode"],
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/commit"
+        },
+        "path": {
+          "$ref": "#/$defs/repository_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mode": {
+          "const": "100644"
+        }
+      }
+    },
+    "live_arm_pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "anchor", "arm"],
+      "properties": {
+        "state": {
+          "enum": ["unavailable", "verified"]
+        },
+        "anchor": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["validator_commit", "path", "mode", "sha256"],
+          "properties": {
+            "validator_commit": {
+              "$ref": "#/$defs/commit"
+            },
+            "path": {
+              "$ref": "#/$defs/repository_path"
+            },
+            "mode": {
+              "const": "100644"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "arm": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": [
+            "arm",
+            "generation",
+            "predecessor_authority_commit",
+            "repair_packet",
+            "repair_manifest"
+          ],
+          "properties": {
+            "arm": {
+              "enum": ["cargo", "kgi_kpi"]
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "predecessor_authority_commit": {
+              "$ref": "#/$defs/commit"
+            },
+            "repair_packet": {
+              "$ref": "#/$defs/artifact_pin"
+            },
+            "repair_manifest": {
+              "$ref": "#/$defs/artifact_pin"
+            }
+          }
+        }
+      }
+    },
+    "gate_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "mode", "sha256", "committed_sha256"],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/repository_path"
+        },
+        "mode": {
+          "type": ["string", "null"]
+        },
+        "sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "committed_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        }
+      }
+    },
+    "gate_worktree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "index_flagged_entries"],
+      "properties": {
+        "status": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "index_flagged_entries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "deciding_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_root", "source_revision", "state", "artifacts"],
+      "properties": {
+        "source_root": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/nullable_commit"
+        },
+        "source_tree": {
+          "$ref": "#/$defs/nullable_commit"
+        },
+        "state": {
+          "enum": [
+            "unavailable",
+            "untracked",
+            "uncommitted_modification",
+            "uncommitted_worktree",
+            "clean_committed"
+          ]
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gate_artifact"
+          }
+        },
+        "worktree": {
+          "$ref": "#/$defs/gate_worktree"
+        },
+        "detail": {
+          "type": "string"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "predecessor_candidate_revision",
+        "candidate_revision",
+        "candidate_tree",
+        "patch_sha256",
+        "changed_paths"
+      ],
+      "properties": {
+        "predecessor_candidate_revision": {
+          "$ref": "#/$defs/commit"
+        },
+        "candidate_revision": {
+          "$ref": "#/$defs/commit"
+        },
+        "candidate_tree": {
+          "$ref": "#/$defs/commit"
+        },
+        "patch_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "changed_paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/repository_path"
+          }
+        }
+      }
+    },
+    "authority_link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "candidate_revision",
+        "retention_commit",
+        "record_path",
+        "record_sha256",
+        "result_path",
+        "result_sha256",
+        "successor_obligation_ids",
+        "deciding_gate"
+      ],
+      "properties": {
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "candidate_revision": {
+          "$ref": "#/$defs/commit"
+        },
+        "retention_commit": {
+          "$ref": "#/$defs/commit"
+        },
+        "record_path": {
+          "$ref": "#/$defs/repository_path"
+        },
+        "record_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "result_path": {
+          "$ref": "#/$defs/repository_path"
+        },
+        "result_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "successor_obligation_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "deciding_gate": {
+          "$ref": "#/$defs/deciding_gate"
+        }
+      }
+    },
+    "validator_identity_divergence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "historical_gate_revision",
+        "current_gate_revision",
+        "disposition",
+        "historical_decision_disposition",
+        "inherits_current_authority",
+        "migration",
+        "note"
+      ],
+      "properties": {
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "historical_gate_revision": {
+          "$ref": "#/$defs/commit"
+        },
+        "current_gate_revision": {
+          "$ref": "#/$defs/commit"
+        },
+        "disposition": {
+          "const": "compatibility_authorized"
+        },
+        "historical_decision_disposition": {
+          "const": "retained_without_semantic_reproof"
+        },
+        "inherits_current_authority": {
+          "const": false
+        },
+        "migration": {
+          "const": "current_gate_full_semantic_replay"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "revalidated_generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "candidate_revision",
+        "current_gate_structurally_valid",
+        "historical_blocker_count",
+        "retained_integration_decision",
+        "current_gate_replayed_integration_decision"
+      ],
+      "properties": {
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "candidate_revision": {
+          "$ref": "#/$defs/commit"
+        },
+        "current_gate_structurally_valid": {
+          "type": "boolean"
+        },
+        "historical_blocker_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retained_integration_decision": {
+          "enum": ["ALLOW", "BLOCK"]
+        },
+        "current_gate_replayed_integration_decision": {
+          "enum": ["ALLOW", "BLOCK"]
+        }
+      }
+    },
+    "authority_chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "rooted",
+        "root_arm",
+        "root_commit",
+        "depth",
+        "links",
+        "validator_identity_divergences",
+        "revalidated_generations"
+      ],
+      "properties": {
+        "kind": {
+          "enum": ["prior_v2_record", "legacy_bootstrap_report"]
+        },
+        "rooted": {
+          "type": "boolean"
+        },
+        "root_arm": {
+          "type": ["string", "null"],
+          "enum": ["cargo", "kgi_kpi", null]
+        },
+        "root_commit": {
+          "$ref": "#/$defs/nullable_commit"
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/authority_link"
+          }
+        },
+        "validator_identity_divergences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/validator_identity_divergence"
+          }
+        },
+        "revalidated_generations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/revalidated_generation"
+          }
+        }
+      }
+    },
+    "timed_validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result_revision",
+        "result_tree",
+        "status",
+        "exit_code",
+        "timed_out",
+        "log_complete",
+        "clean_before",
+        "clean_after",
+        "index_flags_clean",
+        "head_unchanged",
+        "log_inside_source_worktree",
+        "result_inside_source_worktree",
+        "log_bytes",
+        "log_sha256",
+        "passing"
+      ],
+      "properties": {
+        "result_revision": {
+          "$ref": "#/$defs/commit"
+        },
+        "result_tree": {
+          "$ref": "#/$defs/commit"
+        },
+        "status": {
+          "enum": ["passed", "failed"]
+        },
+        "exit_code": {
+          "type": ["integer", "null"]
+        },
+        "timed_out": {
+          "type": "boolean"
+        },
+        "log_complete": {
+          "type": "boolean"
+        },
+        "clean_before": {
+          "type": "boolean"
+        },
+        "clean_after": {
+          "type": "boolean"
+        },
+        "index_flags_clean": {
+          "type": "boolean"
+        },
+        "head_unchanged": {
+          "type": "boolean"
+        },
+        "log_inside_source_worktree": {
+          "type": "boolean"
+        },
+        "result_inside_source_worktree": {
+          "type": "boolean"
+        },
+        "log_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "log_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "passing": {
+          "type": "boolean"
+        }
+      }
+    },
+    "evidence_state": {
+      "enum": [
+        "DEFECT_REPRODUCED",
+        "DEFECT_SOURCE_PROVEN",
+        "DEFECT_INJECTION_ONLY",
+        "CLOSURE_UNPROVEN",
+        "ORACLE_VACUOUS",
+        "CLAIM_FALSE",
+        "SCOPE_BOUNDARY",
+        "REQUIREMENT_UNSATISFIABLE",
+        "CLOSED_PROVEN"
+      ]
+    },
+    "next_action": {
+      "enum": [
+        "PRODUCT_REPAIR",
+        "RUN_CLOSURE_EVIDENCE",
+        "REPAIR_ORACLE",
+        "REPAIR_CLAIM",
+        "DOCUMENT_NON_REACHABILITY",
+        "MANAGER_SCOPE_DECISION",
+        "MANAGER_REQUIREMENT_DECISION",
+        "NONE"
+      ]
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "row_id",
+        "section",
+        "evidence_state",
+        "next_action",
+        "continuity",
+        "closure_proven",
+        "blocking",
+        "reasons"
+      ],
+      "properties": {
+        "row_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "section": {
+          "enum": ["prior_obligations", "new_findings"]
+        },
+        "evidence_state": {
+          "$ref": "#/$defs/evidence_state"
+        },
+        "next_action": {
+          "$ref": "#/$defs/next_action"
+        },
+        "continuity": {
+          "enum": [
+            "not_applicable",
+            "predecessor_state_unavailable",
+            "recurred_after_proven_closure",
+            "closed_this_generation",
+            "continuous_open"
+          ]
+        },
+        "closure_proven": {
+          "type": "boolean"
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "claim_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "kind",
+        "obligation_id",
+        "locus_path",
+        "derivation_path",
+        "locus",
+        "path_existed_in_predecessor",
+        "locus_existed_in_predecessor",
+        "predecessor_behaviour",
+        "candidate_behaviour",
+        "evidence_state",
+        "evidence_ref_ids",
+        "disposition",
+        "next_action"
+      ],
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "kind": {
+          "enum": ["parity", "closure"]
+        },
+        "obligation_id": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "locus_path": {
+          "$ref": "#/$defs/repository_path"
+        },
+        "derivation_path": {
+          "$ref": "#/$defs/repository_path"
+        },
+        "locus": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path_existed_in_predecessor": {
+          "type": "boolean"
+        },
+        "locus_existed_in_predecessor": {
+          "type": "boolean"
+        },
+        "predecessor_behaviour": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_behaviour": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_state": {
+          "enum": ["available", "unavailable"]
+        },
+        "evidence_ref_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "disposition": {
+          "enum": [
+            "derivation_complete",
+            "derivation_contradicted",
+            "derivation_unavailable"
+          ]
+        },
+        "next_action": {
+          "$ref": "#/$defs/next_action"
+        }
+      }
+    },
+    "action_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "PRODUCT_REPAIR",
+        "RUN_CLOSURE_EVIDENCE",
+        "REPAIR_ORACLE",
+        "REPAIR_CLAIM",
+        "DOCUMENT_NON_REACHABILITY",
+        "MANAGER_SCOPE_DECISION",
+        "MANAGER_REQUIREMENT_DECISION",
+        "NONE"
+      ],
+      "properties": {
+        "PRODUCT_REPAIR": {"type": "integer", "minimum": 0},
+        "RUN_CLOSURE_EVIDENCE": {"type": "integer", "minimum": 0},
+        "REPAIR_ORACLE": {"type": "integer", "minimum": 0},
+        "REPAIR_CLAIM": {"type": "integer", "minimum": 0},
+        "DOCUMENT_NON_REACHABILITY": {"type": "integer", "minimum": 0},
+        "MANAGER_SCOPE_DECISION": {"type": "integer", "minimum": 0},
+        "MANAGER_REQUIREMENT_DECISION": {"type": "integer", "minimum": 0},
+        "NONE": {"type": "integer", "minimum": 0}
+      }
+    },
+    "evidence_state_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "DEFECT_REPRODUCED",
+        "DEFECT_SOURCE_PROVEN",
+        "DEFECT_INJECTION_ONLY",
+        "CLOSURE_UNPROVEN",
+        "ORACLE_VACUOUS",
+        "CLAIM_FALSE",
+        "SCOPE_BOUNDARY",
+        "REQUIREMENT_UNSATISFIABLE",
+        "CLOSED_PROVEN"
+      ],
+      "properties": {
+        "DEFECT_REPRODUCED": {"type": "integer", "minimum": 0},
+        "DEFECT_SOURCE_PROVEN": {"type": "integer", "minimum": 0},
+        "DEFECT_INJECTION_ONLY": {"type": "integer", "minimum": 0},
+        "CLOSURE_UNPROVEN": {"type": "integer", "minimum": 0},
+        "ORACLE_VACUOUS": {"type": "integer", "minimum": 0},
+        "CLAIM_FALSE": {"type": "integer", "minimum": 0},
+        "SCOPE_BOUNDARY": {"type": "integer", "minimum": 0},
+        "REQUIREMENT_UNSATISFIABLE": {"type": "integer", "minimum": 0},
+        "CLOSED_PROVEN": {"type": "integer", "minimum": 0}
+      }
+    },
+    "nullable_nonnegative_integer": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["i1", "i5", "repair_surface", "obligations"],
+      "properties": {
+        "i1": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "manifest_claims",
+            "derivation_rows",
+            "rows_unavailable",
+            "changed_surface_coverage",
+            "claim_coverage",
+            "derivation_next_action_counts",
+            "blocking_derivations"
+          ],
+          "properties": {
+            "manifest_claims": {
+              "$ref": "#/$defs/nullable_nonnegative_integer"
+            },
+            "derivation_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "rows_unavailable": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "changed_surface_coverage": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["changed_paths", "paths_with_surface", "surfaces"],
+              "properties": {
+                "changed_paths": {"type": "integer", "minimum": 0},
+                "paths_with_surface": {"type": "integer", "minimum": 0},
+                "surfaces": {"type": "integer", "minimum": 0}
+              }
+            },
+            "claim_coverage": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/claim_coverage"
+              }
+            },
+            "derivation_next_action_counts": {
+              "$ref": "#/$defs/action_counts"
+            },
+            "blocking_derivations": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "i5": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "evidence_state_counts",
+            "next_action_counts",
+            "blocking_rows",
+            "unavailable_negative_control_rows",
+            "product_repair_required",
+            "scope_referrals",
+            "comparison_note"
+          ],
+          "properties": {
+            "evidence_state_counts": {
+              "$ref": "#/$defs/evidence_state_counts"
+            },
+            "next_action_counts": {
+              "$ref": "#/$defs/action_counts"
+            },
+            "blocking_rows": {"type": "integer", "minimum": 0},
+            "unavailable_negative_control_rows": {"type": "integer", "minimum": 0},
+            "product_repair_required": {"type": "boolean"},
+            "scope_referrals": {"type": "integer", "minimum": 0},
+            "comparison_note": {"type": "string", "minLength": 1}
+          }
+        },
+        "repair_surface": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "paths",
+            "inserted_lines",
+            "deleted_lines",
+            "binary_paths",
+            "repair_commits",
+            "measurement_only"
+          ],
+          "properties": {
+            "paths": {"$ref": "#/$defs/nullable_nonnegative_integer"},
+            "inserted_lines": {"$ref": "#/$defs/nullable_nonnegative_integer"},
+            "deleted_lines": {"$ref": "#/$defs/nullable_nonnegative_integer"},
+            "binary_paths": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/repository_path"}
+            },
+            "repair_commits": {"$ref": "#/$defs/nullable_nonnegative_integer"},
+            "measurement_only": {"type": "string", "minLength": 1}
+          }
+        },
+        "obligations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "prior",
+            "new",
+            "closed_proven",
+            "predecessor_obligation_completeness"
+          ],
+          "properties": {
+            "prior": {"type": "integer", "minimum": 0},
+            "new": {"type": "integer", "minimum": 0},
+            "closed_proven": {"type": "integer", "minimum": 0},
+            "predecessor_obligation_completeness": {
+              "enum": ["verified", "unavailable"]
+            }
+          }
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "code", "path", "message"],
+      "properties": {
+        "level": {
+          "enum": ["error", "warning"]
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

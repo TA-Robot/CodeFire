@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codefire.dev/schemas/ai/review-recurrence-live-arm-anchor.v1.schema.json",
+  "title": "CodeFire review recurrence live-arm anchor v1",
+  "description": "Closed manager-owned authority selecting at most one Cargo and one KGI/KPI live generation. Schema validity proves shape only; the recurrence gate separately binds generation, commit, path, mode and digest to the clean validator repository and current or retained record.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "arms"],
+  "properties": {
+    "schema": {
+      "const": "codefire.review_recurrence_live_arm_anchor.v1"
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/arm"
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "repository_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^/\\\\\\u0000-\\u001F\\u007F][^\\\\\\u0000-\\u001F\\u007F]*$",
+      "description": "Runtime validation requires the exact canonical safe repository-relative POSIX spelling."
+    },
+    "artifact_pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "path", "sha256", "mode"],
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/commit"
+        },
+        "path": {
+          "$ref": "#/$defs/repository_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mode": {
+          "const": "100644"
+        }
+      }
+    },
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm",
+        "generation",
+        "predecessor_authority_commit",
+        "repair_packet",
+        "repair_manifest"
+      ],
+      "properties": {
+        "arm": {
+          "enum": ["cargo", "kgi_kpi"]
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "predecessor_authority_commit": {
+          "$ref": "#/$defs/commit"
+        },
+        "repair_packet": {
+          "$ref": "#/$defs/artifact_pin"
+        },
+        "repair_manifest": {
+          "$ref": "#/$defs/artifact_pin"
+        }
+      }
+    }
+  }
+}

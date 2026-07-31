@@ -452,6 +452,7 @@
         "claim_id",
         "path",
         "locus",
+        "path_existed_in_predecessor",
         "locus_existed_in_predecessor",
         "predecessor_behaviour",
         "candidate_behaviour",
@@ -474,6 +475,10 @@
         },
         "locus_existed_in_predecessor": {
           "type": "boolean"
+        },
+        "path_existed_in_predecessor": {
+          "type": "boolean",
+          "description": "Machine-checked Git tree-entry fact for path. This is distinct from the reviewer's semantic locus-existence judgement."
         },
         "predecessor_behaviour": {
           "type": "string",

@@ -64,10 +64,15 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["obligation_id", "closure_validation_ids"],
+        "required": ["obligation_id", "origin_generation", "closure_validation_ids"],
         "properties": {
           "obligation_id": {
             "$ref": "#/$defs/identifier"
+          },
+          "origin_generation": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Manager-frozen first review generation for this obligation; runtime validation requires it to precede this manifest generation and match rooted authority."
           },
           "closure_validation_ids": {
             "type": "array",
@@ -107,6 +112,7 @@
     "required_validations": {
       "type": "array",
       "uniqueItems": true,
+      "description": "Exact clean, unmodified-candidate argv whose required outcome is exit zero. Expected-rejection, mutation, and manual held-out probes remain parity_closure_claims with independent evidence unless a separately content-bound exit-zero harness is frozen.",
       "items": {
         "type": "object",
         "additionalProperties": false,
