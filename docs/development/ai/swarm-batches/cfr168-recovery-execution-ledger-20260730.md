@@ -2370,3 +2370,77 @@ summary ledgers, and `issue-root-cause-map.json`: three CFB
 (`CFB-133/136/138`) plus six CFR (`CFR-168..173`), nine total. No issue status
 changed. The current disposition-index SHA-256 is
 `e9f5b3891a33802507d8ba67305d7725f1c9f6fde57890a38d6404bb478ce4f8`.
+
+## 2026-07-31 11:32 UTC review-cause analysis decontaminated before launch
+
+No provider had launched the prepared causal classifier, so no worker result
+or provider spend was discarded. Manager inspection found that the prior
+design still exposed a methodological risk: one session was asked to freeze
+calibration, then open the provisional audit, compare it, and inspect temporal
+reports. Its packet also supplied the provisional 51-row census. A content
+freeze reduced post-hoc editing but did not remove model-context contamination
+or count anchoring.
+
+Commits `6e4c8e5b838248899b3c43cb3f170409d3abf777` and
+`c88f0facf71d169dcee706613d54bef05e9c5aae` supersede those launch mechanics
+without rewriting the earlier preparation record:
+
+1. the Fugu blind-calibration lane now starts at exact pre-audit snapshot
+   `c258cbfc061b14905554c9d319b350d2da7f771b`, tree
+   `75135efad20c5908884231b152cde72d0c9be965`;
+2. that snapshot contains exactly 21 `review.md` files but contains neither
+   the provisional root-cause audit nor the three temporal reports;
+3. the blind lane is not told the provisional 51-row result; row count is an
+   outcome and every row must bind one independently testable effect;
+4. a different, currently blocked Fugu session will reconcile effect identity
+   before comparing counts or six-axis values, freeze that comparison, and
+   only then open the temporal reports; and
+5. a fresh Claude session remains blocked until it can adjudicate only the
+   comparator's decision-relevant queue.
+
+The revised reliability gate SHA-256 is
+`8fd0c824f0f87a25b4c6c3eb400033672eb99d73c2b86b16858fc65534b39665`.
+Blind execution ticket, task view, typed packet, and one-lane scheduler
+manifest SHA-256 values are respectively
+`f39259cddcae985014a70d66d618702ff9a7ebe758786ddd54e9204c173eaa23`,
+`31bec81b4c7148b99aa1e0a42b352c9e7f5f4ee7485ea7533b24514fb791b7e4`,
+`98554b90400f263ff53d883f7cb8002b64368ddcc7a68713f31ba955e6b4bcaf`,
+and
+`315fac4193de43f2a10c3fb7578238f2ae70d70631e6757750e38685f3d01488`.
+`dev-swarm validate` and `dev-swarm plan` resolve one Fugu Ultra reviewer,
+Claude/Codex zero, a 12-hour runaway limit, and the exact `c258cbf…` base.
+
+The blocked comparison execution ticket, task view, and typed packet SHA-256
+values are respectively
+`276cde1c03d11c82876a0017fb6f7f965c9a222f2a10b2cc8426fbe16183d82c`,
+`a63331d50b90e712e30bcfea2e03c81c7b9c5aadf713fbded80cfe7faf991d22`,
+and
+`044db1037803311634e0f0e38d2a1c623c9fc1212205e3074226a387fc50dae7`.
+No comparison manifest may be created until the blind report commit/tree,
+bytes, SHA-256, row count, row-identity digest, reproduced-effect set, and
+decision-critical-unavailable set are bound.
+
+The blocked Claude adjudication execution ticket, task view, and typed packet
+SHA-256 values are now
+`364bd76727d359d8042bcc3beb22b191984fa282494c5ffb9cdf87ea12774aeb`,
+`32e308b8da34338c27e6a0270e78f8b4d9e9058814fba1666976416588120a6f`,
+and
+`2c101663e224392e0254e5708827fbba365ec96f4a4125ddd32c95749db810ff`.
+The pilot-resume and general bottleneck gates now require calibration,
+fresh-session comparison, unchanged temporal application, and adjudication;
+their SHA-256 values are
+`884cb2221db840b2b585949c07c762c95696790a6b7613e11222eee3c5bcb9d7`
+and
+`16b0a7a1d16a2213f1e20dd591682a65bedd0fc5c72d753a6f5ddb8b5e4abf0d`.
+
+Before accepting the blind report, the manager must preserve the complete
+Fugu event-log digest and inspect tool calls for access to a newer ref/commit,
+another worktree, the provisional-audit path, any temporal-report path, or
+pilot artifacts. A clean report diff alone does not prove a clean blind input.
+
+The first methodology commit added new untracked Markdown files after the
+initial worktree `git diff --check`; staged `git diff --cached --check`
+therefore exposed six line-ending whitespace warnings only at commit time.
+Commit `c88f0fa…` removes them. Future mixed tracked/untracked documentation
+changes must stage intended files before the final diff check so the final
+gate covers the actual commit set.
