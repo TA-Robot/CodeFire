@@ -2609,3 +2609,66 @@ and
 `7307d4024f08e9c7e4d3a8262a90208f3c94a8692e3ebd41dfce5751e255e5fe`.
 The complete AI-development gate and the one-lane Fugu Ultra manifest
 validate/plan pass at exact base `c258cbf…`; no provider was launched.
+
+## 2026-07-31 12:01 UTC review observations separated from effect episodes
+
+Commit `e3ec4db6c4bcedaeb79f0290d3953852cc1d9266` corrects a remaining
+denominator bias before the blind classifier launches. The prior normalized
+form still counted one report occurrence per row. The same continuously open
+effect could therefore appear in several successor reports and vote several
+times as if it were several independent defects; its local origin could also
+change from repair-introduced in one chain to predecessor-existing in the
+next.
+
+The frozen method now keeps three units separate:
+
+1. one predecessor/review/repair/successor generation chain;
+2. one continuity-proven same-subject/same-effect episode from onset through
+   proven closure or censoring; and
+3. one report observation in one generation.
+
+Episode onset origin and observation-local axes remain independent. Exact
+continuity evidence joins observations; exact closure evidence permits a new
+linked episode; absence of either is `UNAVAILABLE`, not a forced merge or
+split. Same-invariant effects on different subjects remain separate episodes.
+Four explicit sanity cases bind continuation, ambiguous intermediate state,
+closure followed by recurrence, and cross-subject recurrence.
+
+The classifier publishes chain, episode, and observation tables plus
+deterministic identity digests. The comparator freezes all three units before
+temporal access. Every multi-observation link, proven-closure/new-episode
+relation, or identity-unavailable that changes the episode denominator is
+routed to Claude adjudication even when source narratives appear consistent.
+Observation-, unique-episode-, and generation-level aggregates must all name
+their unit; disagreement between units is sensitivity evidence rather than a
+process decision.
+
+The process-change gate now rejects both a fixed 100-item target and an
+unspecified "small sample". A live experiment must preregister an eligible
+cohort and stopping rule, preferably all eligible transitions from one
+canonical freeze through terminal composition, and return
+`INSUFFICIENT_EVIDENCE` rather than extend or stop after observing outcomes.
+
+Current SHA-256 values are:
+
+- reliability gate:
+  `4d45108ed7090ec4d734487df0215db6eb2781b40e6863a431aec13c97fe2c4d`;
+- blind execution ticket / typed packet:
+  `502324191c97425742fcfc563919e6ef93f52acb25c6265add4cd2cb78d3d420` /
+  `6883169cd9cba9f0791fb44cd6a09695b66d855973f32183ef058dd79a38759c`;
+- comparison execution ticket / typed packet:
+  `afda72e648e9146231ea77c4fbddf5cb922a5d93c404a4e1cdfe51a3c70006e3` /
+  `aec4497458bfc37f930094740690408977ab742bfd1290e71c58e007db3bc082`;
+- adjudication execution ticket / typed packet:
+  `d04e00f1cf846da2da1c4fe2dcc563523bc3183159940acc34a1e68be90ace2c` /
+  `298d972baffe6a4f33042603ba4c6bf67f144fd1f3262712960cdb9d943f36bb`;
+- development bottleneck / pilot-resume gates:
+  `e543f7073fc6319b6181be440f91e657e230ea47ad2a37b6a6c6a8388bf37931` /
+  `e08f0a8cccc3bd5943d8955417f9e44de36770630482954751cefe4a09359c1b`;
+  and
+- snapshot preflight:
+  `dfd32317bbbd4b75c26039bfa403ed592b7fd9262572da3385257c4c6dbf00fd`.
+
+JSON parsing, AI contracts, all seven AI-development subgates, and the exact
+one-lane Fugu Ultra manifest validate/plan pass at `c258cbf…`. No provider or
+product lane was launched.
