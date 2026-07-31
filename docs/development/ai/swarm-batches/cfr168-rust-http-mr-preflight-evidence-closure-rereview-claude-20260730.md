@@ -1,6 +1,6 @@
 # CFR-168 Rust HTTP MR Preflight Evidence-Closure Rereview Prep
 
-Status: blocked pending exact candidate and result binding
+Status: candidate-bound; review launch blocked pending profile/process disposition
 
 Provider/model when unblocked: fresh Claude Opus 5 (`claude-opus-5`)
 
@@ -8,7 +8,9 @@ Role: independent reviewer
 
 Mode: report-only
 
-No runnable manifest exists while any subject field remains `UNBOUND`.
+No runnable manifest was created in this rollover. The exact candidate is bound,
+but the manager intentionally withholds reviewer launch while the full-session
+execution-profile and history-rewrite deviations remain explicit.
 
 ## Objective
 
@@ -34,23 +36,49 @@ reviewer session.
 | Repair contract commit | `e3b005a0f371d497b5555442385ece799ab6fd91` |
 | Repair contract tree | `c7905f162b74083e5f36f638246e81adf775696b` |
 | Repair packet SHA-256 | `92f7aaa6c229bef453066be9c606dbc424e2ffa784454d75b32617447bbd6aeb` |
-| Candidate SHA / parent / tree | `UNBOUND` / `UNBOUND` / `UNBOUND` |
-| Additive repair commits `e3b005a..HEAD` | `UNBOUND` |
-| Cumulative binary patch SHA-256 | `UNBOUND` |
-| Exact changed paths/blobs/numstat | `UNBOUND` |
-| Repair result SHA-256 | `UNBOUND` |
-| Exact focused test IDs | `UNBOUND` |
-| Clean tracked/untracked evidence | `UNBOUND` |
+| Candidate SHA / parent / tree | `92fc8103bb4de400eaf40e9db76075130dedbb35` / `4bb2880f8978c79f9b6397f3b3c6df8d5ac5d7bf` / `53ebad73bb99dbead5207efd34c64126ba3bbb0a` |
+| Additive repair commits `e3b005a..HEAD` | `4bb2880f8978c79f9b6397f3b3c6df8d5ac5d7bf`, `92fc8103bb4de400eaf40e9db76075130dedbb35` / `2` |
+| Cumulative binary patch SHA-256 | `68447e39eadc30776ff9367fee10bf18f73d0e2b999c3eb999ad75b87ce1da7a` |
+| Exact changed paths/blobs/numstat | Two paths, bound in `cfr168-rust-http-mr-preflight-evidence-closure-repair-candidate-ready-20260730/candidate.md` |
+| Repair result SHA-256 | `8688d2dbd030e366b49ace99074894b74c6ccf71253f675f942f9e81a6f49983` |
+| Exact focused test IDs | `merge_request_object_work_scales_with_the_reachable_closure_while_response_work_is_flat`; `terminal_response_body_sizes_are_exact_for_the_standard_fixtures`; `http_deadline_phase_identity_does_not_claim_call_site_uniqueness`; `suppression_scope_in_the_prepared_response_region_stays_narrow`; `review_retained_limit_minus_exact_plus_one_is_effect_safe`; `route_unwind_with_a_parked_pair_releases_every_permit_and_stays_terminalizable`; `dual_response_raw_drop_detects_unreleased_resources`; `precommit_accounting_release_failure_is_pre_effect_and_keeps_its_primary_outcome`; `post_commit_cleanup_recorder_fails_closed_when_finish_is_rejected` |
+| Clean tracked/untracked evidence | Manager capture `2026-07-31T02:51:31Z`: checkout HEAD matched `92fc8103…`; porcelain empty; no merge commit; no remaining provider/gate process |
 
 Multiple additive repair commits are permitted. The patch identity is the
 cumulative `e3b005a..CANDIDATE_HEAD`, not `HEAD^..HEAD`.
 
-After candidate freeze, the manager replaces every `UNBOUND`, generates a
-candidate-ready card, creates a review task-base commit immediately above the
-candidate, then creates a manifest whose `base_revision` is that ticket
+The manager recomputed the terminal candidate and generated the candidate-
+ready card below. This ticket commit is immediately above the immutable
+candidate. No manifest was created and no reviewer was launched. When the
+manager later admits review, the manifest `base_revision` must be this ticket
 commit while the immutable reviewed subject remains its parent candidate.
 The reviewer recomputes every identity, no-merge ancestry, commit list, paths,
 patch/result digest, and clean state. A mismatch is `REQUEST_CHANGES`.
+
+Candidate card:
+
+`docs/development/ai/swarm-results/cfr168-rust-http-mr-preflight-evidence-closure-repair-candidate-ready-20260730/candidate.md`
+
+## Manager rollover deviations
+
+The current committed range is clean, linear, and two commits long, but the
+worker did not preserve append-only checkpoint history. Its reflog records two
+WIP commits plus a result commit, a reset back to `e3b005a`, replacement
+product/result commits, and two later amendments of the result commit. The
+terminal result commit is therefore `92fc8103…`, not the earlier observed
+`5cb46e07…`. `5cb46e07…` to `92fc8103…` changes only this repair result
+Markdown; product commit `4bb2880f…` is byte-identical. This ticket binds only
+the terminal identity and does not erase or approve the process deviation.
+
+The exact post-cache-clear shared-profile gate command has zero execution-
+profile violations and passed 25 merge-request tests, 159 HTTP tests, 794 full
+CLI tests, 90 core tests, format, CLI binary/all-target Clippy, and core
+Clippy. The complete implementer session nevertheless audits `BLOCK` because
+11 deliberate scratch regression/probe commands explicitly selected
+`/tmp/cfr168-probe-target` or `/tmp/reg-target`. A combined audit also records
+42 separate File Doctor commands with alternate homes/targets. No broad worker
+gate is authorized for reviewer reuse; the independent reviewer reruns every
+required Cargo gate on the declared shared profile.
 
 ## Scope
 
