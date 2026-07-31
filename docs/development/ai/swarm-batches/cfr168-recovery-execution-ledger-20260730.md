@@ -2146,4 +2146,17 @@ dependency splitting, terminalization, manager queue, gate reuse, provider
 readiness, resource retention, and shared-primitives preflight, and requires
 raw queue/service/rework/burden/guardrail evidence before adoption. No fixed
 finding count or template depth is selected. The packet SHA-256 is
-`351697911abdcbb09a242b2ef3338a638daa0de1a057ec52df617d81bd8583b9`.
+`61e337f2944bd5d11a2eb868f104520cd3b9cef11079eb9575c3cf54cb2a237f`.
+
+The gate does not add a classification dependency to the already prepared
+report-only shared-primitives preflight. That preflight may collect evidence
+without mutating product or accepting rejected behavior; a `READY` result is
+not itself proof of a shared-root cause or speedup.
+
+The current review queue now admits the three exact Claude resumes
+concurrently when the verified adaptive provider window allows. Under a
+constrained window, Cargo `4e5c0e7` precedes Upload `446cf4a` and KGI/KPI
+`753c8db` because its accepted canonical port releases four held Rust gates.
+This is a downstream-release tie-break, not a fixed one-lane cap or a review
+quality judgment. The updated disposition-index SHA-256 is
+`5f5a1f5e3b20385bcb163380f4235b7dbbe4561825d5451da4d3110cacd77991`.

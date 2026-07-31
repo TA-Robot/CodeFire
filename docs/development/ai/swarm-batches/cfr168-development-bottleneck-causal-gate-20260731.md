@@ -264,16 +264,20 @@ raw outcomes and return `INSUFFICIENT_EVIDENCE`.
 ### Card H — Shared primitive preflight
 
 - Hypothesis: `H-NR-09`.
-- Admission: only after the blind review-root-cause classification and
-  adjudication establishes same-invariant recurrence.
-- Intervention: report-only contract preflight; no extraction or product
-  implementation.
+- Admission: the already prepared report-only preflight may run as evidence
+  collection before the blind classification because it mutates no product
+  byte and binds no rejected implementation as accepted behavior.
+- Intervention: enumerate candidate shared contracts from exact immutable
+  findings; no extraction or product implementation.
 - Target: later same-invariant findings captured before surface repair and
   generations avoided.
 - Burden/noise: distinct contracts, duplicated obligations, unavailable
   production entry points, implementer/reviewer artifacts.
 - Guardrails: a rejecting report may describe a required invariant but cannot
   confer acceptance on its product implementation.
+- Interpretation boundary: neither `READY` nor a later MR-write repair proves
+  `H-NR-09` or a speedup. General process adoption and recurrence claims wait
+  for the blind classification, adjudication, and a later eligible subject.
 
 ## Common Outcome Measures
 
@@ -346,4 +350,3 @@ No permanent development-process change is justified by this gate until:
 
 The valid conclusion may be that the current data do not support a process
 change.
-

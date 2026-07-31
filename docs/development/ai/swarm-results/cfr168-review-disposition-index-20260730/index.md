@@ -1,6 +1,7 @@
 # CFR-168 Independent Review Disposition Index
 
 Date: 2026-07-30
+Last updated: 2026-07-31
 
 This index binds every committed independent `review.md` currently present
 under `docs/development/ai/swarm-results/` to one explicit disposition. It
@@ -49,20 +50,24 @@ CFR-168 closure.
 
 ## Current review queue
 
-1. Resume exact Upload reviewer session `239dd18d-…` on clean candidate
-   `446cf4a` after verified Claude capacity. Its report is absent; no Upload
-   product byte is accepted.
-2. Resume exact source-keyed Cargo gate reviewer session `d089c8ae-…` on clean
-   candidate `4e5c0e7` after verified Claude capacity. Only after fresh
-   acceptance may Storage session `c28925df-…` resume or the prepared
-   File-ancestry review consume the gate.
-3. Preserve accepted MR-list candidate `b164046` as an exact input while
+After verified capacity, admit the three conflict-free exact-session resumes
+up to the adaptive provider window; do not serialize them behind a fixed
+single-lane limit. If available capacity is smaller than the ready set, use
+downstream release rather than list position:
+
+1. Resume source-keyed Cargo gate reviewer session `d089c8ae-…` on clean
+   candidate `4e5c0e7`. It has first constrained-slot priority because an
+   accepted canonical port releases four held Rust candidate gates. Acceptance
+   of `4e5c0e7` alone is insufficient; the semantic canonical port and its
+   exact review still follow.
+2. Resume Upload reviewer session `239dd18d-…` on clean candidate `446cf4a`.
+   Its report is absent; no Upload product byte is accepted.
+3. Resume KGI/KPI reviewer session `60548555-…` on clean candidate `753c8db`.
+   Its green manager/worker gates and absent report are not decision evidence.
+4. Preserve accepted MR-list candidate `b164046` as an exact input while
    routing its four non-blocking observations into the shared-primitives /
    POST-precedence successor. Rust HTTP `92fc810` and File Doctor `cd130e5`
    remain source-profile blocked with exact candidate cards already prepared.
-4. Resume exact KGI/KPI reviewer session `60548555-…` on clean candidate
-   `753c8db` after verified Claude capacity. Its green worker gates and absent
-   report are not decision evidence.
 5. The specification-bound shared-primitives preflight is logically `ready`
    at canonical `8929a98` but launch-held by Claude and Fugu provider
    backoffs. Launch MR-write only after a committed `READY`; accepted Upload
