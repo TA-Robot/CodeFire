@@ -1,10 +1,15 @@
 # Development-Flow KGI/KPI Zero-Residual Independent Rereview
 
-Review date: 2026-07-31  
-Reviewer: Fugu Ultra 1.1 independent reviewer  
-Exact candidate: `0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1`  
-Candidate parent: `a6d41a9d7cdae2157cdcc5ca9f9008e4734c4e16`  
-Candidate tree: `c4210c692a2cdf90c8073dbb899d9787eccdd448`  
+Review date: 2026-07-31
+
+Reviewer: Fugu Ultra 1.1 independent reviewer
+
+Exact candidate: `0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1`
+
+Candidate parent: `a6d41a9d7cdae2157cdcc5ca9f9008e4734c4e16`
+
+Candidate tree: `c4210c692a2cdf90c8073dbb899d9787eccdd448`
+
 Implementation diff: `a6d41a9d7cdae2157cdcc5ca9f9008e4734c4e16..0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1`
 
 **Decision: `REQUEST_CHANGES`.**
@@ -596,8 +601,11 @@ Required focused acceptance evidence for the next candidate:
   `0ae583ef8b4cfd26e10ebc1f13564d32a7f5e7e1`.
 - **Files changed by reviewer:** only
   `docs/development/ai/swarm-results/development-flow-kgi-kpi-zero-residual-rereview-fugu-20260730/review.md`.
-- **Substantive report commit:** populated after the first report-only commit; see the metadata line
-  added in the final report-only commit.
+- **Substantive report commit:** `5082a295fa898d24d9f17602505e5eea806d2601`
+  (`docs(ai): add KGI KPI zero-residual rereview`).
+- **Clean-worktree confirmation:** immediately after that report-only commit,
+  `git status --short`, `git diff --check`, and `git diff --name-only` produced no output. This
+  metadata/whitespace follow-up is also required to finish with an empty `git status --short`.
 - **Validation:** 55/55 semantic codes, 15/15 structural codes, 79/79 repository tests, contracts,
   AI-development aggregate, project-docs, and candidate diff check all passed; adversarial production
   probes above still fail the contract.
