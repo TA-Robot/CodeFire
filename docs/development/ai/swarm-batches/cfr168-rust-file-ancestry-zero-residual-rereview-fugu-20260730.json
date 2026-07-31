@@ -2,7 +2,7 @@
   "schema": "dev-swarm.v1",
   "batch_id": "cfr168-rust-file-ancestry-zero-residual-rereview-fugu-20260730",
   "workspace": "/workspace/worktrees/cfr168-rust-file-ancestry-zero-residual-rereview-fugu-base",
-  "base_revision": "8882ead03efbeb07db79e25e0098c8e20f30458a",
+  "base_revision": "d9d6b19dcd289d160dfc10ebb4f23da0b905bd68",
   "max_parallel": {
     "fugu": 1,
     "claude": 0,
