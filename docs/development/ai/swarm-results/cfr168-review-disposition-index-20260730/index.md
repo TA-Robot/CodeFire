@@ -68,11 +68,17 @@ downstream release rather than list position:
    routing its four non-blocking observations into the shared-primitives /
    POST-precedence successor. Rust HTTP `92fc810` and File Doctor `cd130e5`
    remain source-profile blocked with exact candidate cards already prepared.
-5. The specification-bound shared-primitives preflight is logically `ready`
+5. File Ancestry `02b0d63`, File Doctor `cd130e5`, Rust HTTP `92fc810`, and
+   the Storage original-session repair consume
+   `cfr168-rust-source-keyed-recovery-wave-binding-20260731.md` after the
+   accepted canonical Cargo port. Their older direct/shared-target launch
+   mechanics are not executable; their closure and decision requirements
+   remain unchanged.
+6. The specification-bound shared-primitives preflight is logically `ready`
    at canonical `8929a98` but launch-held by Claude and Fugu provider
    backoffs. Launch MR-write only after a committed `READY`; accepted Upload
    remains a later composition input.
-6. Integrate product commits only after exact acceptance, then run composed
+7. Integrate product commits only after exact acceptance, then run composed
    broad gates before Install, Dogfood, Close, and Retrospect.
 
 ## Root-finding coverage map

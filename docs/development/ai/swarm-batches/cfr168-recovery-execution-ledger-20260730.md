@@ -2225,3 +2225,33 @@ The pilot worktree remains clean at HEAD `cdaee6a`, tree
 pilot result or decision was created. Resume can therefore continue from the
 original frozen calibration after verified Claude capacity; no reconstruction
 or calibration retuning is needed.
+
+## 2026-07-31 10:38 UTC Rust source-keyed recovery wave bound
+
+Blocked addendum `cfr168-rust-source-keyed-recovery-wave-binding-20260731.md`
+binds exact File Ancestry `02b0d63`, File Doctor `cd130e5`, Rust HTTP
+`92fc810`, and Storage original-session inputs to the future accepted
+canonical Cargo port. Its SHA-256 is
+`607f54c9ce4b51b9d2904d7c1a41da720f58fc5b2b929718e748f1bf084227aa`.
+
+The addendum supersedes only old direct/shared-target launch mechanics.
+Existing candidate identities, closure matrices, exact test selections,
+mutations, scopes, and decision rules remain mandatory. Every Rust command
+must use the accepted absolute source-keyed wrapper, exact clean subject,
+unique bounded result/log, nonzero selection, complete digest, and unchanged
+candidate proof. Older manifests are launch-ineligible until regenerated
+against the accepted port.
+
+Timeouts are per command, finite, and based on comparable measured duration;
+no blanket 30/40-minute limit remains. Heavy gates may receive six hours, and
+the separate six-hour lock wait permits healthy serialization. Deliberate
+regressions use one clean scratch worktree with temporary mutation/revert
+commits and ephemeral source-keyed artifacts, not dirty candidates or one
+target/worktree per mutation.
+
+This binding starts no Rust process or provider. Static/report work may run up
+to live admission, but the currently designed global Rust execution lock
+continues to serialize Cargo until separately reviewed bounded concurrency
+exists. The current disposition index now points all four Rust lines to this
+binding; its SHA-256 is
+`d139b3d6b774217d4d4b1c75fb71853dbf54f42c4a74cf71e667a602e45d571d`.
