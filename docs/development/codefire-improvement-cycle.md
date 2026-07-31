@@ -23,14 +23,18 @@ CodeFire本体にAI agent運用機能は入れない。ただし、外部自動�
 ## Cycle Overview
 
 1. Discovery: Algorithm dogfood projectでCodeFireを使い、バグ、UX違和感、JSON contract不整合、速度、記憶領域、diagnostic不足を `CFB-*` として記録する。
-2. Expansion: 必要ならCodeFireソースコードレビューを行い、同じbatchの `CFR-*` を追加する。
+2. Expansion: 必要なら、事前に定めたrisk surfaceとevidence planに沿ってCodeFireソースコードレビューを行い、同じbatchの `CFR-*` を追加する。件数は終了条件にしない。
 3. Freeze: そのcycleで修正するissue batchを確定する。この時点で次のissue探索を止める。
-4. Burn-down planning: batch内issueをroot cause単位に束ね、全部消すための修正計画を作る。
-5. CodeFire development: 計画に沿ってbatch内issueを全部fixedまたは明示wontfixにする。
-6. Install: 開発したCodeFireをinstallし、実際の `codefire` commandとして使える状態にする。
-7. Confirmation dogfood: Algorithm projectでbatch内issueの再現コマンドを再実行し、修正を確認する。
-8. Close audit: backlog、detail issue、history、active roadmap stage、cycle planが一致していることを確認する。
-9. Next discovery: batch内issueが全部消えてから、次のalgorithm計画と次のissue出しへ進む。
+4. Burn-down planning / risk-based preflight: batch内issueをroot cause単位に束ね、変更境界、hazard、反例、検証、依存DAGを固定し、高risk contractだけ実装前に独立preflightする。
+5. CodeFire source acceptance: Implement、Validate、Candidate Freeze、Independent Review、impact/actionability裁定、必要なbounded Repair/Rereviewを経てcanonicalへIntegrateする。この時点はsource acceptanceでありissue Closeではない。
+6. Install: source acceptedなCodeFireをinstallし、実際の `codefire` commandとして使える状態にする。installed artifactをaccepted sourceへbindする。
+7. Confirmation dogfood / Evaluate: Algorithm projectでbatch内issueの再現コマンドと通常workflowを再実行し、修正、回帰、KGI/KPI、unavailable evidenceを確認する。
+8. Final Close audit: batch内issueをterminal dispositionにし、backlog、detail issue、root-cause map、history、active roadmap stage、cycle planをexact integrated/installed/dogfooded evidenceへ一致させる。
+9. Retrospect / Next discovery: `keep`、`change`、`stop`、`experiment`を記録し、batch内issueが全部terminalになってから次のalgorithm計画とissue探索へ進む。
+
+完全な段階、review裁定、source acceptanceとfinal Closeの区別は
+`project-management.md` を正とする。この文書はCodeFire固有のInstallと
+dogfoodの反復を具体化する。
 
 今後の基本形は **issueを出す -> 全部消す -> issueを出す** である。issueを出したまま次のissue discoveryへ進まない。
 
@@ -58,7 +62,10 @@ Work:
 
 Exit criteria:
 
-- frozen batchで対象にしたissueがfixedまたは明示的なwontfixになっている。
+- frozen batchのsource変更がValidate、Candidate Freeze、Independent Review、
+  impact/actionability裁定、必要なRepair/Rereviewを経てcanonicalへIntegrate
+  され、現在candidateにopen required correctionがない。issue statusはfinal
+  Closeまでnonterminalのままにする。
 - `cargo fmt --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace` が通る。
 - docs-onlyではない変更は、該当するtargeted testと全体testの両方を原則実行する。
 - `docs/development/history.md` に結果と証跡を残す。
@@ -156,10 +163,16 @@ Input:
 
 Work:
 
-- CodeFire sourceをreviewし、追加で40件を目標に改善issueを出す。
+- managerがreview開始前に、変更履歴、公開command/JSON、persisted state、
+  authority/security、resource/performance、module境界、既知incidentから
+  review surface、risk route、必要な正/負 evidenceを固定する。
+- 固定したsurfaceをCodeFire sourceでreviewし、証拠のある改善issueを出す。
+  finding件数、report行数、reviewer数、checklist達成率は目標にしない。
 - 重複issueは増やさず、既存issueへ証拠を追記する。
 - 1 issue 1 fileを守る。
 - issueは症状だけでなく、再現、影響、候補修正、acceptance criteriaまで書く。
+- observationごとに影響と修正要否を分離し、修正必須でない
+  implementation varianceや将来改善を現在batchへ混ぜない。
 
 Review focus:
 
@@ -176,7 +189,14 @@ Review focus:
 
 Exit criteria:
 
-- 追加40件目標を達成しているか、重複排除の結果として達成しない理由が明記されている。
+- 事前に固定したrisk surface、production route、既知hazard、正/負evidence
+  objectiveがすべてreview済み、明示的not-applicable、または証拠付きで
+  unavailable/routedになっている。
+- 発見した全observationが証拠とcanonical issue/duplicate/referralへ結び付き、
+  未所有のmaterial findingとcoverage gapがない。
+- 独立reviewが、未解決のauthorization-changing choice、contradiction、
+  reproducible fail-open/contract-escape behavior、unowned falsifierを残していない。件数ゼロは許容されるが、
+  coverage/evidenceを示さない「問題なし」は終了証拠にならない。
 - summary backlogとdetail filesが一致している。
 - issue templateが使われている。
 - 追加したCFRは現在batchに入れるか、次batch候補として明示的に分けている。
@@ -220,7 +240,11 @@ Common rules:
 
 - 既存issueと同じ根なら新規issueにせず、既存issueへEvidenceを追記する。
 - 「不便」だけで終わらせず、再現、影響、workaround、候補修正、acceptance criteriaを書く。
-- issue closeは実装、テスト、docs更新、履歴更新が揃ってから行う。
+- source acceptanceは実装、検証、独立review、裁定、canonical integrationが
+  揃った中間状態としてissue本文/cycle evidenceへ記録する。既存status enumへ
+  新しい値を足さず、この時点では`fixed`にしない。
+- issue CloseはさらにInstall、confirmation Dogfood/Evaluate、ledger/docs/history
+  同期が揃ってから行う。historicalなClose記録は遡及変更しない。
 
 ## Current Cycle State
 

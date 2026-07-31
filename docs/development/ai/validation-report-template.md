@@ -129,6 +129,174 @@ The last line appears exactly once and must be either
 `ACCEPT_WITH_NOTES` is not permitted. Discussion may describe acceptance
 criteria, but must not emit a second `OVERALL_VERDICT` line.
 
+## Finding Impact and Actionability Record
+
+Use the compact screen once for every canonical review observation before any
+repair. Escalate to the expanded record only for a proposed
+`required_correction`, accepted variance, disputed/reopened locus, high or
+material impact, or acceptance-critical unknown. A duplicate may reference its
+canonical expanded record. A clearly evidenced invalid, out-of-scope, or
+nonblocking observation may terminate after the compact screen and manager
+disposition. This two-depth shape reduces review service time without omitting
+an axis or treating unknown as neutral.
+
+When combined with the compact exact review above, place the reviewer blocks
+before its Decision section and single `OVERALL_VERDICT`. The manager block
+below is a later, separate artifact; it is not appended to the reviewer report.
+
+Severity alone is never a repair instruction. If a review produces no
+observation, write `none` and still provide the immutable subject,
+changed-path/obligation coverage, hazards, and evidence that justify stopping;
+an empty report is not coverage. Definitions and authority live in
+`operating-protocol.md`; this template mirrors them and does not replace policy
+or machine schemas. Future typed tooling may prefill Git-derived identity,
+coverage, common frozen facts, and unchanged axes, but the reviewer/manager
+remain responsible for their semantic truth.
+
+```text
+### Observation <observation_id>
+
+Identity and evidence:
+- finding_id: <stable ID>
+- effect_episode_id: <stable ID or unavailable + reason>
+- decision_locus_id: <stable path/symbol/conceptual decision locus>
+- exact candidate commit/tree: <SHA> / <SHA>
+- changed path/symbol or conceptual scope: <value>
+- frozen requirement/invariant/acceptance refs: <exact refs or none + evidence>
+- observed fact: <falsifiable statement>
+- production route/precondition: <route or unreachable/unknown + evidence>
+- reproducer/counterexample: <ref, not_attempted, unavailable, or not_applicable + reason>
+- evidence refs: <immutable refs>
+
+Compact impact screen (required for every observation):
+- frozen outcomes: <affected/unaffected/unknown + exact refs/evidence>
+- affected entities: users=<affected/unaffected/unknown>; workflows=<...>; surfaces=<...>; owners=<...> — <refs/reason>
+- impact categories: correctness=<affected/unaffected/unknown>; state=<...>; data=<...>; authority=<...>; api_compatibility=<...>; operations=<...>; performance=<...>; resource=<...>; maintainability=<...>; development_flow=<...> — <refs/reasons>
+- reachability/likelihood: <affected/unaffected/unknown + route/basis>
+- blast radius: <affected/unaffected/unknown + boundaries>
+- severity/materiality: <affected/unaffected/unknown + preliminary value/criterion>
+- reversibility/recovery: <affected/unaffected/unknown + owner/steps>
+- recurrence: <affected/unaffected/unknown + prior IDs>
+- evidence quality: <available/partial/unavailable + reproducibility/limitations>
+- repair tradeoffs/hazards: <affected/unaffected/unknown + refs; cannot offset must-fix>
+- must_fix_candidates: <MF IDs/none/unknown + evidence>
+- acceptance_critical_unknown: <yes/no + evidence>
+- proposed disposition: <six values or null_pending_impact + evidence>
+- full_record_required: <yes/no + triggering condition or compact-terminal rationale>
+- canonical full-record ref: <required for duplicate when applicable, otherwise null>
+
+If `full_record_required` is `no`, delete the expanded block below and leave the
+manager the compact proposal, canonical/referral ID, and evidence. Otherwise
+complete every expanded row:
+
+Expanded impact gate (conditional):
+| Axis | Assessment | Rationale / criterion | Evidence |
+|---|---|---|---|
+| frozen outcomes | <violated/satisfied/unaffected/unknown for each requirement, invariant, KGI/KPI, quality guardrail> | <why each is or is not binding> | <refs> |
+| affected entities | users=<set/none/unknown>; workflows=<set/none/unknown>; surfaces=<set/none/unknown>; owners=<set/none/unknown> | <explicit empty/unknown reason> | <refs> |
+| correctness | adverse/beneficial/neutral/not_applicable/unknown: <effect> | <criterion> | <refs> |
+| state | adverse/beneficial/neutral/not_applicable/unknown: <effect> | <criterion> | <refs> |
+| data | adverse/beneficial/neutral/not_applicable/unknown: <effect> | <criterion> | <refs> |
+| authority | adverse/beneficial/neutral/not_applicable/unknown: <effect> | <criterion> | <refs> |
+| api_compatibility | adverse/beneficial/neutral/not_applicable/unknown: <effect> | <criterion> | <refs> |
+| operations | adverse/beneficial/neutral/not_applicable/unknown: <effect> | <criterion> | <refs> |
+| performance | adverse/beneficial/neutral/not_applicable/unknown: <effect> | <criterion> | <refs> |
+| resource | adverse/beneficial/neutral/not_applicable/unknown: <effect> | <criterion> | <refs> |
+| maintainability | adverse/beneficial/neutral/not_applicable/unknown: <effect> | <frozen/pre-measured criterion or preference boundary> | <refs> |
+| development_flow | adverse/beneficial/neutral/not_applicable/unknown: <effect> | <criterion> | <refs> |
+| reachability / likelihood | <observed/reachable/conditional/unreachable/unknown> / <observed/reproducible/probable/possible/unlikely/unknown> | <route and basis> | <refs> |
+| blast radius | <local/cross_module/cross_workflow/persisted/public/cross_generation/system_wide/none/unknown> | <boundaries> | <refs> |
+| severity / materiality | <critical/high/moderate/low/none/unknown> / <material/nonmaterial/unknown> | <criterion, not a score> | <refs> |
+| reversibility / recovery | <reversible_in_place/rollback_required/data_or_state_recovery_required/irreversible/unknown> | <steps, owner, cost evidence> | <refs> |
+| recurrence likelihood | <observed_recurrence/likely/possible/unlikely/none_proven/unknown> | <prior effect/decision IDs> | <refs> |
+| evidence quality | confidence=<high/medium/low/unknown>; reproducibility=<reproduced/observed_once/not_reproduced/not_attempted/unavailable>; availability=<available/partial/unavailable> | <limitations> | <refs> |
+| repair tradeoffs | cost=<basis/unavailable>; hazards=<IDs>; alternatives=<list>; workaround=<limits> | <may select scope/order/mechanism, never offset must-fix> | <refs> |
+
+Reviewer must-fix and actionability proposal:
+- MF-1 frozen requirement/invariant/guardrail violation: proved/rejected/unknown — <evidence>
+- MF-2 reachable material correctness/state/data/authority failure: proved/rejected/unknown — <evidence>
+- MF-3 public/persisted/cross-generation compatibility break: proved/rejected/unknown — <evidence>
+- MF-4 frozen operations/performance/resource/availability/recovery breach: proved/rejected/unknown — <evidence>
+- MF-5 required acceptance evidence absent/contradicted/invalid: proved/rejected/unknown — <evidence>
+- MF-6 repair-introduced regression or reopened proven effect: proved/rejected/unknown — <evidence>
+- proposed impact_gate: complete | blocked_pending_impact_investigation | routed_noncritical_investigation
+- proposed impact investigation objective: <when any relevant axis is unknown/unavailable>
+- manager impact adjudication required: yes/no — <high/material boundary, dispute, variance reversal, or reason>
+- reviewer proposal: required_correction | accepted_implementation_variance | nonblocking_improvement | out_of_scope | duplicate | invalid_or_unsubstantiated | null_pending_impact
+- canonical duplicate/referral: <ID or null>
+- proposed smallest repair/rereview boundary: <proposal only, or null>
+- reviewer actor/event/evidence/rationale: <identity and refs>
+```
+
+Commit the reviewer report now. Do not append manager decisions to that
+report-only commit. `OVERALL_VERDICT` is the reviewer's terminal proposal; it is
+not integration authority.
+
+After the report commit and reviewer/children stop, the manager writes a
+separate adjudication/repair-authority artifact. It references immutable
+reviewer bytes rather than editing them:
+
+```text
+### Manager adjudication <decision_id>
+
+Subject and chronology:
+- reviewer report path / commit / SHA-256: <exact values>
+- observation_id / finding_id / decision_locus_id: <values>
+- manager actor / event / timestamp / evidence: <distinct identity and refs>
+
+Final impact and actionability:
+- final or changed impact axes: <reviewer rows accepted by ref, plus every changed axis/evidence/rationale>
+- impact_gate: complete | blocked_pending_impact_investigation | routed_noncritical_investigation
+- impact investigation owner/ref/result: <required when relevant>
+- final MF-1..MF-6 decisions: <proved/rejected/unknown + evidence>
+- final actionability_disposition: required_correction | accepted_implementation_variance | nonblocking_improvement | out_of_scope | duplicate | invalid_or_unsubstantiated | null_pending_impact
+- correction_required: true | false | undecided
+- canonical duplicate/referral: <ID or null>
+
+Required-correction causal class:
+- required_correction_causal_class: contract_omission | implementation_nonconformance | repair_introduced_regression | null
+- governance-origin precedence: <no pre-candidate rule / effect created by repair delta / existing rule and non-repair-origin violation>
+- frozen-clause or additive-amendment ref: <required only for correction>
+- causal decision evidence: <required only for correction>
+
+Repair and rereview authority:
+- authorized correction IDs: <required-correction IDs or null>
+- allowed paths/symbols: <set or null>
+- forbidden paths/surfaces: <set or null>
+- required positive validations: <IDs/commands or equivalence evidence>
+- required negative controls/hazards: <IDs/evidence>
+- exact rereview scope: <delta + inherited obligations/effects + affected surfaces, or null>
+- scope expansion/re-Freeze trigger: <new effect/contract/public/state/persisted surface or null>
+- repair episode / successor candidate closure: <refs and open/closed/unavailable; never rewrite the original disposition>
+
+Stable decision locus:
+- active decision_id / subject scope / effective candidate: <values>
+- decision: <disposition and supported equivalence/correction basis>
+- permitted reopen triggers: <subset of frozen_requirement_changed, materially_new_evidence, new_counterexample, prefrozen_metric_regression>
+- reopen evidence/ref: <exact evidence or null; materially new means new to the active decision record, with proved prior omission/misbinding if the artifact predates it>
+- supersedes_decision_ids: <IDs or empty>
+- reopen result: not_requested | rejected_preference_churn | admitted_for_manager_adjudication
+```
+
+Finish the manager artifact with an index proving that every observation occurs
+exactly once and that no acceptance-critical impact remains undecided:
+
+| Observation | Impact gate | Proved MF IDs | Actionability | Causal class or null | Active decision | Repair/rereview ref or null | Reopen trigger/result |
+|---|---|---|---|---|---|---|---|
+| <ID> | <state> | <IDs/none> | <disposition/null> | <class/null> | <ID> | <ref/null> | <trigger/result> |
+
+For a non-correction disposition, causal class and repair authority are null.
+For `required_correction`, all three are present before mutation. Observation
+`out_of_scope` must never be used as the recurrence gate's forbidden
+changed-path `out_of_scope` escape: every Git-changed path still needs an
+in-scope reviewed surface and obligation/effect coverage.
+
+Use the protocol's disposition precedence. In particular, a duplicate delegates
+to the canonical row and cannot erase its correction/closure state; a proved
+must-fix trigger outranks variance/nonblocking labels. Preserve an original
+`required_correction` after repair and close it through the separate successor
+candidate/repair evidence instead of changing history.
+
 ## Successor Review Recurrence Addendum
 
 For review generation 2 or later, use this addendum with the compact exact

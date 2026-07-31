@@ -100,6 +100,33 @@ independence. Those remain explicit manager and independent-review judgements.
 An `ALLOW` is therefore necessary machine evidence for integration, not a
 replacement for human semantic acceptance.
 
+## General actionability-policy transition
+
+The general review policy in `../operating-protocol.md` applies before recurrence
+repair. Current `codefire.review_recurrence_control.v2` cannot encode the six
+actionability dispositions, the compact/full impact assessment, stable accepted
+variance, or manager repair authority. Until a separately accepted v2.1
+schema/checker migration exists:
+
+- retain every review observation in the immutable reviewer proposal and a
+  separate manager impact/actionability record from
+  `../validation-report-template.md`;
+- put a true current-v2 `new_finding` into the recurrence record only when it is
+  a successor obligation under current v2 semantics; it remains blocking and
+  cannot be closed in the generation that first records it;
+- retain accepted variance, nonblocking improvement, duplicate,
+  out-of-scope-observation, and invalid/unsubstantiated decisions externally;
+  do not hide them, convert them into product repair, or fabricate a v2 finding
+  solely because v2 lacks their vocabulary; and
+- treat any future machine `ALLOW` as recurrence-topology evidence only. It does
+  not prove the general impact/actionability record, manager adjudication,
+  fresh-session semantics, or absence of preference churn.
+
+This transition does not weaken changed-path coverage. Every Git-changed path
+still needs a reviewed in-scope surface and obligation/effect coverage; the
+observation disposition `out_of_scope` is never the forbidden changed-path
+approval escape.
+
 ## Operating sequence
 
 1. The manager freezes and commits the repair packet plus manifest before the

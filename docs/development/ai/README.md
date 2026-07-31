@@ -34,19 +34,38 @@ Do not spawn or delegate implementation work until the task packet has:
 - validation command list;
 - expected handoff format.
 
+## Governance authority map
+
+Keep authority one-way so that a task packet or template cannot silently become
+policy:
+
+| Concern | Canonical owner | Relationship of other artifacts |
+|---|---|---|
+| lifecycle, issue admission, source acceptance and final Close | `../project-management.md` | `../codefire-improvement-cycle.md` maps the lifecycle to CodeFire Install/Dogfood; historical cycle rows remain historical |
+| AI roles, review types, impact/actionability, repair/rereview and integration controls | `operating-protocol.md` | task packets instantiate a bounded plan and cannot override the protocol |
+| KGI/KPI definitions, denominators, unavailable evidence and management cadence | `development-flow-kgi-kpi.md` | flow records carry evidence; a record does not redefine a metric |
+| human review/report input shape | `validation-report-template.md` | mirrors required policy fields; it does not adjudicate or grant authority |
+| machine shape and checker enforcement | `schemas/` and `../tools/` | schemas are authoritative for JSON shape only; passing shape does not prove semantic impact, actionability, honest execution or independence |
+| successor-review specialization | `review-recurrence/README.md` | adds exact generation/path/evidence controls without weakening the general review policy |
+| staged review-bottleneck implementation details | `task-packets/cfr168-review-bottleneck-operating-controls-freeze-20260731.md` | detailed P0-P2 proposal; it remains subject to independent acceptance and cannot self-authorize implementation or claim improvement |
+
 ## Current AIA-047 checkpoint
 
 The experimental recurrence-v2 implementation is integrated at
-`00ad88562068a6101a7530b84d5f52b0cff559f0`; L1.1-L1.5 are complete. The exact
-implementation candidate `9e50f04b3d6e53753e40aab57cfbc4a884de5bc8`
-received an independent `ACCEPT_FOR_INTEGRATION` through the recorded
-GPT-5.6/Codex fallback because Claude and Fugu were unavailable.
+`00ad88562068a6101a7530b84d5f52b0cff559f0` as an accepted experimental
+foundation. Its exact candidate
+`9e50f04b3d6e53753e40aab57cfbc4a884de5bc8` received the bounded recorded
+GPT-5.6/Codex fallback review because Claude and Fugu were unavailable.
 
-This is not evidence that the review bottleneck improved. L1.6 remains
-pending: no Cargo/KGI bootstrap manifest pair or manager-owned live-arm anchor
-is committed. The v1 compatibility path always returns structured `BLOCK`, no
-live v2 `ALLOW` exists, and the blind Fugu causal branch cannot begin before
-the recorded 2026-08-03 provider window. See
+Later Cargo/KGI authority audit exposed additional live-freeze requirements, so
+L1.5 authority hardening is reopened and in progress rather than complete. The
+canonical branch contains the accepted hardening contract and manager
+implementation authorization, but no hardening implementation candidate is yet
+integrated there. This is also not evidence that the review bottleneck improved.
+L1.6 remains pending: no Cargo/KGI bootstrap manifest pair or manager-owned
+live-arm anchor is committed. The v1 compatibility path always returns
+structured `BLOCK`, no live v2 `ALLOW` exists, and the blind Fugu causal branch
+cannot begin before the recorded 2026-08-03 provider window. See
 [`review-recurrence/README.md`](review-recurrence/README.md) for the executable
 contract and
 [`swarm-results/cfr168-review-recurrence-v2-implementation-rereview-gpt56-20260731/review.md`](swarm-results/cfr168-review-recurrence-v2-implementation-rereview-gpt56-20260731/review.md)
@@ -77,10 +96,16 @@ For a new task:
 4. Create or reuse a JSON task packet under `task-packets/json/`; validate it with `../tools/check_ai_contracts.py`.
 5. Add the task to the active roadmap batch or issue detail.
 6. Inspect the dry-run manifest from `../tools/run_ai_role.py` or a `dev-swarm plan`; resolve stale base, unavailable provider/capabilities, and dirty write-set intersections before granting writes.
-7. Run an independent reviewer and bind the review to task/patch digests.
-8. Run `python3 docs/development/tools/check_ai_development.py` when the AI system or strategy changed.
-9. Record the lane/candidate/review/gate events required by `development-flow-kgi-kpi.md`.
-10. Update canonical docs and history with the result.
+7. Validate, commit, and Candidate Freeze the exact tree/patch/path set and reviewer exclusions.
+8. Run the risk-selected independent review and bind it to task/patch digests.
+9. Assess impact and adjudicate actionability; repair/rereview only
+   `required_correction` within a manager-frozen boundary.
+10. Integrate the source-accepted candidate, then complete applicable
+    Install, Dogfood/Evaluate, final Close, and Retrospect stages from
+    `../project-management.md`.
+11. Run `python3 docs/development/tools/check_ai_development.py` when the AI system or strategy changed.
+12. Record only the applicable raw lane/candidate/review/gate events required by `development-flow-kgi-kpi.md`; do not manufacture non-applicable KPI events.
+13. Update canonical docs and history with the result.
 
 For a batch:
 
@@ -88,7 +113,8 @@ For a batch:
 2. Group tasks by non-overlapping files or modules.
 3. Assign one lane per group.
 4. Keep one manager lane responsible for conflict control and final integration.
-5. Run reviewers after implementation, not in the same lane.
+5. Run risk-based contract preflight before mutation where required.
+6. Freeze exact candidates and run reviewers after implementation, not in the same lane.
 
 The committed-state audit at
 `swarm-batches/codefire-state-audit-20260729.json` is a concrete five-lane example: four disjoint Fugu
