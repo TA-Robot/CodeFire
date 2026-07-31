@@ -9,7 +9,7 @@ Base revision: `00ad88562068a6101a7530b84d5f52b0cff559f0`.
 
 ## Why this repair exists
 
-The first Cargo/KGI live-manifest extraction audit found ten defects before a
+The first Cargo/KGI live-manifest extraction audit found eleven defects before a
 manager-owned live anchor was written:
 
 1. `derivations[].locus_existed_in_predecessor` describes symbol/locus
@@ -64,6 +64,11 @@ manager-owned live anchor was written:
     currently leaves a successor at `ALLOW`. Unknown result fields are also
     ignored, so the replay contract can drift without a deliberate schema or
     compatibility decision.
+11. Derivation `next_action` is required and parsed but never evaluated or
+    emitted. A record can pair `derivation_complete` with `PRODUCT_REPAIR`,
+    `REPAIR_CLAIM`, or a manager action and still reach `ALLOW` with no visible
+    repair requirement. The explicit action surface is therefore disconnected
+    from the closed decision model.
 
 The same audit exposed an operating ambiguity, which this packet resolves
 without weakening evidence: the frozen Cargo/KGI tables include destructive or
@@ -100,6 +105,10 @@ negative-control evidence belongs.
   dot/dot-dot components, empty components, repeated/trailing separators, and
   spellings normalized by `PurePosixPath` such as `a/./b`; do not silently skip
   the Git fact check when a current path is unsafe.
+- Use one shared predecessor-path presence probe for current evaluation and
+  retained replay. An unsafe path or any Git tree-entry read failure is a
+  structural finding; neither branch may `continue` without comparing the
+  claimed path fact or recording why it was unavailable.
 - Require every record derivation's `path` to equal the matching frozen
   manifest claim's `locus_path`. A mismatched path is structural failure even
   when both paths exist and the evidence is otherwise well formed.
@@ -123,7 +132,8 @@ must still require an I1 derivation. Repointing the derivation to an unrelated
 existing path must fail with a dedicated manifest/derivation path mismatch.
 Equal manifest/derivation spellings `.`, `a/./b`, `a//b`, and `a/` must each
 fail identically in the current generation and retained replay rather than
-bypassing current tree-entry verification.
+bypassing current tree-entry verification. A forced Git tree-entry probe error
+must likewise block both paths with the same finding semantics.
 
 ### F1b — bind bootstrap obligation origins
 
@@ -196,11 +206,18 @@ historical anchor, and validator-owned schema. Each must return structured
   - `index_flags_clean == (index_flagged_entries == [])`;
   - `head_unchanged` iff the after revision/tree equal the captured source
     revision/tree and `head_probe_error` is null.
-- Extend timed-gate v2 output with the requested result path, emitted in a
-  closed schema shape. Require cwd, Git root, log path, and result path to be
-  absolute normalized paths; cwd must be within the declared Git root, while
-  log and result must be distinct and outside it. Recompute both inside/outside
-  summary booleans from those paths rather than trusting them.
+- Require the runner's HEAD-probe detail shape itself: a null
+  `head_probe_error` iff both after revision and tree are non-null; a non-null
+  error iff both after identities are null. One surviving hash beside a probe
+  error, or one missing hash without an error, is not runner-produced evidence.
+- Extend timed-gate v2 output with exact required sibling object
+  `"result": {"path": "<absolute path>"}` next to `log`; that object has
+  `additionalProperties: false`. Require cwd, Git root, `log.path`, and
+  `result.path` to be absolute normalized paths; cwd must be within the
+  declared Git root, while log and result must be distinct and outside it.
+  Recompute both inside/outside summary booleans from those paths rather than
+  trusting them. This is an explicit pre-live timed-v2 shape break and must be
+  documented with the record/manifest shape breaks.
 - Validate the runner-owned timing model rather than accepting internally
   contradictory diagnostics: timeout must be positive; monotonic duration and
   drift threshold must be finite and nonnegative; start/end timestamps must be
@@ -226,10 +243,12 @@ historical anchor, and validator-owned schema. Each must return structured
   that mutate-and-restore did not occur during it.
 
 Required counterexamples independently falsify each boolean/detail pair,
-provide a non-null probe error with `head_unchanged: true`, move cwd outside the
-declared root, put log/result paths inside the root while setting the booleans
-false, make log and result the same path, use negative timeout/duration/drift
-values, falsify the wall-minus/discontinuity relations, detach the timestamps,
+provide a non-null probe error with `head_unchanged: true`, pair an error with
+surviving after hashes, omit only one after hash without an error, move cwd
+outside the declared root, put log/result paths inside the root while setting
+the booleans false, make log and result the same path, use negative
+timeout/duration/drift values, falsify the wall-minus/discontinuity relations,
+detach the timestamps,
 contradict status/exit/timed-out fields, and replay an inconsistent
 retained timed result. Detached/relation-inconsistent timestamps must block;
 consistent forward and backward wall-clock jumps must both pass their timing
@@ -289,11 +308,27 @@ than being parsed last-write-wins.
   rows, metrics, successor obligations, record validity, review and integration
   decisions, blockers, findings/count, and the complete rooted authority-chain
   meaning (`kind`, root arm/commit, depth, and links).
+- Compare `limits` to the exact v2 provenance-disclosure constant; changing its
+  meaning requires a result-schema/compatibility decision rather than silent
+  replay drift.
 - Fields whose value necessarily changes with the replay location, such as an
-  analysed local root path, may be excluded only by name and rationale. Fields
-  checked by a separate exact historical authority operation—deciding-gate
-  identity, live-arm pin/blob, and invalid-path interval evidence—must be named
-  and linked to that check, not silently skipped.
+  analysed local root path, may be excluded only by name and rationale. The
+  machine-local path exclusions are exactly `analysed_git_root`,
+  `validator_source_root`, and CLI-added `record`, because they are
+  machine-local paths. They remain known closed-shape fields, not arbitrary
+  extension points.
+- `authority_chain.validator_identity_divergences` and
+  `authority_chain.revalidated_generations` are current-gate replay
+  diagnostics: a later gate necessarily derives different values. Validate
+  their closed shapes, deliberately exclude their immutable historical bytes
+  from direct equality, recompute them under the current gate, and emit those
+  recomputed values in the successor result. They must never supply root or
+  integration authority. Stable `kind`, root arm/commit, depth, and link
+  identities remain exact comparisons.
+- Fields checked by a separate exact historical authority operation—
+  `deciding_gate`, `live_arm`/pin/blob, and invalid-path interval evidence—must
+  be present in the closed result shape and linked to that operation, not
+  silently skipped. A mutation must fail in that named operation.
 - Apply the same closed-shape and semantic replay rule at every retained
   generation. A result produced by an older deciding gate remains immutable,
   but current authorization must fail closed if its authority-bearing claim is
@@ -304,6 +339,24 @@ Required counterexamples independently mutate retained `git_verified`,
 an otherwise unknown authority-looking member. Each must block a successor.
 Machine-local diagnostic paths may differ only where the contract explicitly
 permits them, while an unmodified retained result must still replay cleanly.
+
+### F1h — route derivation dispositions and actions
+
+- Freeze one deterministic derivation route table:
+  `derivation_complete -> NONE`,
+  `derivation_contradicted -> REPAIR_CLAIM`, and
+  `derivation_unavailable -> RUN_CLOSURE_EVIDENCE`.
+- Reject every other disposition/action pair. Any derivation action other than
+  `NONE` is blocking and must remain visible in deterministic I1 result
+  coverage and action counts; it cannot disappear behind the obligation-row
+  `product_repair_required` metric.
+- Preserve the evidence-state/disposition checks. This route table classifies
+  what must happen next; it does not turn reviewer prose into machine proof.
+
+Required counterexamples pair `derivation_complete` with each non-`NONE`
+action, pair contradicted/unavailable dispositions with `NONE`, and mutate a
+retained result's emitted derivation action/count. Every mismatch must block;
+the complete/`NONE` positive fixture must remain passing.
 
 ### F2 — make live anchor authority schema-exact
 
@@ -388,8 +441,9 @@ port candidates exist.
   loading, strict authority decoding, and result/replay plumbing
 - `docs/development/tools/run_timed_gate.py` only to emit the new bound result
   path and preserve internally derived path/cleanliness/HEAD summaries
-- `docs/development/tools/check_ai_contracts.py` only to register the new
-  canonical live-anchor schema in the repository schema registry
+- `docs/development/tools/check_ai_contracts.py` to register the new canonical
+  live-anchor schema and apply the strict decoder to registered authority
+  schema blobs
 - `docs/development/tools/test_ai_tools.py`
 - `docs/development/ai/review-recurrence/README.md`
 - one implementation result under
