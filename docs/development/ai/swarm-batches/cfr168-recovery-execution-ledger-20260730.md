@@ -2008,3 +2008,36 @@ All three decisions remain absent. No candidate gains integration authority.
 Resume must use the same exact session/worktree after verified capacity,
 without launching a competing reviewer. The now-ready shared-primitives
 preflight is also launch-held by provider backoff.
+
+## 2026-07-31 09:53 UTC review-root-cause reliability gate
+
+The earlier review-recursion audit is now treated as a substantive but
+provisional single-analyst hypothesis, not as a process-change decision.
+Packet `cfr168-review-root-cause-reliability-gate-20260731.md` adds a blind
+reclassification and disagreement-adjudication gate before any template,
+mandatory finding count, repair-delta threshold, or checklist may be adopted.
+Its SHA-256 is
+`f05a616537efa7b068ffbe7545f5bd8ebcd6269191b7023704421edca0df18b1`.
+
+The correction is methodological:
+
+- the 51 successor findings are a census of **observed later findings**, not a
+  denominator for absolute review recall;
+- absence of later withdrawal is not sufficient evidence for review
+  precision;
+- one narrative primary cause is replaced for validation purposes by six
+  independently evidenced axes: code origin, prior-review detectability,
+  repair-contract handling, effect evidence, closure-oracle quality, and
+  review-routing state; and
+- every decision-critical disagreement and reproduced production effect must
+  be independently adjudicated, followed by an unchanged temporal check.
+
+The interrupted intervention pilot remains frozen under its original
+preregistration. It may finish, but its output cannot authorize policy. If the
+reliability gate changes a decision-relevant label, only a separate sensitivity
+replay may evaluate the difference; the frozen calibration must not be
+rewritten.
+
+Preferred low-Codex execution is a blind Fugu Ultra 1.1 classifier followed by
+Claude Opus 5 adjudication of disagreements. Both providers remain launch-held
+under their recorded backoffs, and neither has an automatic Codex fallback.
