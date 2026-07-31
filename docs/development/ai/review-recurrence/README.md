@@ -53,7 +53,10 @@ requires `--validator-root` to differ from `--git-root`.
 3. Every retained v2 generation is replayed oldest-first with the current
    schema, artifact binding, manifest equality, timed-evidence checks, and
    decision derivation. A retained result records what an older gate said; it
-   is never trusted as the source of predecessor state.
+   is never trusted as the source of predecessor state. For a manager-fixed
+   live arm, each retained pin is rebound to the exact anchor blob at that
+   generation's historical deciding-gate commit, which must remain in the
+   current validator ancestry.
 4. Replay uses current semantics and does not claim that an older gate was
    semantically identical. Structural or retained-result replay mismatches
    block the current decision. Ordinary historical blockers, including the
@@ -78,8 +81,9 @@ requires `--validator-root` to differ from `--git-root`.
   evidence commit. In-tree log or result paths block acceptance even when the
   checkout appears clean afterward.
 - The timed result must bind the exact candidate revision/tree, clean states
-  before and after execution, an empty index-flag set, complete log bytes and
-  digest, a terminal exit code, and the exact frozen argv.
+  before and after execution, an unchanged post-command `HEAD`/tree, an empty
+  before/after index-flag union, complete log bytes and digest, a terminal exit
+  code, and the exact frozen argv.
 - `CLOSED_PROVEN` with `NONE` is the only potentially nonblocking state/action
   pair, and only when its separately derived closure proof succeeds. Routing
   never grants integration authority.
@@ -128,7 +132,7 @@ replacement for human semantic acceptance.
      --git-root <analysed-candidate-repository> \
      --validator-root <clean-validator-repository> \
      --live-arm cargo \
-     --result <outside-analysed-source>/recurrence-result.json
+     --result <outside-both-repositories>/recurrence-result.json
    ```
 
 Use `--live-arm kgi_kpi` for that arm. Exit `0` with

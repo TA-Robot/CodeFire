@@ -10,7 +10,7 @@ These JSON Schemas are the portable contract for AI-assisted CodeFire developmen
 | `review-recurrence-control.v1.schema.json` | Rejected historical recurrence shape, retained byte-for-byte for compatibility evidence. Normal gate input always produces `BLOCK`; it is never current authorization. |
 | `review-recurrence-control.v2.schema.json` | Current experimental recurrence candidate: Git-bound authority generations, exact artifact roles, path/surface coverage, derived evidence state and next action, committed timed evidence, and terminalization. |
 | `review-recurrence-repair-manifest.v1.schema.json` | Pre-repair manager anchor for exact obligation, parity/closure-claim, and required-validation sets. The machine checks equality, not semantic completeness. |
-| `timed-gate-result.v2.schema.json` | Candidate revision/tree, clean-before/after and index-flag state, monotonic execution, and complete log identity for recurrence evidence. |
+| `timed-gate-result.v2.schema.json` | Candidate revision/tree before execution, unchanged HEAD/tree afterward, clean-before/after and before/after index-flag state, monotonic execution, and complete log identity for recurrence evidence. |
 | `development-flow-record.v1.schema.json` | Batch KGI status, lane timing, KPI measurements, incidents, and immutable active-log prefixes. |
 
 Contract rules:

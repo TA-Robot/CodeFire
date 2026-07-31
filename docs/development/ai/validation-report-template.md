@@ -212,7 +212,8 @@ behavioral interpretation remain reviewer judgements.
 Mark each condition independently. `ACCEPT` is invalid unless all are true:
 
 - the v2 authority chain roots at the manager-fixed arm and every retained v2
-  generation has passed current-gate semantic replay;
+  generation has passed current-gate semantic replay, including rebind of its
+  live-arm pin to the exact anchor blob at its historical deciding-gate commit;
 - every prior obligation has a disposition;
 - every exact changed path has one or more reviewed surfaces;
 - no surface is referred to manager;
@@ -221,6 +222,8 @@ Mark each condition independently. `ACCEPT` is invalid unless all are true:
 - unavailable evidence is explicit;
 - all manifest-required validations are passing, terminal, exit-code-bound,
   and content-addressed `codefire.timed_gate.v2` evidence;
+- each validation retains the same `HEAD` revision/tree after execution and has
+  no index flag before or after the command;
 - each timed log and result was written outside the source worktree and then
   copied byte-identically into the evidence commit;
 - the report-only commit exists and the reviewer and all child processes have
@@ -249,7 +252,7 @@ python3 docs/development/tools/check_review_recurrence.py \
   --git-root <analysed-candidate-repository> \
   --validator-root <clean-validator-repository> \
   --live-arm cargo \
-  --result <outside-analysed-source>/recurrence-result.json
+  --result <outside-both-repositories>/recurrence-result.json
 ```
 
 Use `--live-arm kgi_kpi` for that arm. v1, a legacy-bootstrap v2 generation,

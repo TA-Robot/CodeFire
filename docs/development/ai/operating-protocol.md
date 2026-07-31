@@ -268,9 +268,11 @@ come only from the frozen manifest and must bind committed
 the live log and result outside the source worktree, then copy those bytes
 unchanged into the evidence commit. Acceptance requires the exact candidate
 revision/tree, clean state before and after, no index flags, complete log
-bytes/digest, exact argv, terminal exit, stopped reviewer, zero child
-processes, and committed terminal-event evidence. Mutate-and-restore behavior
-inside the command remains outside this proof.
+bytes/digest, exact argv, unchanged post-command `HEAD`/tree, terminal exit,
+stopped reviewer, zero child processes, and committed terminal-event evidence.
+The index check is the union of its before/after observations, so clearing a
+pre-existing flag inside the command does not hide it. Mutate-and-restore
+behavior inside the command remains outside this proof.
 
 Authority is progressive. A legacy-bootstrap v2 generation derives
 predecessor completeness as `unavailable`, always blocks, and exists only to
@@ -279,7 +281,10 @@ record/result chain to the manager-fixed Cargo or KGI/KPI root. The current
 gate replays every retained generation oldest-first using current schema,
 artifact, manifest, timed-evidence, and decision semantics. Retained results
 are comparison evidence, never trusted predecessor state; replay does not
-claim that older gate implementations were semantically identical.
+claim that older gate implementations were semantically identical. For a live
+arm, replay also reloads each generation's exact anchor blob from its historical
+deciding-gate commit and requires that commit to remain in the current validator
+ancestry; a retained pin cannot substitute for that rebind.
 
 Run the decision from a clean committed validator checkout. `--git-root` is
 the analysed candidate repository; `--validator-root` is the separate
@@ -298,7 +303,7 @@ python3 docs/development/tools/check_review_recurrence.py \
   --git-root <analysed-candidate-repository> \
   --validator-root <clean-validator-repository> \
   --live-arm cargo \
-  --result <outside-analysed-source>/recurrence-result.json
+  --result <outside-both-repositories>/recurrence-result.json
 ```
 
 Use `--live-arm kgi_kpi` for that arm. Only exit `0` with
