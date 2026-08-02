@@ -484,6 +484,16 @@ MAX_EXPORTED_ARTIFACT_LOGICAL_BYTES = 512 * 1024**2
 ARTIFACT_EXPORT_TIMEOUT_SECONDS = 120.0
 ARTIFACT_EXPORT_RECHECK_BYTES = 16 * 1024**2
 MAX_ARTIFACT_EXPORT_RESIDUE_ENTRIES = 16
+# Cargo uplifts a produced binary by hard-linking
+# ``<profile>/deps/<crate>-<metadata>`` to ``<profile>/<name>``, so the
+# requested export source normally carries exactly two links. Requiring a
+# single link would block every real release export while proving nothing:
+# what makes the copy trustworthy is the no-follow descriptor plus the
+# complete pre/post inode identity comparison below, neither of which
+# depends on the link count. Two is the bound the uplift needs; a third
+# link is an alias this gate never creates, so it stays a `BLOCK`. The
+# exported destination is unrelated and remains strictly single-link.
+MAX_EXPORT_SOURCE_ARTIFACT_LINKS = 2
 ALLOWED_SUBCOMMANDS = frozenset({"build", "check", "clippy", "doc", "fmt", "test"})
 LOCKED_SUBCOMMANDS = frozenset({"build", "check", "clippy", "doc", "test"})
 TEST_RESULT_RE = re.compile(
@@ -4445,11 +4455,17 @@ def export_bound_artifact(
         source_before = os.fstat(source_descriptor)
         if (
             not stat.S_ISREG(source_before.st_mode)
-            or source_before.st_nlink != 1
+            or source_before.st_nlink < 1
+            or source_before.st_nlink > MAX_EXPORT_SOURCE_ARTIFACT_LINKS
             or not source_before.st_mode & stat.S_IXUSR
         ):
             raise GateBlocked(
-                "artifact-not-private-executable", artifact_relative
+                "artifact-not-private-executable",
+                f"{artifact_relative}: "
+                f"regular={stat.S_ISREG(source_before.st_mode)}, "
+                f"mode=0o{stat.S_IMODE(source_before.st_mode):04o}, "
+                f"nlink={source_before.st_nlink}, "
+                f"nlink_maximum={MAX_EXPORT_SOURCE_ARTIFACT_LINKS}",
             )
         if (
             source_before.st_size
@@ -4722,6 +4738,10 @@ def export_bound_artifact(
             "source_inode": source_before.st_ino,
             "source_mode": stat.S_IMODE(source_before.st_mode),
             "source_nlink": source_before.st_nlink,
+            "source_nlink_maximum": MAX_EXPORT_SOURCE_ARTIFACT_LINKS,
+            "source_cargo_uplift_hardlinked": (
+                source_before.st_nlink > 1
+            ),
             "export_device": exported.st_dev,
             "export_inode": exported.st_ino,
             "export_mode": stat.S_IMODE(exported.st_mode),

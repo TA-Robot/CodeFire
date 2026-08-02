@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import concurrent.futures
 import ast
+import errno
 import fcntl
 import hashlib
 import json
@@ -145,6 +146,7 @@ from run_timed_gate import (  # noqa: E402
 )
 from run_source_keyed_cargo_gate import (  # noqa: E402
     GateBlocked,
+    MAX_EXPORT_SOURCE_ARTIFACT_LINKS,
     MAX_RETAINED_TEST_HARNESSES,
     MAX_TEST_HARNESS_SUMMARIES,
     MARKER_NAME,
@@ -162,6 +164,7 @@ from run_source_keyed_cargo_gate import (  # noqa: E402
     create_clean_git_snapshot,
     evidence_path,
     exclusive_lock,
+    export_bound_artifact,
     git_bytes,
     git_tree_entries,
     isolation_identity,
@@ -188,6 +191,7 @@ from readonly_source_exec import (  # noqa: E402
 from run_dogfood_smoke import smoke_commands, validate_result  # noqa: E402
 from suggest_validation import parse_porcelain_paths, suggestions  # noqa: E402
 from validate_ai_runtime import strict_config_probe  # noqa: E402
+import run_source_keyed_cargo_gate as gate_module  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -2963,6 +2967,28 @@ class SourceKeyedGateDocumentationTests(unittest.TestCase):
             "not of the code the interpreter actually executed", text
         )
 
+    def test_export_source_link_bound_is_stated_not_overclaimed(
+        self,
+    ) -> None:
+        text = self.contract
+        # The document claimed the export source was single-link. No real
+        # `cargo build --release` artifact is: the live 2026-08-02 release
+        # build blocked on exactly that. The claim must not return.
+        self.assertNotIn("single-link executable", text)
+        self.assertIn(
+            "The export source is admitted with one or two links", text
+        )
+        self.assertIn("Cargo's uplift", text)
+        # Relaxing the source bound must not be read as relaxing the
+        # destination or the mutation check, so both have to stay written
+        # down beside it.
+        self.assertIn(
+            "The published destination is separate and stays strictly "
+            "single-link",
+            text,
+        )
+        self.assertIn("artifact-changed-during-export", text)
+
     def documented_unshare_sequence(self) -> list[str]:
         """The flag sequence the contract document publishes, as tokens."""
         match = re.search(r"`unshare ([^`]+)`", self.contract)
@@ -3064,6 +3090,253 @@ class SourceKeyedGateDocumentationTests(unittest.TestCase):
             "key: shortening or reordering it left the artifact key "
             "unchanged",
         )
+
+class ArtifactExportIdentityTests(unittest.TestCase):
+    """Pin every export identity predicate around the uplift acceptance.
+
+    `export_bound_artifact` used to require `st_nlink == 1` on the source,
+    which no real `cargo build --release` artifact can satisfy: Cargo
+    uplifts by hard-linking the compiled `deps/` inode onto the
+    profile-root name. Relaxing a link count is the kind of edit that can
+    quietly carry the neighbouring checks with it, so the acceptance and
+    each protection it sits beside are asserted together. Every rejection
+    below must also leave no destination and no staging residue.
+    """
+
+    COMPILED_NAME = "codefire_rs-0123456789abcdef"
+
+    def make_scene(self, temporary: Path) -> tuple[Path, Path, Path]:
+        target = temporary / "namespace"
+        (target / "release/deps").mkdir(parents=True)
+        candidate = temporary / "candidate"
+        (candidate / "target/release").mkdir(parents=True)
+        return target, candidate, candidate / "target/release/codefire-rs"
+
+    def write_artifact(
+        self,
+        target: Path,
+        payload: bytes = b"source-keyed-binary",
+        *,
+        links: int = 2,
+        mode: int = 0o755,
+    ) -> Path:
+        artifact = target / "release/codefire-rs"
+        if links == 1:
+            artifact.write_bytes(payload)
+            artifact.chmod(mode)
+            return artifact
+        # Written in Cargo's own direction: the bytes are produced under
+        # `deps/` and the profile-root name is a second link to that exact
+        # inode, not a copy of it.
+        compiled = target / "release/deps" / self.COMPILED_NAME
+        compiled.write_bytes(payload)
+        compiled.chmod(mode)
+        os.link(compiled, artifact)
+        for index in range(links - 2):
+            os.link(compiled, target / f"release/deps/alias-{index}")
+        self.assertEqual(artifact.stat().st_nlink, links)
+        return artifact
+
+    def export(
+        self, target: Path, candidate: Path, destination: Path
+    ) -> dict[str, object]:
+        return export_bound_artifact(
+            target,
+            "release/codefire-rs",
+            candidate,
+            destination,
+            free_floor_bytes=0,
+        )
+
+    def staging_residue(self, destination: Path) -> list[str]:
+        return sorted(
+            path.name
+            for path in destination.parent.iterdir()
+            if path.name.startswith(f".{destination.name}.")
+        )
+
+    def assert_failed_closed(self, destination: Path) -> None:
+        self.assertFalse(destination.exists())
+        self.assertEqual(self.staging_residue(destination), [])
+
+    def test_cargo_uplift_hardlinked_source_exports_a_private_copy(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            target, candidate, destination = self.make_scene(temporary)
+            artifact = self.write_artifact(target)
+            source = artifact.stat()
+            result = self.export(target, candidate, destination)
+            self.assertEqual(result["decision"], "EXPORTED")
+            self.assertEqual(result["source_nlink"], 2)
+            self.assertTrue(result["source_cargo_uplift_hardlinked"])
+            self.assertEqual(
+                result["source_nlink_maximum"],
+                MAX_EXPORT_SOURCE_ARTIFACT_LINKS,
+            )
+            self.assertEqual(
+                destination.read_bytes(), b"source-keyed-binary"
+            )
+            self.assertEqual(
+                result["sha256"],
+                hashlib.sha256(b"source-keyed-binary").hexdigest(),
+            )
+            published = destination.stat()
+            self.assertTrue(stat.S_ISREG(published.st_mode))
+            self.assertEqual(published.st_nlink, 1)
+            self.assertEqual(result["export_nlink"], 1)
+            self.assertEqual(stat.S_IMODE(published.st_mode), 0o700)
+            # The copy goes through a descriptor. A third link onto the
+            # uplifted inode would satisfy "same bytes" and still leave the
+            # exported binary writable from inside the artifact namespace.
+            self.assertNotEqual(published.st_ino, source.st_ino)
+            self.assertEqual(artifact.stat().st_nlink, 2)
+
+    def test_over_linked_source_is_blocked(self) -> None:
+        # The bound is the uplift pair and nothing wider. Assert the
+        # constant too: widening it later must break this test rather than
+        # silently admit an inode with more aliases than Cargo creates.
+        self.assertEqual(MAX_EXPORT_SOURCE_ARTIFACT_LINKS, 2)
+        for links in (3, 4):
+            with self.subTest(links=links), tempfile.TemporaryDirectory() as raw:
+                temporary = Path(raw).resolve()
+                target, candidate, destination = self.make_scene(temporary)
+                self.write_artifact(target, links=links)
+                with self.assertRaises(GateBlocked) as raised:
+                    self.export(target, candidate, destination)
+                self.assertEqual(
+                    raised.exception.code,
+                    "artifact-not-private-executable",
+                )
+                self.assertIn(f"nlink={links}", raised.exception.detail)
+                self.assert_failed_closed(destination)
+
+    def test_symlinked_source_is_rejected_by_the_no_follow_open(
+        self,
+    ) -> None:
+        # The symlink rejection is the kernel's, not a predicate the link
+        # bound could weaken: O_NOFOLLOW fails the open before any stat is
+        # taken. Pin the errno so a future rewrite cannot lose the flag and
+        # keep passing on the link-count check alone.
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            target, candidate, destination = self.make_scene(temporary)
+            real = target / "release/deps" / self.COMPILED_NAME
+            real.write_bytes(b"source-keyed-binary")
+            real.chmod(0o755)
+            (target / "release/codefire-rs").symlink_to(real)
+            with self.assertRaises(OSError) as raised:
+                self.export(target, candidate, destination)
+            self.assertEqual(raised.exception.errno, errno.ELOOP)
+            self.assert_failed_closed(destination)
+
+    def test_nonregular_or_nonexecutable_source_is_blocked(self) -> None:
+        cases = (
+            ("directory", None, 0o700, "regular=False"),
+            ("not-executable-uplifted", 2, 0o600, "mode=0o0600"),
+            ("not-executable-single-link", 1, 0o600, "mode=0o0600"),
+        )
+        for name, links, mode, expected in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as raw:
+                temporary = Path(raw).resolve()
+                target, candidate, destination = self.make_scene(temporary)
+                if links is None:
+                    (target / "release/codefire-rs").mkdir(mode=mode)
+                else:
+                    self.write_artifact(target, links=links, mode=mode)
+                with self.assertRaises(GateBlocked) as raised:
+                    self.export(target, candidate, destination)
+                self.assertEqual(
+                    raised.exception.code,
+                    "artifact-not-private-executable",
+                )
+                self.assertIn(expected, raised.exception.detail)
+                self.assert_failed_closed(destination)
+
+    def test_mutation_through_the_second_link_blocks_the_export(
+        self,
+    ) -> None:
+        # This is the protection the single-link rule was standing in for.
+        # With two links admitted, a writer holding the `deps/` name can
+        # touch the inode mid-copy, so the pre/post identity comparison has
+        # to be what actually fails closed. Both shapes are covered: an
+        # equal-size rewrite, which only the timestamps reveal, and an
+        # append, which also moves the size.
+        for mutation in ("same-size-rewrite", "append"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as raw:
+                temporary = Path(raw).resolve()
+                target, candidate, destination = self.make_scene(temporary)
+                self.write_artifact(target)
+                compiled = target / "release/deps" / self.COMPILED_NAME
+                original = gate_module.write_all
+                observed = {"mutated": False}
+
+                def write_all_then_mutate(
+                    descriptor: int,
+                    payload: bytes,
+                    _mutation: str = mutation,
+                ) -> None:
+                    original(descriptor, payload)
+                    if observed["mutated"]:
+                        return
+                    observed["mutated"] = True
+                    if _mutation == "append":
+                        with open(compiled, "ab") as handle:
+                            handle.write(b"-tampered")
+                        return
+                    with open(compiled, "r+b") as handle:
+                        handle.write(b"X")
+                    # Filesystem timestamp granularity is not a test input:
+                    # force an observably different mtime so an equal-size
+                    # rewrite cannot pass by landing inside the same tick
+                    # as the pre-copy capture.
+                    os.utime(compiled, ns=(1_000_000_000, 1_000_000_000))
+
+                with mock.patch.object(
+                    gate_module, "write_all", write_all_then_mutate
+                ):
+                    with self.assertRaises(GateBlocked) as raised:
+                        self.export(target, candidate, destination)
+                self.assertTrue(observed["mutated"])
+                self.assertEqual(
+                    raised.exception.code, "artifact-changed-during-export"
+                )
+                self.assert_failed_closed(destination)
+
+    def test_unsafe_prior_destination_is_never_replaced(self) -> None:
+        # The destination side keeps the strict single-link rule. A prior
+        # export that is a symlink, or that carries a link the crash-residue
+        # recovery cannot account for, must block with the prior bytes left
+        # exactly as they were.
+        cases = (
+            ("symlink", 0, "unsafe-prior-artifact-export"),
+            ("unaccounted-link", 1, "ambiguous-artifact-export-recovery"),
+            ("over-linked", 2, "unsafe-prior-artifact-export"),
+        )
+        for name, extra_links, expected in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as raw:
+                temporary = Path(raw).resolve()
+                target, candidate, destination = self.make_scene(temporary)
+                self.write_artifact(target)
+                if name == "symlink":
+                    elsewhere = candidate / "target/release/elsewhere"
+                    elsewhere.write_bytes(b"prior")
+                    destination.symlink_to(elsewhere)
+                else:
+                    destination.write_bytes(b"prior")
+                    destination.chmod(0o700)
+                    for index in range(extra_links):
+                        os.link(
+                            destination,
+                            destination.parent / f"keep-{index}",
+                        )
+                with self.assertRaises(GateBlocked) as raised:
+                    self.export(target, candidate, destination)
+                self.assertEqual(raised.exception.code, expected)
+                self.assertEqual(destination.read_bytes(), b"prior")
+                self.assertEqual(self.staging_residue(destination), [])
+
 
 class SourceKeyedCargoGateTests(unittest.TestCase):
     def make_repository(
@@ -4666,6 +4939,84 @@ class SourceKeyedCargoGateTests(unittest.TestCase):
             self.assertEqual(
                 committed["execution_key"], result["execution_key"]
             )
+
+    def test_release_export_accepts_the_cargo_uplift_hardlink(
+        self,
+    ) -> None:
+        # The 2026-08-02 live release build compiled for four minutes and
+        # then blocked `artifact-not-private-executable` on
+        # `release/codefire-rs`. Cargo uplifts a binary by hard-linking the
+        # compiled `release/deps/<crate>-<metadata>` inode onto the
+        # profile-root name, so the export source always arrives with two
+        # links. Reproduce that exact on-disk shape through the whole gate,
+        # not only through the export helper, because the helper is not
+        # where the release lane failed.
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            temporary = Path(temporary_raw).resolve()
+            root, profile, environment = self.make_repository(temporary)
+            output = root / "target/release/codefire-rs"
+            output.parent.mkdir(parents=True)
+            uplift: dict[str, int] = {}
+
+            def runner(*args, **kwargs):
+                target = Path(kwargs["environment"]["CARGO_TARGET_DIR"])
+                compiled = (
+                    target / "release/deps/example-0123456789abcdef"
+                )
+                compiled.parent.mkdir(parents=True, exist_ok=True)
+                compiled.write_bytes(b"source-keyed-binary")
+                compiled.chmod(0o755)
+                artifact = target / "release/codefire-rs"
+                os.link(compiled, artifact)
+                observed = artifact.stat()
+                uplift["nlink"] = observed.st_nlink
+                uplift["inode"] = observed.st_ino
+                return self.fake_runner(b"")(*args, **kwargs)
+
+            result = run_source_keyed_gate(
+                [
+                    "cargo",
+                    "build",
+                    "--release",
+                    "--locked",
+                    "-p",
+                    "example",
+                ],
+                root,
+                temporary / "evidence/uplift.log",
+                30,
+                environment=environment,
+                profile=profile,
+                new_namespace_free_floor_bytes=0,
+                export_artifact_relative="release/codefire-rs",
+                export_path=output,
+                gate_runner=runner,
+            )
+            self.assertEqual(uplift["nlink"], 2)
+            self.assertEqual(result["decision"], "PASS")
+            export = result["artifact_export"]
+            self.assertEqual(export["decision"], "EXPORTED")
+            self.assertEqual(export["source_nlink"], 2)
+            self.assertTrue(export["source_cargo_uplift_hardlinked"])
+            self.assertEqual(
+                export["source_nlink_maximum"],
+                MAX_EXPORT_SOURCE_ARTIFACT_LINKS,
+            )
+            self.assertEqual(
+                export["sha256"],
+                hashlib.sha256(b"source-keyed-binary").hexdigest(),
+            )
+            self.assertEqual(output.read_bytes(), b"source-keyed-binary")
+            published = output.stat()
+            self.assertEqual(published.st_nlink, 1)
+            self.assertEqual(export["export_nlink"], 1)
+            self.assertEqual(stat.S_IMODE(published.st_mode), 0o700)
+            # Accepting a hard-linked *source* must not turn publication
+            # into a link: the destination is a fresh inode written through
+            # a descriptor, so nothing in the artifact namespace can still
+            # reach the exported bytes.
+            self.assertNotEqual(published.st_ino, uplift["inode"])
+            self.assertEqual(export["export_inode"], published.st_ino)
 
     def test_tracked_or_nonignored_artifact_export_is_rejected(
         self,

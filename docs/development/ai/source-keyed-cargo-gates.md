@@ -324,8 +324,20 @@ incomplete namespace before releasing the locks; startup recovery covers
 abrupt host/process loss.
 
 Release publication uses `--export-artifact` and `--export-path`. The wrapper
-copies and hashes the requested single-link executable under the same locks,
-but does not replace the canonical export until the gate, candidate recapture,
+copies and hashes the requested owner-executable regular file under the same
+locks. The export source is admitted with one or two links: Cargo's uplift
+hard-links `<profile>/deps/<crate>-<metadata>` to `<profile>/<name>`, so a
+single-link requirement would block every real release export. Nothing else
+is relaxed. The source is opened no-follow, so a symlink, and a non-regular
+or non-owner-executable inode, still fail closed; a third link is `BLOCK`;
+and the complete pre/post source identity — device, inode, mode, link count,
+size, mtime, and ctime — must be unchanged across the copy, so a mutation
+through either link is `artifact-changed-during-export`. The published
+destination is separate and stays strictly single-link: it is created
+exclusively and no-follow, written by descriptor copy rather than by link,
+and a pre-existing destination that is non-regular, foreign-owned, or still
+hard-linked after crash-residue recovery is rejected. The wrapper does not
+replace the canonical export until the gate, candidate recapture,
 snapshot cleanup, log analysis, retention record, run-state commit, and final
 disk predicates have all passed. Replacement is same-directory and
 inode-checked; crash-left export temporary/previous entries are recovered on
