@@ -260,6 +260,20 @@ is normally inert: the release launcher runs the gate as a subprocess under
 executed as `__main__` still yields a second instance under its own policy
 module name, which this mechanism cannot address.
 
+The release launcher re-binds those same policy identities from outside the
+gate, together with the pinned supervisor's own. `st_uid` is the one field
+it cannot compare: the gate runs under `unshare -Urpf`, so the launcher's
+owner reads back as 0 inside it and every unmapped owner as the kernel
+overflow uid. Bytes, SHA-256, device, inode, mode, link count, mtime, and
+ctime are still compared for strict equality; the uid is recorded from both
+sides as `outer_uid` and `gate_namespace_uid` rather than collapsed into
+one ambiguous number. Ownership is not weakened by that — each side rejects
+a file whose `st_uid` is not its own effective uid before it records an
+identity at all, and never validates ownership against the other side's
+value. What authorizes trusting the gate's local check is the same binding
+pinning `policy-supervisor`: the check is only as good as the code running
+it, and that code's digest is bound on both sides.
+
 Logs and result JSON must be distinct direct children of the fixed dedicated
 evidence root and outside the candidate, target, and Git administration
 paths. Nested paths and pre-existing destinations are rejected; path

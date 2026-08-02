@@ -86,6 +86,8 @@ from check_review_recurrence import (  # noqa: E402
 from build_source_bound_rust import (  # noqa: E402
     BINARY_PATH,
     BUILD_COMMAND,
+    POLICY_INVARIANT_IDENTITY_FIELDS,
+    POLICY_NAMESPACE_RELATIVE_IDENTITY_FIELDS,
     SOURCE_GATE_PYTHON,
     acquire_gate_evidence_lock,
     bound_binary_identity,
@@ -93,9 +95,14 @@ from build_source_bound_rust import (  # noqa: E402
     prepare_gate_evidence_slot,
     provenance_destination_contract,
     run_bounded_source_gate,
+    running_ai_contracts_identity,
+    running_build_python_identity,
+    running_build_wrapper_identity,
+    running_source_gate_supervisor_identity,
     source_gate_launcher_environment,
     source_keyed_build_argv,
     release_gate_evidence_lock,
+    validate_outer_policy_binding,
     validate_provenance_payload,
     validate_source_inputs_against_head,
     write_provenance,
@@ -2915,6 +2922,234 @@ class HistoryTestCountConsistencyTests(unittest.TestCase):
                     f"admitted {sorted(admitted)} from {named}",
                 )
 
+class OuterPolicyBindingTests(unittest.TestCase):
+    """Cross-namespace policy identity, as the live release build sees it.
+
+    The gate is launched under `unshare -Urpf`, so the one identity field
+    that cannot survive the boundary is `st_uid`: the launcher's own owner
+    reads back as 0 inside the gate and every unmapped owner as the kernel
+    overflow uid. The live build recorded 1000 -> 0 for the policy modules
+    and 0 -> 65534 for `/usr/bin/python3.10` while bytes, SHA-256, device,
+    inode, mode, link count, mtime, and ctime all matched.
+
+    Dropping a field from an equality check is the kind of repair that can
+    quietly become a relaxation, so these tests pin the whole shape: the
+    live mapping is accepted, every invariant field still fails on its own,
+    ownership is still enforced locally, and two genuinely different files
+    are never treated as the same policy.
+    """
+
+    # Exactly the values the 2026-08-02 release gate recorded.
+    LIVE_NAMESPACE_UIDS = {
+        "policy-build-source-bound": 0,
+        "policy-ai-contracts": 0,
+        "policy-supervisor": 0,
+        "python": 65534,
+    }
+
+    def outer_identities(self) -> dict[str, dict[str, object]]:
+        return {
+            "policy-build-source-bound": running_build_wrapper_identity(),
+            "policy-ai-contracts": running_ai_contracts_identity(),
+            "policy-supervisor": (
+                running_source_gate_supervisor_identity()
+            ),
+            "python": running_build_python_identity(),
+        }
+
+    def gate_result(
+        self, tools: dict[str, dict[str, object]]
+    ) -> dict[str, object]:
+        return {"readonly_isolation_identity": {"tools": tools}}
+
+    def namespace_shifted_tools(self) -> dict[str, dict[str, object]]:
+        return {
+            name: {**identity, "uid": self.LIVE_NAMESPACE_UIDS[name]}
+            for name, identity in self.outer_identities().items()
+        }
+
+    def test_live_namespace_shifted_uids_are_bound_not_compared(
+        self,
+    ) -> None:
+        outer = self.outer_identities()
+        payload = validate_outer_policy_binding(
+            self.gate_result(self.namespace_shifted_tools())
+        )
+        self.assertEqual(
+            payload["schema"],
+            "codefire.rust_build_outer_policy_binding.v2",
+        )
+        self.assertEqual(
+            sorted(payload["members"]), sorted(self.LIVE_NAMESPACE_UIDS)
+        )
+        for name, member in payload["members"].items():
+            with self.subTest(member=name):
+                # Both views are kept, under names that say which is which.
+                self.assertEqual(
+                    member["outer_uid"], outer[name]["uid"]
+                )
+                self.assertEqual(
+                    member["gate_namespace_uid"],
+                    self.LIVE_NAMESPACE_UIDS[name],
+                )
+                # The ambiguous single `uid` key is gone: a consumer must
+                # say which namespace it means.
+                self.assertNotIn("uid", member)
+                for field in POLICY_INVARIANT_IDENTITY_FIELDS:
+                    self.assertEqual(member[field], outer[name][field])
+        # 1000 -> 0 for a policy module the launcher owns, and 0 -> 65534
+        # for a root-owned interpreter, are the two shapes that occur.
+        self.assertEqual(
+            payload["members"]["policy-build-source-bound"]["outer_uid"],
+            os.geteuid(),
+        )
+        self.assertEqual(
+            payload["members"]["policy-build-source-bound"][
+                "gate_namespace_uid"
+            ],
+            0,
+        )
+        self.assertEqual(
+            payload["members"]["python"]["gate_namespace_uid"], 65534
+        )
+
+    def test_every_invariant_field_mismatch_still_fails(self) -> None:
+        # Non-vacuity for the half of the tuple that is still compared.
+        # Each field is broken on its own, so a loop that silently stopped
+        # comparing one of them cannot pass by way of the others.
+        self.assertNotIn("uid", POLICY_INVARIANT_IDENTITY_FIELDS)
+        for name in self.LIVE_NAMESPACE_UIDS:
+            for field in POLICY_INVARIANT_IDENTITY_FIELDS:
+                with self.subTest(member=name, field=field):
+                    tools = self.namespace_shifted_tools()
+                    value = tools[name][field]
+                    if isinstance(value, str):
+                        tools[name][field] = "0" * len(value)
+                    else:
+                        tools[name][field] = int(value) + 1
+                    with self.assertRaises(ValueError) as raised:
+                        validate_outer_policy_binding(
+                            self.gate_result(tools)
+                        )
+                    self.assertIn(f"{name}.{field}", str(raised.exception))
+
+    def test_missing_or_non_integer_namespace_uid_is_rejected(
+        self,
+    ) -> None:
+        # The uid is no longer compared, so it has to be recorded instead.
+        # A gate result that simply omits it must not publish a binding
+        # with a null where the evidence should be.
+        for broken in (None, "0", True, 0.0):
+            with self.subTest(uid=broken):
+                tools = self.namespace_shifted_tools()
+                if broken is None:
+                    del tools["policy-supervisor"]["uid"]
+                else:
+                    tools["policy-supervisor"]["uid"] = broken
+                with self.assertRaises(ValueError) as raised:
+                    validate_outer_policy_binding(self.gate_result(tools))
+                self.assertIn(
+                    "policy-supervisor", str(raised.exception)
+                )
+                self.assertIn("gate uid", str(raised.exception))
+
+    def test_a_different_real_file_is_never_accepted_as_a_policy(
+        self,
+    ) -> None:
+        # Guards the whole design against the reading "uid is unchecked, so
+        # identity is loose". Every member is given another member's real,
+        # namespace-shifted identity; each swap must be rejected.
+        shifted = self.namespace_shifted_tools()
+        names = sorted(shifted)
+        for name in names:
+            for other in names:
+                if other == name:
+                    continue
+                with self.subTest(member=name, replaced_with=other):
+                    tools = self.namespace_shifted_tools()
+                    tools[name] = {
+                        **shifted[other],
+                        "uid": self.LIVE_NAMESPACE_UIDS[name],
+                    }
+                    with self.assertRaises(ValueError) as raised:
+                        validate_outer_policy_binding(
+                            self.gate_result(tools)
+                        )
+                    self.assertIn(
+                        "differs from outer build policy",
+                        str(raised.exception),
+                    )
+
+    def test_missing_gate_policy_member_is_rejected(self) -> None:
+        for name in self.LIVE_NAMESPACE_UIDS:
+            with self.subTest(member=name):
+                tools = self.namespace_shifted_tools()
+                del tools[name]
+                with self.assertRaisesRegex(
+                    ValueError, f"identity is missing: {name}"
+                ):
+                    validate_outer_policy_binding(self.gate_result(tools))
+
+    def test_local_owner_controlled_rejection_is_unchanged(self) -> None:
+        # The repair rests entirely on each side still enforcing ownership
+        # against its own effective uid. Move the outer euid and every
+        # owner-controlled reader must refuse, exactly as before.
+        for reader in (
+            running_build_wrapper_identity,
+            running_ai_contracts_identity,
+            running_source_gate_supervisor_identity,
+        ):
+            with self.subTest(reader=reader.__name__):
+                self.assertIsInstance(reader()["uid"], int)
+                with mock.patch(
+                    "build_source_bound_rust.os.geteuid",
+                    return_value=os.geteuid() + 1,
+                ):
+                    with self.assertRaises((RuntimeError, ValueError)):
+                        reader()
+
+    def test_gate_owner_check_is_authorized_by_the_pinned_supervisor(
+        self,
+    ) -> None:
+        # The gate's own owner check runs inside the shifted namespace, so
+        # the launcher cannot re-derive it. What makes it trustworthy is
+        # that the code running it is byte for byte the pinned supervisor,
+        # which is now a bound member rather than an unrecorded assumption.
+        payload = validate_outer_policy_binding(
+            self.gate_result(self.namespace_shifted_tools())
+        )
+        semantic = payload["namespace_relative_identity"]
+        self.assertEqual(
+            semantic["fields"],
+            list(POLICY_NAMESPACE_RELATIVE_IDENTITY_FIELDS),
+        )
+        self.assertEqual(
+            semantic["gate_owner_check_authorized_by"],
+            "policy-supervisor",
+        )
+        self.assertIn("unshare -Urpf", semantic["reason"])
+        self.assertIn("overflow uid", semantic["reason"])
+        self.assertIn("its own", semantic["owner_validation"])
+        self.assertEqual(
+            payload["invariant_fields"],
+            list(POLICY_INVARIANT_IDENTITY_FIELDS),
+        )
+        supervisor = payload["members"]["policy-supervisor"]
+        self.assertEqual(
+            supervisor["sha256"],
+            hashlib.sha256(
+                (TOOLS_DIR / "run_source_keyed_cargo_gate.py").read_bytes()
+            ).hexdigest(),
+        )
+        # The digest covers the payload as published, minus itself.
+        without = {
+            key: value
+            for key, value in payload.items()
+            if key != "identity_sha256"
+        }
+        self.assertEqual(payload["identity_sha256"], sha256_json(without))
+
+
 class SourceKeyedGateDocumentationTests(unittest.TestCase):
     """The contract document must not outrun the implementation.
 
@@ -3029,6 +3264,23 @@ class SourceKeyedGateDocumentationTests(unittest.TestCase):
             "the reservation fallback after a failed publication", text
         )
         self.assertIn("never a second rendering of them", text)
+
+    def test_cross_namespace_uid_semantic_is_documented(self) -> None:
+        text = self.contract
+        # The uid was compared raw across the user-namespace boundary, so
+        # no live release build could bind its own policy. Dropping a field
+        # from an equality check has to be written down as a namespace
+        # correction, with the ownership guarantee that survives it.
+        self.assertIn(
+            "`st_uid` is the one field it cannot compare", text
+        )
+        self.assertIn("unshare -Urpf", text)
+        self.assertIn("`outer_uid` and `gate_namespace_uid`", text)
+        self.assertIn(
+            "rejects a file whose `st_uid` is not its own effective uid",
+            text,
+        )
+        self.assertIn("pinning `policy-supervisor`", text)
 
     def documented_unshare_sequence(self) -> list[str]:
         """The flag sequence the contract document publishes, as tokens."""

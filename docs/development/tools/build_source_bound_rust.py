@@ -287,16 +287,34 @@ _BUILD_AI_CONTRACTS = _preload_ai_contracts()
 from ai_contracts import sha256_json
 
 
-POLICY_IDENTITY_FIELDS = (
+# `st_uid` is the only identity field whose value depends on which user
+# namespace observed it. The source gate is launched under
+# `unshare -Urpf`, so inside it the launcher's own owner reads back as 0
+# and every unmapped owner as the kernel overflow uid: the live release
+# build recorded 1000 -> 0 for the policy modules and 0 -> 65534 for
+# `/usr/bin/python3.10`. Raw uid equality across that boundary is not a
+# property any real invocation can have, so it is not compared.
+#
+# Nothing about ownership is relaxed by that. Each side validates st_uid
+# against its own effective uid, locally, before it records an identity at
+# all -- `_bootstrap_file_identity(owner_controlled=True)` out here and the
+# gate's `_preload_policy_module` in there -- and neither ever validates
+# against the other side's value. Both uids are carried into the binding as
+# named evidence instead of being collapsed into one ambiguous number.
+POLICY_INVARIANT_IDENTITY_FIELDS = (
     "bytes",
     "sha256",
     "device",
     "inode",
     "mode",
-    "uid",
     "nlink",
     "mtime_ns",
     "ctime_ns",
+)
+POLICY_NAMESPACE_RELATIVE_IDENTITY_FIELDS = ("uid",)
+POLICY_IDENTITY_FIELDS = (
+    POLICY_INVARIANT_IDENTITY_FIELDS
+    + POLICY_NAMESPACE_RELATIVE_IDENTITY_FIELDS
 )
 
 
@@ -360,6 +378,47 @@ def running_ai_contracts_identity() -> dict[str, Any]:
     return current
 
 
+def running_source_gate_supervisor_identity() -> dict[str, Any]:
+    """Identity of the pinned gate code, read from the outer namespace.
+
+    This member is what authorizes the others. The gate enforces its own
+    owner check inside a user namespace whose uid view is shifted, so the
+    launcher cannot re-derive that check's input and must not pretend to.
+    What it can prove is that the code running the check is byte for byte
+    the supervisor it pinned, which is exactly what this identity binds --
+    the same file `run_bounded_source_gate` opens, passes by descriptor,
+    and re-verifies after the gate exits.
+    """
+    lexical = SOURCE_KEYED_CARGO_GATE.absolute()
+    if lexical.resolve(strict=True) != lexical:
+        raise ValueError(
+            f"source gate supervisor identity is unsafe: {lexical}"
+        )
+    descriptor = os.open(
+        lexical,
+        os.O_RDONLY
+        | os.O_CLOEXEC
+        | getattr(os, "O_NOFOLLOW", 0),
+    )
+    try:
+        identity = _bootstrap_file_identity(
+            descriptor,
+            maximum_bytes=BUILD_BOOTSTRAP_MAX_BYTES,
+            owner_controlled=True,
+        )
+        observed = os.stat(lexical, follow_symlinks=False)
+        if (observed.st_dev, observed.st_ino) != (
+            identity["device"],
+            identity["inode"],
+        ):
+            raise ValueError(
+                f"source gate supervisor identity is unsafe: {lexical}"
+            )
+        return identity
+    finally:
+        os.close(descriptor)
+
+
 def gate_policy_identity(
     gate_result: dict[str, Any], name: str
 ) -> dict[str, Any]:
@@ -381,24 +440,61 @@ def validate_outer_policy_binding(
     expected = {
         "policy-build-source-bound": running_build_wrapper_identity(),
         "policy-ai-contracts": running_ai_contracts_identity(),
+        "policy-supervisor": running_source_gate_supervisor_identity(),
         "python": running_build_python_identity(),
     }
     bound: dict[str, Any] = {}
     for name, outer_identity in expected.items():
         gate_identity = gate_policy_identity(gate_result, name)
-        for field in POLICY_IDENTITY_FIELDS:
+        for field in POLICY_INVARIANT_IDENTITY_FIELDS:
             if gate_identity.get(field) != outer_identity.get(field):
                 raise ValueError(
                     "source gate policy differs from outer build policy: "
                     f"{name}.{field}"
                 )
-        bound[name] = {
+        member = {
             field: outer_identity[field]
-            for field in POLICY_IDENTITY_FIELDS
+            for field in POLICY_INVARIANT_IDENTITY_FIELDS
         }
+        for field in POLICY_NAMESPACE_RELATIVE_IDENTITY_FIELDS:
+            for side, identity in (
+                ("outer", outer_identity),
+                ("gate", gate_identity),
+            ):
+                if not isinstance(identity.get(field), int) or isinstance(
+                    identity.get(field), bool
+                ):
+                    raise ValueError(
+                        "source gate policy identity is missing a "
+                        f"{side} {field}: {name}"
+                    )
+        member["outer_uid"] = outer_identity["uid"]
+        member["gate_namespace_uid"] = gate_identity["uid"]
+        bound[name] = member
     payload = {
-        "schema": "codefire.rust_build_outer_policy_binding.v1",
+        "schema": "codefire.rust_build_outer_policy_binding.v2",
         "members": bound,
+        "invariant_fields": list(POLICY_INVARIANT_IDENTITY_FIELDS),
+        "namespace_relative_identity": {
+            "fields": list(POLICY_NAMESPACE_RELATIVE_IDENTITY_FIELDS),
+            "reason": (
+                "the source gate runs under `unshare -Urpf`, so its st_uid "
+                "view is namespace-relative: the launcher's owner maps to 0 "
+                "and every unmapped owner to the kernel overflow uid"
+            ),
+            "outer_uid": (
+                "st_uid observed in the launcher's namespace"
+            ),
+            "gate_namespace_uid": (
+                "st_uid observed inside the gate's user namespace"
+            ),
+            "owner_validation": (
+                "each side rejects a file whose st_uid is not its own "
+                "effective uid before recording the identity, and never "
+                "validates ownership against the other side's value"
+            ),
+            "gate_owner_check_authorized_by": "policy-supervisor",
+        },
         "python_flags": [
             "-I",
             "-S",
