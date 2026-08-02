@@ -125,6 +125,30 @@ The active product/control split is frozen as follows:
 6. compose accepted Python and Rust inputs once per runtime before starting the
    predecessor-gated successors, metrics/conformance and terminal lifecycle.
 
+#### CFR-168 continuation state (2026-08-02, after exact adjudication)
+
+This later checkpoint supersedes only the **current-state interpretation** of
+items 1-5 above. Their identities and historical evidence remain unchanged.
+It is bound to canonical checkpoint `200c612` and the exact artifacts named
+below; candidate/worktree volume is still not progress.
+
+| Prior item | Current terminal/intermediate state | Next authorized transition |
+|---:|---|---|
+| 1 | The five AIA-046 export/stdout/policy/re-read fixes and exact review are integrated through `350a79f`; manager authority is bound at `200c612`. A later real File Ancestry gate proved the distinct AIA-048 `required_correction`, so the control plane is **not complete**. | Finish the three-path AIA-048 repair, non-Cargo suite, exact failed-gate reproduction and fresh exact review before any broader Rust gate. |
+| 2 | Python accepted-input candidate `cf1ac6a` and result `b7aadd5` are immutable; their fresh exact review and broad integration-profile gate are still running. No composition acceptance or integration is claimed. | Require the report-only terminal review, manager adjudication and exact composition topology before integration. |
+| 3 | File Ancestry's former five blocker groups are source-closed through R1e `44b66ef`; R1f `58bb5a2` contains only the three required lint corrections. Its prior focused gate is `BLOCK`, not evidence, because AIA-048 killed the 40-test harness during live sampling. Rust HTTP remains separately pending. | After AIA-048 acceptance, run source-keyed fmt, focused 40+, full bin, Core and strict Clippy gates, then obtain a fresh exact review. |
+| 4 | Decision locus `cfr168.file-doctor.composition-input` is terminal at adjudication `22297b9`: select accepted `A=1a04490`; exclude unreviewed `H=cd130e5`. The old “A or H” choice is satisfied. | Compose `A` rather than cherry-picking `H`; the composed revision still needs its own exact review. |
+| 5 | Storage's 23 observations are adjudicated at `375bd98` and reduced manager authority is frozen at `d44621f`: G1-G5, B1-B3+B-REV, C1-C4 and the exact eleven paths. The impossible R3 seventh-terminal requirement is superseded. | Resume the original bounded Storage implementer only after AIA-048 acceptance and a new exact source-binding envelope; then source-keyed gates and fresh review. |
+
+File Doctor review-note routing is retained without converting optional
+observations into required corrections:
+
+| Observation | Current disposition and owner |
+|---|---|
+| `FD2-NOTE1` | Decision-record-only `nonblocking_improvement`; not admitted, no repair authority. |
+| `FD2-NOTE2` | Decision-record-only `nonblocking_improvement`; not admitted, no repair authority. |
+| `FD2-NOTE3` | `NEXT_DISCOVERY_CANDIDATE`, manager-owned and not admitted. A future packet may consider an unavailable-subject fence only with a newly selected base and frozen terminalization, fence-time syscall-cost and multi-fault-precedence hazards. `cd130e5` is reference material only. |
+
 AIA-047 L1.5 hardening and review-system redesign are preserved, separately
 owned work. Neither is a CFR-168 product-source prerequisite. They must not take
 an implementer, reviewer, integration slot or heavy validation resource while
