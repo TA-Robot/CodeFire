@@ -1,10 +1,10 @@
 # AIA-048 Source-keyed Cargo Live-Sampler Churn Repair
 
-Status: Frozen for implementation  
-Packet ID: `aia048-source-keyed-live-sampler-churn-repair-20260802`  
-Base revision: `54028a136943a9d5f9608e19d3855c0edae46adf`  
-Base tree: `e4057e1b6f16b12fed45ad0b50bc4c6014ca7ebd`  
-Risk: High — required correction in the Rust-validation control plane  
+Status: Frozen for implementation
+Packet ID: `aia048-source-keyed-live-sampler-churn-repair-20260802`
+Base revision: `54028a136943a9d5f9608e19d3855c0edae46adf`
+Base tree: `e4057e1b6f16b12fed45ad0b50bc4c6014ca7ebd`
+Risk: High — required correction in the Rust-validation control plane
 Lifecycle: newly observed failure -> Freeze / Plan / Preflight
 
 ## Objective
