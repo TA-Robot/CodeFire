@@ -74,6 +74,41 @@ Root execution order:
 | 10 | CFR-172 | RVC-002/009 | bounded read-only adoption/mental-model experiment | frozen |
 | 11 | CFR-173 | RVC-003/004/010 | privacy-preserving product falsification pilot and stop decision | frozen |
 
+### CFR-168 closure-mode checkpoint (2026-08-02)
+
+The manager re-audited the exact candidate graph, immutable review reports and
+canonical product tree at `163c194764781a01dded4cc338fa5376fefb7541`.
+Candidate generation, review volume, branch count and worktree count are not
+progress. From this checkpoint, progress means an exact terminal review
+decision, canonical integration, or a later lifecycle exit backed by the
+required evidence.
+
+The active product/control split is frozen as follows:
+
+1. independently review source-keyed Cargo control candidate `74cd37d`; only an
+   accepted semantic canonical port may supply evidence for held Rust reviews;
+2. repair and rereview Python Upload/CFB-138, then resolve the shared-primitives
+   preflight before MR-write and Python composition;
+3. review File Ancestry `02b0d63` and Rust HTTP `92fc810` before authorizing any
+   new product repair;
+4. adjudicate whether accepted File Doctor `1a04490` or independently reviewed
+   hardening `cd130e5` is the composition input before composition starts;
+5. repair rejected Rust Storage `cdcb9bd` only within its corrected eleven-path
+   boundary, then obtain a fresh exact review; and
+6. compose accepted Python and Rust inputs once per runtime before starting the
+   predecessor-gated successors, metrics/conformance and terminal lifecycle.
+
+AIA-047 L1.5 hardening and review-system redesign are preserved, separately
+owned work. Neither is a CFR-168 product-source prerequisite. They must not take
+an implementer, reviewer, integration slot or heavy validation resource while
+a ready CFR-168 product lane is unserviced.
+
+No observation directly authorizes repair. Each review observation receives an
+impact/must-fix/actionability disposition first. A candidate with changed bytes
+gets a new exact review subject; two consecutive required-correction rounds on
+the same mechanism return that mechanism to Plan/Preflight instead of another
+unbounded local patch.
+
 ### Review-bottleneck control checkpoint
 
 This control-plane work does not advance the product root beyond its existing
