@@ -158,6 +158,7 @@ from run_timed_gate import (  # noqa: E402
 )
 from run_source_keyed_cargo_gate import (  # noqa: E402
     GateBlocked,
+    LIVE_BEST_EFFORT_NAMESPACE_SCAN,
     MAX_EXPORT_SOURCE_ARTIFACT_LINKS,
     MAX_RETAINED_TEST_HARNESSES,
     MAX_TEST_HARNESS_SUMMARIES,
@@ -180,7 +181,9 @@ from run_source_keyed_cargo_gate import (  # noqa: E402
     git_bytes,
     git_tree_entries,
     isolation_identity,
+    live_namespace_sample,
     main as source_keyed_cargo_main,
+    namespace_traversal,
     namespace_usage,
     normalize_cargo_argv,
     pinned_tool_files,
@@ -4245,6 +4248,88 @@ class ArtifactExportIdentityTests(unittest.TestCase):
                 self.assertEqual(self.staging_residue(destination), [])
 
 
+class ModuleOverride:
+    """Module stand-in that overrides named attributes, forwards the rest.
+
+    Patched onto one module's global (`mock.patch.object(gate_module,
+    "os", ...)`), so the override is visible to the gate and to nothing
+    else. Patching the real `os`/`shutil` attribute instead would reach
+    every importer in the process, including the fixture's own removals.
+    """
+
+    def __init__(self, module, **overrides) -> None:
+        self._module = module
+        self._overrides = overrides
+
+    def __getattr__(self, name):
+        if name in self._overrides:
+            return self._overrides[name]
+        return getattr(self._module, name)
+
+
+class ScanEntries:
+    """Minimal `with`-able stand-in for a `ScandirIterator`."""
+
+    def __init__(self, entries) -> None:
+        self.entries = entries
+
+    def __enter__(self):
+        return self.entries
+
+    def __exit__(self, *exception) -> bool:
+        return False
+
+
+class ChurningScandir:
+    """`os.scandir` that mutates the tree at exact points in one walk.
+
+    The live sampler's window is between `scandir` returning a name and
+    the descriptor-relative lookup that follows it. A background thread
+    reaches that window only sometimes, and assertions that depend on
+    winning a race are not controls. This closes the window exactly:
+    each call materialises the real entries, sorts them so the walk's LIFO
+    pending stack has a fixed visit order, then runs `schedule[n]` for
+    that call's sequence number before handing the list back.
+
+    Sorting is what makes the *directory* window reachable. The walk pops
+    the last-pushed directory first, so a victim named to sort before a
+    sibling is stat'd, pushed, and only reopened after that sibling has
+    been scanned -- which is the call the schedule removes it on.
+    """
+
+    def __init__(self, schedule) -> None:
+        self.schedule = schedule
+        self.scans = 0
+        self.fired: list[int] = []
+
+    def __call__(self, directory):
+        self.scans += 1
+        with os.scandir(directory) as scanner:
+            entries = sorted(scanner, key=lambda entry: entry.name)
+        action = self.schedule.get(self.scans)
+        if action is not None:
+            action()
+            self.fired.append(self.scans)
+        return ScanEntries(entries)
+
+    def proxy(self):
+        return ModuleOverride(os, scandir=self)
+
+
+def remove_shallow_directory(path: Path) -> None:
+    """Remove a one-level directory without recursing through `os.scandir`.
+
+    `shutil.rmtree` walks with `os.scandir`, which is the very call the
+    churn fixture replaces; using it inside a scheduled action would
+    re-enter the fixture. Every victim directory here is one level deep by
+    construction, so an explicit unlink/rmdir pair is both sufficient and
+    free of that coupling.
+    """
+    for child in sorted(os.listdir(path)):
+        os.unlink(path / child)
+    os.rmdir(path)
+
+
 class SourceKeyedCargoGateTests(unittest.TestCase):
     def make_repository(
         self, temporary: Path
@@ -7059,6 +7144,1218 @@ class SourceKeyedCargoGateTests(unittest.TestCase):
                 read_run_state(target, source_key=source_key)["state"],
                 "PREPARED",
             )
+
+    # ------------------------------------------------------------------
+    # Live target sampler versus gate-owned Cargo churn (AIA-048).
+    #
+    # The 2026-08-02 focused File Ancestry gate compiled, ran 40 tests,
+    # failed none, and was still killed at guard invocation 243 with
+    # `live-target-usage-unavailable`. Nothing was wrong with the
+    # candidate: `namespace_usage` enumerated the namespace Cargo was
+    # building into, and by the time its path-based `stat`/reopen reached
+    # a name, the gate's own rustc had already removed it. Two whole-scan
+    # retries can both land in that traffic.
+    # ------------------------------------------------------------------
+
+    def churn_namespace(self, temporary: Path) -> tuple[Path, Path]:
+        """A prepared namespace with the layout the schedules assume.
+
+        With `ChurningScandir` sorting each enumeration, the visit order
+        is fixed:
+
+            scan 1  namespace root  (run state, marker, `build`)
+            scan 2  `build`         (`gone.tmp`, `keep.rlib`, `victim`,
+                                     `zafter`)
+            scan 3  `build/zafter`
+            scan 4  `build/victim`
+
+        `victim` is therefore stat'd and pushed at scan 2 but not reopened
+        until after scan 3, which is the window a directory removal has to
+        land in to exercise the reopen rather than the stat.
+        """
+        _, profile, _ = self.make_repository(temporary)
+        admitted = Path(str(profile["target_dir"]))
+        namespace, _, _, _, _ = prepare_namespace(
+            admitted,
+            "7" * 64,
+            {
+                "schema": "codefire.cargo_source_key.v1",
+                "candidate": {"tree": "live-churn"},
+            },
+            lock_timeout_seconds=0,
+            new_namespace_free_floor_bytes=0,
+        )
+        build = namespace / "build"
+        build.mkdir()
+        (build / "gone.tmp").write_bytes(b"g" * 2048)
+        (build / "keep.rlib").write_bytes(b"k" * 4096)
+        (build / "victim").mkdir()
+        (build / "victim/payload.bin").write_bytes(b"p" * 4096)
+        (build / "zafter").mkdir()
+        (build / "zafter/keep.bin").write_bytes(b"z" * 4096)
+        return namespace, build
+
+    def test_live_scan_tolerates_a_file_vanishing_after_enumeration(
+        self,
+    ) -> None:
+        # Control 1: the exact window the live gate died in. `scandir`
+        # returned `gone.tmp`; the descriptor-relative no-follow stat then
+        # proves it absent. Under the live policy that is gate-owned
+        # churn, and the sample must still complete.
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            namespace, build = self.churn_namespace(temporary)
+            baseline = namespace_usage(namespace)
+            vanishing = (build / "gone.tmp").stat()
+
+            churn = ChurningScandir(
+                {2: lambda: (build / "gone.tmp").unlink()}
+            )
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                sample = live_namespace_sample(
+                    namespace, deadline_seconds=30.0
+                )
+
+            self.assertEqual(churn.fired, [2])
+            self.assertEqual(
+                sample["policy"], LIVE_BEST_EFFORT_NAMESPACE_SCAN
+            )
+            self.assertEqual(sample["churn"]["vanished_entries"], 1)
+            self.assertEqual(sample["churn"]["vanished_directories"], 0)
+            # Progress, not merely survival: one entry was skipped and
+            # every other entry in the namespace was measured.
+            self.assertEqual(
+                sample["usage"]["entry_count"],
+                baseline["entry_count"] - 1,
+            )
+            self.assertEqual(
+                sample["usage"]["logical_bytes"],
+                baseline["logical_bytes"] - vanishing.st_size,
+            )
+            self.assertEqual(
+                sample["usage"]["allocated_bytes"],
+                baseline["allocated_bytes"]
+                - vanishing.st_blocks * 512,
+            )
+
+    def test_live_scan_tolerates_a_directory_vanishing_before_reopen(
+        self,
+    ) -> None:
+        # Control 2: the other half of the same race. rustc creates and
+        # removes whole scratch directories under the target-local
+        # `TMPDIR`, so the subtree can be gone between the parent's stat
+        # and the descriptor-relative reopen. Only its unmeasured child is
+        # lost; the directory entry itself was already counted.
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            namespace, build = self.churn_namespace(temporary)
+            baseline = namespace_usage(namespace)
+            payload = (build / "victim/payload.bin").stat()
+
+            churn = ChurningScandir(
+                {3: lambda: remove_shallow_directory(build / "victim")}
+            )
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                sample = live_namespace_sample(
+                    namespace, deadline_seconds=30.0
+                )
+
+            self.assertEqual(churn.fired, [3])
+            self.assertEqual(sample["churn"]["vanished_directories"], 1)
+            self.assertEqual(sample["churn"]["vanished_entries"], 0)
+            self.assertEqual(
+                sample["usage"]["entry_count"],
+                baseline["entry_count"] - 1,
+            )
+            self.assertEqual(
+                sample["usage"]["logical_bytes"],
+                baseline["logical_bytes"] - payload.st_size,
+            )
+
+    def test_live_scan_refuses_replacement_and_symlink_as_churn(
+        self,
+    ) -> None:
+        # Control 3: disappearance is not the same event as replacement.
+        # A same-name directory with a different inode, and a symlink put
+        # where a directory was, both stay fail-closed under the live
+        # policy -- otherwise "tolerate churn" would quietly become
+        # "follow whatever is there now".
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            namespace, build = self.churn_namespace(temporary)
+            original = (build / "victim").stat()
+
+            def replace() -> None:
+                (build / "victim").rename(build / "victim-old")
+                (build / "victim").mkdir()
+
+            churn = ChurningScandir({3: replace})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(GateBlocked) as raised:
+                    live_namespace_sample(
+                        namespace, deadline_seconds=30.0
+                    )
+            self.assertEqual(churn.fired, [3])
+            self.assertEqual(
+                raised.exception.code, "namespace-entry-identity-mismatch"
+            )
+            # Non-vacuity: the replacement really did land, and really was
+            # a different inode from the one the walk had bound.
+            self.assertTrue((build / "victim").is_dir())
+            self.assertNotEqual(
+                (build / "victim").stat().st_ino, original.st_ino
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            # The identity binding covers every component, not only the
+            # queued leaf. Without that chain, replacing `parent` with an
+            # empty directory makes the old `parent/victim` lookup return
+            # ENOENT and look indistinguishable from leaf disappearance.
+            temporary = Path(raw).resolve()
+            namespace = temporary / "namespace"
+            parent = namespace / "parent"
+            victim = parent / "victim"
+            zafter = parent / "zafter"
+            victim.mkdir(parents=True)
+            zafter.mkdir()
+            (victim / "payload.bin").write_bytes(b"p" * 4096)
+            (zafter / "keep.bin").write_bytes(b"z" * 4096)
+            original_parent = parent.stat()
+
+            def replace_ancestor() -> None:
+                parent.rename(namespace / "parent-old")
+                parent.mkdir()
+
+            churn = ChurningScandir({3: replace_ancestor})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(GateBlocked) as ancestor:
+                    live_namespace_sample(
+                        namespace, deadline_seconds=30.0
+                    )
+            self.assertEqual(churn.fired, [3])
+            self.assertEqual(
+                ancestor.exception.code,
+                "namespace-entry-identity-mismatch",
+            )
+            self.assertNotEqual(
+                parent.stat().st_ino, original_parent.st_ino
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            # The namespace root is bound through its parent entry as well
+            # as by the held root fd. Reopening an empty relative path only
+            # duplicates that old fd and cannot detect a same-name root
+            # replacement.
+            temporary = Path(raw).resolve()
+            namespace = temporary / "namespace"
+            namespace.mkdir()
+            (namespace / "keep.rlib").write_bytes(b"k" * 4096)
+            original_root = namespace.stat()
+
+            def replace_root() -> None:
+                namespace.rename(temporary / "namespace-old")
+                namespace.mkdir()
+                (namespace / "replacement.bin").write_bytes(
+                    b"r" * (1024 * 1024)
+                )
+
+            churn = ChurningScandir({1: replace_root})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(GateBlocked) as root_replaced:
+                    live_namespace_sample(
+                        namespace, deadline_seconds=30.0
+                    )
+            self.assertEqual(churn.fired, [1])
+            self.assertEqual(
+                root_replaced.exception.code,
+                "namespace-entry-identity-mismatch",
+            )
+            self.assertNotEqual(
+                namespace.stat().st_ino, original_root.st_ino
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            # The binding starts at `/`, not at the immediate parent. A
+            # same-name replacement of the registry ancestor must not keep
+            # validating against the held old registry fd.
+            temporary = Path(raw).resolve()
+            registry = temporary / "registry"
+            namespace = registry / "namespace"
+            namespace.mkdir(parents=True)
+            (namespace / "keep.rlib").write_bytes(b"k" * 4096)
+
+            def replace_registry() -> None:
+                registry.rename(temporary / "registry-old")
+                registry.mkdir()
+                namespace.mkdir()
+                (namespace / "replacement.bin").write_bytes(
+                    b"r" * (1024 * 1024)
+                )
+
+            churn = ChurningScandir({1: replace_registry})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(GateBlocked) as ancestor_root:
+                    live_namespace_sample(
+                        namespace, deadline_seconds=30.0
+                    )
+            self.assertEqual(churn.fired, [1])
+            self.assertEqual(
+                ancestor_root.exception.code,
+                "namespace-entry-identity-mismatch",
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            registry = temporary / "registry"
+            namespace = registry / "namespace"
+            namespace.mkdir(parents=True)
+            (namespace / "keep.rlib").write_bytes(b"k" * 4096)
+
+            def symlink_registry() -> None:
+                registry.rename(temporary / "registry-old")
+                registry.symlink_to(
+                    temporary / "registry-old",
+                    target_is_directory=True,
+                )
+
+            churn = ChurningScandir({1: symlink_registry})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(OSError) as ancestor_symlink:
+                    live_namespace_sample(
+                        namespace, deadline_seconds=30.0
+                    )
+            self.assertEqual(churn.fired, [1])
+            self.assertNotIsInstance(
+                ancestor_symlink.exception, FileNotFoundError
+            )
+            self.assertIn(
+                ancestor_symlink.exception.errno,
+                {errno.ELOOP, errno.ENOTDIR},
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            # The root is checked again after all queued children drain.
+            # Replacing it during child scan 2 occurs after the root's own
+            # post-scan check and used to leave the new subtree unmeasured.
+            temporary = Path(raw).resolve()
+            namespace = temporary / "namespace"
+            child = namespace / "child"
+            child.mkdir(parents=True)
+            (child / "keep.rlib").write_bytes(b"k" * 4096)
+
+            def replace_root_late() -> None:
+                namespace.rename(temporary / "namespace-old")
+                namespace.mkdir()
+                (namespace / "replacement.bin").write_bytes(
+                    b"r" * (1024 * 1024)
+                )
+
+            churn = ChurningScandir({2: replace_root_late})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(GateBlocked) as late_root:
+                    live_namespace_sample(
+                        namespace, deadline_seconds=30.0
+                    )
+            self.assertEqual(churn.fired, [2])
+            self.assertEqual(
+                late_root.exception.code,
+                "namespace-entry-identity-mismatch",
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            # A file lookup happens through a held directory descriptor.
+            # If that directory is renamed away, its enumerated file is
+            # removed, and a different same-name directory appears, the
+            # file's ENOENT alone is not proof of harmless disappearance.
+            temporary = Path(raw).resolve()
+            namespace = temporary / "namespace"
+            parent = namespace / "parent"
+            parent.mkdir(parents=True)
+            (parent / "gone.tmp").write_bytes(b"g" * 2048)
+            original_parent = parent.stat()
+
+            def replace_file_parent() -> None:
+                parent.rename(namespace / "parent-old")
+                (namespace / "parent-old/gone.tmp").unlink()
+                parent.mkdir()
+                (parent / "replacement.bin").write_bytes(
+                    b"r" * (1024 * 1024)
+                )
+
+            churn = ChurningScandir({2: replace_file_parent})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(GateBlocked) as file_parent:
+                    live_namespace_sample(
+                        namespace, deadline_seconds=30.0
+                    )
+            self.assertEqual(churn.fired, [2])
+            self.assertEqual(
+                file_parent.exception.code,
+                "namespace-entry-identity-mismatch",
+            )
+            self.assertNotEqual(
+                parent.stat().st_ino, original_parent.st_ino
+            )
+            self.assertTrue((parent / "replacement.bin").is_file())
+
+        with tempfile.TemporaryDirectory() as raw:
+            # Replacement must also be detected when every entry from the
+            # held old directory still stats successfully. An ENOENT-only
+            # recheck would never run in this shape and would omit the new
+            # replacement subtree from the allocation sample.
+            temporary = Path(raw).resolve()
+            namespace = temporary / "namespace"
+            parent = namespace / "parent"
+            parent.mkdir(parents=True)
+            (parent / "keep.rlib").write_bytes(b"k" * 4096)
+            original_parent = parent.stat()
+
+            def replace_after_enumeration() -> None:
+                parent.rename(namespace / "parent-old")
+                parent.mkdir()
+                (parent / "replacement.bin").write_bytes(
+                    b"r" * (1024 * 1024)
+                )
+
+            churn = ChurningScandir({2: replace_after_enumeration})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(GateBlocked) as post_scan:
+                    live_namespace_sample(
+                        namespace, deadline_seconds=30.0
+                    )
+            self.assertEqual(churn.fired, [2])
+            self.assertEqual(
+                post_scan.exception.code,
+                "namespace-entry-identity-mismatch",
+            )
+            self.assertNotEqual(
+                parent.stat().st_ino, original_parent.st_ino
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            namespace, build = self.churn_namespace(temporary)
+
+            def swap() -> None:
+                (build / "victim").rename(build / "victim-old")
+                (build / "victim").symlink_to(build / "zafter")
+
+            churn = ChurningScandir({3: swap})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(OSError) as symlinked:
+                    live_namespace_sample(
+                        namespace, deadline_seconds=30.0
+                    )
+            self.assertEqual(churn.fired, [3])
+            # O_NOFOLLOW|O_DIRECTORY reports ELOOP or ENOTDIR depending on
+            # the kernel/filesystem path, never ENOENT: the tolerant branch
+            # is keyed on FileNotFoundError alone, so a symlink cannot reach
+            # it.
+            self.assertNotIsInstance(
+                symlinked.exception, FileNotFoundError
+            )
+            self.assertIn(
+                symlinked.exception.errno,
+                {errno.ELOOP, errno.ENOTDIR},
+            )
+
+    def test_strict_measurement_still_fails_closed_on_those_controls(
+        self,
+    ) -> None:
+        # Control 4: the same three windows through the strict entry
+        # point. Tolerance has to be a property of the named live policy,
+        # not of the walk, or admission and final retention would inherit
+        # it. `namespace_usage` is what admission, registry inspection,
+        # and the post-gate retention measurement all call.
+        def vanished_file(build: Path) -> dict:
+            return {2: lambda: (build / "gone.tmp").unlink()}
+
+        def vanished_directory(build: Path) -> dict:
+            return {
+                3: lambda: remove_shallow_directory(build / "victim")
+            }
+
+        def replaced_directory(build: Path) -> dict:
+            def replace() -> None:
+                remove_shallow_directory(build / "victim")
+                (build / "victim").mkdir()
+
+            return {3: replace}
+
+        cases = (
+            ("vanished-file", vanished_file, FileNotFoundError, None),
+            (
+                "vanished-directory",
+                vanished_directory,
+                FileNotFoundError,
+                None,
+            ),
+            (
+                "replaced-directory",
+                replaced_directory,
+                GateBlocked,
+                "namespace-entry-identity-mismatch",
+            ),
+        )
+        for label, factory, exception, code in cases:
+            with self.subTest(control=label):
+                with tempfile.TemporaryDirectory() as raw:
+                    temporary = Path(raw).resolve()
+                    namespace, build = self.churn_namespace(temporary)
+                    churn = ChurningScandir(factory(build))
+                    with mock.patch.object(
+                        gate_module, "os", churn.proxy()
+                    ):
+                        with self.assertRaises(exception) as raised:
+                            namespace_usage(namespace)
+                    self.assertTrue(churn.fired)
+                    if code is not None:
+                        self.assertEqual(raised.exception.code, code)
+
+        # Strict scans also revalidate the directory pathname after all
+        # cached entries stat successfully. This closes the later window
+        # where the opened directory itself disappears or is replaced
+        # during its scan.
+        for replacement in (False, True):
+            with self.subTest(post_scan_replacement=replacement):
+                with tempfile.TemporaryDirectory() as raw:
+                    namespace = Path(raw).resolve() / "namespace"
+                    parent = namespace / "parent"
+                    parent.mkdir(parents=True)
+                    (parent / "keep.rlib").write_bytes(b"k" * 4096)
+
+                    def mutate_parent() -> None:
+                        parent.rename(namespace / "parent-old")
+                        if replacement:
+                            parent.mkdir()
+
+                    churn = ChurningScandir({2: mutate_parent})
+                    with mock.patch.object(
+                        gate_module, "os", churn.proxy()
+                    ):
+                        expected = (
+                            GateBlocked
+                            if replacement
+                            else FileNotFoundError
+                        )
+                        with self.assertRaises(expected) as raised:
+                            namespace_usage(namespace)
+                    self.assertEqual(churn.fired, [2])
+                    if replacement:
+                        self.assertEqual(
+                            raised.exception.code,
+                            "namespace-entry-identity-mismatch",
+                        )
+
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            namespace = temporary / "namespace"
+            namespace.mkdir()
+            (namespace / "keep.rlib").write_bytes(b"k" * 4096)
+
+            def replace_root() -> None:
+                namespace.rename(temporary / "namespace-old")
+                namespace.mkdir()
+
+            churn = ChurningScandir({1: replace_root})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(GateBlocked) as root_replaced:
+                    namespace_usage(namespace)
+            self.assertEqual(churn.fired, [1])
+            self.assertEqual(
+                root_replaced.exception.code,
+                "namespace-entry-identity-mismatch",
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            registry = temporary / "registry"
+            namespace = registry / "namespace"
+            namespace.mkdir(parents=True)
+            (namespace / "keep.rlib").write_bytes(b"k" * 4096)
+
+            def replace_registry() -> None:
+                registry.rename(temporary / "registry-old")
+                registry.mkdir()
+                namespace.mkdir()
+
+            churn = ChurningScandir({1: replace_registry})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(GateBlocked) as ancestor_root:
+                    namespace_usage(namespace)
+            self.assertEqual(churn.fired, [1])
+            self.assertEqual(
+                ancestor_root.exception.code,
+                "namespace-entry-identity-mismatch",
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            registry = temporary / "registry"
+            namespace = registry / "namespace"
+            namespace.mkdir(parents=True)
+            (namespace / "keep.rlib").write_bytes(b"k" * 4096)
+
+            def symlink_registry() -> None:
+                registry.rename(temporary / "registry-old")
+                registry.symlink_to(
+                    temporary / "registry-old",
+                    target_is_directory=True,
+                )
+
+            churn = ChurningScandir({1: symlink_registry})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(OSError) as ancestor_symlink:
+                    namespace_usage(namespace)
+            self.assertEqual(churn.fired, [1])
+            self.assertNotIsInstance(
+                ancestor_symlink.exception, FileNotFoundError
+            )
+            self.assertIn(
+                ancestor_symlink.exception.errno,
+                {errno.ELOOP, errno.ENOTDIR},
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            namespace = temporary / "namespace"
+            child = namespace / "child"
+            child.mkdir(parents=True)
+            (child / "keep.rlib").write_bytes(b"k" * 4096)
+
+            def replace_root_late() -> None:
+                namespace.rename(temporary / "namespace-old")
+                namespace.mkdir()
+
+            churn = ChurningScandir({2: replace_root_late})
+            with mock.patch.object(gate_module, "os", churn.proxy()):
+                with self.assertRaises(GateBlocked) as late_root:
+                    namespace_usage(namespace)
+            self.assertEqual(churn.fired, [2])
+            self.assertEqual(
+                late_root.exception.code,
+                "namespace-entry-identity-mismatch",
+            )
+
+        # The new parent-entry binding preserves the predecessor's failure
+        # code when the initial open/stat identity race is detected.
+        with tempfile.TemporaryDirectory() as raw:
+            namespace = Path(raw).resolve() / "namespace"
+            namespace.mkdir()
+            real_stat = os.stat
+
+            def mismatched_root_stat(path, *arguments, **keywords):
+                observed = real_stat(path, *arguments, **keywords)
+                if (
+                    path == namespace.name
+                    and keywords.get("dir_fd") is not None
+                ):
+                    fields = list(observed)
+                    fields[stat.ST_INO] += 1
+                    return os.stat_result(fields)
+                return observed
+
+            mismatched_os = ModuleOverride(os, stat=mismatched_root_stat)
+            with mock.patch.object(gate_module, "os", mismatched_os):
+                with self.assertRaises(GateBlocked) as initial_race:
+                    namespace_usage(namespace)
+            self.assertEqual(
+                initial_race.exception.code,
+                "directory-identity-mismatch",
+            )
+
+    def test_unknown_namespace_scan_policy_is_rejected(self) -> None:
+        # The tolerant branch is a string comparison. A typo must not be
+        # able to select either policy by accident, and an explicitly
+        # strict traversal must stay strict.
+        with self.assertRaises(GateBlocked) as raised:
+            namespace_traversal(policy="live")
+        self.assertEqual(
+            raised.exception.code, "unknown-namespace-scan-policy"
+        )
+        self.assertEqual(namespace_traversal()["policy"], "strict")
+        self.assertEqual(
+            namespace_traversal(
+                policy=LIVE_BEST_EFFORT_NAMESPACE_SCAN
+            )["policy"],
+            LIVE_BEST_EFFORT_NAMESPACE_SCAN,
+        )
+
+    def live_guard_gate(
+        self,
+        temporary: Path,
+        runner,
+        **gate_arguments,
+    ) -> dict[str, object]:
+        """Run one admitted gate whose fake runner drives the live guard.
+
+        `runtime_guard` is the exact callable the supervisor invokes.
+        Calling it from the runner runs it in-process instead of in the
+        forked guard worker, which is the only difference: the worker
+        transports a decision and an error code, not a different guard.
+        """
+        root, profile, environment = self.make_repository(temporary)
+        gate_arguments.setdefault("new_namespace_free_floor_bytes", 0)
+        return run_source_keyed_gate(
+            ["cargo", "check", "--locked"],
+            root,
+            temporary / "evidence/live-guard.log",
+            30,
+            environment=environment,
+            profile=profile,
+            gate_runner=runner,
+            **gate_arguments,
+        )
+
+    def test_live_guard_still_blocks_stable_over_limit_allocation(
+        self,
+    ) -> None:
+        # Control 5. The reserve is the per-run growth bound, so a
+        # namespace that stably exceeds it must still terminate the gate.
+        # The guard is called twice -- before and after the allocation --
+        # so a bound that blocked unconditionally could not pass as this
+        # control.
+        observed: dict[str, object] = {}
+
+        def runner(*arguments, **keywords):
+            target = Path(keywords["environment"]["CARGO_TARGET_DIR"])
+            observed["before"] = keywords["runtime_guard"]()
+            (target / "debug").mkdir(parents=True, exist_ok=True)
+            (target / "debug/big.rlib").write_bytes(b"x" * (1024 * 1024))
+            with self.assertRaises(GateBlocked) as raised:
+                keywords["runtime_guard"]()
+            observed["code"] = raised.exception.code
+            observed["detail"] = raised.exception.detail
+            return self.fake_runner(b"")(*arguments, **keywords)
+
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            self.live_guard_gate(
+                temporary,
+                runner,
+                new_namespace_allocation_reserve_bytes=128 * 1024,
+            )
+        self.assertIsNone(observed["before"])
+        self.assertEqual(
+            observed["code"], "live-namespace-allocation-limit-exceeded"
+        )
+        self.assertIn("limit=131072", observed["detail"])
+
+    def test_live_guard_aggregate_budget_blocker_stays_reachable(
+        self,
+    ) -> None:
+        # Control 6a. With a fresh key the admission arithmetic keeps the
+        # aggregate check behind the per-run bound, so the reachable shape
+        # is a re-run against an already committed namespace: there the
+        # budget is compared with no new reserve, while the live bound is
+        # the namespace's own prior size plus the reserve.
+        observed: dict[str, object] = {}
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            root, profile, environment = self.make_repository(temporary)
+            first = run_source_keyed_gate(
+                ["cargo", "check", "--locked"],
+                root,
+                temporary / "evidence/aggregate-one.log",
+                30,
+                environment=environment,
+                profile=profile,
+                new_namespace_free_floor_bytes=0,
+                gate_runner=self.fake_runner(b""),
+            )
+            self.assertEqual(first["decision"], "PASS")
+            namespace = Path(first["target"]["namespace"])
+            committed = namespace_usage(namespace)["allocated_bytes"]
+
+            def runner(*arguments, **keywords):
+                target = Path(
+                    keywords["environment"]["CARGO_TARGET_DIR"]
+                )
+                observed["before"] = keywords["runtime_guard"]()
+                (target / "debug").mkdir(parents=True, exist_ok=True)
+                (target / "debug/grow.rlib").write_bytes(
+                    b"x" * (1024 * 1024)
+                )
+                with self.assertRaises(GateBlocked) as raised:
+                    keywords["runtime_guard"]()
+                observed["code"] = raised.exception.code
+                return self.fake_runner(b"")(*arguments, **keywords)
+
+            run_source_keyed_gate(
+                ["cargo", "check", "--locked"],
+                root,
+                temporary / "evidence/aggregate-two.log",
+                30,
+                environment=environment,
+                profile=profile,
+                new_namespace_free_floor_bytes=0,
+                persistent_aggregate_budget_bytes=(
+                    committed + 256 * 1024
+                ),
+                gate_runner=runner,
+            )
+        self.assertIsNone(observed["before"])
+        self.assertEqual(
+            observed["code"], "live-persistent-aggregate-budget-exceeded"
+        )
+
+    def test_live_guard_free_floor_runs_after_observed_churn(
+        self,
+    ) -> None:
+        # Control 6b, and the independence requirement in one test. The
+        # namespace walk is made to observe churn in the same invocation
+        # that the filesystem sample must refuse: a vanished build
+        # temporary says nothing about free space, so skipping the floor
+        # check because the walk skipped an entry would be wrong.
+        observed: dict[str, object] = {}
+        free = {"value": 10**15}
+        real_disk_usage = shutil.disk_usage
+
+        def disk_usage(path):
+            usage = real_disk_usage(path)
+            return type(usage)(usage.total, usage.used, free["value"])
+
+        def runner(*arguments, **keywords):
+            target = Path(keywords["environment"]["CARGO_TARGET_DIR"])
+            build = target / "debug"
+            build.mkdir(parents=True, exist_ok=True)
+            (build / "gone.tmp").write_bytes(b"g" * 2048)
+            (build / "keep.rlib").write_bytes(b"k" * 4096)
+            churn = ChurningScandir(
+                {2: lambda: (build / "gone.tmp").unlink()}
+            )
+            free["value"] = 0
+            try:
+                with mock.patch.object(
+                    gate_module, "os", churn.proxy()
+                ):
+                    with self.assertRaises(GateBlocked) as raised:
+                        keywords["runtime_guard"]()
+            finally:
+                free["value"] = 10**15
+            observed["fired"] = list(churn.fired)
+            observed["code"] = raised.exception.code
+            return self.fake_runner(b"")(*arguments, **keywords)
+
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            with mock.patch.object(
+                gate_module,
+                "shutil",
+                ModuleOverride(shutil, disk_usage=disk_usage),
+            ):
+                self.live_guard_gate(
+                    temporary,
+                    runner,
+                    new_namespace_free_floor_bytes=1024,
+                )
+        # The churn happened, and the floor still decided the outcome.
+        self.assertEqual(observed["fired"], [2])
+        self.assertEqual(
+            observed["code"], "live-filesystem-free-floor-crossed"
+        )
+
+    def test_live_guard_deadline_and_entry_limit_remain_enforced(
+        self,
+    ) -> None:
+        # Control 7. Churn tolerance must not have disarmed either bound
+        # on the live scan itself. Both are asserted on the same captured
+        # guard the supervisor would have called.
+        capture: dict[str, object] = {}
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            result = self.live_guard_gate(
+                temporary, self.fake_runner(b"", capture)
+            )
+            self.assertEqual(result["decision"], "PASS")
+            guard = capture["runtime_guard"]
+            self.assertIsNone(guard())
+
+            with mock.patch.object(
+                gate_module, "LIVE_NAMESPACE_SCAN_SECONDS", -1.0
+            ):
+                with self.assertRaises(GateBlocked) as expired:
+                    guard()
+            self.assertEqual(
+                expired.exception.code,
+                "live-namespace-scan-deadline-exceeded",
+            )
+
+            with mock.patch.object(
+                gate_module, "MAX_NAMESPACE_ENTRY_COUNT", 1
+            ):
+                with self.assertRaises(GateBlocked) as counted:
+                    guard()
+            self.assertEqual(
+                counted.exception.code,
+                "namespace-entry-count-limit-exceeded",
+            )
+
+        # A directory with no entries never executes the per-entry check.
+        # Advance a fake clock while its scandir result is being returned;
+        # the post-directory boundary must still reject the expired walk.
+        with tempfile.TemporaryDirectory() as raw:
+            namespace = Path(raw).resolve() / "namespace"
+            (namespace / "empty").mkdir(parents=True)
+            clock = {"value": 0.0}
+            churn = ChurningScandir(
+                {2: lambda: clock.__setitem__("value", 10.0)}
+            )
+            fake_time = ModuleOverride(
+                time, monotonic=lambda: clock["value"]
+            )
+            with mock.patch.object(
+                gate_module, "os", churn.proxy()
+            ), mock.patch.object(gate_module, "time", fake_time):
+                with self.assertRaises(GateBlocked) as empty_expired:
+                    live_namespace_sample(
+                        namespace, deadline_seconds=1.0
+                    )
+            self.assertEqual(churn.fired, [2])
+            self.assertEqual(
+                empty_expired.exception.code,
+                "live-namespace-scan-deadline-exceeded",
+            )
+
+    def test_predecessor_two_retry_sampler_fails_for_churn(self) -> None:
+        # Behavioral reversal for the exact predecessor strategy. Each of
+        # its two strict whole-scan attempts loses a different enumerated
+        # file, so it reaches the recorded blocker for FileNotFoundError --
+        # not an import error or a missing new symbol.
+        def make_two_windows(base: Path) -> tuple[Path, Path]:
+            namespace = base / "namespace"
+            build = namespace / "build"
+            build.mkdir(parents=True)
+            (build / "keep.rlib").write_bytes(b"k" * 4096)
+            (build / "tmp-0").write_bytes(b"0" * 2048)
+            (build / "tmp-1").write_bytes(b"1" * 2048)
+            return namespace, build
+
+        with tempfile.TemporaryDirectory() as raw:
+            namespace, build = make_two_windows(Path(raw).resolve())
+            predecessor_churn = ChurningScandir(
+                {
+                    2: lambda: (build / "tmp-0").unlink(),
+                    4: lambda: (build / "tmp-1").unlink(),
+                }
+            )
+
+            def predecessor_two_attempts() -> None:
+                usage = None
+                for _attempt in range(2):
+                    try:
+                        usage = namespace_usage(namespace)
+                        break
+                    except FileNotFoundError:
+                        continue
+                if usage is None:
+                    raise GateBlocked(
+                        "live-target-usage-unavailable",
+                        str(namespace),
+                    )
+
+            with mock.patch.object(
+                gate_module, "os", predecessor_churn.proxy()
+            ):
+                with self.assertRaises(GateBlocked) as predecessor:
+                    predecessor_two_attempts()
+            self.assertEqual(predecessor_churn.fired, [2, 4])
+            self.assertEqual(
+                predecessor.exception.code,
+                "live-target-usage-unavailable",
+            )
+
+        # The repaired policy accepts those same two stale-entry windows in
+        # one bounded sample and still measures the stable survivor.
+        with tempfile.TemporaryDirectory() as raw:
+            namespace, build = make_two_windows(Path(raw).resolve())
+
+            def remove_both() -> None:
+                (build / "tmp-0").unlink()
+                (build / "tmp-1").unlink()
+
+            repaired_churn = ChurningScandir({2: remove_both})
+            with mock.patch.object(
+                gate_module, "os", repaired_churn.proxy()
+            ):
+                sample = live_namespace_sample(
+                    namespace, deadline_seconds=30.0
+                )
+            self.assertEqual(repaired_churn.fired, [2])
+            self.assertEqual(sample["churn"]["vanished_entries"], 2)
+            self.assertGreater(sample["usage"]["allocated_bytes"], 0)
+            self.assertTrue((build / "keep.rlib").is_file())
+
+    def test_live_guard_makes_progress_under_repeated_churn(
+        self,
+    ) -> None:
+        # Control 8, and the regression control for the recorded failure.
+        #
+        # Ordering is load-bearing. The first assertion executed is the
+        # behavioural one -- the guard, invoked repeatedly while entries
+        # are created and removed underneath it, does not raise. On the
+        # predecessor tree that call raises
+        # `GateBlocked("live-target-usage-unavailable")` on the first
+        # round, which is exactly the recorded gate failure, and the test
+        # fails there rather than on a missing symbol.
+        #
+        # Only after that does the sample's own churn evidence get
+        # inspected, to show the walk skipped entries and still measured
+        # the survivors instead of returning early.
+        observed: dict[str, object] = {}
+        rounds = 5
+
+        def runner(*arguments, **keywords):
+            target = Path(keywords["environment"]["CARGO_TARGET_DIR"])
+            build = target / "debug"
+            build.mkdir(parents=True, exist_ok=True)
+            (build / "keep.rlib").write_bytes(b"k" * 4096)
+            (build / "zlast").mkdir()
+            (build / "zlast/keep.bin").write_bytes(b"z" * 4096)
+            for index in range(rounds + 1):
+                (build / f"tmp-{index}").write_bytes(b"t" * 2048)
+                (build / f"dir-{index}").mkdir()
+                (build / f"dir-{index}/payload.bin").write_bytes(
+                    b"p" * 2048
+                )
+
+            def churn_for(index: int) -> ChurningScandir:
+                # scan 2 is `debug`; scan 3 is `debug/zlast`, which is
+                # popped before `dir-<index>` and is therefore the call
+                # that opens the reopen window.
+                def remove_file() -> None:
+                    (build / f"tmp-{index}").unlink()
+                    (build / f"late-{index}").write_bytes(b"l" * 2048)
+
+                def remove_directory() -> None:
+                    remove_shallow_directory(build / f"dir-{index}")
+
+                return ChurningScandir(
+                    {2: remove_file, 3: remove_directory}
+                )
+
+            fired: list[list[int]] = []
+            for index in range(rounds):
+                churn = churn_for(index)
+                with mock.patch.object(
+                    gate_module, "os", churn.proxy()
+                ):
+                    # The behavioural control: no raise, five times, with
+                    # the tree changing under every one of them.
+                    self.assertIsNone(keywords["runtime_guard"]())
+                fired.append(list(churn.fired))
+            observed["fired"] = fired
+
+            evidence = churn_for(rounds)
+            with mock.patch.object(
+                gate_module, "os", evidence.proxy()
+            ):
+                observed["sample"] = live_namespace_sample(
+                    target, deadline_seconds=30.0
+                )
+            observed["survivors"] = sorted(
+                path.name for path in build.iterdir()
+            )
+            return self.fake_runner(b"")(*arguments, **keywords)
+
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            self.live_guard_gate(temporary, runner)
+
+        self.assertEqual(observed["fired"], [[2, 3]] * rounds)
+        sample = observed["sample"]
+        self.assertEqual(sample["churn"]["vanished_entries"], 1)
+        self.assertEqual(sample["churn"]["vanished_directories"], 1)
+        # Progress: the survivors were measured, not abandoned.
+        self.assertGreater(sample["usage"]["allocated_bytes"], 0)
+        self.assertGreaterEqual(
+            sample["usage"]["entry_count"],
+            len(observed["survivors"]),
+        )
+        self.assertIn("keep.rlib", observed["survivors"])
+        self.assertNotIn(f"tmp-{rounds}", observed["survivors"])
+
+    def test_live_sampler_repair_leaves_pass_and_block_topology_intact(
+        self,
+    ) -> None:
+        # Control 9. Both terminal paths, with the same assertions:
+        # candidate unchanged, complete log evidence, no snapshot left
+        # behind, no registry quarantine residue, runtime scratch removed.
+        #
+        # The BLOCK arm is driven by the one live-scan hazard that is not
+        # churn -- a same-name directory replacement -- so it doubles as
+        # proof that the tolerant branch cannot swallow it inside a real
+        # gate.
+        def assert_published(
+            result: dict[str, object],
+            root: Path,
+            profile: dict[str, object],
+            temporary: Path,
+            slot: str,
+            expected_returncode: int,
+        ) -> None:
+            result_path = temporary / f"evidence/{slot}.json"
+            with mock.patch.dict(
+                DEFAULT_PROFILE, profile, clear=True
+            ), mock.patch(
+                "run_source_keyed_cargo_gate.run_source_keyed_gate",
+                return_value=result,
+            ):
+                returncode, stdout = self.main_capturing_stdout(
+                    self.gate_argv(root, temporary, slot)
+                )
+            self.assertEqual(returncode, expected_returncode)
+            durable = result_path.read_bytes()
+            payload = self.assert_stdout_is_the_durable_representation(
+                stdout, durable
+            )
+            self.assertEqual(payload, result)
+            identity = result_path.stat()
+            self.assertEqual(stat.S_IMODE(identity.st_mode), 0o400)
+            self.assertEqual(identity.st_nlink, 1)
+            self.assertEqual(
+                [
+                    path.name
+                    for path in result_path.parent.iterdir()
+                    if path.name.startswith(f".{result_path.name}.")
+                ],
+                [],
+            )
+
+        def assert_clean(result, profile, log_path: Path) -> None:
+            self.assertTrue(result["candidate_unchanged"])
+            self.assertEqual(result["candidate"], result["candidate_after"])
+            self.assertTrue(log_path.is_file())
+            self.assertEqual(
+                hashlib.sha256(log_path.read_bytes()).hexdigest(),
+                result["log_binding"]["sha256"],
+            )
+            self.assertTrue(
+                result["log_binding"]["source_key_present_in_prefix"]
+            )
+            snapshot_root = Path(str(profile["snapshot_root"]))
+            self.assertEqual(sorted(snapshot_root.iterdir()), [])
+            registry = (
+                Path(str(profile["target_dir"]))
+                / SOURCE_KEY_TARGET_DIRECTORY
+            )
+            self.assertEqual(
+                [
+                    name
+                    for name in os.listdir(registry)
+                    if name.startswith(".quarantine-")
+                ],
+                [],
+            )
+            self.assertFalse(
+                Path(
+                    result["runtime_scratch"]["admission"]["root"]
+                ).exists()
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            root, profile, environment = self.make_repository(temporary)
+            log_path = temporary / "evidence/pass.log"
+            passing = run_source_keyed_gate(
+                ["cargo", "check", "--locked"],
+                root,
+                log_path,
+                30,
+                environment=environment,
+                profile=profile,
+                new_namespace_free_floor_bytes=0,
+                gate_runner=self.fake_runner(b""),
+            )
+            self.assertEqual(passing["decision"], "PASS")
+            self.assertEqual(passing["blockers"], [])
+            self.assertEqual(
+                passing["retention"]["decision"], "PERSISTED"
+            )
+            assert_clean(passing, profile, log_path)
+            assert_published(
+                passing,
+                root,
+                profile,
+                temporary,
+                "pass-published",
+                0,
+            )
+
+        observed: dict[str, object] = {}
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            root, profile, environment = self.make_repository(temporary)
+            log_path = temporary / "evidence/block.log"
+
+            def runner(*arguments, **keywords):
+                target = Path(
+                    keywords["environment"]["CARGO_TARGET_DIR"]
+                )
+                build = target / "debug"
+                build.mkdir(parents=True, exist_ok=True)
+                (build / "victim").mkdir()
+                (build / "victim/payload.bin").write_bytes(b"p" * 4096)
+                (build / "zlast").mkdir()
+                (build / "zlast/keep.bin").write_bytes(b"z" * 4096)
+
+                def replace() -> None:
+                    remove_shallow_directory(build / "victim")
+                    (build / "victim").mkdir()
+
+                churn = ChurningScandir({3: replace})
+                with mock.patch.object(
+                    gate_module, "os", churn.proxy()
+                ):
+                    with self.assertRaises(GateBlocked) as raised:
+                        keywords["runtime_guard"]()
+                observed["code"] = raised.exception.code
+                gate = self.fake_runner(b"")(*arguments, **keywords)
+                gate["runtime_guard"] = {
+                    "enabled": True,
+                    "interval_seconds": 1.0,
+                    "decision": "BLOCK",
+                    "error": {
+                        "error_type": "GateBlocked",
+                        "code": raised.exception.code,
+                    },
+                }
+                return gate
+
+            blocked = run_source_keyed_gate(
+                ["cargo", "check", "--locked"],
+                root,
+                log_path,
+                30,
+                environment=environment,
+                profile=profile,
+                new_namespace_free_floor_bytes=0,
+                gate_runner=runner,
+            )
+            self.assertEqual(
+                observed["code"], "namespace-entry-identity-mismatch"
+            )
+            self.assertEqual(blocked["decision"], "BLOCK")
+            self.assertIn(
+                "runtime-resource-guard-not-passed", blocked["blockers"]
+            )
+            self.assertEqual(
+                blocked["retention"]["decision"],
+                "INCOMPLETE_GATE_CLEANED",
+            )
+            self.assertFalse(
+                Path(blocked["target"]["namespace"]).exists()
+            )
+            assert_clean(blocked, profile, log_path)
+            assert_published(
+                blocked,
+                root,
+                profile,
+                temporary,
+                "block-published",
+                3,
+            )
+
 
 class SwarmAdmissionTests(unittest.TestCase):
     def snapshot(self, **overrides: object) -> dict[str, object]:

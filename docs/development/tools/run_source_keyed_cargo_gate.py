@@ -477,6 +477,29 @@ MAX_ROOT_DIRECTORY_ENTRIES = 100_000
 MAX_REGISTRY_ROOT_ENTRIES = 4_096
 LIVE_NAMESPACE_SCAN_SECONDS = 0.75
 REGISTRY_SCAN_SECONDS = 30.0
+# The two namespace measurement policies, kept apart by name so a strict
+# caller cannot inherit tolerant semantics by accident.
+#
+# STRICT is what admission, registry inspection, recovery, and the
+# post-gate retention measurement use. Those all run under the registry and
+# global locks against a namespace nobody is writing, so an entry `scandir`
+# returned and a descriptor-relative lookup then cannot find is a genuine
+# anomaly and stays a fatal `FileNotFoundError`.
+#
+# LIVE_BEST_EFFORT exists for exactly one caller: the one-second supervisor
+# sample taken while the gate's own Cargo process is building into the
+# namespace. There, creation, rename, and removal are what a compliant
+# writer does -- rustc's `TMPDIR` scratch directories most of all -- so a
+# name proven absent by the descriptor-relative lookup is ordinary
+# gate-owned churn rather than a sampling failure. Nothing else is
+# reclassified: a symlink or other object replacing a bound directory, a
+# same-name directory replacement, a wrong device or inode, the entry-count
+# limit, and the live-scan deadline stay fail-closed under both policies.
+STRICT_NAMESPACE_SCAN = "strict"
+LIVE_BEST_EFFORT_NAMESPACE_SCAN = "live-best-effort"
+NAMESPACE_SCAN_POLICIES = frozenset(
+    {STRICT_NAMESPACE_SCAN, LIVE_BEST_EFFORT_NAMESPACE_SCAN}
+)
 TREE_CLEANUP_SECONDS = 5 * 60.0
 SNAPSHOT_VERIFY_SECONDS = 120.0
 SOURCE_STATE_PREFLIGHT_SECONDS = 120.0
@@ -3482,6 +3505,75 @@ def open_directory_no_follow(path: Path) -> int:
     return descriptor
 
 
+def open_bound_namespace_root(
+    path: Path,
+) -> tuple[int, dict[str, Any]]:
+    """Open and identity-bind every component of an absolute namespace."""
+    absolute = path.absolute()
+    parts = tuple(absolute.parts[1:])
+    if not absolute.is_absolute() or not parts:
+        raise GateBlocked("namespace-entry-identity-mismatch", str(path))
+    anchor = os.open(
+        "/",
+        os.O_RDONLY
+        | os.O_DIRECTORY
+        | os.O_CLOEXEC
+        | getattr(os, "O_NOFOLLOW", 0),
+    )
+    current = os.dup(anchor)
+    try:
+        expected_components: list[tuple[str, int, int]] = []
+        for part in parts:
+            if part in {"", ".", ".."} or "/" in part:
+                raise GateBlocked(
+                    "directory-identity-mismatch", str(path)
+                )
+            child = os.open(
+                part,
+                os.O_RDONLY
+                | os.O_DIRECTORY
+                | os.O_CLOEXEC
+                | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=current,
+            )
+            try:
+                opened = os.fstat(child)
+                observed = os.stat(
+                    part,
+                    dir_fd=current,
+                    follow_symlinks=False,
+                )
+                if (
+                    not stat.S_ISDIR(observed.st_mode)
+                    or (opened.st_dev, opened.st_ino)
+                    != (observed.st_dev, observed.st_ino)
+                ):
+                    # Preserve the initial-open failure code emitted by
+                    # `open_directory_no_follow`; the namespace-entry code
+                    # is for replacement detected after traversal begins.
+                    raise GateBlocked(
+                        "directory-identity-mismatch", str(path)
+                    )
+            except BaseException:
+                os.close(child)
+                raise
+            expected_components.append(
+                (part, opened.st_dev, opened.st_ino)
+            )
+            os.close(current)
+            current = child
+        return current, {
+            "anchor_descriptor": anchor,
+            "relative": "/".join(parts),
+            "expected_components": tuple(expected_components),
+            "path": str(absolute),
+        }
+    except BaseException:
+        os.close(current)
+        os.close(anchor)
+        raise
+
+
 def prepare_runtime_scratch(target: Path) -> dict[str, Any]:
     parent = open_directory_no_follow(target)
     scratch: int | None = None
@@ -3681,10 +3773,16 @@ def reopen_directory_at(
     relative: str,
     *,
     code: str,
+    expected_components: tuple[tuple[str, int, int], ...] | None = None,
 ) -> int:
+    parts = tuple(relative.split("/")) if relative else ()
+    if expected_components is not None and tuple(
+        item[0] for item in expected_components
+    ) != parts:
+        raise GateBlocked(code, relative)
     current = os.dup(root)
     try:
-        for part in relative.split("/") if relative else ():
+        for index, part in enumerate(parts):
             if part in {"", ".", ".."} or "/" in part:
                 raise GateBlocked(code, relative)
             child = os.open(
@@ -3699,6 +3797,16 @@ def reopen_directory_at(
             if not stat.S_ISDIR(metadata.st_mode):
                 os.close(child)
                 raise GateBlocked(code, relative)
+            if expected_components is not None:
+                _, expected_device, expected_inode = expected_components[
+                    index
+                ]
+                if (metadata.st_dev, metadata.st_ino) != (
+                    expected_device,
+                    expected_inode,
+                ):
+                    os.close(child)
+                    raise GateBlocked(code, relative)
             os.close(current)
             current = child
         return current
@@ -3755,31 +3863,130 @@ def ordered_name_summary(names: list[str]) -> str:
     )
 
 
+def namespace_traversal(
+    *,
+    policy: str = STRICT_NAMESPACE_SCAN,
+    deadline: float | None = None,
+    maximum_entries: int | None = None,
+) -> dict[str, Any]:
+    """Build the shared budget and policy for one namespace measurement.
+
+    ``policy`` is the single switch separating the strict quiescent
+    measurement from the live best-effort reaction sample, and it is
+    required to be one of the two named policies: an unrecognised value is
+    a `BLOCK` rather than a silent fall-through to whichever branch the
+    comparison happens to take.
+
+    ``maximum_entries`` defaults to `None` rather than to the module
+    constant so the limit is resolved on every call. A default argument
+    would freeze the value at import time, which is not what the inline
+    dicts this replaced did.
+    """
+    if policy not in NAMESPACE_SCAN_POLICIES:
+        raise GateBlocked("unknown-namespace-scan-policy", str(policy))
+    return {
+        "policy": policy,
+        "entries": 0,
+        "maximum_entries": (
+            MAX_NAMESPACE_ENTRY_COUNT
+            if maximum_entries is None
+            else maximum_entries
+        ),
+        "deadline": deadline,
+        "vanished_entries": 0,
+        "vanished_directories": 0,
+    }
+
+
+def enforce_namespace_scan_deadline(traversal: Mapping[str, Any]) -> None:
+    """Fail once a bounded namespace walk has exhausted its wall budget."""
+    deadline = traversal.get("deadline")
+    if deadline is not None and time.monotonic() > float(deadline):
+        raise GateBlocked(
+            "live-namespace-scan-deadline-exceeded",
+            str(LIVE_NAMESPACE_SCAN_SECONDS),
+        )
+
+
 def namespace_usage_at(
     directory: int,
     *,
     traversal: dict[str, Any] | None = None,
+    root_path_binding: Mapping[str, Any] | None = None,
 ) -> dict[str, int]:
     if traversal is None:
-        traversal = {
-            "entries": 0,
-            "maximum_entries": MAX_NAMESPACE_ENTRY_COUNT,
-            "deadline": None,
-        }
+        traversal = namespace_traversal()
+    # Absence of the key is strict, not tolerant: a caller that builds its
+    # own traversal dict without naming a policy gets the fail-closed one.
+    tolerate_gate_owned_churn = (
+        traversal.get("policy") == LIVE_BEST_EFFORT_NAMESPACE_SCAN
+    )
     allocated = 0
     logical = 0
     entries = 0
     root_identity = os.fstat(directory)
-    pending: list[tuple[str, int, int]] = [
-        ("", root_identity.st_dev, root_identity.st_ino)
+    pending: list[
+        tuple[
+            str,
+            int,
+            int,
+            tuple[tuple[str, int, int], ...],
+        ]
+    ] = [
+        ("", root_identity.st_dev, root_identity.st_ino, ())
     ]
     while pending:
-        relative, expected_device, expected_inode = pending.pop()
-        current = reopen_directory_at(
-            directory,
+        # Check around every directory operation as well as every entry.
+        # An empty-directory fan-out otherwise performs no per-entry check
+        # and could overrun the live wall budget while still returning a
+        # successful sample.
+        enforce_namespace_scan_deadline(traversal)
+        (
             relative,
-            code="namespace-entry-identity-mismatch",
-        )
+            expected_device,
+            expected_inode,
+            expected_components,
+        ) = pending.pop()
+        try:
+            current = reopen_directory_at(
+                directory,
+                relative,
+                code="namespace-entry-identity-mismatch",
+                expected_components=expected_components,
+            )
+        except FileNotFoundError:
+            # A directory this walk already saw and stat'd is now proven
+            # absent by the descriptor-relative reopen. Under the live
+            # policy that is the gate's own Cargo process removing a
+            # scratch directory it created; its subtree is simply not
+            # measured. Only ENOENT lands here: ELOOP from the per-component
+            # O_NOFOLLOW open, ENOTDIR from a file put in its place, and the
+            # identity mismatch below all stay fail-closed.
+            if not tolerate_gate_owned_churn:
+                raise
+            # Re-resolve the expected component chain once before treating
+            # ENOENT as disappearance. If a same-name ancestor was replaced,
+            # the per-component identities make that a mismatch rather than
+            # silently classifying the missing leaf as ordinary churn. If the
+            # path really is absent, this second lookup raises ENOENT again.
+            try:
+                reappeared = reopen_directory_at(
+                    directory,
+                    relative,
+                    code="namespace-entry-identity-mismatch",
+                    expected_components=expected_components,
+                )
+            except FileNotFoundError:
+                pass
+            else:
+                os.close(reappeared)
+                raise GateBlocked(
+                    "namespace-entry-identity-mismatch",
+                    relative or ".",
+                )
+            enforce_namespace_scan_deadline(traversal)
+            traversal["vanished_directories"] += 1
+            continue
         try:
             opened = os.fstat(current)
             if (opened.st_dev, opened.st_ino) != (
@@ -3802,20 +4009,43 @@ def namespace_usage_at(
                             "namespace-entry-count-limit-exceeded",
                             str(traversal["maximum_entries"]),
                         )
-                    deadline = traversal.get("deadline")
-                    if (
-                        deadline is not None
-                        and time.monotonic() > float(deadline)
-                    ):
-                        raise GateBlocked(
-                            "live-namespace-scan-deadline-exceeded",
-                            str(LIVE_NAMESPACE_SCAN_SECONDS),
+                    enforce_namespace_scan_deadline(traversal)
+                    try:
+                        metadata = os.stat(
+                            name,
+                            dir_fd=current,
+                            follow_symlinks=False,
                         )
-                    metadata = os.stat(
-                        name,
-                        dir_fd=current,
-                        follow_symlinks=False,
-                    )
+                    except FileNotFoundError:
+                        # `scandir` returned this name and the
+                        # descriptor-relative no-follow stat proves it is
+                        # gone. The enumeration cost was already charged
+                        # against the entry budget above, so a churning
+                        # namespace cannot buy extra traversal here.
+                        if not tolerate_gate_owned_churn:
+                            raise
+                        # The stat uses the already-open directory. Before
+                        # calling a missing file ordinary churn, re-resolve
+                        # that directory's complete component chain from
+                        # the namespace root. This catches a parent that
+                        # was renamed away and replaced while the held old
+                        # descriptor lost the enumerated file; otherwise
+                        # the replacement subtree would go unmeasured.
+                        try:
+                            verified_parent = reopen_directory_at(
+                                directory,
+                                relative,
+                                code=(
+                                    "namespace-entry-identity-mismatch"
+                                ),
+                                expected_components=expected_components,
+                            )
+                        except FileNotFoundError:
+                            pass
+                        else:
+                            os.close(verified_parent)
+                        traversal["vanished_entries"] += 1
+                        continue
                     entries += 1
                     allocated += metadata.st_blocks * 512
                     logical += metadata.st_size
@@ -3830,10 +4060,73 @@ def namespace_usage_at(
                                 child_relative,
                                 metadata.st_dev,
                                 metadata.st_ino,
+                                expected_components
+                                + (
+                                    (
+                                        name,
+                                        metadata.st_dev,
+                                        metadata.st_ino,
+                                    ),
+                                ),
                             )
                         )
+            # The directory may have been renamed away and replaced after
+            # it was opened. Revalidate its complete pathname identity even
+            # when every cached entry stat succeeded; ENOENT-only checks
+            # would otherwise miss a replacement subtree entirely.
+            revalidation_root = directory
+            revalidation_relative = relative
+            revalidation_components = expected_components
+            root_entry_revalidation = (
+                not relative and root_path_binding is not None
+            )
+            if root_entry_revalidation:
+                assert root_path_binding is not None
+                revalidation_root = int(
+                    root_path_binding["anchor_descriptor"]
+                )
+                revalidation_relative = str(
+                    root_path_binding["relative"]
+                )
+                revalidation_components = tuple(
+                    root_path_binding["expected_components"]
+                )
+            try:
+                current_path = reopen_directory_at(
+                    revalidation_root,
+                    revalidation_relative,
+                    code="namespace-entry-identity-mismatch",
+                    expected_components=revalidation_components,
+                )
+            except FileNotFoundError:
+                if (
+                    not tolerate_gate_owned_churn
+                    or root_entry_revalidation
+                ):
+                    raise
+                traversal["vanished_directories"] += 1
+            else:
+                os.close(current_path)
+            # `scanner` may have been empty, so the loop above is not a
+            # sufficient deadline boundary on its own.
+            enforce_namespace_scan_deadline(traversal)
         finally:
             os.close(current)
+    if root_path_binding is not None:
+        # Root replacement can occur after the root's own scan while a
+        # queued child is being processed. Revalidate the complete absolute
+        # component chain once more after the traversal drains; checking
+        # only the root iteration leaves that later window open.
+        final_root = reopen_directory_at(
+            int(root_path_binding["anchor_descriptor"]),
+            str(root_path_binding["relative"]),
+            code="namespace-entry-identity-mismatch",
+            expected_components=tuple(
+                root_path_binding["expected_components"]
+            ),
+        )
+        os.close(final_root)
+        enforce_namespace_scan_deadline(traversal)
     return {
         "allocated_bytes": allocated,
         "logical_bytes": logical,
@@ -3853,11 +4146,9 @@ def inspect_registry(
         raise GateBlocked("unsafe-source-key-registry", str(registry))
     registry_descriptor = open_directory_no_follow(registry)
     deadline = time.monotonic() + REGISTRY_SCAN_SECONDS
-    traversal = {
-        "entries": 0,
-        "maximum_entries": MAX_NAMESPACE_ENTRY_COUNT,
-        "deadline": deadline,
-    }
+    traversal = namespace_traversal(
+        policy=STRICT_NAMESPACE_SCAN, deadline=deadline
+    )
     try:
         namespace_names = bounded_directory_names_at(
             registry_descriptor,
@@ -3877,7 +4168,10 @@ def inspect_registry(
             raise GateBlocked(
                 "unknown-source-key-registry-entry", str(namespace)
             )
-        namespace_descriptor = open_directory_no_follow(namespace)
+        (
+            namespace_descriptor,
+            namespace_root_binding,
+        ) = open_bound_namespace_root(namespace)
         marker = namespace / MARKER_NAME
         try:
             try:
@@ -3974,13 +4268,18 @@ def inspect_registry(
                 invalidated = True
             usage = (
                 namespace_usage_at(
-                    namespace_descriptor, traversal=traversal
+                    namespace_descriptor,
+                    traversal=traversal,
+                    root_path_binding=namespace_root_binding,
                 )
                 if measure_usage
                 else None
             )
         finally:
             os.close(namespace_descriptor)
+            os.close(
+                int(namespace_root_binding["anchor_descriptor"])
+            )
         inventory.append(
             {
                 "source_key": namespace.name,
@@ -4007,25 +4306,63 @@ def inspect_registry(
     return inventory
 
 
-def namespace_usage(
-    path: Path,
-    *,
-    live_deadline_seconds: float | None = None,
-) -> dict[str, int]:
-    descriptor = open_directory_no_follow(path)
+def namespace_usage(path: Path) -> dict[str, int]:
+    """Strict quiescent measurement of a namespace nobody is writing.
+
+    This is the admission and final-retention number. It has no deadline
+    and no churn tolerance: a vanished entry, a replaced identity, a
+    symlink traversal, or an over-limit namespace all raise. A stable
+    symlink entry itself is measured without following it. The live sampler
+    is `live_namespace_sample` and is deliberately a separate function
+    rather than a flag on this one.
+    """
+    descriptor, root_path_binding = open_bound_namespace_root(path)
     try:
-        traversal = {
-            "entries": 0,
-            "maximum_entries": MAX_NAMESPACE_ENTRY_COUNT,
-            "deadline": (
-                time.monotonic() + live_deadline_seconds
-                if live_deadline_seconds is not None
-                else None
-            ),
-        }
-        return namespace_usage_at(descriptor, traversal=traversal)
+        return namespace_usage_at(
+            descriptor,
+            traversal=namespace_traversal(policy=STRICT_NAMESPACE_SCAN),
+            root_path_binding=root_path_binding,
+        )
     finally:
         os.close(descriptor)
+        os.close(int(root_path_binding["anchor_descriptor"]))
+
+
+def live_namespace_sample(
+    path: Path,
+    *,
+    deadline_seconds: float,
+) -> dict[str, Any]:
+    """Best-effort reaction sample of a namespace Cargo is writing.
+
+    Bounded by ``deadline_seconds`` and by the same entry-count limit as
+    the strict scan, so a namespace churning without bound cannot make the
+    supervisor unresponsive. The returned ``churn`` counters describe what
+    this one sample skipped; they are not a namespace history, and the
+    number retention decides on remains the strict post-gate scan.
+    """
+    traversal = namespace_traversal(
+        policy=LIVE_BEST_EFFORT_NAMESPACE_SCAN,
+        deadline=time.monotonic() + deadline_seconds,
+    )
+    descriptor, root_path_binding = open_bound_namespace_root(path)
+    try:
+        usage = namespace_usage_at(
+            descriptor,
+            traversal=traversal,
+            root_path_binding=root_path_binding,
+        )
+    finally:
+        os.close(descriptor)
+        os.close(int(root_path_binding["anchor_descriptor"]))
+    return {
+        "policy": LIVE_BEST_EFFORT_NAMESPACE_SCAN,
+        "usage": usage,
+        "churn": {
+            "vanished_entries": traversal["vanished_entries"],
+            "vanished_directories": traversal["vanished_directories"],
+        },
+    }
 
 
 def utc_now() -> str:
@@ -7482,25 +7819,34 @@ def run_source_keyed_gate(
                     )
 
                     def runtime_resource_guard() -> None:
-                        live_usage: dict[str, int] | None = None
+                        # The sample itself absorbs ordinary gate-owned
+                        # churn inside the namespace, so the two attempts
+                        # below no longer stand between Cargo's normal
+                        # create/rename/remove traffic and a `BLOCK`. What
+                        # is left for them is the one absence the live
+                        # policy does not cover: the namespace root being
+                        # unopenable at all. That is not churn, so after a
+                        # second attempt it stays
+                        # `live-target-usage-unavailable`.
+                        sample: dict[str, Any] | None = None
                         for _attempt in range(2):
                             try:
-                                live_usage = namespace_usage(
+                                sample = live_namespace_sample(
                                     target,
-                                    live_deadline_seconds=(
+                                    deadline_seconds=(
                                         LIVE_NAMESPACE_SCAN_SECONDS
                                     ),
                                 )
                                 break
                             except FileNotFoundError:
                                 continue
-                        if live_usage is None:
+                        if sample is None:
                             raise GateBlocked(
                                 "live-target-usage-unavailable",
                                 str(target),
                             )
                         live_allocated = int(
-                            live_usage["allocated_bytes"]
+                            sample["usage"]["allocated_bytes"]
                         )
                         if live_allocated > live_namespace_limit:
                             raise GateBlocked(
@@ -7520,6 +7866,10 @@ def run_source_keyed_gate(
                                 f"observed={live_aggregate}, "
                                 f"budget={persistent_aggregate_budget_bytes}",
                             )
+                        # Independent of the namespace walk, and therefore
+                        # still taken when that walk skipped churned
+                        # entries: a vanished build temporary says nothing
+                        # about how much room the filesystem has left.
                         live_free = shutil.disk_usage(admitted_root).free
                         if live_free < new_namespace_free_floor_bytes:
                             raise GateBlocked(

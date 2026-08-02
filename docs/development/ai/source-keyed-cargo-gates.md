@@ -434,10 +434,21 @@ JSON is never trusted as the allocation source.
    allocation already exceeds 32 GiB or current free space is below 100 GiB.
    A new persistent key also blocks when aggregate plus reserve exceeds the
    budget.
-4. While the process is live, a one-second supervisor samples the selected
-   namespace, aggregate allocation, and filesystem free floor. Crossing the
-   per-run growth bound, 32 GiB aggregate budget, or 100 GiB floor terminates
-   the process group and records `BLOCK`.
+4. While the process is live, a one-second supervisor takes a bounded
+   best-effort sample of the selected namespace, aggregate allocation, and
+   filesystem free floor. Only this live sample tolerates a file returned by
+   descriptor-relative enumeration disappearing before its no-follow stat, or
+   an already-bound directory disappearing before descriptor reopen. The
+   enumeration still consumes the entry budget and the vanished subtree is
+   omitted from that sample. Every reopened path component and every completed
+   directory scan is revalidated against its bound device/inode chain. A
+   same-name replacement, a symlink replacing a bound directory, wrong
+   device/inode, malformed namespace, entry-limit excess, or live-scan
+   deadline excess remains fail-closed; stable symlink entries are measured
+   without being followed. The independent free-space sample still runs after
+   ordinary churn is observed. Crossing the per-run growth bound, 32 GiB
+   aggregate budget, or 100 GiB floor terminates the process group and records
+   `BLOCK`.
 5. After the gate, the wrapper measures the namespace and aggregate again,
    then repeats the measurement after retention and run-state control writes.
    Any aggregate or free-floor violation is `BLOCK`. A newly created
@@ -538,10 +549,14 @@ dependency supply-chain attestation.
   they reference, the complete toolchain/native linker tree, Cargo registry
   contents, system libraries, and network dependency bytes are not all
   content-bound.
-- The live supervisor is a best-effort reaction boundary. It is not a
-  filesystem project quota, cgroup `memory.max`, or cgroup `pids.max`; a
-  sufficiently fast write/allocation burst can occur between samples, and
-  source tmpfs/compiler memory can still pressure the host.
+- The live supervisor is a best-effort reaction boundary. Its churn-tolerant
+  walk is deliberately separate from strict admission, registry, recovery,
+  post-gate, and retention measurements. It can omit an entry that Cargo
+  proves absent while the sample is in progress, and a sufficiently fast
+  write/allocation burst can occur between samples. The strict post-gate scan,
+  not the live sample, decides retention. This is not an atomic namespace
+  snapshot, filesystem project quota, cgroup `memory.max`, or cgroup
+  `pids.max`; source tmpfs/compiler memory can still pressure the host.
 - The current global Cargo lock plus jobs/test-thread caps remains the primary
   OOM control. Do not claim that this gate alone prevents host ENOSPC, OOM, or
   PID exhaustion.
