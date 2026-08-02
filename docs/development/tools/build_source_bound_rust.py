@@ -295,12 +295,22 @@ from ai_contracts import sha256_json
 # `/usr/bin/python3.10`. Raw uid equality across that boundary is not a
 # property any real invocation can have, so it is not compared.
 #
-# Nothing about ownership is relaxed by that. Each side validates st_uid
-# against its own effective uid, locally, before it records an identity at
-# all -- `_bootstrap_file_identity(owner_controlled=True)` out here and the
-# gate's `_preload_policy_module` in there -- and neither ever validates
-# against the other side's value. Both uids are carried into the binding as
-# named evidence instead of being collapsed into one ambiguous number.
+# Nothing about ownership is relaxed by that, but be exact about what
+# ownership means per member. The three owner-controlled members -- the
+# build wrapper, `ai_contracts`, and the gate supervisor -- are validated
+# locally against each side's *own* effective uid before an identity is
+# recorded at all: `_bootstrap_file_identity(owner_controlled=True)` out
+# here and the gate's `_preload_policy_module` in there. The pinned
+# interpreter is deliberately not one of them: `/usr/bin/python3.10` is a
+# root-owned system file on this host, so it is read with
+# `owner_controlled=False` and its ownership is not checked at all;
+# recording that it "is euid-owned" would state a host fact as if it were
+# a control. It is still required to be a regular, single-link,
+# non-group/world-writable inode and is still bound exactly on every
+# invariant field, including its SHA-256. No member's ownership is ever
+# validated against the other side's value, and both uids are carried into
+# the binding as named evidence rather than collapsed into one ambiguous
+# number.
 POLICY_INVARIANT_IDENTITY_FIELDS = (
     "bytes",
     "sha256",
@@ -312,9 +322,10 @@ POLICY_INVARIANT_IDENTITY_FIELDS = (
     "ctime_ns",
 )
 POLICY_NAMESPACE_RELATIVE_IDENTITY_FIELDS = ("uid",)
-POLICY_IDENTITY_FIELDS = (
-    POLICY_INVARIANT_IDENTITY_FIELDS
-    + POLICY_NAMESPACE_RELATIVE_IDENTITY_FIELDS
+# What `owner_validation` records per member, and what each value means.
+POLICY_OWNER_VALIDATION_LOCAL_EUID = "local-effective-uid"
+POLICY_OWNER_VALIDATION_PINNED_SYSTEM_FILE = (
+    "pinned-system-file-not-euid-checked"
 )
 
 
@@ -438,13 +449,29 @@ def validate_outer_policy_binding(
     gate_result: dict[str, Any],
 ) -> dict[str, Any]:
     expected = {
-        "policy-build-source-bound": running_build_wrapper_identity(),
-        "policy-ai-contracts": running_ai_contracts_identity(),
-        "policy-supervisor": running_source_gate_supervisor_identity(),
-        "python": running_build_python_identity(),
+        "policy-build-source-bound": (
+            running_build_wrapper_identity(),
+            POLICY_OWNER_VALIDATION_LOCAL_EUID,
+        ),
+        "policy-ai-contracts": (
+            running_ai_contracts_identity(),
+            POLICY_OWNER_VALIDATION_LOCAL_EUID,
+        ),
+        "policy-supervisor": (
+            running_source_gate_supervisor_identity(),
+            POLICY_OWNER_VALIDATION_LOCAL_EUID,
+        ),
+        # Read with `owner_controlled=False`: a root-owned system
+        # interpreter is not the launcher's to own, so its ownership is not
+        # checked and the binding must not imply that it was. Every other
+        # predicate and every invariant field still applies to it.
+        "python": (
+            running_build_python_identity(),
+            POLICY_OWNER_VALIDATION_PINNED_SYSTEM_FILE,
+        ),
     }
     bound: dict[str, Any] = {}
-    for name, outer_identity in expected.items():
+    for name, (outer_identity, owner_validation) in expected.items():
         gate_identity = gate_policy_identity(gate_result, name)
         for field in POLICY_INVARIANT_IDENTITY_FIELDS:
             if gate_identity.get(field) != outer_identity.get(field):
@@ -470,6 +497,7 @@ def validate_outer_policy_binding(
                     )
         member["outer_uid"] = outer_identity["uid"]
         member["gate_namespace_uid"] = gate_identity["uid"]
+        member["owner_validation"] = owner_validation
         bound[name] = member
     payload = {
         "schema": "codefire.rust_build_outer_policy_binding.v2",
@@ -489,11 +517,24 @@ def validate_outer_policy_binding(
                 "st_uid observed inside the gate's user namespace"
             ),
             "owner_validation": (
-                "each side rejects a file whose st_uid is not its own "
-                "effective uid before recording the identity, and never "
-                "validates ownership against the other side's value"
+                "per member. A member recorded "
+                f"`{POLICY_OWNER_VALIDATION_LOCAL_EUID}` is rejected by "
+                "each side unless its st_uid is that side's own effective "
+                "uid, checked before the identity is recorded. A member "
+                f"recorded `{POLICY_OWNER_VALIDATION_PINNED_SYSTEM_FILE}` "
+                "has no ownership check at all -- the pinned interpreter "
+                "is a root-owned system file, so no euid claim is made "
+                "over it -- but is still required to be a regular, "
+                "single-link, non-group/world-writable inode and is still "
+                "bound exactly on every invariant field. No member's "
+                "ownership is ever validated against the other side's "
+                "value"
             ),
             "gate_owner_check_authorized_by": "policy-supervisor",
+            "owner_validation_values": [
+                POLICY_OWNER_VALIDATION_LOCAL_EUID,
+                POLICY_OWNER_VALIDATION_PINNED_SYSTEM_FILE,
+            ],
         },
         "python_flags": [
             "-I",

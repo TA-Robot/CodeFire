@@ -88,6 +88,8 @@ from build_source_bound_rust import (  # noqa: E402
     BUILD_COMMAND,
     POLICY_INVARIANT_IDENTITY_FIELDS,
     POLICY_NAMESPACE_RELATIVE_IDENTITY_FIELDS,
+    POLICY_OWNER_VALIDATION_LOCAL_EUID,
+    POLICY_OWNER_VALIDATION_PINNED_SYSTEM_FILE,
     SOURCE_GATE_PYTHON,
     acquire_gate_evidence_lock,
     bound_binary_identity,
@@ -2946,6 +2948,15 @@ class OuterPolicyBindingTests(unittest.TestCase):
         "policy-supervisor": 0,
         "python": 65534,
     }
+    # Which rule each member is actually held to. The pinned interpreter is
+    # a root-owned system file, so it is read with `owner_controlled=False`
+    # and the binding must not claim otherwise.
+    EXPECTED_OWNER_VALIDATION = {
+        "policy-build-source-bound": POLICY_OWNER_VALIDATION_LOCAL_EUID,
+        "policy-ai-contracts": POLICY_OWNER_VALIDATION_LOCAL_EUID,
+        "policy-supervisor": POLICY_OWNER_VALIDATION_LOCAL_EUID,
+        "python": POLICY_OWNER_VALIDATION_PINNED_SYSTEM_FILE,
+    }
 
     def outer_identities(self) -> dict[str, dict[str, object]]:
         return {
@@ -2991,6 +3002,10 @@ class OuterPolicyBindingTests(unittest.TestCase):
                 self.assertEqual(
                     member["gate_namespace_uid"],
                     self.LIVE_NAMESPACE_UIDS[name],
+                )
+                self.assertEqual(
+                    member["owner_validation"],
+                    self.EXPECTED_OWNER_VALIDATION[name],
                 )
                 # The ambiguous single `uid` key is gone: a consumer must
                 # say which namespace it means.
@@ -3091,9 +3106,9 @@ class OuterPolicyBindingTests(unittest.TestCase):
                     validate_outer_policy_binding(self.gate_result(tools))
 
     def test_local_owner_controlled_rejection_is_unchanged(self) -> None:
-        # The repair rests entirely on each side still enforcing ownership
-        # against its own effective uid. Move the outer euid and every
-        # owner-controlled reader must refuse, exactly as before.
+        # Dropping uid from the cross-namespace comparison is only sound
+        # while each side still enforces ownership locally, so move the
+        # outer euid and every owner-controlled reader must refuse.
         for reader in (
             running_build_wrapper_identity,
             running_ai_contracts_identity,
@@ -3107,6 +3122,49 @@ class OuterPolicyBindingTests(unittest.TestCase):
                 ):
                     with self.assertRaises((RuntimeError, ValueError)):
                         reader()
+
+    def test_pinned_python_is_not_claimed_to_be_euid_owned(self) -> None:
+        # `/usr/bin/python3.10` is a root-owned system file. It is read
+        # with `owner_controlled=False` on purpose, so the binding must not
+        # be read as asserting euid ownership over it -- but every other
+        # predicate still applies, and it is still bound on every invariant
+        # field including its digest.
+        identity = running_build_python_identity()
+        with mock.patch(
+            "build_source_bound_rust.os.geteuid",
+            return_value=os.geteuid() + 1,
+        ):
+            self.assertEqual(running_build_python_identity(), identity)
+        observed = os.stat("/proc/self/exe")
+        self.assertTrue(stat.S_ISREG(observed.st_mode))
+        self.assertEqual(
+            (identity["device"], identity["inode"]),
+            (observed.st_dev, observed.st_ino),
+        )
+        self.assertEqual(identity["nlink"], 1)
+        self.assertFalse(identity["mode"] & 0o022)
+        self.assertEqual(
+            self.EXPECTED_OWNER_VALIDATION["python"],
+            POLICY_OWNER_VALIDATION_PINNED_SYSTEM_FILE,
+        )
+        # The three owner-controlled members are the ones that do carry the
+        # euid claim; the payload must distinguish them, not lump them.
+        payload = validate_outer_policy_binding(
+            self.gate_result(self.namespace_shifted_tools())
+        )
+        recorded = {
+            name: member["owner_validation"]
+            for name, member in payload["members"].items()
+        }
+        self.assertEqual(recorded, self.EXPECTED_OWNER_VALIDATION)
+        self.assertEqual(
+            sorted(
+                payload["namespace_relative_identity"][
+                    "owner_validation_values"
+                ]
+            ),
+            sorted(set(self.EXPECTED_OWNER_VALIDATION.values())),
+        )
 
     def test_gate_owner_check_is_authorized_by_the_pinned_supervisor(
         self,
@@ -3129,7 +3187,24 @@ class OuterPolicyBindingTests(unittest.TestCase):
         )
         self.assertIn("unshare -Urpf", semantic["reason"])
         self.assertIn("overflow uid", semantic["reason"])
-        self.assertIn("its own", semantic["owner_validation"])
+        # The semantic must be stated per member, not as a blanket claim
+        # that every member is euid-owned -- `python` is not.
+        self.assertIn(
+            POLICY_OWNER_VALIDATION_LOCAL_EUID,
+            semantic["owner_validation"],
+        )
+        self.assertIn(
+            POLICY_OWNER_VALIDATION_PINNED_SYSTEM_FILE,
+            semantic["owner_validation"],
+        )
+        self.assertIn(
+            "that side's own effective uid",
+            semantic["owner_validation"],
+        )
+        self.assertIn(
+            "has no ownership check at all",
+            semantic["owner_validation"],
+        )
         self.assertEqual(
             payload["invariant_fields"],
             list(POLICY_INVARIANT_IDENTITY_FIELDS),
@@ -3148,6 +3223,25 @@ class OuterPolicyBindingTests(unittest.TestCase):
             if key != "identity_sha256"
         }
         self.assertEqual(payload["identity_sha256"], sha256_json(without))
+
+
+class FrozenCtimeStat:
+    """A stat result whose ctime never advances.
+
+    Models the filesystem the export actually runs on, where ctime moves
+    only about every 3.8 ms. Under that granularity a mutation that also
+    restores mtime leaves the before/after stat tuples byte-identical, so
+    a stat-only oracle reports "unchanged" over a copy it has already torn.
+    Freezing the field makes that race a fixture instead of a coin flip.
+    """
+
+    def __init__(self, metadata: os.stat_result, ctime_ns: int) -> None:
+        self._metadata = metadata
+        self.st_ctime_ns = ctime_ns
+        self.st_ctime = ctime_ns / 1_000_000_000
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._metadata, name)
 
 
 class SourceKeyedGateDocumentationTests(unittest.TestCase):
@@ -3247,6 +3341,28 @@ class SourceKeyedGateDocumentationTests(unittest.TestCase):
         )
         self.assertIn("artifact-changed-during-export", text)
 
+    def test_export_stat_identity_is_not_claimed_sufficient(self) -> None:
+        text = self.contract
+        # The document said a mutation through either link *is*
+        # `artifact-changed-during-export`, which the stat tuple cannot
+        # deliver: with mtime restored and ctime quantised the tuples match
+        # over a torn copy. The claim must not come back unqualified.
+        self.assertNotIn(
+            "must be unchanged across the copy, so a mutation", text
+        )
+        self.assertIn(
+            "That stat identity is necessary and not sufficient", text
+        )
+        self.assertIn("re-reads and hashes the whole source", text)
+        self.assertIn(
+            "requires the re-read length and digest to equal the staged "
+            "copy",
+            text,
+        )
+        self.assertIn(
+            "`source_reread_bytes` and `source_reread_sha256`", text
+        )
+
     def test_stdout_result_agreement_is_documented_as_byte_equality(
         self,
     ) -> None:
@@ -3276,9 +3392,19 @@ class SourceKeyedGateDocumentationTests(unittest.TestCase):
         )
         self.assertIn("unshare -Urpf", text)
         self.assertIn("`outer_uid` and `gate_namespace_uid`", text)
+        # Ownership must be documented per member. The pinned interpreter
+        # is root-owned, so a blanket euid claim would be false.
         self.assertIn(
-            "rejects a file whose `st_uid` is not its own effective uid",
+            "rejected by each side unless `st_uid` is that side's own "
+            "effective uid",
             text,
+        )
+        self.assertIn(
+            "The pinned interpreter is deliberately not one of them", text
+        )
+        self.assertIn("no euid claim is made over it", text)
+        self.assertIn(
+            "regular, single-link, non-group/world-writable inode", text
         )
         self.assertIn("pinning `policy-supervisor`", text)
 
@@ -3596,6 +3722,210 @@ class ArtifactExportIdentityTests(unittest.TestCase):
                     raised.exception.code, "artifact-changed-during-export"
                 )
                 self.assert_failed_closed(destination)
+
+    # Three 1 MiB chunks, so a mutation after the first destination write
+    # still leaves two chunks to be read from the mutated source.
+    TORN_PAYLOAD_BYTES = 3 * 1024 * 1024
+
+    def frozen_ctime_fstat(self, inode: int):
+        """Patch `os.fstat` so one inode's ctime never moves.
+
+        Only the export source is affected; every other descriptor the
+        export stats -- the staged destination above all -- is passed
+        through untouched, so nothing else in the copy is simulated away.
+        """
+        real_fstat = os.fstat
+        frozen: dict[str, int] = {}
+
+        def fstat(descriptor: int):
+            metadata = real_fstat(descriptor)
+            if metadata.st_ino != inode:
+                return metadata
+            frozen.setdefault("ctime_ns", metadata.st_ctime_ns)
+            return FrozenCtimeStat(metadata, frozen["ctime_ns"])
+
+        return mock.patch("os.fstat", fstat)
+
+    def stat_oracle(self, descriptor: int) -> tuple:
+        """Exactly the tuple the pre-repair export compared."""
+        metadata = os.fstat(descriptor)
+        return (
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_mode,
+            metadata.st_nlink,
+            metadata.st_size,
+            metadata.st_mtime_ns,
+            metadata.st_ctime_ns,
+        )
+
+    def test_mid_copy_mutation_is_caught_when_the_stat_oracle_is_blind(
+        self,
+    ) -> None:
+        # The fourth P0. A two-link 3 MiB source was overwritten through
+        # its sibling link after the first destination write and had its
+        # mtime restored; with ctime quantised to ~3.8 ms the before/after
+        # tuples matched on attempt 75 and the export published a torn
+        # A-prefix/B-suffix file equal to neither the original nor the
+        # final source. One link is not a defence -- the same overwrite
+        # goes through the source's own path -- so both are covered.
+        original = b"A" * self.TORN_PAYLOAD_BYTES
+        replacement = b"B" * self.TORN_PAYLOAD_BYTES
+        for links in (1, 2):
+            with self.subTest(links=links), tempfile.TemporaryDirectory() as raw:
+                temporary = Path(raw).resolve()
+                target, candidate, destination = self.make_scene(temporary)
+                artifact = self.write_artifact(
+                    target, original, links=links
+                )
+                mutated_through = (
+                    artifact
+                    if links == 1
+                    else target / "release/deps" / self.COMPILED_NAME
+                )
+                observed = artifact.stat()
+                stamp = (observed.st_atime_ns, observed.st_mtime_ns)
+                witness = os.open(artifact, os.O_RDONLY)
+                original_write_all = gate_module.write_all
+                staged = bytearray()
+                state: dict[str, object] = {"mutated": False}
+
+                def write_all_then_mutate(
+                    descriptor: int, payload: bytes
+                ) -> None:
+                    original_write_all(descriptor, payload)
+                    staged.extend(payload)
+                    if state["mutated"]:
+                        return
+                    state["mutated"] = True
+                    with open(mutated_through, "r+b") as handle:
+                        handle.write(replacement)
+                    # The attacker restores mtime; the filesystem declines
+                    # to move ctime. Nothing in the stat tuple is left to
+                    # report the overwrite.
+                    os.utime(mutated_through, ns=stamp)
+
+                try:
+                    with self.frozen_ctime_fstat(observed.st_ino):
+                        before = self.stat_oracle(witness)
+                        with mock.patch.object(
+                            gate_module, "write_all", write_all_then_mutate
+                        ):
+                            with self.assertRaises(GateBlocked) as raised:
+                                self.export(
+                                    target, candidate, destination
+                                )
+                        after = self.stat_oracle(witness)
+                finally:
+                    os.close(witness)
+
+                self.assertTrue(state["mutated"])
+                # The old oracle is genuinely blind here: if the repair
+                # were reverted this export would have succeeded.
+                self.assertEqual(before, after)
+                # And the bytes it would have published are torn -- equal
+                # to neither version of the source.
+                staged_bytes = bytes(staged)
+                self.assertEqual(len(staged_bytes), len(original))
+                self.assertNotEqual(staged_bytes, original)
+                self.assertNotEqual(staged_bytes, replacement)
+                self.assertTrue(staged_bytes.startswith(b"A" * 1024))
+                self.assertTrue(staged_bytes.endswith(b"B" * 1024))
+                # Only the content re-read can reject it.
+                self.assertEqual(
+                    raised.exception.code, "artifact-changed-during-export"
+                )
+                self.assertIn("reread_sha256=", raised.exception.detail)
+                self.assertEqual(
+                    artifact.read_bytes(), replacement
+                )
+                self.assert_failed_closed(destination)
+
+    def test_mutation_between_the_copy_and_the_reread_is_caught(
+        self,
+    ) -> None:
+        # The re-read is only sound if a change landing in the window
+        # between the copy and it is also rejected. Mutate exactly at the
+        # rewind, with the stat oracle still blind: the staged bytes are a
+        # clean copy of the original, so nothing but the digest comparison
+        # can distinguish them from a correct export.
+        original = b"A" * self.TORN_PAYLOAD_BYTES
+        replacement = b"B" * self.TORN_PAYLOAD_BYTES
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            target, candidate, destination = self.make_scene(temporary)
+            artifact = self.write_artifact(target, original, links=2)
+            compiled = target / "release/deps" / self.COMPILED_NAME
+            observed = artifact.stat()
+            stamp = (observed.st_atime_ns, observed.st_mtime_ns)
+            real_lseek = os.lseek
+            staged = bytearray()
+            state: dict[str, object] = {"mutated": False}
+            original_write_all = gate_module.write_all
+
+            def recording_write_all(
+                descriptor: int, payload: bytes
+            ) -> None:
+                original_write_all(descriptor, payload)
+                staged.extend(payload)
+
+            def lseek_then_mutate(descriptor: int, position: int, whence: int):
+                if not state["mutated"] and whence == os.SEEK_SET:
+                    state["mutated"] = True
+                    with open(compiled, "r+b") as handle:
+                        handle.write(replacement)
+                    os.utime(compiled, ns=stamp)
+                return real_lseek(descriptor, position, whence)
+
+            with self.frozen_ctime_fstat(observed.st_ino), mock.patch.object(
+                gate_module, "write_all", recording_write_all
+            ), mock.patch("os.lseek", lseek_then_mutate):
+                with self.assertRaises(GateBlocked) as raised:
+                    self.export(target, candidate, destination)
+
+            self.assertTrue(state["mutated"])
+            # The copy itself was never torn: the whole original was read
+            # before the mutation landed.
+            self.assertEqual(bytes(staged), original)
+            self.assertEqual(
+                raised.exception.code, "artifact-changed-during-export"
+            )
+            self.assertIn(
+                hashlib.sha256(original).hexdigest(),
+                raised.exception.detail,
+            )
+            self.assertIn(
+                hashlib.sha256(replacement).hexdigest(),
+                raised.exception.detail,
+            )
+            self.assert_failed_closed(destination)
+
+    def test_successful_export_records_a_matching_source_reread(
+        self,
+    ) -> None:
+        payload = b"A" * self.TORN_PAYLOAD_BYTES
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            target, candidate, destination = self.make_scene(temporary)
+            self.write_artifact(target, payload, links=2)
+            result = self.export(target, candidate, destination)
+            self.assertEqual(result["decision"], "EXPORTED")
+            # Recorded as its own fact, not inferred from `sha256`, so a
+            # consumer can see the second read happened at all.
+            self.assertEqual(
+                result["source_reread_sha256"],
+                hashlib.sha256(payload).hexdigest(),
+            )
+            self.assertEqual(
+                result["source_reread_bytes"], len(payload)
+            )
+            self.assertEqual(
+                result["source_reread_sha256"], result["sha256"]
+            )
+            self.assertEqual(
+                result["source_reread_bytes"], result["bytes"]
+            )
+            self.assertEqual(destination.read_bytes(), payload)
 
     def test_unsafe_prior_destination_is_never_replaced(self) -> None:
         # The destination side keeps the strict single-link rule. A prior

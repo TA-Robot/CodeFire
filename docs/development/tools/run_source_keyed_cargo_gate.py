@@ -4380,6 +4380,21 @@ def recover_artifact_export_residue(
     }
 
 
+def exported_source_identity(
+    metadata: os.stat_result,
+) -> tuple[int, ...]:
+    """The stat fields an export source must hold still across the copy."""
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
 def export_bound_artifact(
     target: Path,
     artifact_relative: str,
@@ -4558,28 +4573,65 @@ def export_bound_artifact(
                 last_resource_check = size
         source_after = os.fstat(source_descriptor)
         if (
-            (
-                source_before.st_dev,
-                source_before.st_ino,
-                source_before.st_mode,
-                source_before.st_nlink,
-                source_before.st_size,
-                source_before.st_mtime_ns,
-                source_before.st_ctime_ns,
-            )
-            != (
-                source_after.st_dev,
-                source_after.st_ino,
-                source_after.st_mode,
-                source_after.st_nlink,
-                source_after.st_size,
-                source_after.st_mtime_ns,
-                source_after.st_ctime_ns,
-            )
+            exported_source_identity(source_before)
+            != exported_source_identity(source_after)
             or size != source_after.st_size
         ):
             raise GateBlocked(
                 "artifact-changed-during-export", artifact_relative
+            )
+        # The stat tuple above is necessary and not sufficient. A writer
+        # holding either link can overwrite the source mid-copy and restore
+        # its mtime, and this filesystem advances ctime only about every
+        # 3.8 ms: on attempt 75 of a 3 MiB two-link source, `source_before`
+        # and `source_after` were identical across a mutation that had
+        # already torn the staged copy into an A-prefix/B-suffix file equal
+        # to neither the original nor the final source. The same hole is
+        # reachable through a single link's own path, so the link bound is
+        # not what closes it.
+        #
+        # Re-read the whole source through the same pinned descriptor and
+        # require it to hash to exactly what was staged. A mutation landing
+        # after this read cannot reach the staged bytes; one landing before
+        # or during the copy cannot survive the comparison. This is content
+        # equality, not a finer clock, so it does not depend on winning a
+        # timestamp tick.
+        staged_sha256 = digest.hexdigest()
+        os.lseek(source_descriptor, 0, os.SEEK_SET)
+        reread_digest = hashlib.sha256()
+        reread_bytes = 0
+        while True:
+            if time.monotonic() > export_deadline:
+                raise GateBlocked(
+                    "artifact-export-deadline-exceeded",
+                    str(ARTIFACT_EXPORT_TIMEOUT_SECONDS),
+                )
+            chunk = os.read(source_descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            reread_bytes += len(chunk)
+            if reread_bytes > MAX_EXPORTED_ARTIFACT_LOGICAL_BYTES:
+                raise GateBlocked(
+                    "artifact-export-logical-bytes-exceeded",
+                    f"bytes>{MAX_EXPORTED_ARTIFACT_LOGICAL_BYTES}",
+                )
+            reread_digest.update(chunk)
+        source_reread = os.fstat(source_descriptor)
+        source_reread_sha256 = reread_digest.hexdigest()
+        if (
+            reread_bytes != size
+            or source_reread_sha256 != staged_sha256
+            or exported_source_identity(source_reread)
+            != exported_source_identity(source_before)
+            or exported_source_identity(source_reread)
+            != exported_source_identity(source_after)
+        ):
+            raise GateBlocked(
+                "artifact-changed-during-export",
+                f"{artifact_relative}: staged_bytes={size}, "
+                f"reread_bytes={reread_bytes}, "
+                f"staged_sha256={staged_sha256}, "
+                f"reread_sha256={source_reread_sha256}",
             )
         os.fchmod(destination_descriptor, 0o700)
         if time.monotonic() > export_deadline:
@@ -4734,6 +4786,8 @@ def export_bound_artifact(
             "export_path": str(destination_lexical),
             "bytes": size,
             "sha256": digest.hexdigest(),
+            "source_reread_bytes": reread_bytes,
+            "source_reread_sha256": source_reread_sha256,
             "source_device": source_before.st_dev,
             "source_inode": source_before.st_ino,
             "source_mode": stat.S_IMODE(source_before.st_mode),

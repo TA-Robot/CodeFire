@@ -267,12 +267,19 @@ owner reads back as 0 inside it and every unmapped owner as the kernel
 overflow uid. Bytes, SHA-256, device, inode, mode, link count, mtime, and
 ctime are still compared for strict equality; the uid is recorded from both
 sides as `outer_uid` and `gate_namespace_uid` rather than collapsed into
-one ambiguous number. Ownership is not weakened by that — each side rejects
-a file whose `st_uid` is not its own effective uid before it records an
-identity at all, and never validates ownership against the other side's
-value. What authorizes trusting the gate's local check is the same binding
-pinning `policy-supervisor`: the check is only as good as the code running
-it, and that code's digest is bound on both sides.
+one ambiguous number. Ownership is not weakened by that, and each member
+records which rule it was held to. The three owner-controlled members — the
+build wrapper, `ai_contracts`, and the gate supervisor — are rejected by
+each side unless `st_uid` is that side's own effective uid, checked before
+the identity is recorded. The pinned interpreter is deliberately not one of
+them: `/usr/bin/python3.10` is a root-owned system file, so its ownership
+is not checked at all and no euid claim is made over it. It is still
+required to be a regular, single-link, non-group/world-writable inode and
+is still bound exactly on every invariant field including its SHA-256. No
+member's ownership is ever validated against the other side's value. What
+authorizes trusting the gate's local check is the same binding pinning
+`policy-supervisor`: the check is only as good as the code running it, and
+that code's digest is bound on both sides.
 
 Logs and result JSON must be distinct direct children of the fixed dedicated
 evidence root and outside the candidate, target, and Git administration
@@ -345,8 +352,24 @@ single-link requirement blocks the normal release export outright. Nothing
 else is relaxed. The source is opened no-follow, so a symlink, and a non-regular
 or non-owner-executable inode, still fail closed; a third link is `BLOCK`;
 and the complete pre/post source identity — device, inode, mode, link count,
-size, mtime, and ctime — must be unchanged across the copy, so a mutation
-through either link is `artifact-changed-during-export`. The published
+size, mtime, and ctime — must be unchanged across the copy.
+
+That stat identity is necessary and not sufficient, and must not be
+described as if it were. A writer holding either link can overwrite the
+source mid-copy and restore its mtime, and this filesystem advances ctime
+only about every 3.8 ms: on attempt 75 of a 3 MiB two-link source the
+before and after tuples were identical across a mutation that had already
+torn the staged copy into an A-prefix/B-suffix file equal to neither the
+original nor the final source. A single link's own path reaches the same
+hole, so the link bound is not what closes it. What closes it is content:
+after the copy the wrapper seeks the same pinned descriptor back to zero,
+re-reads and hashes the whole source under the same logical-byte bound and
+export deadline, takes a third `fstat`, and requires the re-read length and
+digest to equal the staged copy and all three stat identities to agree. A
+mutation landing after that read cannot reach the staged bytes; one landing
+before or during the copy cannot survive the comparison. Either way the
+result is `artifact-changed-during-export`, and the export records
+`source_reread_bytes` and `source_reread_sha256`. The published
 destination is separate and stays strictly single-link: it is created
 exclusively and no-follow, written by descriptor copy rather than by link,
 and a pre-existing destination that is non-regular, foreign-owned, or still
