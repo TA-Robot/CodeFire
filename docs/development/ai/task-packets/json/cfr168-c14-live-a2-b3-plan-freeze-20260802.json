@@ -1,0 +1,356 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "cfr168-c14-live-a2-b3-plan-freeze-20260802",
+  "status": "ready",
+  "objective": "After manager integration of this packet, repair only CFR-168 C14-LIVE-A2/B3 on the accepted Python HTTP Upload mutation-response path: freeze the conservative EFFECT_MAY_HAVE_STARTED boundary, transfer the selected prepared owner to the mutation slot before fallible rejected cleanup, keep wire publication as a borrow, separate pre-effect abort from post-effect finish, retry cleanup exactly once on the same non-consuming owner, preserve one response attempt, and report ADR-020-compatible decision-work and separate wire state.",
+  "base_revision": "333e41082ffc35c73c02a420511ae2f16839c5b8",
+  "role": "manager",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 2,
+      "reversibility": 1,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "cross_subsystem_architecture",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 11,
+    "selected_tier": "ultra",
+    "rationale": "The repair crosses durable-effect, response ownership, request-loop accounting, socket framing, error-origin, and canonical-contract boundaries. Historical GET and MR-write sources gave conflicting post-effect cleanup rules, and a later manager adjudication corrects the terminal interpretation, so exact phase assignment and an independent Ultra review are mandatory."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-4-remote-http-security",
+      "pack-5-project-management-docs"
+    ],
+    "additional_files": [
+      "AGENTS.md",
+      "adr/ADR-020-decision-equivalent-work-budget.md",
+      "codefire",
+      "docs/development/project-management.md",
+      "docs/development/ai/operating-protocol.md",
+      "docs/development/ai/task-packets/cfr168-c14-live-a2-b3-plan-freeze-20260802.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md",
+      "docs/development/ai/swarm-batches/cfr168-rust-storage-review-closure-repair-manager-freeze-20260802.md",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "docs/development/code-review-issues/cfr-168.md",
+      "tests/test_codefire_cli.py",
+      "tests/test_python_http_mr_list_decision_work.py",
+      "tests/test_python_http_upload_accounted_traversal.py"
+    ],
+    "evidence_refs": [
+      "product-base:333e41082ffc35c73c02a420511ae2f16839c5b8",
+      "product-tree:c0ab3a09e4731ca27d43023be72e577487b11600",
+      "codefire-blob:73b1f368f9c1591be6fd9219b839351878b82b9a",
+      "shared-preflight-sha256:ca1a1451bfc1b25ed1c54f1b012d4d0e508ef0a96f88401e61284c6d156a4441",
+      "composition-review-sha256:a3835f3720983cee72a3368fcc149158a44c6bb3ea1d3c89cbca8432503fadd5",
+      "composition-result-sha256:02a759c40d11c9b79d52872104b53da79c9de069629c8b63aa9bb610adcce3e3",
+      "storage-manager-freeze-sha256:913b0a0b29dc620f60f6cc31013f5a9b59a064e680d64919521eb0edb3462348",
+      "adr020-sha256:4566de104181bc94f7d7fd41ae1b59b8c93b267665898f2629a3ff6c58ce5ab9",
+      "execution-base:L-is-manager-named-packet-containing-clean-docs-only-descendant-of-product-base",
+      "phase-marker:M=EFFECT_MAY_HAVE_STARTED-after-final-preeffect-fence-and-response-seal-immediately-before-first-fallible-effect",
+      "pair-states:OPEN-SEALED-SELECTING_SUCCESS_OR_DURABLE-SELECTED_SUCCESS_OR_DURABLE-CLEANUP_PENDING-CLOSED",
+      "slot-states:EMPTY-PREPARED-SEALED-EFFECT_MAY_HAVE_STARTED-SELECTED-WIRE_STARTED-WIRE_COMPLETE-CLEANUP_PENDING-CLOSED",
+      "handoff:selected-owner-reaches-slot-before-fallible-rejected-cleanup",
+      "wire-ownership:slot-owns-and-wire-borrows-selected-owner",
+      "cleanup-shape:non-consuming-same-owner-one-synchronous-retry",
+      "persistent-cleanup:close-connection-cleanup_incomplete-owner-reachable-observer-truth-no-second-document",
+      "terminal-zero:complete-with-separate-wire-state-no-new-terminal-variant",
+      "candidate-write-set:exactly-nine-paths",
+      "counterexample-matrix:T01-through-T15-required",
+      "implementation-prohibited-until-manager-integrates-packet-and-names-L"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "adr/ADR-020-decision-equivalent-work-budget.md",
+      "codefire",
+      "docs/development/project-management.md",
+      "docs/development/ai/operating-protocol.md",
+      "docs/development/ai/task-packets/cfr168-c14-live-a2-b3-plan-freeze-20260802.md",
+      "docs/development/ai/task-packets/json/cfr168-c14-live-a2-b3-plan-freeze-20260802.json",
+      "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md",
+      "docs/development/ai/swarm-batches/cfr168-rust-storage-review-closure-repair-manager-freeze-20260802.md",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "docs/development/code-review-issues/cfr-168.md",
+      "tests/test_codefire_cli.py",
+      "tests/test_python_http_mr_list_decision_work.py",
+      "tests/test_python_http_upload_accounted_traversal.py"
+    ],
+    "write_set": [
+      "codefire",
+      "tests/test_codefire_cli.py",
+      "tests/test_python_http_post_effect_response.py",
+      "adr/ADR-021-python-http-mutation-response-lifecycle.md",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "docs/development/code-review-issues/cfr-168.md"
+    ],
+    "disallowed_paths": [
+      "README.md",
+      "Cargo.toml",
+      "Cargo.lock",
+      "install.sh",
+      "demo.sh",
+      "pyproject.toml",
+      "setup.py",
+      "crates",
+      "schemas",
+      "subprojects",
+      "docs/development/README.md",
+      "docs/development/current-cycle-burn-down-plan.md",
+      "docs/development/history.md",
+      "docs/development/codefire-improvement-cycle.md",
+      "docs/development/ai/flow-metrics",
+      "docs/development/ai/review-packets",
+      "docs/development/ai/swarm-results",
+      "docs/development/ai/task-packets/cfr168-c14-live-a2-b3-plan-freeze-20260802.md",
+      "docs/development/ai/task-packets/json/cfr168-c14-live-a2-b3-plan-freeze-20260802.json",
+      "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md",
+      "docs/development/ai/swarm-batches/cfr168-rust-storage-review-closure-repair-manager-freeze-20260802.md",
+      "adr/ADR-020-decision-equivalent-work-budget.md",
+      ".claude-second-agent",
+      ".claude-worktrees",
+      ".codex-second-agent",
+      ".dev-swarm"
+    ],
+    "disallowed_actions": [
+      "starting implementation before the manager integrates this packet and names full execution base L",
+      "changing product, tests, source docs, issue state, install state, or dogfood state in the packet-authoring lane",
+      "using an execution base whose product/test/ADR/source-doc/issue blobs differ from P",
+      "changing the typed base_revision to make a generic launcher accept a different base",
+      "adding a tenth path to candidate C or placing a result/review/history/current-state artifact inside C",
+      "amending, squashing, rebasing, merging, or rewriting candidate C after Candidate Freeze",
+      "running fallible rejected-owner cleanup before the selected owner reaches the mutation slot",
+      "transferring the Upload selected owner out of the slot with take, clone, re-encoding, or reconstruction",
+      "using one generic slot close to choose both pre-effect abort and post-effect finish semantics",
+      "closing or clearing the selected owner before its one post-M wire attempt",
+      "calling the opposite selector after a selection direction starts",
+      "placing accounting cleanup, diagnostic work, or terminal observation inside transport_boundary",
+      "attempting send_json, prepare_json, or a second HTTP document after WIRE_STARTED",
+      "retrying cleanup more than once synchronously, adopting it in a later request, or treating __del__ as evidence",
+      "clearing an owner, scalar, debt, or permit before its exact release succeeds",
+      "inventing publication_failed, wire_failed, response_abandoned, or another advertised decision-work terminal",
+      "overwriting an earlier budget_exceeded, subject_changed, deadline_exceeded, or other valid terminal",
+      "classifying failure origin from message text, errno, exception class, traceback, or timing",
+      "changing GET/read-slot semantics or slotless GC/MR POST behavior",
+      "implementing C14-LIVE-A1, C14-SUCCESSOR-OWNER, MR-write, reducer, nonce, gate, recovery, ancestry, signature, validation, bootstrap, GC, Rust, packaging, install, Docker, or dogfood work",
+      "claiming B3, C14, MR-write, CFR-168, CFB-136, CFB-138, the batch, Install, Dogfood, or Retrospect complete",
+      "performing implementation and independent review in the same lane",
+      "repairing a reviewer preference without manager actionability adjudication and a frozen required-correction scope"
+    ]
+  },
+  "non_goals": [
+    "C14-LIVE-A1 constructor-unwind, commit-source, server-verification, signature, ancestry, or other pre-effect cleanup work.",
+    "C14-SUCCESSOR-OWNER production-unwired/deferred factories, sealed ancestry, control witness, O2, or O3.",
+    "GET/read response-slot behavior or its accepted pre-effect dispose-before-select rule.",
+    "Wiring the A2 mutation slot into GC or merge-request create/review/apply routes.",
+    "MR-write implementation, accepted-base rebinding, review/apply work, or clearing its B1 blocker.",
+    "Publication reducer, nonce, gate, recovery, object-copy, ancestry, signature, validation, bootstrap, authority, or GC semantics.",
+    "Rust, Cargo, schemas, conformance, capability advertisement, packaging, Install, Docker, network, Dogfood, or Retrospect.",
+    "A new advertised decision-work terminal reason or an ADR-020 vocabulary change.",
+    "Unbounded/background/cross-request cleanup retry or destructor-based correctness.",
+    "Proving the actual first durable byte, peer receipt, TCP flush, or filesystem visibility from M or wire states.",
+    "Closing B3, global C14, CFR-168, CFB-136, CFB-138, MR-write, or the active batch from this slice.",
+    "Management/current-state/history/flow/review artifact changes inside the nine-path candidate.",
+    "Unrelated refactor, rename, formatting sweep, performance optimization, or style-only cleanup."
+  ],
+  "invariants": [
+    {
+      "id": "INV-BASE",
+      "statement": "P is exactly 333e41082ffc35c73c02a420511ae2f16839c5b8 tree c0ab3a09e4731ca27d43023be72e577487b11600; manager-named L is a clean linear packet-containing descendant with no product/test/ADR/source-doc/issue byte change from P.",
+      "falsification_test": "Any identity mismatch, merge, dirty launch state, missing packet, or product/test/ADR/source-doc/issue diff in P..L blocks implementation."
+    },
+    {
+      "id": "INV-SCOPE",
+      "statement": "Candidate C is one non-merge child of L and changes exactly the nine write-set paths, no result or review path.",
+      "falsification_test": "git rev-list, parent identity, or git diff --name-only shows another topology, missing path, or tenth path."
+    },
+    {
+      "id": "INV-M",
+      "statement": "M=EFFECT_MAY_HAVE_STARTED is one-way, after the last complete pre-effect fence and response seal and immediately before the first fallible effect; before M no effect occurred, after M no-effect cannot be proved.",
+      "falsification_test": "A callback/fallible action exists between seal/M/effect, M precedes the final fence, M follows an effect, or tests claim M proves an actual durable byte."
+    },
+    {
+      "id": "INV-PAIR-STATES",
+      "statement": "The pair follows OPEN -> SEALED -> SELECTING_SUCCESS|SELECTING_DURABLE -> SELECTED_SUCCESS|SELECTED_DURABLE -> CLEANUP_PENDING -> CLOSED with immutable selection direction.",
+      "falsification_test": "Any opposite-selection transition, selected owner visible to generic pair cleanup, pointer cleared before release, or unguarded state skip."
+    },
+    {
+      "id": "INV-SLOT-STATES",
+      "statement": "The slot follows EMPTY -> PREPARED -> SEALED -> EFFECT_MAY_HAVE_STARTED -> SELECTED -> WIRE_STARTED -> WIRE_COMPLETE -> CLEANUP_PENDING -> CLOSED, with explicit pre-effect abort and post-effect finish branches.",
+      "falsification_test": "A post-WIRE_STARTED return to selection/send-json, a generic close choosing both policies, or a persistent owner cleared before observation."
+    },
+    {
+      "id": "INV-HANDOFF",
+      "statement": "The exact selected owner reaches slot.selected and leaves the pair before the first fallible rejected-owner cleanup; after failure the slot owns selected and the pair owns only rejected cleanup.",
+      "falsification_test": "Inject the first rejected close failure; selected is absent from the slot, still owned/closable by the pair, cloned, re-encoded, or destroyed."
+    },
+    {
+      "id": "INV-BORROW",
+      "statement": "The Upload mutation slot remains canonical owner through terminal observation; wire publication borrows exact frozen header/body and no local take/clone/re-encoding splits ownership.",
+      "falsification_test": "A local prepared owner outlives or bypasses the slot, response identity changes, or observer cannot reach a persistent remainder."
+    },
+    {
+      "id": "INV-PRE-POST-CLEANUP",
+      "statement": "Before M, abort publishes nothing when disposal is uncertain; at/after M, finish never destroys selected before its wire attempt and cleanup remains secondary.",
+      "falsification_test": "T01 emits bytes/effects or T03/T04 loses/replaces the selected response."
+    },
+    {
+      "id": "INV-SELECTION",
+      "statement": "After M, confirmed matching reducer return selects exact prepared success; unconfirmed publication selects exact fixed durable 503; selection never changes.",
+      "falsification_test": "A confirmed path emits durable, an unconfirmed path emits success/arbitrary error, payload is re-encoded, or opposite selection succeeds."
+    },
+    {
+      "id": "INV-WIRE",
+      "statement": "WIRE_STARTED precedes the first header write attempt; only socket writes/flush carry transport origin; after WIRE_STARTED no second HTTP document is possible.",
+      "falsification_test": "Header/body fault appends another status/document, WIRE_STARTED is set after write returns, or cleanup OSError is transport-marked."
+    },
+    {
+      "id": "INV-RETRY",
+      "statement": "A failed A2 cleanup retains a non-consuming exact owner and receives exactly one synchronous retry on the same owner, two total attempts; no destructor/background/cross-request retry is correctness evidence.",
+      "falsification_test": "Attempt count differs, owner identity changes, retry loops, a next request adopts it, or only __del__ drains it."
+    },
+    {
+      "id": "INV-PERSISTENT",
+      "statement": "After persistent cleanup failure, connection closes, no second response occurs, terminal is cleanup_incomplete for residual debt/permits, and observer exposes the reachable exact owner and debt without clearing them.",
+      "falsification_test": "Observer reports complete/zero while release failed, owner is unreachable, connection continues, or a second response is attempted."
+    },
+    {
+      "id": "INV-RECOVERED",
+      "statement": "Recovered cleanup reaches zero debt/permits, terminal complete unless an earlier valid terminal exists, and consumes one bounded secondary diagnostic; clean requests emit none.",
+      "falsification_test": "Recovered request is cleanup_incomplete/new terminal, diagnostic is unread/duplicated/primary, or a clean request logs cleanup."
+    },
+    {
+      "id": "INV-TERMINAL",
+      "statement": "Decision-work terminal describes accounting, not wire delivery: zero uses complete, residual uses existing cleanup_incomplete, earlier valid terminals are preserved, and no new advertised publication/wire terminal is added.",
+      "falsification_test": "Code/ADR/docs add a new terminal, overwrite an earlier terminal, label residual complete, or encode wire progress in terminal reason."
+    },
+    {
+      "id": "INV-ORIGIN",
+      "statement": "Socket failures are transport-origin; post-write accounting cleanup is outside transport; pre-M filesystem errors remain typed filesystem authority; MemoryError remains outside that arm.",
+      "falsification_test": "Classification uses class/message/errno, cleanup OSError becomes transport, filesystem ETIMEDOUT abandons instead of typed 400, or MemoryError is encoded as filesystem."
+    },
+    {
+      "id": "INV-REGRESSION",
+      "statement": "GET/read and slotless GC/MR POST behavior is unchanged, and no A2 state leaks into a later request.",
+      "falsification_test": "T14 baseline differs or T15 observes stale selection/wire/cleanup/owner/debt/permit state."
+    },
+    {
+      "id": "INV-DOCS",
+      "statement": "ADR-021 and the four canonical source docs state the exact implemented M/state/ownership/retry/terminal contract; cfr-168 stays investigating and makes no Install/Dogfood/global closure claim.",
+      "falsification_test": "Docs contradict code/oracles, omit a frozen state, claim actual effect timing, add a terminal, or close/widen an issue."
+    },
+    {
+      "id": "INV-REVIEW",
+      "statement": "Candidate C is reviewed exactly and report-only by a fresh lane excluded from packet writing, implementation, repair, adjudication, and integration; byte changes create a new candidate.",
+      "falsification_test": "Reviewer wrote candidate bytes, shares a prohibited role, reviews an unbound tree, fixes findings directly, or approves bytes changed after freeze."
+    }
+  ],
+  "validation": [
+    {
+      "id": "VAL-COMPILE",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile codefire tests/test_codefire_cli.py tests/test_python_http_post_effect_response.py",
+      "purpose": "Compile the changed Python runtime and both test surfaces without creating tracked bytecode.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "VAL-FOCUSED",
+      "command": "python3 -m unittest tests.test_python_http_post_effect_response -v",
+      "purpose": "Execute the required T01-T15 pair, slot, real-socket, cleanup, terminal, and regression matrix.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "VAL-EXISTING",
+      "command": "python3 -m unittest tests.test_codefire_cli.CodeFireCliTests.test_python_upload_response_preflight_precedes_effect_and_retries_durable_result tests.test_codefire_cli.CodeFireCliTests.test_python_mutation_response_owner_rejects_foreign_and_retries_cleanup -v",
+      "purpose": "Preserve and strengthen the accepted response-preflight and foreign-ledger/selection behavior.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "VAL-REVERSALS",
+      "command": "Run each packet T01-T15 temporary reversal separately against its named focused oracle, record the intended behavioral failure, restore exact candidate bytes, then run git diff --check and git status --short.",
+      "purpose": "Prove all fifteen counterexample oracles are load-bearing and non-vacuous without committing reversal patches.",
+      "required": true
+    },
+    {
+      "id": "VAL-SOURCE-DOCS",
+      "command": "python3 docs/development/tools/check_source_docs.py",
+      "purpose": "Validate the four canonical source documents against repository structure and references.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "VAL-PROJECT-DOCS",
+      "command": "python3 docs/development/tools/check_project_docs.py",
+      "purpose": "Validate ADR, issue ledger, links, and project-document consistency.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "VAL-FULL-PYTHON",
+      "command": "python3 -m unittest discover -s tests -v",
+      "purpose": "Run the applicable broad Python regression gate after focused checks pass.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "VAL-DEMO",
+      "command": "./demo.sh",
+      "purpose": "Run the repository-required Python CLI smoke workflow.",
+      "required": true,
+      "requires_capability": "bash"
+    },
+    {
+      "id": "VAL-SCOPE",
+      "command": "Verify C is one non-merge child of manager-named L, git diff --name-only L..C equals the exact nine-path write set, and git diff --check L..C passes.",
+      "purpose": "Freeze one immutable candidate with exact topology and no scope drift.",
+      "required": true
+    },
+    {
+      "id": "VAL-CANDIDATE",
+      "command": "python3 docs/development/tools/capture_candidate_identity.py --repo . --base $L --head HEAD --format json",
+      "purpose": "Capture candidate commit/tree/patch/path identity; the tool's manifest option expects a swarm-batch manifest rather than this typed task packet, so exact nine-path equality is proved independently by VAL-SCOPE.",
+      "required": true,
+      "requires_capability": "python3"
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "Full P and manager-named L commit/tree identity with proof that P..L is the authorized docs-only packet integration.",
+      "One clean non-merge candidate C commit/tree/parent and canonical L..C patch SHA-256.",
+      "Exact nine-path name-status plus final blob and mode for every candidate path.",
+      "All validation commands with exit code, selected/executed count, duration, and log digest; skips and unavailable evidence remain explicit.",
+      "T01-T15 success evidence and each temporary reversal's intended behavioral failure, with candidate bytes restored.",
+      "Exact selected success/durable wire bytes, status-line counts, and no-effect authority snapshots for the applicable cases.",
+      "Observer snapshots for clean, recovered cleanup, transport failure, and persistent cleanup including owner reachability, debt, permits, attempts, selection, and wire state.",
+      "Changed B3 AST source-segment hashes and a mapping from every semantic delta to a frozen design decision or oracle.",
+      "Explicit non-goal and intentionally untouched path statement, including A1, successor, GET, slotless POST, MR-write, reducer, Rust, install, and dogfood.",
+      "Candidate Freeze statement that C was not amended/rebased/merged and that any later byte change requires a new candidate.",
+      "Fresh reviewer exclusion set and a statement that implementation, integration, Install, Dogfood, and issue Close were not performed by the packet-authoring lane."
+    ],
+    "evidence_digest_required": true
+  }
+}
