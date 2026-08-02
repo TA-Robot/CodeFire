@@ -95,8 +95,19 @@ The active product/control split is frozen as follows:
    fast-forward canonical over the entire accepted chain and run the
    post-integration gate. Only a canonical head containing that whole chain may
    supply evidence for held Rust reviews;
-2. repair and rereview Python Upload/CFB-138, then resolve the shared-primitives
-   preflight before MR-write and Python composition;
+2. Python Upload/CFB-138 repair and rereview are done: candidate `0f43415` holds
+   a fresh exact `ACCEPT` published at `c54e5ce`. The shared-primitives
+   preflight `BLOCK` is not overturned and is not restated as `READY`; it is
+   decomposed by the manager Plan/FREEZE packet
+   `docs/development/ai/task-packets/cfr168-python-http-accepted-input-composition-20260802.md`,
+   which assigns `B1`'s composition base and accepted input graph for the
+   accepted-input composition writer only, releases `B2` solely as the
+   composition resolution action and leaves it open until the frozen composed
+   candidate earns a fresh exact `ACCEPT`, and leaves `B3` open and routed to
+   `C14-LIVE-A2`. MR-write stays blocked, both on `B1`'s own rejected base and
+   on `B3`. The exact remaining manager action is: integrate that Plan/FREEZE
+   commit, then launch the single bounded composition writer on exact base
+   `a972cde`;
 3. review File Ancestry `02b0d63` and Rust HTTP `92fc810` before authorizing any
    new product repair;
 4. adjudicate whether accepted File Doctor `1a04490` or independently reviewed

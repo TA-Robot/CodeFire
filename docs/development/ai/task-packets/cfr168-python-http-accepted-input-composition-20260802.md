@@ -1,0 +1,436 @@
+# CFR-168 Python HTTP accepted-input composition — manager Plan/FREEZE packet
+
+Status: ready_for_bounded_composition
+
+Packet ID: `cfr168-python-http-accepted-input-composition-20260802`
+Role: manager (Plan/FREEZE authority); the executing lane is one implementer
+Provider/model: Claude Opus 5 for both the composition writer and the fresh review
+Typed companion: `docs/development/ai/task-packets/json/cfr168-python-http-accepted-input-composition-20260802.json`
+Bound preflight: `docs/development/ai/swarm-results/cfr168-python-composition-exact-preflight-claude-20260802/preflight.md`
+Original shared-primitives authority, preserved unchanged: `docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md`
+
+> Status vocabulary note. `docs/development/ai/schemas/task-packet.v1.schema.json`
+> constrains the machine `status` field to
+> `draft|ready|in_progress|blocked|completed|cancelled` with
+> `additionalProperties: false`, so the typed companion carries `"status": "ready"`
+> plus the exact token `packet-status:ready_for_bounded_composition` in
+> `context.evidence_refs` and invariant `INV-STATUS`. The authoritative packet
+> status is **`ready_for_bounded_composition`** and nothing broader. This is a
+> schema encoding, not a widening of the authorization.
+
+## Objective
+
+Compose the already-accepted Python HTTP inputs — the MR-list candidate
+`b164046` (which subsumes the accepted Doctor/Branch candidate `701469f`) and the
+accepted Upload live-route cleanup successor delta `cb13da0..0f43415` — onto the
+exact canonical base `a972cde890e0d621aaced6aca4b45835871da975` as one clean
+additive commit inside a frozen 19-path write set, then obtain one fresh exact
+report-only review of the frozen candidate.
+
+This packet authorizes **composition of already-accepted bytes only**. It does
+not authorize MR-write, integration of the composed candidate, Install, Dogfood,
+any Cargo/Rust work, any new product behaviour, or any lifecycle exit.
+
+### Exact bases and identities
+
+| Role | Value |
+|---|---|
+| Immutable product base | `a972cde890e0d621aaced6aca4b45835871da975`, tree `76a7342031f560a116916cfe978979674841c75f`, parent `1a9e01d462ed39599a1d8cf0b864264cf0861d18` |
+| Canonical branch | `integration/cfr168-p0-canonical` |
+| Preflight's prospective base (historical) | `fb891b01f45e4d1963c48f06b827f8335150dace`, tree `2dadc3088c14fb624fb30d8060eba7466297959a` |
+| Divergence `fb891b0..a972cde` | 4 commits, 0 merges, 5 docs paths, **0 product/runtime/test/packaging paths** |
+| Manager post-integration gate on `a972cde` | `python3 docs/development/tools/check_ai_development.py --timeout 180` passed 7/7 in 53.188 s — the integration lane's measurement, not this packet's and not the writer's |
+
+### Accepted input authorities
+
+| Input | Candidate | Tree | Accepted report | Report SHA-256 |
+|---|---|---|---|---|
+| Doctor + Branch | `701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714` | `dd63dd560514aef08925cc8b1dbe815bafcceef4` | `docs/development/ai/swarm-results/cfr168-python-http-doctor-branch-composition-rereview-20260730/review.md` (blob `e5096bbb3a4da181b0bee471619de61f11b15635`) | `c7a1665fdf4a6e1104bbab18ec8051c048ace1d25e865952bbbcd35a06eb19c0` |
+| MR-list | `b16404676639336f705feffd9af4857d4a1fcc69` | `36185e320338b67e1610d82fcc81cba310c36026` | `docs/development/ai/swarm-results/cfr168-python-http-mr-list-final-publication-closure-rereview-claude-20260731/review.md` (blob `ec7a09b795e0c3df22b6394ae03c465aa90f42c7`) | `5c952a9a5c162bfbb93522bb644fcba44ce32ddf3628501e6f94308899fe760e` |
+| Upload live-route cleanup | `0f4341561ce95935600bf1398b8a5fbdb206daba` | `da356c2a041e57eea9192ab917f3a293239c60e7` | report commit `c54e5ce4ab9e8f58f1db88ae59edceae96653058`, path `docs/development/ai/swarm-results/cfr168-python-http-upload-live-route-cleanup-rereview-claude-20260802/review.md` (blob `216ee2680872c43dcd7b657e3a8d4312dbd9b1e9`) | `46e7c3e41ac1b132766657e445e017b392ce6a0b72eb46f909b13755fc8a9b3c` |
+
+`merge-base(701469f, b164046) = 701469f`: the Doctor/Branch input is a strict
+ancestor of the MR-list input and is fully subsumed by it. There is nothing
+separate to replay for Doctor/Branch.
+
+The Doctor/Branch `ACCEPT` carries an explicit carve-out — it neither accepts nor
+rejects the adjacent upload slice from `0703f71` — so no duplicate-omission
+argument in this packet may rest on that report. The omission rests on the Upload
+acceptance chain and on measured blob identity instead.
+
+### Initial-Upload duplicate
+
+`git show 0703f71` and `git diff 5254e3d..cb13da0` share the stable patch-id
+`9889888cedeba7344fb987ff5891cf728d9c7e36`. The **`b164046` copy is kept**,
+arriving inside the accepted MR-list tree at `0703f71`. The Upload lineage's own
+`5254e3d..cb13da0` limb is **omitted**, and only the successor delta
+`cb13da0..0f43415` is applied. On the one path both copies touch,
+`tests/test_python_http_upload_accounted_traversal.py` is blob
+`141dcbd4ee1f8727fbe146faef481cf746c8c73f` at `cb13da0` **and** at `b164046`, so
+the omission is a no-op there and the newest 36-test successor blob is taken
+whole.
+
+## Manager adjudication of the shared-primitives `B1`/`B2`/`B3`
+
+The original authority
+`docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md`
+(blob `ec2a264142c6625dadd4809d99cf18d3371e9847`, SHA-256
+`ca1a1451bfc1b25ed1c54f1b012d4d0e508ef0a96f88401e61284c6d156a4441`, unchanged at
+`a972cde`) records verdict **`BLOCK`** with blocking conflicts `B1`, `B2` and `B3`. That
+report is preserved byte-for-byte, is not rewritten, and is **not** reinterpreted
+as `READY`. Its `BLOCK` remains the standing verdict for the subject it actually
+adjudicated: the MR-write repair packet. What follows is a manager decomposition
+of that `BLOCK` for a *different, narrower* subject — the accepted-input
+composition — and nothing else.
+
+### `B1` — resolved only for the accepted-input composition writer
+
+`B1` failed because the frozen MR-write repair packet's `base_revision`
+`fcb2324145962e79d7c6ee173b9cf545733b957d` carries a `codefire` byte-identical to
+the rejected candidate and contains none of the fourteen accepted primitive
+symbols the repair must reuse, and because choosing or creating a base is
+manager-owned composition that the preflight declared a Non-Goal.
+
+**Manager decision.** For the accepted-input composition writer only, `B1` is
+resolved by this packet, because the manager now performs exactly the act the
+preflight said was manager-owned: it assigns the base and the input graph.
+
+- Immutable product base: `a972cde890e0d621aaced6aca4b45835871da975`.
+- Accepted input graph: `b164046` (subsuming `701469f`) plus the successor delta `cb13da0..0f43415`, with the initial-Upload duplicate omitted as measured above.
+- Nothing must be guessed: every source blob, three-way base, expected target blob and omission is named in this packet and in the bound preflight.
+
+**Explicitly not resolved.** MR-write's rejected/frozen base
+`fcb2324145962e79d7c6ee173b9cf545733b957d` remains blocked. `B1` is untouched for
+MR-write; no MR-write base has been rebound, and this packet does not rebind one.
+
+### `B2` — released only as the composition resolution action; remains OPEN
+
+`B2` failed because the accepted MR-list tree `b164046` carries, on its two live
+`handle_http_upload` routes, the `_AccountedUploadCommitSource` cleanup defect
+held OPEN as `HIGH-2`, plus an inverted primary/cleanup error precedence at
+`b164046:7047`-`7049` — so accepted product bytes and a frozen rejecting
+specification contradicted each other about the same symbol, with no frozen
+packet owning the accepted tree's copy.
+
+**Manager decision.** The accepted Upload live-route successor now supplies the
+missing behaviour, and the **exact composition of `b164046` plus
+`cb13da0..0f43415` owns the product contradiction**. The `ACCEPT` at `c54e5ce`
+disposes `HIGH-2` as closed on all three limbs for candidate `0f43415`, and the
+bound preflight's inversion census measures the contradiction's disappearance in
+the composed `codefire`: `raise cleanup_error from run_error` occurrences go
+`cb13da0` 2 -> `b164046` 2 (including the cited `b164046:7049` site) ->
+`0f43415` 1 -> composed **1**, with the surviving occurrence in
+`run_server_verification` and **zero** in
+`enforce_remote_commit_signature_policy_accounted`.
+
+**`B2` remains OPEN.** It is released here **only** as the authorization to
+perform the composition, not as a finding that the contradiction is already
+discharged in the repository. `B2` closes only when the frozen composed candidate
+receives a fresh exact `ACCEPT`. Until then:
+
+- the composed tree is a candidate, not an accepted tree;
+- no document may state that `B2` is resolved in the repository, only that the composition is its assigned resolution action;
+- the `run_server_verification` inversion is pre-existing on both lineages, is not composition-introduced, and routes to `C14-LIVE-A1`.
+
+### `B3` — remains OPEN, routes to `C14-LIVE-A2`, blocks MR-write
+
+`B3` failed because `_PreparedHTTPMutationResponses` is byte-identical in all five
+bound trees while two frozen specifications give directly opposed rules for the
+post-first-authoritative-effect window (accepted GET: publish nothing on disposal
+failure; MR-write `F5`: return the selected success/durable bytes), and no
+accepted or rejecting report states the phase index that reconciles them.
+
+**Manager decision.** `B3` is **not** resolved, not narrowed and not reassigned by
+this packet.
+
+- `B3` routes to **`C14-LIVE-A2`** post-effect / response / wire work, to be undertaken *after* composition as its own bounded subject with its own authority.
+- `B3` continues to **block MR-write and global closure**. Nothing in this packet releases either.
+- `B3` does **not** prevent composition of already-accepted bytes, for one reason only: the composition must not change or claim the `B3` surface. `_PreparedHTTPMutationResponses`, the handler `POST` arm, and the request-loop `finally` are carried through byte-identical to their accepted sources; the new observer test only **reads** them. A composition that altered that surface, or that claimed a phase index for it, would be outside this authorization.
+
+### Registered OPEN handles
+
+`git grep C14-LIVE` over `a972cde` returns nothing: these handles do not yet
+exist in-tree. The composition writer registers them as **OPEN** in
+`docs/development/code-review-issues/cfr-168.md`. Registration is bookkeeping for
+routed residuals, never a claim of repair.
+
+| Handle | Owns | State |
+|---|---|---|
+| `C14-LIVE-A1` | The inherited `RetryableCleanup` constructor/traceback cleanup debt — constructor unwinds that do not attach the cleanup error as `__cause__` in `_open` and `validate_sealed_commit`; the persistent-teardown `F6` non-recovery reproduced at 11,456 retained bytes; and all pre-effect cleanup owners. Also owns the one surviving `raise cleanup_error from run_error` in `run_server_verification`, pre-existing on both lineages. | OPEN |
+| `C14-LIVE-A2` | `B3`'s post-effect / response / wire contract, plus promoting `C14`/`B2` from a review artifact to a durable in-tree contract, plus the `shape-pending` state of `RetryableCleanup`. | OPEN |
+| `C14-SUCCESSOR-OWNER` | The production-unwired successor owners — `AccountedHTTPUploadAncestry`, `AccountedHTTPUploadSealedAncestry` — and the remaining global `C14` surfaces carried through untouched: `AccountedServerVerification`/`run_server_verification`, handler `POST` and request-loop `finally`, signature/server/ancestry owners outside the two wrappers, planner/stage/sealed factories, `F7` `_open` handle orphaning, `F9` `_control_charge_witness`, `O2` oracle insensitivity, and `O3` `except BaseException as retry_error: detach(retry_error)`. | OPEN |
+
+The `O1` evidence-authority observation from the Upload `ACCEPT` is discharged by
+citation, not by authoring a new authority: the writer adds a relative citation to
+the existing in-tree shared-primitives preflight at the `C14`/`B2` mentions in the
+two merged canonical source docs. The `C14-LIVE-A2` contract half stays OPEN.
+
+### MR-write and closure
+
+MR-write remains **blocked** until (a) the composed candidate is accepted by a
+fresh exact review and (b) the later required `C14` resolution lands. `B1` stays
+blocked for MR-write's own base; `B3` stays open against MR-write's post-effect
+window. No root row and no issue state changes: `docs/development/current-cycle-burn-down-plan.md`
+root row 6 (`CFR-168 + CFB-136 + CFB-138`) stays `Implement in progress`, and no
+`Close` is performed on any root, issue or cycle.
+
+## Scope
+
+### Writer base rule
+
+The writer's immutable **product** base is `a972cde890e0d621aaced6aca4b45835871da975`.
+
+This Plan/FREEZE commit is docs-only and touches no product path. The exact new
+base for the writer will be **this Plan/FREEZE commit** once it is
+manager-integrated onto `integration/cfr168-p0-canonical`. This packet
+deliberately does **not** embed that commit's own SHA: a file cannot contain the
+hash of the commit that adds it without self-reference. The identity is instead
+bound structurally and verifiably:
+
+1. If this Plan/FREEZE commit is **not yet** integrated, the writer starts from `a972cde` exactly.
+2. If it **is** integrated first — the preferred order — the writer starts from the integrated Plan/FREEZE commit and must prove `git rev-parse HEAD^` equals that commit and that the commit's own parent is `a972cde`.
+3. Either way the writer must prove that **every product and composition-target blob is identical to its `a972cde` value** before writing: `codefire` `61214a21fd866efc0d9a8888dfbfc8e707039d48` mode `100755`; `tests/test_codefire_cli.py` `10317e13deb531d04b9df44e756d7b8659b31c82`; `docs/development/source-architecture.md` `0fe3dc8470ee2a477afae7fb874fe645071908e2`; `docs/development/command-source-trace.md` `5feeaff7784cea83ad5db9205ddc648fe89703f6`; `docs/development/change-playbook.md` `12d7fc6ab41177454a3f8c2b3cb0ee156055f83f`; `docs/development/source-data-model-catalog.md` `77623025f184a89a87cbcfb6447fb082edc77733`; `docs/development/code-review-issues/cfr-168.md` `3d9a4df9c19eff20a0d38bef4ff2c6a75a919bb8`; and the four new test modules plus the seven evidence paths still absent.
+4. Any mismatch is a hard abort with no edit, and returns the base question to the manager.
+
+Exactly one writer, one clean additive commit, then a fresh report-only review by
+a separate lane, session and worktree. The writer must not create the review
+file; the reviewer must not write any writer path and must not create the freeze
+commit.
+
+### Writer write set — exactly 19 paths
+
+| # | Path | Operation |
+|---:|---|---|
+| 1 | `codefire` | three-way semantic union, mode preserved `100755` |
+| 2 | `tests/test_codefire_cli.py` | clean apply from `b164046` (base-equal path) |
+| 3 | `tests/test_python_http_doctor_decision_work.py` | `ADD` from `b164046` |
+| 4 | `tests/test_python_http_branch_decision_work.py` | `ADD` from `b164046` |
+| 5 | `tests/test_python_http_mr_list_decision_work.py` | `ADD` from `b164046` |
+| 6 | `tests/test_python_http_upload_accounted_traversal.py` | `ADD` from `0f43415`, duplicate omitted, newest wins |
+| 7 | `docs/development/source-architecture.md` | three-way union + `O1` citation |
+| 8 | `docs/development/command-source-trace.md` | three-way union + `O1` citation |
+| 9 | `docs/development/change-playbook.md` | three-way union |
+| 10 | `docs/development/source-data-model-catalog.md` | three-way union |
+| 11 | `docs/development/ai/swarm-results/cfr168-python-http-upload-live-route-cleanup-rereview-claude-20260802/review.md` | `ADD` from `c54e5ce` |
+| 12 | `docs/development/ai/swarm-batches/cfr168-python-http-upload-live-route-cleanup-repair-20260802.md` | `ADD` from `0f43415` |
+| 13 | `docs/development/ai/swarm-batches/cfr168-python-http-upload-zero-residual-repair-20260730.md` | `ADD` from `0f43415` |
+| 14 | `docs/development/ai/swarm-batches/cfr168-python-http-upload-zero-residual-repair-20260730.json` | `ADD` from `0f43415` |
+| 15 | `docs/development/ai/swarm-results/cfr168-python-http-upload-high2-third-repair-20260731/result.md` | `ADD` from `0f43415` |
+| 16 | `docs/development/ai/swarm-results/cfr168-python-http-upload-zero-residual-review-closure-repair-20260731/result.md` | `ADD` from `0f43415` |
+| 17 | `docs/development/ai/swarm-results/cfr168-python-http-upload-zero-residual-review-closure-repair-20260731/result-2.md` | `ADD` from `0f43415` |
+| 18 | `docs/development/code-review-issues/cfr-168.md` | hand edit — register `C14-LIVE-A1`, `C14-LIVE-A2`, `C14-SUCCESSOR-OWNER` as OPEN |
+| 19 | `docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md` | `NEW` — writer's own result report |
+
+`docs/development/current-cycle-burn-down-plan.md` is **not** in the writer's
+write set. The bound preflight offered it as an optional 19th writer path and
+recommended deferring it to the manager; the manager accepts that recommendation
+and writes the burn-down line itself in the same commit that publishes this
+packet. Path 19 is the writer's result report instead.
+
+### Read set
+
+The bound preflight; this packet and its typed companion; the three accepted
+reports; the original shared-primitives preflight; `AGENTS.md`;
+`docs/development/current-cycle-burn-down-plan.md`;
+`docs/development/code-review-issues/cfr-168.md`; the four canonical source docs;
+and read-only `git show` / `git diff` over `701469f`, `b164046`, `cb13da0`,
+`0f43415`, `c54e5ce`, `5254e3d`, `16d0129`, `5790463`, `0703f71`, `fb891b0`,
+`a972cde`.
+
+### Disallowed paths
+
+Everything outside the 19 paths. Named explicitly because they are the live
+hazards:
+
+- the 5 canonical-newer management docs — `docs/development/README.md`, `docs/development/current-cycle-burn-down-plan.md`, `docs/development/history.md`, `docs/development/codefire-improvement-cycle.md`, `docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md` — must never be checked out from any candidate;
+- the AIA-046 Cargo/O1 governance surface — `docs/development/ai/source-keyed-cargo-gates.md`, `docs/development/tools/run_source_keyed_cargo_gate.py`, `docs/development/ai/task-packets/cfr168-source-keyed-cargo-canonical-port-20260731.md`, the three `aia-source-keyed-cargo-*` review reports, and closure-mode item 1;
+- `crates/`, `Cargo.toml`, `Cargo.lock`, `install.sh`, `pyproject.toml`, `setup.py`, `demo.sh`, `schemas/`, `adr/`, top-level `README.md`;
+- the 18 already-identical candidate docs, the superseded `…upload-third-repair-rereview-claude-20260731/review.md` `REQUEST_CHANGES` report, and the three stale open-audit artifacts — leave all untouched, delete none;
+- the original shared-primitives preflight — read-only, never edited;
+- any `.claude-second-agent`, `.claude-worktrees`, `.codex-second-agent`, `.fugu-*`, `.dev-swarm` path, and any agent state, log or worktree debris. The five canonical-newer management docs and agent state must not be imported under any circumstance.
+
+### Disallowed actions
+
+No `git cherry-pick` of any candidate range; no `git merge` of any candidate; no
+merge commit; no amend of an accepted candidate; no Cargo/Rust command; no
+`install.sh`; no dogfood; no network; no Docker; no `git reset --hard` and no
+`git checkout --` over user changes; no integration of the composed candidate; no
+`Close` on any root, issue or cycle; no edit to the original shared-primitives
+preflight; no self-review by the writer.
+
+## Exact semantic procedure
+
+Semantic apply throughout. Both candidate lineages carry management docs that
+would clobber the canonical governance and Cargo lineage, so no range may be
+cherry-picked.
+
+1. **Verify start state, abort on any mismatch.** `HEAD` per the writer base rule; `HEAD^{tree}`; `git rev-parse HEAD:codefire` = `61214a21fd866efc0d9a8888dfbfc8e707039d48`; `git status --porcelain` empty; all base-side blobs equal to their `a972cde` values; all `ADD` paths absent.
+2. **Product fast-forwards from `b164046`.** `b164046` supplies `codefire`, `tests/test_codefire_cli.py`, and the Doctor, Branch and MR-list decision-work tests. `701469f` is subsumed and is not replayed. The base blob is identical on `tests/test_codefire_cli.py`, so only ours changed it and the apply is clean.
+3. **Merge the Upload successor onto `codefire`.** Three-way `git merge-file -p --diff3` with ours `b164046:codefire` `f30575a697c1b525653c13738987ccdb5c0151ea`, base `cb13da0:codefire` `03966af23dd860c5235832320a8f1977ecd6495a`, theirs `0f43415:codefire` `b984c1e7e393af658a618c96270d33d39bf8eeaa`. Not `git apply` against the working tree: the working `codefire` is now ours and the delta's context is the base's. Expect exit 0, **zero** conflict markers, exactly additive line arithmetic, mode preserved `100755`, and target blob **`f5e0b6db7c15aeadd3025ae4f038e301a7634caf`**. Recompute with `git hash-object codefire` — note the bound preflight's `W2` pseudocode contains the typo `codefier`; use `codefire`.
+4. **Upload test module: newest wins, duplicate omitted.** Take `0f43415`'s 36-test module, blob `829836bc0411bf82030286e6f1b0e3d58e574e14`, **not** `b164046`'s 10-test duplicate `141dcbd4ee1f8727fbe146faef481cf746c8c73f`. Ours equals base on this path, so this is a clean fast-forward, not a merge.
+5. **Three-way union the four canonical source docs** with `cb13da0` as base, ours `b164046`, theirs `0f43415`. Expected merged blobs from the preflight, abbreviated — the writer must recompute and publish the full 40-character values: `docs/development/source-architecture.md` `d8d7aa9881b5…`; `docs/development/command-source-trace.md` `0a8d2a886c88…`; `docs/development/change-playbook.md` `9a3afd7dd932…`; `docs/development/source-data-model-catalog.md` `2b68347eaa35…`. Expect zero conflicts, zero heading collisions, zero duplicate headings. Preserve the Upload-side scoping sentence that bounds the synchronous drain guarantee to the two commit-source routes and to nothing else.
+6. **Add only the exact listed evidence files** — paths 11 to 17. Do not import the five canonical-newer management docs, any agent state, or any other candidate doc.
+7. **Hand-authored edits.** Add the `O1` relative citation to the existing in-tree shared-primitives preflight at the `C14`/`B2` mentions in paths 7 and 8. Register `C14-LIVE-A1`, `C14-LIVE-A2` and `C14-SUCCESSOR-OWNER` as OPEN in path 18. Write path 19 truthfully scoped: it must state that the candidate is composed-not-accepted, name every input SHA, name the omitted duplicate patch-id `9889888cedeba7344fb987ff5891cf728d9c7e36`, name the three OPEN handles, and say explicitly that it closes neither CFR-168, CFB-136, CFB-138, global `C14`, MR-write, integration, Install nor Dogfood.
+8. **Freeze.** One clean additive commit; `git rev-list --count <base>..HEAD` = 1; `--merges` = 0; `git diff --name-status <base>..HEAD` exactly the 19 paths; record candidate SHA, tree, `git diff --binary <base>..HEAD | sha256sum`, the six product blob ids, the four merged doc blob ids and both test counts; `git status --porcelain` empty.
+9. **Then, and only then, the fresh report-only review starts.**
+
+### Anti-false-closure rule
+
+No composition text may apply `Close`, `Closed`, `complete`, `zero-residual` or
+`ACCEPT` to CFR-168, CFB-136, CFB-138, global `C14`, MR-write or the cycle. Only
+two narrow claims are licensed by evidence: `HIGH-2` is closed on all three limbs
+**for candidate `0f43415`** per report SHA-256 `46e7c3e4…`; and the `B2` product
+contradiction between `b164046` and the shared-primitives preflight is
+**measured as eliminated on the composed tree**, which is a candidate-scoped
+measurement and not a repository-level resolution of `B2`.
+
+## Non-Goals
+
+- Resolving `B3`, or stating any phase index for the post-first-effect `PreparedResponse` window.
+- Releasing MR-write, or rebinding MR-write's rejected/frozen base — `B1` stays blocked there.
+- Declaring the original shared-primitives `BLOCK` to be `READY`, or editing that report.
+- Closing `B2` in the repository; `B2` closes only on a fresh exact `ACCEPT` of the composed candidate.
+- Integrating the composed candidate, or fast-forwarding canonical.
+- Any Cargo/Rust work, `install.sh`, packaging, dogfood, Docker or network activity.
+- Changing root row 6 off `Implement in progress`, or any issue state or `Close`.
+- Fixing the pre-existing `check_ai_development.py` default-timeout behaviour, the `run_server_verification` inversion, `O3`'s `BaseException` handling, `F6`/`F7`/`F9`, or any other routed residual.
+- Introducing any new product behaviour, refactor, rename or optimisation not present in an accepted source blob.
+- Authoring a new `C14`/`B2` authority document; the `O1` remediation is a citation only.
+
+## Invariants
+
+| ID | Statement | Falsification |
+|---|---|---|
+| `INV-BASE` | The composition's product base is `a972cde`, and if the Plan/FREEZE commit is integrated first the writer's `HEAD^` is that commit whose own parent is `a972cde`. | `git rev-parse HEAD^` / `HEAD^^` mismatch, or any base-side blob differing from its `a972cde` value. |
+| `INV-PATHS` | `git diff --name-status <base>..HEAD` is exactly the 19 paths, one commit, zero merges. | Any 20th path, any missing path, any merge commit. |
+| `INV-BLOBS` | The six product blobs and four merged doc blobs equal their recomputed expected values; `codefire` mode stays `100755`. | `git hash-object` or `git ls-tree` mismatch. |
+| `INV-DUP` | The initial-Upload patch appears exactly once in `codefire`, and `tests/test_python_http_upload_accounted_traversal.py` has 36 test methods — not 10 and not 46. | A doubled hunk, or a method count other than 36. |
+| `INV-B3` | The `B3` surface is byte-identical to its accepted source: `_PreparedHTTPMutationResponses`, the handler `POST` arm and the request-loop `finally` are unchanged and only read by tests. | Any diff on that surface, or any text claiming a post-effect phase index. |
+| `INV-INVERSION` | `grep -n 'raise cleanup_error from run_error' codefire` returns exactly one occurrence, inside `run_server_verification`, and zero inside `enforce_remote_commit_signature_policy_accounted`. | Two occurrences means the Upload delta was lost; zero means the routed residual was silently repaired. |
+| `INV-GOVERNANCE` | The AIA-046 Cargo/O1 governance surface and the five canonical-newer management docs are byte-identical to the base. | Any diff on those paths. |
+| `INV-NOCLOSE` | No writer artifact states `Close`, `Closed`, `complete`, `zero-residual` or `ACCEPT` about CFR-168, CFB-136, CFB-138, global `C14`, MR-write or the cycle; root row 6 stays `Implement in progress`. | Any such phrasing, or a changed root row. |
+| `INV-AUTHORITY` | The original shared-primitives preflight is unmodified and its verdict is still described as `BLOCK`. | A diff on that path, or any text calling it `READY`. |
+| `INV-STATUS` | This packet's authoritative status is `ready_for_bounded_composition`; the typed companion's `status: "ready"` is a schema encoding of exactly that and nothing broader. | Any artifact treating the packet as authorizing MR-write, integration or closure. |
+
+## Validation
+
+Run on the frozen composed candidate. Nothing may be reported as `PASS` unless it
+was executed; anything not run is recorded as **not run**, never as `PASS`.
+**Do not run any Cargo/Rust command.**
+
+### Identity and exactness
+
+| ID | Command | Expected |
+|---|---|---|
+| `I1` | `git rev-parse HEAD HEAD^{tree} HEAD^` | recorded; `HEAD^` per `INV-BASE` |
+| `I2` | `git rev-list --count <base>..HEAD` and `git rev-list --merges <base>..HEAD \| wc -l` | `1` and `0` |
+| `I3` | `git diff --name-status <base>..HEAD` | exactly the 19 paths |
+| `I4` | `git hash-object codefire` | `f5e0b6db7c15aeadd3025ae4f038e301a7634caf` |
+| `I5` | `git ls-tree HEAD -- codefire` | mode `100755` |
+| `I6` | `git hash-object` on the four merged source docs | full 40-character blobs, matching the preflight's `d8d7aa9881b5…`, `0a8d2a886c88…`, `9a3afd7dd932…`, `2b68347eaa35…` prefixes |
+| `I7` | `git hash-object tests/test_python_http_upload_accounted_traversal.py` | `829836bc0411bf82030286e6f1b0e3d58e574e14` |
+| `I8` | `git show 0703f71 \| git patch-id --stable` and `git diff 5254e3d cb13da0 \| git patch-id --stable` | both `9889888cedeba7344fb987ff5891cf728d9c7e36` |
+| `I9` | `git diff --binary <base>..HEAD \| sha256sum`; report digests recomputed | recorded; `46e7c3e4…` and `756bf200…` reconfirmed |
+| `I10` | AST proof on merged `codefire`: units changed by ours vs theirs, overlap, drift, qualified-name collisions, module-level union and evaluation order | 0 overlap, 0 non-identical accepted units, 0 drift, 0 collisions, merged equals the union |
+| `I11` | `grep -c '<<<<<<<\|>>>>>>>\|=======' codefire` and the four merged docs | `0` everywhere |
+| `I12` | `git diff --check` and `git status --porcelain` | clean and empty |
+
+### Focused Python
+
+| ID | Command | Expected |
+|---|---|---|
+| `V1` | `python3 -m py_compile codefire` and the five test modules | `PASS` |
+| `V2` | `python3 -m unittest tests.test_python_http_upload_accounted_traversal -v` | **36/36** |
+| `V3` | `python3 -m unittest tests.test_python_http_mr_list_decision_work -v` | **49/49** |
+| `V4` | `python3 -m unittest tests.test_python_http_doctor_decision_work tests.test_python_http_branch_decision_work -v` | **32/32** (19 + 13) |
+| `V5` | `python3 -m unittest tests.test_python_ancestry_owner tests.test_python_signature_owner tests.test_python_signature_terminal_freeze tests.test_python_sealed_production tests.test_python_external_production -v` | **59/59** adjacent, unchanged by composition |
+
+### Broad Python
+
+| ID | Command | Expected |
+|---|---|---|
+| `V6` | `python3 -m unittest discover -s tests -p 'test_python_*.py'` | **538/538** in 34 modules |
+| `V7` | `python3 -m unittest tests.test_codefire_cli -v` | **228/228** — mandatory composition-only gate; `b164046`'s copy has never run against the merged `codefire`. A `-k upload` subset is a pre-check, never a substitute |
+| `V8` | `python3 -m unittest discover -s tests -v` | **766/766** in 35 modules |
+| `V9` | `./demo.sh` | run if applicable per `AGENTS.md`; record the exact outcome, and record honestly and explicitly if it is not applicable or not run |
+
+### Checkers
+
+| ID | Command | Expected |
+|---|---|---|
+| `D1` | `python3 docs/development/tools/check_source_docs.py` | `PASS` |
+| `D2` | `python3 docs/development/tools/check_project_docs.py` | `PASS`; Markdown inventory grows from the canonical count by exactly the writer's Markdown additions |
+| `D3` | `python3 docs/development/tools/check_ai_contracts.py` | `PASS` |
+| `D4` | `python3 docs/development/tools/check_ai_acceleration_docs.py` | `PASS` |
+| `D5` | `python3 docs/development/tools/check_ai_development.py --timeout 180` | `PASS` 7/7. A larger timeout is permitted **only** with a recorded reason; the default `--timeout 60` is known to fail pre-existing on `tool_tests` timing and is not the writer's to fix |
+| `D6` | `git diff <base>..HEAD -- docs/development/ai/source-keyed-cargo-gates.md docs/development/tools/run_source_keyed_cargo_gate.py` | empty |
+| `D7` | `grep -n 'shared-primitives\|C14\|B2'` on paths 7 and 8 | every mention resolves to the in-tree authority path |
+
+### Non-vacuity and reversals
+
+| ID | Check | Expected |
+|---|---|---|
+| `R1` | The nine single-edit Upload reversals `r1`-`r6b` and `m2` named in the Upload `ACCEPT` | each fails at the boundary it names |
+| `R2` | Upload production accounting observer probe — `make_http_handler` into `handle_one_request` `finally`, read through `_decision_work_observer`, real socket `POST` with one real `close(2)` fault | `current = {}`, `open_permit_count = 0`, `terminal_reason = 'complete'`, 0 response bytes, 0 durable bytes; the pre-repair triple was 11,456 / 0 / `None` |
+| `R3` | `close(2)` call-count bound with 8 faults armed on both live routes | exactly 2 `close` calls on the faulting source, exactly 1 on every other |
+| `R4` | `C14` precedence by exception object identity, not type or message | primary decision is the outer exception; the first cleanup error attaches as `__cause__` |
+| `R5` | MR-list reversals from the `5c952a9a…` `ACCEPT` | each fails at its named boundary |
+| `R6` | Branch deadline reversal — revert the corrected `test_codefire_cli.py` expectation to the pre-fix `200 OK` / zero-poll form | fails, proving the corrected expectation is load-bearing |
+| `R7` | Composition-specific inversion census: `grep -n 'raise cleanup_error from run_error' codefire` | exactly 1, inside `run_server_verification` only; 0 in `enforce_remote_commit_signature_policy_accounted` |
+| `R8` | `grep -c '_drained_commit_source_cleanup_error' codefire` | `5`; both live call sites carry the drain helper intact |
+| `R9` | Three-run stability of the three new Upload live-route tests | 3 x 3/3, no port, PID or timing flake |
+
+### Not run, not to be claimed
+
+No Cargo/Rust (`cargo fmt`, `cargo clippy`, `cargo test`), no `install.sh`, no
+dogfood, no Docker, no network. `check_swarm_admission.py`,
+`check_review_terminalization.py` and `check_review_recurrence.py` require
+mandatory arguments and gate lane admission rather than this composition's
+content; do not run them blind.
+
+## Handoff
+
+### Writer required outputs
+
+1. One clean additive commit on the writer base, exactly the 19 paths, zero merges, clean tree.
+2. `docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md` recording: candidate SHA and tree; the writer base and its parent chain to `a972cde`; the 19-path name-status; `git diff --binary <base>..HEAD | sha256sum`; the six product blob ids and `codefire` mode; the four merged doc blob ids in full; the omitted duplicate patch-id; test counts `538` and `766` plus the focused counts; every checker result; every reversal result; every item not run, marked not run; and the three OPEN handles.
+3. Truthful scoping: composed candidate only; closes nothing; `B2` still OPEN pending fresh exact `ACCEPT`; `B3` OPEN and routed to `C14-LIVE-A2`; MR-write still blocked; root row 6 unchanged.
+4. Evidence digests are required, not optional.
+
+### Fresh review — report-only, exactly one path
+
+`docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md`
+
+A fresh agent, session and worktree, with no inherited implementer conversation,
+WIP or `/tmp` state, and its own scratch prefix. It must not call the candidate's
+own test helpers when reproducing oracles, must not write any writer path, and
+must not create the freeze commit.
+
+The reviewer must independently recompute, not accept from any handoff: the
+candidate and base identities and the parent chain; the six product blobs; the
+four doc union blobs in full; the duplicate stable patch-id
+`9889888cedeba7344fb987ff5891cf728d9c7e36`; the binary patch SHA-256s; the test
+counts `538` and `766` and every focused count; the reversals `R1`-`R9`; the
+inversion census; the AST disjointness; the `B1`/`B2`/`B3` state as adjudicated
+here; and the negative space — zero product divergence between `16d0129` and
+`a972cde`, the five canonical-newer management docs byte-identical, the 18
+already-identical docs unchanged, the Cargo/O1 governance surface untouched, no
+agent-state or worktree debris imported. It must confirm the duplicate is omitted
+exactly once, must reproduce rather than infer `R2`, `R3`, `R4` and `V7`, and must
+render an explicit scope verdict.
+
+Any `ACCEPT` must state that it is scoped to the immutable composed candidate
+only and does not close CFR-168, CFB-136, CFB-138, all of Upload, global `C14`,
+`B3`, MR-write, integration, Install, Dogfood or any predecessor-gated successor,
+and must not move root row 6 off `Implement in progress`. Any `Close`,
+`Closed`, `complete` or `zero-residual` phrasing applied to the root, the cycle or
+global `C14` is grounds for rejection. Two consecutive required-correction rounds
+on the same mechanism return that mechanism to Plan/Preflight.
+
+### Dependencies and ordering
+
+1. Manager integrates this Plan/FREEZE commit onto `integration/cfr168-p0-canonical` (preferred), or the writer starts from `a972cde`.
+2. One composition writer produces and freezes the candidate.
+3. One fresh exact review produces the single report.
+4. On `ACCEPT`: `B2` closes for the composed candidate; the manager may then consider integration as a separate decision.
+5. `C14-LIVE-A1` and `C14-LIVE-A2` are undertaken as their own bounded subjects afterwards. `B3` and `C14-LIVE-A2` gate MR-write. MR-write stays blocked until the composed `ACCEPT` and the later required `C14` resolution both land.

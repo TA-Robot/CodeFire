@@ -1,0 +1,485 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "cfr168-python-http-accepted-input-composition-20260802",
+  "status": "ready",
+  "objective": "Compose the accepted Python HTTP inputs - MR-list candidate b16404676639336f705feffd9af4857d4a1fcc69 (which strictly subsumes accepted Doctor/Branch candidate 701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714) plus the accepted Upload live-route cleanup successor delta cb13da0..0f4341561ce95935600bf1398b8a5fbdb206daba - onto the exact canonical base a972cde890e0d621aaced6aca4b45835871da975 as one clean additive commit inside a frozen 19-path write set, omitting the duplicate initial-Upload patch, then obtain one fresh exact report-only review of the frozen candidate. Authoritative packet status is ready_for_bounded_composition; the machine status field is constrained to the schema enum. Authorizes composition of already-accepted bytes only: no MR-write, no integration, no Close, no Install, no Dogfood, no Cargo/Rust, no new product behaviour.",
+  "base_revision": "a972cde890e0d621aaced6aca4b45835871da975",
+  "role": "manager",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 2,
+      "reversibility": 2,
+      "ambiguity": 2,
+      "invariant_density": 2,
+      "verification_cost": 2,
+      "downstream_multiplier": 2
+    },
+    "mandatory_ultra": [
+      "sealed_commit_or_branch_atomicity",
+      "security_auth_signature_or_remote_mutation",
+      "cross_subsystem_architecture",
+      "conflicting_sources_or_reviewers"
+    ],
+    "score": 12,
+    "selected_tier": "ultra",
+    "rationale": "One codefire dispatcher carries the request ledger/deadline, sealed-session and authority owners, response publication, cleanup precedence and reducer seams for every Python HTTP route. The composition performs a real three-way merge on that single file across two independently accepted lineages, omits a duplicated initial patch, and must leave the still-open B3 post-effect surface byte-identical. A frozen rejecting shared-primitives BLOCK and two accepted trees disagree about the same symbol, so manager conflict resolution is required and isolated reviews cannot validate it."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-3-store-object-commit-integrity",
+      "pack-4-remote-http-security",
+      "pack-5-project-management-docs"
+    ],
+    "additional_files": [
+      "docs/development/ai/task-packets/cfr168-python-http-accepted-input-composition-20260802.md",
+      "docs/development/ai/swarm-results/cfr168-python-composition-exact-preflight-claude-20260802/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-doctor-branch-composition-rereview-20260730/review.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-mr-list-final-publication-closure-rereview-claude-20260731/review.md",
+      "docs/development/current-cycle-burn-down-plan.md",
+      "docs/development/code-review-issues/cfr-168.md",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/change-playbook.md",
+      "docs/development/source-data-model-catalog.md",
+      "AGENTS.md"
+    ],
+    "evidence_refs": [
+      "packet-status:ready_for_bounded_composition",
+      "product-base:a972cde890e0d621aaced6aca4b45835871da975",
+      "product-base-tree:76a7342031f560a116916cfe978979674841c75f",
+      "product-base-parent:1a9e01d462ed39599a1d8cf0b864264cf0861d18",
+      "canonical-branch:integration/cfr168-p0-canonical",
+      "preflight-prospective-base:fb891b01f45e4d1963c48f06b827f8335150dace",
+      "preflight-prospective-base-tree:2dadc3088c14fb624fb30d8060eba7466297959a",
+      "base-divergence:fb891b0..a972cde=4-commits-0-merges-5-docs-paths-0-product-paths",
+      "preflight-capture-session:8434420d-dfbf-4ff4-b288-ee846dec92ba",
+      "preflight-capture-agent:cfr168_python_composition_exact_preflight_20260802",
+      "preflight-capture-timestamp:2026-08-02T15:42:10.597976+00:00",
+      "preflight-capture-is-error:false",
+      "preflight-transcript-sha256:b2d80ec5d94b363efcc31aa8ff757030958b6556b80bd8e877bfc4e92407e9c1",
+      "preflight-events-sha256:bdd9f401f5c7b891e6c9c949ad575317a875f9c98ff6ae8f78db857c189272f1",
+      "preflight-response-sha256:06308884e0de0c87828c5e8fe96c32f872864035e22ced74ad0576f6cf4caf29",
+      "preflight-body-sha256:6342030bf0686a741869f9701fe71935ffd858dfba2db28b2a9c24d8f6a1085f",
+      "preflight-body-bytes:63644",
+      "preflight-body-lines:662",
+      "input-doctor-branch:701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714",
+      "input-doctor-branch-tree:dd63dd560514aef08925cc8b1dbe815bafcceef4",
+      "input-doctor-branch-report-sha256:c7a1665fdf4a6e1104bbab18ec8051c048ace1d25e865952bbbcd35a06eb19c0",
+      "input-doctor-branch-subsumed-by:b16404676639336f705feffd9af4857d4a1fcc69",
+      "input-mr-list:b16404676639336f705feffd9af4857d4a1fcc69",
+      "input-mr-list-tree:36185e320338b67e1610d82fcc81cba310c36026",
+      "input-mr-list-report-sha256:5c952a9a5c162bfbb93522bb644fcba44ce32ddf3628501e6f94308899fe760e",
+      "input-upload:0f4341561ce95935600bf1398b8a5fbdb206daba",
+      "input-upload-tree:da356c2a041e57eea9192ab917f3a293239c60e7",
+      "input-upload-report-commit:c54e5ce4ab9e8f58f1db88ae59edceae96653058",
+      "input-upload-report-sha256:46e7c3e41ac1b132766657e445e017b392ce6a0b72eb46f909b13755fc8a9b3c",
+      "input-upload-replay-range:cb13da0..0f4341561ce95935600bf1398b8a5fbdb206daba",
+      "duplicate-kept:0703f71b9800ff19ce52d01bcd46c8eddb323df2-inside-b164046",
+      "duplicate-omitted-range:5254e3d..cb13da0",
+      "duplicate-stable-patch-id:9889888cedeba7344fb987ff5891cf728d9c7e36",
+      "duplicate-omitted-path-blob-equal:141dcbd4ee1f8727fbe146faef481cf746c8c73f",
+      "shared-primitives-authority:docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md",
+      "shared-primitives-authority-blob:ec2a264142c6625dadd4809d99cf18d3371e9847",
+      "shared-primitives-authority-sha256:ca1a1451bfc1b25ed1c54f1b012d4d0e508ef0a96f88401e61284c6d156a4441",
+      "shared-primitives-verdict:BLOCK-preserved-unchanged-not-READY",
+      "adjudication-B1:resolved-only-for-accepted-input-composition-writer-by-binding-base-a972cde-and-accepted-input-graph",
+      "adjudication-B1-mr-write:rejected-frozen-base-fcb2324145962e79d7c6ee173b9cf545733b957d-remains-blocked",
+      "adjudication-B2:released-only-as-composition-resolution-action-remains-OPEN-until-composed-candidate-fresh-exact-ACCEPT",
+      "adjudication-B2-owner:exact-composition-of-b164046-plus-cb13da0..0f43415-owns-the-product-contradiction",
+      "adjudication-B3:remains-OPEN-routes-to-C14-LIVE-A2-blocks-MR-write-and-global-closure-composition-must-not-change-or-claim-the-B3-surface",
+      "routed-open-handle:C14-LIVE-A1-retryablecleanup-constructor-traceback-and-pre-effect-owners",
+      "routed-open-handle:C14-LIVE-A2-post-effect-response-wire-and-C14-B2-contract-document",
+      "routed-open-handle:C14-SUCCESSOR-OWNER-production-unwired-and-remaining-global-C14-owners",
+      "mr-write:blocked-until-accepted-composition-and-later-required-C14-resolution",
+      "root-row-6:Implement in progress-unchanged",
+      "issue-close:none",
+      "expected-codefire-blob:f5e0b6db7c15aeadd3025ae4f038e301a7634caf",
+      "expected-codefire-mode:100755",
+      "expected-upload-test-blob:829836bc0411bf82030286e6f1b0e3d58e574e14",
+      "expected-doc-union-blob-prefixes:d8d7aa9881b5,0a8d2a886c88,9a3afd7dd932,2b68347eaa35",
+      "manager-post-integration-gate:check_ai_development.py --timeout 180 passed 7/7 in 53.188s on a972cde (integration lane measurement, not this lane and not the writer)",
+      "review-path:docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md",
+      "burn-down-edit-owner:manager-only-closure-mode-current-critical-path-item-2"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "docs/development/ai/task-packets/cfr168-python-http-accepted-input-composition-20260802.md",
+      "docs/development/ai/task-packets/json/cfr168-python-http-accepted-input-composition-20260802.json",
+      "docs/development/ai/swarm-results/cfr168-python-composition-exact-preflight-claude-20260802/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-doctor-branch-composition-rereview-20260730/review.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-mr-list-final-publication-closure-rereview-claude-20260731/review.md",
+      "docs/development/current-cycle-burn-down-plan.md",
+      "AGENTS.md"
+    ],
+    "write_set": [
+      "codefire",
+      "tests/test_codefire_cli.py",
+      "tests/test_python_http_doctor_decision_work.py",
+      "tests/test_python_http_branch_decision_work.py",
+      "tests/test_python_http_mr_list_decision_work.py",
+      "tests/test_python_http_upload_accounted_traversal.py",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/change-playbook.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-upload-live-route-cleanup-rereview-claude-20260802/review.md",
+      "docs/development/ai/swarm-batches/cfr168-python-http-upload-live-route-cleanup-repair-20260802.md",
+      "docs/development/ai/swarm-batches/cfr168-python-http-upload-zero-residual-repair-20260730.md",
+      "docs/development/ai/swarm-batches/cfr168-python-http-upload-zero-residual-repair-20260730.json",
+      "docs/development/ai/swarm-results/cfr168-python-http-upload-high2-third-repair-20260731/result.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-upload-zero-residual-review-closure-repair-20260731/result.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-upload-zero-residual-review-closure-repair-20260731/result-2.md",
+      "docs/development/code-review-issues/cfr-168.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md"
+    ],
+    "disallowed_paths": [
+      "docs/development/README.md",
+      "docs/development/current-cycle-burn-down-plan.md",
+      "docs/development/history.md",
+      "docs/development/codefire-improvement-cycle.md",
+      "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-upload-third-repair-rereview-claude-20260731/review.md",
+      "docs/development/ai/source-keyed-cargo-gates.md",
+      "docs/development/tools/run_source_keyed_cargo_gate.py",
+      "docs/development/ai/task-packets/cfr168-source-keyed-cargo-canonical-port-20260731.md",
+      "docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md",
+      "README.md",
+      "Cargo.toml",
+      "Cargo.lock",
+      "install.sh",
+      "demo.sh",
+      "pyproject.toml",
+      "setup.py",
+      "crates",
+      "schemas",
+      "adr",
+      ".claude-second-agent",
+      ".claude-worktrees",
+      ".codex-second-agent",
+      ".dev-swarm"
+    ],
+    "disallowed_actions": [
+      "git cherry-pick of any candidate range",
+      "git merge of any candidate, or any merge commit",
+      "amending any accepted candidate",
+      "checking out any of the five canonical-newer management docs from a candidate",
+      "importing agent state, logs or worktree debris",
+      "editing the original shared-primitives preflight or restating its BLOCK as READY",
+      "writing the fresh review report from the writer lane, or self-review",
+      "creating the freeze commit from the reviewer lane",
+      "any Cargo or Rust command",
+      "install.sh, packaging, dogfood, Docker or network activity",
+      "integrating the composed candidate or fast-forwarding canonical",
+      "Close or Closed or complete or zero-residual claims on CFR-168, CFB-136, CFB-138, global C14, MR-write or the cycle",
+      "moving root row 6 off Implement in progress",
+      "changing or claiming the B3 post-effect PreparedResponse surface",
+      "repairing the run_server_verification inversion, O3, F6, F7, F9 or any routed residual",
+      "changing the check_ai_development default timeout behaviour",
+      "deleting the superseded REQUEST_CHANGES report or the stale open-audit artifacts"
+    ]
+  },
+  "non_goals": [
+    "Resolving B3 or stating any phase index for the post-first-effect PreparedResponse window.",
+    "Releasing MR-write or rebinding MR-write's rejected/frozen base; B1 stays blocked there.",
+    "Declaring the original shared-primitives BLOCK to be READY, or editing that report.",
+    "Closing B2 in the repository; B2 closes only on a fresh exact ACCEPT of the composed candidate.",
+    "Integrating the composed candidate or fast-forwarding canonical.",
+    "Any Cargo/Rust work, install.sh, packaging, dogfood, Docker or network activity.",
+    "Changing root row 6 off Implement in progress, or any issue state or Close.",
+    "Fixing the pre-existing check_ai_development default-timeout behaviour, the run_server_verification inversion, O3 BaseException handling, F6, F7, F9 or any other routed residual.",
+    "Introducing any new product behaviour, refactor, rename or optimisation not present in an accepted source blob.",
+    "Authoring a new C14/B2 authority document; the O1 remediation is a citation to the existing in-tree preflight only.",
+    "Adding docs/development/current-cycle-burn-down-plan.md to the writer's write set; the manager owns that edit."
+  ],
+  "invariants": [
+    {
+      "id": "INV-BASE",
+      "statement": "The composition's immutable product base is a972cde890e0d621aaced6aca4b45835871da975; if the manager Plan/FREEZE commit is integrated first the writer's HEAD^ is that commit and its own parent is a972cde.",
+      "falsification_test": "git rev-parse HEAD^ and HEAD^^ mismatch, or any base-side product/target blob differing from its a972cde value."
+    },
+    {
+      "id": "INV-PATHS",
+      "statement": "git diff --name-status <base>..HEAD is exactly the 19 declared writer paths, in one commit with zero merges and a clean tree.",
+      "falsification_test": "Any additional path, any missing path, more than one commit, or any merge commit."
+    },
+    {
+      "id": "INV-BLOBS",
+      "statement": "codefire is blob f5e0b6db7c15aeadd3025ae4f038e301a7634caf at mode 100755, the upload traversal test is 829836bc0411bf82030286e6f1b0e3d58e574e14, and the four merged doc blobs match the recomputed expected values.",
+      "falsification_test": "git hash-object or git ls-tree mismatch on any of those paths."
+    },
+    {
+      "id": "INV-DUP",
+      "statement": "The initial-Upload patch appears exactly once in codefire and tests/test_python_http_upload_accounted_traversal.py has exactly 36 test methods.",
+      "falsification_test": "A doubled hunk in codefire, or a method count of 10, 46 or anything other than 36."
+    },
+    {
+      "id": "INV-B3",
+      "statement": "The B3 surface - _PreparedHTTPMutationResponses, the handler POST arm and the request-loop finally - is byte-identical to its accepted source and only read by tests.",
+      "falsification_test": "Any diff on that surface, or any composition text asserting a post-effect phase index."
+    },
+    {
+      "id": "INV-INVERSION",
+      "statement": "grep -n 'raise cleanup_error from run_error' codefire returns exactly one occurrence, inside run_server_verification, and zero inside enforce_remote_commit_signature_policy_accounted.",
+      "falsification_test": "Two occurrences means the Upload delta was lost; zero means a routed residual was silently repaired."
+    },
+    {
+      "id": "INV-GOVERNANCE",
+      "statement": "The AIA-046 Cargo/O1 governance surface and the five canonical-newer management docs are byte-identical to the base.",
+      "falsification_test": "git diff <base>..HEAD over those paths is non-empty."
+    },
+    {
+      "id": "INV-NOCLOSE",
+      "statement": "No writer artifact applies Close, Closed, complete, zero-residual or ACCEPT to CFR-168, CFB-136, CFB-138, global C14, MR-write or the cycle, and root row 6 stays Implement in progress.",
+      "falsification_test": "Any such phrasing in a writer artifact, or a changed root row."
+    },
+    {
+      "id": "INV-AUTHORITY",
+      "statement": "The original shared-primitives preflight is unmodified and is still described as BLOCK with B1, B2 and B3.",
+      "falsification_test": "A diff on that path, or any artifact calling that verdict READY or resolved."
+    },
+    {
+      "id": "INV-STATUS",
+      "statement": "The authoritative packet status is ready_for_bounded_composition; the machine status field value 'ready' is a task-packet.v1 schema encoding of exactly that and authorizes nothing broader.",
+      "falsification_test": "Any artifact treating this packet as authorizing MR-write, integration, Install, Dogfood or closure."
+    }
+  ],
+  "validation": [
+    {
+      "id": "I1",
+      "command": "git rev-parse HEAD HEAD^{tree} HEAD^",
+      "purpose": "Record candidate identity and prove the writer base rule; HEAD^ per INV-BASE.",
+      "required": true
+    },
+    {
+      "id": "I2",
+      "command": "git rev-list --count <base>..HEAD && git rev-list --merges <base>..HEAD | wc -l",
+      "purpose": "Prove one additive commit and zero merges; expect 1 and 0.",
+      "required": true
+    },
+    {
+      "id": "I3",
+      "command": "git diff --name-status <base>..HEAD",
+      "purpose": "Prove the write set is exactly the 19 declared paths with no extras.",
+      "required": true
+    },
+    {
+      "id": "I4",
+      "command": "git hash-object codefire",
+      "purpose": "Prove the merged codefire blob is f5e0b6db7c15aeadd3025ae4f038e301a7634caf.",
+      "required": true
+    },
+    {
+      "id": "I5",
+      "command": "git ls-tree HEAD -- codefire",
+      "purpose": "Prove the executable mode 100755 was preserved through the three-way merge.",
+      "required": true
+    },
+    {
+      "id": "I6",
+      "command": "git hash-object docs/development/source-architecture.md docs/development/command-source-trace.md docs/development/change-playbook.md docs/development/source-data-model-catalog.md",
+      "purpose": "Recompute the four doc union blobs in full and compare to the preflight prefixes d8d7aa9881b5, 0a8d2a886c88, 9a3afd7dd932, 2b68347eaa35.",
+      "required": true
+    },
+    {
+      "id": "I7",
+      "command": "git hash-object tests/test_python_http_upload_accounted_traversal.py",
+      "purpose": "Prove the 36-test successor blob 829836bc0411bf82030286e6f1b0e3d58e574e14 was taken, not the 10-test duplicate 141dcbd4ee1f8727fbe146faef481cf746c8c73f.",
+      "required": true
+    },
+    {
+      "id": "I8",
+      "command": "git show 0703f71 | git patch-id --stable && git diff 5254e3d cb13da0 | git patch-id --stable",
+      "purpose": "Reconfirm the duplicate stable patch-id 9889888cedeba7344fb987ff5891cf728d9c7e36 on both sides.",
+      "required": true
+    },
+    {
+      "id": "I9",
+      "command": "git diff --binary <base>..HEAD | sha256sum",
+      "purpose": "Record the exact composed patch digest and reconfirm the bound report digests 46e7c3e4 and 756bf200.",
+      "required": true
+    },
+    {
+      "id": "I10",
+      "command": "python3 - (AST proof over merged codefire: per-side changed units, overlap, drift, qualified-name collisions, module-level union and evaluation order)",
+      "purpose": "Prove each accepted change lands exactly once with zero collateral drift and zero name collisions.",
+      "required": true
+    },
+    {
+      "id": "I11",
+      "command": "grep -c '<<<<<<<\\|>>>>>>>\\|=======' codefire docs/development/source-architecture.md docs/development/command-source-trace.md docs/development/change-playbook.md docs/development/source-data-model-catalog.md",
+      "purpose": "Prove zero conflict markers survived any three-way merge; expect 0 everywhere.",
+      "required": true
+    },
+    {
+      "id": "I12",
+      "command": "git diff --check && git status --porcelain",
+      "purpose": "Prove no whitespace or conflict defects and a clean tree after the freeze.",
+      "required": true
+    },
+    {
+      "id": "V1",
+      "command": "python3 -m py_compile codefire tests/test_codefire_cli.py tests/test_python_http_doctor_decision_work.py tests/test_python_http_branch_decision_work.py tests/test_python_http_mr_list_decision_work.py tests/test_python_http_upload_accounted_traversal.py",
+      "purpose": "Compile the merged product and all five bound test modules.",
+      "required": true
+    },
+    {
+      "id": "V2",
+      "command": "python3 -m unittest tests.test_python_http_upload_accounted_traversal -v",
+      "purpose": "Focused Upload gate; expect 36/36.",
+      "required": true
+    },
+    {
+      "id": "V3",
+      "command": "python3 -m unittest tests.test_python_http_mr_list_decision_work -v",
+      "purpose": "Focused MR-list gate; expect 49/49.",
+      "required": true
+    },
+    {
+      "id": "V4",
+      "command": "python3 -m unittest tests.test_python_http_doctor_decision_work tests.test_python_http_branch_decision_work -v",
+      "purpose": "Focused Doctor+Branch gate; expect 32/32.",
+      "required": true
+    },
+    {
+      "id": "V5",
+      "command": "python3 -m unittest tests.test_python_ancestry_owner tests.test_python_signature_owner tests.test_python_signature_terminal_freeze tests.test_python_sealed_production tests.test_python_external_production -v",
+      "purpose": "Adjacent neighbour set unchanged by composition; expect 59/59.",
+      "required": true
+    },
+    {
+      "id": "V6",
+      "command": "python3 -m unittest discover -s tests -p 'test_python_*.py'",
+      "purpose": "Broad Python gate; expect 538/538 in 34 modules.",
+      "required": true
+    },
+    {
+      "id": "V7",
+      "command": "python3 -m unittest tests.test_codefire_cli -v",
+      "purpose": "Mandatory composition-only gate; expect 228/228. No accepted review has run b164046's CLI suite against the merged codefire.",
+      "required": true
+    },
+    {
+      "id": "V8",
+      "command": "python3 -m unittest discover -s tests -v",
+      "purpose": "Full discover gate; expect 766/766 in 35 modules.",
+      "required": true
+    },
+    {
+      "id": "V9",
+      "command": "./demo.sh",
+      "purpose": "AGENTS.md demo gate; run if applicable and record the exact outcome, or record honestly and explicitly that it is not applicable or not run.",
+      "required": false
+    },
+    {
+      "id": "D1",
+      "command": "python3 docs/development/tools/check_source_docs.py",
+      "purpose": "Canonical source-doc contract check.",
+      "required": true
+    },
+    {
+      "id": "D2",
+      "command": "python3 docs/development/tools/check_project_docs.py",
+      "purpose": "Project doc/link/ledger check; Markdown inventory grows by exactly the writer's Markdown additions.",
+      "required": true
+    },
+    {
+      "id": "D3",
+      "command": "python3 docs/development/tools/check_ai_contracts.py",
+      "purpose": "AI packet contract check.",
+      "required": true
+    },
+    {
+      "id": "D4",
+      "command": "python3 docs/development/tools/check_ai_acceleration_docs.py",
+      "purpose": "AI acceleration doc check.",
+      "required": true
+    },
+    {
+      "id": "D5",
+      "command": "python3 docs/development/tools/check_ai_development.py --timeout 180",
+      "purpose": "Aggregate development gate; expect 7/7. A larger timeout is permitted only with a recorded reason; the default 60s timeout fails pre-existing on tool_tests timing and is not the writer's to fix.",
+      "required": true
+    },
+    {
+      "id": "D6",
+      "command": "git diff <base>..HEAD -- docs/development/ai/source-keyed-cargo-gates.md docs/development/tools/run_source_keyed_cargo_gate.py",
+      "purpose": "Prove the AIA-046 Cargo/O1 governance surface is untouched; expect empty.",
+      "required": true
+    },
+    {
+      "id": "D7",
+      "command": "grep -n 'shared-primitives\\|C14\\|B2' docs/development/source-architecture.md docs/development/command-source-trace.md",
+      "purpose": "Prove the O1 citation resolves every C14/B2 mention to the in-tree authority path.",
+      "required": true
+    },
+    {
+      "id": "R1",
+      "command": "Upload ACCEPT single-edit reversals r1-r6b and m2",
+      "purpose": "Each must fail at the boundary it names; proves the Upload oracles are non-vacuous.",
+      "required": true
+    },
+    {
+      "id": "R2",
+      "command": "Upload production accounting observer probe: make_http_handler into handle_one_request finally via _decision_work_observer, real socket POST with one real close(2) fault",
+      "purpose": "Expect current={}, open_permit_count=0, terminal_reason='complete', 0 response bytes, 0 durable bytes; pre-repair triple was 11456/0/None.",
+      "required": true
+    },
+    {
+      "id": "R3",
+      "command": "close(2) call-count bound with 8 faults armed on both live routes",
+      "purpose": "Expect exactly 2 close calls on the faulting source and exactly 1 on every other source.",
+      "required": true
+    },
+    {
+      "id": "R4",
+      "command": "C14 precedence by exception object identity",
+      "purpose": "Primary decision is the outer exception; the first cleanup error attaches as __cause__.",
+      "required": true
+    },
+    {
+      "id": "R5",
+      "command": "MR-list reversals from the 5c952a9a ACCEPT",
+      "purpose": "Each must fail at its named boundary.",
+      "required": true
+    },
+    {
+      "id": "R6",
+      "command": "Branch deadline reversal: revert the corrected test_codefire_cli.py expectation to the pre-fix 200 OK / zero-poll form",
+      "purpose": "Must fail, proving the corrected expectation is load-bearing.",
+      "required": true
+    },
+    {
+      "id": "R7",
+      "command": "grep -n 'raise cleanup_error from run_error' codefire",
+      "purpose": "Composition-specific inversion census; expect exactly 1 occurrence inside run_server_verification and 0 inside enforce_remote_commit_signature_policy_accounted.",
+      "required": true
+    },
+    {
+      "id": "R8",
+      "command": "grep -c '_drained_commit_source_cleanup_error' codefire",
+      "purpose": "Expect 5; both live call sites carry the synchronous drain helper intact.",
+      "required": true
+    },
+    {
+      "id": "R9",
+      "command": "Three consecutive runs of the three new Upload live-route tests",
+      "purpose": "Expect 3x 3/3 with no port, PID or timing flake.",
+      "required": true
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "One clean additive commit on the writer base: exactly the 19 declared paths, one commit, zero merges, clean tree, codefire mode 100755 preserved.",
+      "docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md recording candidate SHA and tree, the writer base and its parent chain to a972cde, the 19-path name-status, the binary patch SHA-256, the six product blob ids, the four merged doc blob ids in full, the omitted duplicate patch-id 9889888cedeba7344fb987ff5891cf728d9c7e36, test counts 538 and 766 plus every focused count, every checker result, every reversal result, and every item not run marked explicitly not run.",
+      "Registration of C14-LIVE-A1, C14-LIVE-A2 and C14-SUCCESSOR-OWNER as OPEN in docs/development/code-review-issues/cfr-168.md, as bookkeeping and never as a repair claim.",
+      "Truthful scoping in every writer artifact: composed candidate only; closes nothing; B2 remains OPEN pending a fresh exact ACCEPT; B3 remains OPEN and routed to C14-LIVE-A2; MR-write remains blocked; root row 6 unchanged.",
+      "One fresh exact report-only review at docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md by a separate agent, session and worktree, recomputing identities, the six product blobs, the four doc union blobs, the stable patch-id, all test counts, all reversals, the B1/B2/B3 state, the negative space, and an explicit scope verdict."
+    ],
+    "evidence_digest_required": true
+  }
+}
