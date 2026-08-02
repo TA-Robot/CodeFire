@@ -329,6 +329,68 @@ beyond two seconds is an explicit clock discontinuity; never replace the
 monotonic duration with `date`, shell `time`, filesystem mtime, or provider
 wall timestamps.
 
+Cargo is the exception to the generic timed-gate entry point. A shared target
+root is not a cross-worktree provenance boundary, so every Cargo acceptance
+gate uses the source-keyed wrapper:
+
+```bash
+export RUSTUP_HOME=/home/devuser/.cache/codefire-rust-1.97/rustup
+export CARGO_HOME=/home/devuser/.cache/codefire-rust-1.97/cargo
+export RUSTUP_TOOLCHAIN=1.97.0-x86_64-unknown-linux-gnu
+export CARGO_TARGET_DIR=/workspace/.cache/cargo-target-shared
+export CARGO_BUILD_JOBS=2
+export RUST_TEST_THREADS=2
+export CARGO_INCREMENTAL=0
+
+/usr/bin/python3.10 -I -S \
+  docs/development/tools/run_source_keyed_cargo_gate.py \
+  --repo "$WORKTREE" \
+  --timeout 3600 \
+  --lock-timeout 21600 \
+  --log "$LOG" \
+  --result "$RESULT_JSON" \
+  -- cargo test --workspace --locked
+```
+
+The direct form assumes an already trusted, loader-scrubbed launcher. Use
+`build_source_bound_rust.py` for canonical release provenance; it supplies a
+positive launcher environment and holds the evidence lock through result/log
+verification and provenance fsync. `$LOG` and `$RESULT_JSON` must be distinct,
+new direct children of the fixed
+`/workspace/.cache/codefire-gate-evidence` root.
+
+Cargo trust is clean-only: dirty candidates remain `BLOCK` even with
+`--ephemeral`. A clean temporary candidate may choose ephemeral retention.
+The wrapper materializes exact HEAD Git blobs on separate inodes, copies the
+verified manifest into a namespace-private tmpfs at the original source path,
+and remounts that copy read-only; the live worktree and host snapshot are
+never the executed source tree.
+
+Persistent storage has no namespace-count cap. New persistent artifact keys
+are admitted only when the actually measured aggregate plus the
+4,005,875,000-byte reserve fits the 32 GiB budget. Every new namespace must
+leave 100 GiB free after the same reservation. Existing reuse is not a
+bypass: an already-over-budget aggregate or current free space below 100 GiB
+also blocks. A one-second live supervisor terminates on observed namespace,
+aggregate, or free-floor violation. Post-gate and post-control-write actual
+violations block and either clean the new key or retain an existing key with
+explicit evidence. The supervisor is not a hard filesystem quota or cgroup
+memory/PID limit; global Cargo serialization and the low-memory profile remain
+the primary OOM control.
+
+The full order is evidence-root lock, global execution lock, registry lock,
+artifact key lock, then release-provenance publication lock. The six-hour
+lock timeout allows waiting behind a healthy lane; it does not shorten the
+per-gate process timeout. Every focused `cargo test` must select exactly one
+`--lib`, `--bin`, or `--test` harness and report a non-ignored test in every
+observed harness. The analyzer admits at most 1,024 summaries, retains 128
+bounded records plus a digest, and the final JSON cannot exceed 1 MiB. This
+transcript check assumes reviewed/trusted test source; it is not a structured
+protocol against a test body that forges libtest-looking stdout. See
+[`source-keyed-cargo-gates.md`](source-keyed-cargo-gates.md) for source-key,
+crash-state recovery, final artifact publication, evidence, cleanup, and the
+explicit non-hermetic boundary.
+
 Reuse is allowed only when the task packet explicitly permits a deterministic
 focused gate and every key byte matches. Never reuse:
 

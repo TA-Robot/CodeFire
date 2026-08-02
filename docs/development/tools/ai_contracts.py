@@ -8,9 +8,13 @@ import fnmatch
 import json
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
+
+sys.dont_write_bytecode = True
+sys.pycache_prefix = "/dev/null"
 
 
 TASK_SCHEMA = "codefire.ai_task_packet.v1"
@@ -312,7 +316,12 @@ def repository_path_valid(value: Any) -> bool:
     return all(part not in ("", ".", "..") for part in path.parts)
 
 
-def read_repository_artifact(root: Path, path_ref: str) -> bytes:
+def read_repository_artifact(
+    root: Path,
+    path_ref: str,
+    *,
+    maximum_bytes: int = 1024 * 1024,
+) -> bytes:
     if not repository_path_valid(path_ref):
         raise ValueError(f"unsafe repository artifact path: {path_ref!r}")
     resolved_root = root.resolve()
@@ -328,6 +337,10 @@ def read_repository_artifact(root: Path, path_ref: str) -> bytes:
         raise ValueError(f"repository artifact is missing or outside the repository: {path_ref}") from exc
     if not artifact.is_file():
         raise ValueError(f"repository artifact is not a regular file: {path_ref}")
+    if artifact.stat().st_size > maximum_bytes:
+        raise ValueError(
+            f"repository artifact exceeds {maximum_bytes} bytes: {path_ref}"
+        )
     return artifact.read_bytes()
 
 
@@ -954,16 +967,94 @@ def validate_review_against_task(
                 )
                 continue
             if required_capability == "rust-source-bound-binary":
-                from build_source_bound_rust import validate_provenance_payload
+                from build_source_bound_rust import (
+                    CanonicalProvenanceChanged,
+                    GateEvidenceLockUnavailable,
+                    validate_locked_canonical_provenance,
+                )
 
-                expected_revision = resolved_head_revision or str(review.get("head_revision"))
-                for message in validate_provenance_payload(
-                    root,
-                    evidence_payload,
-                    expected_revision=expected_revision,
-                ):
+                destination_contract = evidence_payload.get(
+                    "provenance_destination_contract"
+                )
+                canonical_path = (
+                    destination_contract.get("relative_path")
+                    if isinstance(destination_contract, dict)
+                    else None
+                )
+                if canonical_path != evidence_path:
                     findings.append(
-                        Finding("error", "review-rust-provenance-invalid", evidence_path, message)
+                        Finding(
+                            "error",
+                            "review-rust-provenance-not-canonical",
+                            evidence_path,
+                            (
+                                "capability evidence must be read from its "
+                                f"bound canonical path {canonical_path!r}"
+                            ),
+                        )
+                    )
+                    continue
+                expected_revision = (
+                    resolved_head_revision
+                    or str(review.get("head_revision"))
+                )
+                try:
+                    _locked_payload, _identity, errors = (
+                        validate_locked_canonical_provenance(
+                            root,
+                            relative=Path(evidence_path),
+                            expected_revision=expected_revision,
+                            expected_sha256=evidence_digest,
+                            expected_bytes=len(raw_evidence),
+                        )
+                    )
+                except CanonicalProvenanceChanged as exc:
+                    findings.append(
+                        Finding(
+                            "error",
+                            (
+                                "review-rust-provenance-changed-"
+                                f"{exc.phase}"
+                            ),
+                            evidence_path,
+                            str(exc),
+                        )
+                    )
+                    continue
+                except GateEvidenceLockUnavailable as exc:
+                    findings.append(
+                        Finding(
+                            "error",
+                            "review-rust-provenance-lock-unavailable",
+                            evidence_path,
+                            str(exc),
+                        )
+                    )
+                    continue
+                except (
+                    FileNotFoundError,
+                    OSError,
+                    TimeoutError,
+                    UnicodeDecodeError,
+                    ValueError,
+                ) as exc:
+                    findings.append(
+                        Finding(
+                            "error",
+                            "review-rust-provenance-invalid",
+                            evidence_path,
+                            str(exc),
+                        )
+                    )
+                    continue
+                for message in errors:
+                    findings.append(
+                        Finding(
+                            "error",
+                            "review-rust-provenance-invalid",
+                            evidence_path,
+                            message,
+                        )
                     )
             else:
                 findings.append(

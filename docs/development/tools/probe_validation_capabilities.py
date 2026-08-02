@@ -9,11 +9,16 @@ import shutil
 import sys
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+sys.pycache_prefix = "/dev/null"
+
 from build_source_bound_rust import (
     BINARY_PATH,
+    CanonicalProvenanceChanged,
     DEFAULT_OUTPUT,
     git_head,
-    validate_provenance_payload,
+    source_paths,
+    validate_locked_canonical_provenance,
 )
 
 
@@ -35,29 +40,50 @@ def repository_root() -> Path:
 
 
 def newest_mtime(paths: list[Path]) -> float | None:
-    mtimes = [path.stat().st_mtime for path in paths if path.is_file()]
-    return max(mtimes) if mtimes else None
+    newest: float | None = None
+    for path in paths:
+        if path.is_file():
+            observed = path.stat().st_mtime
+            newest = (
+                observed if newest is None else max(newest, observed)
+            )
+    return newest
 
 
 def rust_binary_state(root: Path) -> dict[str, object]:
-    sources = list((root / "crates").rglob("*.rs"))
-    sources.extend([root / "Cargo.toml", root / "Cargo.lock"])
-    source_mtime = newest_mtime(sources)
+    try:
+        source_mtime = newest_mtime(source_paths(root))
+    except (
+        FileNotFoundError,
+        OSError,
+        TimeoutError,
+        UnicodeDecodeError,
+        ValueError,
+    ):
+        source_mtime = None
     provenance_path = root / DEFAULT_OUTPUT
     provenance_errors: list[str] = []
     provenance: dict[str, object] | None = None
-    if provenance_path.is_file():
+    provenance_present = provenance_path.exists() or provenance_path.is_symlink()
+    if provenance_present:
         try:
-            loaded = json.loads(provenance_path.read_text(encoding="utf-8"))
-            if not isinstance(loaded, dict):
-                raise ValueError("provenance root must be an object")
-            provenance = loaded
-            provenance_errors = validate_provenance_payload(
-                root,
-                provenance,
-                expected_revision=git_head(root),
+            loaded, _identity, provenance_errors = (
+                validate_locked_canonical_provenance(
+                    root,
+                    relative=DEFAULT_OUTPUT,
+                    expected_revision=git_head(root),
+                )
             )
-        except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+            provenance = loaded
+        except (
+            CanonicalProvenanceChanged,
+            FileNotFoundError,
+            json.JSONDecodeError,
+            OSError,
+            TimeoutError,
+            UnicodeDecodeError,
+            ValueError,
+        ) as exc:
             provenance_errors = [str(exc)]
     source_revision_bound = provenance is not None and not provenance_errors
     candidates = [root / BINARY_PATH, root / "target/debug/codefire-rs"]
@@ -80,7 +106,7 @@ def rust_binary_state(root: Path) -> dict[str, object]:
         "note": "source binding requires a valid clean-HEAD provenance artifact; mtime ordering is informational only",
         "provenance": {
             "path": DEFAULT_OUTPUT.as_posix(),
-            "present": provenance_path.is_file(),
+            "present": provenance_present,
             "valid": source_revision_bound,
             "base_revision": provenance.get("base_revision") if provenance else None,
             "errors": provenance_errors,

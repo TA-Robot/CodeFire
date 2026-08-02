@@ -192,6 +192,7 @@ Use this exact shared low-memory Rust profile for every Cargo command:
 ```bash
 export RUSTUP_HOME=/home/devuser/.cache/codefire-rust-1.97/rustup
 export CARGO_HOME=/home/devuser/.cache/codefire-rust-1.97/cargo
+export RUSTUP_TOOLCHAIN=1.97.0-x86_64-unknown-linux-gnu
 export PATH="$CARGO_HOME/bin:$PATH"
 export CARGO_TARGET_DIR=/workspace/.cache/cargo-target-shared
 export CARGO_BUILD_JOBS=2
@@ -199,9 +200,13 @@ export RUST_TEST_THREADS=2
 export CARGO_INCREMENTAL=0
 ```
 
-Do not create a worktree-local target or another Rustup/Cargo home. Serialize
-Cargo invocations and record exact commands/counts/durations/toolchain/target
-and log digests for:
+Do not invoke Cargo directly. Treat each Cargo command below as the logical
+argv after `--` to `run_source_keyed_cargo_gate.py`, using clean exact HEAD
+and dedicated external evidence paths as specified in
+[`source-keyed-cargo-gates.md`](../source-keyed-cargo-gates.md). Do not create
+a worktree-local target or another Rustup/Cargo home. The wrapper serializes
+Cargo invocations; record exact commands/counts/durations/toolchain/target and
+log digests for:
 
 1. identity, no-merge ancestry, commit list, path set, result digest,
    cumulative patch, and clean state;
