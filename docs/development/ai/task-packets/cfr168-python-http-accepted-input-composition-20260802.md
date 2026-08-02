@@ -28,24 +28,28 @@ Original shared-primitives authority, preserved unchanged: `docs/development/ai/
 > that `806f6c8` called `R1`-`R9` is now `X1`-`X9`. No reversal was dropped.
 >
 > **Correction 2 — canonical source-doc blob stages.** A manager pre-commit
-> audit of `a7e283e` found one hard contract contradiction. The four canonical
-> source docs pass through **two sequential stages**: the step-5 three-way union,
-> and the step-7 hand-authored `O1` citation, which by construction edits two of
-> those same four files. `a7e283e`'s single `I5` check nevertheless required the
+> audit of `a7e283e` found one hard contract contradiction. As of that audit the
+> four canonical source docs passed through **two sequential stages**: the step-5
+> three-way union, and the step-7 hand-authored `O1` citation, which by
+> construction edits two of those same four files. (Correction 3 below adds a
+> third stage; the current model is three stages, not two.) `a7e283e`'s single `I5` check nevertheless required the
 > **final** committed files to match all four **pre-citation** union blobs, which
 > is unsatisfiable for `docs/development/source-architecture.md` and
 > `docs/development/command-source-trace.md` and made `I5` ambiguous at best. This
-> successor correction separates the two stages, publishes both blob sets as full
-> 40-character values, and splits `I5` into `I5-UNION` and `I5-FINAL`.
+> successor correction separated those two stages, published both blob sets as
+> full 40-character values, and split `I5` into `I5-UNION` and `I5-FINAL`.
 >
-> Correction 2 changes **nothing else**: the 18 + 1 + 1 topology, the routed-
-> residual owner map, the `B1`/`B2`/`B3` adjudication, the accepted inputs, the
-> product behaviour, the scope, the read/write sets and every other invariant and
-> gate are carried through unchanged. `806f6c8` and `a7e283e` both remain
+> Correction 2 changed **nothing else at the time it landed**: the 18 + 1 + 1
+> topology, the routed-residual owner map, the `B1`/`B2`/`B3` adjudication, the
+> accepted inputs, the product behaviour, the scope, the read/write sets and every
+> other invariant and gate were carried through unchanged. That statement is
+> historical and describes Correction 2 only — Correction 3 below does change the
+> product behaviour, the write scope and the doc-stage count, and supersedes the
+> two-stage model with a three-stage one. `806f6c8` and `a7e283e` both remain
 > immutable history and neither is amended, rebased or reset. The published
 > composition preflight is also unchanged and remains valid **as historical
 > intermediate-union evidence** — its four blob prefixes are the step-5 union
-> stage, never the final committed candidate bytes. Because no commit can name
+> stage, never the bytes committed in `C`. Because no commit can name
 > itself, this correction carries no SHA of its own; it simply extends the
 > manager-integrated Plan/FREEZE chain, and the launch base `L` is the final
 > integrated docs-only `HEAD` that results.
@@ -517,7 +521,7 @@ cherry-picked.
 2. **Product fast-forwards from `b164046`.** `b164046` supplies `codefire`, `tests/test_codefire_cli.py`, and the Doctor, Branch and MR-list decision-work tests. `701469f` is subsumed and is not replayed. The base blob is identical on `tests/test_codefire_cli.py`, so only ours changed it and the apply is clean.
 3. **Merge the Upload successor onto `codefire`.** Three-way `git merge-file -p --diff3` with ours `b164046:codefire` `f30575a697c1b525653c13738987ccdb5c0151ea`, base `cb13da0:codefire` `03966af23dd860c5235832320a8f1977ecd6495a`, theirs `0f43415:codefire` `b984c1e7e393af658a618c96270d33d39bf8eeaa`. Not `git apply` against the working tree: the working `codefire` is now ours and the delta's context is the base's. Expect exit 0, **zero** conflict markers, exactly additive line arithmetic, mode preserved `100755`, and **pre-bridge** target blob **`f5e0b6db7c15aeadd3025ae4f038e301a7634caf`**. Recompute with `git hash-object codefire` — note the bound preflight's `W2` pseudocode contains the typo `codefier`; use `codefire`. This is the union value **before** the step-8 `C18` bridge; it is a required intermediate checkpoint and is *not* the blob committed in `C`.
 4. **Upload test module: newest wins, duplicate omitted.** Take `0f43415`'s 36-test module, **pre-bridge** blob `829836bc0411bf82030286e6f1b0e3d58e574e14`, **not** `b164046`'s 10-test duplicate `141dcbd4ee1f8727fbe146faef481cf746c8c73f`. Ours equals base on this path, so this is a clean fast-forward, not a merge. Step 8 then adds one oracle to this module, so `829836bc…` is a required intermediate checkpoint and is *not* the blob committed in `C`.
-5. **Stage one — three-way union the four canonical source docs**, with `cb13da0` as base, ours `b164046`, theirs `0f43415`. This is an **intermediate** stage: two of these four files are edited again in step 7, so these blobs are *not* the committed candidate bytes. Reconstruct them, in a scratch location or in the working tree before any hand edit, with `git merge-file -p --diff3 <ours> <base> <theirs>`, expecting exit 0 and zero conflict markers on each. The four **pre-citation union blobs**, in full:
+5. **Stage one — three-way union the four canonical source docs**, with `cb13da0` as base, ours `b164046`, theirs `0f43415`. This is an **intermediate** stage: paths 7 and 8 are edited again in step 7 and paths 7, 8 and 9 again in step 8, so for three of these four files these blobs are *not* the bytes committed in `C`. Only `docs/development/source-data-model-catalog.md` keeps its stage-one value all the way into `C`. Reconstruct them, in a scratch location or in the working tree before any hand edit, with `git merge-file -p --diff3 <ours> <base> <theirs>`, expecting exit 0 and zero conflict markers on each. The four **pre-citation union blobs**, in full:
 
    | Path | Pre-citation union blob (stage one) |
    |---|---|
@@ -528,7 +532,7 @@ cherry-picked.
 
    These are the values the bound preflight abbreviates as `d8d7aa9881b5…`, `0a8d2a886c88…`, `9a3afd7dd932…` and `2b68347eaa35…`; the preflight is correct and unchanged, and it describes **this stage only**. Expect zero conflicts, zero heading collisions, zero duplicate headings. Preserve the Upload-side scoping sentence that bounds the synchronous drain guarantee to the two commit-source routes and to nothing else.
 6. **Add only the exact listed evidence files** — aggregate paths 11 to 17. Do not import the five canonical-newer management docs, any agent state, or any other candidate doc.
-7. **Stage two — hand-authored edits inside `C`.** Add the `O1` **relative** citation to the existing in-tree shared-primitives preflight at the `C14`/`B2` mentions in paths 7 and 8 — a repo-relative link to `ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md`, resolving from `docs/development/`. This citation, and nothing else, is what moves paths 7 and 8 off their stage-one union blobs. Paths 9 and 10 carry no citation and are therefore **byte-identical to their stage-one union blobs** in the committed candidate. Register `C14-LIVE-A1`, `C14-LIVE-A2` and `C14-SUCCESSOR-OWNER` as OPEN in path 18, using the ownership map above verbatim in effect and implementing none of them.
+7. **Stage two — hand-authored edits inside `C`.** Add the `O1` **relative** citation to the existing in-tree shared-primitives preflight at the `C14`/`B2` mentions in paths 7 and 8 — a repo-relative link to `ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md`, resolving from `docs/development/`. This citation, and nothing else, is what moves paths 7 and 8 off their stage-one union blobs. Paths 9 and 10 carry no citation and are therefore **byte-identical to their stage-one union blobs at this stage-two checkpoint**. That is a statement about the checkpoint only: path 9 is edited again by the step-8 `C18` bridge, so **only path 10 is still at its stage-one value in the committed candidate**. Register `C14-LIVE-A1`, `C14-LIVE-A2` and `C14-SUCCESSOR-OWNER` as OPEN in path 18, using the ownership map above verbatim in effect and implementing none of them.
 
    The four **stage-two** blobs, after the citation and before the step-8 bridge:
 
@@ -548,7 +552,7 @@ cherry-picked.
    edit and reach their committed values at stage three.
 8. **Land the frozen `C18` bridge — stage three.** Implement exactly the resolution frozen in "The `C18` composition bridge", touching only aggregate paths 1, 6, 7, 8 and 9, and honouring every forbidden-implementation rule. Mark the standalone cleanup `OSError` at its owner in `_drained_commit_source_cleanup_error`; make `os_error_origin` exhaustive over filesystem, transport and the post-commit / commit-source-cleanup origin; make `classify_route_os_error` refuse the cleanup origin exactly as it refuses the transport origin; add the one new cross-input oracle to path 6; and state the third origin in paths 7, 8 and 9. Then recompute and publish the **stage-three final blobs** for `codefire` and for paths 6, 7, 8 and 9 — none of these is knowable in advance, so this packet freezes their *pre-bridge* inputs and the *delta contract*, not their final hashes. `docs/development/source-data-model-catalog.md` must still hash `2b68347eaa357f187f794c2a76992401743929eb`, and `tests/test_python_http_mr_list_decision_work.py` must still equal its accepted-source blob. Prove the bridge delta on `codefire` is confined to the named taxonomy symbols and their two call sites, with no other unit changed.
 9. **Freeze `C`.** One clean additive commit containing exactly aggregate paths 1-18 and nothing else: `git rev-list --count L..C` = 1; `git rev-list --merges L..C | wc -l` = 0; `git diff --name-status L..C` exactly the 18 paths; `git status --porcelain` empty. `C` contains no reference to its own identity.
-10. **Commit `W` on top of `C`.** Exactly one `ADD` at aggregate path 19, recording `C`'s SHA, tree, `git diff --binary L..C | sha256sum`, the six product blob ids and `codefire` mode, **both** canonical source-doc blob stages in full — the four stage-one pre-citation union blobs, the four stage-two post-citation blobs, and the four stage-three committed blobs, with the deltas between each pair identified — the **pre-bridge and final** identities of `codefire` and of aggregate path 6, the omitted duplicate patch-id, the test counts, every gate and reversal result, and every item not run marked not run. `git diff --name-status C..W` is exactly that one path; `git diff C..W -- <the 18 candidate paths>` is empty. `W` must state truthfully that `C` is composed-not-accepted, that it closes neither CFR-168, CFB-136, CFB-138, global `C14`, `B3`, MR-write, integration, Install nor Dogfood, and that `C14-LIVE-A1`, `C14-LIVE-A2` and `C14-SUCCESSOR-OWNER` are registered OPEN and unimplemented.
+10. **Commit `W` on top of `C`.** Exactly one `ADD` at aggregate path 19, recording `C`'s SHA, tree, `git diff --binary L..C | sha256sum`, the six product blob ids and `codefire` mode, **all three** canonical source-doc blob stages in full — the four stage-one pre-citation union blobs, the four stage-two post-citation blobs, and the four stage-three committed blobs, with the deltas between each pair identified — the **pre-bridge and final** identities of `codefire` and of aggregate path 6, the omitted duplicate patch-id, the test counts, every gate and reversal result, and every item not run marked not run. `git diff --name-status C..W` is exactly that one path; `git diff C..W -- <the 18 candidate paths>` is empty. `W` must state truthfully that `C` is composed-not-accepted, that it closes neither CFR-168, CFB-136, CFB-138, global `C14`, `B3`, MR-write, integration, Install nor Dogfood, and that `C14-LIVE-A1`, `C14-LIVE-A2` and `C14-SUCCESSOR-OWNER` are registered OPEN and unimplemented.
 11. **Then, and only then, the fresh report-only review starts** and produces `R` on top of `W`.
 
 ### Anti-false-closure rule
@@ -590,7 +594,7 @@ no artifact may describe `C18` itself as closed repository-wide.
 - Implementing the §5.7 post-effect publication clause; the bridge adds the post-commit cleanup **origin** only, and the post-effect window stays `B3`/`C14-LIVE-A2`.
 - Closing `C18` repository-wide, or closing `B2` on the strength of the bridge before the fresh exact `ACCEPT` in `R`.
 - Authoring a new `C14`/`B2` authority document; the `O1` remediation is a citation only.
-- Treating the bound preflight's four abbreviated doc blobs as the final candidate bytes, or requiring the committed architecture and trace files to match their pre-citation union blobs; they are the stage-one intermediate values and the `O1` citation necessarily moves those two paths off them.
+- Treating the bound preflight's four abbreviated doc blobs as the bytes committed in `C`, or requiring the committed architecture, trace or playbook files to match their pre-citation union blobs; those are the stage-one intermediate values, the `O1` citation necessarily moves architecture and trace off them, and the `C18` bridge necessarily moves playbook off its one as well.
 - Dropping, deferring or relocating the `O1` citation in order to make the committed blobs equal the stage-one union blobs.
 - Amending, rebasing or reversing `806f6c8`; it stays immutable history.
 
@@ -652,7 +656,7 @@ recorded as **not run**, never as `PASS`. **Do not run any Cargo/Rust command.**
 | `I8` | `git diff --binary L..C \| sha256sum` | recorded in `W`; the bound report digests `46e7c3e4…` and `756bf200…` reconfirmed |
 | `I9` | AST proof on the **pre-bridge** merged `codefire`: units changed by ours vs theirs, overlap, drift, qualified-name collisions, module-level union and evaluation order | 0 overlap, 0 non-identical accepted units, 0 drift, 0 collisions, merged equals the union |
 | `I9-BRIDGE` | AST diff of `C`'s `codefire` against the pre-bridge checkpoint | the changed-unit set is exactly the frozen `C18` bridge: the cleanup-origin marker and predicate, `os_error_origin`, `classify_route_os_error`, and `_drained_commit_source_cleanup_error`. Zero other units changed, zero renames, zero qualified-name collisions, and no unit deleted |
-| `I10` | `grep -c '<<<<<<<\|>>>>>>>\|=======' codefire` and the four canonical source docs, at both the stage-one union reconstruction and the stage-two committed files | `0` everywhere, at both stages |
+| `I10` | `grep -c '<<<<<<<\|>>>>>>>\|=======' codefire` and the four canonical source docs, at all three stages: the stage-one union reconstruction, the stage-two `I5-CITED` checkpoint, and the stage-three files committed in `C` | `0` everywhere, at every one of the three stages |
 | `I11` | `git diff --check` and `git status --porcelain` at each of `C`, `W` and `R` | clean and empty at all three |
 
 ### Focused Python
@@ -731,7 +735,7 @@ content; do not run them blind.
 ### Writer result `W` — required outputs
 
 1. One clean additive commit whose parent is `C`, containing exactly one `ADD` of `docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md`, zero merges, clean tree, and no candidate byte changed.
-2. `W` records `C` exactly: SHA, tree, parent `L` and the chain from `L` back to `a972cde`; the 18-path `L..C` name-status; `git diff --binary L..C | sha256sum`; the six product blob ids and `codefire` mode; **both canonical source-doc blob stages in full** — the four stage-one pre-citation union blobs from `I5-UNION` and the four stage-two final candidate blobs from `I5-FINAL`, stated as two distinct sets, with the architecture and trace paths identified as the two that differ and their `O1`-citation-only delta shown, and the playbook and catalog paths identified as identical across both stages; the omitted duplicate patch-id `9889888cedeba7344fb987ff5891cf728d9c7e36`; the **pre-bridge and final** identities of `codefire` and of aggregate path 6, with the exact bridge delta and the `I9-BRIDGE` changed-unit set; test counts `539` and `767` plus every focused count; every `T`, `I`, `V`, `D` and `X` result including `X10`-`X13`; and every item not run marked explicitly not run.
+2. `W` records `C` exactly: SHA, tree, parent `L` and the chain from `L` back to `a972cde`; the 18-path `L..C` name-status; `git diff --binary L..C | sha256sum`; the six product blob ids and `codefire` mode; **all three canonical source-doc blob stages in full**, stated as three distinct sets — the four stage-one pre-citation union blobs from `I5-UNION`, the four stage-two post-citation blobs from `I5-CITED`, and the four stage-three blobs committed in `C` from `I5-FINAL` — with the delta between each pair identified: stage one to stage two changes architecture and trace by the `O1` citation only, stage two to stage three changes architecture, trace and playbook by the `C18` bridge truth only, and `docs/development/source-data-model-catalog.md` is unchanged across all three; the omitted duplicate patch-id `9889888cedeba7344fb987ff5891cf728d9c7e36`; the **pre-bridge and final** identities of `codefire` and of aggregate path 6, with the exact bridge delta and the `I9-BRIDGE` changed-unit set; test counts `539` and `767` plus every focused count; every `T`, `I`, `V`, `D` and `X` result including `X10`-`X13`; and every item not run marked explicitly not run.
 3. Truthful scoping: `C` is composed-not-accepted; it closes nothing; `C` is accepted-input composition **plus one preflight-prescribed `C18` bridge**, not a byte-only union, and `W` must say so plainly and cite `C18`, §5.7 and the §9.2 conflict-map row; the bridge resolves only the `C18` composition incompatibility and only on a fresh exact `ACCEPT`; `B2` remains OPEN pending that `ACCEPT`; `B3` remains OPEN and routed to `C14-LIVE-A2`; MR-write remains blocked; the three handles are registered OPEN and unimplemented; root row 6 unchanged.
 4. Evidence digests are required, not optional.
 
