@@ -1157,6 +1157,50 @@ def gate_evidence_root_contract(root: Path, raw: object) -> Path:
     return resolved
 
 
+def artifact_export_reread_errors(artifact_export: object) -> list[str]:
+    """Require the export's source re-read evidence, not merely carry it.
+
+    The gate publishes an export only after the staged bytes hash equal to
+    one complete re-read of the source, and records that pair. A result
+    that omits it either predates the control or was not produced by it; a
+    result that contradicts it is self-inconsistent. Either way the
+    torn-view guarantee is unproven, so every consumer that accepts
+    `artifact_export` evidence has to reject it here rather than treat the
+    fields as optional decoration.
+
+    This checks the recorded pair only. It is not an independent re-read,
+    and it inherits the narrow guarantee documented at the gate: equality
+    with one complete post-copy read, not proof the source was stable.
+    """
+    if not isinstance(artifact_export, dict):
+        return ["source-keyed artifact export evidence is missing"]
+    reread_bytes = artifact_export.get("source_reread_bytes")
+    reread_sha256 = artifact_export.get("source_reread_sha256")
+    exported_bytes = artifact_export.get("bytes")
+    exported_sha256 = artifact_export.get("sha256")
+    if (
+        not isinstance(reread_bytes, int)
+        or isinstance(reread_bytes, bool)
+        or not isinstance(reread_sha256, str)
+        or not isinstance(exported_bytes, int)
+        or isinstance(exported_bytes, bool)
+        or not isinstance(exported_sha256, str)
+    ):
+        return [
+            "source-keyed artifact export is missing source re-read "
+            "evidence"
+        ]
+    if (
+        reread_bytes != exported_bytes
+        or reread_sha256 != exported_sha256
+    ):
+        return [
+            "source-keyed artifact export source re-read evidence "
+            "differs from the exported bytes"
+        ]
+    return []
+
+
 def validate_source_keyed_gate_chain(
     root: Path,
     payload: dict[str, Any],
@@ -1445,6 +1489,7 @@ def validate_source_keyed_gate_chain(
         != artifact_export.get("target_artifact_path")
     ):
         errors.append("source-keyed artifact export evidence differs")
+    errors.extend(artifact_export_reread_errors(artifact_export))
     if binary is not None:
         for evidence_name, identity_name in (
             ("bytes", "bytes"),
@@ -3709,6 +3754,11 @@ def main() -> int:
             raise ValueError(
                 "source-keyed gate artifact export evidence is missing or mismatched"
             )
+        export_reread_errors = artifact_export_reread_errors(
+            artifact_export
+        )
+        if export_reread_errors:
+            raise ValueError("; ".join(export_reread_errors))
         binary_identity = bound_binary_identity(root, BINARY_PATH)
         for evidence_name, identity_name in (
             ("bytes", "bytes"),

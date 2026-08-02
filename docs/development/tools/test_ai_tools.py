@@ -6,6 +6,7 @@ import ast
 import errno
 import fcntl
 import hashlib
+import inspect
 import io
 import json
 import os
@@ -92,6 +93,7 @@ from build_source_bound_rust import (  # noqa: E402
     POLICY_OWNER_VALIDATION_PINNED_SYSTEM_FILE,
     SOURCE_GATE_PYTHON,
     acquire_gate_evidence_lock,
+    artifact_export_reread_errors,
     bound_binary_identity,
     build_source_manifest,
     prepare_gate_evidence_slot,
@@ -202,6 +204,7 @@ from run_dogfood_smoke import smoke_commands, validate_result  # noqa: E402
 from suggest_validation import parse_porcelain_paths, suggestions  # noqa: E402
 from validate_ai_runtime import strict_config_probe  # noqa: E402
 import run_source_keyed_cargo_gate as gate_module  # noqa: E402
+import build_source_bound_rust as build_module  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -1256,6 +1259,8 @@ class RustBuildProvenanceTests(unittest.TestCase):
                     "export_path": str(root / BINARY_PATH),
                     "bytes": binary_identity["bytes"],
                     "sha256": binary_identity["sha256"],
+                    "source_reread_bytes": binary_identity["bytes"],
+                    "source_reread_sha256": binary_identity["sha256"],
                     "export_device": binary_identity["device"],
                     "export_inode": binary_identity["inode"],
                     "export_mode": binary_identity["mode"],
@@ -1326,6 +1331,76 @@ class RustBuildProvenanceTests(unittest.TestCase):
                 ),
                 [],
             )
+
+            # The chain must require the export's source re-read pair, not
+            # accept a result that merely carries the fields. Republishing
+            # the gate result keeps the provenance digests honest, so the
+            # only thing these two cases change is the export evidence.
+            def republish(mutate) -> None:
+                mutated = copy.deepcopy(gate_result)
+                mutate(mutated["artifact_export"])
+                raw_result = (
+                    json.dumps(
+                        mutated,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                    + "\n"
+                ).encode()
+                result_path.chmod(0o600)
+                result_path.write_bytes(raw_result)
+                result_path.chmod(0o400)
+                provenance[
+                    "source_keyed_gate_result_bytes"
+                ] = len(raw_result)
+                provenance[
+                    "source_keyed_gate_result_sha256"
+                ] = hashlib.sha256(raw_result).hexdigest()
+
+            for label, mutate, expected in (
+                (
+                    "missing",
+                    lambda export: export.pop("source_reread_sha256"),
+                    "is missing source re-read evidence",
+                ),
+                (
+                    "mismatched",
+                    lambda export: export.update(
+                        {"source_reread_sha256": "0" * 64}
+                    ),
+                    "re-read evidence differs from the exported bytes",
+                ),
+                (
+                    "short",
+                    lambda export: export.update(
+                        {"source_reread_bytes": 1}
+                    ),
+                    "re-read evidence differs from the exported bytes",
+                ),
+            ):
+                with self.subTest(reread_evidence=label):
+                    republish(mutate)
+                    self.assertTrue(
+                        any(
+                            expected in error
+                            for error in validate_provenance_payload(
+                                root,
+                                provenance,
+                                expected_revision=head,
+                            )
+                        ),
+                        validate_provenance_payload(
+                            root, provenance, expected_revision=head
+                        ),
+                    )
+            republish(lambda export: None)
+            self.assertEqual(
+                validate_provenance_payload(
+                    root, provenance, expected_revision=head
+                ),
+                [],
+            )
+
             log.unlink()
             self.assertTrue(
                 any(
@@ -3224,6 +3299,96 @@ class OuterPolicyBindingTests(unittest.TestCase):
         }
         self.assertEqual(payload["identity_sha256"], sha256_json(without))
 
+class ArtifactExportRereadEvidenceTests(unittest.TestCase):
+    """The re-read pair is a requirement, not an optional field.
+
+    Carrying `source_reread_bytes`/`source_reread_sha256` through to the
+    provenance proves nothing on its own: a result that omits them was not
+    produced by the control, and one that contradicts them is
+    self-inconsistent. Both readings must be rejected wherever
+    `artifact_export` evidence is accepted.
+    """
+
+    def sound_export(self) -> dict[str, object]:
+        payload = b"source-keyed-binary"
+        return {
+            "decision": "EXPORTED",
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "source_reread_bytes": len(payload),
+            "source_reread_sha256": hashlib.sha256(payload).hexdigest(),
+        }
+
+    def test_matching_reread_evidence_is_accepted(self) -> None:
+        self.assertEqual(
+            artifact_export_reread_errors(self.sound_export()), []
+        )
+
+    def test_missing_reread_evidence_is_rejected(self) -> None:
+        for field in ("source_reread_bytes", "source_reread_sha256"):
+            with self.subTest(missing=field):
+                export = self.sound_export()
+                del export[field]
+                self.assertEqual(
+                    artifact_export_reread_errors(export),
+                    [
+                        "source-keyed artifact export is missing source "
+                        "re-read evidence"
+                    ],
+                )
+
+    def test_mistyped_reread_evidence_is_rejected(self) -> None:
+        # `True == 1` in Python, so a boolean byte count would satisfy a
+        # naive equality against a one-byte export. Reject the type.
+        for field, value in (
+            ("source_reread_bytes", "19"),
+            ("source_reread_bytes", True),
+            ("source_reread_bytes", 19.0),
+            ("source_reread_sha256", None),
+            ("source_reread_sha256", 0),
+            ("bytes", None),
+            ("sha256", None),
+        ):
+            with self.subTest(field=field, value=value):
+                export = self.sound_export()
+                export[field] = value
+                self.assertTrue(artifact_export_reread_errors(export))
+
+    def test_mismatched_reread_evidence_is_rejected(self) -> None:
+        expected = [
+            "source-keyed artifact export source re-read evidence "
+            "differs from the exported bytes"
+        ]
+        export = self.sound_export()
+        export["source_reread_bytes"] = int(export["bytes"]) + 1
+        self.assertEqual(artifact_export_reread_errors(export), expected)
+        export = self.sound_export()
+        export["source_reread_sha256"] = "0" * 64
+        self.assertEqual(artifact_export_reread_errors(export), expected)
+
+    def test_absent_export_object_is_rejected(self) -> None:
+        for absent in (None, [], "EXPORTED"):
+            with self.subTest(value=absent):
+                self.assertEqual(
+                    artifact_export_reread_errors(absent),
+                    ["source-keyed artifact export evidence is missing"],
+                )
+
+    def test_every_export_consumer_requires_the_pair(self) -> None:
+        # Both acceptance sites must call the shared requirement. Reading
+        # the source is the only way to see that the launcher's own inline
+        # acceptance -- which no unit test can reach without a real gate --
+        # did not keep treating the fields as decoration.
+        for function in (
+            build_module.validate_source_keyed_gate_chain,
+            build_module.main,
+        ):
+            with self.subTest(consumer=function.__name__):
+                self.assertIn(
+                    "artifact_export_reread_errors",
+                    inspect.getsource(function),
+                )
+
 
 class FrozenCtimeStat:
     """A stat result whose ctime never advances.
@@ -3361,6 +3526,40 @@ class SourceKeyedGateDocumentationTests(unittest.TestCase):
         )
         self.assertIn(
             "`source_reread_bytes` and `source_reread_sha256`", text
+        )
+
+    def test_reread_guarantee_is_stated_narrowly(self) -> None:
+        text = self.contract
+        # The re-read proves the published bytes equal one complete
+        # post-copy read. It does not detect every mutation before or
+        # during the copy, and a lock-free double read cannot claim writer
+        # exclusion. Both overclaims must stay out of the contract.
+        self.assertNotIn("cannot survive the comparison", text)
+        self.assertNotIn("cannot reach the staged bytes", text)
+        self.assertIn(
+            "What it does not establish is detection of every mutation "
+            "before or during the copy",
+            text,
+        )
+        self.assertIn(
+            "installs a complete, stable replacement early enough for "
+            "both reads to observe it identically passes",
+            text,
+        )
+        self.assertIn(
+            "Both reads are lock-free, so nothing here excludes a "
+            "concurrent writer or proves the source was quiescent",
+            text,
+        )
+        self.assertIn(
+            "torn-view exclusion, not as proof the source was stable", text
+        )
+        # And the consumer duty the pair creates must be written down.
+        self.assertIn(
+            "must require `source_reread_bytes` and "
+            "`source_reread_sha256` to equal the exported `bytes` and "
+            "`sha256` rather than merely carry them",
+            text,
         )
 
     def test_stdout_result_agreement_is_documented_as_byte_equality(
@@ -3899,6 +4098,91 @@ class ArtifactExportIdentityTests(unittest.TestCase):
                 raised.exception.detail,
             )
             self.assert_failed_closed(destination)
+
+    def test_complete_stable_replacement_is_published_undetected(
+        self,
+    ) -> None:
+        # The exact limit of the re-read, pinned so nobody can restore the
+        # claim that a mutation before or during the copy "cannot survive".
+        # A writer that installs a complete, stable replacement before the
+        # copy starts is observed identically by both reads, so the export
+        # succeeds -- and publishes the replacement, not what the source
+        # held when the gate began. This is characterisation, not approval:
+        # closing it needs writer exclusion, which a lock-free double read
+        # does not provide.
+        original = b"A" * self.TORN_PAYLOAD_BYTES
+        replacement = b"B" * self.TORN_PAYLOAD_BYTES
+        with tempfile.TemporaryDirectory() as raw:
+            temporary = Path(raw).resolve()
+            target, candidate, destination = self.make_scene(temporary)
+            artifact = self.write_artifact(target, original, links=2)
+            compiled = target / "release/deps" / self.COMPILED_NAME
+            observed = artifact.stat()
+            stamp = (observed.st_atime_ns, observed.st_mtime_ns)
+            witness = os.open(artifact, os.O_RDONLY)
+            try:
+                with self.frozen_ctime_fstat(observed.st_ino):
+                    before = self.stat_oracle(witness)
+                    with open(compiled, "r+b") as handle:
+                        handle.write(replacement)
+                    os.utime(compiled, ns=stamp)
+                    after = self.stat_oracle(witness)
+                    result = self.export(
+                        target, candidate, destination
+                    )
+            finally:
+                os.close(witness)
+            # Nothing in the stat tuple reports the replacement either.
+            self.assertEqual(before, after)
+            self.assertEqual(result["decision"], "EXPORTED")
+            # What was published is the replacement, and it is exactly the
+            # content one complete read of the source returns. That is the
+            # whole guarantee: no torn view, not a stable source.
+            self.assertEqual(destination.read_bytes(), replacement)
+            self.assertEqual(artifact.read_bytes(), replacement)
+            self.assertNotEqual(destination.read_bytes(), original)
+            self.assertEqual(
+                result["source_reread_sha256"],
+                hashlib.sha256(replacement).hexdigest(),
+            )
+
+    def test_published_bytes_equal_one_complete_source_read(
+        self,
+    ) -> None:
+        # The positive form of the same guarantee, over both the quiet case
+        # and the replaced case: whatever an accepted export publishes is
+        # byte-equal to a single complete read of the source, and to the
+        # digest the export recorded for it.
+        original = b"A" * self.TORN_PAYLOAD_BYTES
+        replacement = b"B" * self.TORN_PAYLOAD_BYTES
+        for label, replace_with in (
+            ("quiet", None),
+            ("replaced-before-copy", replacement),
+        ):
+            with self.subTest(source=label), tempfile.TemporaryDirectory() as raw:
+                temporary = Path(raw).resolve()
+                target, candidate, destination = self.make_scene(temporary)
+                artifact = self.write_artifact(target, original, links=2)
+                compiled = target / "release/deps" / self.COMPILED_NAME
+                observed = artifact.stat()
+                stamp = (observed.st_atime_ns, observed.st_mtime_ns)
+                with self.frozen_ctime_fstat(observed.st_ino):
+                    if replace_with is not None:
+                        with open(compiled, "r+b") as handle:
+                            handle.write(replace_with)
+                        os.utime(compiled, ns=stamp)
+                    result = self.export(
+                        target, candidate, destination
+                    )
+                published = destination.read_bytes()
+                self.assertEqual(published, artifact.read_bytes())
+                self.assertEqual(
+                    hashlib.sha256(published).hexdigest(),
+                    result["source_reread_sha256"],
+                )
+                self.assertEqual(
+                    len(published), result["source_reread_bytes"]
+                )
 
     def test_successful_export_records_a_matching_source_reread(
         self,

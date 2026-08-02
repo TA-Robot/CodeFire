@@ -365,11 +365,30 @@ hole, so the link bound is not what closes it. What closes it is content:
 after the copy the wrapper seeks the same pinned descriptor back to zero,
 re-reads and hashes the whole source under the same logical-byte bound and
 export deadline, takes a third `fstat`, and requires the re-read length and
-digest to equal the staged copy and all three stat identities to agree. A
-mutation landing after that read cannot reach the staged bytes; one landing
-before or during the copy cannot survive the comparison. Either way the
-result is `artifact-changed-during-export`, and the export records
-`source_reread_bytes` and `source_reread_sha256`. The published
+digest to equal the staged copy and all three stat identities to agree.
+
+Be exact about that guarantee, because the stronger reading is false. What
+it establishes is that the published bytes equal one complete re-read of
+the source the gate performed after the copy, with the before, after, and
+re-read stat identities agreeing: the export cannot publish a view it never
+read as a whole, so the torn file above is rejected as
+`artifact-changed-during-export` and the export records
+`source_reread_bytes` and `source_reread_sha256`.
+
+What it does not establish is detection of every mutation before or during
+the copy. A writer that installs a complete, stable replacement early
+enough for both reads to observe it identically passes, and the export then
+publishes that replacement rather than what the source held when the gate
+started. Both reads are lock-free, so nothing here excludes a concurrent
+writer or proves the source was quiescent; a writer that can time both
+reads, or write the staged sequence back before the re-read, is not
+excluded. Each of those needs the same-UID actor the boundary section
+already places outside this gate. Read the pair as torn-view exclusion, not
+as proof the source was stable. Consumers of the export evidence must
+require `source_reread_bytes` and `source_reread_sha256` to equal the
+exported `bytes` and `sha256` rather than merely carry them; both
+`validate_source_keyed_gate_chain` and the release launcher's own
+acceptance reject a result that omits or contradicts the pair. The published
 destination is separate and stays strictly single-link: it is created
 exclusively and no-follow, written by descriptor copy rather than by link,
 and a pre-existing destination that is non-regular, foreign-owned, or still

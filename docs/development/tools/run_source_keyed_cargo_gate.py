@@ -488,8 +488,8 @@ MAX_ARTIFACT_EXPORT_RESIDUE_ENTRIES = 16
 # ``<profile>/deps/<crate>-<metadata>`` to ``<profile>/<name>``, so the
 # requested export source normally carries exactly two links. Requiring a
 # single link blocks that normal release export while proving nothing:
-# what makes the copy trustworthy is the no-follow descriptor plus the
-# complete pre/post inode identity comparison below, neither of which
+# what the copy rests on is the no-follow descriptor, the pre/post inode
+# identity comparison, and the full-content re-read below, none of which
 # depends on the link count. Two is the bound the uplift needs; a third
 # link is an alias this gate never creates, so it stays a `BLOCK`. The
 # exported destination is unrelated and remains strictly single-link.
@@ -4591,11 +4591,30 @@ def export_bound_artifact(
         # not what closes it.
         #
         # Re-read the whole source through the same pinned descriptor and
-        # require it to hash to exactly what was staged. A mutation landing
-        # after this read cannot reach the staged bytes; one landing before
-        # or during the copy cannot survive the comparison. This is content
-        # equality, not a finer clock, so it does not depend on winning a
-        # timestamp tick.
+        # require it to hash to exactly what was staged. Be exact about
+        # what that establishes, because the tempting stronger reading is
+        # false.
+        #
+        # It establishes: the staged byte sequence equals one complete
+        # re-read of the source taken immediately after the copy, while
+        # the before, after, and re-read stat identities all agree. So the
+        # export cannot publish a view the gate never read as a whole --
+        # the torn A-prefix/B-suffix file above equals no single complete
+        # read. This is content equality, not a finer clock, so it does not
+        # depend on winning a timestamp tick.
+        #
+        # It does not establish that every mutation before or during the
+        # copy is detected. A writer that installs a complete, stable
+        # replacement early enough for both reads to observe it identically
+        # passes here, and the export then publishes that replacement
+        # rather than what the source held when the gate started. Both
+        # reads are also lock-free: nothing here excludes a concurrent
+        # writer or proves the source was quiescent, so a writer that can
+        # time both reads, or write the staged sequence back before the
+        # re-read, is not excluded either. Each of those needs the same-UID
+        # actor the contract's boundary section already places outside this
+        # gate; none of them is closed by this check, and no comment or
+        # contract statement may say otherwise.
         staged_sha256 = digest.hexdigest()
         os.lseek(source_descriptor, 0, os.SEEK_SET)
         reread_digest = hashlib.sha256()
