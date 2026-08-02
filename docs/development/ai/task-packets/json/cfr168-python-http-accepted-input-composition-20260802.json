@@ -2,7 +2,7 @@
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "cfr168-python-http-accepted-input-composition-20260802",
   "status": "ready",
-  "objective": "Compose the accepted Python HTTP inputs - MR-list candidate b16404676639336f705feffd9af4857d4a1fcc69 (which strictly subsumes accepted Doctor/Branch candidate 701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714) plus the accepted Upload live-route cleanup successor delta cb13da0..0f4341561ce95935600bf1398b8a5fbdb206daba - onto the manager-integrated Plan/FREEZE chain head L, as an exact three-commit linear chain: candidate C of exactly 18 paths whose parent is L, writer result W of exactly one result path whose parent is C, and reviewer report R of exactly one review path whose parent is W. The aggregate writer write set is 19 paths split 18 plus 1; it is NOT one commit and the result is NOT part of the candidate. C alone is the immutable review subject and must never contain or claim its own SHA. The immutable product base stays a972cde890e0d621aaced6aca4b45835871da975 at blob level, which is what base_revision encodes; the execution base is L, named by the manager launch prompt. Authoritative packet status is ready_for_bounded_composition; the machine status field is constrained to the schema enum. Authorizes composition of already-accepted bytes only: no MR-write, no integration of C, W or R, no Close, no Install, no Dogfood, no Cargo/Rust, no new product behaviour, and no implementation of the routed C14 handles.",
+  "objective": "Compose the accepted Python HTTP inputs - MR-list candidate b16404676639336f705feffd9af4857d4a1fcc69 (which strictly subsumes accepted Doctor/Branch candidate 701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714) plus the accepted Upload live-route cleanup successor delta cb13da0..0f4341561ce95935600bf1398b8a5fbdb206daba - onto the manager-integrated Plan/FREEZE chain head L, AND land exactly one preflight-prescribed C18 error-origin semantic bridge that the two accepted inputs require in order to coexist, as an exact three-commit linear chain: candidate C of exactly 18 paths whose parent is L, writer result W of exactly one result path whose parent is C, and reviewer report R of exactly one review path whose parent is W. The aggregate writer write set is 19 paths split 18 plus 1; it is NOT one commit and the result is NOT part of the candidate. C alone is the immutable review subject and must never contain or claim its own SHA. The immutable product base stays a972cde890e0d621aaced6aca4b45835871da975 at blob level, which is what base_revision encodes; the execution base is L, named by the manager launch prompt. Authoritative packet status is ready_for_bounded_composition; the machine status field is constrained to the schema enum. This is NOT a byte-only union: the error-origin taxonomy exists only in b164046 and the synchronous cleanup drain only in 0f43415, so their union is not closed under either input's accepted behaviour and a bounded semantic bridge is mandatory. Authorizes accepted-input composition plus that single frozen C18 bridge and nothing else: no MR-write, no integration of C, W or R, no Close, no Install, no Dogfood, no Cargo/Rust, no other new product behaviour, and no implementation of the routed C14 handles.",
   "base_revision": "a972cde890e0d621aaced6aca4b45835871da975",
   "role": "manager",
   "risk": {
@@ -119,7 +119,25 @@
       "preflight-doc-blob-scope:the bound preflight's abbreviated d8d7aa9881b5, 0a8d2a886c88, 9a3afd7dd932 and 2b68347eaa35 are the stage-one union values only; the preflight is unchanged and remains valid as historical intermediate-union evidence, and must never be read as the final candidate blobs",
       "blob-stage-correction:a manager pre-commit audit of a7e283e5eb5a9f54765c46f10057313a4e858f38 found that the single I5 check required the final committed files to match all four pre-citation union blobs, which is unsatisfiable for the two paths the O1 citation must edit; this successor correction separates the stages and splits I5 into I5-UNION and I5-FINAL, changing no other gate",
       "blob-stage-correction-scope:no change to the 18+1+1 topology, the routed-residual owner map, the B1/B2/B3 adjudication, the accepted inputs, product behaviour, scope, read/write sets or any other invariant or gate",
-      "plan-freeze-chain:806f6c8033905cd44e22bf12d42c62dba42c47a8 then the a7e283e5eb5a9f54765c46f10057313a4e858f38 topology correction then this successor blob-stage correction; each extends the chain, none replaces an earlier commit, and L is the final integrated docs-only HEAD whose SHA no Plan/FREEZE file may hard-code because a commit cannot name itself",
+      "plan-freeze-chain:806f6c8033905cd44e22bf12d42c62dba42c47a8 then the a7e283e5eb5a9f54765c46f10057313a4e858f38 topology correction then the blob-stage correction then this successor C18-bridge correction; each extends the chain, none replaces an earlier commit, and L is the final integrated docs-only HEAD whose SHA no Plan/FREEZE file may hard-code because a commit cannot name itself",
+      "c18-bridge-correction:a real focused gate on the staged composition ran python3 -m unittest tests.test_python_http_upload_accounted_traversal -v, 36 tests, and failed exactly the two subtests of test_request_loop_accounts_a_drained_cleanup_fault (route=ancestry, route=signature-history) with len(handler_errors)=0 expected 1; the accepted Upload candidate 0f43415 passes that same test",
+      "c18-incompatibility-proof:classify_route_os_error and os_error_origin exist only in b164046; _drained_commit_source_cleanup_error exists only in 0f43415; cb13da0 has neither; the composed tree is the first tree where both exist, so neither ACCEPT ever exercised the interaction and the union is NOT closed under the accepted behaviour of either input",
+      "c18-failure-mechanism:_drained_commit_source_cleanup_error returns the first one-shot close(2) OSError unmarked; both live call sites raise it standalone as 'raise cleanup_error from None'; do_POST's except BaseException arm calls classify_route_os_error, which returns None only for a non-OSError or a transport-marked OSError and otherwise marks filesystem; so the cleanup fault is consumed as a typed filesystem 400 instead of escaping after handle_one_request accounts the drained ledger",
+      "c18-authority-register:shared-primitives preflight C18 per-clause register around line 206 - one typed exhaustive error-origin taxonomy shared by GET and POST including post-commit cleanup, classified at the boundary that raised it, never by message text; marker frozen; absent from every tree except b164046",
+      "c18-authority-5.7:shared-primitives preflight section 5.7 ErrorOrigin around line 592 - adapt; reuse the accepted taxonomy os_error_origin, classify_route_os_error, route_filesystem_boundary, mark_transport_origin with no second route-local protocol, and add the post-commit cleanup origin",
+      "c18-authority-conflict-map:shared-primitives preflight section 9.2 conflict-map error-origin row around line 846 - reuse the accepted taxonomy; add only the post-commit cleanup origin; risk if unresolved is a second route-local taxonomy",
+      "c18-bridge-resolution:one shared taxonomy with three distinct origins - filesystem, transport, post-commit/commit-source-cleanup; the standalone cleanup OSError is marked at its owner inside _drained_commit_source_cleanup_error; classify_route_os_error refuses that origin exactly as it refuses transport, so the error reaches 'if authority is None: raise', escapes do_POST and escapes handle_one_request after the drained ledger is observed as current {}, open_permit_count 0, terminal_reason complete, zero response bytes and zero durable bytes",
+      "c18-bridge-preserved:generic unmarked route OSError including a patched handle_http_upload still becomes the accepted typed filesystem 400; transport-origin OSError still abandons the connection; MemoryError and other process-fatal conditions stay outside the OSError arm; route-raised ConnectionResetError/TimeoutError still publish the typed diagnostic because class alone proves nothing; C14 precedence keeps the operation decision outer with the cleanup error as __cause__",
+      "c18-bridge-forbidden:no second or route-local classifier; no message-text, errno-allowlist or exception-subclass heuristic; no disabling, bypassing or route-scoping of classify_route_os_error; no broad removal of filesystem classification; no marking the cleanup origin anywhere but the cleanup owner and never inferred from the exception chain, traceback or call stack",
+      "c18-bridge-write-scope:exactly 5 of the existing 18 candidate paths carry bridge bytes - codefire (1), tests/test_python_http_upload_accounted_traversal.py (6), docs/development/source-architecture.md (7), docs/development/command-source-trace.md (8), docs/development/change-playbook.md (9); no path is added to C and the topology stays 18+1+1",
+      "c18-bridge-not-edited:docs/development/source-data-model-catalog.md carries no error-origin content and stays 2b68347eaa357f187f794c2a76992401743929eb; tests/test_python_http_mr_list_decision_work.py stays byte-identical to its accepted source so test_dispatcher_publishes_every_route_filesystem_failure remains an unmodified control",
+      "c18-new-oracle-decision:one new direct cross-input oracle IS required and is added inside already-listed path 6, not as a new path; the two existing tests are each single-sided and a bridge that merely route-scoped the classifier for uploads would pass both; path 6 hosts it because it already owns the cleanup-origin producer and the real-socket one-shot close(2) harness, and this leaves the MR-list module untouched as a control",
+      "c18-new-oracle-contract:the oracle proves os_error_origin names the cleanup origin and is exhaustive over three origins; classify_route_os_error returns None for cleanup origin and a typed authority for an otherwise identical unmarked OSError; identity not message or type, via two OSErrors with the same errno, message and filename differing only by the production mark; and that a cleanup error carried as __cause__ does not change the outer exception's classification",
+      "test-count-effect:upload module 36 -> 37 methods; V2 37/37; V6 539/539 in 34 modules; V8 767/767 in 35 modules; V3 49/49, V4 32/32, V5 59/59 and V7 228/228 unchanged; all baselines counted on the staged composition (upload 36, mr-list 49, cli 228, python 538/34, all 766/35)",
+      "pre-bridge-checkpoints:codefire f5e0b6db7c15aeadd3025ae4f038e301a7634caf at mode 100755 and tests/test_python_http_upload_accounted_traversal.py 829836bc0411bf82030286e6f1b0e3d58e574e14 are PRE-BRIDGE intermediate checkpoints, not the blobs committed in C",
+      "doc-stage-three:the four canonical source docs now have three stages - union, +O1 citation, +C18 bridge truth; stage three is the committed value; source-architecture.md, command-source-trace.md and change-playbook.md reach writer-published stage-three hashes and source-data-model-catalog.md stays 2b68347eaa357f187f794c2a76992401743929eb across all three",
+      "c18-bridge-closes:on a fresh exact ACCEPT of C in R the bridge closes ONLY the C18 composition incompatibility between the two accepted inputs; it does not close B2 before review, B3, C14-LIVE-A1, C14-LIVE-A2, C14-SUCCESSOR-OWNER, the constructor-unwind or global C14 debt, MR-write, any root issue, the cycle, Install or Dogfood, and C18 is not closed repository-wide",
+      "c18-b3-surface:the bridge does not touch _PreparedHTTPMutationResponses, the handler POST arm or the request-loop finally; it changes classify_route_os_error's verdict for one origin, not the arm that consults it; the observable outcome for the standalone cleanup fault changes from a typed 400 to no response, which is the accepted Upload behaviour at 0f43415 restored, not a new post-effect rule, and no phase index is claimed",
       "manager-post-integration-gate:check_ai_development.py --timeout 180 passed 7/7 in 53.188s on a972cde (integration lane measurement, not this lane and not the writer)",
       "review-path:docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md",
       "reversal-family-rename:the reversal validation family published as R1-R9 in 806f6c8 is now X1-X9 so it cannot be confused with reviewer report commit R; none was dropped",
@@ -209,6 +227,12 @@
       "integrating C, W or R, or fast-forwarding canonical",
       "Close or Closed or complete or zero-residual claims on CFR-168, CFB-136, CFB-138, global C14, MR-write or the cycle",
       "moving root row 6 off Implement in progress",
+      "building a second or route-local error-origin classifier",
+      "deciding error origin by message text, errno allowlist/denylist or exception subclass instead of the boundary/owner marker",
+      "disabling, bypassing or route-scoping classify_route_os_error, or broadly removing filesystem classification",
+      "marking the commit-source cleanup origin anywhere other than the cleanup owner, or inferring it from the exception chain, traceback or call stack",
+      "any product change beyond the single frozen C18 bridge",
+      "editing tests/test_python_http_mr_list_decision_work.py or docs/development/source-data-model-catalog.md as part of the bridge",
       "changing or claiming the B3 post-effect PreparedResponse surface",
       "repairing the run_server_verification inversion, O3, F6, F7, F9 or any routed residual",
       "changing the check_ai_development default timeout behaviour",
@@ -229,7 +253,12 @@
     "Any Cargo/Rust work, install.sh, packaging, dogfood, Docker or network activity.",
     "Changing root row 6 off Implement in progress, or any issue state or Close.",
     "Fixing the pre-existing check_ai_development default-timeout behaviour, the run_server_verification inversion, O3 BaseException handling, F6, F7, F9 or any other routed residual.",
-    "Introducing any new product behaviour, refactor, rename or optimisation not present in an accepted source blob.",
+    "Introducing any new product behaviour, refactor, rename or optimisation beyond the single frozen C18 bridge; every other byte must come from an accepted source blob.",
+    "Treating the composition as a byte-only union, or requiring codefire, aggregate path 6, or aggregate paths 7-9 to equal their pre-bridge or accepted-source blobs in the committed candidate.",
+    "Building a second route-local error classifier, or deciding origin by message text, errno list or exception subclass.",
+    "Route-scoping or disabling classify_route_os_error, or broadly removing filesystem classification, to make the Upload oracle pass.",
+    "Implementing the section 5.7 post-effect publication clause; the bridge adds the post-commit cleanup origin only, and the post-effect window stays B3 / C14-LIVE-A2.",
+    "Closing C18 repository-wide, or closing B2 on the strength of the bridge before the fresh exact ACCEPT in R.",
     "Authoring a new C14/B2 authority document; the O1 remediation is a citation to the existing in-tree preflight only.",
     "Treating the bound preflight's four abbreviated doc blobs as the final candidate bytes, or requiring the committed source-architecture.md and command-source-trace.md to match their pre-citation union blobs; those are the stage-one intermediate values and the O1 citation necessarily moves those two paths off them.",
     "Dropping, deferring or relocating the O1 citation in order to make the committed blobs equal the stage-one union blobs.",
@@ -269,18 +298,28 @@
     },
     {
       "id": "INV-BLOBS",
-      "statement": "codefire is blob f5e0b6db7c15aeadd3025ae4f038e301a7634caf at mode 100755 and the upload traversal test is 829836bc0411bf82030286e6f1b0e3d58e574e14.",
-      "falsification_test": "git hash-object or git ls-tree mismatch on either path."
+      "statement": "PRE-BRIDGE, codefire is f5e0b6db7c15aeadd3025ae4f038e301a7634caf at mode 100755 and the upload traversal test is 829836bc0411bf82030286e6f1b0e3d58e574e14. IN C, both differ from those values by the frozen C18 bridge and nothing else, mode still 100755, and the writer publishes the final hashes it measured. tests/test_python_http_mr_list_decision_work.py is byte-identical to its accepted-source blob and docs/development/source-data-model-catalog.md is still 2b68347eaa357f187f794c2a76992401743929eb.",
+      "falsification_test": "A pre-bridge checkpoint that misses its value; a mode change; a committed codefire or path-6 blob whose delta from the checkpoint is not exactly the frozen bridge; any change to the MR-list module or the catalog; or any artifact asserting the committed blobs equal the pre-bridge values."
+    },
+    {
+      "id": "INV-C18-BRIDGE",
+      "statement": "C contains exactly one semantic bridge: one shared taxonomy with three origins - filesystem, transport, post-commit/commit-source-cleanup; the cleanup origin marked at the _drained_commit_source_cleanup_error owner; classify_route_os_error refusing that origin exactly as it refuses transport; and nothing else changed. Origin is decided by marker/boundary identity, never by message, errno or exception class. Generic unmarked route OSError still yields the typed filesystem 400, transport-origin OSError still abandons the connection, MemoryError stays outside the OSError arm, and C14 precedence over a cleanup cause is unchanged.",
+      "falsification_test": "A second or route-local classifier; a message, errno or subclass heuristic; classify_route_os_error disabled, bypassed or route-scoped; filesystem classification broadly removed; the cleanup mark applied anywhere but the cleanup owner or inferred from the exception chain; any codefire unit changed outside the named taxonomy symbols and their two call sites; or any product change beyond this bridge."
+    },
+    {
+      "id": "INV-C18-SCOPE",
+      "statement": "The C18 bridge closes only the C18 composition incompatibility between the two accepted inputs, and only on a fresh exact ACCEPT of candidate C in R.",
+      "falsification_test": "Any artifact using it to close B2 before review, or to close B3, C14-LIVE-A1, C14-LIVE-A2, C14-SUCCESSOR-OWNER, the constructor-unwind or global C14 debt, MR-write, a root issue, the cycle, Install or Dogfood, or calling C18 closed repository-wide."
     },
     {
       "id": "INV-DOC-STAGES",
-      "statement": "The four canonical source docs have exactly two stages. Stage one, the pre-citation three-way union reconstructed from cb13da0/b164046/0f43415, is source-architecture.md=d8d7aa9881b5f96bcfa13b78168403be9ae62512, command-source-trace.md=0a8d2a886c883a051fe8c0e74bf550da3821b977, change-playbook.md=9a3afd7dd932bd3db7f33909e3cda40fb867abfc, source-data-model-catalog.md=2b68347eaa357f187f794c2a76992401743929eb. Stage two, the final blobs committed in C, is source-architecture.md=5a1755ebd7e0eff8f55f92ae940557badb3ca567, command-source-trace.md=72953356fca0982596bbb81a939fd4e2f2584a75, change-playbook.md=9a3afd7dd932bd3db7f33909e3cda40fb867abfc, source-data-model-catalog.md=2b68347eaa357f187f794c2a76992401743929eb. source-architecture.md and command-source-trace.md differ between the stages only by the required relative O1 citation; change-playbook.md and source-data-model-catalog.md are identical across both stages.",
-      "falsification_test": "Any stage-one reconstruction that misses its union blob; any final blob in C other than the four stage-two values; a stage-one to stage-two delta on source-architecture.md or command-source-trace.md containing anything beyond the O1 citation and the reflow it forces; any change at all to change-playbook.md or source-data-model-catalog.md after stage one; or any artifact requiring the committed files to match the pre-citation union blobs."
+      "statement": "The four canonical source docs have exactly three stages. Stage one, the pre-citation three-way union reconstructed from cb13da0/b164046/0f43415, is source-architecture.md=d8d7aa9881b5f96bcfa13b78168403be9ae62512, command-source-trace.md=0a8d2a886c883a051fe8c0e74bf550da3821b977, change-playbook.md=9a3afd7dd932bd3db7f33909e3cda40fb867abfc, source-data-model-catalog.md=2b68347eaa357f187f794c2a76992401743929eb. Stage two, after the O1 citation, is source-architecture.md=5a1755ebd7e0eff8f55f92ae940557badb3ca567, command-source-trace.md=72953356fca0982596bbb81a939fd4e2f2584a75, change-playbook.md=9a3afd7dd932bd3db7f33909e3cda40fb867abfc, source-data-model-catalog.md=2b68347eaa357f187f794c2a76992401743929eb; the first two differ from stage one only by the required relative O1 citation. Stage three, the blobs committed in C, differs from stage two on source-architecture.md, command-source-trace.md and change-playbook.md only by the frozen C18 bridge truth, at writer-published hashes; source-data-model-catalog.md is unchanged across all three stages.",
+      "falsification_test": "Any stage-one reconstruction that misses its union blob; a stage-one to stage-two delta on source-architecture.md or command-source-trace.md beyond the O1 citation; any stage-two change to change-playbook.md or source-data-model-catalog.md; a stage-two to stage-three delta beyond the C18 bridge truth; any change to source-data-model-catalog.md at any stage; or any artifact requiring the committed files to equal the stage-one or stage-two values on the first three paths."
     },
     {
       "id": "INV-DUP",
-      "statement": "The initial-Upload patch appears exactly once in codefire and tests/test_python_http_upload_accounted_traversal.py has exactly 36 test methods.",
-      "falsification_test": "A doubled hunk in codefire, or a method count of 10, 46 or anything other than 36."
+      "statement": "The initial-Upload patch appears exactly once in codefire, and tests/test_python_http_upload_accounted_traversal.py has exactly 37 test methods in C: the 36 accepted methods unchanged plus exactly one new C18 oracle.",
+      "falsification_test": "A doubled hunk in codefire; a method count other than 37 in C or other than 36 before the bridge; or any edit to one of the 36 accepted methods."
     },
     {
       "id": "INV-B3",
@@ -380,8 +419,8 @@
     },
     {
       "id": "I3",
-      "command": "git hash-object codefire",
-      "purpose": "Prove the merged codefire blob is f5e0b6db7c15aeadd3025ae4f038e301a7634caf.",
+      "command": "git hash-object codefire at the pre-bridge checkpoint and again in C",
+      "purpose": "Pre-bridge codefire must be exactly f5e0b6db7c15aeadd3025ae4f038e301a7634caf; in C it is a different, writer-published value whose delta from that checkpoint is exactly the frozen C18 bridge.",
       "required": true
     },
     {
@@ -397,15 +436,21 @@
       "required": true
     },
     {
+      "id": "I5-CITED",
+      "command": "git hash-object the four canonical source docs after the O1 citation and before the step-8 bridge; diff against each I5-UNION scratch file",
+      "purpose": "Prove the stage-two checkpoint is exactly source-architecture.md=5a1755ebd7e0eff8f55f92ae940557badb3ca567, command-source-trace.md=72953356fca0982596bbb81a939fd4e2f2584a75, change-playbook.md=9a3afd7dd932bd3db7f33909e3cda40fb867abfc, source-data-model-catalog.md=2b68347eaa357f187f794c2a76992401743929eb; the playbook and catalog diffs are empty and the architecture and trace diffs contain only the required relative O1 citation and the reflow it forces.",
+      "required": true
+    },
+    {
       "id": "I5-FINAL",
-      "command": "git hash-object docs/development/source-architecture.md docs/development/command-source-trace.md docs/development/change-playbook.md docs/development/source-data-model-catalog.md ; diff each I5-UNION scratch file against its committed counterpart",
-      "purpose": "Prove the stage-two final candidate blobs are exactly source-architecture.md=5a1755ebd7e0eff8f55f92ae940557badb3ca567, command-source-trace.md=72953356fca0982596bbb81a939fd4e2f2584a75, change-playbook.md=9a3afd7dd932bd3db7f33909e3cda40fb867abfc, source-data-model-catalog.md=2b68347eaa357f187f794c2a76992401743929eb; the playbook and catalog diffs are empty and the architecture and trace diffs contain only the required relative O1 citation and the reflow it forces.",
+      "command": "git hash-object the four canonical source docs as committed in C; diff each against its I5-CITED value",
+      "purpose": "source-data-model-catalog.md must still be 2b68347eaa357f187f794c2a76992401743929eb with an empty diff; source-architecture.md, command-source-trace.md and change-playbook.md are at writer-published stage-three values whose diffs contain only the frozen C18 bridge truth. No stage-one or stage-two value may be asserted as the committed value for those three paths.",
       "required": true
     },
     {
       "id": "I6",
-      "command": "git hash-object tests/test_python_http_upload_accounted_traversal.py",
-      "purpose": "Prove the 36-test successor blob 829836bc0411bf82030286e6f1b0e3d58e574e14 was taken, not the 10-test duplicate 141dcbd4ee1f8727fbe146faef481cf746c8c73f.",
+      "command": "git hash-object tests/test_python_http_upload_accounted_traversal.py at the pre-bridge checkpoint and again in C; git hash-object tests/test_python_http_mr_list_decision_work.py in C",
+      "purpose": "Pre-bridge the upload module is exactly 829836bc0411bf82030286e6f1b0e3d58e574e14, not the 10-test duplicate 141dcbd4ee1f8727fbe146faef481cf746c8c73f; in C it is a writer-published value differing only by the one new C18 oracle; the MR-list module stays byte-identical to its accepted source.",
       "required": true
     },
     {
@@ -423,7 +468,13 @@
     {
       "id": "I9",
       "command": "python3 - (AST proof over merged codefire: per-side changed units, overlap, drift, qualified-name collisions, module-level union and evaluation order)",
-      "purpose": "Prove each accepted change lands exactly once with zero collateral drift and zero name collisions.",
+      "purpose": "Prove each accepted change lands exactly once with zero collateral drift and zero name collisions, on the PRE-BRIDGE merged codefire.",
+      "required": true
+    },
+    {
+      "id": "I9-BRIDGE",
+      "command": "AST diff of C's codefire against the pre-bridge checkpoint",
+      "purpose": "The changed-unit set must be exactly the frozen C18 bridge: the cleanup-origin marker and predicate, os_error_origin, classify_route_os_error and _drained_commit_source_cleanup_error. Zero other units changed, zero renames, zero qualified-name collisions, no unit deleted.",
       "required": true
     },
     {
@@ -447,13 +498,13 @@
     {
       "id": "V2",
       "command": "python3 -m unittest tests.test_python_http_upload_accounted_traversal -v",
-      "purpose": "Focused Upload gate; expect 36/36.",
+      "purpose": "Focused Upload gate; expect 37/37 - the 36 accepted methods plus the new C18 oracle. Both subtests of test_request_loop_accounts_a_drained_cleanup_fault must pass; on the pre-bridge tree they fail 0 != 1, which is the measured defect the bridge exists to fix.",
       "required": true
     },
     {
       "id": "V3",
       "command": "python3 -m unittest tests.test_python_http_mr_list_decision_work -v",
-      "purpose": "Focused MR-list gate; expect 49/49.",
+      "purpose": "Focused MR-list gate; expect 49/49 including test_dispatcher_publishes_every_route_filesystem_failure, measured passing at 49/49 on the pre-bridge composed tree, so any regression there is bridge-introduced.",
       "required": true
     },
     {
@@ -471,7 +522,7 @@
     {
       "id": "V6",
       "command": "python3 -m unittest discover -s tests -p 'test_python_*.py'",
-      "purpose": "Broad Python gate; expect 538/538 in 34 modules.",
+      "purpose": "Broad Python gate; expect 539/539 in 34 modules - 538 pre-bridge plus the one new oracle.",
       "required": true
     },
     {
@@ -483,7 +534,7 @@
     {
       "id": "V8",
       "command": "python3 -m unittest discover -s tests -v",
-      "purpose": "Full discover gate; expect 766/766 in 35 modules.",
+      "purpose": "Full discover gate; expect 767/767 in 35 modules - 766 pre-bridge plus the one new oracle.",
       "required": true
     },
     {
@@ -532,6 +583,12 @@
       "id": "D7",
       "command": "grep -n 'shared-primitives\\|C14\\|B2' docs/development/source-architecture.md docs/development/command-source-trace.md",
       "purpose": "Prove the O1 citation resolves every C14/B2 mention to the in-tree authority path.",
+      "required": true
+    },
+    {
+      "id": "D8",
+      "command": "grep -n for the origin taxonomy on docs/development/source-architecture.md docs/development/command-source-trace.md docs/development/change-playbook.md",
+      "purpose": "Each of the three docs must name all three origins - filesystem, transport, post-commit/commit-source cleanup - and none may still assert that only client transport failures abandon the connection, or that origin is decided by exception class.",
       "required": true
     },
     {
@@ -587,15 +644,39 @@
       "command": "Three consecutive runs of the three new Upload live-route tests",
       "purpose": "Expect 3x 3/3 with no port, PID or timing flake.",
       "required": true
+    },
+    {
+      "id": "X10",
+      "command": "Bridge non-vacuity: remove the cleanup-origin mark from _drained_commit_source_cleanup_error, changing nothing else",
+      "purpose": "test_request_loop_accounts_a_drained_cleanup_fault must fail on both routes with len(handler_errors) 0 != 1 - the exact measured pre-bridge defect. Must be performed and reverted, not inferred.",
+      "required": true
+    },
+    {
+      "id": "X11",
+      "command": "Bridge non-vacuity: restore classify_route_os_error to its accepted form so it absorbs the cleanup origin, leaving the mark in place",
+      "purpose": "The same Upload production oracle must fail on both routes, proving the refusal and not merely the mark is load-bearing. Must be performed and reverted.",
+      "required": true
+    },
+    {
+      "id": "X12",
+      "command": "Anti-overreach: make classify_route_os_error treat a generic unmarked OSError as cleanup origin",
+      "purpose": "test_dispatcher_publishes_every_route_filesystem_failure in tests.test_python_http_mr_list_decision_work must fail, including its patched handle_http_upload subtest, proving the bridge did not weaken filesystem classification. Must be performed and reverted.",
+      "required": true
+    },
+    {
+      "id": "X13",
+      "command": "Marker not message or type: replace the cleanup-origin marker check with an errno test, a message-substring test or an exception-subclass test",
+      "purpose": "The new C18 cross-input oracle must fail, because its two OSErrors share errno, message and filename and differ only by the production mark. Must be performed and reverted.",
+      "required": true
     }
   ],
   "handoff": {
     "required_outputs": [
-      "Candidate C: one clean additive commit whose parent is the manager-named launch base L, containing exactly the 18 candidate paths (aggregate 1-18), zero merges, clean tree, codefire mode 100755 preserved, no self-identity reference anywhere inside those paths, the O1 relative citation present in aggregate paths 7 and 8 with the four canonical source docs at their stage-two final blobs 5a1755ebd7e0eff8f55f92ae940557badb3ca567 / 72953356fca0982596bbb81a939fd4e2f2584a75 / 9a3afd7dd932bd3db7f33909e3cda40fb867abfc / 2b68347eaa357f187f794c2a76992401743929eb, and C14-LIVE-A1, C14-LIVE-A2 and C14-SUCCESSOR-OWNER registered OPEN under the single-owner map and implemented nowhere.",
+      "Candidate C: one clean additive commit whose parent is the manager-named launch base L, containing exactly the 18 candidate paths (aggregate 1-18), zero merges, clean tree, codefire mode 100755 preserved, no self-identity reference anywhere inside those paths, the O1 relative citation present in aggregate paths 7 and 8 with the stage-two checkpoints 5a1755ebd7e0eff8f55f92ae940557badb3ca567 / 72953356fca0982596bbb81a939fd4e2f2584a75 / 9a3afd7dd932bd3db7f33909e3cda40fb867abfc / 2b68347eaa357f187f794c2a76992401743929eb recorded before the bridge, the frozen C18 bridge present in aggregate paths 1, 6, 7, 8 and 9 and nowhere else with source-data-model-catalog.md still 2b68347eaa357f187f794c2a76992401743929eb and tests/test_python_http_mr_list_decision_work.py still byte-identical to its accepted source, and C14-LIVE-A1, C14-LIVE-A2 and C14-SUCCESSOR-OWNER registered OPEN under the single-owner map and implemented nowhere.",
       "Writer result W: one clean additive commit whose parent is C, containing exactly one ADD of docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md, zero merges, clean tree, and no candidate byte changed.",
-      "W records C exactly: SHA, tree, parent L and the chain from L back to a972cde; the 18-path L..C name-status; git diff --binary L..C | sha256sum; the six product blob ids and codefire mode; BOTH canonical source-doc blob stages in full as two distinct sets - the four stage-one pre-citation union blobs from I5-UNION and the four stage-two final candidate blobs from I5-FINAL - with source-architecture.md and command-source-trace.md identified as the two that differ and their O1-citation-only delta shown, and change-playbook.md and source-data-model-catalog.md identified as identical across both stages; the omitted duplicate patch-id 9889888cedeba7344fb987ff5891cf728d9c7e36; test counts 538 and 766 plus every focused count; every T, I, V, D and X result; and every item not run marked explicitly not run.",
-      "Truthful scoping in W: C is composed-not-accepted; it closes nothing; B2 remains OPEN pending a fresh exact ACCEPT of C; B3 remains OPEN and routed to C14-LIVE-A2; MR-write remains blocked; the three C14 handles are registered OPEN and unimplemented; root row 6 unchanged.",
-      "Reviewer report R: one report-only commit whose parent is W, adding exactly docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md and changing no candidate or result byte, produced by a fresh agent, session and worktree. The review subject is C; W is bound only as writer evidence; R records both C and W. The reviewer independently recomputes L, C and W identities and the chain to a972cde, the topology counts T1-T7, the six product blobs, both canonical source-doc blob stages - re-reconstructing the four stage-one pre-citation union blobs from cb13da0/b164046/0f43415 per I5-UNION and rechecking the four stage-two final blobs in C per I5-FINAL, confirming the architecture and trace deltas carry only the required relative O1 citation while the playbook and catalog are unchanged across stages - the stable patch-id, all test counts, the reversals X1-X9, the inversion census, the AST disjointness, the B1/B2/B3 state, the single-owner ownership map, and the negative space, and renders an explicit scope verdict.",
+      "W records C exactly: SHA, tree, parent L and the chain from L back to a972cde; the 18-path L..C name-status; git diff --binary L..C | sha256sum; the six product blob ids and codefire mode; ALL THREE canonical source-doc blob stages in full as distinct sets - the stage-one pre-citation union blobs from I5-UNION, the stage-two post-citation blobs from I5-CITED and the stage-three committed blobs from I5-FINAL - with the delta between each pair identified, and source-data-model-catalog.md shown unchanged across all three; the PRE-BRIDGE and FINAL identities of codefire and of aggregate path 6 with the exact bridge delta and the I9-BRIDGE changed-unit set; the omitted duplicate patch-id 9889888cedeba7344fb987ff5891cf728d9c7e36; test counts 539 and 767 plus every focused count; every T, I, V, D and X result including X10-X13 performed rather than inferred; and every item not run marked explicitly not run.",
+      "Truthful scoping in W: C is composed-not-accepted; C is accepted-input composition PLUS one preflight-prescribed C18 bridge, not a byte-only union, and W must say so plainly and cite C18, section 5.7 and the section 9.2 conflict-map row; the bridge resolves only the C18 composition incompatibility and only on a fresh exact ACCEPT; it closes nothing; B2 remains OPEN pending a fresh exact ACCEPT of C; B3 remains OPEN and routed to C14-LIVE-A2; MR-write remains blocked; the three C14 handles are registered OPEN and unimplemented; root row 6 unchanged.",
+      "Reviewer report R: one report-only commit whose parent is W, adding exactly docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md and changing no candidate or result byte, produced by a fresh agent, session and worktree. The review subject is C; W is bound only as writer evidence; R records both C and W. The reviewer independently recomputes L, C and W identities and the chain to a972cde, the topology counts T1-T7, the six product blobs, all three canonical source-doc blob stages - re-reconstructing the stage-one union blobs from cb13da0/b164046/0f43415 per I5-UNION, rechecking the stage-two blobs per I5-CITED and confirming the architecture and trace deltas carry only the required relative O1 citation, then rechecking the committed blobs per I5-FINAL and confirming the stage-three deltas carry only the frozen C18 bridge truth while the catalog is unchanged throughout - the C18 bridge itself by independently reproducing the pre-bridge failure, re-deriving the I9-BRIDGE changed-unit set and proving no drift outside it, the stable patch-id, all test counts, the reversals X1-X13 performing X10-X13 rather than inferring them, the inversion census, the AST disjointness, the B1/B2/B3 state, the single-owner ownership map, and the negative space, and renders an explicit scope verdict.",
       "After an ACCEPT in R the manager may consider integrating the linear chain C..R as a separate decision; this packet does not authorize that integration."
     ],
     "evidence_digest_required": true
