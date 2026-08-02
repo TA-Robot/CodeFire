@@ -2,7 +2,7 @@
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "cfr168-python-http-accepted-input-composition-20260802",
   "status": "ready",
-  "objective": "Compose the accepted Python HTTP inputs - MR-list candidate b16404676639336f705feffd9af4857d4a1fcc69 (which strictly subsumes accepted Doctor/Branch candidate 701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714) plus the accepted Upload live-route cleanup successor delta cb13da0..0f4341561ce95935600bf1398b8a5fbdb206daba - onto the exact canonical base a972cde890e0d621aaced6aca4b45835871da975 as one clean additive commit inside a frozen 19-path write set, omitting the duplicate initial-Upload patch, then obtain one fresh exact report-only review of the frozen candidate. Authoritative packet status is ready_for_bounded_composition; the machine status field is constrained to the schema enum. Authorizes composition of already-accepted bytes only: no MR-write, no integration, no Close, no Install, no Dogfood, no Cargo/Rust, no new product behaviour.",
+  "objective": "Compose the accepted Python HTTP inputs - MR-list candidate b16404676639336f705feffd9af4857d4a1fcc69 (which strictly subsumes accepted Doctor/Branch candidate 701469f91dd0c4c52c5628fb3e9d9e9d0ab0c714) plus the accepted Upload live-route cleanup successor delta cb13da0..0f4341561ce95935600bf1398b8a5fbdb206daba - onto the manager-integrated Plan/FREEZE chain head L, as an exact three-commit linear chain: candidate C of exactly 18 paths whose parent is L, writer result W of exactly one result path whose parent is C, and reviewer report R of exactly one review path whose parent is W. The aggregate writer write set is 19 paths split 18 plus 1; it is NOT one commit and the result is NOT part of the candidate. C alone is the immutable review subject and must never contain or claim its own SHA. The immutable product base stays a972cde890e0d621aaced6aca4b45835871da975 at blob level, which is what base_revision encodes; the execution base is L, named by the manager launch prompt. Authoritative packet status is ready_for_bounded_composition; the machine status field is constrained to the schema enum. Authorizes composition of already-accepted bytes only: no MR-write, no integration of C, W or R, no Close, no Install, no Dogfood, no Cargo/Rust, no new product behaviour, and no implementation of the routed C14 handles.",
   "base_revision": "a972cde890e0d621aaced6aca4b45835871da975",
   "role": "manager",
   "risk": {
@@ -22,7 +22,7 @@
     ],
     "score": 12,
     "selected_tier": "ultra",
-    "rationale": "One codefire dispatcher carries the request ledger/deadline, sealed-session and authority owners, response publication, cleanup precedence and reducer seams for every Python HTTP route. The composition performs a real three-way merge on that single file across two independently accepted lineages, omits a duplicated initial patch, and must leave the still-open B3 post-effect surface byte-identical. A frozen rejecting shared-primitives BLOCK and two accepted trees disagree about the same symbol, so manager conflict resolution is required and isolated reviews cannot validate it."
+    "rationale": "One codefire dispatcher carries the request ledger/deadline, sealed-session and authority owners, response publication, cleanup precedence and reducer seams for every Python HTTP route. The composition performs a real three-way merge on that single file across two independently accepted lineages, omits a duplicated initial patch, and must leave the still-open B3 post-effect surface byte-identical. A frozen rejecting shared-primitives BLOCK and two accepted trees disagree about the same symbol, so manager conflict resolution is required and isolated reviews cannot validate it. The lane is additionally topology-sensitive: candidate, writer result and reviewer report must be three separate linear commits because a candidate cannot record its own identity."
   },
   "context": {
     "pack_ids": [
@@ -47,9 +47,20 @@
     ],
     "evidence_refs": [
       "packet-status:ready_for_bounded_composition",
-      "product-base:a972cde890e0d621aaced6aca4b45835871da975",
-      "product-base-tree:76a7342031f560a116916cfe978979674841c75f",
-      "product-base-parent:1a9e01d462ed39599a1d8cf0b864264cf0861d18",
+      "immutable-product-base:a972cde890e0d621aaced6aca4b45835871da975",
+      "immutable-product-base-tree:76a7342031f560a116916cfe978979674841c75f",
+      "immutable-product-base-parent:1a9e01d462ed39599a1d8cf0b864264cf0861d18",
+      "base-revision-semantics:base_revision pins the immutable product base at blob and schema level; it is NOT the execution base because a commit cannot self-name",
+      "execution-base:L = the final manager-integrated Plan/FREEZE chain HEAD, named by the manager launch prompt",
+      "execution-base-constraint:L must linearly descend from a972cde with zero merges, docs-only changed paths, and every product and composition-target blob identical to its a972cde value",
+      "launch-rule:manual second-agent launch on L only; the writer is never launched on a972cde after the Plan/FREEZE chain is integrated",
+      "automation-rule:generic run_ai_role must not be used after integration; run_ai_role.preflight_task_execution errors with 'task base_revision ... differs from HEAD ...' whenever base_revision differs from HEAD, and that rejection is correct behaviour that must not be worked around or patched by editing base_revision",
+      "superseded-commit:806f6c8033905cd44e22bf12d42c62dba42c47a8 published an impossible one-commit 19-path candidate topology; preserved as immutable history and superseded by this successor correction, never amended, rebased or reset",
+      "topology:three linear commits L->C->W->R, zero merges anywhere",
+      "topology-candidate:C parent=L, exactly 18 paths, immutable review subject, never contains or claims its own SHA/tree/patch digest",
+      "topology-result:W parent=C, exactly one ADD result path, no candidate byte changed, may record C exactly",
+      "topology-review:R parent=W, exactly one ADD review path, report-only, reviews C and binds W only as writer evidence, records C and W",
+      "aggregate-write-set:19 paths split 18 in C plus 1 in W; not one commit; the result is not part of the candidate",
       "canonical-branch:integration/cfr168-p0-canonical",
       "preflight-prospective-base:fb891b01f45e4d1963c48f06b827f8335150dace",
       "preflight-prospective-base-tree:2dadc3088c14fb624fb30d8060eba7466297959a",
@@ -84,15 +95,17 @@
       "shared-primitives-authority-blob:ec2a264142c6625dadd4809d99cf18d3371e9847",
       "shared-primitives-authority-sha256:ca1a1451bfc1b25ed1c54f1b012d4d0e508ef0a96f88401e61284c6d156a4441",
       "shared-primitives-verdict:BLOCK-preserved-unchanged-not-READY",
-      "adjudication-B1:resolved-only-for-accepted-input-composition-writer-by-binding-base-a972cde-and-accepted-input-graph",
+      "adjudication-B1:resolved-only-for-accepted-input-composition-writer-by-binding-immutable-product-base-a972cde-and-accepted-input-graph",
       "adjudication-B1-mr-write:rejected-frozen-base-fcb2324145962e79d7c6ee173b9cf545733b957d-remains-blocked",
-      "adjudication-B2:released-only-as-composition-resolution-action-remains-OPEN-until-composed-candidate-fresh-exact-ACCEPT",
+      "adjudication-B2:released-only-as-composition-resolution-action-remains-OPEN-until-candidate-C-earns-fresh-exact-ACCEPT-in-R",
       "adjudication-B2-owner:exact-composition-of-b164046-plus-cb13da0..0f43415-owns-the-product-contradiction",
       "adjudication-B3:remains-OPEN-routes-to-C14-LIVE-A2-blocks-MR-write-and-global-closure-composition-must-not-change-or-claim-the-B3-surface",
-      "routed-open-handle:C14-LIVE-A1-retryablecleanup-constructor-traceback-and-pre-effect-owners",
-      "routed-open-handle:C14-LIVE-A2-post-effect-response-wire-and-C14-B2-contract-document",
-      "routed-open-handle:C14-SUCCESSOR-OWNER-production-unwired-and-remaining-global-C14-owners",
-      "mr-write:blocked-until-accepted-composition-and-later-required-C14-resolution",
+      "owner-map-A1:C14-LIVE-A1 owns reachable pre-effect loci: RetryableCleanup constructor/traceback debt in _open and validate_sealed_commit, F6 persistent teardown, F7 _open handle orphaning, every reachable pre-effect cleanup owner on the two commit-source wrappers, and AccountedServerVerification / run_server_verification including the surviving inversion there",
+      "owner-map-A2:C14-LIVE-A2 owns B3 post-effect, response and wire loci: _PreparedHTTPMutationResponses post-effect contract, the handler POST arm, the request-loop finally and the wire publication window, plus promoting C14/B2 to a durable in-tree contract and the RetryableCleanup shape-pending state",
+      "owner-map-SUCCESSOR:C14-SUCCESSOR-OWNER owns only production-unwired or deferred global loci owned by neither A1 nor A2: AccountedHTTPUploadAncestry, AccountedHTTPUploadSealedAncestry, planner/stage/sealed factories, signature and ancestry owners outside the two commit-source wrappers excluding AccountedServerVerification and run_server_verification, F9 _control_charge_witness, O2, O3",
+      "owner-map-overlap-correction:AccountedServerVerification, run_server_verification, the handler POST arm and the request-loop finally are REMOVED from C14-SUCCESSOR-OWNER; the first two are C14-LIVE-A1 and the last two are C14-LIVE-A2; every routed locus has exactly one owner",
+      "owner-map-writer-limit:the composition writer registers the three handles OPEN in candidate C and implements, narrows, repairs or closes none of them",
+      "mr-write:blocked-until-accepted-candidate-C-and-later-required-C14-resolution",
       "root-row-6:Implement in progress-unchanged",
       "issue-close:none",
       "expected-codefire-blob:f5e0b6db7c15aeadd3025ae4f038e301a7634caf",
@@ -101,7 +114,8 @@
       "expected-doc-union-blob-prefixes:d8d7aa9881b5,0a8d2a886c88,9a3afd7dd932,2b68347eaa35",
       "manager-post-integration-gate:check_ai_development.py --timeout 180 passed 7/7 in 53.188s on a972cde (integration lane measurement, not this lane and not the writer)",
       "review-path:docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md",
-      "burn-down-edit-owner:manager-only-closure-mode-current-critical-path-item-2"
+      "reversal-family-rename:the reversal validation family published as R1-R9 in 806f6c8 is now X1-X9 so it cannot be confused with reviewer report commit R; none was dropped",
+      "burn-down-edit-owner:manager-only"
     ]
   },
   "scope": {
@@ -143,7 +157,10 @@
       "docs/development/codefire-improvement-cycle.md",
       "docs/development/ai/swarm-batches/cfr168-recovery-execution-ledger-20260730.md",
       "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-python-composition-exact-preflight-claude-20260802/preflight.md",
       "docs/development/ai/swarm-results/cfr168-python-http-upload-third-repair-rereview-claude-20260731/review.md",
+      "docs/development/ai/task-packets/cfr168-python-http-accepted-input-composition-20260802.md",
+      "docs/development/ai/task-packets/json/cfr168-python-http-accepted-input-composition-20260802.json",
       "docs/development/ai/source-keyed-cargo-gates.md",
       "docs/development/tools/run_source_keyed_cargo_gate.py",
       "docs/development/ai/task-packets/cfr168-source-keyed-cargo-canonical-port-20260731.md",
@@ -164,48 +181,81 @@
       ".dev-swarm"
     ],
     "disallowed_actions": [
+      "composing all 19 aggregate paths into one commit, or placing the result or review path inside candidate C",
+      "embedding C's own SHA, tree or patch digest anywhere inside C's 18 paths",
+      "squashing, amending, rebasing or resetting C, W or R once frozen",
+      "any merge commit in C, W or R",
+      "launching the writer on a972cde after the Plan/FREEZE chain is integrated",
+      "launching this lane through generic run_ai_role after integration, or editing base_revision to make such a launch pass",
       "git cherry-pick of any candidate range",
-      "git merge of any candidate, or any merge commit",
-      "amending any accepted candidate",
+      "git merge of any candidate",
       "checking out any of the five canonical-newer management docs from a candidate",
       "importing agent state, logs or worktree debris",
-      "editing the original shared-primitives preflight or restating its BLOCK as READY",
-      "writing the fresh review report from the writer lane, or self-review",
-      "creating the freeze commit from the reviewer lane",
+      "editing the original shared-primitives preflight, the published composition preflight, or this packet and its typed companion",
+      "restating the shared-primitives BLOCK as READY",
+      "implementing, narrowing, repairing or closing C14-LIVE-A1, C14-LIVE-A2 or C14-SUCCESSOR-OWNER",
+      "writing the reviewer report from the writer lane, or self-review",
+      "creating C or W from the reviewer lane, or writing any candidate or result path from the reviewer lane",
       "any Cargo or Rust command",
       "install.sh, packaging, dogfood, Docker or network activity",
-      "integrating the composed candidate or fast-forwarding canonical",
+      "integrating C, W or R, or fast-forwarding canonical",
       "Close or Closed or complete or zero-residual claims on CFR-168, CFB-136, CFB-138, global C14, MR-write or the cycle",
       "moving root row 6 off Implement in progress",
       "changing or claiming the B3 post-effect PreparedResponse surface",
       "repairing the run_server_verification inversion, O3, F6, F7, F9 or any routed residual",
       "changing the check_ai_development default timeout behaviour",
-      "deleting the superseded REQUEST_CHANGES report or the stale open-audit artifacts"
+      "deleting the superseded REQUEST_CHANGES report or the stale open-audit artifacts",
+      "amending, rebasing or reversing 806f6c8033905cd44e22bf12d42c62dba42c47a8"
     ]
   },
   "non_goals": [
+    "Composing all 19 aggregate paths into one commit, or treating the writer result or the review report as part of candidate C.",
+    "Embedding C's own SHA, tree or patch digest anywhere inside C's 18 paths.",
+    "Launching the writer on a972cde after the Plan/FREEZE chain is integrated, or launching through generic run_ai_role after integration, or editing base_revision to make such a launch pass.",
     "Resolving B3 or stating any phase index for the post-first-effect PreparedResponse window.",
+    "Implementing, narrowing, repairing or closing C14-LIVE-A1, C14-LIVE-A2 or C14-SUCCESSOR-OWNER; the writer only registers them OPEN.",
     "Releasing MR-write or rebinding MR-write's rejected/frozen base; B1 stays blocked there.",
     "Declaring the original shared-primitives BLOCK to be READY, or editing that report.",
-    "Closing B2 in the repository; B2 closes only on a fresh exact ACCEPT of the composed candidate.",
-    "Integrating the composed candidate or fast-forwarding canonical.",
+    "Closing B2 in the repository; B2 closes only on a fresh exact ACCEPT of candidate C.",
+    "Integrating C, W or R, or fast-forwarding canonical.",
     "Any Cargo/Rust work, install.sh, packaging, dogfood, Docker or network activity.",
     "Changing root row 6 off Implement in progress, or any issue state or Close.",
     "Fixing the pre-existing check_ai_development default-timeout behaviour, the run_server_verification inversion, O3 BaseException handling, F6, F7, F9 or any other routed residual.",
     "Introducing any new product behaviour, refactor, rename or optimisation not present in an accepted source blob.",
     "Authoring a new C14/B2 authority document; the O1 remediation is a citation to the existing in-tree preflight only.",
-    "Adding docs/development/current-cycle-burn-down-plan.md to the writer's write set; the manager owns that edit."
+    "Adding docs/development/current-cycle-burn-down-plan.md to any writer or reviewer write set; the manager owns every burn-down edit.",
+    "Amending, rebasing or reversing 806f6c8033905cd44e22bf12d42c62dba42c47a8; it stays immutable history."
   ],
   "invariants": [
     {
-      "id": "INV-BASE",
-      "statement": "The composition's immutable product base is a972cde890e0d621aaced6aca4b45835871da975; if the manager Plan/FREEZE commit is integrated first the writer's HEAD^ is that commit and its own parent is a972cde.",
-      "falsification_test": "git rev-parse HEAD^ and HEAD^^ mismatch, or any base-side product/target blob differing from its a972cde value."
+      "id": "INV-LAUNCH",
+      "statement": "The launch base L is the manager-named, manager-integrated Plan/FREEZE chain HEAD; L linearly descends from a972cde890e0d621aaced6aca4b45835871da975 with docs-only differences, zero merges, and every product and composition-target blob identical to its a972cde value. base_revision is the immutable product base, not the execution base.",
+      "falsification_test": "git merge-base --is-ancestor a972cde L fails, a972cde..L contains a merge or any product/runtime/test/packaging path, any target blob differs, or a lane launches on a972cde after integration."
     },
     {
-      "id": "INV-PATHS",
-      "statement": "git diff --name-status <base>..HEAD is exactly the 19 declared writer paths, in one commit with zero merges and a clean tree.",
-      "falsification_test": "Any additional path, any missing path, more than one commit, or any merge commit."
+      "id": "INV-TOPOLOGY",
+      "statement": "The lane is exactly three linear commits L -> C -> W -> R: rev-list --count L..C is 1, C..W is 1, W..R is 1, L..R is 3, and rev-list --merges L..R is empty.",
+      "falsification_test": "Any other commit count, any merge commit, or any squash of C, W and R into fewer commits."
+    },
+    {
+      "id": "INV-CANDIDATE-PATHS",
+      "statement": "git diff --name-status L..C is exactly the 18 candidate paths, aggregate paths 1-18, with no extras and nothing missing.",
+      "falsification_test": "A 19th path in C, the result or review path inside C, or any missing candidate path."
+    },
+    {
+      "id": "INV-RESULT-PATH",
+      "statement": "git diff --name-status C..W is exactly one ADD of the aggregate path 19 result report, and git diff C..W over the 18 candidate paths is empty.",
+      "falsification_test": "Any second path in W, or any candidate byte changed by W."
+    },
+    {
+      "id": "INV-REVIEW-PATH",
+      "statement": "git diff --name-status W..R is exactly one ADD of the single review path, and git diff W..R over the 18 candidate paths and the result path is empty.",
+      "falsification_test": "Any second path in R, or any candidate or result byte changed by R."
+    },
+    {
+      "id": "INV-NO-SELF-REF",
+      "statement": "No byte inside C's 18 paths contains or claims C's own SHA, tree or patch digest. W may record C exactly; R may record C and W.",
+      "falsification_test": "git grep of C's SHA, tree or patch digest over the 18 candidate paths returns a match."
     },
     {
       "id": "INV-BLOBS",
@@ -220,7 +270,7 @@
     {
       "id": "INV-B3",
       "statement": "The B3 surface - _PreparedHTTPMutationResponses, the handler POST arm and the request-loop finally - is byte-identical to its accepted source and only read by tests.",
-      "falsification_test": "Any diff on that surface, or any composition text asserting a post-effect phase index."
+      "falsification_test": "Any diff on that surface, or any artifact asserting a post-effect phase index."
     },
     {
       "id": "INV-INVERSION",
@@ -228,97 +278,143 @@
       "falsification_test": "Two occurrences means the Upload delta was lost; zero means a routed residual was silently repaired."
     },
     {
+      "id": "INV-OWNERS",
+      "statement": "Every routed locus has exactly one owner: reachable pre-effect loci including AccountedServerVerification, run_server_verification and validate_sealed_commit's constructor unwind belong to C14-LIVE-A1; B3 post-effect, response and wire loci including the handler POST arm and the request-loop finally belong to C14-LIVE-A2; C14-SUCCESSOR-OWNER holds only production-unwired or deferred global loci owned by neither.",
+      "falsification_test": "Any locus appearing under two handles, or any of AccountedServerVerification, run_server_verification, the handler POST arm or the request-loop finally listed under C14-SUCCESSOR-OWNER."
+    },
+    {
+      "id": "INV-REGISTER-ONLY",
+      "statement": "Candidate C registers the three C14 handles OPEN and implements none of them.",
+      "falsification_test": "Any behavioural change on a routed residual, or any text claiming one is narrowed, repaired or closed."
+    },
+    {
       "id": "INV-GOVERNANCE",
-      "statement": "The AIA-046 Cargo/O1 governance surface and the five canonical-newer management docs are byte-identical to the base.",
-      "falsification_test": "git diff <base>..HEAD over those paths is non-empty."
+      "statement": "The AIA-046 Cargo/O1 governance surface and the five canonical-newer management docs are byte-identical to L across L..R.",
+      "falsification_test": "git diff L..R over those paths is non-empty."
     },
     {
       "id": "INV-NOCLOSE",
-      "statement": "No writer artifact applies Close, Closed, complete, zero-residual or ACCEPT to CFR-168, CFB-136, CFB-138, global C14, MR-write or the cycle, and root row 6 stays Implement in progress.",
-      "falsification_test": "Any such phrasing in a writer artifact, or a changed root row."
+      "statement": "No writer or reviewer artifact applies Close, Closed, complete, zero-residual or ACCEPT to CFR-168, CFB-136, CFB-138, global C14, MR-write or the cycle, and root row 6 stays Implement in progress.",
+      "falsification_test": "Any such phrasing in a writer or reviewer artifact, or a changed root row."
     },
     {
       "id": "INV-AUTHORITY",
-      "statement": "The original shared-primitives preflight is unmodified and is still described as BLOCK with B1, B2 and B3.",
-      "falsification_test": "A diff on that path, or any artifact calling that verdict READY or resolved."
+      "statement": "The original shared-primitives preflight and the published composition preflight are unmodified, and the shared-primitives verdict is still described as BLOCK with B1, B2 and B3.",
+      "falsification_test": "A diff on either path, or any artifact calling that verdict READY or resolved."
     },
     {
       "id": "INV-STATUS",
-      "statement": "The authoritative packet status is ready_for_bounded_composition; the machine status field value 'ready' is a task-packet.v1 schema encoding of exactly that and authorizes nothing broader.",
-      "falsification_test": "Any artifact treating this packet as authorizing MR-write, integration, Install, Dogfood or closure."
+      "statement": "The authoritative packet status is ready_for_bounded_composition; the machine status value 'ready' and base_revision a972cde are task-packet.v1 schema encodings of exactly that and of the immutable product base, and authorize nothing broader.",
+      "falsification_test": "Any artifact treating this packet as authorizing MR-write, integration, Install, Dogfood or closure, or treating base_revision as the execution base."
     }
   ],
   "validation": [
     {
+      "id": "T1",
+      "command": "git rev-list --count L..C && git rev-list --merges L..C | wc -l",
+      "purpose": "Prove candidate C is one additive commit on the manager-named launch base L with zero merges; expect 1 and 0.",
+      "required": true
+    },
+    {
+      "id": "T2",
+      "command": "git diff --name-status L..C",
+      "purpose": "Prove C contains exactly the 18 candidate paths, aggregate 1-18, with no result or review path.",
+      "required": true
+    },
+    {
+      "id": "T3",
+      "command": "git rev-list --count C..W && git rev-list --merges C..W | wc -l && git diff --name-status C..W",
+      "purpose": "Prove writer result W is one commit on C with zero merges adding exactly the one aggregate path 19 result report.",
+      "required": true
+    },
+    {
+      "id": "T4",
+      "command": "git diff C..W -- <the 18 candidate paths>",
+      "purpose": "Prove W changes no candidate byte; expect empty.",
+      "required": true
+    },
+    {
+      "id": "T5",
+      "command": "git rev-list --count W..R && git diff --name-status W..R",
+      "purpose": "Prove reviewer report R is one commit on W adding exactly the one review path.",
+      "required": true
+    },
+    {
+      "id": "T6",
+      "command": "git rev-list --count L..R && git rev-list --merges L..R | wc -l",
+      "purpose": "Prove the whole lane is exactly three linear commits; expect 3 and 0.",
+      "required": true
+    },
+    {
+      "id": "T7",
+      "command": "git grep -F <C SHA> C -- <the 18 candidate paths> ; repeat for C tree and C patch digest",
+      "purpose": "Prove C never contains or claims its own identity; expect no match.",
+      "required": true
+    },
+    {
       "id": "I1",
-      "command": "git rev-parse HEAD HEAD^{tree} HEAD^",
-      "purpose": "Record candidate identity and prove the writer base rule; HEAD^ per INV-BASE.",
+      "command": "git rev-parse C C^{tree} C^",
+      "purpose": "Record candidate identity and prove C^ equals the manager-named launch base L.",
       "required": true
     },
     {
       "id": "I2",
-      "command": "git rev-list --count <base>..HEAD && git rev-list --merges <base>..HEAD | wc -l",
-      "purpose": "Prove one additive commit and zero merges; expect 1 and 0.",
+      "command": "git merge-base --is-ancestor a972cde L && git rev-list --merges a972cde..L | wc -l && git diff --name-only a972cde..L",
+      "purpose": "Prove L linearly descends from the immutable product base a972cde with zero merges, docs-only paths and zero product/runtime/test/packaging paths.",
       "required": true
     },
     {
       "id": "I3",
-      "command": "git diff --name-status <base>..HEAD",
-      "purpose": "Prove the write set is exactly the 19 declared paths with no extras.",
-      "required": true
-    },
-    {
-      "id": "I4",
       "command": "git hash-object codefire",
       "purpose": "Prove the merged codefire blob is f5e0b6db7c15aeadd3025ae4f038e301a7634caf.",
       "required": true
     },
     {
-      "id": "I5",
-      "command": "git ls-tree HEAD -- codefire",
-      "purpose": "Prove the executable mode 100755 was preserved through the three-way merge.",
+      "id": "I4",
+      "command": "git ls-tree C -- codefire",
+      "purpose": "Prove executable mode 100755 survived the three-way merge.",
       "required": true
     },
     {
-      "id": "I6",
+      "id": "I5",
       "command": "git hash-object docs/development/source-architecture.md docs/development/command-source-trace.md docs/development/change-playbook.md docs/development/source-data-model-catalog.md",
       "purpose": "Recompute the four doc union blobs in full and compare to the preflight prefixes d8d7aa9881b5, 0a8d2a886c88, 9a3afd7dd932, 2b68347eaa35.",
       "required": true
     },
     {
-      "id": "I7",
+      "id": "I6",
       "command": "git hash-object tests/test_python_http_upload_accounted_traversal.py",
       "purpose": "Prove the 36-test successor blob 829836bc0411bf82030286e6f1b0e3d58e574e14 was taken, not the 10-test duplicate 141dcbd4ee1f8727fbe146faef481cf746c8c73f.",
       "required": true
     },
     {
-      "id": "I8",
+      "id": "I7",
       "command": "git show 0703f71 | git patch-id --stable && git diff 5254e3d cb13da0 | git patch-id --stable",
       "purpose": "Reconfirm the duplicate stable patch-id 9889888cedeba7344fb987ff5891cf728d9c7e36 on both sides.",
       "required": true
     },
     {
-      "id": "I9",
-      "command": "git diff --binary <base>..HEAD | sha256sum",
-      "purpose": "Record the exact composed patch digest and reconfirm the bound report digests 46e7c3e4 and 756bf200.",
+      "id": "I8",
+      "command": "git diff --binary L..C | sha256sum",
+      "purpose": "Record the exact candidate patch digest in W and reconfirm the bound report digests 46e7c3e4 and 756bf200.",
       "required": true
     },
     {
-      "id": "I10",
+      "id": "I9",
       "command": "python3 - (AST proof over merged codefire: per-side changed units, overlap, drift, qualified-name collisions, module-level union and evaluation order)",
       "purpose": "Prove each accepted change lands exactly once with zero collateral drift and zero name collisions.",
       "required": true
     },
     {
-      "id": "I11",
+      "id": "I10",
       "command": "grep -c '<<<<<<<\\|>>>>>>>\\|=======' codefire docs/development/source-architecture.md docs/development/command-source-trace.md docs/development/change-playbook.md docs/development/source-data-model-catalog.md",
       "purpose": "Prove zero conflict markers survived any three-way merge; expect 0 everywhere.",
       "required": true
     },
     {
-      "id": "I12",
+      "id": "I11",
       "command": "git diff --check && git status --porcelain",
-      "purpose": "Prove no whitespace or conflict defects and a clean tree after the freeze.",
+      "purpose": "Prove no whitespace or conflict defects and a clean tree at each of C, W and R.",
       "required": true
     },
     {
@@ -384,7 +480,7 @@
     {
       "id": "D2",
       "command": "python3 docs/development/tools/check_project_docs.py",
-      "purpose": "Project doc/link/ledger check; Markdown inventory grows by exactly the writer's Markdown additions.",
+      "purpose": "Project doc/link/ledger check; the Markdown inventory grows from L by exactly the Markdown paths added in the commit under test.",
       "required": true
     },
     {
@@ -407,7 +503,7 @@
     },
     {
       "id": "D6",
-      "command": "git diff <base>..HEAD -- docs/development/ai/source-keyed-cargo-gates.md docs/development/tools/run_source_keyed_cargo_gate.py",
+      "command": "git diff L..C -- docs/development/ai/source-keyed-cargo-gates.md docs/development/tools/run_source_keyed_cargo_gate.py",
       "purpose": "Prove the AIA-046 Cargo/O1 governance surface is untouched; expect empty.",
       "required": true
     },
@@ -418,55 +514,55 @@
       "required": true
     },
     {
-      "id": "R1",
+      "id": "X1",
       "command": "Upload ACCEPT single-edit reversals r1-r6b and m2",
-      "purpose": "Each must fail at the boundary it names; proves the Upload oracles are non-vacuous.",
+      "purpose": "Each must fail at the boundary it names; proves the Upload oracles are non-vacuous. Renamed from R1 in 806f6c8 so the family cannot be confused with reviewer report commit R.",
       "required": true
     },
     {
-      "id": "R2",
+      "id": "X2",
       "command": "Upload production accounting observer probe: make_http_handler into handle_one_request finally via _decision_work_observer, real socket POST with one real close(2) fault",
-      "purpose": "Expect current={}, open_permit_count=0, terminal_reason='complete', 0 response bytes, 0 durable bytes; pre-repair triple was 11456/0/None.",
+      "purpose": "Expect current={}, open_permit_count=0, terminal_reason='complete', 0 response bytes, 0 durable bytes; pre-repair triple was 11456/0/None. Must be reproduced, not inferred.",
       "required": true
     },
     {
-      "id": "R3",
+      "id": "X3",
       "command": "close(2) call-count bound with 8 faults armed on both live routes",
-      "purpose": "Expect exactly 2 close calls on the faulting source and exactly 1 on every other source.",
+      "purpose": "Expect exactly 2 close calls on the faulting source and exactly 1 on every other source. Must be reproduced, not inferred.",
       "required": true
     },
     {
-      "id": "R4",
+      "id": "X4",
       "command": "C14 precedence by exception object identity",
-      "purpose": "Primary decision is the outer exception; the first cleanup error attaches as __cause__.",
+      "purpose": "Primary decision is the outer exception; the first cleanup error attaches as __cause__. Must be reproduced, not inferred.",
       "required": true
     },
     {
-      "id": "R5",
+      "id": "X5",
       "command": "MR-list reversals from the 5c952a9a ACCEPT",
       "purpose": "Each must fail at its named boundary.",
       "required": true
     },
     {
-      "id": "R6",
+      "id": "X6",
       "command": "Branch deadline reversal: revert the corrected test_codefire_cli.py expectation to the pre-fix 200 OK / zero-poll form",
       "purpose": "Must fail, proving the corrected expectation is load-bearing.",
       "required": true
     },
     {
-      "id": "R7",
+      "id": "X7",
       "command": "grep -n 'raise cleanup_error from run_error' codefire",
       "purpose": "Composition-specific inversion census; expect exactly 1 occurrence inside run_server_verification and 0 inside enforce_remote_commit_signature_policy_accounted.",
       "required": true
     },
     {
-      "id": "R8",
+      "id": "X8",
       "command": "grep -c '_drained_commit_source_cleanup_error' codefire",
       "purpose": "Expect 5; both live call sites carry the synchronous drain helper intact.",
       "required": true
     },
     {
-      "id": "R9",
+      "id": "X9",
       "command": "Three consecutive runs of the three new Upload live-route tests",
       "purpose": "Expect 3x 3/3 with no port, PID or timing flake.",
       "required": true
@@ -474,11 +570,12 @@
   ],
   "handoff": {
     "required_outputs": [
-      "One clean additive commit on the writer base: exactly the 19 declared paths, one commit, zero merges, clean tree, codefire mode 100755 preserved.",
-      "docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md recording candidate SHA and tree, the writer base and its parent chain to a972cde, the 19-path name-status, the binary patch SHA-256, the six product blob ids, the four merged doc blob ids in full, the omitted duplicate patch-id 9889888cedeba7344fb987ff5891cf728d9c7e36, test counts 538 and 766 plus every focused count, every checker result, every reversal result, and every item not run marked explicitly not run.",
-      "Registration of C14-LIVE-A1, C14-LIVE-A2 and C14-SUCCESSOR-OWNER as OPEN in docs/development/code-review-issues/cfr-168.md, as bookkeeping and never as a repair claim.",
-      "Truthful scoping in every writer artifact: composed candidate only; closes nothing; B2 remains OPEN pending a fresh exact ACCEPT; B3 remains OPEN and routed to C14-LIVE-A2; MR-write remains blocked; root row 6 unchanged.",
-      "One fresh exact report-only review at docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md by a separate agent, session and worktree, recomputing identities, the six product blobs, the four doc union blobs, the stable patch-id, all test counts, all reversals, the B1/B2/B3 state, the negative space, and an explicit scope verdict."
+      "Candidate C: one clean additive commit whose parent is the manager-named launch base L, containing exactly the 18 candidate paths (aggregate 1-18), zero merges, clean tree, codefire mode 100755 preserved, no self-identity reference anywhere inside those paths, the O1 citation present in aggregate paths 7 and 8, and C14-LIVE-A1, C14-LIVE-A2 and C14-SUCCESSOR-OWNER registered OPEN under the single-owner map and implemented nowhere.",
+      "Writer result W: one clean additive commit whose parent is C, containing exactly one ADD of docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md, zero merges, clean tree, and no candidate byte changed.",
+      "W records C exactly: SHA, tree, parent L and the chain from L back to a972cde; the 18-path L..C name-status; git diff --binary L..C | sha256sum; the six product blob ids and codefire mode; the four merged doc blob ids in full; the omitted duplicate patch-id 9889888cedeba7344fb987ff5891cf728d9c7e36; test counts 538 and 766 plus every focused count; every T, I, V, D and X result; and every item not run marked explicitly not run.",
+      "Truthful scoping in W: C is composed-not-accepted; it closes nothing; B2 remains OPEN pending a fresh exact ACCEPT of C; B3 remains OPEN and routed to C14-LIVE-A2; MR-write remains blocked; the three C14 handles are registered OPEN and unimplemented; root row 6 unchanged.",
+      "Reviewer report R: one report-only commit whose parent is W, adding exactly docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md and changing no candidate or result byte, produced by a fresh agent, session and worktree. The review subject is C; W is bound only as writer evidence; R records both C and W. The reviewer independently recomputes L, C and W identities and the chain to a972cde, the topology counts T1-T7, the six product blobs, the four doc union blobs in full, the stable patch-id, all test counts, the reversals X1-X9, the inversion census, the AST disjointness, the B1/B2/B3 state, the single-owner ownership map, and the negative space, and renders an explicit scope verdict.",
+      "After an ACCEPT in R the manager may consider integrating the linear chain C..R as a separate decision; this packet does not authorize that integration."
     ],
     "evidence_digest_required": true
   }

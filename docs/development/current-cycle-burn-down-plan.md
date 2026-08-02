@@ -85,16 +85,18 @@ required evidence.
 
 The active product/control split is frozen as follows:
 
-1. source-keyed Cargo control is independently accepted on both halves and
-   awaits one review before integration. Source `1bbcfde` holds a fresh exact
-   `ACCEPT`, now published durably at
+1. source-keyed Cargo control is complete and canonical. The full Cargo and O1
+   chain is integrated at `a972cde890e0d621aaced6aca4b45835871da975`, tree
+   `76a7342031f560a116916cfe978979674841c75f`: source `1bbcfde` holds a fresh
+   exact `ACCEPT` published durably at
    `docs/development/ai/swarm-results/aia-source-keyed-cargo-gate-fourth-closure-rereview-claude-20260802/review.md`;
-   canonical port `fb891b0` holds a fresh exact `ACCEPT` at review `8316956`.
-   Nothing is integrated. The exact remaining manager action is: fresh-review
-   the 2026-08-02 O1 evidence-authority repair as its own subject, then
-   fast-forward canonical over the entire accepted chain and run the
-   post-integration gate. Only a canonical head containing that whole chain may
-   supply evidence for held Rust reviews;
+   canonical port `fb891b0` holds a fresh exact `ACCEPT` at review `8316956`;
+   and the 2026-08-02 O1 evidence-authority successor chain is published and
+   fresh-reviewed through `a972cde`. The manager post-integration gate
+   `python3 docs/development/tools/check_ai_development.py --timeout 180` passed
+   7/7 in 53.188 s on that head. This item awaits no further review and no
+   further integration; the canonical head now supplies the source-keyed
+   evidence the held Rust reviews were waiting for;
 2. Python Upload/CFB-138 repair and rereview are done: candidate `0f43415` holds
    a fresh exact `ACCEPT` published at `c54e5ce`. The shared-primitives
    preflight `BLOCK` is not overturned and is not restated as `READY`; it is
@@ -105,9 +107,15 @@ The active product/control split is frozen as follows:
    composition resolution action and leaves it open until the frozen composed
    candidate earns a fresh exact `ACCEPT`, and leaves `B3` open and routed to
    `C14-LIVE-A2`. MR-write stays blocked, both on `B1`'s own rejected base and
-   on `B3`. The exact remaining manager action is: integrate that Plan/FREEZE
-   commit, then launch the single bounded composition writer on exact base
-   `a972cde`;
+   on `B3`. The immutable product base stays `a972cde`. The exact remaining
+   manager action is: integrate the complete Plan/FREEZE chain, then bind that
+   exact docs-only integrated `HEAD` as the execution base in the launch prompt
+   and launch the bounded lane as three linear commits — candidate `C` of
+   exactly 18 paths, writer result `W` of exactly one result path, and reviewer
+   report `R` of exactly one review path. The writer is not launched on
+   `a972cde` once that chain is integrated, and generic `run_ai_role` is not
+   used because the packet's `base_revision` intentionally stays pinned at the
+   immutable product base;
 3. review File Ancestry `02b0d63` and Rust HTTP `92fc810` before authorizing any
    new product repair;
 4. adjudicate whether accepted File Doctor `1a04490` or independently reviewed
