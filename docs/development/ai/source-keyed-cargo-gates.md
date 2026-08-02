@@ -327,8 +327,8 @@ Release publication uses `--export-artifact` and `--export-path`. The wrapper
 copies and hashes the requested owner-executable regular file under the same
 locks. The export source is admitted with one or two links: Cargo's uplift
 hard-links `<profile>/deps/<crate>-<metadata>` to `<profile>/<name>`, so a
-single-link requirement would block every real release export. Nothing else
-is relaxed. The source is opened no-follow, so a symlink, and a non-regular
+single-link requirement blocks the normal release export outright. Nothing
+else is relaxed. The source is opened no-follow, so a symlink, and a non-regular
 or non-owner-executable inode, still fail closed; a third link is `BLOCK`;
 and the complete pre/post source identity — device, inode, mode, link count,
 size, mtime, and ctime — must be unchanged across the copy, so a mutation
@@ -343,7 +343,11 @@ disk predicates have all passed. Replacement is same-directory and
 inode-checked; crash-left export temporary/previous entries are recovered on
 the next export. `build_source_bound_rust.py` uses this path and accepts the
 binary only when stdout, result JSON, export digest, and no-follow binary
-identity agree. Export destinations are limited to Git-untracked,
+identity agree. That stdout agreement is byte equality, checked before the
+decision is read, so every terminal gate path — PASS, `BLOCK`, internal
+error, and the reservation fallback after a failed publication — writes the
+exact bytes it made durable and never a second rendering of them. Export
+destinations are limited to Git-untracked,
 Git-ignored `target/**` paths and are checked before and immediately before
 publication.
 

@@ -6,6 +6,7 @@ import ast
 import errno
 import fcntl
 import hashlib
+import io
 import json
 import os
 import re
@@ -195,6 +196,28 @@ import run_source_keyed_cargo_gate as gate_module  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+class StdoutBytesCapture:
+    """A stdout stand-in that accepts raw bytes and refuses text.
+
+    `write` raising is the point of the fixture. The release wrapper
+    compares the gate's captured stdout with the published result file
+    byte for byte before it reads the decision, so the gate has to emit the
+    durable bytes through `sys.stdout.buffer`. Any `print` of a second
+    rendering fails here instead of silently restoring that mismatch.
+    """
+
+    def __init__(self) -> None:
+        self.buffer = io.BytesIO()
+
+    def flush(self) -> None:
+        pass
+
+    def write(self, text: str) -> int:
+        raise AssertionError(
+            f"the gate wrote a text representation to stdout: {text!r}"
+        )
 
 
 class ContractTests(unittest.TestCase):
@@ -2988,6 +3011,24 @@ class SourceKeyedGateDocumentationTests(unittest.TestCase):
             text,
         )
         self.assertIn("artifact-changed-during-export", text)
+
+    def test_stdout_result_agreement_is_documented_as_byte_equality(
+        self,
+    ) -> None:
+        text = self.contract
+        # "stdout ... agree" was true of the intent and false of the code:
+        # the gate pretty-printed a second rendering, so the wrapper's
+        # comparison failed on every live invocation. Say what the
+        # agreement is and which paths owe it.
+        self.assertIn(
+            "That stdout agreement is byte equality, checked before the "
+            "decision is read",
+            text,
+        )
+        self.assertIn(
+            "the reservation fallback after a failed publication", text
+        )
+        self.assertIn("never a second rendering of them", text)
 
     def documented_unshare_sequence(self) -> list[str]:
         """The flag sequence the contract document publishes, as tokens."""
@@ -5871,6 +5912,199 @@ class SourceKeyedCargoGateTests(unittest.TestCase):
                 ["result-publication-incomplete"],
             )
             self.assertFalse(reserved["artifact_export_accepted"])
+
+    def main_capturing_stdout(
+        self, argv: list[str]
+    ) -> tuple[int, bytes]:
+        captured = StdoutBytesCapture()
+        with mock.patch.object(sys, "stdout", captured):
+            returncode = source_keyed_cargo_main(argv)
+        return returncode, captured.buffer.getvalue()
+
+    def gate_argv(
+        self, root: Path, temporary: Path, slot: str
+    ) -> list[str]:
+        return [
+            "--repo",
+            str(root),
+            "--log",
+            str(temporary / f"evidence/{slot}.log"),
+            "--result",
+            str(temporary / f"evidence/{slot}.json"),
+            "--timeout",
+            "30",
+            "--",
+            "cargo",
+            "check",
+            "--locked",
+        ]
+
+    def assert_stdout_is_the_durable_representation(
+        self, stdout: bytes, durable: bytes
+    ) -> dict[str, object]:
+        # This is exactly the comparison `build_source_bound_rust.py`
+        # makes, before it reads the decision at all. Every live wrapper
+        # invocation failed it while stdout carried a pretty-printed second
+        # rendering of the same payload.
+        self.assertEqual(stdout, durable)
+        self.assertTrue(stdout.endswith(b"\n"))
+        self.assertNotIn(b"\n", stdout[:-1])
+        payload = json.loads(stdout)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(stdout, rendered_result(payload))
+        # Negative control: the representation the gate used to print. The
+        # assertion is the reversal itself — if these ever became equal the
+        # test above would stop distinguishing the fix from the defect.
+        self.assertNotEqual(
+            json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
+            + b"\n",
+            durable,
+        )
+        return payload
+
+    def test_pass_stdout_is_the_published_result_byte_for_byte(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            temporary = Path(temporary_raw).resolve()
+            root, profile, _ = self.make_repository(temporary)
+            result_path = temporary / "evidence/pass.json"
+            with mock.patch.dict(
+                DEFAULT_PROFILE, profile, clear=True
+            ), mock.patch(
+                "run_source_keyed_cargo_gate.run_source_keyed_gate",
+                return_value={
+                    "schema": "codefire.source_keyed_cargo_gate.v1",
+                    "decision": "PASS",
+                    "argv": ["cargo", "check", "--locked"],
+                },
+            ):
+                returncode, stdout = self.main_capturing_stdout(
+                    self.gate_argv(root, temporary, "pass")
+                )
+            self.assertEqual(returncode, 0)
+            payload = self.assert_stdout_is_the_durable_representation(
+                stdout, result_path.read_bytes()
+            )
+            self.assertEqual(payload["decision"], "PASS")
+
+    def test_block_stdout_is_the_published_result_byte_for_byte(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            temporary = Path(temporary_raw).resolve()
+            root, profile, _ = self.make_repository(temporary)
+            result_path = temporary / "evidence/block-bytes.json"
+            argv = self.gate_argv(root, temporary, "block-bytes")
+            # An unfrozen lockfile blocks after the result reservation, so
+            # the BLOCK is the published payload rather than the reserved
+            # one.
+            argv[-1] = "focused"
+            with mock.patch.dict(DEFAULT_PROFILE, profile, clear=True):
+                returncode, stdout = self.main_capturing_stdout(argv)
+            self.assertEqual(returncode, 3)
+            payload = self.assert_stdout_is_the_durable_representation(
+                stdout, result_path.read_bytes()
+            )
+            self.assertEqual(payload["decision"], "BLOCK")
+            self.assertEqual(
+                payload["blockers"], ["cargo-lockfile-not-frozen"]
+            )
+
+    def test_internal_error_stdout_is_the_published_result_byte_for_byte(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            temporary = Path(temporary_raw).resolve()
+            root, profile, _ = self.make_repository(temporary)
+            result_path = temporary / "evidence/internal-bytes.json"
+            with mock.patch.dict(
+                DEFAULT_PROFILE, profile, clear=True
+            ), mock.patch(
+                "run_source_keyed_cargo_gate.run_source_keyed_gate",
+                side_effect=RuntimeError("synthetic post-admission failure"),
+            ):
+                returncode, stdout = self.main_capturing_stdout(
+                    self.gate_argv(root, temporary, "internal-bytes")
+                )
+            self.assertEqual(returncode, 2)
+            payload = self.assert_stdout_is_the_durable_representation(
+                stdout, result_path.read_bytes()
+            )
+            self.assertEqual(
+                payload["blockers"],
+                ["source-keyed-gate-internal-error"],
+            )
+
+    def test_publication_failure_stdout_is_the_reserved_bytes_on_disk(
+        self,
+    ) -> None:
+        # When publication fails the payload falls back to the reservation.
+        # stdout has to fall back with it: the reservation bytes are what
+        # the result path still holds, so anything else reintroduces the
+        # mismatch on precisely the path where evidence matters most.
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            temporary = Path(temporary_raw).resolve()
+            root, profile, _ = self.make_repository(temporary)
+            result_path = temporary / "evidence/fallback.json"
+            with mock.patch.dict(
+                DEFAULT_PROFILE, profile, clear=True
+            ), mock.patch(
+                "run_source_keyed_cargo_gate.run_source_keyed_gate",
+                return_value={
+                    "schema": "codefire.source_keyed_cargo_gate.v1",
+                    "decision": "PASS",
+                },
+            ), mock.patch(
+                "run_source_keyed_cargo_gate.publish_reserved_result",
+                side_effect=OSError("synthetic publication failure"),
+            ):
+                returncode, stdout = self.main_capturing_stdout(
+                    self.gate_argv(root, temporary, "fallback")
+                )
+            self.assertEqual(returncode, 2)
+            payload = self.assert_stdout_is_the_durable_representation(
+                stdout, result_path.read_bytes()
+            )
+            self.assertEqual(payload["decision"], "BLOCK")
+            self.assertEqual(
+                payload["blockers"], ["result-publication-incomplete"]
+            )
+            self.assertEqual(payload["phase"], "RESERVED_BEFORE_EXECUTION")
+
+    def test_pre_reservation_block_renders_raw_non_ascii_once(
+        self,
+    ) -> None:
+        # Nothing is durable yet on this path, so the payload is rendered
+        # once through the same bounded encoder. `ensure_ascii=False` means
+        # a non-ASCII detail reaches stdout as UTF-8, not as `\u` escapes,
+        # and a consumer comparing bytes has to see the same encoding the
+        # publisher would have used.
+        with tempfile.TemporaryDirectory() as temporary_raw:
+            temporary = Path(temporary_raw).resolve()
+            root, profile, _ = self.make_repository(temporary)
+            nested = root / "サブ計画"
+            nested.mkdir()
+            result_path = temporary / "evidence/non-ascii.json"
+            argv = self.gate_argv(root, temporary, "non-ascii")
+            argv[1] = str(nested)
+            with mock.patch.dict(
+                DEFAULT_PROFILE, profile, clear=True
+            ), mock.patch(
+                "run_source_keyed_cargo_gate.run_source_keyed_gate"
+            ) as run_mock:
+                returncode, stdout = self.main_capturing_stdout(argv)
+            self.assertEqual(returncode, 3)
+            run_mock.assert_not_called()
+            self.assertFalse(result_path.exists())
+            payload = self.assert_stdout_is_the_durable_representation(
+                stdout, stdout
+            )
+            self.assertEqual(
+                payload["blockers"], ["candidate-not-worktree-root"]
+            )
+            self.assertIn("サブ計画".encode("utf-8"), stdout)
+            self.assertNotIn(b"\\u", stdout)
 
     def test_preexisting_result_blocks_before_gate_execution(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_raw:

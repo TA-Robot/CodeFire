@@ -487,7 +487,7 @@ MAX_ARTIFACT_EXPORT_RESIDUE_ENTRIES = 16
 # Cargo uplifts a produced binary by hard-linking
 # ``<profile>/deps/<crate>-<metadata>`` to ``<profile>/<name>``, so the
 # requested export source normally carries exactly two links. Requiring a
-# single link would block every real release export while proving nothing:
+# single link blocks that normal release export while proving nothing:
 # what makes the copy trustworthy is the no-follow descriptor plus the
 # complete pre/post inode identity comparison below, neither of which
 # depends on the link count. Two is the bound the uplift needs; a third
@@ -8102,6 +8102,41 @@ def rendered_result(payload: Mapping[str, Any]) -> bytes:
         ) from exc
 
 
+def unreserved_result_bytes(payload: Mapping[str, Any]) -> bytes:
+    """Render a terminal payload that no reservation ever made durable.
+
+    Used only before `reserve_result_path` succeeds, so there is no file
+    for a consumer to compare stdout against. The payload is still bounded
+    exactly like a published one; if it is refused, a fixed minimal BLOCK
+    is rendered instead, because a terminal handler must not raise a second
+    exception on its way out.
+    """
+    try:
+        return rendered_result(payload)
+    except GateBlocked:
+        return rendered_result(
+            {
+                "schema": RESULT_SCHEMA,
+                "decision": "BLOCK",
+                "blockers": ["result-payload-exceeds-bound"],
+            }
+        )
+
+
+def emit_durable_result(raw: bytes) -> None:
+    """Write the exact bytes a consumer will re-read from the result file.
+
+    `build_source_bound_rust.py` compares captured stdout to the published
+    result byte for byte *before* it reads the decision, so stdout has to
+    carry the durable representation and nothing else. A second rendering
+    here — pretty-printed, re-encoded, or re-sorted — makes every release
+    invocation fail that comparison whatever the gate itself decided.
+    """
+    sys.stdout.flush()
+    sys.stdout.buffer.write(raw)
+    sys.stdout.buffer.flush()
+
+
 def reserve_result_path(path: Path) -> dict[str, Any]:
     reservation_payload = {
         "schema": RESULT_SCHEMA,
@@ -8166,7 +8201,14 @@ def close_result_reservation(reservation: Mapping[str, Any]) -> None:
 def publish_reserved_result(
     reservation: Mapping[str, Any],
     payload: Mapping[str, Any],
-) -> None:
+) -> bytes:
+    """Publish `payload` and return the exact bytes now on disk.
+
+    The caller needs those bytes verbatim: the release wrapper compares
+    them with the gate's stdout, so re-rendering the same payload a second
+    time at the print site would be a separate representation to keep in
+    step. Returning the committed bytes makes that impossible to get wrong.
+    """
     path = Path(str(reservation["path"]))
     descriptor = int(reservation["descriptor"])
     parent = int(reservation["parent_descriptor"])
@@ -8246,6 +8288,7 @@ def publish_reserved_result(
             # The canonical result is already durably committed. A private
             # old-BLOCK residue is harmless and can be removed manually.
             pass
+        return raw
     except BaseException as original:
         rollback_errors: list[str] = []
         if backup_created and not publication_committed:
@@ -8352,6 +8395,7 @@ def main(argv: list[str] | None = None) -> int:
     reservation: dict[str, Any] | None = None
     evidence_lock_descriptor: int | None = None
     evidence_lock_inherited = False
+    durable_raw: bytes | None = None
     try:
         if not math.isfinite(args.timeout) or args.timeout <= 0:
             raise GateBlocked(
@@ -8457,7 +8501,7 @@ def main(argv: list[str] | None = None) -> int:
             "admission": evidence_admission,
             "postflight": evidence_postflight,
         }
-        publish_reserved_result(reservation, payload)
+        durable_raw = publish_reserved_result(reservation, payload)
         close_result_reservation(reservation)
         reservation = None
     except GateBlocked as exc:
@@ -8469,17 +8513,22 @@ def main(argv: list[str] | None = None) -> int:
         }
         if reservation is not None:
             try:
-                publish_reserved_result(reservation, payload)
+                durable_raw = publish_reserved_result(reservation, payload)
             except (OSError, ValueError) as write_exc:
                 print(
                     f"source-keyed Cargo gate result write failed: {write_exc}",
                     file=sys.stderr,
                 )
                 payload = dict(reservation["payload"])
+                # The reservation bytes are what the path still holds, so
+                # stdout stays the durable representation on this path too.
+                durable_raw = bytes(reservation["raw"])
             finally:
                 close_result_reservation(reservation)
                 reservation = None
-        print(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            durable_raw = unreserved_result_bytes(payload)
+        emit_durable_result(durable_raw)
         return 3
     except Exception as exc:
         failure = {
@@ -8491,18 +8540,21 @@ def main(argv: list[str] | None = None) -> int:
         }
         if reservation is not None:
             try:
-                publish_reserved_result(reservation, failure)
+                durable_raw = publish_reserved_result(reservation, failure)
             except (OSError, ValueError) as write_exc:
                 print(
                     f"source-keyed Cargo gate result write failed: {write_exc}",
                     file=sys.stderr,
                 )
                 failure = dict(reservation["payload"])
+                durable_raw = bytes(reservation["raw"])
             finally:
                 close_result_reservation(reservation)
                 reservation = None
+        else:
+            durable_raw = unreserved_result_bytes(failure)
         print(f"source-keyed Cargo gate error: {exc}", file=sys.stderr)
-        print(json.dumps(failure, indent=2, sort_keys=True))
+        emit_durable_result(durable_raw)
         return 2
     finally:
         if evidence_lock_descriptor is not None:
@@ -8512,7 +8564,7 @@ def main(argv: list[str] | None = None) -> int:
                 release_gate_evidence_lock(
                     evidence_lock_descriptor
                 )
-    print(json.dumps(payload, indent=2, sort_keys=True))
+    emit_durable_result(durable_raw)
     if payload["decision"] == "PASS":
         return 0
     gate_code = payload.get("gate", {}).get("exit_code")
