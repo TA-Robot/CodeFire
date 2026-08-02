@@ -16,7 +16,10 @@ manager-owned integration precondition, its observation **O1**: the source
 `ACCEPT` for `1bbcfde` existed only as an out-of-tree agent session and was not
 locatable from canonical, so canonical could not evidence its own source
 authority. This file discharges the publication half of that precondition by
-making the verdict durable inside canonical with content digests.
+making the verdict durable, with content digests, inside this accepted-chain
+candidate repository artifact. It is not canonical yet, and this file does not
+make it so: it becomes canonical only after this repair is independently
+reviewed and the manager fast-forwards canonical over the whole accepted chain.
 
 ### Original review session
 
@@ -53,7 +56,7 @@ the durable authority from this point forward.
 | Extracted formal-report body (the verbatim text below the rule) | `7b81cf2ab150d553cbd80a74c151fbaefcb5d90ec3201fd7d7b25da1e04dd9bd` |
 
 The sibling `events.jsonl` is digest-bound only. Raw JSONL and interactive
-progress chatter are deliberately not embedded in canonical.
+progress chatter are deliberately not embedded in this repository artifact.
 
 ### Reviewed subject identities (recomputed by the publisher)
 

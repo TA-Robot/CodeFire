@@ -60,13 +60,13 @@ their own fresh independent exact `ACCEPT`.
 | Reviewer session | `9fac2a66-27ff-4be6-9551-b83e662fd31c`, agent `aia-cargo-final-oracle-rereview-claude-20260802`, `2026-08-02T14:40:04.301989+00:00`, `is_error` `false` |
 | Verdict | `ACCEPT` |
 
-That verdict is now durable in canonical at
+That verdict is now durably published in this accepted-chain candidate at
 `docs/development/ai/swarm-results/aia-source-keyed-cargo-gate-fourth-closure-rereview-claude-20260802/review.md`,
 published 2026-08-02 to close observation `O1` of the exact port review:
 
 | Digest | SHA-256 |
 |---|---|
-| Published file | `624d2d0c40530a5c2fd823a21f6c47a8508d220fc068c298631cf36581038481` |
+| Published file | `e3047e4912350230abc83826a6046d1448228dbb05003338ff2f853bfee6ed05` |
 | Verbatim report body inside it | `7b81cf2ab150d553cbd80a74c151fbaefcb5d90ec3201fd7d7b25da1e04dd9bd` |
 | Capture `transcript.jsonl` | `2ec8b17a4f4bf33a2b5c71c5d335e5291a6d61a998f3371bc759b3bbc80acd0a` |
 | Capture `events.jsonl` | `18d89bfb1647a4ce71b3d79aa7819d237ac50857dbb6a28a5a83861b3714603b` |
