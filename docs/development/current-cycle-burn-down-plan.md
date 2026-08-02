@@ -85,8 +85,16 @@ required evidence.
 
 The active product/control split is frozen as follows:
 
-1. independently review source-keyed Cargo control candidate `74cd37d`; only an
-   accepted semantic canonical port may supply evidence for held Rust reviews;
+1. source-keyed Cargo control is independently accepted on both halves and
+   awaits one review before integration. Source `1bbcfde` holds a fresh exact
+   `ACCEPT`, now published durably at
+   `docs/development/ai/swarm-results/aia-source-keyed-cargo-gate-fourth-closure-rereview-claude-20260802/review.md`;
+   canonical port `fb891b0` holds a fresh exact `ACCEPT` at review `8316956`.
+   Nothing is integrated. The exact remaining manager action is: fresh-review
+   the 2026-08-02 O1 evidence-authority repair as its own subject, then
+   fast-forward canonical over the entire accepted chain and run the
+   post-integration gate. Only a canonical head containing that whole chain may
+   supply evidence for held Rust reviews;
 2. repair and rereview Python Upload/CFB-138, then resolve the shared-primitives
    preflight before MR-write and Python composition;
 3. review File Ancestry `02b0d63` and Rust HTTP `92fc810` before authorizing any
