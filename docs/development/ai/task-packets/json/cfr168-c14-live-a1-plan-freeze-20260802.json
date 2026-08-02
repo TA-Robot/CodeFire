@@ -1,0 +1,349 @@
+{
+  "schema": "codefire.ai_task_packet.v1",
+  "packet_id": "cfr168-c14-live-a1-plan-freeze-20260802",
+  "status": "ready",
+  "objective": "Implement the manager-frozen CFR-168 C14-LIVE-A1 pre-effect cleanup contract on exact base 333e410: preserve the exact primary exception outermost, attach the first cleanup fault as its immediate cause while retaining prior effective chains, perform bounded descriptor cleanup without raw-FD retry, prevent _open memory-owner orphaning and 22,912-byte double growth, cover every live direct ancestry/signature/server owner, synchronize source truth, and leave A2/B3 plus sealed/composite successors unchanged.",
+  "base_revision": "333e41082ffc35c73c02a420511ae2f16839c5b8",
+  "role": "implementer",
+  "risk": {
+    "dimensions": {
+      "blast_radius": 2,
+      "reversibility": 1,
+      "ambiguity": 0,
+      "invariant_density": 2,
+      "verification_cost": 1,
+      "downstream_multiplier": 1
+    },
+    "mandatory_ultra": [],
+    "score": 7,
+    "selected_tier": "high",
+    "rationale": "An Ultra manager decision has already frozen the cross-owner exception, recovery, FD and ownership contracts into deterministic identity/count/state oracles. The implementation remains cross-cutting in one Python product file and needs a High implementer plus an independent Ultra reviewer. Any new authority, response/wire, persisted, public, or unresolved state-machine choice escalates back to Ultra Freeze rather than being guessed by the implementer."
+  },
+  "context": {
+    "pack_ids": [
+      "pack-0-universal-orientation",
+      "pack-3-store-object-commit-integrity",
+      "pack-4-remote-http-security",
+      "pack-5-project-management-docs"
+    ],
+    "additional_files": [
+      "docs/development/ai/task-packets/cfr168-c14-live-a1-plan-freeze-20260802.md",
+      "docs/development/code-review-issues/cfr-168.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-upload-third-repair-rereview-claude-20260731/review.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-upload-live-route-cleanup-rereview-claude-20260802/review.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md",
+      "docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md",
+      "codefire",
+      "tests/test_python_http_upload_accounted_traversal.py",
+      "tests/test_python_ancestry_owner.py",
+      "tests/test_python_ancestry_borrow_handoff.py",
+      "tests/test_python_signature_authority.py",
+      "tests/test_python_signature_owner.py",
+      "tests/test_python_external_verification.py",
+      "tests/test_python_external_production.py",
+      "tests/test_python_signature_verification_handoff.py",
+      "tests/test_python_sealed_production.py",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "docs/development/known-limitations.md"
+    ],
+    "evidence_refs": [
+      "product-base:333e41082ffc35c73c02a420511ae2f16839c5b8",
+      "product-base-tree:c0ab3a09e4731ca27d43023be72e577487b11600",
+      "product-codefire-blob:73b1f368f9c1591be6fd9219b839351878b82b9a",
+      "shared-primitives-sha256:ca1a1451bfc1b25ed1c54f1b012d4d0e508ef0a96f88401e61284c6d156a4441",
+      "upload-third-rereview-sha256:f131284ea7d441781790481f1d356ca73a763d1ddb41ae878a6f7179c88ec649",
+      "live-route-accept-sha256:46e7c3e41ac1b132766657e445e017b392ce6a0b72eb46f909b13755fc8a9b3c",
+      "composition-result-sha256:02a759c40d11c9b79d52872104b53da79c9de069629c8b63aa9bb610adcce3e3",
+      "composition-review-sha256:a3835f3720983cee72a3368fcc149158a44c6bb3ea1d3c89cbca8432503fadd5",
+      "manager-decision:exact-primary-outer-first-cleanup-immediate-cause-prior-effective-chains-below",
+      "manager-decision:no-global-cleanup-container",
+      "manager-decision:a1-owns-live-ancestry-signature-server-open-validate-f6-f7",
+      "ordering:a1-implementation-and-exact-review-before-a2-product-implementation"
+    ]
+  },
+  "scope": {
+    "read_set": [
+      "AGENTS.md",
+      "codefire",
+      "tests/test_python_*.py",
+      "tests/test_codefire_cli.py",
+      "docs/development/project-management.md",
+      "docs/development/agent-workflow.md",
+      "docs/development/codefire-improvement-cycle.md",
+      "docs/development/code-review-issues/cfr-168.md",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "docs/development/known-limitations.md",
+      "docs/development/ai/README.md",
+      "docs/development/ai/operating-protocol.md",
+      "docs/development/ai/provider-routing-policy.md",
+      "docs/development/ai/task-packets/cfr168-c14-live-a1-plan-freeze-20260802.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-upload-third-repair-rereview-claude-20260731/review.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-upload-live-route-cleanup-rereview-claude-20260802/review.md",
+      "docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md",
+      "docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md"
+    ],
+    "write_set": [
+      "codefire",
+      "tests/test_python_http_upload_accounted_traversal.py",
+      "tests/test_python_ancestry_owner.py",
+      "tests/test_python_ancestry_borrow_handoff.py",
+      "tests/test_python_signature_authority.py",
+      "tests/test_python_signature_owner.py",
+      "tests/test_python_external_verification.py",
+      "tests/test_python_external_production.py",
+      "tests/test_python_signature_verification_handoff.py",
+      "tests/test_python_sealed_production.py",
+      "docs/development/source-architecture.md",
+      "docs/development/command-source-trace.md",
+      "docs/development/source-data-model-catalog.md",
+      "docs/development/change-playbook.md",
+      "docs/development/known-limitations.md",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a1-implementation-20260802/result.md"
+    ],
+    "disallowed_paths": [
+      "crates/**",
+      "schemas/**",
+      "install.sh",
+      "pyproject.toml",
+      "setup.py",
+      ".devcontainer/**",
+      "subprojects/**",
+      "tests/test_python_http_mr_list_decision_work.py",
+      "tests/test_python_existing_response_composition.py",
+      "tests/test_python_existing_response_composition_freeze.py",
+      "tests/test_python_response_input.py",
+      "tests/test_python_sealed_signature_composite.py",
+      "tests/test_python_existing_terminal_owner.py",
+      "tests/test_python_existing_consumer_terminal_freeze.py",
+      "tests/test_python_sealed_owner.py",
+      "tests/test_python_sealed_borrow.py",
+      "docs/development/code-review-issues/cfr-168.md",
+      "docs/development/current-cycle-burn-down-plan.md",
+      "docs/development/history.md",
+      "docs/development/README.md",
+      "docs/development/issue-root-cause-map.json",
+      "docs/development/ai/task-packets/cfr168-c14-live-a1-plan-freeze-20260802.md",
+      "docs/development/ai/task-packets/json/cfr168-c14-live-a1-plan-freeze-20260802.json",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a1-exact-review-claude-20260802/review.md"
+    ],
+    "disallowed_actions": [
+      "Change _PreparedHTTPMutationResponses, _HTTPMutationResponseSlot, the POST response arm, request-loop finally, response selection or wire publication",
+      "Implement C14-LIVE-A2, B3, a global RetryableCleanup shape, secondary-failure wire/log protocol or a new cleanup container",
+      "Change AccountedHTTPUploadSealedAncestry, AccountedHTTPUploadSignatureVerificationComposite, AccountedHTTPUploadExistingTerminalOwner or other sealed/composite successor orchestration",
+      "Retry a raw file-descriptor integer after close reports an error",
+      "Use an unbounded retry, sleep-until-success loop, request hang or process-wide cleanup registry",
+      "Clear a scalar, permit, process, child or owner pointer before its release has committed",
+      "Replace the exact primary exception object, omit the first cleanup cause or discard the primary's pre-existing effective chain",
+      "Change traversal order, signature decisions, verification commands, public error/status behavior, persisted state, resource profiles or serialized formats",
+      "Claim that verification-process cleanup rolls back effects already performed by the configured command",
+      "Edit the CFR-168 status, current cycle, history, roadmap, Install, Dogfood, Close or Retrospect evidence",
+      "Self-review, self-approve, integrate, amend, rebase, squash, merge canonical or reuse an excluded reviewer session",
+      "Discard user changes or use destructive Git cleanup"
+    ]
+  },
+  "non_goals": [
+    "Implement A2/B3 post-effect response/wire ownership or make it an A1 acceptance prerequisite",
+    "Wire any sealed/composite terminal successor into production",
+    "Create a public retry API, persistent cleanup journal, exception wrapper type, ExceptionGroup or global secondary-failure collection",
+    "Guarantee recovery from an eternally non-committing ledger release or unreapable process",
+    "Retry an ambiguously closed raw FD instead of conservatively abandoning its numeric ownership",
+    "Change ancestry result/order, signature policy semantics, verification command selection, deadlines, resource profiles or HTTP responses",
+    "Roll back external effects created by configured verification commands",
+    "Update Rust, packaging, schemas, devcontainer, dogfood, issue status or lifecycle terminal records",
+    "Treat passing tests or one reviewer as canonical integration, Install, Dogfood, CFR-168 Close or global C14 closure"
+  ],
+  "invariants": [
+    {
+      "id": "A1-primary-identity",
+      "statement": "The exact original operation, construction or validation exception object is outermost; the exact first cleanup fault is its immediate explicit cause.",
+      "falsification_test": "Inject distinct primary and cleanup exception objects and assert identity; restoring cleanup-first, wrapping the primary or omitting the cause must fail."
+    },
+    {
+      "id": "A1-prior-chain",
+      "statement": "The cleanup fault's prior effective cause/context chain followed by the primary's prior effective chain remains below the immediate cleanup cause, cycle-free and with each exception identity at most once.",
+      "falsification_test": "Seed distinct, shared and cyclic cause/context nodes; deleting, reordering, duplicating or cycling a node must fail the exact identity-sequence oracle."
+    },
+    {
+      "id": "A1-payload-detachment",
+      "statement": "Rebuilding the bounded exception chain does not retain raw policy, parsed policy, commit payload, process output or owner frames through release observation.",
+      "falsification_test": "Hold only weak references to payload sentinels and inspect release callbacks; retaining a traceback/local through the chain must fail collection and observer assertions."
+    },
+    {
+      "id": "A1-first-cleanup-only",
+      "statement": "The first cleanup fault determines cause or cleanup-only outer identity; later cleanup faults never replace it and create no global container.",
+      "falsification_test": "Make three independent cleanup actions fail with distinct objects and require the first identity to remain the only attached cleanup fault while all actions are attempted boundedly."
+    },
+    {
+      "id": "A1-owner-retention",
+      "statement": "A retryable scalar, permit, child, process or memory owner remains published until its own release commits; post-commit exceptions consume ownership exactly once while still propagating.",
+      "falsification_test": "Inject pre- and post-commit release faults and assert same-owner retry, before/after ledger current, no double release and no false zero."
+    },
+    {
+      "id": "A1-f6-bounded-sweep",
+      "statement": "One session close performs a finite sweep of all independent descriptor owners after the first fault, detaching each numeric before one close, releasing logical control, and allowing the bounded wrapper retry to drain the 11,456-byte source reservation.",
+      "falsification_test": "Make every descriptor close report a distinct error; an early break, unbounded retry, repeated numeric, residual current or open permit must fail."
+    },
+    {
+      "id": "A1-fd-aba",
+      "statement": "A descriptor number consumed before an ambiguous close result is never retried, even if the same integer is later reused by ambient authority.",
+      "falsification_test": "Reuse the failed integer before owner retry and prove the ambient descriptor remains open; restoring numeric retry must close it and fail the oracle."
+    },
+    {
+      "id": "A1-f7-no-orphan",
+      "statement": "_open settles the exact old _memory owner before polling, allocating, acquiring or constructing a replacement; a settlement fault preserves exactly 11,456 retained bytes and never grows to 22,912.",
+      "falsification_test": "Hold the constructor error/source, fail old-memory cleanup and reenter _open; restoring overwrite must increase acquire/constructor calls and ledger current to 22,912."
+    },
+    {
+      "id": "A1-live-owner-completeness",
+      "statement": "A1 covers the live direct AccountedHTTPUploadAncestry, AccountedRemoteSignaturePolicyAuthority, AccountedCommitSignaturePolicy, AccountedServerVerification/run_server_verification, commit source and validate_sealed_commit cleanup loci.",
+      "falsification_test": "Inject a primary-plus-cleanup fault at each named constructor/body/finally/wrapper surface and require one exact identity/state oracle per route."
+    },
+    {
+      "id": "A1-semantic-compatibility",
+      "statement": "Goal-directed and full-BFS ancestry, signature decisions, verification commands, deadline phases, accounting profiles, error-origin classification and pre-effect durable authority remain otherwise unchanged.",
+      "falsification_test": "Run the established focused and adjacent suites plus before/after authority hashes; any changed result/order/profile/status or durable byte blocks acceptance."
+    },
+    {
+      "id": "A1-a2-successor-negative-space",
+      "statement": "A2/B3 response/wire owners and sealed/composite successor class bodies remain AST-identical to 333e410.",
+      "falsification_test": "Compare exact qualified AST bodies against 333e410 and fail if any excluded unit changes, even when the broad suite passes."
+    },
+    {
+      "id": "A1-source-truth",
+      "statement": "All four canonical source documents and known limitations distinguish live direct ancestry/signature/server owners from unwired sealed/composite successors and state bounded cleanup/FD limitations exactly.",
+      "falsification_test": "Restore production-unwired wording for a live owner, omit the conservative FD/process limitation or overclaim persistent primitive recovery and require source/project docs review to fail."
+    }
+  ],
+  "validation": [
+    {
+      "id": "V01-identity",
+      "command": "Record full P/F/C commit, tree and parent identities; prove P=333e41082ffc35c73c02a420511ae2f16839c5b8, P..F is exactly the two packet files, F..C has zero merges and only the closed candidate write-set subset.",
+      "purpose": "Bind the implementation and evidence to the exact source base and prevent packet/result/review bytes from entering the candidate.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "V02-patch",
+      "command": "git diff --name-status F..C && git diff --binary F..C | sha256sum && git diff --check F..C && git status --short",
+      "purpose": "Freeze exact paths, patch digest, whitespace integrity and clean candidate state.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "V03-compile",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile codefire tests/test_codefire_cli.py tests/test_python_http_upload_accounted_traversal.py tests/test_python_ancestry_owner.py tests/test_python_ancestry_borrow_handoff.py tests/test_python_signature_authority.py tests/test_python_signature_owner.py tests/test_python_external_verification.py tests/test_python_external_production.py tests/test_python_signature_verification_handoff.py tests/test_python_sealed_production.py",
+      "purpose": "Compile the product and every candidate-owned regression module without worktree bytecode artifacts.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "V04-focused",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_python_http_upload_accounted_traversal tests.test_python_ancestry_owner tests.test_python_ancestry_borrow_handoff tests.test_python_signature_authority tests.test_python_signature_owner tests.test_python_external_verification tests.test_python_external_production tests.test_python_signature_verification_handoff tests.test_python_sealed_production -v",
+      "purpose": "Run all nine A1 owner modules and record per-module selected/passed counts; base count is 165 methods before additions.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "V05-adjacent",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_python_signature_terminal_freeze tests.test_python_sealed_signature_composite tests.test_python_existing_terminal_owner tests.test_python_existing_consumer_terminal_freeze tests.test_python_sealed_owner tests.test_python_sealed_borrow -v",
+      "purpose": "Prove shared A1 class changes preserve unwired successor and terminal behavior without editing those modules.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "V06-upload-cli",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_codefire_cli -k upload",
+      "purpose": "Exercise the legacy upload-facing CLI surface after cleanup semantics change.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "V07-python-broad",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_python_*.py' -v",
+      "purpose": "Run the full Python fallback module family on the exact candidate.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "V08-full",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+      "purpose": "Run the repository-wide Python test discovery gate on the exact candidate.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "V09-demo",
+      "command": "./demo.sh",
+      "purpose": "Run the AGENTS.md Python product demo gate and record exact outcome.",
+      "required": true
+    },
+    {
+      "id": "V10-docs",
+      "command": "python3 docs/development/tools/check_source_docs.py && python3 docs/development/tools/check_project_docs.py",
+      "purpose": "Validate canonical source truth, known-limitations links and project document consistency.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "V11-ai-docs",
+      "command": "python3 docs/development/tools/check_ai_contracts.py && python3 docs/development/tools/check_ai_acceleration_docs.py && python3 docs/development/tools/check_ai_development.py --timeout 180",
+      "purpose": "Revalidate the bound packet and complete AI/project non-mutating gate on the exact candidate.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "V12-positive-matrix",
+      "command": "Execute and record A1-P01 through A1-P18 from the Markdown packet with exact exception/owner identities, ledger currents, permit counts, FD call counts, durable authority hashes and payload weak-reference observations.",
+      "purpose": "Prove every frozen live owner, recovery transition and negative state with non-vacuous behavioral evidence.",
+      "required": true
+    },
+    {
+      "id": "V13-reversals",
+      "command": "Apply A1-X01 through A1-X15 one at a time to a disposable candidate copy, run each named behavioral oracle, require the intended failure, then restore and verify the candidate patch digest.",
+      "purpose": "Prove precedence, chain retention, bounded sweep, FD ABA, owner retention, F7 and A2/successor negative-space assertions are load-bearing.",
+      "required": true
+    },
+    {
+      "id": "V14-ast-negative-space",
+      "command": "AST-compare 333e410:codefire with C:codefire by qualified class/function body; changed units must be only the A1 locus table and small private helpers satisfying the packet boundary, while every named A2/error-origin/sealed-composite unit remains identical and codefire mode remains 100755.",
+      "purpose": "Reject scope creep hidden inside the monolithic Python file even when changed-file checks and broad tests pass.",
+      "required": true,
+      "requires_capability": "git"
+    },
+    {
+      "id": "V15-independent-review",
+      "command": "Freeze C and W, then run one fresh report-only exact review from an eligible session/worktree; bind C commit/tree/patch/path set, W digest, all obligations/effects, validation logs, reversals, exclusions and a literal ACCEPT or REQUEST_CHANGES proposal.",
+      "purpose": "Obtain independent evidence over the immutable A1 candidate without self-approval or reopening A2 by preference.",
+      "required": true
+    }
+  ],
+  "handoff": {
+    "required_outputs": [
+      "full_P_F_C_commit_tree_parent_and_zero_merge_topology",
+      "exact_candidate_changed_paths_git_blobs_modes_and_patch_sha256",
+      "implementation_provider_model_session_worktree_and_clean_state",
+      "exception_identity_and_effective_chain_matrix",
+      "f6_descriptor_sweep_close_counts_fd_aba_and_zero_logical_debt_evidence",
+      "f7_same_memory_identity_11456_not_22912_and_no_new_acquire_evidence",
+      "per_owner_primary_cleanup_retry_state_and_payload_detachment_evidence",
+      "durable_authority_before_after_hashes_and_external_command_effect_caveat",
+      "focused_adjacent_broad_demo_docs_ai_validation_table_with_counts_durations_exits_and_log_digests",
+      "A1_P01_P18_positive_matrix",
+      "A1_X01_X15_behavioral_reversal_matrix",
+      "qualified_AST_changed_and_excluded_unit_comparison",
+      "canonical_source_and_known_limitation_truth_synchronization",
+      "separate_W_result_commit_and_digest",
+      "fresh_reviewer_eligibility_exclusion_record_and_exact_R_report_commit_digest_decision",
+      "A2_B3_successor_CFR168_install_dogfood_close_remain_unauthorized"
+    ],
+    "evidence_digest_required": true
+  }
+}
