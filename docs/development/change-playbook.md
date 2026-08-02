@@ -37,6 +37,7 @@ python3 docs/development/tools/probe_validation_capabilities.py
 | Commit | commit transaction and active-reset sections in architecture | `commit_active_reset`, open/ledger pending guards, store validators, signatures, doctor fixtures |
 | Diff/show/review/patch/merge | `view` and its submodules | bounded output, object reads, merge/patch idempotency |
 | Remote/HTTP/signatures | `remote`, `http`, `http_tls`, `signatures` | path/resource limits, nonce/key policy, structured remote errors |
+| Python HTTP compound read route (Doctor/branch/bundle/MR list) | the route's operation owner, the shared `do_GET`/`do_POST` dispatcher, `read_json_accounted` and its authority fence | deferred per-record fault ownership, one typed filesystem-authority family, per-`(root, head)` escrow memo, poll-per-quantum policy, exact/±1 dimension bounds |
 | Version/schema/capability/page | `compatibility`, `command_registry`, `pagination`, `schemas/public/` | checksum conformance corpus, Rust/Python/minimal-consumer decisions, parser/manifest agreement |
 | Doctor/migration/layout | `repo_layout`, `doctor`, `migration`, shared transaction/snapshot validator | typed divergence/pending vocabulary, store registry, ledger-bound raw/parsed opened-registry snapshot ownership, recovery fixtures |
 | AI development system | `ai/README.md`, schemas, model policy | strategy decision register and local AI gate |
@@ -311,6 +312,87 @@ handler wiring.
 - GC planning binds bounded policy/root/inventory/retention fingerprints and a non-future trusted planning time; exact candidate quarantine/progress and exact JSON audit recover before pending release, while JSONL remains derived;
 - verification/review/context/explain/certificate use the applicable versioned assessment subject; live subjects bind the canonical worktree manifest and are rechecked through branch publication, while certificate/verification subject identity and exact variant fields are sealed and cross-checked;
 - resource/command limits drain both streams during execution, report bytes seen/stored/truncation, and test timeout cleanup including descendants where the platform claims process-group termination;
+- a compound read route that pins a whole authority snapshot must not let a later record's read,
+  no-follow, parse, or version fault pre-empt an earlier record's validation fault: retain each
+  record's own capture outcome and raise it in filename order at the point the per-record route
+  observed it. Multi-fault fixtures in both orders, not single-fault fixtures, are the evidence;
+- no route may answer an unusable filesystem authority with a zero-byte reply. Map every no-follow
+  rejection, symlinked/directory authority, unavailable path, permission denial, metadata failure, and
+  failed read into one typed 400 family, and keep the shared `do_GET`/`do_POST` arm so an escaping
+  `OSError` cannot close the connection silently; only client transport failures and commit-source
+  cleanup faults still abandon it, and a cleanup fault does so only after the request loop has
+  accounted the drained ledger. Following an authority symlink is not compatibility worth preserving;
+- memoize repeated pinned traversal/digest work by its exact pinned identity, prove the object
+  traversal and hash counters become constant rather than linear at several cardinalities, and prove
+  the constancy claim non-vacuous by removing the memo. Keep the final fence over every reused result;
+- reduce duplicate deadline polls to one per bounded work quantum without reducing cancellation
+  coverage: prove a long single traversal still cancels at many boundaries with exact phase
+  attribution, and prove each production poll is required by silencing it. Enumerate poll sites from
+  live production frames, not from the phase helper that implements them, and silence exactly one site
+  at a time: replacing a whole helper cannot distinguish two adjacent redundant polls;
+- never infer a missing leaf from an unavailable parent. Pin the parent directory capability
+  no-follow, record its identity in the capture, and record absence only when that proved parent
+  returns the supported leaf-absence result. Reprove the parent at the final fence: an unreadable
+  parent is never evidence of continued absence, and a stale record must fail closed rather than be
+  silently downgraded;
+- classify failure origin at the boundary or owner that raised it, over one taxonomy that is exhaustive
+  across transport, filesystem and commit-source cleanup. `TimeoutError`/`ConnectionError` are raised
+  both by a client socket and by a remote filesystem, so mark transport at the real socket transfers,
+  filesystem at route execution, and commit-cleanup at the cleanup owner that drained the fault, and
+  share one classifier between GET and POST — extend that classifier with a new origin rather than
+  adding a second route-local one. A string, errno or
+  exception-class heuristic is not evidence and does not survive dispatcher composition;
+- cleanup keeps retry ownership until its release succeeds. Never zero a scalar, remove a session,
+  detach an owner, or clear a map first; make cleanup idempotent so a second call releases only the
+  remainder; never swallow `BaseException`; and never publish a success while route ownership,
+  temporary bytes, or open permits survive — name the residual terminal state instead;
+- reprove every captured metadata field after the final byte read, the EOF probe, and all interruptible
+  digest work, and bind the digest to that terminal observation. Mutate mode, hardlink add/remove,
+  symlink replacement, size, identity, and content at each boundary; where a boundary is physically
+  undetectable because the fence already owns and hashed those bytes, document that outcome as the
+  pinned snapshot instead of claiming a rejection;
+- prepare and encode the complete accounted response before the terminal authority/session/project
+  fence, run cleanup before publication, and leave nothing authority-dependent, callback-capable, or
+  input-proportional between that fence and the first response byte. Do not claim the authority fence is
+  the last *fallible* boundary while a pinned lock or descriptor is still unlocked or closed after it:
+  place the final publishable proof after every context-manager teardown, owned by the caller that
+  actually publishes, and prove the ordering with an oracle that observes `flock`/`close` and not only
+  named methods. Define the publication point exactly and transfer one prepared-response owner without a
+  second encoding or ledger;
+- make the publishable proof a production transition, not an advisory check. A guard whose only effect is
+  a flag some test reads cannot enforce anything: gate the owner transfer on the proved state, so an
+  unproved response cannot reach the wire. On a failed proof, release the prepared bytes, make the ledger
+  terminal for the exact cleanup reason *before* selecting any response, keep the typed diagnostic
+  observable, and publish nothing rather than a success;
+- displace a prepared response before selecting another one. Every error arm reached while a response
+  slot already owns bytes must dispose of that owner first, or a post-route fault is silently replaced by
+  the older prepared success. Specify the precedence when disposal itself fails — unknown ledger state
+  means nothing is published and the fault is recorded — and keep the shape identical across GET and
+  POST so a successor cannot inherit only half of it;
+- replace defensive silence in accounting with a typed fail-closed error. An exact release larger than
+  the owner still holds is a defect: returning quietly masks the next double-release. Making it typed
+  found a real aggregate-plus-exact double release in session cleanup that the silent form had hidden;
+- scope every oracle to what it measures. If a claim is route-wide, instrument every physical read or
+  poll site and assert the exact protocol with named owners; otherwise name the helper boundary in the
+  assertion. An overclaimed test is not evidence;
+- do not keep write-only evidence. A counter that is only incremented and a property that is never read
+  prove nothing: consume the diagnostic on the production path — as a note on the primary error, or in the
+  handler's own error log — and assert both that a faulted request emits it and that a clean request does
+  not;
+- record every new regression that passes on the revision it was meant to falsify, with the reason. A
+  legacy pass does not erase a candidate-added false guarantee, and an unexplained pass reads as a hidden
+  gap;
+- never let a fixture-derived identity choose which record an expectation covers. Record IDs derived
+  from content digests over real commit objects vary between fixture builds, so selecting a subject by
+  sorted-ID order and then asserting a persisted field reproduces only intermittently. Derive the
+  expectation from the same rule the route applies and add a deterministic case for the interesting
+  record. One such latent expectation in the merge-request-list cardinality case was the identified
+  cause of an intermittent focused-module failure: it published the correct `stale` status while the
+  test expected the persisted `open`, and it reproduced roughly once in five whole-module runs;
+- a live-socket harness must tolerate a deliberately abandoned transport. When the server abandons the
+  connection, the client's half-close can raise `ENOTCONN` and its read can raise `ECONNRESET`; treat
+  both as end-of-stream and keep asserting the exact wire bytes, or the harness itself becomes the
+  intermittent failure;
 - a terminal HTTP ledger is never reopened for diagnostics: route-owned payloads first return to request-header-only current/open-zero, then one fixed bounded control-plane response is written; append, truncate, replacement, encoder/writer failure, and budget-vs-subject precedence remain fixtures;
 - pending/stale/corrupt states lead to safe, explicit recovery; doctor reuses the typed snapshot/transaction validators and recommends inspection plus only the exact owning retry.
 
@@ -326,6 +408,50 @@ serialized bytes, and maximum serialized record bytes must cover both incoming a
 Prepare, validate, finish, and retryable close stay on the handler request ledger/deadline. Preserve the no-ledger legacy path and
 the later signature/verification/digest/ancestry/publication order; test mixed bounds, exact-minus-one, deadline no-effect, final
 staged-tree fence, and cleanup faults before claiming production coverage.
+
+Never create a `DecisionWorkLedger` inside a live HTTP request. `validate_sealed_commit` takes an optional caller ledger/deadline;
+thread the request's exact pair, or -- when the request already validated the same closure -- pass the request-owned
+`RemoteJSONPublicationRootProof` and reuse the resulting `RemoteJSONPublicationIdentity`, so no root is traversed twice. A caller
+with nothing to thread must keep the legacy positional call shape verbatim, because fault tests stub that signature. Put a deadline
+poll immediately before *every* first externally visible effect, including the missing-project layout bootstrap, and before the
+response slot marks the effect started -- otherwise an elapsed request answers 503 or 200 instead of the typed deadline outcome.
+
+Give every `SealedCommitValidationSession` an explicit owner and claim its `Path`, memo, sets, registry, reuse pool, map entries and
+descriptor owners before the allocator that creates them; recycle released descriptor owners so the registry cannot grow per read,
+and reserve `finalize`'s ordered-id projection before allocating it. Derive a reservation term only from a claim site that exists:
+a per-record heap multiplier with no matching claim becomes an admission cliff far below the declared record limit. Stream and hash
+canonical bytes with bounded scratch through `canonical_json_stream_digest` instead of reserving a whole-record encode, and prove
+byte-identity against `canonical_json` when touching it. Note two frozen constraints: `_HTTPUploadSealedValidationReservation.close`
+requires the ledger's scalars to be exactly its baseline plus upper, and the server-verification owner snapshots absolute ledger
+scalars -- so the sealed owner's final fence must run while no other owner holds retained or temporary bytes on that ledger.
+Record the real admissible record size and count, and prove the first refusal is a named resource owner rather than formula slack.
+
+A request has more than one route to an effect. `handle_http_upload` reaches
+`execute_remote_json_publication -> recover_remote_pending_quarantine -> validate_sealed_commit` on a retry, so that chain carries the
+same exact ledger and deadline and polls before each recovered root, before the receipt replay, and immediately before the quarantine
+cleanup. When auditing "one request, one ledger", enumerate the recovery and error routes too, not only the ordinary one. Owners that
+reserve a fixed upper for one dimension must still cover the others: reserve what is count-independent, and acquire exactly what is
+sized by data the traversal discovers -- a dimension left at zero silently rejects every caller at the first claim. Let the caller
+ledger raise its own typed budget diagnostic for an exactly acquired dimension instead of shadowing it with an owner-level refusal.
+Single-use authority objects must take their state transition *before* any callback they can reach, including a deadline poll, or an
+alias or reentrant consumer borrows the same authority twice.
+
+An accounting invariant only counts as covered when deleting it changes a focused assertion. For a claim, bind the exact/minus-one
+capacity so the claim itself is the refusal and its dimension, phase and exact size are asserted. For a check, create the state the
+check exists to reject immediately before it runs and delegate to the production function, so replacing that function with a no-op
+stops the raise; forcing it to raise only proves it is reached. For a deadline poll, expire the clock in the gap that only that poll
+guards and assert the resulting layout/effect or response difference.
+
+Release is the other half of accounting and has its own ordering rule: never erase the claim, the amount, or the owner's
+open/acquired state before the fallible ledger call. Consume ownership only for a release the ledger really made — compare its scalar
+before and after — and always let the failure propagate. Otherwise a pre-effect fault strands the bytes with nothing left owed, and
+the retry is a silent no-op. Keep primary-error precedence in cleanup so the fault that caused the unwind is not replaced by the
+release that failed while handling it.
+
+An allocation is only accounted if the charge can be *witnessed* at the moment of allocation. Route accounted collection allocations
+through a named pre-allocation boundary that proves the charge — in the dimension the caller's ledger actually sees, not merely in
+the owner's bookkeeping — and record what is owed only after that proof. A test that notices the missing charge after the allocation
+already happened is evidence of the wrong thing.
 
 When adding a dependency for one of these boundaries, record the reason, direct/transitive impact, rejected alternatives, and replacement/removal condition in an ADR. Current worktree, lock, and sealed-object capability decisions are ADR-009, ADR-010, and ADR-011. Local open authority plus active transition recovery is [ADR-015](../../adr/ADR-015-verified-open-authority-and-active-transitions.md), with implementation closure tracked by [CFR-163](code-review-issues/cfr-163.md). Versioned remote/assessment subjects and execution profiles are [ADR-016](../../adr/ADR-016-versioned-trust-subject-and-execution-profile.md), with delivery tracked by [CFR-164](code-review-issues/cfr-164.md). Remote project containment, publication, MR escrow, and GC recovery are [ADR-017](../../adr/ADR-017-remote-publication-transaction.md), tracked by [CFR-165](code-review-issues/cfr-165.md), [CFR-174](code-review-issues/cfr-174.md), and [CFR-175](code-review-issues/cfr-175.md). Version/schema/capability negotiation, extension criticality, conformance corpus, cursor snapshots, and remote Doctor routing are [ADR-018](../../adr/ADR-018-version-capability-conformance-contract.md), tracked by [CFR-166](code-review-issues/cfr-166.md) and [CFB-134](bug-issues/cfb-134.md). Effective verification-policy provenance, file-only ChangeCoverage, and their sealed cross-root binding are [ADR-019](../../adr/ADR-019-effective-policy-and-change-coverage-contract.md), tracked by [CFR-167](code-review-issues/cfr-167.md).
 

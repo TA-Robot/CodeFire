@@ -388,6 +388,106 @@ into `AccountedHTTPUploadSealedValidation`. The same handler ledger/deadline spa
 fence, finish, and retryable close; the no-ledger direct path retains legacy validation. Incoming/existing payload plans do not
 escape through this handoff, and later signature/verification/digest/ancestry/publication order is unchanged.
 
+That request ledger is the only sealed-validation ledger a Python upload uses on *both* of its routes. The ordinary route is described
+next; the completed-quarantine retry route is described after it, and neither mints a ledger of its own.
+`validate_sealed_commit` takes an optional
+caller ledger/deadline and mints its own `local_v1` ledger only for a caller that has no budget, so a live request no longer runs an
+unaccounted, unpolled closure traversal against a 1 GiB allowance. Publication-root validation consumes a request-owned
+`RemoteJSONPublicationRootProof` derived from the validated snapshot's own `validated_commits`, and
+`preflight_remote_json_publication` reuses the resulting `RemoteJSONPublicationIdentity` instead of repeating it, so one upload
+traverses each publication root exactly once. The proof is claimed inside the sealed reservation, consumed while that snapshot still
+exists, and revoked at the final revalidation fence that releases it.
+
+The publication-root proof is single-use. `AVAILABLE -> CONSUMING` is claimed before the deadline poll -- the only callback the proof
+can reach -- and `CONSUMING -> CONSUMED` before the validated roots are returned, so an alias, a callback reentry, or a second call
+all meet a non-available state and get the exact typed state error. A refused revocation, state, deadline, object-store or
+root-coverage check restores `AVAILABLE` and consumes nothing. `revoke` is terminal and idempotent from any state.
+
+Every externally visible effect of an upload is preceded by a deadline poll on the exact request deadline: the missing-project layout
+bootstrap, the object copy, and the branch/generation publication. Each poll runs after the identity and final-subject checks and
+before the response slot's effect-started transition, so an already-elapsed request returns the typed deadline outcome with
+byte-identical authority instead of a 503 retry or a 200 over a moved branch. The final fence additionally asserts, in production,
+that the covered pool settled to zero, that each dimension's high-water sits inside the admitted reservation, and that the pool was
+actually used.
+
+An upload retry has a second route with its own effects. `execute_remote_json_publication` and
+`recover_remote_pending_quarantine` accept the caller's exact ledger and deadline, and `handle_http_upload` passes its own, so a
+completed-quarantine recovery validates each recovered durable root on the request ledger under an
+`upload recovery sealed validation` phase instead of on a fresh `local_v1` `local_graph` ledger. That recovery polls the request
+deadline before each recovered root, before the receipt replay, and immediately before the quarantine cleanup -- the recovery's first
+externally visible effect and the point at which the recovered result becomes the response. Nothing fallible or input-proportional
+runs between that last poll and the cleanup. A caller with no request budget, such as remote GC, keeps the legacy behaviour.
+
+`SealedCommitValidationSession` reserves its own control state -- the absolutised store `Path`, document memo, validated-commit set,
+descriptor registry, descriptor reuse pool, subdirectory map and every descriptor owner -- through an explicit control owner before
+the allocator that creates it, and `finalize` reserves its ordered-id projection before allocating and sorting it. Released
+descriptor owners return to a reuse pool, so the registry is bounded by the simultaneously open descriptors (root, one per object
+subdirectory, at most two transients) instead of growing once per record read. `_AccountedUploadCommitSource` supplies
+`_AccountedUploadSourceMemory`, which acquires that control upper on the caller's exact ledger before the session constructor runs;
+document, frame and read-scratch accounting on that route is unchanged.
+
+That owner splits its two dimensions deliberately. `retained_bytes` is a fixed upper reserved once, before the constructor allocates
+anything it covers. `temporary_bytes` is not reserved: the only temporary control state on the route is `finalize`'s ordered
+object-id projection, whose exact size is `sizeof([]) + pointer_bytes * documents` -- 56 B empty, 64 B for one record, 272 B for 27 --
+and a count-independent upper for it would be the blanket profile-sized reservation this owner exists to avoid. It is therefore
+acquired exactly, on the caller's ledger and on the claim's own `snapshot_revalidation` phase, before the list exists, with the
+caller ledger raising its own typed budget diagnostic. Without that capacity every caller-owned finalization rejected at the claim,
+which made the reusable `validate_sealed_commit` / `validate_remote_json_publication_identity` /
+`preflight_remote_json_publication` API unusable.
+
+`finalize`'s ordered object-id projection — currently the one allocation routed this way — passes through
+`_charged_allocation_boundary`, a named pre-allocation check that refuses an allocation whose charge cannot be *witnessed*. A
+dimension the owner reserves in full is its own witness; any other dimension must be visible on the caller's ledger. `finalize`
+therefore charges, proves, records what is owed, and only then builds the list, so a build that stops charging that projection — or
+charges it against the retained reservation instead of the caller's temporary budget — fails before the list exists rather than
+allocating unowned memory. The other accounted collections on this route (descriptor registry, subdirectory map, pair-plan and
+pair-builder collections) are charged before allocation but do not go through this boundary.
+
+Control releases are retryable and exactly once, at the owner and at the wrapper above it. `_AccountedUploadSourceMemory` consumes
+its record of a claim only for a release the ledger really made, decided by comparing that ledger's scalar before and after, and the
+failure always propagates. `_AccountedUploadCommitSource` — the commit source of the fast-forward ancestry and commit-signature
+history upload routes — keeps `_session` and `_memory` reachable until each one's own cleanup has succeeded, so a failing `close(2)`
+inside the session teardown leaves the reservation owed and a further `close` finishes it rather than returning over stranded bytes.
+Both live call sites take that further `close` themselves: `is_ancestor_from_objects_accounted` and
+`enforce_remote_commit_signature_policy_accounted` route the source teardown through `_drained_commit_source_cleanup_error`, which
+retries the same source exactly once — never more — and returns the *first* cleanup error, so the request ledger is already drained
+at the point the request loop accounts the request rather than only after the caller drops the error it was handed. Measured through
+`make_http_handler`'s own `_decision_work_observer`, a request carrying one failing `close(2)` is accounted with zero current debt,
+zero permits and terminal `complete`; the upload still fails and the `OSError` still escapes the loop, so `complete` describes the
+accounting and not the request.
+
+Which error the caller sees is shared-primitives `C14`, defined by the in-tree authority
+[`shared-primitives preflight`](ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md)
+(`C14` in its per-clause register, `B2` in its decision table): a cleanup fault never displaces the primary operation decision. When
+the traversal or the policy decision itself failed, that decision is the outer exception and the first cleanup error is attached as
+its `__cause__`; only when the operation succeeded is the cleanup error surfaced on its own. Both routes previously inverted this
+(`raise cleanup_error from run_error` handed the caller a descriptor `OSError` in place of the decision it asked for), which that
+same shared-primitives preflight recorded as behaviour-open `B2`; both now close it. The release order is unchanged — commit source
+first, then the authority — and the surfaced cleanup error is still the first one, never the retry's. Both constructor unwinds
+(`_AccountedUploadCommitSource._open` and `validate_sealed_commit`) already kept that precedence.
+
+That synchronous guarantee is scoped to those two commit-source routes and to nothing else. `_AccountedUploadSourceMemory` also
+serves `validate_sealed_commit`, which owns its own release and is not covered by the helper. The `__del__` on both owners is a
+best-effort fallback for every caller and a guarantee for none: it runs only once the owner has become collectible — the source sits
+in a cycle through the raised error's traceback, so it needs the cyclic collector and returns nothing at all while that error is
+still held — and a session teardown that keeps failing is recovered by neither finalizer, because `_AccountedUploadSourceMemory.close`
+refuses with control debt and its `__del__` swallows the refusal. Recovery from a permanently failing teardown is not claimed.
+
+The sealed reservation carries no per-record heap multiplier. Retained terms are the owner's fixed fields, the two borrow handles,
+the session control upper, the publication-proof upper, a fixed control allowance plus borrow fingerprint per record, the staged
+aggregate twice (documents once, live frame object ids once), and the pair-probe plan -- each matching an actual retained claim. The
+temporary upper takes the largest of the three non-overlapping per-record scratch sets rather than their sum. The canonical borrow
+fingerprint, the final detach, and the terminal pair probe all stream through `canonical_json_stream_digest`, which emits
+byte-identical canonical bytes in bounded chunks, so no whole-record encode is reserved or held. Measured on the unmodified
+`http_v1` profile, the single-record admission ceiling moves from 126,976 B to above 3 MiB and the first refusal is `staging`, an
+owner reached before sealed validation is prepared.
+
+Of the four HTTP-reachable `validate_sealed_commit` owner functions outside the ordinary upload,
+`recover_remote_pending_quarantine` is upload-reachable and is repaired above. The remaining three --
+`handle_http_list`, `http_remote_branch`, and `validate_http_merge_request_record` -- carry no request ledger or deadline in their
+own handlers, so there is nothing to thread; the reusable accounted API above is the handoff the adjacent branch/MR/escrow packet
+needs, and it now completes on all three of its public entry points.
+
 The production sealed owner owns staging-provided dimension bounds, the iterative validation session, borrowed documents, deadline
 work, and every traversal FD.
 Its FD contract also detaches before one close attempt; a synthetic pre-call fault may leak the original descriptor rather than risk
@@ -711,6 +811,90 @@ Store sealed-head validation, final identity/revalidation fences, metrics projec
 output. JSON/text output is counted before allocation, reserves exact Retained bytes, and performs
 one final stdout write. Subject drift releases every snapshot/projection and records
 `subject_changed`; the root traversal depth is zero.
+
+The Python merge-request list read route owns one compound operation per request. Authority capture
+pins every merge-request record's raw bytes, descriptor identity, and metadata in deterministic
+filename order without pre-empting any later record's fault: a record's own read, no-follow, parse, or
+version outcome is retained on its pinned entry and raised only when validation reaches that record,
+which is the exact point the pre-fix per-record route observed it. A later record can therefore never
+replace an earlier record's first error. One sealed-validation session per distinct pinned object root
+validates every sealed reference, and one memo per pinned `(object root, source head)` owns the escrow
+object-set traversal and its canonical digest, so many merge requests sharing one head reuse the same
+ordered IDs and digest without repeating any physical read, traversal step, hash byte, or retained
+copy. Object traversal and hashing therefore stay constant in merge-request count; only per-record
+reads, subject digests, and projection entries scale. The pinned project descriptor is read once
+through one accounted no-follow descriptor, charged for exactly the bytes consumed, parsed from those
+owned bytes, and memoized rather than stat-then-reopened. Deadline polling follows one stable policy of
+one poll per bounded work quantum, so cancellation coverage is preserved while duplicate boundary polls
+are gone; every retained production poll site is the unique cancellation point for a nonzero admitted
+work quantum, proved by silencing exactly one site at a time.
+
+The route's prepublication order is fixed and is the model the composed GET/POST spine reuses. The
+whole projection is prepared, then the complete accounted response is encoded into one
+prepared-response owner, then the terminal fences run while every pinned owner is still alive: the
+authority fence reproves each consumed authority file, the session fence reproves each sealed object
+root, and the project gate's own fence reproves the pinned root, locks directory, and descriptor bytes
+exactly once. Cleanup then releases every operation owner with retry, and the route returns.
+
+Those three fences are the last *authority-dependent* boundaries: after the project fence no authority
+path is read and no pinned identity is compared again. They are deliberately **not** the last fallible
+boundary. The pinned shared lock is still unlocked and four pinned descriptors are still closed while
+the route's context managers unwind, and any of those five operations can fail. The final publishable
+proof is therefore owned by the handler and runs only after the route and both of its context-manager
+teardowns have completed successfully: request headers plus the prepared response only, no temporary
+bytes, no open permits. After that proof only the prepared owner's transfer and its publication remain,
+so no fallible, authority-dependent, callback-capable, or input-proportional work runs between the
+final proof and the wire.
+
+Publication is one production state transition, not an advisory check. The prepared-response slot moves
+`empty → prepared → proved → published`, the proof is the only transition into `proved`, and a slot that
+is not `proved` refuses to hand over its bytes at all. A success can therefore never publish while route
+ownership survives: a failed proof releases the prepared bytes, makes the ledger terminal for
+`cleanup_incomplete` before any response can be selected, keeps the typed diagnostic in the handler's
+error log, and publishes nothing when residual debt makes even the terminal control-plane response
+unpublishable. Residual current work at the end of any request is terminal for `cleanup_incomplete`
+instead of being reported as a completed request.
+
+Every `do_GET` error arm reached while the slot already owns a prepared response displaces that owner
+before selecting a different response, so a post-route unlock or descriptor-close fault publishes its
+typed filesystem-authority diagnostic instead of being replaced by the older prepared success.
+Displacement has deterministic precedence: if the prepared owner cannot be released the ledger state is
+unknown, so nothing is published at all, the disposal fault is recorded on the primary diagnostic and in
+the error log, and the connection closes.
+
+Unsafe filesystem authority is rejected explicitly rather than followed, and leaf absence is never
+inferred from an unavailable parent. Each leaf authority read pins its parent directory capability
+no-follow first and records the parent's identity in the capture; a missing, replaced, symlinked,
+denied, unreadable, or metadata-failing parent is a typed filesystem-authority failure, and only a
+proved parent plus a supported leaf-absence result records absence. The final fence reproves the parent
+identity as well as the leaf, so an unreadable parent is never evidence of continued absence and a
+stale merge request can never be silently downgraded to open. Every no-follow rejection, symlinked or
+directory authority, unavailable path, permission denial, metadata failure, and failed read maps into
+one stable typed diagnostic family, and the shared `do_GET`/`do_POST` dispatchers publish that family
+for any filesystem-origin `OSError` escaping a read or mutation route, so no Doctor, branch,
+merge-request-list, bundle, upload, merge-request, or GC route can close a connection with a zero-byte
+reply. A commit-source cleanup fault is the one `OSError` that arm refuses: it carries the
+commit-cleanup origin, so it escapes the dispatcher rather than being published as an authority
+failure the caller never asked about.
+
+Failure origin is decided by the boundary or owner that raised the error, never by its Python exception
+class. `TimeoutError` and `ConnectionError` are raised both by a client socket and by a remote
+filesystem, so each of the three origins is marked where it happens: the request-line, header, body,
+and response-byte transfers run inside one transport boundary that marks what they raise; route
+execution runs inside one filesystem boundary that marks every unmarked `OSError` it lets escape; and
+the commit-source cleanup owner marks the standalone `OSError` its synchronous drain returns with the
+commit-cleanup origin. A real socket timeout, reset, broken pipe, or disconnect therefore still
+abandons the connection without fabricating a second response, while a filesystem `ETIMEDOUT` publishes
+its typed authority failure on both GET and POST. A commit-cleanup `OSError` is refused by the same one
+shared classifier that refuses transport, so it escapes after the request loop has already accounted
+the drained ledger. Request-deadline cancellation keeps its typed 503, and `MemoryError` or any other
+process-fatal condition stays outside the filesystem arm.
+
+Cleanup retains retry ownership until release succeeds. No scalar is zeroed, no session removed, no
+owner detached, and no map cleared before that owner's exact ledger release or session close succeeds,
+so a second cleanup call releases only what is still owned and can never double-release. Cleanup never
+swallows `BaseException`: the selected primary diagnostic keeps its own identity while every cleanup
+fault is recorded on it and completed through the supported terminal protocol.
 
 MR creation materializes a versioned immutable subject and target-local source graph escrow while
 holding ordered project gates. Review binds the subject digest. Apply consumes only the reviewed

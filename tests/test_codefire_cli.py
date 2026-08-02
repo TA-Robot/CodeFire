@@ -6276,8 +6276,23 @@ class CodeFireCliTests(unittest.TestCase):
             b"GET /v1/projects/org/app/branches HTTP/1.0\r\n\r\n",
             monotonic_clock=Clock(),
         )
-        self.assertTrue(list_wire.startswith(b"HTTP/1.0 200 OK\r\n"))
-        self.assertEqual(list_observation["deadline"]["poll_count"], 0)
+        self.assertTrue(
+            list_wire.startswith(b"HTTP/1.0 503 Service Unavailable\r\n")
+        )
+        self.assertNotIn(b"HTTP/1.0 200 OK", list_wire)
+        list_payload = json.loads(list_wire.split(b"\r\n\r\n", 1)[1])
+        self.assertEqual(list_payload["kind"], "request_deadline_exceeded")
+        self.assertEqual(list_payload["exit_code"], 60)
+        self.assertEqual(
+            list_payload["diagnostics"][0]["phase"], "branch list planning"
+        )
+        self.assertEqual(list_observation["deadline"]["poll_count"], 1)
+        self.assertEqual(
+            list_observation["snapshot"]["terminal_reason"],
+            "deadline_exceeded",
+        )
+        self.assertEqual(list_observation["open_permit_count"], 0)
+        self.assert_http_work_closed(list_observation)
 
         globals_ = namespace["handle_http_bundle"].__globals__
         Session = globals_["SealedCommitValidationSession"]

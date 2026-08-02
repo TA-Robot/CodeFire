@@ -78,7 +78,16 @@ reachable record chunked read/hash and canonical traversal, final subject fence,
 and pathname replacement terminate as `subject_changed`; one fixed bounded control response emits the existing
 canonical 400 without reserving on the terminal ledger. The same optional deadline polls those bounded operations
 through response publication; Python upload also polls while freezing its response pair and at its final pre-effect
-fence. Expiry emits a fixed 503 only after route ownership closes. Contiguous stdlib JSON
+fence. That upload route now polls the exact request deadline immediately before each of its three first effects --
+missing-project layout bootstrap, object copy, and branch/generation publication -- after every identity and
+final-subject check and before the response slot marks the effect started, so an already-elapsed request yields the
+typed deadline outcome with the authority, objects, generation, nonce and receipt unchanged. Its publication-root
+validation reuses one request-owned single-use proof of the already-validated closure, so parse/validate/plan/preflight/apply
+stay separate while the same root is never traversed twice and no `local_v1` ledger is created inside the request.
+The retry route `handle_http_upload -> execute_remote_json_publication -> recover_remote_pending_quarantine ->
+validate_sealed_commit` carries the same exact ledger and deadline: each recovered durable root is validated on the
+request ledger, and the deadline is polled before each recovered root, before the receipt replay, and immediately
+before the quarantine cleanup that is that route's first externally visible effect. Expiry emits a fixed 503 only after route ownership closes. Contiguous stdlib JSON
 parse/materialization remains non-interruptible, so full Python bundle deadline support is still rejected. This
 coverage does not imply other POST response preflight, request-header/body, full upload-work deadline polling,
 other-route deadline coverage, or connection admission.
@@ -94,7 +103,31 @@ exceptionへ残さず、authority closeはchildを先に閉じる。別のproduc
 同じP0 bytesとduplicated project/policy capabilityを`AccountedServerVerification`へ貸し、ambient policy readなしでplan/cwdを作る。
 partial childはfallible acquisition前にauthorityへ公開し、combined construction全域のcallback再入を拒否する。handlerはまだこのsurfaceを使わない。
 production接続済み`AccountedHTTPUploadSealedValidation`はsealed Stageからincoming/existingのcount/aggregate/max-record scalar
-boundsだけを一度moveし、staged session/FDをhandler ledger/deadlineへ閉じる。さらにproduction-unwired
+boundsだけを一度moveし、staged session/FDをhandler ledger/deadlineへ閉じる。`validate_sealed_commit`はcaller ledger/deadlineを
+任意で受け取り、budgetを持たないcallerだけが`local_v1` ledgerを作る。upload routeはvalidated snapshotから
+`RemoteJSONPublicationRootProof`を作ってpublication identityへ渡し、publication preflightはその`RemoteJSONPublicationIdentity`を
+再利用するので、同一rootのclosure traversalは1 requestで一度だけになる。`SealedCommitValidationSession`はPath/documents/
+validated_commits/descriptor registry/reuse pool/subdirectory mapをallocation前にcontrol ownerへclaimし、closeしたdescriptor ownerは
+poolへ戻すのでregistryはread数ではなく同時opened descriptor数で有界になる。`_AccountedUploadCommitSource`は
+`_AccountedUploadSourceMemory`でその control upperをexact request ledgerへ先に確保する。cleanupはretryable:
+`_session`/`_memory`はそれぞれのcleanupが成功した後にだけ手放すので、session teardown中の`close(2)`失敗でも reservation は
+owedかつreachableのまま残り、再度の`close`が解放を完了する。live routeの`is_ancestor_from_objects_accounted`と
+`enforce_remote_commit_signature_policy_accounted`はその再closeを`_drained_commit_source_cleanup_error`で自ら同期実行し、同じ
+sourceをちょうど一度だけ(それ以上は決してしない)retryして最初のcleanup errorを得るので、request loopがrequestを精算する時点で
+ledgerはすでにdrain済みになる。`make_http_handler`の`_decision_work_observer`で測ると、`close(2)`失敗を1回含むrequestは
+current debt 0、permit 0、terminal `complete`で精算される(uploadは失敗しOSErrorはloop外へ抜けるので、`complete`はaccountingの
+話でありrequestの成否ではない)。callerがどのerrorを見るかはshared-primitives `C14` — in-tree authorityは
+[`shared-primitives preflight`](ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md)
+で、per-clause registerが`C14`を、decision tableが`B2`を定義する: cleanup faultはprimary operation decisionを
+決して置き換えない。traversal/policy decision自体が失敗した場合はそのdecisionがouter exceptionで、最初のcleanup errorが
+`__cause__`として付く。operationが成功した場合にのみcleanup error自体が表に出る。両routeは以前これを反転させており
+(`raise cleanup_error from run_error`)、その同じshared-primitives preflightがbehaviour-open `B2`として記録していたものを
+ここで解消する。release順
+(commit source → authority)と「最初のcleanup errorを使う」規則は不変。constructor unwindは以前からこのprecedenceを保つ。
+この同期保証はこの2つのcommit-source live routeにのみ及ぶ: `_AccountedUploadSourceMemory`は
+`validate_sealed_commit`でも使われ、そちらはhelperの対象外で自前のreleaseを持つ。`__del__`は全callerに対してbest-effort
+fallbackであり、どのcallerにも保証ではない: 対象がcollectibleになって初めて動き、raisedされたerrorのtracebackがsourceを
+pinしている間は何も返さず、持続的に失敗するsession teardownはどちらのfinalizerでも回収されない。さらにproduction-unwired
 `AccountedHTTPUploadAncestry`はvalidated commit loaderを借用するfull BFS decisionのcollection/frame/deadlineを閉じ、match後も
 legacy late-error orderのため全走査する。production-unwired `AccountedHTTPUploadSealedAncestry`はsealed ownerのpreallocated ancestry
 handleを、callerへcompositeを返した後のsingle-use `prepare`で同じledger/deadlineのBFS loaderへ貸す。BFS payload/loaderを先にdropして
@@ -217,6 +250,67 @@ pre-effect closeだけがexact hidden identityを削除し、effect後はreducer
 - `print_cli_error_json` maps `CliError` to the same envelope and stable exit class.
 - `open_snapshot_divergence` preserves phase/authority/expected/actual/expected-record/actual-record/repository/branch; `open_recovery_pending` preserves operation/phase/repository/branch/open directory. Neither diagnostic proposes a mutating repair.
 - generic repository JSON serialization and reads share a 64 MiB cap; reads are component-wise/final no-follow, non-blocking, regular-file-only, and limit-plus-one bounded. Smaller transaction/import/owner readers keep their specialized limits.
+
+### Filesystem authority failures on read and mutation routes
+
+- Every no-follow rejection, symlinked or directory authority, unavailable path, permission denial,
+  metadata failure, and failed read maps into one typed diagnostic family, `filesystem authority is
+  unusable: <target>: <reason>`, published as 400.
+- The shared Python `do_GET`/`do_POST` dispatchers publish that family for any filesystem-origin
+  `OSError` escaping a route, so Doctor, branch list, merge-request list, bundle, upload,
+  merge-request, and GC can never answer a filesystem fault with a zero-byte reply.
+- Origin is decided by the boundary or owner that raised the error, not by its exception class, and the
+  one shared taxonomy is exhaustive over three origins: transport, filesystem, and commit-cleanup.
+  `transport_boundary()` wraps the request-line, header, body, and response-byte transfers and marks
+  what they raise; `route_filesystem_boundary()` wraps route execution and marks every unmarked
+  `OSError` it lets escape; `_drained_commit_source_cleanup_error` marks the standalone `OSError` its
+  synchronous drain returns as commit-cleanup origin, at that owner and nowhere else.
+  `classify_route_os_error` is the one shared decision both dispatch arms
+  use, and it refuses the commit-cleanup origin exactly as it refuses transport. A real socket timeout,
+  reset, broken pipe, or disconnect abandons the connection without
+  fabricating a second response, and the abandoned request still closes its ledger with zero debt and
+  zero open permits; a commit-source cleanup fault likewise escapes rather than publishing a typed
+  authority, after the request loop has already accounted the drained ledger;
+  a filesystem `ETIMEDOUT` publishes the typed family on both GET and POST.
+  Request-deadline cancellation keeps its typed 503 and `MemoryError` stays outside the arm.
+- A leaf authority is absent only through a proved parent directory capability. `_open_authority_parent`
+  pins the parent no-follow and records its identity in the capture; a missing, replaced, symlinked,
+  denied, unreadable, or metadata-failing parent is a typed filesystem-authority failure, never
+  absence, so a stale merge request is never silently downgraded to open.
+- Following an authority symlink is not preserved compatibility. A symlinked merge-request, branch, or
+  descriptor record is rejected explicitly where the pre-fix route silently followed it.
+- A pinned authority record replaced during a request is rejected as `pinned authority record changed:
+  <path> (<reason>)`, with reasons `unreadable`, `appeared`, `parent_changed`, `identity_changed`,
+  `mode_changed`, `link_count_changed`, `size_changed`, and `digest_changed`.
+- Cleanup releases are retryable and idempotent: no scalar, session, owner, or map entry is dropped
+  before its exact release succeeds, and a cleanup that cannot reach zero terminates the request ledger
+  as `cleanup_incomplete` rather than publishing a success with residual current work. An exact release
+  larger than the owner still holds is not absorbed: it fails closed as `decision-work owner
+  over-release: <owner> owns <n>, release requested <m>`. Session index ownership is released per key,
+  and never as an aggregate that a still-unreleased key would double-release on the next attempt.
+- A cleanup fault that a retry repaired is consumed, not stored unread: it becomes a note on the primary
+  diagnostic when the request already failed, and otherwise reaches the handler's own error log as
+  `recovered cleanup fault: <bounded json>` with its attempt count and fault text. A clean request emits
+  nothing.
+- The read routes' publication point is `_HTTPReadResponseSlot.prove_and_take` followed by
+  `prepared.publish`, and it runs in `do_GET` *after* the route and both of its context-manager
+  teardowns. The pinned lock unlock and the four pinned descriptor closes therefore precede the final
+  proof rather than following it. A slot that was not proved refuses to hand over its bytes
+  (`prepared read response was not proved publishable`), and a failed proof publishes no success byte,
+  logs `prepared read response cannot publish with unaccounted current work`, and terminates the ledger
+  as `cleanup_incomplete`.
+- A filesystem-origin `OSError` raised by the post-route unlock or descriptor close reaches the same
+  typed 400 family. The already-prepared success is displaced first, so a proven-but-superseded response
+  can never replace the typed diagnostic. If that disposal fails, the ledger state is unknown: nothing is
+  published, the disposal fault is recorded on the primary diagnostic and logged, and the connection
+  closes.
+- One MR-list request performs exactly five physical `remote_project.json` descriptor reads with named
+  owners: the project gate pins the descriptor before locking, reproves it once on acquisition and once
+  at its terminal fence, `stable_project_id` charges and parses the single accounted copy the subject
+  comparison uses, and the final authority fence reproves those exact owned bytes.
+- The dispatcher arm is a shared correction the merge-request mutation and GC routes reuse. It does not
+  make their own product work complete: those routes remain separately reviewed successors and still
+  owe their own ledger/deadline/accounting evidence.
 
 ### Lock and idempotency
 
