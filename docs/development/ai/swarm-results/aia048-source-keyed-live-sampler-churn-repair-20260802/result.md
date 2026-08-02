@@ -1,8 +1,8 @@
 # AIA-048 Source-keyed Live-Sampler Churn Repair Result
 
-Date: 2026-08-02  
+Date: 2026-08-02
 Status: implementation candidate frozen; manager Cargo reproduction and fresh
-exact review still required  
+exact review still required
 Packet: `docs/development/ai/task-packets/aia048-source-keyed-live-sampler-churn-repair-20260802.md`
 
 This report does **not** accept AIA-048, AIA-046, File Ancestry, or CFR-168.
