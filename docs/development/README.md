@@ -4,18 +4,21 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 ## Current Operating Snapshot
 
-Last audited: 2026-08-02 after the CFR-168 closure-state and critical-path
-re-audit.
+Last audited: 2026-08-02 at canonical `808513a`, after Python accepted-input
+composition and the AIA-048 source-keyed live-sampler repair were accepted and
+integrated.
 
 - Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
 - CFB detail ledger: 138 total; 135 `fixed`, 3 `investigating`. Open/investigating count: 3.
 - CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, 6 `investigating`. Open/investigating count: 6.
 - Final installed `/tmp/codefire-cfr167-final.KWa8TC/bin/codefire` has source-matching SHA-256 `1483874b4c1de4a78478595d5d158cf34a12e5ec3b05255dfc8819f511f00272`; policy/coverage reversal, sealed digest binding, and canonical Dogfood pass.
-- The current Git worktree contains the intentional uncommitted review, invariant-fix, regression, ADR, and management-document packages. They remain classified project state and must not be destructively cleaned or presented as a clean checkpoint.
+- The canonical CFR-168 integration worktree is clean at this audit. Other preserved task worktrees remain project state and must not be destructively cleaned or mistaken for canonical progress.
 - CFB-120..132 and the complete Stage 1 Dogfood-blocker lifecycle are closed. Canonical Algorithm is now sealed at `CF-COMMIT-e5ca290905c2a4b5e2c05bd4` with Atom hash schema 4, `sealed-snapshot-v1`, `open-clean`, and zero Fires; the configured legacy repository was not mutated.
 - RVC-011 / CFR-161 is closed through Install, installed counterexample replay, both real-repository read-only probes, canonical trace-warning verification, and Retrospect. ADR-013 now owns the typed committable decision and non-relaxable safety floor.
 - RVC-039 / CFR-162 is closed through the full lifecycle. ADR-014 makes unresolved text, binary, and semantic merge facts authoritative blockers and makes `merge --continue` the explicit validated resolution boundary.
 - `BATCH-2026-07-review-portfolio-completion` remains frozen. Roots through CFR-167/CFB-134 completed through Retrospect; CFB-133, admitted CFR-168 blockers CFB-136/138, and CFR-168..173 are the 9 active issues. No unrelated Discovery is admitted until the batch completes.
+- CFR-168 Python accepted-input composition is source accepted and integrated through exact candidate `cf1ac6a`, canonical product composition `5d3f351`, writer evidence `1d59156`, and exact review `b4a3ef3`. Candidate-bound CLI 228/228 and full Python 767/767 gates passed. This satisfies the `B2` product-composition resolution only; `B1`, `B3`, `C14`, MR-write, Install, Dogfood, and CFR-168 Close remain open.
+- AIA-048 is accepted and integrated through implementation `e533a33`, result `0e24029`, exact review `9826a7a`, and result-format normalization `808513a`; the canonical AI tool suite passed 266/266 after integration. File Ancestry candidate `2f1a083` has source-keyed fmt and focused 40/40 PASS evidence, while its broader Rust gates and exact product review remain pending.
 - AIA-047 retains the historical experimental foundation integrated at `00ad88562068a6101a7530b84d5f52b0cff559f0`; its recorded L1.1-L1.5 completion and GPT-5.6/Codex fallback review remain facts about that checkpoint. A later Cargo/KGI authority audit reopened L1.5 authority hardening. Its local implementation WIP is preserved but is not a CFR-168 product-source prerequisite, so it no longer precedes an available product candidate, review, or integration lane. L1.6 remains blocked until that hardening is independently accepted: no manager-owned Cargo/KGI manifests or clean-validator live-arm anchor exists, v1 always returns `BLOCK`, and no live v2 `ALLOW` exists. This changes no CodeFire product bytes and proves no live reduction in review recurrence.
 - The base environment still does not expose `cargo` on `PATH`; a durable pinned toolchain/CI identity remains release work.
 
@@ -55,7 +58,7 @@ Before starting implementation:
 
 The CFB-120..132, CFR-161, CFR-162, CFR-163/CFB-135, CFR-164, CFR-165/CFR-174/CFR-175, CFR-166/CFB-134, and CFR-167 roots are complete. The active constrained work is:
 
-1. Complete CFR-168/CFB-136/CFB-138 product-source work, exact review and canonical integration. The separate source-keyed Cargo evidence control remains required for Rust candidate evidence; AIA-047 L1.5 and review-system redesign do not become product prerequisites.
+1. Complete CFR-168/CFB-136/CFB-138 product-source work, exact review and canonical integration. The accepted AIA-048 source-keyed Cargo evidence control is now the required Rust-candidate validation path; AIA-047 L1.5 and review-system redesign do not become product prerequisites.
 2. Complete CFR-168 full gates, source-bound Install, installed reversals, canonical Dogfood, evidence synchronization, Close and Retrospect.
 3. Resume the preserved AIA-047 authority-hardening WIP after CFR-168 source acceptance, or earlier only in a conflict-free lane while every ready product lane is already serviced; then unblock L1.6 and its rooted comparison generations.
 4. Burn down architecture, automation, and claim roots in the frozen dependency order; CFB-133 closes with CFR-170.
