@@ -642,6 +642,41 @@ class AccountedCommitSignaturePolicyTests(unittest.TestCase):
         owner.close()
         self.assert_released(ledger)
 
+    def test_collection_allocation_failure_preserves_exact_prior_chain(self):
+        Owner = NAMESPACE["AccountedCommitSignaturePolicy"]
+        commit = self.signed(label="allocation-chain")
+        graph = {"CF-COMMIT-head": commit}
+
+        for target in ("frontier", "seen"):
+            with self.subTest(target=target):
+                ledger = self.ledger()
+                owner = Owner(self.policy_raw(), ledger, self.loader(graph))
+                primary = MemoryError(f"{target} exact primary")
+                prior = LookupError(f"{target} exact prior")
+                primary.__cause__ = prior
+
+                if target == "frontier":
+                    def fail_append(*_args, failure=primary):
+                        raise failure
+
+                    owner._append_frontier = fail_append
+                    action = lambda: owner._push_frontier(
+                        "CF-COMMIT-head", True, edge=False
+                    )
+                else:
+                    def fail_insert(*_args, failure=primary):
+                        raise failure
+
+                    owner._insert_seen = fail_insert
+                    action = lambda: owner._mark_seen("CF-COMMIT-head")
+
+                with self.assertRaises(MemoryError) as caught:
+                    action()
+                self.assertIs(caught.exception, primary)
+                self.assertIs(caught.exception.__cause__, prior)
+                owner.close()
+                self.assert_released(ledger)
+
     def test_hmac_key_sort_is_deadline_polled(self):
         payload = {
             "type": "commit",

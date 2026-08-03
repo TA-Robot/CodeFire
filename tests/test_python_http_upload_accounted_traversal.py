@@ -4500,6 +4500,27 @@ class PythonHTTPUploadAccountedTraversalTests(unittest.TestCase):
         )
         self.assertEqual(len({id(error) for error in chain}), len(chain))
 
+    def test_later_cleanup_detach_never_mutates_first_shared_tail(self):
+        first = RuntimeError("first cleanup")
+        shared = LookupError("shared cleanup tail")
+        tail = OSError("protected cleanup tail")
+        later = ValueError("later cleanup")
+        later_prefix = KeyError("later cleanup prefix")
+        first.__cause__ = shared
+        shared.__cause__ = tail
+        later.__cause__ = later_prefix
+        later_prefix.__cause__ = shared
+
+        retained = self.globals["_retain_first_cleanup_failure"](
+            first, later
+        )
+
+        self.assertIs(retained, first)
+        self.assertIs(first.__cause__, shared)
+        self.assertIs(shared.__cause__, tail)
+        self.assertIsNone(later.__cause__)
+        self.assertIsNone(later_prefix.__cause__)
+
     def test_persistent_descriptor_fault_sweeps_once_then_drains(self):
         source_type = self.globals["_AccountedUploadCommitSource"]
         descriptor_type = self.globals["_SealedValidationFileDescriptor"]

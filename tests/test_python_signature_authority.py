@@ -777,6 +777,43 @@ class PythonSignatureAuthorityTests(unittest.TestCase):
         authority.close(ledger)
         self.assert_closed(ledger)
 
+    def test_close_later_fault_cannot_mutate_first_shared_tail(self):
+        self.write_policy()
+        ledger = self.ledger()
+        authority = self.Authority(self.project, ledger)
+        self.prepare_noop(authority, ledger)
+        close_capability = authority._close_capability
+        first = RuntimeError("exact authority first cleanup")
+        shared = LookupError("authority shared cleanup")
+        tail = OSError("authority protected cleanup tail")
+        later = ValueError("authority later cleanup")
+        first.__cause__ = shared
+        shared.__cause__ = tail
+        later.__cause__ = shared
+        calls = []
+
+        def fail_two(attribute):
+            calls.append(attribute)
+            if len(calls) == 1:
+                raise first
+            if len(calls) == 2:
+                raise later
+            return close_capability(attribute)
+
+        authority._close_capability = fail_two
+        try:
+            with self.assertRaises(RuntimeError) as caught:
+                authority.close(ledger)
+        finally:
+            authority._close_capability = close_capability
+        self.assertIs(caught.exception, first)
+        self.assertIs(first.__cause__, shared)
+        self.assertIs(shared.__cause__, tail)
+        self.assertIsNone(later.__cause__)
+        self.assertGreaterEqual(len(calls), 3)
+        authority.close(ledger)
+        self.assert_closed(ledger)
+
     def test_policy_first_errors_precede_loader(self):
         cases = (
             (b"[", "Expecting value"),
@@ -935,6 +972,76 @@ class PythonSignatureAuthorityTests(unittest.TestCase):
         self.assertTrue(
             all(raw is None and digest is None for raw, digest in observations)
         )
+        self.assert_closed(ledger)
+
+    def test_prepare_policy_preserves_generic_child_cleanup_chain(self):
+        self.write_policy()
+        ledger = self.ledger()
+        authority = self.Authority(self.project, ledger)
+        owner_class = self.Authority.prepare_policy.__globals__[
+            "AccountedCommitSignaturePolicy"
+        ]
+        primary = RuntimeError("exact child primary")
+        cleanup = OSError("exact child cleanup")
+        cleanup_prior = LookupError("exact child cleanup prior")
+        primary.__cause__ = cleanup
+        cleanup.__cause__ = cleanup_prior
+
+        class FailingOwner:
+            def __init__(self, *_args):
+                raise primary
+
+        self.Authority.prepare_policy.__globals__[
+            "AccountedCommitSignaturePolicy"
+        ] = FailingOwner
+        try:
+            with self.assertRaises(RuntimeError) as caught:
+                authority.prepare_policy(self.empty_loader(), ledger)
+        finally:
+            self.Authority.prepare_policy.__globals__[
+                "AccountedCommitSignaturePolicy"
+            ] = owner_class
+        self.assertIs(caught.exception, primary)
+        self.assertIs(caught.exception.__cause__, cleanup)
+        self.assertIs(cleanup.__cause__, cleanup_prior)
+        authority.close(ledger)
+        self.assert_closed(ledger)
+
+    def test_decoder_payload_is_replaced_but_cleanup_tail_survives(self):
+        self.write_policy()
+        ledger = self.ledger()
+        authority = self.Authority(self.project, ledger)
+        owner_class = self.Authority.prepare_policy.__globals__[
+            "AccountedCommitSignaturePolicy"
+        ]
+        decoder = json.JSONDecodeError(
+            "injected decoder", "distinctive decoder payload", 3
+        )
+        cleanup = RuntimeError("exact decoder cleanup")
+        cleanup_prior = LookupError("exact decoder cleanup prior")
+        decoder.__cause__ = cleanup
+        cleanup.__cause__ = cleanup_prior
+
+        class FailingOwner:
+            def __init__(self, *_args):
+                raise decoder
+
+        self.Authority.prepare_policy.__globals__[
+            "AccountedCommitSignaturePolicy"
+        ] = FailingOwner
+        try:
+            with self.assertRaises(self.namespace["CFError"]) as caught:
+                authority.prepare_policy(self.empty_loader(), ledger)
+        finally:
+            self.Authority.prepare_policy.__globals__[
+                "AccountedCommitSignaturePolicy"
+            ] = owner_class
+        self.assertIsNot(caught.exception, decoder)
+        self.assertFalse(hasattr(caught.exception, "doc"))
+        self.assertIs(caught.exception.__cause__, cleanup)
+        self.assertIs(cleanup.__cause__, cleanup_prior)
+        self.assertIsNone(decoder.__cause__)
+        authority.close(ledger)
         self.assert_closed(ledger)
 
 

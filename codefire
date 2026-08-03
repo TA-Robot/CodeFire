@@ -5052,11 +5052,28 @@ def _link_primary_cleanup_exception(
 def _retain_first_cleanup_failure(
     first: BaseException | None, candidate: BaseException
 ) -> BaseException:
-    """Retain one exact cleanup fault and detach every later fault."""
+    """Retain one exact cleanup fault without mutating its reachable chain."""
     if first is None:
         _detach_effective_exception_tracebacks(candidate)
         return candidate
-    _detach_exception_chain(candidate)
+    protected: set[int] = set()
+    current: BaseException | None = first
+    while current is not None and id(current) not in protected:
+        protected.add(id(current))
+        current = current.__cause__ or current.__context__
+    current = candidate
+    visited: set[int] = set()
+    while (
+        current is not None
+        and id(current) not in visited
+        and id(current) not in protected
+    ):
+        visited.add(id(current))
+        following = current.__cause__ or current.__context__
+        current.__traceback__ = None
+        current.__cause__ = None
+        current.__context__ = None
+        current = following
     return first
 
 
@@ -5896,23 +5913,41 @@ class AccountedRemoteSignaturePolicyAuthority:
                 "commit signature policy JSON is invalid: "
                 f"{error.msg}: line {error.lineno} column {error.colno}"
             )
-            _detach_exception_chain(error)
+            cleanup_error = error.__cause__
+            error.__traceback__ = None
+            error.__cause__ = None
+            error.__context__ = None
             raw = None
             failure = CFError(message)
+            if cleanup_error is not None:
+                _detach_effective_exception_tracebacks(cleanup_error)
+                failure = _link_primary_cleanup_exception(
+                    failure, cleanup_error
+                )
         except UnicodeDecodeError as error:
             message = (
                 "commit signature policy UTF-8 is invalid: "
                 f"byte {error.start}: {error.reason}"
             )
-            _detach_exception_chain(error)
+            cleanup_error = error.__cause__
+            error.__traceback__ = None
+            error.__cause__ = None
+            error.__context__ = None
             raw = None
             failure = CFError(message)
+            if cleanup_error is not None:
+                _detach_effective_exception_tracebacks(cleanup_error)
+                failure = _link_primary_cleanup_exception(
+                    failure, cleanup_error
+                )
         except BaseException as error:
-            _detach_exception_chain(error)
+            _detach_effective_exception_tracebacks(error)
             raw = None
             failure = error
         if failure is not None:
-            raise failure.with_traceback(None) from None
+            if failure.__cause__ is not None:
+                raise failure.with_traceback(None) from failure.__cause__
+            raise failure.with_traceback(None)
         self._policy_owner = owner
         raw = None
         return owner
@@ -6637,17 +6672,18 @@ class AccountedRemoteSignaturePolicyAuthority:
             try:
                 self._close_capability(attribute)
             except BaseException as error:
-                if first_failure is None:
-                    first_failure = error
+                first_failure = _retain_first_cleanup_failure(
+                    first_failure, error
+                )
         slots = self._pair_probe_fd_slots
         if slots is not None:
             for slot in slots:
                 try:
                     _CallbackFreeFD.close(slot)
                 except BaseException as error:
-                    _detach_exception_chain(error)
-                    if first_failure is None:
-                        first_failure = error
+                    first_failure = _retain_first_cleanup_failure(
+                        first_failure, error
+                    )
         self._pair_probe_fd_slots = None
         self._pair_policy_scratch = None
         slot = None
@@ -6662,8 +6698,9 @@ class AccountedRemoteSignaturePolicyAuthority:
             try:
                 transition.release_all()
             except BaseException as error:
-                if first_failure is None:
-                    first_failure = error
+                first_failure = _retain_first_cleanup_failure(
+                    first_failure, error
+                )
         complete = self._transition_done(
             self._policy_transition
         ) and self._transition_done(
@@ -7067,7 +7104,7 @@ class AccountedCommitSignaturePolicy:
                 )
             except BaseException as error:
                 allocation_failure = error
-                _detach_exception_chain(error)
+                _detach_effective_exception_tracebacks(error)
             if allocation_failure is not None:
                 while len(self._frontier) > count_before:
                     self._frontier.pop()
@@ -7141,7 +7178,7 @@ class AccountedCommitSignaturePolicy:
                 self._insert_seen(self._seen, object_id)
             except BaseException as error:
                 allocation_failure = error
-                _detach_exception_chain(error)
+                _detach_effective_exception_tracebacks(error)
             if allocation_failure is not None:
                 if object_id in self._seen:
                     self._seen.remove(object_id)
@@ -8072,9 +8109,7 @@ def enforce_remote_commit_signature_policy_accounted(
     try:
         authority.close(active_ledger)
     except BaseException as exc:
-        _detach_effective_exception_tracebacks(exc)
-        if cleanup_error is None:
-            cleanup_error = exc
+        cleanup_error = _retain_first_cleanup_failure(cleanup_error, exc)
     # C14 precedence: a cleanup fault never displaces the operation decision.
     # The caller sees the policy decision it asked for, with the cleanup fault
     # attached as its cause; a cleanup fault alone still surfaces the *first*
@@ -8889,11 +8924,34 @@ class AccountedServerVerification:
             temporary_bytes = 0
             return policy, retained_bytes
         finally:
+            primary_error = sys.exc_info()[1]
+            if primary_error is not None:
+                _detach_effective_exception_tracebacks(primary_error)
             raw = None
-            self._cancel_owned_permit("_policy_read_permit")
-            self._cancel_owned_permit("_policy_permit")
+            cleanup_error: BaseException | None = None
+            for attribute in ("_policy_read_permit", "_policy_permit"):
+                try:
+                    self._cancel_owned_permit(attribute)
+                except BaseException as error:
+                    cleanup_error = _retain_first_cleanup_failure(
+                        cleanup_error, error
+                    )
             if file_descriptor >= 0:
-                os.close(file_descriptor)
+                descriptor = file_descriptor
+                file_descriptor = -1
+                try:
+                    os.close(descriptor)
+                except BaseException as error:
+                    cleanup_error = _retain_first_cleanup_failure(
+                        cleanup_error, error
+                    )
+            if cleanup_error is not None:
+                if primary_error is not None:
+                    linked = _link_primary_cleanup_exception(
+                        primary_error, cleanup_error
+                    )
+                    raise linked.with_traceback(None) from linked.__cause__
+                raise cleanup_error.with_traceback(None)
 
     def _revalidate_project_identity(self) -> None:
         self._ensure_open()
@@ -8934,8 +8992,26 @@ class AccountedServerVerification:
                 "server verification project changed before execution"
             ) from exc
         finally:
+            primary_error = sys.exc_info()[1]
+            if primary_error is not None:
+                _detach_effective_exception_tracebacks(primary_error)
+            cleanup_error: BaseException | None = None
             if ambient_fd >= 0:
-                os.close(ambient_fd)
+                descriptor = ambient_fd
+                ambient_fd = -1
+                try:
+                    os.close(descriptor)
+                except BaseException as error:
+                    cleanup_error = _retain_first_cleanup_failure(
+                        cleanup_error, error
+                    )
+            if cleanup_error is not None:
+                if primary_error is not None:
+                    linked = _link_primary_cleanup_exception(
+                        primary_error, cleanup_error
+                    )
+                    raise linked.with_traceback(None) from linked.__cause__
+                raise cleanup_error.with_traceback(None)
 
     def _revalidate_missing_project(self) -> None:
         self._ensure_open()
@@ -9059,10 +9135,28 @@ class AccountedServerVerification:
                     "server verification policy changed before execution"
                 )
         finally:
+            primary_error = sys.exc_info()[1]
+            if primary_error is not None:
+                _detach_effective_exception_tracebacks(primary_error)
+            cleanup_error: BaseException | None = None
             if raw is not None:
                 raw.clear()
             if file_descriptor >= 0:
-                os.close(file_descriptor)
+                descriptor = file_descriptor
+                file_descriptor = -1
+                try:
+                    os.close(descriptor)
+                except BaseException as error:
+                    cleanup_error = _retain_first_cleanup_failure(
+                        cleanup_error, error
+                    )
+            if cleanup_error is not None:
+                if primary_error is not None:
+                    linked = _link_primary_cleanup_exception(
+                        primary_error, cleanup_error
+                    )
+                    raise linked.with_traceback(None) from linked.__cause__
+                raise cleanup_error.with_traceback(None)
 
     def _revalidate_subject(self) -> None:
         self._revalidate_project_identity()
@@ -9475,8 +9569,12 @@ class AccountedServerVerification:
                 f"server verification failed: {check_id}: "
                 "cwd escapes remote project"
             )
-        current_fd = os.dup(project_fd)
+        current_fd = -1
+        next_fd = -1
+        result = -1
+        primary_error: BaseException | None = None
         try:
+            current_fd = os.dup(project_fd)
             for component in relative.parts:
                 if component in {"", "."}:
                     continue
@@ -9487,21 +9585,56 @@ class AccountedServerVerification:
                     | getattr(os, "O_NOFOLLOW", 0),
                     dir_fd=current_fd,
                 )
-                os.close(current_fd)
+                descriptor = current_fd
+                current_fd = -1
+                os.close(descriptor)
                 current_fd = next_fd
-            return current_fd
+                next_fd = -1
+            result = current_fd
+            current_fd = -1
         except FileNotFoundError as exc:
-            os.close(current_fd)
-            raise CFError(
+            _detach_effective_exception_tracebacks(exc)
+            primary_error = CFError(
                 f"server verification failed: {check_id}: "
                 f"cwd does not exist: {cwd_value}"
-            ) from exc
+            )
+            primary_error.__cause__ = exc
+            primary_error.__suppress_context__ = True
         except OSError as exc:
-            os.close(current_fd)
-            raise CFError(
+            _detach_effective_exception_tracebacks(exc)
+            primary_error = CFError(
                 f"server verification failed: {check_id}: "
                 f"cwd is not a stable directory: {cwd_value}"
-            ) from exc
+            )
+            primary_error.__cause__ = exc
+            primary_error.__suppress_context__ = True
+        except BaseException as error:
+            _detach_effective_exception_tracebacks(error)
+            primary_error = error
+        cleanup_error: BaseException | None = None
+        for descriptor in (current_fd, next_fd):
+            if descriptor < 0:
+                continue
+            try:
+                os.close(descriptor)
+            except BaseException as error:
+                cleanup_error = _retain_first_cleanup_failure(
+                    cleanup_error, error
+                )
+        if primary_error is not None:
+            if cleanup_error is not None:
+                linked = _link_primary_cleanup_exception(
+                    primary_error, cleanup_error
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            if primary_error.__cause__ is not None:
+                raise primary_error.with_traceback(
+                    None
+                ) from primary_error.__cause__
+            raise primary_error.with_traceback(None)
+        if cleanup_error is not None:
+            raise cleanup_error.with_traceback(None)
+        return result
 
     _close_capability = staticmethod(_CLOSE_FILE_DESCRIPTOR)
 
@@ -9567,33 +9700,46 @@ class AccountedServerVerification:
             try:
                 self._kill_process(process)
             except BaseException as exc:
-                cleanup_error = exc
+                cleanup_error = _retain_first_cleanup_failure(
+                    cleanup_error, exc
+                )
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
                 except BaseException as fallback_exc:
-                    if cleanup_error is None:
-                        cleanup_error = fallback_exc
+                    cleanup_error = _retain_first_cleanup_failure(
+                        cleanup_error, fallback_exc
+                    )
         reaped = False
         try:
             self._wait_process(process, self.PROCESS_REAP_SECONDS)
             reaped = True
         except BaseException as exc:
-            if cleanup_error is None:
-                cleanup_error = exc
+            cleanup_error = _retain_first_cleanup_failure(
+                cleanup_error, exc
+            )
             try:
                 process.kill()
-            except BaseException:
-                pass
+            except BaseException as fallback_exc:
+                cleanup_error = _retain_first_cleanup_failure(
+                    cleanup_error, fallback_exc
+                )
             try:
                 process.wait(timeout=self.PROCESS_REAP_SECONDS)
                 reaped = True
-            except BaseException:
-                pass
+            except BaseException as fallback_exc:
+                cleanup_error = _retain_first_cleanup_failure(
+                    cleanup_error, fallback_exc
+                )
         if reaped:
             if process.stdout is not None:
-                process.stdout.close()
+                try:
+                    process.stdout.close()
+                except BaseException as exc:
+                    cleanup_error = _retain_first_cleanup_failure(
+                        cleanup_error, exc
+                    )
             self._process = None
         if cleanup_error is not None:
             _detach_effective_exception_tracebacks(cleanup_error)
@@ -12529,11 +12675,11 @@ class AccountedHTTPUploadAncestry:
             failure = error
         committed = len(self._frontier) == count_before + 1
         if failure is not None and committed:
-            _detach_ancestry_exception_chain(failure)
+            _detach_effective_exception_tracebacks(failure)
         elif failure is not None:
-            _detach_ancestry_exception_chain(failure)
+            _detach_effective_exception_tracebacks(failure)
             self._rollback_transition(transition)
-            raise failure from None
+            raise failure.with_traceback(None)
         elif not committed:
             self._rollback_transition(transition)
             raise CFError("HTTP upload ancestry frontier append did not commit")
@@ -12574,11 +12720,11 @@ class AccountedHTTPUploadAncestry:
             failure = error
         committed = len(self._seen) == count_before + 1 and object_id in self._seen
         if failure is not None and committed:
-            _detach_ancestry_exception_chain(failure)
+            _detach_effective_exception_tracebacks(failure)
         elif failure is not None:
-            _detach_ancestry_exception_chain(failure)
+            _detach_effective_exception_tracebacks(failure)
             self._rollback_transition(transition)
-            raise failure from None
+            raise failure.with_traceback(None)
         elif not committed:
             self._rollback_transition(transition)
             raise CFError("HTTP upload ancestry seen insertion did not commit")

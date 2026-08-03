@@ -521,6 +521,206 @@ class PythonExternalVerificationTests(unittest.TestCase):
         self.assertIsNotNone(process.poll())
         self.assert_closed(ledger)
 
+    def test_stop_process_retains_first_fault_when_stdout_close_fails(self):
+        first = RuntimeError("exact first process cleanup")
+        later = OSError("later stdout cleanup")
+        calls = []
+
+        class Stdout:
+            def close(inner):
+                calls.append("stdout")
+                raise later
+
+        class Process:
+            pid = 123456789
+            stdout = Stdout()
+
+            @staticmethod
+            def poll():
+                return None
+
+        owner = self.Owner.__new__(self.Owner)
+        owner._process = Process()
+        kill_process = self.Owner._kill_process
+        wait_process = self.Owner._wait_process
+        killpg = os.killpg
+
+        def fail_first(_process):
+            calls.append("kill")
+            raise first
+
+        def reap(_process, _timeout):
+            calls.append("wait")
+            return 0
+
+        self.Owner._kill_process = staticmethod(fail_first)
+        self.Owner._wait_process = staticmethod(reap)
+        os.killpg = lambda *_args: calls.append("fallback-kill")
+        try:
+            with self.assertRaises(RuntimeError) as caught:
+                owner._stop_process()
+        finally:
+            self.Owner._kill_process = staticmethod(kill_process)
+            self.Owner._wait_process = staticmethod(wait_process)
+            os.killpg = killpg
+        self.assertIs(caught.exception, first)
+        self.assertIsNone(first.__cause__)
+        self.assertIsNone(later.__cause__)
+        self.assertEqual(calls, ["kill", "fallback-kill", "wait", "stdout"])
+        self.assertIsNone(owner._process)
+
+    def test_cwd_walk_sweeps_unpublished_child_after_primary(self):
+        primary = RuntimeError("exact cwd body primary")
+        cleanup = OSError("exact cwd cleanup")
+        close_calls = []
+        dup = os.dup
+        open_fd = os.open
+        close_fd = os.close
+
+        os.dup = lambda _descriptor: 7001
+        os.open = lambda *_args, **_kwargs: 7002
+
+        def close(descriptor):
+            close_calls.append(descriptor)
+            if descriptor == 7001:
+                raise primary
+            if descriptor == 7002:
+                raise cleanup
+            return close_fd(descriptor)
+
+        os.close = close
+        try:
+            with self.assertRaises(RuntimeError) as caught:
+                self.Owner._open_cwd_capability(10, "child", "cwd-sweep")
+        finally:
+            os.dup = dup
+            os.open = open_fd
+            os.close = close_fd
+        self.assertIs(caught.exception, primary)
+        self.assertIs(caught.exception.__cause__, cleanup)
+        self.assertEqual(close_calls, [7001, 7002])
+
+    def test_policy_read_keeps_body_primary_and_finishes_owner_sweep(self):
+        self.write_policy([{"id": "read", "command": "printf ok"}])
+        ledger = self.ledger()
+        primary = RuntimeError("exact policy read primary")
+        cleanup = OSError("exact policy read cleanup")
+        loads = json.loads
+        close_fd = os.close
+        armed = False
+        failed = False
+        close_calls = []
+
+        def fail_load(*_args, **_kwargs):
+            nonlocal armed
+            armed = True
+            raise primary
+
+        def close(descriptor):
+            nonlocal failed
+            result = close_fd(descriptor)
+            if armed:
+                close_calls.append(descriptor)
+                if not failed:
+                    failed = True
+                    raise cleanup
+            return result
+
+        json.loads = fail_load
+        os.close = close
+        try:
+            with self.assertRaises(RuntimeError) as caught:
+                self.prepare(
+                    self.project,
+                    "main",
+                    self.commit_id,
+                    ledger,
+                    output_limit_bytes=64,
+                )
+        finally:
+            json.loads = loads
+            os.close = close_fd
+        self.assertIs(caught.exception, primary)
+        self.assertIs(caught.exception.__cause__, cleanup)
+        self.assertTrue(failed)
+        self.assertEqual(len(close_calls), 1)
+        self.assert_closed(ledger)
+
+    def test_revalidation_close_faults_link_below_exact_body_primary(self):
+        self.write_policy([{"id": "fence", "command": "printf ok"}])
+
+        ledger = self.ledger()
+        owner = self.prepare(
+            self.project, "main", self.commit_id, ledger, output_limit_bytes=64
+        )
+        primary = RuntimeError("exact project revalidation primary")
+        cleanup = OSError("exact project revalidation cleanup")
+        open_directory = self.Owner._revalidate_project_identity.__globals__[
+            "_open_directory_nofollow"
+        ]
+        fstat = os.fstat
+        close_fd = os.close
+        fake_fd = 7101
+        self.Owner._revalidate_project_identity.__globals__[
+            "_open_directory_nofollow"
+        ] = lambda _path: fake_fd
+        os.fstat = lambda descriptor: (
+            (_ for _ in ()).throw(primary)
+            if descriptor == owner._project_fd
+            else fstat(descriptor)
+        )
+        os.close = lambda descriptor: (
+            (_ for _ in ()).throw(cleanup)
+            if descriptor == fake_fd
+            else close_fd(descriptor)
+        )
+        try:
+            with self.assertRaises(RuntimeError) as caught:
+                owner._revalidate_project_identity()
+        finally:
+            self.Owner._revalidate_project_identity.__globals__[
+                "_open_directory_nofollow"
+            ] = open_directory
+            os.fstat = fstat
+            os.close = close_fd
+        self.assertIs(caught.exception, primary)
+        self.assertIs(caught.exception.__cause__, cleanup)
+        owner.close()
+        self.assert_closed(ledger)
+
+        ledger = self.ledger()
+        owner = self.prepare(
+            self.project, "main", self.commit_id, ledger, output_limit_bytes=64
+        )
+        primary = RuntimeError("exact policy revalidation primary")
+        cleanup = OSError("exact policy revalidation cleanup")
+        open_fd = os.open
+        fstat = os.fstat
+        close_fd = os.close
+        fake_fd = 7102
+        os.open = lambda *_args, **_kwargs: fake_fd
+        os.fstat = lambda descriptor: (
+            (_ for _ in ()).throw(primary)
+            if descriptor == owner._policy_fd
+            else fstat(descriptor)
+        )
+        os.close = lambda descriptor: (
+            (_ for _ in ()).throw(cleanup)
+            if descriptor == fake_fd
+            else close_fd(descriptor)
+        )
+        try:
+            with self.assertRaises(RuntimeError) as caught:
+                owner._revalidate_policy()
+        finally:
+            os.open = open_fd
+            os.fstat = fstat
+            os.close = close_fd
+        self.assertIs(caught.exception, primary)
+        self.assertIs(caught.exception.__cause__, cleanup)
+        owner.close()
+        self.assert_closed(ledger)
+
     def test_spawn_read_kill_faults_reap_and_cleanup(self):
         self.write_policy([{"id": "fault", "command": "sleep 30"}])
         ledger = self.ledger()
@@ -1250,32 +1450,32 @@ class PythonExternalVerificationTests(unittest.TestCase):
                 consume_calls = 0
                 cancel_failures = 0
                 target_permit = None
+                consume_fault = self.namespace["CFError"](
+                    "injected setup consume fault"
+                )
+                cancel_fault = self.namespace["CFError"](
+                    "injected setup cancel fault"
+                )
 
                 def fail_consume(permit, **kwargs):
                     nonlocal consume_calls, target_permit
                     consume_calls += 1
                     if consume_calls == target_call:
                         target_permit = permit
-                        raise self.namespace["CFError"](
-                            "injected setup consume fault"
-                        )
+                        raise consume_fault
                     return consume_reserved(permit, **kwargs)
 
                 def fail_cancel(permit):
                     nonlocal cancel_failures
                     if permit is target_permit and cancel_failures < 2:
                         cancel_failures += 1
-                        raise self.namespace["CFError"](
-                            "injected setup cancel fault"
-                        )
+                        raise cancel_fault
                     return cancel_permit(permit)
 
                 ledger.consume_reserved = fail_consume
                 ledger.cancel_permit = fail_cancel
                 owner = object.__new__(self.Owner)
-                with self.assertRaisesRegex(
-                    self.namespace["CFError"], "setup cancel fault"
-                ):
+                with self.assertRaises(self.namespace["CFError"]) as caught:
                     self.Owner.__init__(
                         owner,
                         project,
@@ -1285,6 +1485,11 @@ class PythonExternalVerificationTests(unittest.TestCase):
                         output_limit_bytes=0,
                         allow_missing_project=allow_missing,
                     )
+                if name == "policy-read":
+                    self.assertIs(caught.exception, consume_fault)
+                    self.assertIs(caught.exception.__cause__, cancel_fault)
+                else:
+                    self.assertIs(caught.exception, cancel_fault)
                 self.assertEqual(cancel_failures, 2)
                 self.assertIs(getattr(owner, attribute), target_permit)
                 self.assertTrue(ledger.permit_is_open(target_permit))

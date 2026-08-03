@@ -453,6 +453,41 @@ class PythonAncestryOwnerTests(unittest.TestCase):
             self.Owner._insert_seen = staticmethod(original_seen)
         self.assert_closed(ledger)
 
+    def test_collection_allocation_failure_preserves_exact_prior_chain(self):
+        original_append = self.Owner._append_frontier
+        original_insert = self.Owner._insert_seen
+        for target in ("frontier", "seen"):
+            with self.subTest(target=target):
+                ledger = self.ledger()
+                owner = self.Owner(
+                    ledger, lambda _object_id: {"parents": []}
+                )
+                primary = MemoryError(f"{target} exact primary")
+                prior = LookupError(f"{target} exact prior")
+                primary.__cause__ = prior
+
+                def fail(*_args, failure=primary):
+                    raise failure
+
+                if target == "frontier":
+                    self.Owner._append_frontier = staticmethod(fail)
+                    action = lambda: owner._push_frontier(
+                        "head", 0, edge=False
+                    )
+                else:
+                    self.Owner._insert_seen = staticmethod(fail)
+                    action = lambda: owner._mark_seen("head")
+                try:
+                    with self.assertRaises(MemoryError) as caught:
+                        action()
+                finally:
+                    self.Owner._append_frontier = staticmethod(original_append)
+                    self.Owner._insert_seen = staticmethod(original_insert)
+                self.assertIs(caught.exception, primary)
+                self.assertIs(caught.exception.__cause__, prior)
+                owner.close()
+                self.assert_closed(ledger)
+
     def test_transition_handoff_faults_release_the_fixed_gate(self):
         transition_type = self.namespace["_AncestryPermitTransition"]
         adopt = transition_type.adopt_acquired
