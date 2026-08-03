@@ -20,6 +20,7 @@ import tempfile
 import threading
 import tracemalloc
 import unittest
+import weakref
 from pathlib import Path
 
 
@@ -4520,6 +4521,757 @@ class PythonHTTPUploadAccountedTraversalTests(unittest.TestCase):
         self.assertIs(shared.__cause__, tail)
         self.assertIsNone(later.__cause__)
         self.assertIsNone(later_prefix.__cause__)
+
+    def test_reused_first_cleanup_object_drops_later_traceback_payload(self):
+        """TR1: re-raising the retained first cleanup releases its frames.
+
+        The later candidate is the exact protected ``first`` object, so the
+        destructive prefix pass is empty and only the protected pass can
+        release anything.  A second protected object is armed through its own
+        named frame, so candidate-only clearing cannot pass this oracle.
+        """
+        retain = self.globals["_retain_first_cleanup_failure"]
+
+        class LaterFramePayload:
+            """One weak-referenceable local owned only by a later frame."""
+
+            def __init__(inner, label):
+                inner.label = label
+
+        def arm_protected_context_tail(error, monitor):
+            protected_tail_local = LaterFramePayload("tr1 protected tail")
+            monitor.append(weakref.ref(protected_tail_local))
+            raise error
+
+        def raise_reused_first_cleanup(error, monitor):
+            reused_first_local = LaterFramePayload("tr1 reused first")
+            monitor.append(weakref.ref(reused_first_local))
+            raise error
+
+        def payload_frames(roots, monitor):
+            """Name every reachable traceback frame owning a live sentinel."""
+            observed = []
+            seen = set()
+            pending = list(roots)
+            while pending:
+                error = pending.pop()
+                if error is None or id(error) in seen:
+                    continue
+                seen.add(id(error))
+                traceback = error.__traceback__
+                while traceback is not None:
+                    values = traceback.tb_frame.f_locals.values()
+                    for index, reference in enumerate(monitor):
+                        sentinel = reference()
+                        if sentinel is not None and any(
+                            value is sentinel for value in values
+                        ):
+                            observed.append(
+                                (traceback.tb_frame.f_code.co_name, index)
+                            )
+                    traceback = traceback.tb_next
+                pending.append(error.__cause__)
+                pending.append(error.__context__)
+            return sorted(observed)
+
+        def snapshot(errors):
+            return [
+                (
+                    error,
+                    error.__cause__,
+                    error.__context__,
+                    error.__suppress_context__,
+                )
+                for error in errors
+            ]
+
+        def assert_protected(before):
+            for error, cause, context, suppress in before:
+                self.assertIs(error.__cause__, cause)
+                self.assertIs(error.__context__, context)
+                self.assertIs(error.__suppress_context__, suppress)
+                self.assertIsNone(error.__traceback__)
+
+        first = RuntimeError("exact first cleanup")
+        middle = LookupError("protected cause middle")
+        tail = OSError("protected context tail")
+        first.__cause__ = middle
+        middle.__context__ = tail
+
+        # Every arming raise runs outside an active handler, so CPython
+        # rewrites no protected ``__context__`` before the snapshot is taken.
+        references = []
+        try:
+            arm_protected_context_tail(tail, references)
+        except OSError:
+            pass
+        try:
+            raise_reused_first_cleanup(first, references)
+        except RuntimeError as caught:
+            later = caught
+
+        self.assertIs(later, first)
+        self.assertEqual(
+            payload_frames([first], references),
+            [
+                ("arm_protected_context_tail", 0),
+                ("raise_reused_first_cleanup", 1),
+            ],
+        )
+
+        protected = snapshot([first, middle, tail])
+        retained = retain(first, later)
+
+        self.assertIs(retained, first)
+        assert_protected(protected)
+        self.assertIs(first.__cause__, middle)
+        self.assertIs(middle.__context__, tail)
+        self.assertIsNone(middle.__cause__)
+        self.assertIsNone(tail.__cause__)
+        self.assertIsNone(tail.__context__)
+        chain = []
+        current = first
+        while current is not None and all(
+            current is not visited for visited in chain
+        ):
+            chain.append(current)
+            current = current.__cause__ or current.__context__
+        self.assertEqual(chain, [first, middle, tail])
+        self.assertEqual(payload_frames([first], references), [])
+
+        # No strong reference to either sentinel ever escaped its own frame,
+        # while the protected graph is deliberately kept alive: the weak
+        # references can only die through the helper's traceback release.
+        gc.collect()
+        self.assertIsNone(references[0]())
+        self.assertIsNone(references[1]())
+
+    def test_reused_protected_cleanup_tail_drops_later_traceback_payload(self):
+        """TR2: re-raising a protected context tail releases its frames.
+
+        The effective ``first`` link is ``__context__`` with no ``__cause__``
+        overriding it, and the candidate is that exact protected tail.  The
+        other protected object is armed separately, so the whole protected
+        chain -- not just the candidate -- must lose its new tracebacks.
+        """
+        retain = self.globals["_retain_first_cleanup_failure"]
+
+        class LaterFramePayload:
+            """One weak-referenceable local owned only by a later frame."""
+
+            def __init__(inner, label):
+                inner.label = label
+
+        def arm_protected_first_cleanup(error, monitor):
+            protected_first_local = LaterFramePayload("tr2 protected first")
+            monitor.append(weakref.ref(protected_first_local))
+            raise error
+
+        def raise_reused_protected_tail(error, monitor):
+            reused_tail_local = LaterFramePayload("tr2 reused tail")
+            monitor.append(weakref.ref(reused_tail_local))
+            raise error
+
+        def payload_frames(roots, monitor):
+            """Name every reachable traceback frame owning a live sentinel."""
+            observed = []
+            seen = set()
+            pending = list(roots)
+            while pending:
+                error = pending.pop()
+                if error is None or id(error) in seen:
+                    continue
+                seen.add(id(error))
+                traceback = error.__traceback__
+                while traceback is not None:
+                    values = traceback.tb_frame.f_locals.values()
+                    for index, reference in enumerate(monitor):
+                        sentinel = reference()
+                        if sentinel is not None and any(
+                            value is sentinel for value in values
+                        ):
+                            observed.append(
+                                (traceback.tb_frame.f_code.co_name, index)
+                            )
+                    traceback = traceback.tb_next
+                pending.append(error.__cause__)
+                pending.append(error.__context__)
+            return sorted(observed)
+
+        def snapshot(errors):
+            return [
+                (
+                    error,
+                    error.__cause__,
+                    error.__context__,
+                    error.__suppress_context__,
+                )
+                for error in errors
+            ]
+
+        def assert_protected(before):
+            for error, cause, context, suppress in before:
+                self.assertIs(error.__cause__, cause)
+                self.assertIs(error.__context__, context)
+                self.assertIs(error.__suppress_context__, suppress)
+                self.assertIsNone(error.__traceback__)
+
+        first = RuntimeError("exact first cleanup")
+        tail = LookupError("protected context tail")
+        first.__context__ = tail
+        self.assertIsNone(first.__cause__)
+        self.assertFalse(first.__suppress_context__)
+
+        references = []
+        try:
+            arm_protected_first_cleanup(first, references)
+        except RuntimeError:
+            pass
+        try:
+            raise_reused_protected_tail(tail, references)
+        except LookupError as caught:
+            later = caught
+
+        self.assertIs(later, tail)
+        self.assertEqual(
+            payload_frames([first], references),
+            [
+                ("arm_protected_first_cleanup", 0),
+                ("raise_reused_protected_tail", 1),
+            ],
+        )
+
+        protected = snapshot([first, tail])
+        retained = retain(first, later)
+
+        self.assertIs(retained, first)
+        assert_protected(protected)
+        self.assertIsNone(first.__cause__)
+        self.assertIs(first.__context__, tail)
+        self.assertFalse(first.__suppress_context__)
+        self.assertIsNone(tail.__cause__)
+        self.assertIsNone(tail.__context__)
+        self.assertEqual(payload_frames([first], references), [])
+
+        gc.collect()
+        self.assertIsNone(references[0]())
+        self.assertIsNone(references[1]())
+
+    def test_distinct_later_prefix_stops_at_protected_tail(self):
+        """TR3: a distinct later prefix detaches only up to the join.
+
+        The non-protected prefix loses traceback, cause and context, the
+        protected join keeps its own outgoing link, and every protected
+        traceback -- including the pre-armed join and deep tail -- is gone.
+        """
+        retain = self.globals["_retain_first_cleanup_failure"]
+
+        class LaterFramePayload:
+            """One weak-referenceable local owned only by a later frame."""
+
+            def __init__(inner, label):
+                inner.label = label
+
+        def arm_protected_join(error, monitor):
+            protected_join_local = LaterFramePayload("tr3 protected join")
+            monitor.append(weakref.ref(protected_join_local))
+            raise error
+
+        def arm_protected_deep_tail(error, monitor):
+            protected_deep_local = LaterFramePayload("tr3 protected deep")
+            monitor.append(weakref.ref(protected_deep_local))
+            raise error
+
+        def arm_distinct_later_prefix(error, monitor):
+            later_prefix_local = LaterFramePayload("tr3 later prefix")
+            monitor.append(weakref.ref(later_prefix_local))
+            raise error
+
+        def raise_distinct_later_cleanup(error, monitor):
+            later_head_local = LaterFramePayload("tr3 later head")
+            monitor.append(weakref.ref(later_head_local))
+            raise error
+
+        def payload_frames(roots, monitor):
+            """Name every reachable traceback frame owning a live sentinel."""
+            observed = []
+            seen = set()
+            pending = list(roots)
+            while pending:
+                error = pending.pop()
+                if error is None or id(error) in seen:
+                    continue
+                seen.add(id(error))
+                traceback = error.__traceback__
+                while traceback is not None:
+                    values = traceback.tb_frame.f_locals.values()
+                    for index, reference in enumerate(monitor):
+                        sentinel = reference()
+                        if sentinel is not None and any(
+                            value is sentinel for value in values
+                        ):
+                            observed.append(
+                                (traceback.tb_frame.f_code.co_name, index)
+                            )
+                    traceback = traceback.tb_next
+                pending.append(error.__cause__)
+                pending.append(error.__context__)
+            return sorted(observed)
+
+        def snapshot(errors):
+            return [
+                (
+                    error,
+                    error.__cause__,
+                    error.__context__,
+                    error.__suppress_context__,
+                )
+                for error in errors
+            ]
+
+        def assert_protected(before):
+            for error, cause, context, suppress in before:
+                self.assertIs(error.__cause__, cause)
+                self.assertIs(error.__context__, context)
+                self.assertIs(error.__suppress_context__, suppress)
+                self.assertIsNone(error.__traceback__)
+
+        first = RuntimeError("exact first cleanup")
+        join = LookupError("protected join tail")
+        deep = OSError("protected deep tail")
+        first.__cause__ = join
+        join.__cause__ = deep
+        head = ValueError("distinct later cleanup")
+        prefix = KeyError("distinct later prefix")
+        head.__cause__ = prefix
+        prefix.__cause__ = join
+
+        references = []
+        try:
+            arm_protected_join(join, references)
+        except LookupError:
+            pass
+        try:
+            arm_protected_deep_tail(deep, references)
+        except OSError:
+            pass
+        try:
+            arm_distinct_later_prefix(prefix, references)
+        except KeyError:
+            pass
+        try:
+            raise_distinct_later_cleanup(head, references)
+        except ValueError as caught:
+            later = caught
+
+        self.assertIs(later, head)
+        self.assertEqual(
+            payload_frames([first, head], references),
+            [
+                ("arm_distinct_later_prefix", 2),
+                ("arm_protected_deep_tail", 1),
+                ("arm_protected_join", 0),
+                ("raise_distinct_later_cleanup", 3),
+            ],
+        )
+
+        protected = snapshot([first, join, deep])
+        retained = retain(first, later)
+
+        self.assertIs(retained, first)
+        assert_protected(protected)
+        self.assertIs(first.__cause__, join)
+        self.assertIs(join.__cause__, deep)
+        self.assertIsNone(deep.__cause__)
+        self.assertIsNone(deep.__context__)
+        # The non-protected prefix is detached exactly as C3 detaches it, and
+        # detachment stops before the protected join instead of entering it.
+        self.assertIsNone(head.__cause__)
+        self.assertIsNone(head.__context__)
+        self.assertIsNone(head.__traceback__)
+        self.assertIsNone(prefix.__cause__)
+        self.assertIsNone(prefix.__context__)
+        self.assertIsNone(prefix.__traceback__)
+        self.assertEqual(payload_frames([first, head, prefix], references), [])
+
+        gc.collect()
+        self.assertEqual([reference() for reference in references], [None] * 4)
+
+    def test_disjoint_later_cleanup_detach_is_unchanged(self):
+        """TR4: a disjoint later chain still receives full C3 detachment.
+
+        The whole later effective chain loses traceback, cause and context,
+        the exact first cleanup object is still returned, and the added
+        protected pass clears the pre-armed protected traceback without
+        touching one protected link.
+        """
+        retain = self.globals["_retain_first_cleanup_failure"]
+
+        class LaterFramePayload:
+            """One weak-referenceable local owned only by a later frame."""
+
+            def __init__(inner, label):
+                inner.label = label
+
+        def arm_protected_tail(error, monitor):
+            protected_tail_local = LaterFramePayload("tr4 protected tail")
+            monitor.append(weakref.ref(protected_tail_local))
+            raise error
+
+        def arm_disjoint_deep_tail(error, monitor):
+            disjoint_deep_local = LaterFramePayload("tr4 disjoint deep")
+            monitor.append(weakref.ref(disjoint_deep_local))
+            raise error
+
+        def arm_disjoint_middle(error, monitor):
+            disjoint_middle_local = LaterFramePayload("tr4 disjoint middle")
+            monitor.append(weakref.ref(disjoint_middle_local))
+            raise error
+
+        def raise_disjoint_later_cleanup(error, monitor):
+            disjoint_head_local = LaterFramePayload("tr4 disjoint head")
+            monitor.append(weakref.ref(disjoint_head_local))
+            raise error
+
+        def payload_frames(roots, monitor):
+            """Name every reachable traceback frame owning a live sentinel."""
+            observed = []
+            seen = set()
+            pending = list(roots)
+            while pending:
+                error = pending.pop()
+                if error is None or id(error) in seen:
+                    continue
+                seen.add(id(error))
+                traceback = error.__traceback__
+                while traceback is not None:
+                    values = traceback.tb_frame.f_locals.values()
+                    for index, reference in enumerate(monitor):
+                        sentinel = reference()
+                        if sentinel is not None and any(
+                            value is sentinel for value in values
+                        ):
+                            observed.append(
+                                (traceback.tb_frame.f_code.co_name, index)
+                            )
+                    traceback = traceback.tb_next
+                pending.append(error.__cause__)
+                pending.append(error.__context__)
+            return sorted(observed)
+
+        def snapshot(errors):
+            return [
+                (
+                    error,
+                    error.__cause__,
+                    error.__context__,
+                    error.__suppress_context__,
+                )
+                for error in errors
+            ]
+
+        def assert_protected(before):
+            for error, cause, context, suppress in before:
+                self.assertIs(error.__cause__, cause)
+                self.assertIs(error.__context__, context)
+                self.assertIs(error.__suppress_context__, suppress)
+                self.assertIsNone(error.__traceback__)
+
+        first = RuntimeError("exact first cleanup")
+        tail = LookupError("protected cleanup tail")
+        first.__cause__ = tail
+        head = ValueError("disjoint later cleanup")
+        middle = KeyError("disjoint later middle")
+        deep = OSError("disjoint later deep")
+        head.__cause__ = middle
+        middle.__context__ = deep
+
+        references = []
+        try:
+            arm_protected_tail(tail, references)
+        except LookupError:
+            pass
+        try:
+            arm_disjoint_deep_tail(deep, references)
+        except OSError:
+            pass
+        try:
+            arm_disjoint_middle(middle, references)
+        except KeyError:
+            pass
+        try:
+            raise_disjoint_later_cleanup(head, references)
+        except ValueError as caught:
+            later = caught
+
+        self.assertIs(later, head)
+        protected_identities = set()
+        current = first
+        while current is not None and id(current) not in protected_identities:
+            protected_identities.add(id(current))
+            current = current.__cause__ or current.__context__
+        for error in (head, middle, deep):
+            self.assertNotIn(id(error), protected_identities)
+        self.assertEqual(
+            payload_frames([first, head], references),
+            [
+                ("arm_disjoint_deep_tail", 1),
+                ("arm_disjoint_middle", 2),
+                ("arm_protected_tail", 0),
+                ("raise_disjoint_later_cleanup", 3),
+            ],
+        )
+
+        protected = snapshot([first, tail])
+        retained = retain(first, later)
+
+        self.assertIs(retained, first)
+        assert_protected(protected)
+        self.assertIs(first.__cause__, tail)
+        self.assertIsNone(tail.__cause__)
+        self.assertIsNone(tail.__context__)
+        for error in (head, middle, deep):
+            self.assertIsNone(error.__cause__)
+            self.assertIsNone(error.__context__)
+            self.assertIsNone(error.__traceback__)
+        self.assertEqual(
+            payload_frames([first, head, middle, deep], references), []
+        )
+
+        gc.collect()
+        self.assertEqual([reference() for reference in references], [None] * 4)
+
+    def test_cyclic_reused_cleanup_graphs_drop_later_tracebacks(self):
+        """TR5: cyclic protected and later graphs terminate and release.
+
+        One protected identity cycle is reused as the candidate, then a
+        cyclic disjoint later graph and a later path joining the protected
+        cycle are retained against the same first cleanup.  Every call must
+        terminate, keep the exact cycle, and clear the re-armed tracebacks.
+        """
+        retain = self.globals["_retain_first_cleanup_failure"]
+
+        class LaterFramePayload:
+            """One weak-referenceable local owned only by a later frame."""
+
+            def __init__(inner, label):
+                inner.label = label
+
+        def arm_protected_cycle_context(error, monitor):
+            cycle_context_local = LaterFramePayload("tr5 cycle context")
+            monitor.append(weakref.ref(cycle_context_local))
+            raise error
+
+        def raise_reused_cycle_cause(error, monitor):
+            cycle_cause_local = LaterFramePayload("tr5 cycle cause")
+            monitor.append(weakref.ref(cycle_cause_local))
+            raise error
+
+        def arm_cyclic_later_tail(error, monitor):
+            cyclic_tail_local = LaterFramePayload("tr5 cyclic tail")
+            monitor.append(weakref.ref(cyclic_tail_local))
+            raise error
+
+        def raise_cyclic_later_head(error, monitor):
+            cyclic_head_local = LaterFramePayload("tr5 cyclic head")
+            monitor.append(weakref.ref(cyclic_head_local))
+            raise error
+
+        def arm_joining_later_middle(error, monitor):
+            joining_middle_local = LaterFramePayload("tr5 joining middle")
+            monitor.append(weakref.ref(joining_middle_local))
+            raise error
+
+        def raise_joining_later_head(error, monitor):
+            joining_head_local = LaterFramePayload("tr5 joining head")
+            monitor.append(weakref.ref(joining_head_local))
+            raise error
+
+        def payload_frames(roots, monitor):
+            """Name every reachable traceback frame owning a live sentinel."""
+            observed = []
+            seen = set()
+            pending = list(roots)
+            while pending:
+                error = pending.pop()
+                if error is None or id(error) in seen:
+                    continue
+                seen.add(id(error))
+                traceback = error.__traceback__
+                while traceback is not None:
+                    values = traceback.tb_frame.f_locals.values()
+                    for index, reference in enumerate(monitor):
+                        sentinel = reference()
+                        if sentinel is not None and any(
+                            value is sentinel for value in values
+                        ):
+                            observed.append(
+                                (traceback.tb_frame.f_code.co_name, index)
+                            )
+                    traceback = traceback.tb_next
+                pending.append(error.__cause__)
+                pending.append(error.__context__)
+            return sorted(observed)
+
+        def snapshot(errors):
+            return [
+                (
+                    error,
+                    error.__cause__,
+                    error.__context__,
+                    error.__suppress_context__,
+                )
+                for error in errors
+            ]
+
+        def assert_protected(before):
+            for error, cause, context, suppress in before:
+                self.assertIs(error.__cause__, cause)
+                self.assertIs(error.__context__, context)
+                self.assertIs(error.__suppress_context__, suppress)
+                self.assertIsNone(error.__traceback__)
+
+        def effective_cycle(root):
+            walked = []
+            current = root
+            while current is not None and all(
+                current is not visited for visited in walked
+            ):
+                walked.append(current)
+                current = current.__cause__ or current.__context__
+            return walked, current
+
+        first = RuntimeError("exact first cleanup")
+        cause_node = LookupError("protected cycle cause")
+        context_node = OSError("protected cycle context")
+        first.__cause__ = cause_node
+        cause_node.__context__ = context_node
+        context_node.__cause__ = first
+        protected_nodes = [first, cause_node, context_node]
+        walked, revisited = effective_cycle(first)
+        self.assertEqual(walked, protected_nodes)
+        self.assertIs(revisited, first)
+
+        # Phase 1: the later candidate is an already protected identity.
+        reuse_references = []
+        try:
+            arm_protected_cycle_context(context_node, reuse_references)
+        except OSError:
+            pass
+        try:
+            raise_reused_cycle_cause(cause_node, reuse_references)
+        except LookupError as caught:
+            reused = caught
+
+        self.assertIs(reused, cause_node)
+        self.assertEqual(
+            payload_frames([first], reuse_references),
+            [
+                ("arm_protected_cycle_context", 0),
+                ("raise_reused_cycle_cause", 1),
+            ],
+        )
+        protected = snapshot(protected_nodes)
+        self.assertIs(retain(first, reused), first)
+        assert_protected(protected)
+        self.assertEqual(effective_cycle(first), (protected_nodes, first))
+        self.assertEqual(payload_frames([first], reuse_references), [])
+        gc.collect()
+        self.assertEqual(
+            [reference() for reference in reuse_references], [None, None]
+        )
+
+        # Phase 2: a cyclic later graph that never reaches a protected node.
+        cyclic_head = ValueError("cyclic later head")
+        cyclic_tail = KeyError("cyclic later tail")
+        cyclic_head.__cause__ = cyclic_tail
+        cyclic_tail.__cause__ = cyclic_head
+        cycle_references = []
+        try:
+            arm_protected_cycle_context(context_node, cycle_references)
+        except OSError:
+            pass
+        try:
+            arm_cyclic_later_tail(cyclic_tail, cycle_references)
+        except KeyError:
+            pass
+        try:
+            raise_cyclic_later_head(cyclic_head, cycle_references)
+        except ValueError as caught:
+            cyclic = caught
+
+        self.assertIs(cyclic, cyclic_head)
+        self.assertEqual(
+            payload_frames([first, cyclic_head], cycle_references),
+            [
+                ("arm_cyclic_later_tail", 1),
+                ("arm_protected_cycle_context", 0),
+                ("raise_cyclic_later_head", 2),
+            ],
+        )
+        protected = snapshot(protected_nodes)
+        self.assertIs(retain(first, cyclic), first)
+        assert_protected(protected)
+        self.assertEqual(effective_cycle(first), (protected_nodes, first))
+        for error in (cyclic_head, cyclic_tail):
+            self.assertIsNone(error.__cause__)
+            self.assertIsNone(error.__context__)
+            self.assertIsNone(error.__traceback__)
+        self.assertEqual(
+            payload_frames([first, cyclic_head, cyclic_tail],
+                           cycle_references),
+            [],
+        )
+        gc.collect()
+        self.assertEqual(
+            [reference() for reference in cycle_references], [None] * 3
+        )
+
+        # Phase 3: a later path that joins the cyclic protected graph.
+        joining_head = ValueError("joining later head")
+        joining_middle = KeyError("joining later middle")
+        joining_head.__cause__ = joining_middle
+        joining_middle.__cause__ = cause_node
+        join_references = []
+        try:
+            arm_protected_cycle_context(context_node, join_references)
+        except OSError:
+            pass
+        try:
+            arm_joining_later_middle(joining_middle, join_references)
+        except KeyError:
+            pass
+        try:
+            raise_joining_later_head(joining_head, join_references)
+        except ValueError as caught:
+            joining = caught
+
+        self.assertIs(joining, joining_head)
+        self.assertEqual(
+            payload_frames([first, joining_head], join_references),
+            [
+                ("arm_joining_later_middle", 1),
+                ("arm_protected_cycle_context", 0),
+                ("raise_joining_later_head", 2),
+            ],
+        )
+        protected = snapshot(protected_nodes)
+        self.assertIs(retain(first, joining), first)
+        assert_protected(protected)
+        self.assertEqual(effective_cycle(first), (protected_nodes, first))
+        for error in (joining_head, joining_middle):
+            self.assertIsNone(error.__cause__)
+            self.assertIsNone(error.__context__)
+            self.assertIsNone(error.__traceback__)
+        self.assertEqual(
+            payload_frames([first, joining_head, joining_middle],
+                           join_references),
+            [],
+        )
+        gc.collect()
+        self.assertEqual(
+            [reference() for reference in join_references], [None] * 3
+        )
 
     def test_persistent_descriptor_fault_sweeps_once_then_drains(self):
         source_type = self.globals["_AccountedUploadCommitSource"]

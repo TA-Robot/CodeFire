@@ -5060,6 +5060,7 @@ def _retain_first_cleanup_failure(
     current: BaseException | None = first
     while current is not None and id(current) not in protected:
         protected.add(id(current))
+        current.__traceback__ = None
         current = current.__cause__ or current.__context__
     current = candidate
     visited: set[int] = set()
