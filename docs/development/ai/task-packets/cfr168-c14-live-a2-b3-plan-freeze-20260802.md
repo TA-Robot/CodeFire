@@ -4,14 +4,17 @@ Status: ready
 
 Packet ID: `cfr168-c14-live-a2-b3-plan-freeze-20260802`
 
+Revision: **2026-08-03 A1-base rebind**. The frozen design is unchanged; only
+the base authority is rebound onto the accepted `C14-LIVE-A1` source package.
+
 Role: manager Plan/FREEZE authority; a later, separate lane may implement only
 after this packet is integrated and the manager names its exact launch base.
 
 Typed companion:
 `docs/development/ai/task-packets/json/cfr168-c14-live-a2-b3-plan-freeze-20260802.json`
 
-Immutable product base: `333e41082ffc35c73c02a420511ae2f16839c5b8`
-(tree `c0ab3a09e4731ca27d43023be72e577487b11600`).
+Immutable product base `P1`: `1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4`
+(tree `fa59fe69ba69bd199ef2cf3757679c98668a0812`).
 
 Decision: **AUTHORIZE_BOUNDED_IMPLEMENTATION_AFTER_PACKET_INTEGRATION**.
 
@@ -20,6 +23,33 @@ lane to mutate product, tests, source docs, issue state, installation, or
 dogfood state. The implementation authorization becomes usable only when a
 manager supplies the full launch-base commit `L` satisfying the base rule in
 this packet. Until then, implementation is forbidden.
+
+### Superseded base authority — retained, not erased
+
+The historical packet is retained as exact prior authority. It is superseded
+only as *base*; its design, matrix, hazards, scope, and non-goals remain in
+force.
+
+| Historical identity | Exact value |
+|---|---|
+| Historical packet commit | `e4d85f2158a3f4e353042ab352b749fa2a69eed3` |
+| Historical packet tree | `0230e537abcd410ecd4fe582ad431417e4618570` |
+| Historical packet parent (`P0`) | `333e41082ffc35c73c02a420511ae2f16839c5b8` |
+| Historical Markdown blob / SHA-256 | `7c1b9640aa1006a62ca653a54cbb3071dd2670ea` / `be8438198330d99e5ec35a72dc03df227a147a18a114846605eed8e9d9712563` |
+| Historical JSON blob / SHA-256 | `eb4be319786ecf0a98260667c1c3c12911177b7b` / `1636cd49057def6303cd8c6fb85b2ee6065d2c7aadf977956e61939b3ee0af6c` |
+| Superseded product authority `P0` | `333e41082ffc35c73c02a420511ae2f16839c5b8`, tree `c0ab3a09e4731ca27d43023be72e577487b11600` |
+| Rebind launch commit | `615da7ae917d2a17d3bc97b00b8b0604092ab6ca`, tree `54ea713028b84cc1b36b795486072b38b35de263`, parent `1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4` |
+
+The rebind launch commit cherry-picks the two historical packet paths onto the
+accepted A1 line; both blobs are byte-identical to `e4d85f21…`. Every `P0`
+line number, blob, and segment hash below is retained as historical evidence
+and is **not** a current-source claim.
+
+Why the rebind is required: the historical base rule demanded an execution base
+with no product difference from `P0`. After A1 acceptance no such base can also
+contain the required A1 product/test changes, so that rule became
+unsatisfiable rather than merely stale. Whole-file `codefire` selection and
+textual conflict resolution outside this contract remain forbidden.
 
 ## Objective
 
@@ -48,43 +78,140 @@ reviewed, integrated, installed, dogfooded, or closed.
 
 ## Authority and exact base
 
-### Immutable source authority `P`
+### Immutable source authority `P1`
 
-| Identity | Exact value |
-|---|---|
-| Commit `P` | `333e41082ffc35c73c02a420511ae2f16839c5b8` |
-| Tree | `c0ab3a09e4731ca27d43023be72e577487b11600` |
-| Parent | `808513a65dbfbbffff8123792d59d9eadfd875b4` |
-| Subject | `docs(cfr168): synchronize accepted source state` |
-| `codefire` blob/mode | `73b1f368f9c1591be6fd9219b839351878b82b9a`, `100755` |
-| `tests/test_codefire_cli.py` blob | `b23c43ced6ccb69c0bb553f9856c1a7b2145e770` |
-| `source-architecture.md` blob | `fe2b3b74f2beaf30218333f14e05b6e4e6d4e699` |
-| `command-source-trace.md` blob | `361a5de8f9f881fbedf35ed5a833baade9529e38` |
-| `source-data-model-catalog.md` blob | `2b68347eaa357f187f794c2a76992401743929eb` |
-| `change-playbook.md` blob | `18d882813e02ed8cd795aa1e46d8cac6a09be4ef` |
-| `cfr-168.md` blob | `29df10886dab2d5950df907d31238e8ea5ce1a8d` |
+`P1` is the manager adjudication commit that accepts the `C14-LIVE-A1` source
+package. It replaces `P0` as the single product authority for A2/B3.
+
+| Identity | Exact value at `P1` | Value at superseded `P0` |
+|---|---|---|
+| Commit | `1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4` | `333e41082ffc35c73c02a420511ae2f16839c5b8` |
+| Tree | `fa59fe69ba69bd199ef2cf3757679c98668a0812` | `c0ab3a09e4731ca27d43023be72e577487b11600` |
+| Parent | `7bd4594f01db6d8298ca242db04b0f71ce34f040` | `808513a65dbfbbffff8123792d59d9eadfd875b4` |
+| Subject | `docs(cfr168): accept C14 A1 source package` | `docs(cfr168): synchronize accepted source state` |
+| `codefire` blob/mode | `15c7ebf5e2c53216c1aaa1add12070cffc12cbdd`, `100755` | `73b1f368f9c1591be6fd9219b839351878b82b9a`, `100755` |
+| `tests/test_codefire_cli.py` blob | `b23c43ced6ccb69c0bb553f9856c1a7b2145e770` (unchanged) | `b23c43ced6ccb69c0bb553f9856c1a7b2145e770` |
+| `source-architecture.md` blob | `ea54f24b70e3c2ba36896e620d00c597c6e0a6bb` | `fe2b3b74f2beaf30218333f14e05b6e4e6d4e699` |
+| `command-source-trace.md` blob | `0c1f24c25ab981de304591e7ab8dd9aed7c47ecf` | `361a5de8f9f881fbedf35ed5a833baade9529e38` |
+| `source-data-model-catalog.md` blob | `d687883f1630508319b29ff98d20b8e164d474bf` | `2b68347eaa357f187f794c2a76992401743929eb` |
+| `change-playbook.md` blob | `8f460e1315b5dc51b53325e7d450aaf7845d2005` | `18d882813e02ed8cd795aa1e46d8cac6a09be4ef` |
+| `cfr-168.md` blob | `29df10886dab2d5950df907d31238e8ea5ce1a8d` (unchanged) | `29df10886dab2d5950df907d31238e8ea5ce1a8d` |
+
+`tests/test_python_http_post_effect_response.py` and
+`adr/ADR-021-python-http-mutation-response-lifecycle.md` are absent at `P0`,
+`P1`, and the rebind launch commit; both remain create-paths.
+
+`P0..P1` is 11 commits, zero merges, and `P0` is a strict ancestor of `P1`.
+
+### A1 product/test lineage bound by `P1`
+
+| Node | Commit | Tree | Exact scope |
+|---|---|---|---|
+| C4 (A1 product candidate) | `19010f742d358c5c03e19d091c4249420f9e53b9` | `a0ec4ee256f63c7fe7de438eb5c978c918b3d22f` | two paths: `codefire`, `tests/test_python_http_upload_accounted_traversal.py` |
+| O1 (test-only correction) | `46d98466c702f111b58a3c1ea080518f75a59580` | `626b28d1989ef21bbc23f94288845be5b0082c90` | one path, two expected literals in `tests/test_python_existing_terminal_owner.py`; zero product bytes |
+| R5 (exact review, ACCEPT) | `7bd4594f01db6d8298ca242db04b0f71ce34f040` | `d3bd3a2c60fab7e34e25726305733bf91a2fe134` | adds only `review.md`; raw SHA-256 `2facd0caef19f993f7e33e5be07a6f4e80ee4b7855756f6d1b49d584565d1a08` |
+| Manager decision (`P1`) | `1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4` | `fa59fe69ba69bd199ef2cf3757679c98668a0812` | adds only `manager-adjudication.md`; `MANAGER_ADJUDICATION: ACCEPT_A1_SOURCE_PACKAGE` |
+
+Changed `P0..P1` paths: `codefire`; nine `tests/test_python_*.py` files; four
+canonical source docs; `docs/development/known-limitations.md`; and seven
+added A1 packet/result documents. No other path differs.
+
+#### A2-owned surfaces are byte-identical and AST-identical at `P1`
+
+Recomputed in this rebind, not inherited from R5. Every historical `P0` text
+hash below reproduces exactly, and every `P1` value equals it. Segments use the
+`ast.get_source_segment` convention, so a nested method's span begins at its
+`def` keyword.
+
+| Surface | `P0` lines | `P1` lines | Bytes | Text SHA-256 (`P0` = `P1`) | AST SHA-256 (`P0` = `P1`) |
+|---|---|---|---:|---|---|
+| `_PreparedHTTPResponseOwner` | 16037-16089 | 16512-16564 | 1748 | `82d4ca7bb9df993a4e825c89acf12e973c46921925bcacdb1673d14efae63c04` | `12e71966c4abc915e53eeb42c9c5fdf64c011a385b26f59931b42c6bab16fce3` |
+| `_PreparedHTTPMutationResponses` | 16092-16243 | 16567-16718 | 5769 | `16a4501d35455d482e1b1e6bd4b16bd661b0c18cdb4afb86c7afcef5353cf25c` | `2aa732efbcc94152af65cfe4e2bc4ae83e7d098328c55cd17cae3b75302ea6ca` |
+| `_HTTPMutationResponseSlot` | 16256-16325 | 16731-16800 | 2635 | `3c3fae78db5e3a61c6a9c33ea03dacab5111ba094284eda3a47bd0c1ea43d9b9` | `0435a770de4e1cb3164cd579172a57b457cdc9901e49f2b0b823ba13e49368a7` |
+| `handle_http_upload` | 14720-15226 | 15195-15701 | 21581 | `b9d032b67ba475fbe2baacb9927fb442614b66b366cc443ce24366d255073732` | `7647655fa70f2be8b933f2e4a1df113cea01aead53bd511ee64eec19e17dd42c` |
+| `publish_prepared` | 17221-17245 | 17696-17720 | 1168 | `99af445f34cce9ca80b5aafe8988d63efec9c8118979f09a5cb793887e2d1940` | `1ddc11226e388aee5f4e164683f8313c89484f9f19090ec749c27564937e178c` |
+| `handle_one_request` | 17264-17419 | 17739-17894 | 7834 | `af8a6a832d3845a236e1f983107dc72b5dec886c8babc90e026b351593eaf007` | `8c6ede01c4b5f6c417ff970d4039372111866cc910b68b32b4c4f779965dd60b` |
+| `do_POST` | 17635-17867 | 18110-18342 | 11265 | `ff31cb1ffc9888836553de36cab1b340b43f04f7038b49b1d581e85bae301e1a` | `3668ac022cda54ba1fc418a11f319f94c1c59326ac48ee3c1767c7555edcdbed` |
+
+Every A2-owned surface moves by exactly `+475` lines and changes no byte. No
+`P0..P1` `codefire` diff hunk intersects any A2-owned `P0` span; the changed
+old-side range is 5003-32673 with a gap across 14720-17867.
+
+#### Classification of every changed `P0..P1` product unit
+
+`codefire` holds 1331 AST units at `P0` and 1337 at `P1`: 6 added, 0 removed,
+43 AST-changed, 0 text-only-changed. All 49 are A1-owned pre-effect
+cleanup/authority units; none is A2-owned.
+
+| A1 owner group | Units | A2 ownership |
+|---|---:|---|
+| New exception helpers `_detach_effective_exception_tracebacks`, `_link_primary_cleanup_exception` (+ `capture`), `_retain_first_cleanup_failure` | 4 added | not A2-owned |
+| `AccountedServerVerification.close.attempt`, `SealedCommitValidationSession.close.attempt` | 2 added | not A2-owned |
+| `AccountedRemoteSignaturePolicyAuthority` and 9 methods | 10 changed | not A2-owned |
+| `AccountedCommitSignaturePolicy` and 6 methods | 7 changed | not A2-owned |
+| `AccountedServerVerification` and 10 methods, `run_server_verification` | 12 changed | not A2-owned |
+| `AccountedHTTPUploadAncestry` and 4 methods, `is_ancestor_from_objects_accounted`, `_detach_ancestry_exception_chain` | 7 changed | not A2-owned |
+| `_AccountedUploadCommitSource` and 2 methods, `_drained_commit_source_cleanup_error`, `enforce_remote_commit_signature_policy_accounted` | 5 changed | not A2-owned |
+| `SealedCommitValidationSession.close`, `SealedCommitValidationSession`, `validate_sealed_commit` | 3 changed | not A2-owned |
+
+Test units changed by A1 span nine `tests/test_python_*.py` files (94 added and
+28 AST-changed units). Zero added or removed test lines across all nine files
+reference `_PreparedHTTPResponseOwner`, `_PreparedHTTPMutationResponses`,
+`_HTTPMutationResponseSlot`, `handle_http_upload`, `publish_prepared`,
+`handle_one_request`, `do_POST`, `select_success`, or `select_durable`.
+`tests/test_codefire_cli.py`, which carries the two bound A2 focused oracles,
+is byte-identical at `P1`.
+
+#### Changed callees reachable from `handle_http_upload` — recompute obligation
+
+`handle_http_upload` is byte-identical but is **not** behaviorally frozen,
+because four functions it calls changed under A1. At `P1`:
+
+| Changed callee | Call line at `P1` | Position relative to the `fence_first_effect` calls at 15401 / 15455 / 15620 |
+|---|---:|---|
+| `validate_sealed_commit` | 15309 | before every fence — strictly pre-effect |
+| `enforce_remote_commit_signature_policy_accounted` | 15364 | before every fence — strictly pre-effect |
+| `run_server_verification` | 15374 | before every fence — strictly pre-effect |
+| `is_ancestor_from_objects_accounted` | 15481 | after the layout-bootstrap fence, before the publication-effect fence and before `select_success`/`select_durable` at 15657-15668 |
+
+A1's new helpers preserve the exact primary exception object, its type, and its
+`str()`; they set `__traceback__` to `None` and rewrite
+`__cause__`/`__context__`/`__suppress_context__` on the retained chain. That is
+consistent with `D9`'s pre-`M` row and with `T01`'s "primary identity
+preserved" oracle, so no frozen A2 decision is contradicted. It does change the
+*observable chain and traceback shape* in the pre-`M` arms `T01` and `T13`
+exercise, and `is_ancestor_from_objects_accounted` sits in the region where
+`D1`/`H01`/`H02` require the implementer to fix `M` against live source.
+Baselines must therefore be recomputed on `L` under the rule below; they must
+not be inherited from `P0`.
 
 ### Execution-base rule `L`
 
 This file cannot contain the commit that contains itself. The manager launch
 prompt must therefore name one full 40-character execution base `L`. `L` must:
 
-1. contain this Markdown packet and its typed companion byte-for-byte;
-2. descend linearly from `P`;
-3. differ from `P` only by the manager-integrated Plan/FREEZE packet paths and
-   any explicitly named management-only integration record;
-4. contain no product, test, ADR, source-doc, packaging, schema, or issue-detail
-   difference from `P`; and
-5. be clean before the implementation worktree is created.
+1. contain this rebound Markdown packet and its typed companion byte-for-byte;
+2. contain the accepted independent rebind preflight report for this packet;
+3. descend linearly from `P1` with no merge commit;
+4. differ from `P1` only by the rebound Plan/FREEZE packet paths, that
+   preflight report, and explicitly named management-only result or
+   adjudication records — each named in the launch prompt by exact path;
+5. contain no product, test, source-doc, ADR, schema, packaging, or
+   issue-detail difference from `P1`; and
+6. be clean before the implementation worktree is created.
 
 The implementer must stop if any predicate fails. Editing the typed
 `base_revision` to make a generic launcher accept a different base is not an
-alternative. `P` is immutable product authority; `L` is the manager-named
-packet-containing execution base.
+alternative. `P1` is immutable product authority; `L` is the manager-named
+packet-containing execution base. `P0` satisfies no predicate above and is
+never a valid `L`.
 
 ### Bound evidence
 
-| Evidence | SHA-256 at `P` | Use |
+Every digest below was recomputed at `P1` and is unchanged from `P0`; all five
+bound evidence blobs are byte-identical across the A1 line.
+
+| Evidence | SHA-256 at `P0` and `P1` | Use |
 |---|---|---|
 | `docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md` | `ca1a1451bfc1b25ed1c54f1b012d4d0e508ef0a96f88401e61284c6d156a4441` | Historical `B3`, `C11`-`C14`, and `RetryableCleanup` evidence. Its `BLOCK` remains historical fact. |
 | `docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md` | `a3835f3720983cee72a3368fcc149158a44c6bb3ea1d3c89cbca8432503fadd5` | Exact ACCEPT of the composed Python input and proof that the B3 surfaces were intentionally unchanged. |
@@ -98,6 +225,12 @@ The later manager correction supersedes only the historical preflight's literal
 remove the requirement to expose residual ownership.
 
 ## Reproduced root cause
+
+Every `codefire:NNNNN` coordinate in this section is a **`P0` line number**,
+retained as historical evidence. The named AST units are byte-identical at
+`P1`, but each sits `+475` lines lower. The implementer must resolve every
+locus by symbol on `L` and must never treat a `P0` line number as a
+current-source claim.
 
 The exact accepted base is not merely missing a defensive check. Ownership is
 handed off in the wrong order across three nested lifetimes.
@@ -128,21 +261,16 @@ writes and `_PreparedHTTPResponseOwner.publish`'s accounting cleanup inside
 already returned. That classification obscures cleanup debt and tempts a
 second-response path.
 
-Exact accepted AST source segments at `P`:
-
-| Surface | Lines | Bytes | SHA-256 |
-|---|---:|---:|---|
-| `_PreparedHTTPResponseOwner` | 16037-16089 | 1748 | `82d4ca7bb9df993a4e825c89acf12e973c46921925bcacdb1673d14efae63c04` |
-| `_PreparedHTTPMutationResponses` | 16092-16243 | 5769 | `16a4501d35455d482e1b1e6bd4b16bd661b0c18cdb4afb86c7afcef5353cf25c` |
-| `_HTTPMutationResponseSlot` | 16256-16325 | 2635 | `3c3fae78db5e3a61c6a9c33ea03dacab5111ba094284eda3a47bd0c1ea43d9b9` |
-| `handle_http_upload` | 14720-15226 | 21581 | `b9d032b67ba475fbe2baacb9927fb442614b66b366cc443ce24366d255073732` |
-| `publish_prepared` | 17221-17245 | 1168 | `99af445f34cce9ca80b5aafe8988d63efec9c8118979f09a5cb793887e2d1940` |
-| `handle_one_request` | 17264-17419 | 7834 | `af8a6a832d3845a236e1f983107dc72b5dec886c8babc90e026b351593eaf007` |
-| `do_POST` | 17635-17867 | 11265 | `ff31cb1ffc9888836553de36cab1b340b43f04f7038b49b1d581e85bae301e1a` |
+Exact accepted AST source segments: see the `P0`/`P1` segment table under
+*A2-owned surfaces are byte-identical and AST-identical at `P1`*. Text and AST
+hashes are the current authority at `P1`; only the line spans moved.
 
 An implementer may change these segments only to realize this packet. Segment
 movement from formatting is not itself a defect, but every semantic delta must
-map to a frozen transition, oracle, or documentation obligation below.
+map to a frozen transition, oracle, or documentation obligation below. Before
+editing, the implementer must re-derive each segment on `L` and confirm the
+seven text/AST hashes above still hold; a mismatch is a base violation, not a
+licence to proceed.
 
 ## Frozen design
 
@@ -479,6 +607,18 @@ documents above, the nine candidate paths, and the existing focused mutation
 response and real-socket tests. Reading adjacent helpers needed to understand a
 call is permitted; writing them is not.
 
+The rebind adds these mandatory reads, because the A1 base changes the
+pre-effect exception behavior the A2 route observes:
+
+- `docs/development/ai/swarm-results/cfr168-c14-live-a1-c4-bound-adjacent-oracle-amendment-20260803/review.md`
+  and `manager-adjudication.md`;
+- `docs/development/ai/task-packets/cfr168-c14-live-a1-plan-freeze-20260802.md`;
+- the A1 exception helpers `_detach_effective_exception_tracebacks`,
+  `_link_primary_cleanup_exception`, and `_retain_first_cleanup_failure`, plus
+  the four changed callees reachable from `handle_http_upload`; and
+- `tests/test_python_http_upload_accounted_traversal.py` at `L`, which A1
+  changed and which the typed companion already lists.
+
 ## Counterexample, oracle, and reversal matrix
 
 Every row is required. A test is non-vacuous only when its named reversal fails
@@ -510,6 +650,34 @@ real handler/socket harness, not only direct class calls. Direct unit tests are
 also required for the pair/slot transition graph and foreign-ledger rejection.
 `T14` must not manufacture new expected behavior from the candidate; its
 baseline is `L`.
+
+### Mandatory baseline recomputation on `L`
+
+Every `T01`-`T15` baseline is a **current-source** obligation on `L`. The
+historical matrix rows are behavioral requirements, not recorded observations.
+
+1. Recompute all fifteen baselines against `L`. A historical line number,
+   expected byte string, exception repr, traceback shape, or cause-chain
+   ordering carried over from `P0` is not evidence and may not substitute for
+   an observation made on `L`.
+2. Establish A1 exception behavior on `L` before writing oracles for the
+   pre-`M` rows. `T01` must bind the exact primary object, type, and `str()`
+   that `L` actually raises, and must state separately what
+   `__traceback__`/`__cause__`/`__context__`/`__suppress_context__` normalization
+   A1 applies. `T13`'s typed filesystem `400` authority must be observed on
+   `L`, not assumed from `P0`.
+3. Fix `M` against live source per `D1`, `H01`, and `H02`, explicitly
+   adjudicating whether `is_ancestor_from_objects_accounted` — whose A1
+   behavior changed and which sits between the layout-bootstrap and
+   publication-effect fences — falls before or at/after `M`, with the exact
+   `L` line and fence evidence for the choice.
+4. Re-derive the `T14` slotless and `T15` next-request baselines on `L`; A1
+   changed nine test modules and the four callees above, so a `P0` baseline is
+   stale by construction.
+5. If a recomputed baseline contradicts a frozen `D1`-`D9` decision or a
+   `T01`-`T15` oracle, stop and return an exact blocker to the manager. Do not
+   edit the design to absorb the difference, and do not weaken an oracle to
+   make a recomputed baseline pass.
 
 ## Hazards and mandatory mitigations
 
@@ -569,6 +737,24 @@ baseline is `L`.
 Run focused checks first and stop on the first unexplained failure. Record the
 full command, exit code, selected/executed test count, duration, and log digest
 in the handoff. A skipped command is a gap, not a pass.
+
+### Base rule proof against `P1`
+
+Run before any edit, and stop on the first failure:
+
+```bash
+P1=1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4
+test "$(git rev-parse "$P1^{tree}")" = fa59fe69ba69bd199ef2cf3757679c98668a0812
+git merge-base --is-ancestor "$P1" "$L"
+test -z "$(git rev-list --merges "$P1".."$L")"
+git diff --name-only "$P1".."$L"
+test -z "$(git status --porcelain)"
+```
+
+The name-only output must contain only the two rebound packet paths, the
+accepted rebind preflight report, and the management-only records the launch
+prompt names by exact path. Any product, test, source-doc, ADR, schema,
+packaging, or issue-detail path in that output is a base violation.
 
 ### Candidate identity and scope
 
@@ -638,7 +824,8 @@ After every required validation passes, commit the nine paths once as candidate
 `C`. Do not amend, squash, rebase, merge, or add evidence to `C`. The handoff
 must bind:
 
-- `L` commit/tree and its proof against `P`;
+- `L` commit/tree and its proof against `P1`, plus the recomputed
+  A2-owned segment table on `L`;
 - `C` commit/tree/parent;
 - canonical patch SHA-256 for `L..C`;
 - exact nine-path name-status and each final blob/mode;
@@ -664,7 +851,7 @@ The reviewer must be a fresh report-only lane and must not be:
 - the manager who adjudicates observations or integrates the candidate; or
 - a lane with an uncommitted shared write set against the candidate.
 
-The reviewer receives `P`, `L`, exact `C`, this packet and companion, the four
+The reviewer receives `P1`, `L`, exact `C`, this packet and companion, the four
 bound evidence documents, the candidate handoff, validation logs, and reversal
 evidence. It reviews the immutable `L..C` patch and writes only a manager-named
 review report path outside `C`; it does not fix code or tests.
@@ -701,7 +888,9 @@ required before integration.
 This packet completes Plan/FREEZE for only `C14-LIVE-A2` / `B3`. The subsequent
 order is mandatory:
 
-1. manager integrates this packet and names `L`;
+0. manager integrates this 2026-08-03 A1-base rebind and commissions a fresh
+   independent rebind preflight against `P1`;
+1. manager accepts that preflight, integrates it, and names `L`;
 2. independent implementer creates and validates one nine-path `C`;
 3. manager Candidate-Freezes exact `C`;
 4. fresh excluded reviewer reports on exact `C`;
@@ -718,6 +907,23 @@ Dogfood. This slice cannot by itself close CFR-168, because A1, successor work,
 MR-write, scale/capability work, installed evaluation, and other frozen
 predecessors remain outside it.
 
+### What the 2026-08-03 rebind is not
+
+The rebind authoring result and the fresh exact preflight that follows it are
+documentation-only steps at stage 0 and 1 above. Neither is, nor implies, any
+of the following:
+
+- A2/B3 implementation, or any product, test, ADR, source-doc, or issue-state
+  change;
+- review acceptance of a candidate, or a Candidate Freeze;
+- integration of A2/B3 into the mainline;
+- Install, Dogfood/Evaluate, Retrospect, or final Close; or
+- reopening, re-adjudicating, or widening the accepted A1 source package.
+
+A2/B3 itself remains open. The A1 manager decision `1e8dd545…` accepted only
+the A1 source package and selected it as the A2/B3 base; it accepted nothing
+in this packet.
+
 ## Handoff
 
 ### Packet-author handoff
@@ -726,10 +932,20 @@ The packet-author lane returns only:
 
 - packet commit and tree;
 - the two created paths and blob IDs;
-- proof that the branch started at exact `P`;
+- proof that the branch started at exact `P0` (historical) or, for the
+  2026-08-03 rebind, at exact launch commit
+  `615da7ae917d2a17d3bc97b00b8b0604092ab6ca` over `P1`;
 - project/AI docs-check commands and results;
 - `git diff --check` and clean committed status; and
 - an explicit statement that no implementation path was touched.
+
+### Rebind-author handoff
+
+The 2026-08-03 rebind lane additionally returns the recomputed `P0`/`P1`
+identity, topology, blob and segment tables; the classification of every
+changed `P0..P1` product and test unit; the semantic-delta result for all seven
+A2-owned surfaces; and Markdown/JSON consistency evidence. It returns no
+implementation artifact.
 
 ### Implementer handoff
 
@@ -788,9 +1004,19 @@ answer and one oracle:
 | Nine-path bound | Scope | candidate identity gate |
 | Fifteen counterexamples/reversals | Matrix | focused/reversal evidence |
 | Fresh reviewer exclusion | Candidate Freeze | manager review launch record |
+| Single product authority | `P1` = `1e8dd545…` | `P1` identity/topology/blob gate |
+| Satisfiable execution base | Execution-base rule `L` | base rule proof against `P1` |
+| A2-owned surfaces unchanged by A1 | `P0`/`P1` segment table | recomputed text/AST hash equality |
+| Historical coordinates are not current source | Reproduced root cause | symbol resolution on `L` |
+| Changed-callee exception behavior | Mandatory baseline recomputation on `L` | `T01`, `T13`, plus the `M` placement adjudication |
 
-There is no unresolved requirement-authority choice inside this bounded slice.
+There is no unresolved requirement-authority choice inside this bounded slice,
+and authority is single-valued: `P1` is the only product base, and the rebound
+`L` rule is the only execution-base rule.
+
 If live source at `L` violates the base rule, if any required behavior needs a
-tenth candidate path, or if a test exposes a contract that changes authority
+tenth candidate path, if a recomputed `T01`-`T15` baseline contradicts a frozen
+`D1`-`D9` decision, or if a test exposes a contract that changes authority
 beyond A2, the implementer must stop and return that exact blocker to the
-manager. It must not improvise a wider repair.
+manager. It must not improvise a wider repair, resolve a `codefire` conflict by
+whole-file selection, or reintroduce `P0` as an authority.

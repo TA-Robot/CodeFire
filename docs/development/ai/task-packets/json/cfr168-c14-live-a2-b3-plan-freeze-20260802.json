@@ -2,8 +2,8 @@
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "cfr168-c14-live-a2-b3-plan-freeze-20260802",
   "status": "ready",
-  "objective": "After manager integration of this packet, repair only CFR-168 C14-LIVE-A2/B3 on the accepted Python HTTP Upload mutation-response path: freeze the conservative EFFECT_MAY_HAVE_STARTED boundary, transfer the selected prepared owner to the mutation slot before fallible rejected cleanup, keep wire publication as a borrow, separate pre-effect abort from post-effect finish, retry cleanup exactly once on the same non-consuming owner, preserve one response attempt, and report ADR-020-compatible decision-work and separate wire state.",
-  "base_revision": "333e41082ffc35c73c02a420511ae2f16839c5b8",
+  "objective": "2026-08-03 A1-base rebind of the C14-LIVE-A2/B3 Plan/FREEZE packet: the frozen D1-D9 design, T01-T15 matrix, hazards, nine-path write set and non-goals are unchanged, and only the base authority is rebound from superseded P0 333e41082ffc35c73c02a420511ae2f16839c5b8 to accepted-A1 manager adjudication P1 1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4. After manager integration of this rebind and an accepted independent rebind preflight, repair only CFR-168 C14-LIVE-A2/B3 on the accepted Python HTTP Upload mutation-response path: freeze the conservative EFFECT_MAY_HAVE_STARTED boundary, transfer the selected prepared owner to the mutation slot before fallible rejected cleanup, keep wire publication as a borrow, separate pre-effect abort from post-effect finish, retry cleanup exactly once on the same non-consuming owner, preserve one response attempt, and report ADR-020-compatible decision-work and separate wire state. All T01-T15 baselines and A1 exception behavior must be recomputed on L from current source.",
+  "base_revision": "1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4",
   "role": "manager",
   "risk": {
     "dimensions": {
@@ -20,7 +20,7 @@
     ],
     "score": 11,
     "selected_tier": "ultra",
-    "rationale": "The repair crosses durable-effect, response ownership, request-loop accounting, socket framing, error-origin, and canonical-contract boundaries. Historical GET and MR-write sources gave conflicting post-effect cleanup rules, and a later manager adjudication corrects the terminal interpretation, so exact phase assignment and an independent Ultra review are mandatory."
+    "rationale": "The repair crosses durable-effect, response ownership, request-loop accounting, socket framing, error-origin, and canonical-contract boundaries. Historical GET and MR-write sources gave conflicting post-effect cleanup rules, and a later manager adjudication corrects the terminal interpretation, so exact phase assignment and an independent Ultra review are mandatory. The 2026-08-03 A1-base rebind adds a second conflicting-source axis: the accepted A1 package rewrote pre-effect cleanup/exception-chain behavior in four callees reachable from handle_http_upload, so the pre-M oracles must be re-established on live source before implementation."
   },
   "context": {
     "pack_ids": [
@@ -39,6 +39,9 @@
       "docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md",
       "docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md",
       "docs/development/ai/swarm-batches/cfr168-rust-storage-review-closure-repair-manager-freeze-20260802.md",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a1-c4-bound-adjacent-oracle-amendment-20260803/review.md",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a1-c4-bound-adjacent-oracle-amendment-20260803/manager-adjudication.md",
+      "docs/development/ai/task-packets/cfr168-c14-live-a1-plan-freeze-20260802.md",
       "docs/development/source-architecture.md",
       "docs/development/command-source-trace.md",
       "docs/development/source-data-model-catalog.md",
@@ -49,15 +52,45 @@
       "tests/test_python_http_upload_accounted_traversal.py"
     ],
     "evidence_refs": [
-      "product-base:333e41082ffc35c73c02a420511ae2f16839c5b8",
-      "product-tree:c0ab3a09e4731ca27d43023be72e577487b11600",
-      "codefire-blob:73b1f368f9c1591be6fd9219b839351878b82b9a",
+      "packet-revision:2026-08-03-a1-base-rebind-design-unchanged",
+      "product-base-P1:1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4",
+      "product-tree-P1:fa59fe69ba69bd199ef2cf3757679c98668a0812",
+      "product-parent-P1:7bd4594f01db6d8298ca242db04b0f71ce34f040",
+      "codefire-blob-P1:15c7ebf5e2c53216c1aaa1add12070cffc12cbdd-mode-100755",
+      "superseded-product-base-P0:333e41082ffc35c73c02a420511ae2f16839c5b8",
+      "superseded-product-tree-P0:c0ab3a09e4731ca27d43023be72e577487b11600",
+      "superseded-codefire-blob-P0:73b1f368f9c1591be6fd9219b839351878b82b9a",
+      "superseded-packet-commit:e4d85f2158a3f4e353042ab352b749fa2a69eed3-tree-0230e537abcd410ecd4fe582ad431417e4618570",
+      "superseded-packet-md-sha256:be8438198330d99e5ec35a72dc03df227a147a18a114846605eed8e9d9712563",
+      "superseded-packet-json-sha256:1636cd49057def6303cd8c6fb85b2ee6065d2c7aadf977956e61939b3ee0af6c",
+      "rebind-launch-commit:615da7ae917d2a17d3bc97b00b8b0604092ab6ca-tree-54ea713028b84cc1b36b795486072b38b35de263",
+      "dependency-a1-c4:19010f742d358c5c03e19d091c4249420f9e53b9-two-paths-codefire-and-upload-accounted-traversal-tests",
+      "dependency-a1-o1:46d98466c702f111b58a3c1ea080518f75a59580-test-only-two-literals-zero-product-bytes",
+      "dependency-a1-r5:7bd4594f01db6d8298ca242db04b0f71ce34f040-review-accept-sha256-2facd0caef19f993f7e33e5be07a6f4e80ee4b7855756f6d1b49d584565d1a08",
+      "dependency-a1-manager-decision:1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4-ACCEPT_A1_SOURCE_PACKAGE",
+      "p0-to-p1-topology:11-commits-0-merges-p0-strict-ancestor-of-p1",
+      "protected-identity-prepared-owner:text-82d4ca7bb9df993a4e825c89acf12e973c46921925bcacdb1673d14efae63c04-ast-12e71966c4abc915e53eeb42c9c5fdf64c011a385b26f59931b42c6bab16fce3-P0-16037-16089-P1-16512-16564",
+      "protected-identity-mutation-responses:text-16a4501d35455d482e1b1e6bd4b16bd661b0c18cdb4afb86c7afcef5353cf25c-ast-2aa732efbcc94152af65cfe4e2bc4ae83e7d098328c55cd17cae3b75302ea6ca-P0-16092-16243-P1-16567-16718",
+      "protected-identity-mutation-slot:text-3c3fae78db5e3a61c6a9c33ea03dacab5111ba094284eda3a47bd0c1ea43d9b9-ast-0435a770de4e1cb3164cd579172a57b457cdc9901e49f2b0b823ba13e49368a7-P0-16256-16325-P1-16731-16800",
+      "protected-identity-handle-http-upload:text-b9d032b67ba475fbe2baacb9927fb442614b66b366cc443ce24366d255073732-ast-7647655fa70f2be8b933f2e4a1df113cea01aead53bd511ee64eec19e17dd42c-P0-14720-15226-P1-15195-15701",
+      "protected-identity-publish-prepared:text-99af445f34cce9ca80b5aafe8988d63efec9c8118979f09a5cb793887e2d1940-ast-1ddc11226e388aee5f4e164683f8313c89484f9f19090ec749c27564937e178c-P0-17221-17245-P1-17696-17720",
+      "protected-identity-handle-one-request:text-af8a6a832d3845a236e1f983107dc72b5dec886c8babc90e026b351593eaf007-ast-8c6ede01c4b5f6c417ff970d4039372111866cc910b68b32b4c4f779965dd60b-P0-17264-17419-P1-17739-17894",
+      "protected-identity-do-post:text-ff31cb1ffc9888836553de36cab1b340b43f04f7038b49b1d581e85bae301e1a-ast-3668ac022cda54ba1fc418a11f319f94c1c59326ac48ee3c1767c7555edcdbed-P0-17635-17867-P1-18110-18342",
+      "semantic-delta:all-seven-a2-owned-surfaces-byte-and-ast-identical-P0-to-P1-shifted-plus-475-lines-no-diff-hunk-intersects-any-a2-span",
+      "changed-product-units-P0-to-P1:1331-to-1337-units-6-added-0-removed-43-ast-changed-0-text-only-all-a1-owned-none-a2-owned",
+      "changed-test-units-P0-to-P1:nine-python-test-modules-94-added-28-ast-changed-zero-added-or-removed-lines-reference-any-a2-owned-symbol",
+      "unchanged-a2-paths-at-P1:tests/test_codefire_cli.py-and-docs/development/code-review-issues/cfr-168.md-byte-identical",
+      "a1-changed-callees-of-handle-http-upload:validate_sealed_commit-L15309-enforce_remote_commit_signature_policy_accounted-L15364-run_server_verification-L15374-is_ancestor_from_objects_accounted-L15481-fences-15401-15455-15620",
+      "a1-exception-behavior:new-helpers-preserve-exact-primary-object-type-and-str-and-normalize-traceback-cause-context-suppress-context-no-D1-D9-or-T01-T15-contradiction-found",
+      "bound-evidence-digests:all-five-recomputed-unchanged-between-P0-and-P1",
       "shared-preflight-sha256:ca1a1451bfc1b25ed1c54f1b012d4d0e508ef0a96f88401e61284c6d156a4441",
       "composition-review-sha256:a3835f3720983cee72a3368fcc149158a44c6bb3ea1d3c89cbca8432503fadd5",
       "composition-result-sha256:02a759c40d11c9b79d52872104b53da79c9de069629c8b63aa9bb610adcce3e3",
       "storage-manager-freeze-sha256:913b0a0b29dc620f60f6cc31013f5a9b59a064e680d64919521eb0edb3462348",
       "adr020-sha256:4566de104181bc94f7d7fd41ae1b59b8c93b267665898f2629a3ff6c58ce5ab9",
-      "execution-base:L-is-manager-named-packet-containing-clean-docs-only-descendant-of-product-base",
+      "execution-base:L-must-contain-rebound-packet-typed-companion-accepted-independent-rebind-preflight-and-explicitly-named-management-only-records-descend-linearly-from-P1-and-have-no-product-test-source-doc-adr-schema-packaging-or-issue-detail-difference-from-P1",
+      "execution-base-negative:P0-is-never-a-valid-L-and-the-historical-no-product-difference-from-P0-rule-is-unsatisfiable-after-A1-acceptance",
+      "baseline-recomputation:T01-through-T15-baselines-and-A1-exception-behavior-must-be-recomputed-on-L-historical-line-numbers-and-expected-bytes-are-not-evidence",
       "phase-marker:M=EFFECT_MAY_HAVE_STARTED-after-final-preeffect-fence-and-response-seal-immediately-before-first-fallible-effect",
       "pair-states:OPEN-SEALED-SELECTING_SUCCESS_OR_DURABLE-SELECTED_SUCCESS_OR_DURABLE-CLEANUP_PENDING-CLOSED",
       "slot-states:EMPTY-PREPARED-SEALED-EFFECT_MAY_HAVE_STARTED-SELECTED-WIRE_STARTED-WIRE_COMPLETE-CLEANUP_PENDING-CLOSED",
@@ -68,7 +101,8 @@
       "terminal-zero:complete-with-separate-wire-state-no-new-terminal-variant",
       "candidate-write-set:exactly-nine-paths",
       "counterexample-matrix:T01-through-T15-required",
-      "implementation-prohibited-until-manager-integrates-packet-and-names-L"
+      "implementation-prohibited-until-manager-integrates-rebound-packet-accepts-a-fresh-independent-rebind-preflight-and-names-L",
+      "negative-space:this-rebind-and-its-preflight-are-not-A2-implementation-review-acceptance-candidate-freeze-integration-Install-Dogfood-Evaluate-Retrospect-or-Close-and-A2-B3-remains-open"
     ]
   },
   "scope": {
@@ -84,6 +118,9 @@
       "docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md",
       "docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md",
       "docs/development/ai/swarm-batches/cfr168-rust-storage-review-closure-repair-manager-freeze-20260802.md",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a1-c4-bound-adjacent-oracle-amendment-20260803/review.md",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a1-c4-bound-adjacent-oracle-amendment-20260803/manager-adjudication.md",
+      "docs/development/ai/task-packets/cfr168-c14-live-a1-plan-freeze-20260802.md",
       "docs/development/source-architecture.md",
       "docs/development/command-source-trace.md",
       "docs/development/source-data-model-catalog.md",
@@ -135,9 +172,15 @@
       ".dev-swarm"
     ],
     "disallowed_actions": [
-      "starting implementation before the manager integrates this packet and names full execution base L",
-      "changing product, tests, source docs, issue state, install state, or dogfood state in the packet-authoring lane",
-      "using an execution base whose product/test/ADR/source-doc/issue blobs differ from P",
+      "starting implementation before the manager integrates this rebound packet, accepts a fresh independent rebind preflight, and names full execution base L",
+      "changing product, tests, source docs, issue state, install state, or dogfood state in the packet-authoring or rebind-authoring lane",
+      "using an execution base whose product/test/ADR/source-doc/schema/packaging/issue blobs differ from P1",
+      "using superseded P0 333e41082ffc35c73c02a420511ae2f16839c5b8 as L, as product authority, or as an oracle baseline",
+      "resolving a codefire conflict by whole-file selection or by textual conflict resolution outside the frozen composition contract",
+      "substituting a historical P0 line number, expected byte string, exception repr, traceback shape, or cause-chain ordering for a T01-T15 baseline recomputed on L",
+      "treating the byte-identity of the seven A2-owned surfaces as proof that their pre-effect callee behavior is unchanged by A1",
+      "editing the frozen D1-D9 design, weakening a T01-T15 oracle, or widening scope to absorb a recomputed baseline difference instead of returning an exact blocker",
+      "reopening, re-adjudicating, or widening the accepted C14-LIVE-A1 source package from this slice",
       "changing the typed base_revision to make a generic launcher accept a different base",
       "adding a tenth path to candidate C or placing a result/review/history/current-state artifact inside C",
       "amending, squashing, rebasing, merging, or rewriting candidate C after Candidate Freeze",
@@ -172,14 +215,26 @@
     "Unbounded/background/cross-request cleanup retry or destructor-based correctness.",
     "Proving the actual first durable byte, peer receipt, TCP flush, or filesystem visibility from M or wire states.",
     "Closing B3, global C14, CFR-168, CFB-136, CFB-138, MR-write, or the active batch from this slice.",
+    "Treating the 2026-08-03 A1-base rebind or its fresh exact preflight as A2 implementation, review acceptance, Candidate Freeze, integration, Install, Dogfood/Evaluate, Retrospect, or Close; A2/B3 remains open.",
+    "Reopening, re-adjudicating, or widening the accepted C14-LIVE-A1 source package, or repairing an A1 exception-behavior difference from inside A2.",
     "Management/current-state/history/flow/review artifact changes inside the nine-path candidate.",
     "Unrelated refactor, rename, formatting sweep, performance optimization, or style-only cleanup."
   ],
   "invariants": [
     {
       "id": "INV-BASE",
-      "statement": "P is exactly 333e41082ffc35c73c02a420511ae2f16839c5b8 tree c0ab3a09e4731ca27d43023be72e577487b11600; manager-named L is a clean linear packet-containing descendant with no product/test/ADR/source-doc/issue byte change from P.",
-      "falsification_test": "Any identity mismatch, merge, dirty launch state, missing packet, or product/test/ADR/source-doc/issue diff in P..L blocks implementation."
+      "statement": "P1 is exactly 1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4 tree fa59fe69ba69bd199ef2cf3757679c98668a0812 parent 7bd4594f01db6d8298ca242db04b0f71ce34f040 with codefire blob 15c7ebf5e2c53216c1aaa1add12070cffc12cbdd mode 100755; manager-named L is a clean non-merge linear descendant of P1 containing the rebound packet, its typed companion, the accepted independent rebind preflight, and only explicitly named management-only records, with no product/test/source-doc/ADR/schema/packaging/issue-detail byte change from P1. Superseded P0 333e41082ffc35c73c02a420511ae2f16839c5b8 is historical evidence only and is never a valid L or product authority.",
+      "falsification_test": "Any identity mismatch, merge commit, dirty launch state, missing packet or preflight, unnamed extra path, or product/test/source-doc/ADR/schema/packaging/issue diff in P1..L blocks implementation; so does any use of P0 as base or authority."
+    },
+    {
+      "id": "INV-REBIND-DELTA",
+      "statement": "All seven A2-owned surfaces are byte-identical and AST-identical between P0 and P1, shifted uniformly by +475 lines, and no P0..P1 codefire diff hunk intersects any A2-owned span; every changed or added P0..P1 product AST unit is A1-owned, and no added or removed A1 test line references an A2-owned symbol.",
+      "falsification_test": "Recompute the seven text/AST segment hashes on L: any inequality with the bound values, any diff hunk intersecting an A2-owned span, any A2-owned unit among the changed P0..P1 units, or any A1 test line touching an A2-owned symbol is a base violation requiring a BLOCK return to the manager."
+    },
+    {
+      "id": "INV-BASELINE-RECOMPUTE",
+      "statement": "Every T01-T15 baseline and all A1 exception behavior is established on L from current source. A1's helpers preserve the exact primary exception object, type and str() while normalizing traceback/cause/context/suppress_context, and four callees reachable from handle_http_upload changed under A1, so pre-M oracles and the D1 placement of M must be re-derived on L with exact line and fence evidence.",
+      "falsification_test": "A T01-T15 oracle cites a P0 line number, expected byte string, exception repr, traceback shape, or cause-chain ordering instead of an observation on L; or the M placement adjudication omits whether is_ancestor_from_objects_accounted falls before or at/after M; or a recomputed baseline contradicting a frozen D1-D9 decision is absorbed by editing the design rather than returned as a blocker."
     },
     {
       "id": "INV-SCOPE",
@@ -269,6 +324,19 @@
   ],
   "validation": [
     {
+      "id": "VAL-BASE-P1",
+      "command": "Verify P1 is 1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4 with tree fa59fe69ba69bd199ef2cf3757679c98668a0812, that git merge-base --is-ancestor P1 L succeeds, that git rev-list --merges P1..L is empty, that git diff --name-only P1..L lists only the two rebound packet paths plus the accepted rebind preflight and explicitly named management-only records, and that git status --porcelain is empty.",
+      "purpose": "Prove the execution base is the accepted-A1 product authority and satisfies the rebound L rule before any edit.",
+      "required": true
+    },
+    {
+      "id": "VAL-A2-SEGMENTS",
+      "command": "Recompute the seven A2-owned ast.get_source_segment text and AST SHA-256 values on L and compare them to the bound P0/P1 table; classify any changed product or test unit reachable from the A2 surfaces.",
+      "purpose": "Prove on current source that A1 left every A2-owned surface byte-identical and AST-identical, and surface any changed callee before implementation.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
       "id": "VAL-COMPILE",
       "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile codefire tests/test_codefire_cli.py tests/test_python_http_post_effect_response.py",
       "purpose": "Compile the changed Python runtime and both test surfaces without creating tracked bytecode.",
@@ -294,6 +362,13 @@
       "command": "Run each packet T01-T15 temporary reversal separately against its named focused oracle, record the intended behavioral failure, restore exact candidate bytes, then run git diff --check and git status --short.",
       "purpose": "Prove all fifteen counterexample oracles are load-bearing and non-vacuous without committing reversal patches.",
       "required": true
+    },
+    {
+      "id": "VAL-BASELINE-RECOMPUTE",
+      "command": "Re-derive every T01-T15 baseline on L, record the exact primary exception object, type and str() plus the A1 traceback/cause/context normalization observed on the pre-M arms, and record the D1 placement of M with exact L line and fence evidence including whether is_ancestor_from_objects_accounted falls before or at/after M.",
+      "purpose": "Prevent stale P0 line numbers, expected bytes, or exception shapes from standing in for current-source proof after the A1 base rebind.",
+      "required": true,
+      "requires_capability": "python3"
     },
     {
       "id": "VAL-SOURCE-DOCS",
@@ -339,7 +414,9 @@
   ],
   "handoff": {
     "required_outputs": [
-      "Full P and manager-named L commit/tree identity with proof that P..L is the authorized docs-only packet integration.",
+      "Full P1 and manager-named L commit/tree identity with proof that P1..L is the authorized docs-only rebound-packet plus accepted-preflight integration and contains no product/test/source-doc/ADR/schema/packaging/issue-detail difference.",
+      "Recomputed A2-owned segment table on L for all seven surfaces, with text and AST SHA-256 equality against the bound P0/P1 values.",
+      "Recomputed T01-T15 baselines on L, the observed A1 primary-exception identity/type/str and traceback/cause/context normalization on the pre-M arms, and the D1 M-placement adjudication with exact L line and fence evidence.",
       "One clean non-merge candidate C commit/tree/parent and canonical L..C patch SHA-256.",
       "Exact nine-path name-status plus final blob and mode for every candidate path.",
       "All validation commands with exit code, selected/executed count, duration, and log digest; skips and unavailable evidence remain explicit.",
@@ -349,7 +426,8 @@
       "Changed B3 AST source-segment hashes and a mapping from every semantic delta to a frozen design decision or oracle.",
       "Explicit non-goal and intentionally untouched path statement, including A1, successor, GET, slotless POST, MR-write, reducer, Rust, install, and dogfood.",
       "Candidate Freeze statement that C was not amended/rebased/merged and that any later byte change requires a new candidate.",
-      "Fresh reviewer exclusion set and a statement that implementation, integration, Install, Dogfood, and issue Close were not performed by the packet-authoring lane."
+      "Fresh reviewer exclusion set and a statement that implementation, integration, Install, Dogfood, and issue Close were not performed by the packet-authoring or rebind-authoring lane.",
+      "Explicit statement that the 2026-08-03 A1-base rebind and its fresh exact preflight are documentation-only, that A2/B3 remains open, and that the accepted A1 source package was neither reopened nor widened."
     ],
     "evidence_digest_required": true
   }
