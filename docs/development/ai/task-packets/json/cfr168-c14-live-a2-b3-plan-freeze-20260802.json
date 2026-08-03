@@ -2,7 +2,7 @@
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "cfr168-c14-live-a2-b3-plan-freeze-20260802",
   "status": "ready",
-  "objective": "2026-08-03 A1-base rebind of the C14-LIVE-A2/B3 Plan/FREEZE packet: the frozen D1-D9 design, T01-T15 matrix, hazards, nine-path write set and non-goals are unchanged, and only the base authority is rebound from superseded P0 333e41082ffc35c73c02a420511ae2f16839c5b8 to accepted-A1 manager adjudication P1 1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4. After manager integration of this rebind and an accepted independent rebind preflight, repair only CFR-168 C14-LIVE-A2/B3 on the accepted Python HTTP Upload mutation-response path: freeze the conservative EFFECT_MAY_HAVE_STARTED boundary, transfer the selected prepared owner to the mutation slot before fallible rejected cleanup, keep wire publication as a borrow, separate pre-effect abort from post-effect finish, retry cleanup exactly once on the same non-consuming owner, preserve one response attempt, and report ADR-020-compatible decision-work and separate wire state. All T01-T15 baselines and A1 exception behavior must be recomputed on L from current source.",
+  "objective": "2026-08-03 A1-base rebind and manager precision correction of the C14-LIVE-A2/B3 Plan/FREEZE packet: the frozen D1-D9 design, T01-T15 matrix, hazards, ten-path write set and non-goals are bound to accepted-A1 manager adjudication P1 1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4. After manager integration and an accepted fresh independent correction preflight, repair only CFR-168 C14-LIVE-A2/B3 on the accepted Python HTTP Upload mutation-response path: freeze the conservative EFFECT_MAY_HAVE_STARTED boundary, transfer the selected prepared owner to the mutation slot before fallible rejected cleanup, keep wire publication as a borrow, separate pre-effect abort from post-effect finish, retry cleanup exactly once on the same non-consuming owner, preserve one response attempt, and report ADR-020-compatible decision-work and separate wire state. All T01-T15 baselines and A1 exception behavior must be recomputed on L from current source.",
   "base_revision": "1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4",
   "role": "manager",
   "risk": {
@@ -35,6 +35,10 @@
       "docs/development/project-management.md",
       "docs/development/ai/operating-protocol.md",
       "docs/development/ai/task-packets/cfr168-c14-live-a2-b3-plan-freeze-20260802.md",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-claude-20260803/result.md",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-preflight-claude-20260803/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-preflight-claude-20260803/manager-adjudication.md",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-manager-correction-preflight-claude-20260803/preflight.md",
       "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md",
       "docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md",
       "docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md",
@@ -47,12 +51,14 @@
       "docs/development/source-data-model-catalog.md",
       "docs/development/change-playbook.md",
       "docs/development/code-review-issues/cfr-168.md",
+      "docs/development/known-limitations.md",
       "tests/test_codefire_cli.py",
       "tests/test_python_http_mr_list_decision_work.py",
-      "tests/test_python_http_upload_accounted_traversal.py"
+      "tests/test_python_http_upload_accounted_traversal.py",
+      "tests/test_python_external_production.py"
     ],
     "evidence_refs": [
-      "packet-revision:2026-08-03-a1-base-rebind-design-unchanged",
+      "packet-revision:2026-08-03-a1-base-rebind-plus-manager-precision-correction-historical-nine-path-scope-superseded",
       "product-base-P1:1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4",
       "product-tree-P1:fa59fe69ba69bd199ef2cf3757679c98668a0812",
       "product-parent-P1:7bd4594f01db6d8298ca242db04b0f71ce34f040",
@@ -88,7 +94,7 @@
       "composition-result-sha256:02a759c40d11c9b79d52872104b53da79c9de069629c8b63aa9bb610adcce3e3",
       "storage-manager-freeze-sha256:913b0a0b29dc620f60f6cc31013f5a9b59a064e680d64919521eb0edb3462348",
       "adr020-sha256:4566de104181bc94f7d7fd41ae1b59b8c93b267665898f2629a3ff6c58ce5ab9",
-      "execution-base:L-must-contain-rebound-packet-typed-companion-accepted-independent-rebind-preflight-and-explicitly-named-management-only-records-descend-linearly-from-P1-and-have-no-product-test-source-doc-adr-schema-packaging-or-issue-detail-difference-from-P1",
+      "execution-base:L-must-contain-exact-six-path-canonical-management-allow-list-including-historical-rebind-result-historical-preflight-manager-adjudication-and-fresh-correction-preflight-descend-linearly-from-P1-and-have-no-other-difference",
       "execution-base-negative:P0-is-never-a-valid-L-and-the-historical-no-product-difference-from-P0-rule-is-unsatisfiable-after-A1-acceptance",
       "baseline-recomputation:T01-through-T15-baselines-and-A1-exception-behavior-must-be-recomputed-on-L-historical-line-numbers-and-expected-bytes-are-not-evidence",
       "phase-marker:M=EFFECT_MAY_HAVE_STARTED-after-final-preeffect-fence-and-response-seal-immediately-before-first-fallible-effect",
@@ -99,10 +105,11 @@
       "cleanup-shape:non-consuming-same-owner-one-synchronous-retry",
       "persistent-cleanup:close-connection-cleanup_incomplete-owner-reachable-observer-truth-no-second-document",
       "terminal-zero:complete-with-separate-wire-state-no-new-terminal-variant",
-      "candidate-write-set:exactly-nine-paths",
+      "candidate-write-set:exactly-ten-paths-including-known-limitations",
+      "ast-digest-convention:python-3.10.12-complete-utf8-source-bound-classdef-or-functiondef-node-default-ast-dump-utf8-no-newline-sha256",
       "counterexample-matrix:T01-through-T15-required",
-      "implementation-prohibited-until-manager-integrates-rebound-packet-accepts-a-fresh-independent-rebind-preflight-and-names-L",
-      "negative-space:this-rebind-and-its-preflight-are-not-A2-implementation-review-acceptance-candidate-freeze-integration-Install-Dogfood-Evaluate-Retrospect-or-Close-and-A2-B3-remains-open"
+      "implementation-prohibited-until-fresh-correction-preflight-ends-exact-ACCEPT_CORRECTED_REBIND_CONTRACT-manager-integrates-it-verifies-six-path-L-and-names-L",
+      "negative-space:historical-rebind-preflight-and-fresh-correction-preflight-are-docs-only-not-A2-implementation-review-acceptance-candidate-freeze-integration-Install-Dogfood-Evaluate-Retrospect-or-Close-and-A2-B3-remains-open"
     ]
   },
   "scope": {
@@ -114,6 +121,10 @@
       "docs/development/ai/operating-protocol.md",
       "docs/development/ai/task-packets/cfr168-c14-live-a2-b3-plan-freeze-20260802.md",
       "docs/development/ai/task-packets/json/cfr168-c14-live-a2-b3-plan-freeze-20260802.json",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-claude-20260803/result.md",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-preflight-claude-20260803/preflight.md",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-preflight-claude-20260803/manager-adjudication.md",
+      "docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-manager-correction-preflight-claude-20260803/preflight.md",
       "docs/development/ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md",
       "docs/development/ai/swarm-results/cfr168-python-composition-exact-review-claude-20260802/review.md",
       "docs/development/ai/swarm-results/cfr168-python-http-accepted-input-composition-20260802/result.md",
@@ -126,9 +137,11 @@
       "docs/development/source-data-model-catalog.md",
       "docs/development/change-playbook.md",
       "docs/development/code-review-issues/cfr-168.md",
+      "docs/development/known-limitations.md",
       "tests/test_codefire_cli.py",
       "tests/test_python_http_mr_list_decision_work.py",
-      "tests/test_python_http_upload_accounted_traversal.py"
+      "tests/test_python_http_upload_accounted_traversal.py",
+      "tests/test_python_external_production.py"
     ],
     "write_set": [
       "codefire",
@@ -139,7 +152,8 @@
       "docs/development/command-source-trace.md",
       "docs/development/source-data-model-catalog.md",
       "docs/development/change-playbook.md",
-      "docs/development/code-review-issues/cfr-168.md"
+      "docs/development/code-review-issues/cfr-168.md",
+      "docs/development/known-limitations.md"
     ],
     "disallowed_paths": [
       "README.md",
@@ -172,7 +186,7 @@
       ".dev-swarm"
     ],
     "disallowed_actions": [
-      "starting implementation before the manager integrates this rebound packet, accepts a fresh independent rebind preflight, and names full execution base L",
+      "starting implementation before a second fresh correction preflight ends exact ACCEPT_CORRECTED_REBIND_CONTRACT and the manager integrates it, verifies the exact six-path P1..L allow-list, and names full execution base L",
       "changing product, tests, source docs, issue state, install state, or dogfood state in the packet-authoring or rebind-authoring lane",
       "using an execution base whose product/test/ADR/source-doc/schema/packaging/issue blobs differ from P1",
       "using superseded P0 333e41082ffc35c73c02a420511ae2f16839c5b8 as L, as product authority, or as an oracle baseline",
@@ -182,7 +196,7 @@
       "editing the frozen D1-D9 design, weakening a T01-T15 oracle, or widening scope to absorb a recomputed baseline difference instead of returning an exact blocker",
       "reopening, re-adjudicating, or widening the accepted C14-LIVE-A1 source package from this slice",
       "changing the typed base_revision to make a generic launcher accept a different base",
-      "adding a tenth path to candidate C or placing a result/review/history/current-state artifact inside C",
+      "adding an eleventh path to candidate C or placing a result/review/history/current-state artifact inside C",
       "amending, squashing, rebasing, merging, or rewriting candidate C after Candidate Freeze",
       "running fallible rejected-owner cleanup before the selected owner reaches the mutation slot",
       "transferring the Upload selected owner out of the slot with take, clone, re-encoding, or reconstruction",
@@ -215,21 +229,21 @@
     "Unbounded/background/cross-request cleanup retry or destructor-based correctness.",
     "Proving the actual first durable byte, peer receipt, TCP flush, or filesystem visibility from M or wire states.",
     "Closing B3, global C14, CFR-168, CFB-136, CFB-138, MR-write, or the active batch from this slice.",
-    "Treating the 2026-08-03 A1-base rebind or its fresh exact preflight as A2 implementation, review acceptance, Candidate Freeze, integration, Install, Dogfood/Evaluate, Retrospect, or Close; A2/B3 remains open.",
+    "Treating the 2026-08-03 A1-base rebind, historical rebind preflight, or fresh correction preflight as A2 implementation, review acceptance, Candidate Freeze, integration, Install, Dogfood/Evaluate, Retrospect, or Close; A2/B3 remains open.",
     "Reopening, re-adjudicating, or widening the accepted C14-LIVE-A1 source package, or repairing an A1 exception-behavior difference from inside A2.",
-    "Management/current-state/history/flow/review artifact changes inside the nine-path candidate.",
+    "Management/current-state/history/flow/review artifact changes inside the ten-path candidate.",
     "Unrelated refactor, rename, formatting sweep, performance optimization, or style-only cleanup."
   ],
   "invariants": [
     {
       "id": "INV-BASE",
-      "statement": "P1 is exactly 1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4 tree fa59fe69ba69bd199ef2cf3757679c98668a0812 parent 7bd4594f01db6d8298ca242db04b0f71ce34f040 with codefire blob 15c7ebf5e2c53216c1aaa1add12070cffc12cbdd mode 100755; manager-named L is a clean non-merge linear descendant of P1 containing the rebound packet, its typed companion, the accepted independent rebind preflight, and only explicitly named management-only records, with no product/test/source-doc/ADR/schema/packaging/issue-detail byte change from P1. Superseded P0 333e41082ffc35c73c02a420511ae2f16839c5b8 is historical evidence only and is never a valid L or product authority.",
-      "falsification_test": "Any identity mismatch, merge commit, dirty launch state, missing packet or preflight, unnamed extra path, or product/test/source-doc/ADR/schema/packaging/issue diff in P1..L blocks implementation; so does any use of P0 as base or authority."
+      "statement": "P1 is exactly 1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4 tree fa59fe69ba69bd199ef2cf3757679c98668a0812 parent 7bd4594f01db6d8298ca242db04b0f71ce34f040 with codefire blob 15c7ebf5e2c53216c1aaa1add12070cffc12cbdd mode 100755; manager-named L is a clean non-merge linear descendant of P1 whose P1..L path set is exactly the canonical six paths: corrected Markdown packet, corrected typed companion, historical rebind result, historical accepted rebind preflight, manager correction adjudication, and fresh correction preflight ending exact ACCEPT_CORRECTED_REBIND_CONTRACT. Their launch-bound blobs and the canonical path-text digest must match, with no other difference from P1. Superseded P0 333e41082ffc35c73c02a420511ae2f16839c5b8 is historical evidence only and is never a valid L or product authority.",
+      "falsification_test": "Any identity, canonical path-text, digest, or blob mismatch; merge commit; dirty launch state; missing historical or correction preflight; non-ACCEPT correction terminal; seventh path; or any use of P0 as base or authority blocks implementation."
     },
     {
       "id": "INV-REBIND-DELTA",
-      "statement": "All seven A2-owned surfaces are byte-identical and AST-identical between P0 and P1, shifted uniformly by +475 lines, and no P0..P1 codefire diff hunk intersects any A2-owned span; every changed or added P0..P1 product AST unit is A1-owned, and no added or removed A1 test line references an A2-owned symbol.",
-      "falsification_test": "Recompute the seven text/AST segment hashes on L: any inequality with the bound values, any diff hunk intersecting an A2-owned span, any A2-owned unit among the changed P0..P1 units, or any A1 test line touching an A2-owned symbol is a base violation requiring a BLOCK return to the manager."
+      "statement": "All seven A2-owned surfaces are byte-identical and AST-identical between P0 and P1, shifted uniformly by +475 lines, and no P0..P1 codefire diff hunk intersects any A2-owned span; every changed or added P0..P1 product AST unit is A1-owned, and no added or removed P0..P1 A1 test line references an A2-owned symbol. AST SHA-256 uses /usr/bin/python3.10 version 3.10.12, the exact ClassDef or FunctionDef node from ast.parse of complete UTF-8 codefire source, ast.dump(node, annotate_fields=True, include_attributes=False), UTF-8 encoding, and no added newline.",
+      "falsification_test": "Recompute the seven text/AST segment hashes on L using the frozen runtime and AST algorithm: any inequality with the bound values, any diff hunk intersecting an A2-owned span, any A2-owned unit among the changed P0..P1 units, or any added or removed P0..P1 A1 test line touching an A2-owned symbol is a base violation requiring a BLOCK return to the manager."
     },
     {
       "id": "INV-BASELINE-RECOMPUTE",
@@ -238,8 +252,8 @@
     },
     {
       "id": "INV-SCOPE",
-      "statement": "Candidate C is one non-merge child of L and changes exactly the nine write-set paths, no result or review path.",
-      "falsification_test": "git rev-list, parent identity, or git diff --name-only shows another topology, missing path, or tenth path."
+      "statement": "Candidate C is one non-merge child of L and changes exactly the ten write-set paths, no result or review path.",
+      "falsification_test": "git rev-list, parent identity, or git diff --name-only shows another topology, missing path, or eleventh path."
     },
     {
       "id": "INV-M",
@@ -313,8 +327,13 @@
     },
     {
       "id": "INV-DOCS",
-      "statement": "ADR-021 and the four canonical source docs state the exact implemented M/state/ownership/retry/terminal contract; cfr-168 stays investigating and makes no Install/Dogfood/global closure claim.",
-      "falsification_test": "Docs contradict code/oracles, omit a frozen state, claim actual effect timing, add a terminal, or close/widen an issue."
+      "statement": "ADR-021, the four canonical source docs, cfr-168, and known-limitations state the exact implemented M/state/ownership/retry/terminal contract; known-limitations distinguishes the repaired A2 live lifecycle from still-frozen successor composition; cfr-168 stays investigating and makes no Install/Dogfood/global closure claim.",
+      "falsification_test": "Docs contradict code/oracles, omit a frozen state, leave the pre-A2 live pair limitation stated as current, erase successor Freeze, claim actual effect timing, add a terminal, or close/widen an issue."
+    },
+    {
+      "id": "INV-CANDIDATE-ORDER",
+      "statement": "The clean-L base, segment, baseline-recompute, and A1-touching baseline gates run before any edit; implementation is then committed once as clean non-merge ten-path C; every candidate-scoped gate and disposable reversal binds those immutable committed bytes; any byte change rejects C and requires a new one-commit candidate from L.",
+      "falsification_test": "A candidate gate runs on uncommitted or dirty bytes, C is committed only after its claimed validation, C is amended/rebased/merged, a repair is stacked onto C, or a reversal mutates the candidate worktree."
     },
     {
       "id": "INV-REVIEW",
@@ -325,68 +344,95 @@
   "validation": [
     {
       "id": "VAL-BASE-P1",
-      "command": "Verify P1 is 1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4 with tree fa59fe69ba69bd199ef2cf3757679c98668a0812, that git merge-base --is-ancestor P1 L succeeds, that git rev-list --merges P1..L is empty, that git diff --name-only P1..L lists only the two rebound packet paths plus the accepted rebind preflight and explicitly named management-only records, and that git status --porcelain is empty.",
+      "command": "Verify P1 identity; compare sorted git diff --name-only P1..L byte-for-byte with the packet's canonical six-line allow-list; recompute its SHA-256 with one trailing newline and compare it with the manager binding; verify the launch-bound Git blobs for both corrected packets, historical rebind result, historical rebind preflight, manager adjudication, and fresh correction preflight; require the fresh report terminal ACCEPT_CORRECTED_REBIND_CONTRACT; require linear non-merge ancestry and an empty worktree.",
       "purpose": "Prove the execution base is the accepted-A1 product authority and satisfies the rebound L rule before any edit.",
       "required": true
     },
     {
       "id": "VAL-A2-SEGMENTS",
-      "command": "Recompute the seven A2-owned ast.get_source_segment text and AST SHA-256 values on L and compare them to the bound P0/P1 table; classify any changed product or test unit reachable from the A2 surfaces.",
+      "command": "Using /usr/bin/python3.10 version 3.10.12, recompute the seven A2-owned ast.get_source_segment text values and AST SHA-256 values from the exact ClassDef or FunctionDef node selected from ast.parse of complete UTF-8 codefire source, ast.dump(node, annotate_fields=True, include_attributes=False), UTF-8 bytes, no added newline; compare them to the bound P0/P1 table and classify any changed product or test unit reachable from the A2 surfaces.",
       "purpose": "Prove on current source that A1 left every A2-owned surface byte-identical and AST-identical, and surface any changed callee before implementation.",
       "required": true,
       "requires_capability": "python3"
     },
     {
+      "id": "VAL-BASELINE-RECOMPUTE",
+      "command": "Before any edit on clean L, re-derive every T01-T15 baseline, record the exact primary exception object, type and str() plus A1 traceback/cause/context normalization on the pre-M arms, and record D1 placement of M with exact L line and fence evidence including whether is_ancestor_from_objects_accounted falls before or at/after M.",
+      "purpose": "Prevent stale P0 line numbers, expected bytes, or exception shapes from standing in for current-source proof after the A1 base rebind.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "VAL-A1-TOUCHING-BASELINE-L",
+      "command": "Before any candidate edit, require HEAD equals L, require an empty worktree, and run PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B -m unittest -v tests.test_python_http_upload_accounted_traversal tests.test_python_external_production; record count, exit, duration, output digest, and both test-file blobs.",
+      "purpose": "Establish a separately identified clean-L baseline for both unchanged A1 modules that reach handle_http_upload or handle_one_request without authorizing them as candidate paths.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
+      "id": "VAL-SCOPE",
+      "command": "After implementation edits and before candidate-scoped validation, create C as one clean non-merge child of manager-named L; verify git diff --name-only L..C equals the exact ten-path write set, git diff --check L..C passes, HEAD equals C, and git status --porcelain is empty.",
+      "purpose": "Freeze one immutable committed candidate with exact topology and no scope drift before relying on any C-scoped evidence.",
+      "required": true
+    },
+    {
+      "id": "VAL-CANDIDATE",
+      "command": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B docs/development/tools/capture_candidate_identity.py --repo . --base $L --head $C --format json",
+      "purpose": "Capture immutable candidate commit/tree/patch/path identity; exact ten-path equality is independently proved by VAL-SCOPE.",
+      "required": true,
+      "requires_capability": "python3"
+    },
+    {
       "id": "VAL-COMPILE",
-      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile codefire tests/test_codefire_cli.py tests/test_python_http_post_effect_response.py",
+      "command": "On clean committed C, run PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B -m py_compile codefire tests/test_codefire_cli.py tests/test_python_http_post_effect_response.py.",
       "purpose": "Compile the changed Python runtime and both test surfaces without creating tracked bytecode.",
       "required": true,
       "requires_capability": "python3"
     },
     {
       "id": "VAL-FOCUSED",
-      "command": "python3 -m unittest tests.test_python_http_post_effect_response -v",
+      "command": "On clean committed C, run PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B -m unittest -v tests.test_python_http_post_effect_response.",
       "purpose": "Execute the required T01-T15 pair, slot, real-socket, cleanup, terminal, and regression matrix.",
       "required": true,
       "requires_capability": "python3"
     },
     {
       "id": "VAL-EXISTING",
-      "command": "python3 -m unittest tests.test_codefire_cli.CodeFireCliTests.test_python_upload_response_preflight_precedes_effect_and_retries_durable_result tests.test_codefire_cli.CodeFireCliTests.test_python_mutation_response_owner_rejects_foreign_and_retries_cleanup -v",
+      "command": "On clean committed C, run PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B -m unittest -v tests.test_codefire_cli.CodeFireCliTests.test_python_upload_response_preflight_precedes_effect_and_retries_durable_result tests.test_codefire_cli.CodeFireCliTests.test_python_mutation_response_owner_rejects_foreign_and_retries_cleanup.",
       "purpose": "Preserve and strengthen the accepted response-preflight and foreign-ledger/selection behavior.",
       "required": true,
       "requires_capability": "python3"
     },
     {
-      "id": "VAL-REVERSALS",
-      "command": "Run each packet T01-T15 temporary reversal separately against its named focused oracle, record the intended behavioral failure, restore exact candidate bytes, then run git diff --check and git status --short.",
-      "purpose": "Prove all fifteen counterexample oracles are load-bearing and non-vacuous without committing reversal patches.",
-      "required": true
-    },
-    {
-      "id": "VAL-BASELINE-RECOMPUTE",
-      "command": "Re-derive every T01-T15 baseline on L, record the exact primary exception object, type and str() plus the A1 traceback/cause/context normalization observed on the pre-M arms, and record the D1 placement of M with exact L line and fence evidence including whether is_ancestor_from_objects_accounted falls before or at/after M.",
-      "purpose": "Prevent stale P0 line numbers, expected bytes, or exception shapes from standing in for current-source proof after the A1 base rebind.",
+      "id": "VAL-A1-TOUCHING-REGRESSION-C",
+      "command": "On clean committed C, require HEAD equals C and run PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B -m unittest -v tests.test_python_http_upload_accounted_traversal tests.test_python_external_production; record count, exit, duration, output digest, and prove both test-file blobs equal the L baseline.",
+      "purpose": "Prove the frozen candidate preserves both A1-touching modules and that the second run cannot be confused with the pre-edit L baseline.",
       "required": true,
       "requires_capability": "python3"
     },
     {
+      "id": "VAL-REVERSALS",
+      "command": "From exact committed C, run each T01-T15 reversal separately in a fresh disposable copy against its named focused oracle, record the intended behavioral failure, and prove the candidate worktree remains clean and byte-identical after every reversal.",
+      "purpose": "Prove all fifteen counterexample oracles are load-bearing and non-vacuous without mutating or rewriting C.",
+      "required": true
+    },
+    {
       "id": "VAL-SOURCE-DOCS",
-      "command": "python3 docs/development/tools/check_source_docs.py",
+      "command": "On clean committed C, run PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B docs/development/tools/check_source_docs.py.",
       "purpose": "Validate the four canonical source documents against repository structure and references.",
       "required": true,
       "requires_capability": "python3"
     },
     {
       "id": "VAL-PROJECT-DOCS",
-      "command": "python3 docs/development/tools/check_project_docs.py",
+      "command": "On clean committed C, run PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B docs/development/tools/check_project_docs.py.",
       "purpose": "Validate ADR, issue ledger, links, and project-document consistency.",
       "required": true,
       "requires_capability": "python3"
     },
     {
       "id": "VAL-FULL-PYTHON",
-      "command": "python3 -m unittest discover -s tests -v",
+      "command": "On clean committed C, run PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B -m unittest discover -s tests -v.",
       "purpose": "Run the applicable broad Python regression gate after focused checks pass.",
       "required": true,
       "requires_capability": "python3"
@@ -397,29 +443,17 @@
       "purpose": "Run the repository-required Python CLI smoke workflow.",
       "required": true,
       "requires_capability": "bash"
-    },
-    {
-      "id": "VAL-SCOPE",
-      "command": "Verify C is one non-merge child of manager-named L, git diff --name-only L..C equals the exact nine-path write set, and git diff --check L..C passes.",
-      "purpose": "Freeze one immutable candidate with exact topology and no scope drift.",
-      "required": true
-    },
-    {
-      "id": "VAL-CANDIDATE",
-      "command": "python3 docs/development/tools/capture_candidate_identity.py --repo . --base $L --head HEAD --format json",
-      "purpose": "Capture candidate commit/tree/patch/path identity; the tool's manifest option expects a swarm-batch manifest rather than this typed task packet, so exact nine-path equality is proved independently by VAL-SCOPE.",
-      "required": true,
-      "requires_capability": "python3"
     }
   ],
   "handoff": {
     "required_outputs": [
-      "Full P1 and manager-named L commit/tree identity with proof that P1..L is the authorized docs-only rebound-packet plus accepted-preflight integration and contains no product/test/source-doc/ADR/schema/packaging/issue-detail difference.",
+      "Full P1 and manager-named L commit/tree identity with byte-for-byte canonical six-path P1..L allow-list, digest, six bound blobs, both distinct preflight roles, and exact fresh terminal ACCEPT_CORRECTED_REBIND_CONTRACT.",
       "Recomputed A2-owned segment table on L for all seven surfaces, with text and AST SHA-256 equality against the bound P0/P1 values.",
       "Recomputed T01-T15 baselines on L, the observed A1 primary-exception identity/type/str and traceback/cause/context normalization on the pre-M arms, and the D1 M-placement adjudication with exact L line and fence evidence.",
       "One clean non-merge candidate C commit/tree/parent and canonical L..C patch SHA-256.",
-      "Exact nine-path name-status plus final blob and mode for every candidate path.",
+      "Exact ten-path name-status plus final blob and mode for every candidate path.",
       "All validation commands with exit code, selected/executed count, duration, and log digest; skips and unavailable evidence remain explicit.",
+      "Separate clean-L baseline and frozen-C regression records for tests.test_python_http_upload_accounted_traversal and tests.test_python_external_production, including counts, exits, durations, output digests, and unchanged test-file blobs.",
       "T01-T15 success evidence and each temporary reversal's intended behavioral failure, with candidate bytes restored.",
       "Exact selected success/durable wire bytes, status-line counts, and no-effect authority snapshots for the applicable cases.",
       "Observer snapshots for clean, recovered cleanup, transport failure, and persistent cleanup including owner reachability, debt, permits, attempts, selection, and wire state.",
@@ -427,7 +461,7 @@
       "Explicit non-goal and intentionally untouched path statement, including A1, successor, GET, slotless POST, MR-write, reducer, Rust, install, and dogfood.",
       "Candidate Freeze statement that C was not amended/rebased/merged and that any later byte change requires a new candidate.",
       "Fresh reviewer exclusion set and a statement that implementation, integration, Install, Dogfood, and issue Close were not performed by the packet-authoring or rebind-authoring lane.",
-      "Explicit statement that the 2026-08-03 A1-base rebind and its fresh exact preflight are documentation-only, that A2/B3 remains open, and that the accepted A1 source package was neither reopened nor widened."
+      "Explicit statement that the historical A1-base rebind preflight and distinct fresh correction preflight are documentation-only, that only the latter's exact ACCEPT unlocks L, that A2/B3 remains open, and that the accepted A1 source package was neither reopened nor widened."
     ],
     "evidence_digest_required": true
   }

@@ -1,11 +1,16 @@
 # CFR-168 C14-LIVE-A2 / B3 post-effect response lifecycle — manager Plan/FREEZE packet
 
-Status: ready
+Status: ready for fresh independent correction preflight; implementation
+remains blocked until that exact preflight is accepted
 
 Packet ID: `cfr168-c14-live-a2-b3-plan-freeze-20260802`
 
-Revision: **2026-08-03 A1-base rebind**. The frozen design is unchanged; only
-the base authority is rebound onto the accepted `C14-LIVE-A1` source package.
+Revision: **2026-08-03 A1-base rebind plus manager precision correction**. The
+frozen `D1`-`D9` behavior design, `T01`-`T15` matrix, hazards, and non-goals
+remain in force. The base authority is rebound onto the accepted
+`C14-LIVE-A1` source package, while this correction explicitly supersedes the
+historical nine-path scope and the ambiguous AST, test-phase, and launch-base
+precision rules identified by independent preflight and manager audit.
 
 Role: manager Plan/FREEZE authority; a later, separate lane may implement only
 after this packet is integrated and the manager names its exact launch base.
@@ -16,7 +21,8 @@ Typed companion:
 Immutable product base `P1`: `1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4`
 (tree `fa59fe69ba69bd199ef2cf3757679c98668a0812`).
 
-Decision: **AUTHORIZE_BOUNDED_IMPLEMENTATION_AFTER_PACKET_INTEGRATION**.
+Decision:
+**AUTHORIZE_BOUNDED_IMPLEMENTATION_AFTER_CORRECTION_PREFLIGHT_ACCEPTANCE**.
 
 This commit is documentation-only. It does not authorize this packet-writing
 lane to mutate product, tests, source docs, issue state, installation, or
@@ -26,9 +32,13 @@ this packet. Until then, implementation is forbidden.
 
 ### Superseded base authority — retained, not erased
 
-The historical packet is retained as exact prior authority. It is superseded
-only as *base*; its design, matrix, hazards, scope, and non-goals remain in
-force.
+The historical packet is retained as exact prior evidence. Its `D1`-`D9`
+behavior design, `T01`-`T15` matrix, hazards, and non-goals remain in force.
+It is superseded as *base* and, only where this corrected packet says so, for
+the exact ten-path candidate scope, AST digest convention, two-phase
+A1-touching regression evidence, canonical launch allow-list, and requirement
+for a second fresh correction preflight. The historical nine-path/no-tenth
+boundary is not current authority.
 
 | Historical identity | Exact value |
 |---|---|
@@ -123,6 +133,15 @@ hash below reproduces exactly, and every `P1` value equals it. Segments use the
 `ast.get_source_segment` convention, so a nested method's span begins at its
 `def` keyword.
 
+The AST digest convention is normative and must not be inferred by an
+implementer: use `/usr/bin/python3.10` version 3.10.12, parse the complete UTF-8
+`codefire` source with `ast.parse`, select the exact bound `ClassDef` or
+`FunctionDef` node, compute
+`ast.dump(node, annotate_fields=True, include_attributes=False)`, encode that
+string as UTF-8 with no added newline, and take SHA-256. Hashing a reparsed
+`Module` wrapper, a text rendering, or an AST produced by another Python minor
+version is not comparable evidence.
+
 | Surface | `P0` lines | `P1` lines | Bytes | Text SHA-256 (`P0` = `P1`) | AST SHA-256 (`P0` = `P1`) |
 |---|---|---|---:|---|---|
 | `_PreparedHTTPResponseOwner` | 16037-16089 | 16512-16564 | 1748 | `82d4ca7bb9df993a4e825c89acf12e973c46921925bcacdb1673d14efae63c04` | `12e71966c4abc915e53eeb42c9c5fdf64c011a385b26f59931b42c6bab16fce3` |
@@ -147,7 +166,7 @@ cleanup/authority units; none is A2-owned.
 |---|---:|---|
 | New exception helpers `_detach_effective_exception_tracebacks`, `_link_primary_cleanup_exception` (+ `capture`), `_retain_first_cleanup_failure` | 4 added | not A2-owned |
 | `AccountedServerVerification.close.attempt`, `SealedCommitValidationSession.close.attempt` | 2 added | not A2-owned |
-| `AccountedRemoteSignaturePolicyAuthority` and 9 methods | 10 changed | not A2-owned |
+| `AccountedRemoteSignaturePolicyAuthority` and 8 methods | 9 changed | not A2-owned |
 | `AccountedCommitSignaturePolicy` and 6 methods | 7 changed | not A2-owned |
 | `AccountedServerVerification` and 10 methods, `run_server_verification` | 12 changed | not A2-owned |
 | `AccountedHTTPUploadAncestry` and 4 methods, `is_ancestor_from_objects_accounted`, `_detach_ancestry_exception_chain` | 7 changed | not A2-owned |
@@ -190,15 +209,23 @@ not be inherited from `P0`.
 This file cannot contain the commit that contains itself. The manager launch
 prompt must therefore name one full 40-character execution base `L`. `L` must:
 
-1. contain this rebound Markdown packet and its typed companion byte-for-byte;
-2. contain the accepted independent rebind preflight report for this packet;
-3. descend linearly from `P1` with no merge commit;
-4. differ from `P1` only by the rebound Plan/FREEZE packet paths, that
-   preflight report, and explicitly named management-only result or
-   adjudication records — each named in the launch prompt by exact path;
-5. contain no product, test, source-doc, ADR, schema, packaging, or
+1. contain this corrected Markdown packet and typed companion byte-for-byte;
+2. contain the historical accepted rebind preflight at
+   `docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-preflight-claude-20260803/preflight.md`;
+3. contain the historical rebind result at
+   `docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-claude-20260803/result.md`;
+4. contain the manager correction adjudication at
+   `docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-preflight-claude-20260803/manager-adjudication.md`;
+5. contain a second, fresh correction preflight at
+   `docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-manager-correction-preflight-claude-20260803/preflight.md`
+   ending exactly
+   `PREFLIGHT_VERDICT: ACCEPT_CORRECTED_REBIND_CONTRACT`;
+6. descend linearly from `P1` with no merge commit;
+7. differ from `P1` by exactly the six paths named in items 1-5, and no other
+   path;
+8. contain no product, test, source-doc, ADR, schema, packaging, or
    issue-detail difference from `P1`; and
-6. be clean before the implementation worktree is created.
+9. be clean before the implementation worktree is created.
 
 The implementer must stop if any predicate fails. Editing the typed
 `base_revision` to make a generic launcher accept a different base is not an
@@ -533,7 +560,7 @@ execution must follow the repository's Low-Codex provider policy:
 
 | Lane | Provider/model | Runaway limit | Authority |
 |---|---|---:|---|
-| Implementation | Claude `claude-opus-5` | 6h | Exact nine-path candidate only |
+| Implementation | Claude `claude-opus-5` | 6h | Exact ten-path candidate only |
 | Deterministic validation/reversal assistance | Fugu `fugu-ultra-v1.1` | 2h per bounded lane | Report-only or disposable reversal work; never candidate integration |
 | Independent exact review | fresh Claude `claude-opus-5` session | 4h | Report-only exact `L..C` review |
 | Adjudication/integration | manager Codex `gpt-5.6-sol`, explicit authorization only | 3h | Control plane only |
@@ -545,9 +572,10 @@ runaway bound, not an expected task duration or permission to discard work.
 
 ## Scope
 
-### Exact nine-path candidate write set
+### Exact ten-path candidate write set
 
-Candidate `C` may change exactly these nine paths, with no optional tenth path:
+Candidate `C` may change exactly these ten paths, with no optional eleventh
+path:
 
 1. `codefire`
 2. `tests/test_codefire_cli.py`
@@ -558,6 +586,7 @@ Candidate `C` may change exactly these nine paths, with no optional tenth path:
 7. `docs/development/source-data-model-catalog.md`
 8. `docs/development/change-playbook.md`
 9. `docs/development/code-review-issues/cfr-168.md`
+10. `docs/development/known-limitations.md`
 
 Candidate `C` is one clean non-merge commit whose parent is `L`. A result file,
 review report, flow record, history entry, current-state update, packet edit, or
@@ -597,13 +626,17 @@ The four canonical source docs must describe the implementation actually
 landed, without claiming Install, Dogfood, MR-write, global C14, or all-route
 closure. `cfr-168.md` must record candidate/source evidence and the exact A2
 scope while keeping `Status: investigating` and every unrelated residual open.
+`known-limitations.md` must distinguish the A2 live response-slot lifecycle
+repaired by this candidate from the still-frozen successor composition,
+publication-proof, and all-route wiring. It must not leave the pre-A2 pair
+limitation stated as current after the production A2 lifecycle changes.
 
 ### Read set
 
 The implementer must read this packet and typed companion, `AGENTS.md`,
 `docs/development/project-management.md`,
 `docs/development/ai/operating-protocol.md`, ADR-020, the four bound evidence
-documents above, the nine candidate paths, and the existing focused mutation
+documents above, the ten candidate paths, and the existing focused mutation
 response and real-socket tests. Reading adjacent helpers needed to understand a
 call is permitted; writing them is not.
 
@@ -617,7 +650,18 @@ pre-effect exception behavior the A2 route observes:
   `_link_primary_cleanup_exception`, and `_retain_first_cleanup_failure`, plus
   the four changed callees reachable from `handle_http_upload`; and
 - `tests/test_python_http_upload_accounted_traversal.py` at `L`, which A1
-  changed and which the typed companion already lists.
+  changed and which the typed companion already lists; and
+- `tests/test_python_external_production.py` at `L`. Both modules reach
+  `handle_http_upload`, and both must receive an explicit pre-edit baseline and
+post-candidate focused regression run even though neither is a candidate
+write path.
+
+The implementer must also read the exact historical rebind result, historical
+rebind preflight, manager correction adjudication, and fresh correction
+preflight paths named by execution-base rule `L`. The historical preflight
+proves the original rebind identities but does not authorize implementation;
+only the fresh correction preflight's exact terminal ACCEPT unlocks manager
+selection of `L`.
 
 ## Counterexample, oracle, and reversal matrix
 
@@ -697,7 +741,7 @@ historical matrix rows are behavioral requirements, not recorded observations.
 | `H12` Broad helper edit regresses GET/slotless POST | Shared `publish_prepared` and dispatcher serve other routes. | Narrow call contract and `T13`/`T14`; full Python gate. |
 | `H13` Observer clears evidence too early | Persistent owner appears clean but is unreachable. | Observe before final best-effort destruction and report exact reachability; `T09`/`T10`. |
 | `H14` Raw `BaseException` swallowing | Process-fatal or accounting defects disappear. | Preserve existing fatal boundaries; only secondary cleanup is bounded/recorded; focused fault identity tests. |
-| `H15` Candidate/result topology drifts | Reviewer no longer sees one immutable subject. | One nine-path candidate commit, external handoff, exact candidate capture, fresh review. |
+| `H15` Candidate/result topology drifts | Reviewer no longer sees one immutable subject. | One ten-path candidate commit, external handoff, exact candidate capture, fresh review. |
 
 ## Non-Goals
 
@@ -747,29 +791,82 @@ P1=1e8dd545f27bd1f22879b067ad0e1b3f4e2ecbc4
 test "$(git rev-parse "$P1^{tree}")" = fa59fe69ba69bd199ef2cf3757679c98668a0812
 git merge-base --is-ancestor "$P1" "$L"
 test -z "$(git rev-list --merges "$P1".."$L")"
-git diff --name-only "$P1".."$L"
+test -n "${L_MANAGEMENT_PATHS_SHA256:-}"
+test -n "${L_PACKET_MD_BLOB:-}"
+test -n "${L_PACKET_JSON_BLOB:-}"
+test -n "${L_REBIND_RESULT_BLOB:-}"
+test -n "${L_HISTORICAL_PREFLIGHT_BLOB:-}"
+test -n "${L_MANAGER_ADJUDICATION_BLOB:-}"
+test -n "${L_CORRECTION_PREFLIGHT_BLOB:-}"
+L_MANAGEMENT_PATHS_EXPECTED="$(cat <<'EOF'
+docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-claude-20260803/result.md
+docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-preflight-claude-20260803/manager-adjudication.md
+docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-preflight-claude-20260803/preflight.md
+docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-manager-correction-preflight-claude-20260803/preflight.md
+docs/development/ai/task-packets/cfr168-c14-live-a2-b3-plan-freeze-20260802.md
+docs/development/ai/task-packets/json/cfr168-c14-live-a2-b3-plan-freeze-20260802.json
+EOF
+)"
+L_MANAGEMENT_PATHS_ACTUAL="$(git diff --name-only "$P1".."$L" | LC_ALL=C sort)"
+test "$L_MANAGEMENT_PATHS_ACTUAL" = "$L_MANAGEMENT_PATHS_EXPECTED"
+test "$(printf '%s\n' "$L_MANAGEMENT_PATHS_EXPECTED" | sha256sum | cut -d' ' -f1)" = "$L_MANAGEMENT_PATHS_SHA256"
+test "$(git rev-parse "$L:docs/development/ai/task-packets/cfr168-c14-live-a2-b3-plan-freeze-20260802.md")" = "$L_PACKET_MD_BLOB"
+test "$(git rev-parse "$L:docs/development/ai/task-packets/json/cfr168-c14-live-a2-b3-plan-freeze-20260802.json")" = "$L_PACKET_JSON_BLOB"
+test "$(git rev-parse "$L:docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-claude-20260803/result.md")" = "$L_REBIND_RESULT_BLOB"
+test "$(git rev-parse "$L:docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-preflight-claude-20260803/preflight.md")" = "$L_HISTORICAL_PREFLIGHT_BLOB"
+test "$(git rev-parse "$L:docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-a1-base-rebind-preflight-claude-20260803/manager-adjudication.md")" = "$L_MANAGER_ADJUDICATION_BLOB"
+test "$(git rev-parse "$L:docs/development/ai/swarm-results/cfr168-c14-live-a2-b3-manager-correction-preflight-claude-20260803/preflight.md")" = "$L_CORRECTION_PREFLIGHT_BLOB"
 test -z "$(git status --porcelain)"
 ```
 
-The name-only output must contain only the two rebound packet paths, the
-accepted rebind preflight report, and the management-only records the launch
-prompt names by exact path. Any product, test, source-doc, ADR, schema,
-packaging, or issue-detail path in that output is a base violation.
+The canonical six-line allow-list above, including order and trailing newline
+used for hashing, is the only valid `P1..L` path set. The manager launch record
+must bind that exact text, its `L_MANAGEMENT_PATHS_SHA256`, and all six Git
+blobs consumed above. There is no optional “other management record.” Any path
+or blob mismatch is a base violation.
 
-### Candidate identity and scope
+### Pre-edit A1-touching baseline on `L`
+
+Run this after the base proof and before the first candidate edit. Record test
+count, exit, duration, output digest, and both test-file blobs separately from
+post-candidate evidence:
+
+```bash
+test "$(git rev-parse HEAD)" = "$L"
+test -z "$(git status --porcelain)"
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B -m unittest -v \
+  tests.test_python_http_upload_accounted_traversal \
+  tests.test_python_external_production
+```
+
+### Candidate creation, freeze, identity, and scope
+
+After the clean-`L` baseline and all implementation edits are complete, the
+implementer must first verify the proposed exact ten-path diff and then create
+one clean, non-merge candidate commit `C` whose sole parent is `L`. This commit
+happens before any candidate-scoped positive gate or reversal is relied upon.
+All remaining validation runs against those immutable committed bytes.
+
+Do not amend, squash, rebase, merge, or stack a repair onto `C`. If any gate
+requires a byte change, reject that candidate and construct a new one-commit
+candidate from `L`; then rerun every candidate-scoped gate. Reversals operate
+only on disposable copies of the exact committed `C`.
 
 ```bash
 test "$(git rev-parse HEAD^)" = "$L"
 test "$(git rev-list --count "$L"..HEAD)" = 1
 test -z "$(git rev-list --merges "$L"..HEAD)"
+test "$(git rev-parse HEAD)" = "$C"
 git diff --name-only "$L"..HEAD
 git diff --check "$L"..HEAD
-python3 docs/development/tools/capture_candidate_identity.py \
+test -z "$(git status --porcelain)"
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B \
+  docs/development/tools/capture_candidate_identity.py \
   --repo . --base "$L" --head HEAD --format json
 ```
 
-The name-only output must equal the nine paths above as a set and contain no
-tenth path. `capture_candidate_identity.py --manifest` consumes a swarm-batch
+The name-only output must equal the ten paths above as a set and contain no
+eleventh path. `capture_candidate_identity.py --manifest` consumes a swarm-batch
 manifest, not this typed task packet, so it is intentionally run without that
 option. Its `changed_paths` output and the independent name-only comparison
 together prove the exact write set; do not mislabel the task packet as a swarm
@@ -778,12 +875,17 @@ manifest or edit its role.
 ### Focused product and socket checks
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile \
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B -m py_compile \
   codefire tests/test_codefire_cli.py tests/test_python_http_post_effect_response.py
-python3 -m unittest tests.test_python_http_post_effect_response -v
-python3 -m unittest \
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B -m unittest -v \
+  tests.test_python_http_post_effect_response
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B -m unittest -v \
   tests.test_codefire_cli.CodeFireCliTests.test_python_upload_response_preflight_precedes_effect_and_retries_durable_result \
-  tests.test_codefire_cli.CodeFireCliTests.test_python_mutation_response_owner_rejects_foreign_and_retries_cleanup -v
+  tests.test_codefire_cli.CodeFireCliTests.test_python_mutation_response_owner_rejects_foreign_and_retries_cleanup
+test "$(git rev-parse HEAD)" = "$C"
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B -m unittest -v \
+  tests.test_python_http_upload_accounted_traversal \
+  tests.test_python_external_production
 ```
 
 The new module must identify all `T01`-`T15` rows in test names, subtests, or a
@@ -791,13 +893,13 @@ checked matrix so the result cannot claim 15 while silently omitting one.
 
 ### Reversal evidence
 
-Apply each `T01`-`T15` reversal separately to a disposable copy or unstaged
-worktree, run its named focused oracle, record the intended behavioral failure,
-and restore the exact candidate bytes before the next reversal. At the end:
+Apply each `T01`-`T15` reversal separately to a fresh disposable copy outside
+the candidate worktree, run its named focused oracle, and record the intended
+behavioral failure. Never apply a reversal to `C`. At the end:
 
 ```bash
 git diff --check
-git status --short
+test -z "$(git status --porcelain)"
 ```
 
 The final candidate worktree must be clean after its commit. No reversal patch
@@ -806,9 +908,9 @@ or generated cache may appear in `C`.
 ### Canonical docs and broad Python gates
 
 ```bash
-python3 docs/development/tools/check_source_docs.py
-python3 docs/development/tools/check_project_docs.py
-python3 -m unittest discover -s tests -v
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B docs/development/tools/check_source_docs.py
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B docs/development/tools/check_project_docs.py
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.10 -B -m unittest discover -s tests -v
 ./demo.sh
 git diff --check "$L"..HEAD
 ```
@@ -818,17 +920,18 @@ behavior, docs-only exemption does not apply.
 
 ## Candidate Freeze and independent review
 
-### Candidate freeze
+### Manager Candidate-Freeze record
 
-After every required validation passes, commit the nine paths once as candidate
-`C`. Do not amend, squash, rebase, merge, or add evidence to `C`. The handoff
-must bind:
+After every required validation passes against the already committed immutable
+`C`, the manager records its Candidate-Freeze identity. This record does not
+create, amend, squash, rebase, merge, or add evidence to `C`. The handoff must
+bind:
 
 - `L` commit/tree and its proof against `P1`, plus the recomputed
   A2-owned segment table on `L`;
 - `C` commit/tree/parent;
 - canonical patch SHA-256 for `L..C`;
-- exact nine-path name-status and each final blob/mode;
+- exact ten-path name-status and each final blob/mode;
 - all validation commands, exit codes, counts, durations, and log digests;
 - `T01`-`T15` result and reversal evidence;
 - source-segment hashes for every changed B3 surface;
@@ -869,7 +972,7 @@ Review must independently cover:
 9. ADR-020 terminal compatibility and observer truth;
 10. all 15 counterexamples/reversals and non-vacuity;
 11. slotless route and next-request regression surface;
-12. exact nine-path scope and canonical documentation truth.
+12. exact ten-path scope and canonical documentation truth.
 
 Every observation must include file/line evidence, impact, certainty, must-fix
 trigger, and actionability disposition under
@@ -888,18 +991,23 @@ required before integration.
 This packet completes Plan/FREEZE for only `C14-LIVE-A2` / `B3`. The subsequent
 order is mandatory:
 
-0. manager integrates this 2026-08-03 A1-base rebind and commissions a fresh
-   independent rebind preflight against `P1`;
-1. manager accepts that preflight, integrates it, and names `L`;
-2. independent implementer creates and validates one nine-path `C`;
-3. manager Candidate-Freezes exact `C`;
-4. fresh excluded reviewer reports on exact `C`;
-5. manager adjudicates every observation;
-6. bounded repair/rereview occurs only for required corrections;
-7. manager integrates an exact accepted candidate and reruns focused checks;
-8. source acceptance is recorded without final issue closure;
-9. applicable fresh Install and real-socket Dogfood/Evaluate run later; and
-10. only then may the manager consider final Close/Retrospect with all other
+0. the manager has integrated the A1-base rebind, historical rebind preflight,
+   rebind result, and this precision correction;
+1. a fresh independent reviewer writes only the correction-preflight path and
+   must end exactly `PREFLIGHT_VERDICT: ACCEPT_CORRECTED_REBIND_CONTRACT`;
+2. the manager integrates that fresh report, verifies the exact six-path
+   `P1..L` allow-list, and names `L`;
+3. the implementer records the two A1-touching modules' baseline on clean `L`;
+4. an independent implementer edits, commits one exact ten-path `C`, and then
+   validates only those immutable bytes;
+5. the manager records the exact validated `C` as Candidate-Frozen;
+6. a fresh excluded reviewer reports on exact `C`;
+7. the manager adjudicates every observation;
+8. bounded repair/rereview occurs only for required corrections;
+9. the manager integrates an exact accepted candidate and reruns focused checks;
+10. source acceptance is recorded without final issue closure;
+11. applicable fresh Install and real-socket Dogfood/Evaluate run later; and
+12. only then may the manager consider final Close/Retrospect with all other
     CFR-168 predecessors.
 
 An exact review ACCEPT is not integration. Integration is not Install or
@@ -958,7 +1066,7 @@ State:
 - Launch base L:
 - Candidate C/tree/parent:
 - Patch SHA-256:
-- Exact nine paths:
+- Exact ten paths:
 - T01-T15 and reversals:
 - Focused/broad/docs/demo validation:
 - Clean worktree:
@@ -1001,7 +1109,7 @@ answer and one oracle:
 | Persistent owner reachability | D7 | `T03`, `T10` |
 | ADR terminal vocabulary | D8 | `T10`-`T12` |
 | One-document precedence | D6/D9 | `T04`, `T06`, `T07` |
-| Nine-path bound | Scope | candidate identity gate |
+| Ten-path bound | Scope | candidate identity gate |
 | Fifteen counterexamples/reversals | Matrix | focused/reversal evidence |
 | Fresh reviewer exclusion | Candidate Freeze | manager review launch record |
 | Single product authority | `P1` = `1e8dd545…` | `P1` identity/topology/blob gate |
@@ -1014,8 +1122,8 @@ There is no unresolved requirement-authority choice inside this bounded slice,
 and authority is single-valued: `P1` is the only product base, and the rebound
 `L` rule is the only execution-base rule.
 
-If live source at `L` violates the base rule, if any required behavior needs a
-tenth candidate path, if a recomputed `T01`-`T15` baseline contradicts a frozen
+If live source at `L` violates the base rule, if any required behavior needs an
+eleventh candidate path, if a recomputed `T01`-`T15` baseline contradicts a frozen
 `D1`-`D9` decision, or if a test exposes a contract that changes authority
 beyond A2, the implementer must stop and return that exact blocker to the
 manager. It must not improvise a wider repair, resolve a `codefire` conflict by
