@@ -4454,6 +4454,52 @@ class PythonHTTPUploadAccountedTraversalTests(unittest.TestCase):
             source.close()
         self.assert_closed(ledger)
 
+    def test_source_close_preserves_cleanup_prior_chain_for_live_wrapper(self):
+        source_type = self.globals["_AccountedUploadCommitSource"]
+        primary = ValueError("exact source-close primary")
+        primary_prior = OSError("source-close primary prior")
+        cleanup = RuntimeError("exact source-close cleanup")
+        cleanup_prior = LookupError("source-close cleanup prior")
+        primary.__context__ = primary_prior
+        cleanup.__cause__ = cleanup_prior
+
+        class OneFaultSession:
+            def __init__(inner):
+                inner.calls = 0
+
+            def close(inner, terminal_reason):
+                self.assertIsNone(terminal_reason)
+                inner.calls += 1
+                if inner.calls == 1:
+                    raise cleanup
+
+        source = source_type.__new__(source_type)
+        session = OneFaultSession()
+        source._session = session
+        source._memory = None
+        first = self.globals["_drained_commit_source_cleanup_error"](
+            source.close,
+            self.globals["_detach_effective_exception_tracebacks"],
+        )
+        self.assertIs(first, cleanup)
+        self.assertEqual(session.calls, 2)
+        self.assertIsNone(source._session)
+        self.assertIs(cleanup.__cause__, cleanup_prior)
+
+        linked = self.globals["_link_primary_cleanup_exception"](
+            primary, first
+        )
+        chain = []
+        current = linked
+        while current is not None:
+            chain.append(current)
+            current = current.__cause__
+        self.assertEqual(
+            chain,
+            [primary, cleanup, cleanup_prior, primary_prior],
+        )
+        self.assertEqual(len({id(error) for error in chain}), len(chain))
+
     def test_persistent_descriptor_fault_sweeps_once_then_drains(self):
         source_type = self.globals["_AccountedUploadCommitSource"]
         descriptor_type = self.globals["_SealedValidationFileDescriptor"]

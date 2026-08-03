@@ -7942,7 +7942,7 @@ class _AccountedUploadCommitSource:
             try:
                 session.close(None)
             except BaseException as exc:
-                _detach_exception_chain(exc)
+                _detach_effective_exception_tracebacks(exc)
                 session_error = exc
             else:
                 self._session = None
@@ -7954,12 +7954,12 @@ class _AccountedUploadCommitSource:
             try:
                 memory.close()
             except BaseException as exc:
-                _detach_exception_chain(exc)
+                _detach_effective_exception_tracebacks(exc)
                 session_error = exc
             else:
                 self._memory = None
         if session_error is not None:
-            raise session_error from None
+            raise session_error.with_traceback(None)
 
     def __del__(self) -> None:
         """Best-effort fallback, in the shape the other owners on this route use.
