@@ -588,7 +588,7 @@ class PythonExistingTerminalOwnerTests(unittest.TestCase):
         verification_type.close = fail_first_close
         try:
             with self.assertRaisesRegex(
-                KeyboardInterrupt, "partial verification close"
+                KeyboardInterrupt, "partial verification construction"
             ):
                 owner.verify_signature_and_server("main", self.head, ledger)
         finally:
@@ -671,7 +671,7 @@ class PythonExistingTerminalOwnerTests(unittest.TestCase):
         ancestry_type.close = fail_first_close
         try:
             with self.assertRaisesRegex(
-                KeyboardInterrupt, "partial ancestry close"
+                KeyboardInterrupt, "partial ancestry construction"
             ):
                 owner.contains_ancestor(self.initial, self.head, ledger)
         finally:
