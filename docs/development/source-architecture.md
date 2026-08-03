@@ -373,7 +373,9 @@ after the fence cannot redirect either. Bootstrap skips policy only while the ac
 bounded, escaping failures retain only a fixed sample/count/digest, and uncertain kill/reap keeps the exact process owner for retry.
 All permits are stored in owner fields before one-shot `reserve_into` registration. FD fields are detached before exactly one
 captured-builtin close invocation; an exception consumes numeric ownership because same-inode/same-number reuse cannot be
-distinguished safely. Config/exception payloads are dropped before Retained release. These boundaries cannot roll back filesystem,
+distinguished safely. Cleanup sweeps every currently owned plan capability once even after an earlier close fault; the operation
+failure remains the exact outer exception and the first cleanup fault becomes its explicit cause after both effective prior chains.
+Config/exception payloads and traceback locals are dropped before Retained release. These boundaries cannot roll back filesystem,
 network, or service effects already performed by a configured command. Production HTTP upload passes the handler's same request
 ledger and deadline through the compatibility wrapper into this owner; standalone/no-ledger callers retain the local-ledger path.
 A production-unwired seeded construction path is reachable only through `AccountedRemoteSignaturePolicyAuthority`. After the
@@ -443,15 +445,21 @@ charges it against the retained reservation instead of the caller's temporary bu
 allocating unowned memory. The other accounted collections on this route (descriptor registry, subdirectory map, pair-plan and
 pair-builder collections) are charged before allocation but do not go through this boundary.
 
-Control releases are retryable and exactly once, at the owner and at the wrapper above it. `_AccountedUploadSourceMemory` consumes
-its record of a claim only for a release the ledger really made, decided by comparing that ledger's scalar before and after, and the
-failure always propagates. `_AccountedUploadCommitSource` — the commit source of the fast-forward ancestry and commit-signature
-history upload routes — keeps `_session` and `_memory` reachable until each one's own cleanup has succeeded, so a failing `close(2)`
-inside the session teardown leaves the reservation owed and a further `close` finishes it rather than returning over stranded bytes.
-Both live call sites take that further `close` themselves: `is_ancestor_from_objects_accounted` and
-`enforce_remote_commit_signature_policy_accounted` route the source teardown through `_drained_commit_source_cleanup_error`, which
-retries the same source exactly once — never more — and returns the *first* cleanup error, so the request ledger is already drained
-at the point the request loop accounts the request rather than only after the caller drops the error it was handed. Measured through
+Control releases are bounded and exactly once at the session. One `SealedCommitValidationSession.close` detaches every descriptor
+before its sole close attempt, continues through the complete registry after faults, drops payload ownership, and releases every
+logical control claim. It returns the first cleanup fault only after that sweep; it never retries a raw descriptor number. The source
+wrapper retains its fixed two-call compatibility surface, but the second call only completes non-descriptor scalar cleanup left by
+another owner. `_AccountedUploadSourceMemory` consumes its record of a claim only for a release the ledger really made, decided by
+comparing that ledger's scalar before and after, and the failure always propagates. Before `_AccountedUploadCommitSource._open`
+polls, allocates, acquires, or constructs a replacement, it reconciles any already-published `_memory`. A persistent constructor
+cleanup failure therefore retains the same 11,456-byte owner instead of overwriting it with a second owner and growing the debt to
+22,912 bytes.
+
+`_AccountedUploadCommitSource` is the commit source of the fast-forward ancestry and commit-signature history upload routes. Both
+live call sites, `is_ancestor_from_objects_accounted` and `enforce_remote_commit_signature_policy_accounted`, route source teardown
+through `_drained_commit_source_cleanup_error`, which invokes the same source at most twice and returns the *first* cleanup error, so
+the request ledger is already drained at the point the request loop accounts the request rather than only after the caller drops the
+error it was handed. Measured through
 `make_http_handler`'s own `_decision_work_observer`, a request carrying one failing `close(2)` is accounted with zero current debt,
 zero permits and terminal `complete`; the upload still fails and the `OSError` still escapes the loop, so `complete` describes the
 accounting and not the request.
@@ -460,11 +468,12 @@ Which error the caller sees is shared-primitives `C14`, defined by the in-tree a
 [`shared-primitives preflight`](ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md)
 (`C14` in its per-clause register, `B2` in its decision table): a cleanup fault never displaces the primary operation decision. When
 the traversal or the policy decision itself failed, that decision is the outer exception and the first cleanup error is attached as
-its `__cause__`; only when the operation succeeded is the cleanup error surfaced on its own. Both routes previously inverted this
+its `__cause__`; the cleanup fault's prior effective chain precedes the primary's prior effective chain, identity duplicates are
+omitted, and the resulting explicit chain is cycle-free. Only when the operation succeeded is the cleanup error surfaced on its own. Both routes previously inverted this
 (`raise cleanup_error from run_error` handed the caller a descriptor `OSError` in place of the decision it asked for), which that
 same shared-primitives preflight recorded as behaviour-open `B2`; both now close it. The release order is unchanged — commit source
 first, then the authority — and the surfaced cleanup error is still the first one, never the retry's. Both constructor unwinds
-(`_AccountedUploadCommitSource._open` and `validate_sealed_commit`) already kept that precedence.
+(`_AccountedUploadCommitSource._open` and `validate_sealed_commit`) use the same exact-primary contract.
 
 That synchronous guarantee is scoped to those two commit-source routes and to nothing else. `_AccountedUploadSourceMemory` also
 serves `validate_sealed_commit`, which owns its own release and is not covered by the helper. The `__del__` on both owners is a
@@ -497,12 +506,12 @@ full-record fingerprint destination, checks it at handle close, retains it throu
 final canonical check and immediately detaches the exposed document before scalar cleanup. Lookup, release, and finish are
 single-flight; callback-rich work is followed by a callback-free handle/owner token recheck before the payload local is obtained.
 Mutation or ambiguous activation makes the owner abort-only, and failed lookup tracebacks are detached before payload release.
-Two additional fallback owners remain deliberately prerequisite-only.
-`AccountedCommitSignaturePolicy` owns raw/parsed policy, borrowed keys, iterative history collections, and streaming HMAC work
+The direct signature and ancestry owners are live, while their sealed/composite handoffs remain deliberately prerequisite-only.
+The direct-live `AccountedCommitSignaturePolicy` owns raw/parsed policy, borrowed keys, iterative history collections, and streaming HMAC work
 through fixed-slot intrusive transitions that reconcile post-effect accounting faults and unlink fully released nodes without
-allocation. A separate production-unwired `AccountedRemoteSignaturePolicyAuthority` pre-reserves path ownership, pins an absent
+allocation. Its live `AccountedRemoteSignaturePolicyAuthority` pre-reserves path ownership, pins an absent
 or exact regular single-link `server_policy.json` behind no-follow project capabilities, and lends its immutable raw bytes once to
-the pure signature owner on the same ledger/deadline. Its combined one-shot surface can instead verify and close that child before
+the pure signature owner on the same ledger/deadline. The authority's combined, still-production-unwired one-shot surface can instead verify and close that child before
 lending the same bytes and duplicated capabilities to server verification. Its final fence rechecks ambient project and exact policy identity/content;
 child payload closes before raw/digest/FD/scalar ownership, and malformed JSON/UTF-8 errors retain no raw policy payload.
 A production-unwired `AccountedHTTPUploadSignatureVerificationComposite` owns one validated sealed owner and one unused policy
@@ -511,7 +520,7 @@ lambda, clone, session load, or store reopen—then closes the signature child a
 both parent guards. Only a successful midpoint release permits verification config/cwd construction or child publication. Failure
 returns no child and retains both parents for explicit retry; cleanup releases an active borrow, then policy authority, then sealed
 authority, stopping before sealed cleanup if policy cleanup fails. Coordinator tokens reject stale direct aliases for its lifetime.
-`AccountedHTTPUploadAncestry` owns a full BFS seen/deque and frame lifecycle through a
+The direct-live `AccountedHTTPUploadAncestry` owns a full BFS seen/deque and frame lifecycle through a
 borrowed validated-commit loader. A fixed owner gate accounts transition bytes before construction; child depth is created only after
 frame acquisition; per-insertion retained/overlap bounds cover CPython growth and deque popleft churn. It preserves full traversal
 after a match and drops loader/parent locals before retryable scalar release. The production-unwired

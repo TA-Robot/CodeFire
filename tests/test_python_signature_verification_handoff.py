@@ -302,12 +302,9 @@ class PythonSignatureVerificationHandoffTests(unittest.TestCase):
         finally:
             ledger.release = original_release
         self.assertEqual(len(raised), 1)
-        with self.assertRaisesRegex(
-            self.namespace["CFError"], "must complete and close"
-        ):
-            authority.revalidate(ledger)
-        owner.close()
+        self.assertTrue(owner._closed)
         authority.revalidate(ledger)
+        owner.close()
         authority.close(ledger)
         self.assert_closed(ledger)
 
@@ -494,6 +491,7 @@ class PythonSignatureVerificationHandoffTests(unittest.TestCase):
         original_close_plans = self.Verification._close_plan_capabilities
         release_calls = []
         cleanup_armed = []
+        cleanup_fault = RuntimeError("synthetic constructor release failure")
 
         def arm_constructor_cleanup(owner, plans):
             cleanup_armed.append(True)
@@ -502,15 +500,13 @@ class PythonSignatureVerificationHandoffTests(unittest.TestCase):
         def fail_before_release(dimension, amount):
             if cleanup_armed:
                 release_calls.append((dimension, amount))
-                raise RuntimeError("synthetic constructor release failure")
+                raise cleanup_fault
             original_release(dimension, amount)
 
         ledger.release = fail_before_release
         self.Verification._close_plan_capabilities = arm_constructor_cleanup
         try:
-            with self.assertRaisesRegex(
-                RuntimeError, "constructor release failure"
-            ) as raised:
+            with self.assertRaises(self.namespace["CFError"]) as raised:
                 authority.prepare_verified_server_verification(
                     self.forbidden_loader, "main", self.commit_id, ledger
                 )
@@ -518,7 +514,8 @@ class PythonSignatureVerificationHandoffTests(unittest.TestCase):
             ledger.release = original_release
             self.Verification._close_plan_capabilities = original_close_plans
         self.assertTrue(release_calls)
-        self.assertIsInstance(raised.exception.__cause__, self.namespace["CFError"])
+        self.assertIn("command must be a string", str(raised.exception))
+        self.assertIs(raised.exception.__cause__, cleanup_fault)
         child = authority._verification_owner
         self.assertIsNotNone(child)
         self.assertFalse(child._closed)

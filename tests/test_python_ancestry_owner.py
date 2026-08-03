@@ -348,6 +348,65 @@ class PythonAncestryOwnerTests(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assert_closed(ledger)
 
+    def test_exact_primary_precedes_constructor_and_contains_cleanup(self):
+        allocate_seen = self.Owner._allocate_seen
+        close = self.Owner.close
+        constructor_primary = MemoryError("exact ancestry constructor")
+        constructor_cleanup = RuntimeError("exact ancestry constructor cleanup")
+
+        def fail_seen():
+            raise constructor_primary
+
+        def fail_constructor_close(_owner, *_args, **_kwargs):
+            raise constructor_cleanup
+
+        self.Owner._allocate_seen = staticmethod(fail_seen)
+        self.Owner.close = fail_constructor_close
+        ledger = self.ledger()
+        class Handoff:
+            _ancestry = None
+
+        handoff = Handoff()
+        try:
+            with self.assertRaises(MemoryError) as caught:
+                self.Owner(
+                    ledger,
+                    lambda _object_id: {"parents": []},
+                    _handoff_owner=handoff,
+                )
+        finally:
+            self.Owner._allocate_seen = staticmethod(allocate_seen)
+            self.Owner.close = close
+        self.assertIs(caught.exception, constructor_primary)
+        self.assertIs(caught.exception.__cause__, constructor_cleanup)
+        handoff._ancestry.close()
+        handoff._ancestry = None
+        del caught
+        gc.collect()
+        self.assert_closed(ledger)
+
+        decision_primary = LookupError("exact ancestry decision")
+        decision_cleanup = OSError("exact ancestry decision cleanup")
+        ledger = self.ledger()
+        owner = self.Owner(
+            ledger,
+            lambda _object_id: (_ for _ in ()).throw(decision_primary),
+        )
+
+        def fail_decision_close(_owner, *_args, **_kwargs):
+            raise decision_cleanup
+
+        self.Owner.close = fail_decision_close
+        try:
+            with self.assertRaises(LookupError) as caught:
+                owner.contains("missing", "head")
+        finally:
+            self.Owner.close = close
+        self.assertIs(caught.exception, decision_primary)
+        self.assertIs(caught.exception.__cause__, decision_cleanup)
+        owner.close()
+        self.assert_closed(ledger)
+
     def test_allocation_and_post_effect_faults_reconcile(self):
         original_append = self.Owner._append_frontier
         append_calls = 0

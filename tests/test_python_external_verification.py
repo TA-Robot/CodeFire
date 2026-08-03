@@ -501,10 +501,9 @@ class PythonExternalVerificationTests(unittest.TestCase):
         process.kill = fail_cleanup
         process.wait = fail_cleanup
         try:
-            with self.assertRaisesRegex(
-                self.namespace["CFError"], "process cleanup failed"
-            ):
+            with self.assertRaises(OSError) as caught:
                 owner.close()
+            self.assertRegex(str(caught.exception), "terminal cleanup fault")
             self.assertIs(owner._process, process)
             self.assertIsNone(process.poll())
             self.assertFalse(owner._closed)
@@ -600,10 +599,11 @@ class PythonExternalVerificationTests(unittest.TestCase):
         self.Owner._spawn_process = staticmethod(observe_process)
         self.Owner._kill_process = staticmethod(fail_kill)
         try:
-            with self.assertRaisesRegex(
-                self.namespace["CFError"], "process cleanup failed"
-            ):
+            with self.assertRaises(self.namespace["CFError"]) as caught:
                 owner.run()
+            self.assertRegex(str(caught.exception), "timed out")
+            self.assertIsInstance(caught.exception.__cause__, OSError)
+            self.assertRegex(str(caught.exception.__cause__), "kill fault")
         finally:
             self.Owner._spawn_process = staticmethod(spawn)
             self.Owner._kill_process = staticmethod(kill_process)
@@ -723,9 +723,9 @@ class PythonExternalVerificationTests(unittest.TestCase):
                 owner.close()
         finally:
             self.Owner._close_capability = staticmethod(close_capability)
-        self.assertFalse(owner._closed)
+        self.assertTrue(owner._closed)
         self.assertEqual(owner._project_fd, -1)
-        self.assertGreater(
+        self.assertEqual(
             active_ledger.current.get("retained_bytes", 0), 0
         )
         os.fstat(project_fd)
@@ -1601,9 +1601,7 @@ class PythonExternalVerificationTests(unittest.TestCase):
 
         ledger.release = interrupt_config_release
         try:
-            with self.assertRaisesRegex(
-                KeyboardInterrupt, "post-config-release fault"
-            ):
+            with self.assertRaises(self.namespace["CFError"]) as caught:
                 self.prepare(
                     self.project,
                     "main",
@@ -1614,6 +1612,11 @@ class PythonExternalVerificationTests(unittest.TestCase):
         finally:
             ledger.release = release
         self.assertTrue(interrupted)
+        self.assertRegex(str(caught.exception), "command must be a string")
+        self.assertIsInstance(caught.exception.__cause__, KeyboardInterrupt)
+        self.assertRegex(
+            str(caught.exception.__cause__), "post-config-release fault"
+        )
         self.assert_closed(ledger)
 
         self.write_policy([])
@@ -1790,7 +1793,7 @@ class PythonExternalVerificationTests(unittest.TestCase):
                     elif kind == "project":
                         self.assertEqual(owner._project_fd, -1)
                     else:
-                        self.assertEqual(owner._plans, [])
+                        self.assertIsNone(owner._plans)
                     retry_closes = []
 
                     def observe_retry(file_descriptor):
@@ -1828,7 +1831,7 @@ class PythonExternalVerificationTests(unittest.TestCase):
             owner.close()
         self.assertEqual(caught.exception.errno, 9)
         self.assertEqual(owner._project_fd, -1)
-        self.assertGreater(ledger.current.get("retained_bytes", 0), 0)
+        self.assertEqual(ledger.current.get("retained_bytes", 0), 0)
         owner.close()
         self.assert_closed(ledger)
 

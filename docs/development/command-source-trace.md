@@ -96,8 +96,9 @@ Python uploadの後段候補は4つのsingle-use ownerへ分離した。producti
 `AccountedServerVerification`はproject/policy/cwd capabilityを最初のopen前から所有し、policyとambient projectを各spawn直前に
 再検証し、childへpinned project/cwd FDを渡す。production uploadはhandlerの同一request ledger/deadlineをownerへ渡し、
 no-ledger callerだけlocal ledgerを維持する。全reservationはcaller-owned permitを`reserve_into`でowner-first登録し、FD番号は
-close前にdetachして一度だけ閉じるためsame-number ABAをretryしない。pure `AccountedCommitSignaturePolicy`はpolicy/history/HMACを、
-そのproduction-unwired `AccountedRemoteSignaturePolicyAuthority`はabsentまたはexact single-link raw policyをno-follow project capabilityへ
+close前にdetachして一度だけ閉じるためsame-number ABAをretryしない。全plan capabilityを最初のfault後もbounded sweepし、primary
+operation errorをexact outer、最初のcleanup errorをexplicit `__cause__`にする。live `AccountedCommitSignaturePolicy`はpolicy/history/HMACを、
+live `AccountedRemoteSignaturePolicyAuthority`はabsentまたはexact single-link raw policyをno-follow project capabilityへ
 固定し、same-ledger/deadlineでpure ownerへ一度だけ貸してfinal identity/content fenceを行う。malformed JSON/UTF-8はraw payloadを
 exceptionへ残さず、authority closeはchildを先に閉じる。別のproduction-unwired combined surfaceはsignature childの成功・close後だけ、
 同じP0 bytesとduplicated project/policy capabilityを`AccountedServerVerification`へ貸し、ambient policy readなしでplan/cwdを作る。
@@ -109,31 +110,33 @@ boundsだけを一度moveし、staged session/FDをhandler ledger/deadlineへ閉
 再利用するので、同一rootのclosure traversalは1 requestで一度だけになる。`SealedCommitValidationSession`はPath/documents/
 validated_commits/descriptor registry/reuse pool/subdirectory mapをallocation前にcontrol ownerへclaimし、closeしたdescriptor ownerは
 poolへ戻すのでregistryはread数ではなく同時opened descriptor数で有界になる。`_AccountedUploadCommitSource`は
-`_AccountedUploadSourceMemory`でその control upperをexact request ledgerへ先に確保する。cleanupはretryable:
-`_session`/`_memory`はそれぞれのcleanupが成功した後にだけ手放すので、session teardown中の`close(2)`失敗でも reservation は
-owedかつreachableのまま残り、再度の`close`が解放を完了する。live routeの`is_ancestor_from_objects_accounted`と
-`enforce_remote_commit_signature_policy_accounted`はその再closeを`_drained_commit_source_cleanup_error`で自ら同期実行し、同じ
-sourceをちょうど一度だけ(それ以上は決してしない)retryして最初のcleanup errorを得るので、request loopがrequestを精算する時点で
+`_AccountedUploadSourceMemory`でその control upperをexact request ledgerへ先に確保する。session closeは全descriptorをfieldから
+detachして各numericを一度だけcloseし、fault後もregistry全体をsweepしてpayloadとlogical controlを解放した後に最初のfaultを返す。
+raw FDはretryしない。wrapperは互換の最大2回callを保つが、2回目が扱うのは残ったnon-descriptor scalarだけである。
+`_AccountedUploadCommitSource._open`は既存`_memory`をpoll/allocation/acquire/session constructionより前にreconcileするため、persistent
+constructor cleanup failureでも11,456-byte ownerを維持し、2つ目を上書きして22,912 bytesへ増やさない。live routeの
+`is_ancestor_from_objects_accounted`と`enforce_remote_commit_signature_policy_accounted`はsource closeを
+`_drained_commit_source_cleanup_error`で自ら同期実行し、同じsourceを最大2回callして最初のcleanup errorを得るので、request loopがrequestを精算する時点で
 ledgerはすでにdrain済みになる。`make_http_handler`の`_decision_work_observer`で測ると、`close(2)`失敗を1回含むrequestは
 current debt 0、permit 0、terminal `complete`で精算される(uploadは失敗しOSErrorはloop外へ抜けるので、`complete`はaccountingの
 話でありrequestの成否ではない)。callerがどのerrorを見るかはshared-primitives `C14` — in-tree authorityは
 [`shared-primitives preflight`](ai/swarm-results/cfr168-python-http-shared-primitives-preflight-claude-20260731/preflight.md)
 で、per-clause registerが`C14`を、decision tableが`B2`を定義する: cleanup faultはprimary operation decisionを
 決して置き換えない。traversal/policy decision自体が失敗した場合はそのdecisionがouter exceptionで、最初のcleanup errorが
-`__cause__`として付く。operationが成功した場合にのみcleanup error自体が表に出る。両routeは以前これを反転させており
+`__cause__`として付く。cleanupの既存effective chain、primaryの既存effective chainの順にidentity dedupしてcycle-freeなexplicit
+cause chainへ続け、payload traceback localsはrelease observerより前にdetachする。operationが成功した場合にのみcleanup error自体が表に出る。両routeは以前これを反転させており
 (`raise cleanup_error from run_error`)、その同じshared-primitives preflightがbehaviour-open `B2`として記録していたものを
 ここで解消する。release順
-(commit source → authority)と「最初のcleanup errorを使う」規則は不変。constructor unwindは以前からこのprecedenceを保つ。
+(commit source → authority)と「最初のcleanup errorを使う」規則は不変。constructor unwindも同じexact-primary契約を使う。
 この同期保証はこの2つのcommit-source live routeにのみ及ぶ: `_AccountedUploadSourceMemory`は
 `validate_sealed_commit`でも使われ、そちらはhelperの対象外で自前のreleaseを持つ。`__del__`は全callerに対してbest-effort
 fallbackであり、どのcallerにも保証ではない: 対象がcollectibleになって初めて動き、raisedされたerrorのtracebackがsourceを
-pinしている間は何も返さず、持続的に失敗するsession teardownはどちらのfinalizerでも回収されない。さらにproduction-unwired
-`AccountedHTTPUploadAncestry`はvalidated commit loaderを借用するfull BFS decisionのcollection/frame/deadlineを閉じ、match後も
+pinしている間は何も返さない。さらにdirect-live `AccountedHTTPUploadAncestry`はvalidated commit loaderを借用するfull BFS decisionのcollection/frame/deadlineを閉じ、match後も
 legacy late-error orderのため全走査する。production-unwired `AccountedHTTPUploadSealedAncestry`はsealed ownerのpreallocated ancestry
 handleを、callerへcompositeを返した後のsingle-use `prepare`で同じledger/deadlineのBFS loaderへ貸す。BFS payload/loaderを先にdropして
 borrowをreleaseし、prepare/close faultはowner fieldへretry ownershipを残す。prepare中callback closeは外側frameでcleanupしてtyped
-cancellationにする。signatureとancestryはまだupload/MR/publicationのproduction pathに未接続であり、terminal fence、
-signature/digest/ancestry ordering、最終publicationの完全なallocation/deadline closureは残る。
+cancellationにする。direct signature/ancestry ownerはlive routeに接続済みだが、sealed/composite successorはupload/MR/publicationの
+production pathに未接続であり、terminal fence、signature/digest/ancestry ordering、最終publicationの完全なallocation/deadline closureは残る。
 
 Existing-project terminal characterizationは、signature compositeからancestry handoffへparent tokenを移管できず、project gateを
 保持してもpolicy-first/sealed-firstの両final orderにcallback mutation窓が残ることを固定する。verification subprocess failureは

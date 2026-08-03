@@ -207,15 +207,17 @@ class PythonAncestryBorrowHandoffTests(unittest.TestCase):
         allocate_seen = Ancestry._allocate_seen
         close_ancestry = Ancestry.close
         close_calls = 0
+        construction_fault = MemoryError("ancestry seen allocation")
+        cleanup_fault = RuntimeError("ancestry constructor cleanup fault")
 
         def fail_seen():
-            raise MemoryError("ancestry seen allocation")
+            raise construction_fault
 
         def fail_twice_cleanup(owner, *args, **kwargs):
             nonlocal close_calls
             close_calls += 1
             if close_calls <= 2:
-                raise RuntimeError("ancestry constructor cleanup fault")
+                raise cleanup_fault
             return close_ancestry(owner, *args, **kwargs)
 
         Ancestry._allocate_seen = staticmethod(fail_seen)
@@ -224,8 +226,9 @@ class PythonAncestryBorrowHandoffTests(unittest.TestCase):
             sealed, ledger
         )
         try:
-            with self.assertRaisesRegex(RuntimeError, "constructor cleanup fault"):
+            with self.assertRaises(MemoryError) as caught:
                 handoff.prepare(ledger)
+            self.assertIs(caught.exception, construction_fault)
             published_ancestry = handoff._ancestry
             self.assertIsNotNone(published_ancestry)
             self.assertFalse(published_ancestry._closed)

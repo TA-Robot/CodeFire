@@ -5001,6 +5001,65 @@ def _detach_exception_chain(error: BaseException) -> None:
         current = next_error
 
 
+def _detach_effective_exception_tracebacks(error: BaseException) -> None:
+    """Drop payload-bearing frames while preserving the effective chain."""
+    current: BaseException | None = error
+    visited: dict[int, None] = {}
+    while current is not None and id(current) not in visited:
+        visited[id(current)] = None
+        current.__traceback__ = None
+        current = current.__cause__ or current.__context__
+
+
+def _link_primary_cleanup_exception(
+    primary: BaseException, cleanup: BaseException
+) -> BaseException:
+    """Put exact cleanup and prior effective chains below an exact primary."""
+    cleanup_chain: list[BaseException] = []
+    primary_chain: list[BaseException] = []
+
+    def capture(
+        start: BaseException | None, destination: list[BaseException]
+    ) -> None:
+        local_seen: set[int] = set()
+        current = start
+        while current is not None and id(current) not in local_seen:
+            local_seen.add(id(current))
+            destination.append(current)
+            current = current.__cause__ or current.__context__
+
+    capture(cleanup, cleanup_chain)
+    capture(primary.__cause__ or primary.__context__, primary_chain)
+    ordered: list[BaseException] = []
+    emitted = {id(primary)}
+    for error in cleanup_chain + primary_chain:
+        if id(error) in emitted:
+            continue
+        emitted.add(id(error))
+        ordered.append(error)
+    for error in [primary] + ordered:
+        error.__traceback__ = None
+        error.__cause__ = None
+        error.__context__ = None
+        error.__suppress_context__ = True
+    for index, error in enumerate(ordered[:-1]):
+        error.__cause__ = ordered[index + 1]
+    if ordered:
+        primary.__cause__ = ordered[0]
+    return primary
+
+
+def _retain_first_cleanup_failure(
+    first: BaseException | None, candidate: BaseException
+) -> BaseException:
+    """Retain one exact cleanup fault and detach every later fault."""
+    if first is None:
+        _detach_effective_exception_tracebacks(candidate)
+        return candidate
+    _detach_exception_chain(candidate)
+    return first
+
+
 class _StablePermitTransition:
     """Durably own permit acquisitions across post-commit Python faults."""
 
@@ -5392,18 +5451,21 @@ class AccountedRemoteSignaturePolicyAuthority:
             self._project_root = Path(os.path.abspath(project_root))
             self._prepare()
         except BaseException as error:
-            _detach_exception_chain(error)
+            _detach_effective_exception_tracebacks(error)
             failure = error
         if failure is not None:
             cleanup_failure: BaseException | None = None
             try:
                 self.close()
             except BaseException as error:
-                _detach_exception_chain(error)
+                _detach_effective_exception_tracebacks(error)
                 cleanup_failure = error
             if cleanup_failure is not None:
-                raise cleanup_failure from failure
-            raise failure from None
+                linked = _link_primary_cleanup_exception(
+                    failure, cleanup_failure
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            raise failure.with_traceback(None)
 
     @staticmethod
     def _fingerprint(metadata: os.stat_result) -> tuple[int, ...]:
@@ -5476,6 +5538,8 @@ class AccountedRemoteSignaturePolicyAuthority:
             os, "O_NOFOLLOW", 0
         )
         current_path = Path(os.sep)
+        completed = False
+        primary_error: BaseException | None = None
         try:
             self._walk_fd = os.open(os.sep, flags)
             for index, component in enumerate(parts):
@@ -5492,7 +5556,8 @@ class AccountedRemoteSignaturePolicyAuthority:
                         os.fstat(self._prefix_fd)
                     )
                     self._missing_parts = tuple(parts[index:])
-                    return
+                    completed = True
+                    break
                 if index + 1 == len(parts):
                     self._prefix_fd = self._walk_fd
                     self._walk_fd = -1
@@ -5516,24 +5581,38 @@ class AccountedRemoteSignaturePolicyAuthority:
                             absolute, "project_identity"
                         )
                     self._project_fingerprint = self._fingerprint(opened)
-                    return
+                    completed = True
+                    break
                 descriptor = self._walk_fd
                 self._walk_fd = -1
                 self.CLOSE_CAPABILITY(descriptor)
                 self._walk_fd = self._next_fd
                 self._next_fd = -1
                 current_path /= component
-            raise CFError("commit signature policy project root cannot be filesystem root")
-        finally:
-            first_failure: BaseException | None = None
-            for attribute in ("_walk_fd", "_next_fd"):
-                try:
-                    self._close_capability(attribute)
-                except BaseException as error:
-                    if first_failure is None:
-                        first_failure = error
-            if first_failure is not None:
-                raise first_failure
+            if not completed:
+                raise CFError(
+                    "commit signature policy project root cannot be filesystem root"
+                )
+        except BaseException as error:
+            _detach_effective_exception_tracebacks(error)
+            primary_error = error
+        cleanup_error: BaseException | None = None
+        for attribute in ("_walk_fd", "_next_fd"):
+            try:
+                self._close_capability(attribute)
+            except BaseException as error:
+                cleanup_error = _retain_first_cleanup_failure(
+                    cleanup_error, error
+                )
+        if primary_error is not None:
+            if cleanup_error is not None:
+                linked = _link_primary_cleanup_exception(
+                    primary_error, cleanup_error
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            raise primary_error.with_traceback(None)
+        if cleanup_error is not None:
+            raise cleanup_error.with_traceback(None)
 
     def _open_absolute_directory(self, path: Path) -> int:
         """Open one absolute directory without retrying detached FD numbers."""
@@ -5542,6 +5621,8 @@ class AccountedRemoteSignaturePolicyAuthority:
         )
         walk_fd = -1
         next_fd = -1
+        result = -1
+        primary_error: BaseException | None = None
         try:
             walk_fd = os.open(os.sep, flags)
             for component in path.parts[1:]:
@@ -5553,19 +5634,29 @@ class AccountedRemoteSignaturePolicyAuthority:
                 next_fd = -1
             result = walk_fd
             walk_fd = -1
-            return result
-        finally:
-            first_failure: BaseException | None = None
-            for descriptor in (walk_fd, next_fd):
-                if descriptor < 0:
-                    continue
-                try:
-                    self.CLOSE_CAPABILITY(descriptor)
-                except BaseException as error:
-                    if first_failure is None:
-                        first_failure = error
-            if first_failure is not None:
-                raise first_failure
+        except BaseException as error:
+            _detach_effective_exception_tracebacks(error)
+            primary_error = error
+        cleanup_error: BaseException | None = None
+        for descriptor in (walk_fd, next_fd):
+            if descriptor < 0:
+                continue
+            try:
+                self.CLOSE_CAPABILITY(descriptor)
+            except BaseException as error:
+                cleanup_error = _retain_first_cleanup_failure(
+                    cleanup_error, error
+                )
+        if primary_error is not None:
+            if cleanup_error is not None:
+                linked = _link_primary_cleanup_exception(
+                    primary_error, cleanup_error
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            raise primary_error.with_traceback(None)
+        if cleanup_error is not None:
+            raise cleanup_error.with_traceback(None)
+        return result
 
     @staticmethod
     def _safe_policy_metadata(metadata: os.stat_result) -> bool:
@@ -5663,6 +5754,8 @@ class AccountedRemoteSignaturePolicyAuthority:
             counters={"files_read": 1, "file_bytes_read": physical_bytes},
         )
         descriptor = -1
+        raw: bytes | None = None
+        primary_error: BaseException | None = None
         try:
             descriptor = os.open(
                 policy_path.name,
@@ -5698,9 +5791,28 @@ class AccountedRemoteSignaturePolicyAuthority:
             self._policy_fingerprint = expected
             self._policy_raw = raw
             self._policy_digest = hashlib.sha256(raw).digest()
-        finally:
-            if descriptor >= 0:
+            raw = None
+        except BaseException as error:
+            _detach_effective_exception_tracebacks(error)
+            primary_error = error
+        raw = None
+        cleanup_error: BaseException | None = None
+        if descriptor >= 0:
+            try:
                 self.CLOSE_CAPABILITY(descriptor)
+            except BaseException as error:
+                cleanup_error = _retain_first_cleanup_failure(
+                    cleanup_error, error
+                )
+        if primary_error is not None:
+            if cleanup_error is not None:
+                linked = _link_primary_cleanup_exception(
+                    primary_error, cleanup_error
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            raise primary_error.with_traceback(None)
+        if cleanup_error is not None:
+            raise cleanup_error.with_traceback(None)
 
     def _prepare(self) -> None:
         project_root = self._project_root
@@ -5953,6 +6065,7 @@ class AccountedRemoteSignaturePolicyAuthority:
             raise CFError("commit signature project authority is unavailable")
         ambient_prefix = -1
         ambient_project = -1
+        primary_error: BaseException | None = None
         try:
             ambient_prefix = self._open_absolute_directory(prefix_path)
             if (
@@ -5970,48 +6083,69 @@ class AccountedRemoteSignaturePolicyAuthority:
                         follow_symlinks=False,
                     )
                 except FileNotFoundError:
-                    return
-                raise SignaturePolicySubjectChanged(
-                    self._project_root, "missing_project_appeared"
+                    pass
+                else:
+                    raise SignaturePolicySubjectChanged(
+                        self._project_root, "missing_project_appeared"
+                    )
+            else:
+                expected = self._project_fingerprint
+                if expected is None or self._project_fd < 0:
+                    raise CFError(
+                        "commit signature project authority is unavailable"
+                    )
+                leaf = project_root.name
+                named = os.stat(
+                    leaf, dir_fd=ambient_prefix, follow_symlinks=False
                 )
-            expected = self._project_fingerprint
-            if expected is None or self._project_fd < 0:
-                raise CFError("commit signature project authority is unavailable")
-            leaf = project_root.name
-            named = os.stat(leaf, dir_fd=ambient_prefix, follow_symlinks=False)
-            flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(
-                os, "O_NOFOLLOW", 0
-            )
-            ambient_project = os.open(leaf, flags, dir_fd=ambient_prefix)
-            if any(
-                self._fingerprint(metadata) != expected
-                for metadata in (
-                    os.fstat(self._project_fd),
-                    named,
-                    os.fstat(ambient_project),
+                flags = os.O_RDONLY | getattr(
+                    os, "O_DIRECTORY", 0
+                ) | getattr(os, "O_NOFOLLOW", 0)
+                ambient_project = os.open(
+                    leaf, flags, dir_fd=ambient_prefix
                 )
-            ):
-                raise SignaturePolicySubjectChanged(
-                    self._project_root, "project_identity"
-                )
-        except SignaturePolicySubjectChanged:
-            raise
+                if any(
+                    self._fingerprint(metadata) != expected
+                    for metadata in (
+                        os.fstat(self._project_fd),
+                        named,
+                        os.fstat(ambient_project),
+                    )
+                ):
+                    raise SignaturePolicySubjectChanged(
+                        self._project_root, "project_identity"
+                    )
+        except SignaturePolicySubjectChanged as error:
+            _detach_effective_exception_tracebacks(error)
+            primary_error = error
         except OSError as error:
-            raise SignaturePolicySubjectChanged(
+            primary_error = SignaturePolicySubjectChanged(
                 self._project_root, "project_unavailable"
-            ) from error
-        finally:
-            first_failure: BaseException | None = None
-            for descriptor in (ambient_project, ambient_prefix):
-                if descriptor < 0:
-                    continue
-                try:
-                    self.CLOSE_CAPABILITY(descriptor)
-                except BaseException as error:
-                    if first_failure is None:
-                        first_failure = error
-            if first_failure is not None:
-                raise first_failure
+            )
+            primary_error.__cause__ = error
+            _detach_effective_exception_tracebacks(primary_error)
+        except BaseException as error:
+            _detach_effective_exception_tracebacks(error)
+            primary_error = error
+        cleanup_error: BaseException | None = None
+        for descriptor in (ambient_project, ambient_prefix):
+            if descriptor < 0:
+                continue
+            try:
+                self.CLOSE_CAPABILITY(descriptor)
+            except BaseException as error:
+                cleanup_error = _retain_first_cleanup_failure(
+                    cleanup_error, error
+                )
+        if primary_error is not None:
+            if cleanup_error is not None:
+                linked = _link_primary_cleanup_exception(
+                    primary_error, cleanup_error
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            raise primary_error.with_traceback(None)
+        if cleanup_error is not None:
+            raise cleanup_error.with_traceback(None)
 
     def _revalidate_policy(self, *, release_temporary: bool = True) -> None:
         project_root = self._project_root
@@ -6050,6 +6184,7 @@ class AccountedRemoteSignaturePolicyAuthority:
             raise CFError("commit signature policy fence is unavailable")
         descriptor = -1
         raw: bytes | None = None
+        primary_error: BaseException | None = None
         try:
             initial = os.stat(
                 policy_path.name,
@@ -6105,18 +6240,38 @@ class AccountedRemoteSignaturePolicyAuthority:
             raw = None
             if release_temporary:
                 transition.release_temporary()
-        except SignaturePolicySubjectChanged:
-            raise
+        except SignaturePolicySubjectChanged as error:
+            _detach_effective_exception_tracebacks(error)
+            primary_error = error
         except OSError as error:
-            raise SignaturePolicySubjectChanged(
+            primary_error = SignaturePolicySubjectChanged(
                 policy_path, "final_unavailable"
-            ) from error
-        finally:
-            raw = None
-            raw_expected = None
-            digest_expected = None
-            if descriptor >= 0:
+            )
+            primary_error.__cause__ = error
+            _detach_effective_exception_tracebacks(primary_error)
+        except BaseException as error:
+            _detach_effective_exception_tracebacks(error)
+            primary_error = error
+        raw = None
+        raw_expected = None
+        digest_expected = None
+        cleanup_error: BaseException | None = None
+        if descriptor >= 0:
+            try:
                 self.CLOSE_CAPABILITY(descriptor)
+            except BaseException as error:
+                cleanup_error = _retain_first_cleanup_failure(
+                    cleanup_error, error
+                )
+        if primary_error is not None:
+            if cleanup_error is not None:
+                linked = _link_primary_cleanup_exception(
+                    primary_error, cleanup_error
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            raise primary_error.with_traceback(None)
+        if cleanup_error is not None:
+            raise cleanup_error.with_traceback(None)
 
     def revalidate(self, ledger: DecisionWorkLedger | None = None) -> None:
         self._ensure_open(ledger)
@@ -6543,9 +6698,10 @@ class AccountedRemoteSignaturePolicyAuthority:
 class AccountedCommitSignaturePolicy:
     """Own a provisional, ledger-accounted commit-signature policy walk.
 
-    This pure helper deliberately has no remote/HTTP wiring yet.  ``loader``
-    returns ``(borrowed_commit, canonical_size_upper)``; that contract lets a
-    later production caller borrow ``SealedCommitValidationSession`` payloads
+    The direct signature-enforcement route uses this pure owner through its
+    pinned policy authority. ``loader`` returns
+    ``(borrowed_commit, canonical_size_upper)``; that contract also lets the
+    still-unwired sealed/composite successor borrow validation-session payloads
     instead of cloning their retained JSON documents.
     """
 
@@ -6671,7 +6827,7 @@ class AccountedCommitSignaturePolicy:
             transition.release_temporary()
         except BaseException as error:
             failure = error
-            _detach_exception_chain(error)
+            _detach_effective_exception_tracebacks(error)
             parsed = None
         if failure is not None:
             cleanup_failure = None
@@ -6679,9 +6835,12 @@ class AccountedCommitSignaturePolicy:
                 self.close()
             except BaseException as cleanup_error:
                 cleanup_failure = cleanup_error
-                _detach_exception_chain(cleanup_error)
+                _detach_effective_exception_tracebacks(cleanup_error)
             if cleanup_failure is not None:
-                failure = cleanup_failure
+                linked = _link_primary_cleanup_exception(
+                    failure, cleanup_failure
+                )
+                raise linked.with_traceback(None) from linked.__cause__
             raise failure.with_traceback(None)
 
     @classmethod
@@ -7228,7 +7387,7 @@ class AccountedCommitSignaturePolicy:
                     raise CFError("commit signature validation failed: invalid signature")
         except BaseException as error:
             failure = error
-            _detach_exception_chain(error)
+            _detach_effective_exception_tracebacks(error)
         expected = None
         digest = None
         key_bytes = None
@@ -7240,13 +7399,18 @@ class AccountedCommitSignaturePolicy:
             self._cancel_owned_permit("_hmac_storage_permit")
         except BaseException as cleanup_error:
             cleanup_failure = cleanup_error
-            _detach_exception_chain(cleanup_error)
+            _detach_effective_exception_tracebacks(cleanup_error)
         if cleanup_failure is None:
             # The detached serializer traceback and all HMAC locals are gone
             # before the first release callback can observe this scalar.
             storage_transition.release_temporary()
             self._retire_released_transition(storage_transition)
         if cleanup_failure is not None:
+            if failure is not None:
+                linked = _link_primary_cleanup_exception(
+                    failure, cleanup_failure
+                )
+                raise linked.with_traceback(None) from linked.__cause__
             raise cleanup_failure.with_traceback(None)
         if failure is not None:
             raise failure.with_traceback(None)
@@ -7257,6 +7421,7 @@ class AccountedCommitSignaturePolicy:
             return
         if not isinstance(commit_id, str):
             raise CFError("commit signature root must be a string")
+        run_error: BaseException | None = None
         try:
             self._push_frontier(commit_id, is_head, edge=False)
             while self._frontier:
@@ -7266,55 +7431,111 @@ class AccountedCommitSignaturePolicy:
                 commit = None
                 parents = None
                 parent = None
+                frame_error: BaseException | None = None
+                revisited = False
                 try:
-                    if not self._mark_seen(current):
-                        continue
-                    self._check_deadline("commit signature history load")
-                    loaded = self._loader(current)
-                    self._check_deadline("commit signature history load")
-                    if (
-                        not isinstance(loaded, tuple)
-                        or len(loaded) != 2
-                        or not isinstance(loaded[0], dict)
-                        or isinstance(loaded[1], bool)
-                        or not isinstance(loaded[1], int)
-                        or loaded[1] < 0
-                    ):
-                        raise CFError(
-                            "commit signature payload loader must return "
-                            "(object, canonical size upper)"
-                        )
-                    commit, commit_upper = loaded
-                    loaded = None
-                    parents = commit.get("parents", [])
-                    if current_is_head or commit.get("signature") is not None or parents:
-                        self._verify_signature(commit, commit_upper, required=True)
-                    if self.require_history:
-                        for index in range(len(parents) - 1, -1, -1):
-                            self._check_deadline("commit signature history")
-                            parent = parents[index]
-                            if isinstance(parent, str) and parent.startswith("CF-COMMIT-"):
-                                self._push_frontier(parent, False, edge=True)
-                finally:
-                    # The popped tuple's scalar covers current through loader,
-                    # verification, and parent expansion, including revisits.
-                    parent = None
-                    parents = None
-                    commit = None
-                    loaded = None
-                    current = None
+                    revisited = not self._mark_seen(current)
+                    if not revisited:
+                        self._check_deadline("commit signature history load")
+                        loaded = self._loader(current)
+                        self._check_deadline("commit signature history load")
+                        if (
+                            not isinstance(loaded, tuple)
+                            or len(loaded) != 2
+                            or not isinstance(loaded[0], dict)
+                            or isinstance(loaded[1], bool)
+                            or not isinstance(loaded[1], int)
+                            or loaded[1] < 0
+                        ):
+                            raise CFError(
+                                "commit signature payload loader must return "
+                                "(object, canonical size upper)"
+                            )
+                        commit, commit_upper = loaded
+                        loaded = None
+                        parents = commit.get("parents", [])
+                        if (
+                            current_is_head
+                            or commit.get("signature") is not None
+                            or parents
+                        ):
+                            self._verify_signature(
+                                commit, commit_upper, required=True
+                            )
+                        if self.require_history:
+                            for index in range(len(parents) - 1, -1, -1):
+                                self._check_deadline(
+                                    "commit signature history"
+                                )
+                                parent = parents[index]
+                                if isinstance(
+                                    parent, str
+                                ) and parent.startswith("CF-COMMIT-"):
+                                    self._push_frontier(
+                                        parent, False, edge=True
+                                    )
+                except BaseException as error:
+                    _detach_effective_exception_tracebacks(error)
+                    frame_error = error
+                parent = None
+                parents = None
+                commit = None
+                loaded = None
+                current = None
+                frame_cleanup: BaseException | None = None
+                try:
                     self._release_active_frame()
-        finally:
+                except BaseException as error:
+                    frame_cleanup = _retain_first_cleanup_failure(
+                        frame_cleanup, error
+                    )
+                if frame_error is not None:
+                    if frame_cleanup is not None:
+                        linked = _link_primary_cleanup_exception(
+                            frame_error, frame_cleanup
+                        )
+                        raise linked.with_traceback(None) from linked.__cause__
+                    raise frame_error.with_traceback(None)
+                if frame_cleanup is not None:
+                    raise frame_cleanup.with_traceback(None)
+                if revisited:
+                    continue
+        except BaseException as error:
+            _detach_effective_exception_tracebacks(error)
+            run_error = error
+        cleanup_error: BaseException | None = None
+        try:
             self._clear_frontier()
+        except BaseException as error:
+            cleanup_error = _retain_first_cleanup_failure(
+                cleanup_error, error
+            )
+        if run_error is not None:
+            if cleanup_error is not None:
+                linked = _link_primary_cleanup_exception(
+                    run_error, cleanup_error
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            raise run_error.with_traceback(None)
+        if cleanup_error is not None:
+            raise cleanup_error.with_traceback(None)
 
     def _clear_frontier(self) -> None:
         if self._frontier is None:
             return
+        first_failure: BaseException | None = None
         while self._frontier:
             object_id, _, transition = self._frontier.pop()
             object_id = None
-            transition.release_retained_primary()
-            self._retire_released_transition(transition)
+            try:
+                transition.release_retained_primary()
+                self._retire_released_transition(transition)
+            except BaseException as error:
+                first_failure = _retain_first_cleanup_failure(
+                    first_failure, error
+                )
+        if first_failure is not None:
+            raise first_failure.with_traceback(None)
 
     def _drop_payloads(self) -> None:
         self._clear_frontier()
@@ -7648,6 +7869,14 @@ class _AccountedUploadCommitSource:
         if session is None:
             if id(self._ledger) != self._ledger_identity:
                 raise CFError("upload commit source belongs to a different ledger")
+            memory = self._memory
+            if memory is not None:
+                try:
+                    memory.close()
+                except BaseException as cleanup_error:
+                    _detach_effective_exception_tracebacks(cleanup_error)
+                    raise cleanup_error.with_traceback(None)
+                self._memory = None
             self._poll()
             # Reserve the session's control state before the constructor that
             # allocates it, then publish the owner so a failed construction is
@@ -7655,24 +7884,35 @@ class _AccountedUploadCommitSource:
             memory = _AccountedUploadSourceMemory(self._ledger)
             memory.acquire()
             self._memory = memory
+            construction_error: BaseException | None = None
             try:
                 session = SealedCommitValidationSession(
                     self._objects_root,
                     self._ledger,
                     control_owner=memory,
                 )
-            except BaseException:
+            except BaseException as error:
                 # Primary-error precedence, and the handle survives: the
                 # constructor's decision is what the caller must see, and a
                 # cleanup that could not release keeps ``self._memory`` set so
                 # ``close`` can retry it.
+                _detach_effective_exception_tracebacks(error)
+                construction_error = error
+            if construction_error is not None:
+                cleanup_failure: BaseException | None = None
                 try:
                     memory.close()
                 except BaseException as cleanup_error:
-                    _detach_exception_chain(cleanup_error)
+                    _detach_effective_exception_tracebacks(cleanup_error)
+                    cleanup_failure = cleanup_error
                 else:
                     self._memory = None
-                raise
+                if cleanup_failure is not None:
+                    linked = _link_primary_cleanup_exception(
+                        construction_error, cleanup_failure
+                    )
+                    raise linked.with_traceback(None) from linked.__cause__
+                raise construction_error.with_traceback(None)
             self._session = session
         return session
 
@@ -7689,11 +7929,11 @@ class _AccountedUploadCommitSource:
     def close(self) -> None:
         """Release this source's session and reservation, retryably.
 
-        Each handle is dropped only once *its* cleanup has actually succeeded.
-        A failing ``close(2)`` inside the session teardown therefore leaves both
-        the session and the still-owed reservation reachable, so calling
-        ``close`` again finishes the release instead of being a silent no-op
-        over permanently stranded bytes.
+        Each raw descriptor is detached and attempted only once by the session.
+        When that bounded sweep reports a consumed-descriptor fault, this source
+        retains the now logically closed session for one idempotent call; that
+        call clears the session field and can then release the memory owner.
+        Retryable scalar debt stays published until its release commits.
         """
         session = self._session
         memory = self._memory
@@ -7745,9 +7985,10 @@ def _drained_commit_source_cleanup_error(
 ) -> BaseException | None:
     """Close one commit source, draining a one-shot cleanup fault in place.
 
-    ``_AccountedUploadCommitSource.close`` keeps every handle whose own cleanup
-    failed, so exactly one further call finishes a release that a transient
-    fault -- a failing ``close(2)`` inside the session teardown -- interrupted.
+    ``_AccountedUploadCommitSource.close`` keeps the session field when its
+    bounded descriptor sweep reports a fault. Exactly one further call observes
+    that session's logically closed state, clears the field, and releases the
+    source memory owner without retrying any raw descriptor number.
     Doing that retry here, synchronously, is what makes the request ledger
     already drained at the point production reads it: the finalizer cannot help
     while the propagating error's traceback still pins the frame holding the
@@ -7819,19 +8060,19 @@ def enforce_remote_commit_signature_policy_accounted(
         policy_owner = None
         authority.revalidate(active_ledger)
     except BaseException as exc:
-        _detach_exception_chain(exc)
+        _detach_effective_exception_tracebacks(exc)
         run_error = exc
     # Same release order as the unaccounted policy path: the commit source
     # first, then the authority.  The source drains a one-shot cleanup fault in
     # place so the request ledger is already settled when this call returns or
     # raises, not only after the caller drops the error it was handed.
     cleanup_error = _drained_commit_source_cleanup_error(
-        source.close, _detach_exception_chain
+        source.close, _detach_effective_exception_tracebacks
     )
     try:
         authority.close(active_ledger)
     except BaseException as exc:
-        _detach_exception_chain(exc)
+        _detach_effective_exception_tracebacks(exc)
         if cleanup_error is None:
             cleanup_error = exc
     # C14 precedence: a cleanup fault never displaces the operation decision.
@@ -7840,8 +8081,9 @@ def enforce_remote_commit_signature_policy_accounted(
     # cleanup error, not the retry's.
     if run_error is not None:
         if cleanup_error is not None:
-            raise run_error from cleanup_error
-        raise run_error from None
+            linked = _link_primary_cleanup_exception(run_error, cleanup_error)
+            raise linked.with_traceback(None) from linked.__cause__
+        raise run_error.with_traceback(None)
     if cleanup_error is not None:
         raise cleanup_error from None
 
@@ -8210,16 +8452,22 @@ class AccountedServerVerification:
             # partial plans through an active exception traceback.  Drop those
             # frames, then leave the active exception handler before close
             # releases their accounted storage.
-            self._detach_exception_tracebacks(exc)
+            _detach_effective_exception_tracebacks(exc)
             construction_error = exc
         self._constructing = False
         if construction_error is not None:
+            cleanup_error: BaseException | None = None
             try:
                 self.close()
             except BaseException as cleanup_exc:
-                self._detach_exception_tracebacks(cleanup_exc)
-                raise cleanup_exc from construction_error
-            raise construction_error from None
+                _detach_effective_exception_tracebacks(cleanup_exc)
+                cleanup_error = cleanup_exc
+            if cleanup_error is not None:
+                linked = _link_primary_cleanup_exception(
+                    construction_error, cleanup_error
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            raise construction_error.with_traceback(None)
 
     @staticmethod
     def _detach_exception_tracebacks(exc: BaseException) -> None:
@@ -9261,11 +9509,19 @@ class AccountedServerVerification:
         self,
         plans: list[tuple[str, str, int, float, dict[str, str]]],
     ) -> None:
+        first_failure: BaseException | None = None
         while plans:
             # Do not retain the popped payload in an exception traceback if
             # the builtin close reports a failure.
             cwd_fd = plans.pop()[2]
-            self._close_capability(cwd_fd)
+            try:
+                self._close_capability(cwd_fd)
+            except BaseException as error:
+                first_failure = _retain_first_cleanup_failure(
+                    first_failure, error
+                )
+        if first_failure is not None:
+            raise first_failure.with_traceback(None)
 
     @staticmethod
     def _spawn_process(
@@ -9340,13 +9596,8 @@ class AccountedServerVerification:
                 process.stdout.close()
             self._process = None
         if cleanup_error is not None:
-            detail = cleanup_error.args[0] if cleanup_error.args else "cleanup fault"
-            if not isinstance(detail, str):
-                detail = type(cleanup_error).__name__
-            detail = self._truncate_failure_text(detail, 1024)
-            raise CFError(
-                f"server verification process cleanup failed: {detail}"
-            ) from cleanup_error
+            _detach_effective_exception_tracebacks(cleanup_error)
+            raise cleanup_error.with_traceback(None)
 
     def _request_remaining_seconds(self) -> float | None:
         deadline = self._deadline
@@ -9416,14 +9667,16 @@ class AccountedServerVerification:
             command, cwd_fd, self._project_fd, env
         )
         self._process = process
-        if process.stdout is None:
-            self._stop_process()
-            raise CFError(
-                f"server verification failed: {check_id}: output pipe is unavailable"
-            )
         output = bytearray()
-        selector = selectors.DefaultSelector()
+        selector: selectors.BaseSelector | None = None
+        run_error: BaseException | None = None
         try:
+            if process.stdout is None:
+                raise CFError(
+                    f"server verification failed: {check_id}: "
+                    "output pipe is unavailable"
+                )
+            selector = selectors.DefaultSelector()
             file_descriptor = process.stdout.fileno()
             os.set_blocking(file_descriptor, False)
             selector.register(file_descriptor, selectors.EVENT_READ)
@@ -9431,7 +9684,6 @@ class AccountedServerVerification:
                 self._poll("upload server verification execution")
                 elapsed = time.monotonic() - started
                 if elapsed >= timeout:
-                    self._stop_process()
                     raise self._format_failure(
                         "server verification failed: "
                         f"{check_id}: timed out after {timeout:g}s",
@@ -9460,7 +9712,6 @@ class AccountedServerVerification:
                         self._consume_output_bytes(len(chunk))
                         output.extend(chunk)
                 if len(output) > self._output_limit_bytes:
-                    self._stop_process()
                     raise self._format_failure(
                         f"server verification failed: {check_id}: output exceeds "
                         f"the {self._output_limit_bytes}-byte limit",
@@ -9485,27 +9736,48 @@ class AccountedServerVerification:
                     self._consume_output_bytes(len(chunk))
                     output.extend(chunk)
                 if len(output) > self._output_limit_bytes:
-                    self._stop_process()
                     raise self._format_failure(
                         f"server verification failed: {check_id}: output exceeds "
                         f"the {self._output_limit_bytes}-byte limit",
                         output,
                     )
                 self._wait_process(process, self.PROCESS_REAP_SECONDS)
-                process.stdout.close()
                 self._process = None
+                process.stdout.close()
                 if return_code != 0:
                     raise self._format_failure(
                         f"server verification failed: {check_id}", output
                     )
-                return
-        except BaseException:
+                break
+        except BaseException as error:
+            _detach_effective_exception_tracebacks(error)
+            run_error = error
+        cleanup_error: BaseException | None = None
+        if run_error is not None and self._process is not None:
             if self._process is not None:
-                self._stop_process()
-            raise
-        finally:
-            selector.close()
-            output.clear()
+                try:
+                    self._stop_process()
+                except BaseException as error:
+                    cleanup_error = _retain_first_cleanup_failure(
+                        cleanup_error, error
+                    )
+        if selector is not None:
+            try:
+                selector.close()
+            except BaseException as error:
+                cleanup_error = _retain_first_cleanup_failure(
+                    cleanup_error, error
+                )
+        output.clear()
+        if run_error is not None:
+            if cleanup_error is not None:
+                linked = _link_primary_cleanup_exception(
+                    run_error, cleanup_error
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            raise run_error.with_traceback(None)
+        if cleanup_error is not None:
+            raise cleanup_error.with_traceback(None)
 
     def run(self) -> None:
         if self._constructing:
@@ -9545,23 +9817,37 @@ class AccountedServerVerification:
                 temporary_bytes=output_temporary,
             )
             self._output_storage_permit = None
+        run_error: BaseException | None = None
         try:
             for plan in self._plans or ():
                 self._run_plan(plan)
-        finally:
-            self._cancel_owned_permit("_policy_fence_storage_permit")
-            policy_permit = self._policy_fence_permit
-            if policy_permit is not None and self._ledger.permit_is_open(
-                policy_permit
-            ):
-                self._ledger.cancel_permit(policy_permit)
-            self._policy_fence_permit = None
-            self._cancel_owned_permit("_output_storage_permit")
-            permit = self._output_permit
-            if permit is not None and self._ledger.permit_is_open(permit):
-                self._ledger.cancel_permit(permit)
-            self._output_permit = None
-        self._completed = True
+        except BaseException as error:
+            _detach_effective_exception_tracebacks(error)
+            run_error = error
+        cleanup_error: BaseException | None = None
+        for attribute in (
+            "_policy_fence_storage_permit",
+            "_policy_fence_permit",
+            "_output_storage_permit",
+            "_output_permit",
+        ):
+            try:
+                self._cancel_owned_permit(attribute)
+            except BaseException as error:
+                cleanup_error = _retain_first_cleanup_failure(
+                    cleanup_error, error
+                )
+        if run_error is None and cleanup_error is None:
+            self._completed = True
+        if run_error is not None:
+            if cleanup_error is not None:
+                linked = _link_primary_cleanup_exception(
+                    run_error, cleanup_error
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            raise run_error.with_traceback(None)
+        if cleanup_error is not None:
+            raise cleanup_error.with_traceback(None)
 
     def close(self) -> None:
         if self._constructing:
@@ -9570,35 +9856,43 @@ class AccountedServerVerification:
             return
         if id(self._ledger) != self._ledger_identity:
             raise CFError("server verification owner belongs to a different ledger")
+        first_failure: BaseException | None = None
+
+        def attempt(action: Any) -> None:
+            nonlocal first_failure
+            try:
+                action()
+            except BaseException as error:
+                first_failure = _retain_first_cleanup_failure(
+                    first_failure, error
+                )
+
         if self._process is not None:
-            self._stop_process()
-        self._cancel_owned_permit("_config_permit")
-        self._cancel_owned_permit("_policy_read_permit")
-        self._cancel_owned_permit("_policy_permit")
-        self._cancel_owned_permit("_capability_permit")
-        self._cancel_owned_permit("_policy_fence_storage_permit")
-        policy_permit = self._policy_fence_permit
-        if policy_permit is not None and self._ledger.permit_is_open(
-            policy_permit
+            attempt(self._stop_process)
+        for attribute in (
+            "_config_permit",
+            "_policy_read_permit",
+            "_policy_permit",
+            "_capability_permit",
+            "_policy_fence_storage_permit",
+            "_policy_fence_permit",
+            "_output_storage_permit",
+            "_output_permit",
         ):
-            self._ledger.cancel_permit(policy_permit)
-        self._policy_fence_permit = None
-        self._cancel_owned_permit("_output_storage_permit")
-        permit = self._output_permit
-        if permit is not None and self._ledger.permit_is_open(permit):
-            self._ledger.cancel_permit(permit)
-        self._output_permit = None
+            attempt(lambda attribute=attribute: self._cancel_owned_permit(attribute))
         if self._orphaned_plans is not None:
-            self._close_plan_capabilities(self._orphaned_plans)
-            self._orphaned_plans.clear()
-            self._orphaned_plans = None
-        self._close_owned_capability("_orphaned_cwd_fd")
+            attempt(lambda: self._close_plan_capabilities(self._orphaned_plans))
+            if not self._orphaned_plans:
+                self._orphaned_plans.clear()
+                self._orphaned_plans = None
+        attempt(lambda: self._close_owned_capability("_orphaned_cwd_fd"))
         if self._plans is not None:
-            self._close_plan_capabilities(self._plans)
-            self._plans.clear()
-            self._plans = None
-        self._close_owned_capability("_policy_fd")
-        self._close_owned_capability("_project_fd")
+            attempt(lambda: self._close_plan_capabilities(self._plans))
+            if not self._plans:
+                self._plans.clear()
+                self._plans = None
+        attempt(lambda: self._close_owned_capability("_policy_fd"))
+        attempt(lambda: self._close_owned_capability("_project_fd"))
         if self._policy is not None:
             self._policy.clear()
             self._policy = None
@@ -9613,16 +9907,50 @@ class AccountedServerVerification:
         self._project_fingerprint = None
         self._project_root = None
         self._failure_message = None
-        self._resume_pending_release()
-        if self._pending_acquisition is not None:
-            raise CFError(
-                "server verification acquisition transition is pending"
-            )
-        if self._temporary_bytes:
-            self._release_owned("temporary_bytes", self._temporary_bytes)
-        if self._retained_bytes:
-            self._release_owned("retained_bytes", self._retained_bytes)
-        self._closed = True
+        permit_attributes = (
+            "_config_permit",
+            "_policy_read_permit",
+            "_policy_permit",
+            "_capability_permit",
+            "_policy_fence_storage_permit",
+            "_policy_fence_permit",
+            "_output_storage_permit",
+            "_output_permit",
+        )
+        logical_parent_releasable = self._process is None
+        if logical_parent_releasable:
+            attempt(self._resume_pending_release)
+            if self._pending_release is None and self._temporary_bytes:
+                attempt(
+                    lambda: self._release_owned(
+                        "temporary_bytes", self._temporary_bytes
+                    )
+                )
+            if self._pending_release is None and self._retained_bytes:
+                attempt(
+                    lambda: self._release_owned(
+                        "retained_bytes", self._retained_bytes
+                    )
+                )
+        complete = (
+            self._process is None
+            and all(getattr(self, attribute) is None for attribute in permit_attributes)
+            and self._orphaned_plans is None
+            and self._orphaned_cwd_fd < 0
+            and self._plans is None
+            and self._policy_fd < 0
+            and self._project_fd < 0
+            and self._pending_acquisition is None
+            and self._pending_release is None
+            and self._temporary_bytes == 0
+            and self._retained_bytes == 0
+        )
+        if complete:
+            self._closed = True
+        if first_failure is not None:
+            raise first_failure.with_traceback(None)
+        if not complete:
+            raise CFError("server verification cleanup is incomplete")
 
     def __del__(self) -> None:
         try:
@@ -9679,20 +10007,21 @@ def run_server_verification(
     try:
         owner.run()
     except BaseException as exc:
-        owner._detach_exception_tracebacks(exc)
+        _detach_effective_exception_tracebacks(exc)
         run_error = exc
     cleanup_error: BaseException | None = None
     try:
         owner.close()
     except BaseException as exc:
-        owner._detach_exception_tracebacks(exc)
+        _detach_effective_exception_tracebacks(exc)
         cleanup_error = exc
-    if cleanup_error is not None:
-        if run_error is not None:
-            raise cleanup_error from run_error
-        raise cleanup_error
     if run_error is not None:
-        raise run_error from None
+        if cleanup_error is not None:
+            linked = _link_primary_cleanup_exception(run_error, cleanup_error)
+            raise linked.with_traceback(None) from linked.__cause__
+        raise run_error.with_traceback(None)
+    if cleanup_error is not None:
+        raise cleanup_error.with_traceback(None)
 
 
 def ensure_repo_layout(repo_root: Path) -> None:
@@ -11645,16 +11974,8 @@ def write_object_records(
 
 
 def _detach_ancestry_exception_chain(error: BaseException) -> None:
-    """Drop every payload-bearing traceback without allocating side storage."""
-    current: BaseException | None = error
-    while current is not None:
-        following = current.__cause__
-        if following is None:
-            following = current.__context__
-        current.__traceback__ = None
-        current.__cause__ = None
-        current.__context__ = None
-        current = following
+    """Drop payload-bearing frames without erasing effective explanations."""
+    _detach_effective_exception_tracebacks(error)
 
 
 class _AncestryPermitTransition:
@@ -11902,10 +12223,10 @@ class _AncestryPermitTransition:
 class AccountedHTTPUploadAncestry:
     """Own one provisional BFS ancestry decision on a request ledger.
 
-    ``loader`` must return a borrowed, already-validated commit mapping whose
-    lifetime exceeds this owner. ``AccountedHTTPUploadSealedAncestry`` now
-    provides that snapshot-bound handoff; handler/terminal wiring remains
-    intentionally deferred.
+    ``loader`` must return a commit mapping whose lifetime exceeds this owner.
+    The direct upload ancestry route supplies its accounted live commit source;
+    the still-unwired ``AccountedHTTPUploadSealedAncestry`` successor supplies a
+    snapshot-bound borrowed loader without changing this owner's BFS contract.
     """
 
     TRANSITION_BYTES = sys.getsizeof(
@@ -11972,18 +12293,21 @@ class AccountedHTTPUploadAncestry:
             self._seen = self._allocate_seen()
             self._frontier = self._allocate_frontier()
         except BaseException as error:
-            _detach_ancestry_exception_chain(error)
+            _detach_effective_exception_tracebacks(error)
             failure = error
         if failure is not None:
             cleanup_failure: BaseException | None = None
             try:
                 self.close()
             except BaseException as error:
-                _detach_ancestry_exception_chain(error)
+                _detach_effective_exception_tracebacks(error)
                 cleanup_failure = error
             if cleanup_failure is not None:
-                raise cleanup_failure from failure
-            raise failure from None
+                linked = _link_primary_cleanup_exception(
+                    failure, cleanup_failure
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            raise failure.with_traceback(None)
 
     @staticmethod
     def _allocate_seen() -> set[str]:
@@ -12353,7 +12677,7 @@ class AccountedHTTPUploadAncestry:
                 depth = None
                 self._release_active_frame()
         except BaseException as error:
-            _detach_ancestry_exception_chain(error)
+            _detach_effective_exception_tracebacks(error)
             failure = error
         parents = None
         parent = None
@@ -12367,11 +12691,14 @@ class AccountedHTTPUploadAncestry:
             try:
                 self.close()
             except BaseException as error:
-                _detach_ancestry_exception_chain(error)
+                _detach_effective_exception_tracebacks(error)
                 cleanup_failure = error
             if cleanup_failure is not None:
-                raise cleanup_failure from failure
-            raise failure from None
+                linked = _link_primary_cleanup_exception(
+                    failure, cleanup_failure
+                )
+                raise linked.with_traceback(None) from linked.__cause__
+            raise failure.with_traceback(None)
         self.close()
         return found
 
@@ -12465,13 +12792,13 @@ def is_ancestor_from_objects_accounted(
         owner = AccountedHTTPUploadAncestry(active_ledger, source.payload, deadline)
         decision = owner.contains(ancestor, commit_id, goal_directed=True)
     except BaseException as exc:
-        _detach_ancestry_exception_chain(exc)
+        _detach_effective_exception_tracebacks(exc)
         run_error = exc
     # Drain a one-shot cleanup fault before returning or raising, so the
     # request ledger this decision was charged against is already settled at
     # the point the request loop reads it.
     cleanup_error = _drained_commit_source_cleanup_error(
-        source.close, _detach_ancestry_exception_chain
+        source.close, _detach_effective_exception_tracebacks
     )
     # C14 precedence: a cleanup fault never displaces the operation decision.
     # The caller sees the ancestry decision it asked for, with the cleanup fault
@@ -12479,8 +12806,9 @@ def is_ancestor_from_objects_accounted(
     # cleanup error, not the retry's.
     if run_error is not None:
         if cleanup_error is not None:
-            raise run_error from cleanup_error
-        raise run_error from None
+            linked = _link_primary_cleanup_exception(run_error, cleanup_error)
+            raise linked.with_traceback(None) from linked.__cause__
+        raise run_error.with_traceback(None)
     if cleanup_error is not None:
         raise cleanup_error from None
     return decision
@@ -25114,45 +25442,104 @@ class SealedCommitValidationSession:
             self._pending_terminal_reason = terminal_reason
         self._closing = True
         completed = False
+        first_failure: BaseException | None = None
+
+        def attempt(action: Any) -> None:
+            nonlocal first_failure
+            try:
+                action()
+            except BaseException as error:
+                first_failure = _retain_first_cleanup_failure(
+                    first_failure, error
+                )
+
         try:
             self.documents.clear()
             self.validated_commits.clear()
-            self._release_memory_scalar("retained_bytes", "_frame_bytes")
-            self._release_memory_scalar(
-                "retained_bytes", "_pending_document_retained_bytes"
+            attempt(
+                lambda: self._release_memory_scalar(
+                    "retained_bytes", "_frame_bytes"
+                )
             )
-            self._release_memory_scalar("retained_bytes", "_aux_retained_bytes")
-            self._release_memory_scalar(
-                "temporary_bytes", "_pending_temporary_bytes"
+            attempt(
+                lambda: self._release_memory_scalar(
+                    "retained_bytes", "_pending_document_retained_bytes"
+                )
             )
-            self._release_control_scalar(
-                "temporary_bytes", "_ordered_projection_bytes"
+            attempt(
+                lambda: self._release_memory_scalar(
+                    "retained_bytes", "_aux_retained_bytes"
+                )
+            )
+            attempt(
+                lambda: self._release_memory_scalar(
+                    "temporary_bytes", "_pending_temporary_bytes"
+                )
+            )
+            attempt(
+                lambda: self._release_control_scalar(
+                    "temporary_bytes", "_ordered_projection_bytes"
+                )
             )
             for owner in reversed(self._fd_owners):
-                owner.close()
-            self._subdir_fds.clear()
-            self._fd_owner_pool.clear()
-            self._fd_owners.clear()
+                attempt(owner.close)
+            descriptors_consumed = all(
+                owner._fd < 0 for owner in self._fd_owners
+            )
+            if descriptors_consumed:
+                self._subdir_fds.clear()
+                self._fd_owner_pool.clear()
+                self._fd_owners.clear()
             # The control claims outlive every collection they cover, so they
             # are released only once those collections are empty.
-            self._release_control_scalar(
-                "retained_bytes", "_subdir_entry_bytes"
-            )
-            self._release_control_scalar(
-                "retained_bytes", "_descriptor_owner_bytes"
-            )
-            self._release_control_scalar("retained_bytes", "_control_bytes")
-            if (
-                self._pending_terminal_reason is not None
-                and self.ledger.terminal_reason is None
-            ):
-                self.ledger.terminate(self._pending_terminal_reason)
-            self._pending_terminal_reason = None
-            completed = True
+            if descriptors_consumed:
+                attempt(
+                    lambda: self._release_control_scalar(
+                        "retained_bytes", "_subdir_entry_bytes"
+                    )
+                )
+                attempt(
+                    lambda: self._release_control_scalar(
+                        "retained_bytes", "_descriptor_owner_bytes"
+                    )
+                )
+            child_debt = any(
+                (
+                    self._frame_bytes,
+                    self._pending_document_retained_bytes,
+                    self._aux_retained_bytes,
+                    self._pending_temporary_bytes,
+                    self._ordered_projection_bytes,
+                    self._subdir_entry_bytes,
+                    self._descriptor_owner_bytes,
+                )
+            ) or not descriptors_consumed
+            if not child_debt:
+                attempt(
+                    lambda: self._release_control_scalar(
+                        "retained_bytes", "_control_bytes"
+                    )
+                )
+            completed = not child_debt and self._control_bytes == 0
+            if completed and self._pending_terminal_reason is not None:
+                if self.ledger.terminal_reason is None:
+                    attempt(
+                        lambda: self.ledger.terminate(
+                            self._pending_terminal_reason
+                        )
+                    )
+                if self.ledger.terminal_reason is not None:
+                    self._pending_terminal_reason = None
+                else:
+                    completed = False
         finally:
             if completed:
                 self.closed = True
             self._closing = False
+        if first_failure is not None:
+            raise first_failure.with_traceback(None)
+        if not completed:
+            raise CFError("sealed validation session cleanup is incomplete")
 
 
 # ``PATH_MAX`` bound on the absolutised object-store path a session adopts.  A
@@ -32631,21 +33018,33 @@ def validate_sealed_commit(
         memory = _AccountedUploadSourceMemory(active_ledger)
         memory.acquire()
     session: SealedCommitValidationSession | None = None
+    constructor_error: BaseException | None = None
     try:
         session = SealedCommitValidationSession(
             objects_root, active_ledger, control_owner=memory
         )
-    except BaseException:
+    except BaseException as primary_error:
         # Primary-error precedence on the constructor unwind, matching the main
         # body below: the constructor's decision is what the caller sees, and a
         # cleanup that could not release leaves the owner alive so its finalizer
         # still gives the reservation back.
+        _detach_effective_exception_tracebacks(primary_error)
+        constructor_error = primary_error
+    if constructor_error is not None:
+        cleanup_error: BaseException | None = None
         if memory is not None:
             try:
                 memory.close()
-            except BaseException as cleanup_error:
-                _detach_exception_chain(cleanup_error)
-        raise
+            except BaseException as error:
+                cleanup_error = _retain_first_cleanup_failure(
+                    cleanup_error, error
+                )
+        if cleanup_error is not None:
+            linked = _link_primary_cleanup_exception(
+                constructor_error, cleanup_error
+            )
+            raise linked.with_traceback(None) from linked.__cause__
+        raise constructor_error.with_traceback(None)
     if seen:
         session.validated_commits.update(seen)
     run_error: BaseException | None = None
@@ -32655,6 +33054,7 @@ def validate_sealed_commit(
             seen.update(session.validated_commits)
         session.finalize(terminate=not caller_owned, poll=poll)
     except BaseException as exc:
+        _detach_effective_exception_tracebacks(exc)
         run_error = exc
     # Primary-error precedence: a cleanup failure never masks the decision that
     # caused it, and a still-owed release stays retryable through its owner.
@@ -32665,12 +33065,16 @@ def validate_sealed_commit(
         try:
             release()
         except BaseException as exc:
-            if cleanup_error is None:
-                cleanup_error = exc
+            cleanup_error = _retain_first_cleanup_failure(
+                cleanup_error, exc
+            )
     if run_error is not None:
-        raise run_error
+        if cleanup_error is not None:
+            linked = _link_primary_cleanup_exception(run_error, cleanup_error)
+            raise linked.with_traceback(None) from linked.__cause__
+        raise run_error.with_traceback(None)
     if cleanup_error is not None:
-        raise cleanup_error
+        raise cleanup_error.with_traceback(None)
 
 
 def _validate_sealed_commit_payload(

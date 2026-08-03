@@ -4289,6 +4289,7 @@ class PythonHTTPUploadAccountedTraversalTests(unittest.TestCase):
         del source
         gc.collect()
         self.assert_closed(ledger)
+
         # The retained session was really the live one, and it is now closed:
         # the fallback drained it rather than abandoning an open handle.
         self.assertTrue(session.closed)
@@ -4369,6 +4370,129 @@ class PythonHTTPUploadAccountedTraversalTests(unittest.TestCase):
         self.assertIn("PRIMARY constructor decision", str(caught.exception))
         self.assertEqual(len(one_shot), 1)
         gc.collect()
+        self.assert_closed(ledger)
+
+    def test_constructor_chain_and_reentry_reconcile_exact_memory_owner(self):
+        source_type = self.globals["_AccountedUploadCommitSource"]
+        session_type = self.globals["SealedCommitValidationSession"]
+        memory_type = self.globals["_AccountedUploadSourceMemory"]
+        primary = ValueError("exact constructor primary")
+        cleanup = RuntimeError("exact memory cleanup")
+        cleanup_prior = LookupError("cleanup prior")
+        primary_prior = OSError("primary prior")
+        shared = EOFError("shared prior")
+        primary.__cause__ = primary_prior
+        primary_prior.__context__ = shared
+        shared.__cause__ = primary_prior
+        cleanup.__context__ = cleanup_prior
+        cleanup_prior.__cause__ = shared
+        blocked = [True]
+        acquire_calls = []
+        constructor_calls = []
+
+        class FailingSession(session_type):
+            def __init__(inner, *args, **kwargs):
+                constructor_calls.append(None)
+                raise primary
+
+        class ControlledMemory(memory_type):
+            def acquire(inner):
+                acquire_calls.append(inner)
+                return super().acquire()
+
+            def close(inner):
+                if blocked[0]:
+                    raise cleanup
+                return super().close()
+
+        ledger = self.ledger(label="constructor chain and F7")
+        source = source_type(
+            self.local_objects, ledger, None, "upload ancestry"
+        )
+        self.globals["SealedCommitValidationSession"] = FailingSession
+        self.globals["_AccountedUploadSourceMemory"] = ControlledMemory
+        try:
+            with self.assertRaises(ValueError) as caught:
+                source.payload(self.head)
+            self.assertIs(caught.exception, primary)
+            chain = []
+            current = caught.exception
+            while current is not None:
+                chain.append(current)
+                current = current.__cause__
+            self.assertEqual(
+                chain,
+                [primary, cleanup, cleanup_prior, shared, primary_prior],
+            )
+            self.assertEqual(len({id(error) for error in chain}), len(chain))
+            first_memory = source._memory
+            self.assertIs(first_memory, acquire_calls[0])
+            self.assertEqual(
+                ledger.current.get("retained_bytes"),
+                self.namespace["SEALED_SESSION_CONTROL_UPPER"],
+            )
+            with self.assertRaises(RuntimeError) as reentry:
+                source.payload(self.head)
+            self.assertIs(reentry.exception, cleanup)
+            self.assertIs(source._memory, first_memory)
+            self.assertEqual(len(acquire_calls), 1)
+            self.assertEqual(len(constructor_calls), 1)
+            self.assertEqual(
+                ledger.current.get("retained_bytes"),
+                self.namespace["SEALED_SESSION_CONTROL_UPPER"],
+            )
+            blocked[0] = False
+            self.globals["SealedCommitValidationSession"] = session_type
+            source.payload(self.head)
+            self.assertEqual(len(acquire_calls), 2)
+            self.assertEqual(len(constructor_calls), 1)
+            self.assertIsNot(source._memory, first_memory)
+        finally:
+            blocked[0] = False
+            self.globals["SealedCommitValidationSession"] = session_type
+            self.globals["_AccountedUploadSourceMemory"] = memory_type
+            source.close()
+        self.assert_closed(ledger)
+
+    def test_persistent_descriptor_fault_sweeps_once_then_drains(self):
+        source_type = self.globals["_AccountedUploadCommitSource"]
+        descriptor_type = self.globals["_SealedValidationFileDescriptor"]
+        close_fd = descriptor_type._close_fd
+        ledger = self.ledger(label="persistent descriptor sweep")
+        source = source_type(
+            self.local_objects, ledger, None, "upload ancestry"
+        )
+        source.payload(self.head)
+        session = source._session
+        self.assertIsNotNone(session)
+        owned = [owner._fd for owner in session._fd_owners if owner._fd >= 0]
+        self.assertGreaterEqual(len(owned), 2)
+        close_calls = []
+        errors = {}
+
+        def fail_every_close(file_descriptor):
+            close_calls.append(file_descriptor)
+            error = OSError(5, f"persistent close {file_descriptor}")
+            errors[file_descriptor] = error
+            raise error
+
+        descriptor_type._close_fd = staticmethod(fail_every_close)
+        try:
+            with self.assertRaises(OSError) as caught:
+                source.close()
+        finally:
+            descriptor_type._close_fd = staticmethod(close_fd)
+        expected_order = list(reversed(owned))
+        self.assertEqual(close_calls, expected_order)
+        self.assertEqual(len(close_calls), len(set(close_calls)))
+        self.assertIs(caught.exception, errors[expected_order[0]])
+        self.assertTrue(session.closed)
+        self.assertIs(source._session, session)
+        self.assertIsNotNone(source._memory)
+        source.close()
+        self.assertEqual(close_calls, expected_order)
+        self.assertIsNone(source._session)
+        self.assertIsNone(source._memory)
         self.assert_closed(ledger)
 
     def test_c18_cleanup_origin_joins_the_one_shared_error_taxonomy(self):

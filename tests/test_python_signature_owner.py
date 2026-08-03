@@ -909,8 +909,11 @@ class AccountedCommitSignaturePolicyTests(unittest.TestCase):
 
         ledger.consume_reserved = fail_policy_consume
         ledger.cancel_permit = fail_cancel_once
-        with self.assertRaisesRegex(NAMESPACE["CFError"], "policy cancel failure"):
+        with self.assertRaisesRegex(
+            NAMESPACE["CFError"], "policy consume failure"
+        ) as caught:
             Owner(raw, ledger, self.loader(graph))
+        self.assertRegex(str(caught.exception.__cause__), "policy cancel failure")
         ledger.consume_reserved = original_consume
         ledger.cancel_permit = original_cancel
         gc.collect()
@@ -956,10 +959,20 @@ class AccountedCommitSignaturePolicyTests(unittest.TestCase):
 
                 ledger.consume_reserved = fail_target_consume
                 ledger.cancel_permit = fail_target_cancel
+                expected = (
+                    f"{target} consume failure"
+                    if target == "hmac"
+                    else f"{target} cancel failure"
+                )
                 with self.assertRaisesRegex(
-                    NAMESPACE["CFError"], f"{target} cancel failure"
-                ):
+                    NAMESPACE["CFError"], expected
+                ) as caught:
                     owner.verify("CF-COMMIT-head")
+                if target == "hmac":
+                    self.assertRegex(
+                        str(caught.exception.__cause__),
+                        "hmac cancel failure",
+                    )
                 self.assertTrue(ledger.has_open_permits())
                 slot = (
                     "_hmac_work_permit"

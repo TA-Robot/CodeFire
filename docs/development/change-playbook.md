@@ -126,7 +126,11 @@ For Python fallback HTTP upload server verification, preserve sealed validation 
 publication identity/digest/ancestry/layout/nonce after it. Pass the handler's exact request ledger and deadline into the existing
 single-use `AccountedServerVerification` path; a no-ledger caller must retain the compatibility wrapper's local ledger. Test
 same-ledger exact-minus-one before spawn, request deadline before layout/nonce, spawned-process cleanup, release-fault retry and
-error chaining, legacy no-ledger execution, and earlier validation-error precedence. Configured commands can create external
+error chaining, legacy no-ledger execution, and earlier validation-error precedence. Preserve the exact operation exception as the
+outer object; append the first cleanup exception as explicit cause, followed by cleanup then primary prior effective chains with
+identity deduplication and no cycles. Before any release observer, detach traceback locals holding config/output/process payload.
+Close every owned plan capability once in a bounded sweep even after an earlier fault, without retrying detached FD numbers.
+Configured commands can create external
 effects before failure; never describe their cleanup as publication rollback.
 
 If a later Python upload owner borrows validated commits, use a purpose-specific single-use handle from the sealed owner and allow
@@ -418,7 +422,12 @@ response slot marks the effect started -- otherwise an elapsed request answers 5
 
 Give every `SealedCommitValidationSession` an explicit owner and claim its `Path`, memo, sets, registry, reuse pool, map entries and
 descriptor owners before the allocator that creates them; recycle released descriptor owners so the registry cannot grow per read,
-and reserve `finalize`'s ordered-id projection before allocating it. Derive a reservation term only from a claim site that exists:
+and reserve `finalize`'s ordered-id projection before allocating it. One close must detach and attempt every descriptor exactly once,
+continue the bounded sweep after faults, drop payloads, release logical control, and only then return the first cleanup failure; never
+retry a raw FD number. The source wrapper may keep its two-call compatibility shape, but a second call may only finish remaining
+non-descriptor scalar cleanup. Before `_AccountedUploadCommitSource._open` performs a poll, allocation, acquisition, or session
+construction, reconcile any published memory owner so a persistent failure retains one 11,456-byte charge rather than overwriting it
+and growing to 22,912. Derive a reservation term only from a claim site that exists:
 a per-record heap multiplier with no matching claim becomes an admission cliff far below the declared record limit. Stream and hash
 canonical bytes with bounded scratch through `canonical_json_stream_digest` instead of reserving a whole-record encode, and prove
 byte-identity against `canonical_json` when touching it. Note two frozen constraints: `_HTTPUploadSealedValidationReservation.close`
@@ -446,7 +455,8 @@ Release is the other half of accounting and has its own ordering rule: never era
 open/acquired state before the fallible ledger call. Consume ownership only for a release the ledger really made — compare its scalar
 before and after — and always let the failure propagate. Otherwise a pre-effect fault strands the bytes with nothing left owed, and
 the retry is a silent no-op. Keep primary-error precedence in cleanup so the fault that caused the unwind is not replaced by the
-release that failed while handling it.
+release that failed while handling it. Preserve exact exception identity and append existing cleanup-chain nodes before existing
+primary-chain nodes, deduplicated by identity into one explicit cycle-free cause chain; later cleanup faults do not displace the first.
 
 An allocation is only accounted if the charge can be *witnessed* at the moment of allocation. Route accounted collection allocations
 through a named pre-allocation boundary that proves the charge — in the dimension the caller's ledger actually sees, not merely in

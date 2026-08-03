@@ -242,6 +242,16 @@ class PythonExternalProductionTests(unittest.TestCase):
         owners = []
         armed = False
         failed = False
+        cleanup_fault = RuntimeError(
+            "injected production verification release"
+        )
+        run_faults = []
+        failure = self.Owner._failure
+
+        def observe_failure(owner, message):
+            error = failure(owner, message)
+            run_faults.append(error)
+            return error
 
         def observe_prepare(*args, **kwargs):
             nonlocal armed
@@ -254,25 +264,26 @@ class PythonExternalProductionTests(unittest.TestCase):
             nonlocal failed
             if armed and dimension == "retained_bytes" and not failed:
                 failed = True
-                raise RuntimeError("injected production verification release")
+                raise cleanup_fault
             return release(dimension, amount)
 
         self.globals["prepare_server_verification"] = observe_prepare
+        self.Owner._failure = observe_failure
         ledger.release = fail_retained_once
         try:
-            with self.assertRaisesRegex(
-                RuntimeError, "production verification release"
-            ) as caught:
+            with self.assertRaises(self.namespace["CFError"]) as caught:
                 self.upload(
                     "release-retry", self.head, self.records, ledger=ledger
                 )
         finally:
             self.globals["prepare_server_verification"] = prepare
+            self.Owner._failure = failure
             ledger.release = release
         self.assertTrue(failed)
         self.assertEqual(len(owners), 1)
-        self.assertIsInstance(caught.exception.__cause__, self.namespace["CFError"])
-        self.assertIn("server verification failed: run-error", str(caught.exception.__cause__))
+        self.assertIs(caught.exception, run_faults[0])
+        self.assertIs(caught.exception.__cause__, cleanup_fault)
+        self.assertIn("server verification failed: run-error", str(caught.exception))
         self.assertFalse(owners[0]._closed)
         owners[0].close()
         self.assertEqual(self.authority_snapshot(project_root), authority_before)
