@@ -58,31 +58,52 @@ This is the live plan for `MS-2026-08-control-restore`. It is a concrete graph, 
 
 ```text
 Critical path: classified-worktree snapshot eb4fd0c → board/packet plan completion → integration → M1 focused validation → final independent Grok or Claude audit → M1 exit and slot shift
-Parallel now: board/packet plan-completion packet, independent baseline audit writing audit-latest.md
-Blocked: final independent audit waits on integration; M1 exit and slot shift wait on the final audit and on every validation named on this card
+Progress: nodes 1-4 done; node 5 ready; node 6 blocked
+Parallel now: none — node 5 is the sole runnable post-fan-in node and no independent M1 packet is idle
+Blocked: M1 exit and slot shift wait on the final independent audit; the integration and validation edges that the final audit waited on are now cleared
 ```
+
+`Parallel now: none` here is fan-in, not stall. The two independent lanes already ran concurrently and both landed (see "Parallel lanes that ran"). Every remaining M1 item is downstream of node 5 on a single edge, so there is no idle independent packet to launch and no free slot being wasted. Idle capacity would only be a stall signal if an unstarted independent M1 packet existed; none does.
 
 ### Nodes on the critical path
 
-| # | Node | State | Owner | Waits on |
-|---|---|---|---|---|
-| 1 | Classified-worktree snapshot `eb4fd0c` | done, preservation-only | Orchestrator | — |
-| 2 | Board and packet plan completion | in progress | Individual agent (Claude Opus 5) | 1 |
-| 3 | Integration of M1 packet worktrees | not started | Orchestrator (Codex, integration branch only) | 2 |
-| 4 | M1 focused validation (the command list above, no wider) | not started | Validation lane | 3 |
-| 5 | Final independent audit (Grok 4.6 or Claude Opus 5, never Codex, not the implementing session) | not started | Audit agent | 3, and 4 for its evidence |
-| 6 | M1 exit and slot shift | not started | Orchestrator | 4 and 5 |
+| # | Node | State | Owner | Waits on | Evidence |
+|---|---|---|---|---|---|
+| 1 | Classified-worktree snapshot `eb4fd0c` | **done**, preservation-only | Orchestrator | — | `eb4fd0c` `snapshot: preserve classified pre-M1 worktree` |
+| 2 | Board and packet plan completion | **done** | Individual agent (Claude Opus 5) | 1 | `a7b750e` `docs: make M1 execution graph concrete`, integrated byte-identically |
+| 3 | Integration of M1 packet worktrees | **done** | Orchestrator (Codex, integration branch only) | 2 | `64b7c55` on `integration/ms-2026-08-control-restore`, 2026-08-21T19:14:51Z; both file blobs identical to `a7b750e` |
+| 4 | M1 focused validation (the command list above, no wider) | **done** | Validation lane (distinct Claude session) | 3 | All five packet commands exited 0 at exact HEAD `64b7c55`; worktree clean before and after |
+| 5 | Final independent audit (Grok 4.6 or Claude Opus 5, never Codex, not the implementing session) | **ready** — not started | Audit agent | 3, 4 (both cleared) | — |
+| 6 | M1 exit and slot shift | **blocked** on node 5 | Orchestrator | 5 | — |
 
-### Parallel now
+### Parallel lanes that ran
 
-Two lanes are live with disjoint write sets:
+Both lanes ran concurrently with disjoint write sets and both completed. This record is kept as evidence that M1 was not planned as a single serial queue:
 
-| Lane | Write set | Why it is independent |
+| Lane | Write set | Outcome |
 |---|---|---|
-| Board/packet plan completion | `milestones.md`, `ai/task-packets/milestone-control-restore.md` | Records the graph; needs no audit result to exist |
-| Independent baseline audit | `ai/audit-latest.md` only | Read-only over plan vs progress; needs no board edit to observe stall |
+| Board/packet plan completion | `milestones.md`, `ai/task-packets/milestone-control-restore.md` | Landed as `a7b750e`, integrated at `64b7c55` |
+| Independent baseline Grok 4.6 audit | `ai/audit-latest.md` only | Completed 2026-08-21T19:15:02Z |
 
-Neither lane may enter the other's write set. The baseline audit is **not** node 5: it observes the current state, it does not clear the M1 exit.
+Neither lane entered the other's write set. The baseline audit was **not** node 5: it observed plan-vs-progress and did not clear the M1 exit.
+
+Baseline audit result, recorded honestly: it reported `stalled=yes` **solely** because the board still carried plan placeholders at the time it read them. Node 2 (`a7b750e`) resolved that specific finding. It reported `scope_creep=no` and all four M1-card validations green. The stall verdict is therefore closed by node 2, not overridden or dismissed.
+
+### Node 4 validation evidence
+
+Run by a distinct Claude validation runner at exact HEAD `64b7c55`. All five packet commands exited 0:
+
+| Command | Result |
+|---|---|
+| `check_project_docs.py` | passed, 534 Markdown files inventoried |
+| `check_ai_acceleration_docs.py` | passed |
+| `run_milestone_audit.py` | final audit brief generated, 123 lines |
+| `bash -n /workspace/scripts/dev-agent` | passed |
+| `/workspace/scripts/test-dev-agent.sh` | passed, all 6 assertions |
+
+Worktree clean before and after. **No product tests were run** — Rust workspace tests, installer, and Algorithm dogfood Retrospect stay out of M1 per the card above, so node 4 is not evidence about product behavior.
+
+That evidence is pinned to tree `64b7c55`. This progress commit edits the same two docs files, so node 5 must run at the resulting commit, not at `64b7c55`. The two doc checkers are re-run here; `bash -n` and `test-dev-agent.sh` target `/workspace/scripts/` and are unaffected by these two files, while `run_milestone_audit.py` reads this board and will render the updated graph.
 
 ### About snapshot `eb4fd0c`
 
@@ -99,7 +120,7 @@ No M1 exit-gate command was run against it and it records no exit evidence in `h
 
 ### Not yet true
 
-M1 is **open**. The exit criteria are not met, the final independent audit has not run, and no slot has shifted. Do not read node 1 or node 2 as an M1 close.
+M1 is **open**. Nodes 1-4 being done is not an exit: the final independent audit (node 5) has not run, node 6 has not run, and no slot has shifted. Four green validations plus a clean integration are the *inputs* to the final audit, not a substitute for it. Do not read this board as an M1 close and do not pre-emptively rename slots.
 
 ## Parked open issues
 
