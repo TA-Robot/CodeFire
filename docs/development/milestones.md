@@ -37,9 +37,11 @@ Exact M1 exit (nothing else counts):
 Required implementation (this slot only):
 
 - resolve which `codefire` executable runs the loop, and record it;
-- select and record the one small real change before the loop starts;
-- run the loop on that change and capture the CodeFire-reported before/after state;
+- select the one small real change, by reading only, before the loop starts;
+- capture the pre-loop state with `status --json`, then run the loop on that change;
 - record the loop evidence and the sealed commit identity.
+
+Capturing the baseline needs a working executable, so it belongs to the loop run, not to selection. Selection is a reading task and stays independent.
 
 The first product increment is **one small real change** in `subprojects/algorithm-evolution-agent-lab`. If the canonical dogfood state is already `open-clean`, the increment is a new small change, not a replay of a parked root.
 
@@ -75,32 +77,36 @@ Parked-issue admission rule for this slot: a parked root enters M1 **only** if r
 This is the live plan for `MS-local-sealed-loop`. It is a concrete graph, not a template. Every active M1 must carry one; the shape rule lives in `milestone-operating-model.md`. A single serial queue with no parallel set is not an M1 plan.
 
 ```text
-Critical path: loop runner readiness → sealed-loop run of the selected increment → loop evidence record → final independent audit → M1 exit and slot shift
+Critical path: loop runner readiness → sealed-loop run of the selected increment (pre-loop baseline first) → loop evidence record → final independent audit → M1 exit and slot shift
 Progress: nothing has run; nodes 1 and 2 are ready, nodes 3-6 are blocked
-Parallel now: node 1 (loop runner readiness) and node 2 (increment selection and pre-loop baseline) — independent, disjoint write sets, both launchable immediately
+Parallel now: node 1 (loop runner readiness) and node 2 (increment selection, reading only) — independent, disjoint write sets, one packet each, both launchable immediately
 Blocked: node 3 waits on 1 and 2; node 4 waits on 3; node 5 waits on 4; node 6 waits on 5
 ```
 
-No node on this graph has run. There is no validation evidence, no sealed commit, and no audit for this milestone yet.
+No node on this graph has run. There is no validation evidence, no sealed commit, and no audit for this milestone yet. No runner and no candidate file have been chosen.
 
 ### Nodes
 
-| # | Node | State | Owner | Waits on | Write set | Evidence |
-|---|---|---|---|---|---|---|
-| 1 | Loop runner readiness — decide which `codefire` executable runs the loop and record it, or record the blocker | **ready** — not started | Individual agent (Claude Opus 5 or Grok 4.6) | — | `docs/development/known-limitations.md` | — |
-| 2 | Increment selection and pre-loop baseline — name the exact one small change and record the CodeFire-reported state before the loop | **ready** — not started | Individual agent (the other family) | — | `docs/development/ai/task-packets/milestone-local-sealed-loop.md` | — |
-| 3 | Sealed-loop run — `open → edit → scan → extinguish → verify → commit` on the selected increment plus its focused test | **blocked** on 1, 2 | Individual agent | 1, 2 | the one touched file under `subprojects/algorithm-evolution-agent-lab/`, and the CodeFire state that loop writes | — |
-| 4 | Loop evidence record — sealed commit identity, before/after state, and which commands actually ran | **blocked** on 3 | Individual agent | 3 | `docs/development/history.md`, `docs/development/ai/task-packets/milestone-local-sealed-loop.md` | — |
-| 5 | Final independent audit (Claude Opus 5 or Grok 4.6, never Codex, not the implementing session) | **blocked** on 4 | Audit agent | 4 | `docs/development/ai/audit-latest.md` only | — |
-| 6 | M1 exit and slot shift | **blocked** on 5 | Orchestrator | 5 | board, history, packet, current-state docs | — |
+| # | Node | State | Owner | Waits on | Packet | Write set | Evidence |
+|---|---|---|---|---|---|---|---|
+| 1 | Loop runner readiness — decide which `codefire` executable runs the loop and record its path, provenance, and capability outcome, or record an exact blocker | **ready** — not started | Individual agent (Claude Opus 5 or Grok 4.6) | — | `ai/task-packets/milestone-local-sealed-loop-runner.md` | that packet file only | — |
+| 2 | Increment selection — name the exact one-file small change, why it is the smallest real change, and which focused test covers it. Reading only: does **not** run or record CodeFire state | **ready** — not started | Individual agent (the other family) | — | `ai/task-packets/milestone-local-sealed-loop-increment.md` | that packet file only | — |
+| 3 | Sealed-loop run — capture the pre-loop `status --json` baseline with the node 1 runner, then `open → edit → scan → extinguish → verify → commit` on the node 2 increment plus its focused test | **blocked** on 1, 2 | Individual agent | 1, 2 | created after fan-in | the one touched file under `subprojects/algorithm-evolution-agent-lab/`, and the CodeFire state that loop writes | — |
+| 4 | Loop evidence record — sealed commit identity, before/after state, and which commands actually ran | **blocked** on 3 | Individual agent | 3 | parent packet | `docs/development/history.md`, `ai/task-packets/milestone-local-sealed-loop.md` | — |
+| 5 | Final independent audit (Claude Opus 5 or Grok 4.6, never Codex, not the implementing session) | **blocked** on 4 | Audit agent | 4 | — | `docs/development/ai/audit-latest.md` only | — |
+| 6 | M1 exit and slot shift | **blocked** on 5 | Orchestrator | 5 | — | board, history, packet, current-state docs | — |
+
+`ai/task-packets/milestone-local-sealed-loop.md` is the parent packet for this milestone. Nodes 1 and 2 each have their own child packet, per `milestone-operating-model.md` and `ai/orchestration-protocol.md`: one packet per parallel slice. The node 3 implementation packet is written **after** nodes 1 and 2 fan in, because its write set depends on which file node 2 selects and which runner node 1 records. It does not exist yet and must not be pre-written.
 
 ### Why nodes 1 and 2 are genuinely independent
 
-Node 1 answers *what runs the loop*. The base environment exposes no `cargo` on `PATH`, and the only recorded source-matching binary is the July `/tmp/codefire-cfr167-final.KWa8TC/bin/codefire` artifact, which is not a durable runner. That question must be settled before the loop can execute.
+Node 1 answers *what runs the loop*. The base environment exposes no `cargo` on `PATH`, and the only recorded source-matching binary is the July `/tmp/codefire-cfr167-final.KWa8TC/bin/codefire` artifact, which is not a durable runner. That question must be settled before any CodeFire command runs.
 
-Node 2 answers *what the loop carries*. Choosing the one small change and recording the pre-loop state reads the dogfood project and the board; it does not depend on which executable will later run.
+Node 2 answers *what the loop carries*. Choosing the one file, the minimal edit, and the focused test is done by **reading** the dogfood project — no CodeFire invocation, no product edit, no state capture. That is why it does not wait on node 1.
 
-Their write sets are disjoint (`known-limitations.md` versus the M1 packet file), so both may run concurrently from the start. Launching only one of them is a stall, not caution.
+The pre-loop `status --json` baseline is therefore **node 3 work, not node 2 work**: it requires a runnable executable, so it sits after the fan-in and immediately before `open`. Putting it in node 2 would have made node 2 secretly depend on node 1 and the two lanes would not have been parallel at all.
+
+Their write sets are disjoint — each child packet writes only itself — so both may run concurrently from the start. Launching only one of them is a stall, not caution.
 
 ### Not yet true
 

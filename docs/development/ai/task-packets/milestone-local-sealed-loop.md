@@ -12,6 +12,12 @@ Risk score: 5
 
 Reasoning tier: high
 
+This is the **parent packet** for the milestone. Nodes 1 and 2 have their own child packets, per `../../milestone-operating-model.md` and `../orchestration-protocol.md`: one packet per parallel slice.
+
+- node 1 → `milestone-local-sealed-loop-runner.md`
+- node 2 → `milestone-local-sealed-loop-increment.md`
+- node 3 → written after nodes 1 and 2 fan in; does not exist yet
+
 This packet is a **plan**. Nothing in it has run. It carries no product evidence and no validation results; the `Evidence` cells on the live board are empty for a reason. Do not read any statement here as an observation.
 
 ## Objective
@@ -25,62 +31,62 @@ The deliverable is a sealed commit plus CodeFire's own before/after report of th
 - Required context pack(s): pack-0-universal-orientation, pack-6-dogfood-algorithm-project
 - Additional files: `docs/development/milestones.md`, `docs/development/milestone-operating-model.md`, `docs/development/known-limitations.md`, `subprojects/algorithm-evolution-agent-lab/AGENTS.md`
 - Related issue or observation: `MS-2026-08-control-restore` restored the scheduler but validated no product behavior. This is the first slot that touches product/dogfood behavior.
-- Board state to respect: the canonical Algorithm project was last recorded `open-clean` at sealed bridge `CF-COMMIT-e5ca290905c2a4b5e2c05bd4` with zero Fires. That is a **prior record**, not a fact this packet has re-observed. Re-read it with `status` before assuming it.
+- Board state to respect: the canonical Algorithm project was last recorded `open-clean` at sealed bridge `CF-COMMIT-e5ca290905c2a4b5e2c05bd4` with zero Fires. That is a **prior record**, not a fact this packet has re-observed. Node 3 re-reads it with `status --json` before the loop; nodes 1 and 2 must not rely on it and must not run `status` to check it.
 
 ## Plan
 
 The live graph is on `docs/development/milestones.md` under "M1 execution graph (current)". That board is authoritative; this section is the packet-local copy.
 
 ```text
-Critical path: loop runner readiness → sealed-loop run of the selected increment → loop evidence record → final independent audit → M1 exit and slot shift
+Critical path: loop runner readiness → sealed-loop run of the selected increment (pre-loop baseline first) → loop evidence record → final independent audit → M1 exit and slot shift
 Progress: nothing has run; nodes 1 and 2 are ready, nodes 3-6 are blocked
-Parallel now: node 1 (loop runner readiness) and node 2 (increment selection and pre-loop baseline) — independent, disjoint write sets, both launchable immediately
+Parallel now: node 1 (loop runner readiness) and node 2 (increment selection, reading only) — independent, disjoint write sets, one packet each, both launchable immediately
 Blocked: node 3 waits on 1 and 2; node 4 waits on 3; node 5 waits on 4; node 6 waits on 5
 ```
 
-| # | Node | State | Waits on | Write set |
-|---|---|---|---|---|
-| 1 | Loop runner readiness | **ready** — not started | — | `docs/development/known-limitations.md` |
-| 2 | Increment selection and pre-loop baseline | **ready** — not started | — | this file |
-| 3 | Sealed-loop run | **blocked** | 1, 2 | one file under `subprojects/algorithm-evolution-agent-lab/`, plus the CodeFire state that loop writes |
-| 4 | Loop evidence record | **blocked** | 3 | `docs/development/history.md`, this file |
-| 5 | Final independent audit | **blocked** | 4 | `docs/development/ai/audit-latest.md` only |
-| 6 | M1 exit and slot shift | **blocked** | 5 | board, history, packet, current-state docs |
+| # | Node | State | Waits on | Packet | Write set |
+|---|---|---|---|---|---|
+| 1 | Loop runner readiness | **ready** — not started | — | `milestone-local-sealed-loop-runner.md` | that packet file only |
+| 2 | Increment selection (reading only) | **ready** — not started | — | `milestone-local-sealed-loop-increment.md` | that packet file only |
+| 3 | Sealed-loop run, pre-loop `status --json` baseline first | **blocked** | 1, 2 | created after fan-in | one file under `subprojects/algorithm-evolution-agent-lab/`, plus the CodeFire state that loop writes |
+| 4 | Loop evidence record | **blocked** | 3 | this file | `docs/development/history.md`, this file |
+| 5 | Final independent audit | **blocked** | 4 | — | `docs/development/ai/audit-latest.md` only |
+| 6 | M1 exit and slot shift | **blocked** | 5 | — | board, history, packet, current-state docs |
 
-Nodes 1 and 2 are independent: node 1 settles *what executes the loop*, node 2 settles *what the loop carries*. Neither reads the other's answer, and their write sets are disjoint. Starting only one of them is a planning defect. Nodes 5 and 6 are named here so the closing shape is fixed in advance; they are not this packet's implementation work.
+Nodes 1 and 2 are independent: node 1 settles *what executes the loop*, node 2 settles *what the loop carries*. Neither reads the other's answer, and their write sets are disjoint — each child packet writes only itself. Starting only one of them is a planning defect. Nodes 5 and 6 are named here so the closing shape is fixed in advance; they are not this packet's implementation work.
+
+The pre-loop `status --json` baseline is **node 3 work**. It cannot run until node 1 has produced a runnable executable, so placing it in node 2 would give node 2 a hidden dependency on node 1 and destroy the parallelism this graph claims. Node 2 selects by reading only.
 
 ### Node 1 — loop runner readiness
 
-Decide, and record in `known-limitations.md`, which `codefire` executable runs this loop. The base environment exposes no `cargo` on `PATH`, and the only recorded source-matching binary is the July artifact `/tmp/codefire-cfr167-final.KWa8TC/bin/codefire`, which is not durable across sessions. Acceptable outcomes:
+Owned by `milestone-local-sealed-loop-runner.md`. Decide which `codefire` executable runs this loop and record its path, provenance, and capability outcome in that packet — or record an exact blocker there. Acceptable outcomes:
 
-- a named, reachable executable with its provenance recorded; or
+- a named, reachable executable with recorded provenance; or
 - an explicit recorded blocker if no such executable can be obtained without leaving M1 scope.
 
 Recording a blocker is a legitimate node 1 result. Inventing a build pipeline, pinning a toolchain, or fixing the installer is **not** in scope — those are release-slot concerns.
 
-### Node 2 — increment selection and pre-loop baseline
+### Node 2 — increment selection
 
-Pick the exact change before touching anything, and record here:
+Owned by `milestone-local-sealed-loop-increment.md`. Pick the exact change by reading, and record in that packet the candidate file, the minimal edit, the reason it is worth making, and the focused test that covers it. Node 2 runs no CodeFire command, records no CodeFire state, and edits no product file.
 
-- the single file and the one-line-scale edit;
-- which focused test covers that file;
-- CodeFire's reported project state before the loop, captured verbatim from `status --json`.
-
-Selection rules: one file, smallest real change with a reason to exist, and not a replay of any parked root. If the project is already `open-clean`, the increment is a new small change — `open-clean` is not permission to skip the edit.
+Selection rules: one file, smallest real change with a reason to exist, and not a replay of any parked root. A prior record that the project is `open-clean` is not permission to skip the edit; the increment is a new small change either way.
 
 ### Node 3 — sealed-loop run
 
-Run the loop in order on the selected increment: `open → edit → scan → extinguish → verify → commit`, then the one focused test. Stop and report on the first command that does not behave as documented; do not work around it and do not widen validation to diagnose it.
+Created only after nodes 1 and 2 fan in, because its write set depends on their results. It captures the pre-loop `status --json` baseline verbatim using the node 1 runner, then runs the loop in order on the node 2 increment: `open → edit → scan → extinguish → verify → commit`, then the one focused test. Stop and report on the first command that does not behave as documented; do not work around it and do not widen validation to diagnose it.
 
 ## Scope
 
-Allowed files:
+Allowed files, per node:
 
-- `docs/development/known-limitations.md` (node 1)
-- `docs/development/ai/task-packets/milestone-local-sealed-loop.md` (nodes 2, 4)
+- `docs/development/ai/task-packets/milestone-local-sealed-loop-runner.md` (node 1, and nothing else)
+- `docs/development/ai/task-packets/milestone-local-sealed-loop-increment.md` (node 2, and nothing else)
 - exactly one file under `subprojects/algorithm-evolution-agent-lab/` (node 3), plus the CodeFire project state the loop itself writes
-- `docs/development/history.md` (node 4)
+- `docs/development/history.md` and this file (node 4)
 - `docs/development/milestones.md` (node 6, orchestrator only)
+
+Nodes 1 and 2 write only their own packet. Neither may touch product code or CodeFire state.
 
 Disallowed files:
 
