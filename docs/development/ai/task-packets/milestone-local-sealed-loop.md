@@ -16,9 +16,10 @@ This is the **parent packet** for the milestone. Nodes 1 and 2 have their own ch
 
 - node 1 → `milestone-local-sealed-loop-runner.md` — completed after independent correction `f963345`; cached runner admitted
 - node 2 → `milestone-local-sealed-loop-increment.md` — ran; Status `completed`, integrated at `f52d489`
-- node 3 → `milestone-local-sealed-loop-run.md` — ready; exact runner, target, preconditions, command arguments, and write set fixed
+- node 3 → `milestone-local-sealed-loop-run.md` — ran; Status `completed`, integrated at `c471b77`; sealed `CF-COMMIT-373468dbaf827a6cc2bae9a4`
+- node 4 → this file plus `docs/development/history.md` — **completed**; loop evidence recorded below. Node 5 is ready. M1 has **not** exited.
 
-Everything from `## Objective` through `## Handoff` is the original **plan** and carries no evidence — do not read those sections as observations. The exceptions are the `Progress` / `Parallel now` / `Blocked` lines and the `State` and `Outcome` cells in `## Plan`, which mirror the live board, plus `## Fan-in result`, which records what the two child packets returned and nothing more. This packet carries **no product evidence**: no CodeFire command, no dogfood edit, and no focused test has run in this milestone.
+Everything from `## Objective` through `## Handoff` is the original **plan** and carries no evidence — do not read those sections as observations. The exceptions are the `Progress` / `Parallel now` / `Blocked` lines and the `State` and `Outcome` cells in `## Plan`, which this node 4 record updates, plus `## Fan-in result`, `## Orchestrator admission after independent classification`, and `## Loop evidence record`. Node 4 does not edit `docs/development/milestones.md`; the live board remains for node 6 / the orchestrator.
 
 ## Objective
 
@@ -39,22 +40,22 @@ The live graph is on `docs/development/milestones.md` under "M1 execution graph 
 
 ```text
 Critical path: loop runner readiness → sealed-loop run of the selected increment (pre-loop baseline first) → loop evidence record → final independent audit → M1 exit and slot shift
-Progress: nodes 1 and 2 are completed; classifier f963345 corrected the node 1 search and the orchestrator admitted the cached source-matching runner; node 3 is written and ready
-Parallel now: node 3 only — one stateful loop has one writer
-Blocked: node 4 waits on 3; node 5 waits on 4; node 6 waits on 5
-Next legal action: launch milestone-local-sealed-loop-run.md
+Progress: nodes 1–4 completed; node 3 sealed CF-COMMIT-373468dbaf827a6cc2bae9a4 (packet c471b77); node 4 records that evidence here
+Parallel now: node 5 only — final independent audit (Claude Opus 5 or Grok 4.6, never Codex, not the implementing session)
+Blocked: node 6 waits on 5
+Next legal action: run the final independent audit into docs/development/ai/audit-latest.md only. Do not exit M1.
 ```
 
 | # | Node | State | Waits on | Packet | Write set | Outcome / current evidence |
 |---|---|---|---|---|---|---|
 | 1 | Loop runner readiness | **completed after independent correction** | — | `milestone-local-sealed-loop-runner.md` | that packet file only | cached source-matching runner admitted; original search miss preserved and classified at `f963345` |
 | 2 | Increment selection (reading only) | **completed** | — | `milestone-local-sealed-loop-increment.md` | that packet file only | one candidate file, one one-line edit, one focused unittest recorded; edit not applied, no command run. Integrated at `f52d489` |
-| 3 | Sealed-loop run, pre-loop `status --json` baseline first | **ready** — not started | 1, 2 | `milestone-local-sealed-loop-run.md` | exact clean file in canonical open directory plus loop-written CodeFire state | — |
-| 4 | Loop evidence record | **blocked** — not started | 3 | this file | `docs/development/history.md`, this file | — |
-| 5 | Final independent audit | **blocked** — not started | 4 | — | `docs/development/ai/audit-latest.md` only | — |
+| 3 | Sealed-loop run, pre-loop `status --json` baseline first | **completed** — integrated at `c471b77` | 1, 2 | `milestone-local-sealed-loop-run.md` | exact clean file in canonical open directory plus loop-written CodeFire state | sealed `CF-COMMIT-373468dbaf827a6cc2bae9a4`; full envelopes in the child packet Result |
+| 4 | Loop evidence record | **completed** | 3 | this file | `docs/development/history.md`, this file | `## Loop evidence record` below; M1 not exited |
+| 5 | Final independent audit | **ready** — not started | 4 | — | `docs/development/ai/audit-latest.md` only | — |
 | 6 | M1 exit and slot shift | **blocked** — not started | 5 | — | board, history, packet, current-state docs | — |
 
-Nodes 1 and 2 were independent and ran as such: node 1 settled *what executes the loop*, node 2 settled *what the loop carries*. Neither read the other's answer, and their write sets stayed disjoint — each child packet wrote only itself. That concurrency is now **evidence of how the two lanes ran**, not a standing second lane: node 2 is finished and node 1 returned a blocker, so there is no independent ready packet left to launch. Nodes 5 and 6 remain named so the closing shape stays fixed in advance; they are not this packet's implementation work.
+Nodes 1 and 2 were independent and ran as such: node 1 settled *what executes the loop*, node 2 settled *what the loop carries*. Neither read the other's answer, and their write sets stayed disjoint — each child packet wrote only itself. That concurrency remains evidence of how those two lanes ran, not a standing second writer. Nodes 3 and 4 then ran serially. Node 5 is now the only ready work. Node 6 stays blocked on 5 and is orchestrator work; this record does not exit M1.
 
 The pre-loop `status --json` baseline is **node 3 work**. It cannot run until a runnable executable exists, so placing it in node 2 would have given node 2 a hidden dependency on node 1 and destroyed the parallelism this graph claims. Node 2 selected by reading only, and node 1's blocker is exactly why that baseline still has no executable.
 
@@ -192,3 +193,156 @@ Independent classifier `f963345` classified node 1's original environment compla
 The same classification proved that the canonical CodeFire open state exists only at `/workspace/project/subprojects/algorithm-evolution-agent-lab` with its store at `/workspace/project/subprojects/.codefire`. This is why ordinary Git-worktree isolation cannot run the real loop. The narrow exception is now explicit: node 3 may write only `/workspace/project/subprojects/algorithm-evolution-agent-lab/src/evoagent/external_validity.py` (confirmed Git-clean and byte-equal to the integration copy at admission) and the CodeFire state written by the loop. Every other `/workspace/project` tracked path remains forbidden. Node 3 records before/after Git status and stops if the exact file precondition changed.
 
 The M1 command list is also made executable: extinguish applies only to actual scan-reported Fires and includes resolution/rationale; commit includes the fixed message. Zero Fires means a recorded no-op for the extinguish stage, not an invented Fire. The ready implementation packet is `milestone-local-sealed-loop-run.md`.
+
+## Loop evidence record
+
+Observed from completed node 3 packet `milestone-local-sealed-loop-run.md` at integration commit `c471b778737d40081d89021a3bc7990717ccd6e8`. Node 4 copies CodeFire's own reports; it did not re-run the loop, did not touch `/workspace/project`, and did not edit `docs/development/milestones.md`. M1 remains **open**. Final independent audit (node 5) has **not** run. This is not an M1 exit.
+
+### Admitted runner
+
+```text
+path: /workspace/.cache/cargo-target-shared/source-keys/9c92559f4f4d51f270d27bcc5fff888936bda373dcb9150435607e6d33c861c6/release/codefire-rs
+sha256: 09d9fa2561de4b687200baa4b9fe54a4159e43def1a7a3cd28dc05c2741741e4
+```
+
+Re-hashed before the first CodeFire command and again after commit. Match. No rebuild, no install. Provenance: classifier `f963345` plus orchestrator admission of the cached source-matching Rust binary.
+
+Canonical open directory: `/workspace/project/subprojects/algorithm-evolution-agent-lab`. `open` was **not** invoked: pre-loop `status --json` already reported branch `main` as `open-clean`.
+
+### Pre-loop state (CodeFire, verbatim)
+
+Command: `"$RUNNER" status --path "$DOGFOOD" --json` — exit 0
+
+```json
+{
+  "command": "status",
+  "data": {
+    "base": "CF-COMMIT-e5ca290905c2a4b5e2c05bd4",
+    "branch": "main",
+    "open_fires": 0,
+    "scan_prediction": {
+      "base_commit": "CF-COMMIT-e5ca290905c2a4b5e2c05bd4",
+      "branch_state": "open-clean",
+      "change_coverage": {
+        "digest": "2beb6d95c37df1f42add132f40f75367226b8c47aedae881ce3b22796b74aed0",
+        "entries": [],
+        "entries_omitted": 0,
+        "entries_truncated": false,
+        "profile": "file-relation-v1",
+        "span_precision": "file_only_no_span_claim",
+        "summary": {
+          "atom_files_with_unclassified_spans": 0,
+          "changed_files": 0,
+          "deleted_atom_files": 0,
+          "non_atom_files": 0,
+          "out_of_atom_files": 0,
+          "tool_migrations": 0
+        },
+        "tool_migration": null,
+        "type": "change_coverage",
+        "version": 1
+      },
+      "changed_atom_count": 0,
+      "changed_count": 0,
+      "non_atom_changed_file_count": 0,
+      "open_fire_count": 0,
+      "source": "preview_recomputed",
+      "tool_migration": null
+    },
+    "state": "open-clean"
+  },
+  "diagnostics": [],
+  "exit_code": 0,
+  "next_actions": [],
+  "ok": true,
+  "repo": "/workspace/project/subprojects",
+  "schema": "codefire.command_result.v1"
+}
+```
+
+### Exact one-line change
+
+File: `/workspace/project/subprojects/algorithm-evolution-agent-lab/src/evoagent/external_validity.py` (`CODE-ExternalValidityEvaluator`). Admission sha256 `1e42de7df500e00f4be8d071de0a775dd3a2c2d018e927539106e23bab2c9df3` (Git-clean). Post-edit sha256 `873aa601542dec4337f17d4f05779d86e26ebc36ae286dc76cc2d420fe10c2e7`.
+
+```diff
+-        improved_domains = tuple(sorted({domain_by_benchmark.get(result.plan.benchmark, "unknown") for result in improvements}))
++        improved_domains = tuple(sorted({domain_by_benchmark[result.plan.benchmark] for result in improvements if result.plan.benchmark in domain_by_benchmark}))
+```
+
+No other dogfood or product file was edited. No test was added.
+
+### Focused test
+
+From the dogfood directory: `PYTHONPATH=src python3 -m unittest tests.test_external_validity -v` — exit 0. Two tests, both `ok`: `test_external_validity_rejects_single_domain_gain`, `test_external_validity_requires_transfer_across_domains`. Ran 2 tests in 0.001s, `OK`.
+
+### Scan, extinguish, verify, commit
+
+All CodeFire envelopes `schema: codefire.command_result.v1`, stderr empty, exit 0. Full JSON is in the node 3 packet Result.
+
+- **scan** — `branch_state: "open-burning"`, `open_fire_count: 1`. The one scan-reported Fire is **`FIRE-C7EE54F7CE66`** (`fire_uid: fire_sha256_c7ee54f7ce66631db3f769dd8b953d04`, `reason: atom_changed`, `CODE-ExternalValidityEvaluator` → `REQ-SOTA-007`). `next_actions` were `context_changed`, `verify`, `context_fire`, `extinguish_fire`. None demanded a product change or a parked issue.
+- **extinguish** — `"$RUNNER" extinguish FIRE-C7EE54F7CE66 --path "$DOGFOOD" --resolution addressed --rationale "External-validity implementation corrected" --json`. Applied. Resolution `res_5b39746c46d0`. Next action: verify only.
+- **verify** — `"$RUNNER" verify --path "$DOGFOOD" --details --json`. `result: "passed"`, `decision.outcome: "passed"`, `open_required_fires: 0`, `blocking_reasons: []`. Seven `missing_required_links` warnings, non-blocking (`trace_completeness_required: false`). Next action: commit only.
+- **commit** — `"$RUNNER" commit --path "$DOGFOOD" -m "Fix unmapped benchmark transferability" --json`. `applied: true`, `blocked: false`. Sealed identity **`CF-COMMIT-373468dbaf827a6cc2bae9a4`**, parent `CF-COMMIT-e5ca290905c2a4b5e2c05bd4`, `changed_atoms: ["CODE-ExternalValidityEvaluator"]`, `extinguished_fire_count: 1`.
+
+Parked roots CFB-133 / CFB-136 / CFR-168..173 were not started. No `block-m1`.
+
+### Post-loop state (CodeFire, verbatim)
+
+Command: `"$RUNNER" status --path "$DOGFOOD" --json` — exit 0
+
+```json
+{
+  "command": "status",
+  "data": {
+    "base": "CF-COMMIT-373468dbaf827a6cc2bae9a4",
+    "branch": "main",
+    "open_fires": 0,
+    "scan_prediction": {
+      "base_commit": "CF-COMMIT-373468dbaf827a6cc2bae9a4",
+      "branch_state": "open-clean",
+      "change_coverage": {
+        "digest": "2beb6d95c37df1f42add132f40f75367226b8c47aedae881ce3b22796b74aed0",
+        "entries": [],
+        "entries_omitted": 0,
+        "entries_truncated": false,
+        "profile": "file-relation-v1",
+        "span_precision": "file_only_no_span_claim",
+        "summary": {
+          "atom_files_with_unclassified_spans": 0,
+          "changed_files": 0,
+          "deleted_atom_files": 0,
+          "non_atom_files": 0,
+          "out_of_atom_files": 0,
+          "tool_migrations": 0
+        },
+        "tool_migration": null,
+        "type": "change_coverage",
+        "version": 1
+      },
+      "changed_atom_count": 0,
+      "changed_count": 0,
+      "non_atom_changed_file_count": 0,
+      "open_fire_count": 0,
+      "source": "preview_recomputed",
+      "tool_migration": null
+    },
+    "state": "open-clean"
+  },
+  "diagnostics": [],
+  "exit_code": 0,
+  "next_actions": [],
+  "ok": true,
+  "repo": "/workspace/project/subprojects",
+  "schema": "codefire.command_result.v1"
+}
+```
+
+Post-state: `open-clean`, `open_fires: 0`, base **`CF-COMMIT-373468dbaf827a6cc2bae9a4`**.
+
+### Preservation outcome
+
+`/workspace/project` Git `HEAD` stayed `f1644122134d479333cf422fdb1d48b8fa92dd8e`. Porcelain went 245 → 246 lines (`113 M`/`132 ??` → `114 M`/`132 ??`). The only newly dirty tracked path was the exact target file. Closed CodeFire feature-branch files unchanged. `.codefire-open` sha256 `60b133b3eeefcc79e20bda32843261897713b0d6e86b2f0d0111cd19862690d6` unchanged. `repo.json` unchanged. `opened/main.json` and `branches/main.json` advanced to the sealed head. Active `fires.json` / `scan.json` / `verification.json` were removed by commit `reset_active_state`; `active/state.json` remained `open-clean`. Stale `/workspace/algorithm-evolution-agent-lab` was unused. Sequencer leftovers under `/workspace/project/.git/sequencer` were untouched.
+
+### What remains
+
+Node 5 — final independent audit — is **ready** and has not started. Write set: `docs/development/ai/audit-latest.md` only. Auditor must not be Codex and must not be the implementing session. Node 6 (M1 exit and slot shift) stays **blocked**. Parked work stays parked. This packet Status remains `in_progress`.
