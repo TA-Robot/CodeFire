@@ -1,6 +1,6 @@
 # AI Task Packet
 
-Status: blocked
+Status: completed
 
 Packet ID: MS-local-sealed-loop-runner
 
@@ -14,7 +14,7 @@ Reasoning tier: high
 
 Parent packet: `milestone-local-sealed-loop.md`. This is node 1 of that graph — one of two parallel ready slices.
 
-Node 1 has now run. Everything from `## Objective` through `## Handoff` is the original **plan** and carries no evidence — do not read those sections as observations. The only observed content in this file is `## Result`.
+Node 1 has now run and its original result was independently classified. Everything from `## Objective` through `## Handoff` is the original **plan**. Observed content is limited to `## Result` and `## Independent classification and admission`.
 
 ## Objective
 
@@ -232,3 +232,31 @@ git diff --check                                       # exit 0, no output
 ```
 
 Not widened. No CodeFire command was used as validation; every `codefire` invocation in this node was a read-only help probe.
+
+## Independent classification and admission
+
+Independent Claude Opus 5 classifier commit `f963345` did not sustain the original `block-m1` classification on its stated ground. It classified the residual environment facts as `park`: no host toolchain, the vanished July `/tmp` artifact, and the Python CLI gap remain true, but none blocks this M1 because node 1's search used `-name codefire` and skipped the existing `codefire-rs` cache.
+
+The orchestrator admits the classifier's smallest resolution, R1. Node 3 uses this existing artifact without installing or building anything:
+
+```text
+path: /workspace/.cache/cargo-target-shared/source-keys/9c92559f4f4d51f270d27bcc5fff888936bda373dcb9150435607e6d33c861c6/release/codefire-rs
+sha256: 09d9fa2561de4b687200baa4b9fe54a4159e43def1a7a3cd28dc05c2741741e4
+recorded Rust input manifest: 96737474cfec261cd9891d3d986e49f81601ef0ce4b7a25ce138526395801435 (99 files)
+fresh integration-head Rust input manifest: 96737474cfec261cd9891d3d986e49f81601ef0ce4b7a25ce138526395801435 (99 files)
+build evidence: /workspace/.cache/codefire-gate-evidence/rust-release-build-ddcfad8a1d7b4b94fa4daf94-0.json
+build decision: PASS, blockers=[]
+build command: cargo build --release --locked -p codefire-cli --bin codefire-rs
+toolchain: rustc/cargo 1.97.0
+```
+
+The artifact's recorded source tree differs from integration HEAD only in non-Rust paths: `git diff --quiet <recorded-tree> HEAD -- Cargo.toml Cargo.lock crates` exits 0, and the repository's own `build_source_manifest()` recomputation matches the recorded manifest. The binary's `status`, `scan`, and `verify` help accepts `--path`/`--json`; the classifier also produced a versioned command-result envelope in a deleted scratch repository.
+
+Node 3 must re-hash the artifact before use and stop if it differs. Cache eviction is a later operational concern, parked on M5; it does not justify a rebuild while this exact artifact exists.
+
+The classifier also found two separate M1 execution defects, resolved in the node 3 packet rather than hidden here:
+
+- the canonical open directory and CodeFire store exist only under `/workspace/project/subprojects`, not in Git worktrees;
+- bare `extinguish --path ...` and `commit --path ...` are not executable because the former needs a Fire/resolution/reason and the latter needs a message.
+
+The orchestrator admitted only the exact currently Git-clean dogfood file plus the existing CodeFire state as node 3's exceptional write set and restated the commands with their required arguments. No other classified dirty-tree path is admitted.

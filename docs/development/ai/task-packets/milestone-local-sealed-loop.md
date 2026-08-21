@@ -1,6 +1,6 @@
 # AI Task Packet
 
-Status: blocked
+Status: in_progress
 
 Packet ID: MS-local-sealed-loop
 
@@ -14,9 +14,9 @@ Reasoning tier: high
 
 This is the **parent packet** for the milestone. Nodes 1 and 2 have their own child packets, per `../../milestone-operating-model.md` and `../orchestration-protocol.md`: one packet per parallel slice.
 
-- node 1 → `milestone-local-sealed-loop-runner.md` — ran; Status `blocked` (`block-m1`), integrated at `eab877f`
+- node 1 → `milestone-local-sealed-loop-runner.md` — completed after independent correction `f963345`; cached runner admitted
 - node 2 → `milestone-local-sealed-loop-increment.md` — ran; Status `completed`, integrated at `f52d489`
-- node 3 → still not written. The fan-in happened, but node 1 produced no runner, so node 3's first mandated step and write set are undetermined
+- node 3 → `milestone-local-sealed-loop-run.md` — ready; exact runner, target, preconditions, command arguments, and write set fixed
 
 Everything from `## Objective` through `## Handoff` is the original **plan** and carries no evidence — do not read those sections as observations. The exceptions are the `Progress` / `Parallel now` / `Blocked` lines and the `State` and `Outcome` cells in `## Plan`, which mirror the live board, plus `## Fan-in result`, which records what the two child packets returned and nothing more. This packet carries **no product evidence**: no CodeFire command, no dogfood edit, and no focused test has run in this milestone.
 
@@ -39,17 +39,17 @@ The live graph is on `docs/development/milestones.md` under "M1 execution graph 
 
 ```text
 Critical path: loop runner readiness → sealed-loop run of the selected increment (pre-loop baseline first) → loop evidence record → final independent audit → M1 exit and slot shift
-Progress: nodes 1 and 2 ran concurrently and have fanned in at f52d489 — node 1 blocked with a recorded block-m1 runner blocker (eab877f), node 2 completed its reading-only increment selection (f52d489); node 3 has not started and nodes 3-6 stay blocked
-Parallel now: none — no independent ready packet remains
-Blocked: node 3 waits on 1 and 2 — node 2's input exists but node 1 supplied no runner; node 4 waits on 3; node 5 waits on 4; node 6 waits on 5
-Next legal action: independent classification of the node 1 runner blocker, then orchestrator admission of the smallest resolution
+Progress: nodes 1 and 2 are completed; classifier f963345 corrected the node 1 search and the orchestrator admitted the cached source-matching runner; node 3 is written and ready
+Parallel now: node 3 only — one stateful loop has one writer
+Blocked: node 4 waits on 3; node 5 waits on 4; node 6 waits on 5
+Next legal action: launch milestone-local-sealed-loop-run.md
 ```
 
-| # | Node | State | Waits on | Packet | Write set | Outcome at `f52d489` |
+| # | Node | State | Waits on | Packet | Write set | Outcome / current evidence |
 |---|---|---|---|---|---|---|
-| 1 | Loop runner readiness | **blocked** — ran, recorded an exact blocker | — | `milestone-local-sealed-loop-runner.md` | that packet file only | `block-m1`: no in-scope executable can express the `--path` / `--json` gate. Integrated at `eab877f` |
+| 1 | Loop runner readiness | **completed after independent correction** | — | `milestone-local-sealed-loop-runner.md` | that packet file only | cached source-matching runner admitted; original search miss preserved and classified at `f963345` |
 | 2 | Increment selection (reading only) | **completed** | — | `milestone-local-sealed-loop-increment.md` | that packet file only | one candidate file, one one-line edit, one focused unittest recorded; edit not applied, no command run. Integrated at `f52d489` |
-| 3 | Sealed-loop run, pre-loop `status --json` baseline first | **blocked** — not started | 1, 2 | not written; blocked on the node 1 resolution | one file under `subprojects/algorithm-evolution-agent-lab/`, plus the CodeFire state that loop writes | — |
+| 3 | Sealed-loop run, pre-loop `status --json` baseline first | **ready** — not started | 1, 2 | `milestone-local-sealed-loop-run.md` | exact clean file in canonical open directory plus loop-written CodeFire state | — |
 | 4 | Loop evidence record | **blocked** — not started | 3 | this file | `docs/development/history.md`, this file | — |
 | 5 | Final independent audit | **blocked** — not started | 4 | — | `docs/development/ai/audit-latest.md` only | — |
 | 6 | M1 exit and slot shift | **blocked** — not started | 5 | — | board, history, packet, current-state docs | — |
@@ -130,11 +130,13 @@ If running the loop appears to require breaking one of these, that is a `block-m
 ## Validation
 
 ```bash
-codefire status --path subprojects/algorithm-evolution-agent-lab --json
-codefire scan --path subprojects/algorithm-evolution-agent-lab
-codefire extinguish --path subprojects/algorithm-evolution-agent-lab
-codefire verify --path subprojects/algorithm-evolution-agent-lab
-codefire commit --path subprojects/algorithm-evolution-agent-lab
+RUNNER=/workspace/.cache/cargo-target-shared/source-keys/9c92559f4f4d51f270d27bcc5fff888936bda373dcb9150435607e6d33c861c6/release/codefire-rs
+DOGFOOD=/workspace/project/subprojects/algorithm-evolution-agent-lab
+"$RUNNER" status --path "$DOGFOOD" --json
+"$RUNNER" scan --path "$DOGFOOD" --json
+"$RUNNER" extinguish <each-scan-reported-fire-id> --path "$DOGFOOD" --resolution addressed --rationale "External-validity implementation corrected" --json
+"$RUNNER" verify --path "$DOGFOOD" --details --json
+"$RUNNER" commit --path "$DOGFOOD" -m "Fix unmapped benchmark transferability" --json
 python3 docs/development/tools/check_project_docs.py
 ```
 
@@ -171,7 +173,7 @@ Observed at integration head `f52d489`. Nodes 1 and 2 ran in parallel and have b
 - Node 3 has not started. No product file, no dogfood file, and no CodeFire-managed state changed in this milestone.
 - No product validation has run. The only commands recorded across both lanes are the two child packets' docs checks (`check_project_docs.py`, `git diff --check`) plus node 1's read-only help probes. Those say nothing about product behavior.
 - There is no runner, no loop evidence, no sealed commit, and no independent audit for this milestone.
-- **A recorded candidate is not a cleared blocker.** Node 2's completion does not resolve node 1: knowing which line to change does not supply an executable that can run `status --json`, `scan`, `extinguish`, `verify`, or `commit`. The milestone is blocked on node 1 alone.
+- **A recorded candidate did not clear the original blocker by itself.** The later independent classification and orchestrator admission cleared it by supplying the missed cached executable; neither event is product-loop evidence.
 - The exact M1 exit on the board is unchanged by this fan-in, and so is the parked-work list. Nothing here admits CFB-133, CFB-136, or CFR-168..173, and node 1's blocker is not evidence for admitting any of them.
 
 ### Next legal action
@@ -182,3 +184,11 @@ Observed at integration head `f52d489`. Nodes 1 and 2 ran in parallel and have b
 This packet does **not** choose the resolution. Provisioning a Rust toolchain or a build, amending the M1 exit gate so its evidence no longer requires `--json`, and adding `--path` / `--json` to the Python implementation are all out of this packet's write set: the first two change milestone scope, the third is product code and belongs to the M2 `MS-agent-local-contract` surface. Node 3 stays unwritten and unstarted until admission.
 
 **Stall risk:** no independent M1 packet remains, so there is no legal parallel lane right now. Idle capacity must not be filled by inventing work, by pre-writing the node 3 packet, or by starting a parked root. Waiting on admission is the correct state, not a stall to be worked around.
+
+## Orchestrator admission after independent classification
+
+Independent classifier `f963345` classified node 1's original environment complaint as `park`, not `block-m1`, because a source-matching and provenance-recorded cached `codefire-rs` exists. The orchestrator selected R1: use it by absolute path, verify SHA-256 immediately before use, and perform no build, install, network, container, or product-code change.
+
+The same classification proved that the canonical CodeFire open state exists only at `/workspace/project/subprojects/algorithm-evolution-agent-lab` with its store at `/workspace/project/subprojects/.codefire`. This is why ordinary Git-worktree isolation cannot run the real loop. The narrow exception is now explicit: node 3 may write only `/workspace/project/subprojects/algorithm-evolution-agent-lab/src/evoagent/external_validity.py` (confirmed Git-clean and byte-equal to the integration copy at admission) and the CodeFire state written by the loop. Every other `/workspace/project` tracked path remains forbidden. Node 3 records before/after Git status and stops if the exact file precondition changed.
+
+The M1 command list is also made executable: extinguish applies only to actual scan-reported Fires and includes resolution/rationale; commit includes the fixed message. Zero Fires means a recorded no-op for the extinguish stage, not an invented Fire. The ready implementation packet is `milestone-local-sealed-loop-run.md`.
