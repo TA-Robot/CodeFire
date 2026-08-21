@@ -14,7 +14,7 @@ Reasoning tier: high
 
 Act as a fresh external worker and determine the first point where the public local CodeFire contract is insufficient to repeat the prior sealed-loop path without product-source knowledge or private command correction.
 
-This is node 1 of active M1 `MS-agent-local-contract`. It is read-only and runs in parallel with the CFR-169 seam classification.
+This was node 1 of completed milestone `MS-agent-local-contract`. It ran read-only in parallel with the CFR-169 seam classification.
 
 ## Allowed inputs
 

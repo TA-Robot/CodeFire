@@ -8,107 +8,101 @@ Last audited: 2026-08-21
 
 Update trigger: M1 exit, M1 blocker admission, or slot shift.
 
-M1 state after replay evidence commit `9ee9485`: **final independent audit ready**. The source-blind Claude session consumed structured argv/actions, resolved two real Fires, and sealed `CF-COMMIT-2792b54ad730e6d644668c38` with post-state `open-clean` / Fire 0. No `block-m1` recurred. M1 has not exited.
+M1 state after the 2026-08-21 slot shift: **two read-only planning packets ready**. `MS-agent-local-contract` exited after the independent Grok audit of exact HEAD `b9ea932`; its product evidence is sealed `CF-COMMIT-2792b54ad730e6d644668c38`. The active milestone is now `MS-remote-happy-path`. No remote command or product fix has run in this new M1.
 
 This is the only live five-ahead execution board. Historical burn-down narrative stays in `current-cycle-burn-down-plan.md` and `history.md`. Those files are not permission to work.
-
-The previous milestone `MS-2026-08-control-restore` exited on 2026-08-21 and the board shifted one slot. Its exit evidence is in `history.md`; its execution record is in `ai/task-packets/milestone-control-restore.md`. Neither is evidence about the current M1.
 
 ## Active slots
 
 | Slot | ID | Name | Exit (must all be true) | In-scope now |
 |---|---|---|---|---|
-| M1 | `MS-agent-local-contract` | Agent-consumable local contract | A fresh Claude or Grok worker can take one bounded local change from status through sealed commit using public help, JSON envelopes, and `next_actions`, without reading CodeFire product source or receiving private command corrections | **Yes** |
-| M2 | `MS-remote-happy-path` | Remote happy path of sealed history | `upload` → `request-merge` → `request-apply` of an already sealed commit works on the documented happy path; bounded HTTP/graph work is in scope only if it blocks that path | No |
-| M3 | `MS-adoption-wedge` | First adoption wedge | A second repository can inspect or import without becoming a Git bridge or an agent platform; remaining product experiments record adopt / narrow / stop | No |
-| M4 | `MS-release-operational-trust` | Release and operational trust | A recorded rights/license decision for published artifacts and one independently verified release-and-rollback rehearsal; no public beta label while source gates or release identity are unresolved | No |
-| M5 | `MS-product-value-proof` | First product-value proof | One candidate user segment completes a claims-comprehension and first-seal study with measured setup/friction and an explicit adopt / narrow / stop decision; broad market discovery and a four-week pilot remain in the roadmap | No |
+| M1 | `MS-remote-happy-path` | Remote happy path of sealed history | One already sealed commit completes documented `upload -> request-merge -> request-apply` against an isolated file-backed remote; CodeFire reports the applied remote head and a read-only replay confirms it; only the smallest reproduced CFR-168/CFB-136 blocker may be fixed | **Yes** |
+| M2 | `MS-adoption-wedge` | First adoption wedge | A second repository can inspect or import without becoming a Git bridge or an agent platform; remaining product experiments record adopt / narrow / stop | No |
+| M3 | `MS-release-operational-trust` | Release and operational trust | A recorded rights/license decision for published artifacts and one independently verified release-and-rollback rehearsal; no public beta label while source gates or release identity are unresolved | No |
+| M4 | `MS-product-value-proof` | First product-value proof | One candidate user segment completes a claims-comprehension and first-seal study with measured setup/friction and an explicit adopt / narrow / stop decision | No |
+| M5 | `MS-ecosystem-conformance-seed` | Ecosystem interoperability seed | One maturity-labelled public profile plus extension rules is consumed by one independently authored adapter/client that passes its bounded conformance corpus; formal standardization and multi-organization targets remain in the roadmap | No |
 
-M4 and M5 are bounded slices of roadmap Stages 4 and 5, not copies of those stages. `strategy/modernization-roadmap.md` remains a stage/gate roadmap and must not be turned into a second task board.
+M3–M5 are bounded slices of roadmap Stages 4–6, not copies of those stages. `strategy/modernization-roadmap.md` remains a stage/gate roadmap and must not become a second task board.
 
-## M1 card — Agent-consumable local contract
+## M1 card — Remote happy path of sealed history
 
-Objective: remove private source knowledge and orchestrator command correction from the local sealed-loop path.
+Objective: prove that CodeFire can move one already sealed history item through its documented file-backed collaboration path without admitting the full remote/scale backlog.
 
 Exact M1 exit (nothing else counts):
 
-- a fresh Claude or Grok worker receives only the public local command contract plus a bounded change packet and reaches a sealed commit;
-- every transition is chosen from command help, a versioned JSON envelope, or machine-readable `next_actions` with complete required arguments;
-- the worker does not read `crates/**` or the Python implementation to discover command syntax or state semantics;
-- an independent other-family audit reproduces the contract path and finds no unsafe or cyclic action.
+- an isolated fixture and exact public commands are selected before any remote mutation;
+- one existing sealed local head completes `upload -> request-merge -> request-apply` on the file-backed happy path;
+- CodeFire's JSON envelopes identify the remote source/target/MR/applied head, and a separate read-only query confirms the terminal head/state;
+- an independent other-family audit verifies object closure, no partial remote mutation, preservation of canonical dogfood state, and no hidden retry/action loop.
 
-Issue inputs admitted to M1:
+Issue inputs:
 
-- CFR-170: **admitted only for the reproduced local-loop action slice** — parameterized-vs-ready execution metadata, shell-free argv/template projection, and the lost single-extinguish path binding;
-- CFB-133: **not admitted** — the clean-room probe did not reproduce the stale migrate action on this path;
-- CFR-169: **parked** — node 2 found that existing owners contain the fix; architecture cleanup would lengthen the critical path.
+- CFR-168: primary remote/graph/object decision-work root, admitted only if the bounded happy path actually hits it;
+- CFB-136: admit only if command-scoped validation reuse is required by the exact path and the existing subject/final-revalidation contract fails a focused probe.
 
-M1 validation is packet-scoped. The clean-room probe and every admitted fix packet must name the exact public commands and focused tests it uses. The standing management checks are:
+The classification packets may inspect existing source, tests, public docs, and historical evidence read-only. They may not run upload/request mutations, implement, or start a scale campaign.
+
+M1 validation is packet-scoped. Every admitted run/fix packet must name its exact public commands and focused tests. Standing management checks:
 
 ```bash
 python3 docs/development/tools/check_project_docs.py
 python3 docs/development/tools/check_ai_acceleration_docs.py
 ```
 
-Workspace-wide Rust tests, full installer, full Algorithm suite, Retrospect, remote mutation, and review-portfolio discovery are out of M1 unless a later admitted fix packet proves one is the narrowest deterministic gate for its touched surface.
-
 M1 non-goals:
 
-- CFR-168/CFB-136 graph, HTTP, cache, or remote-scale work (M2);
-- CFR-171..173 adoption/claim/product experiments (M3);
-- release or product-economics work (M4/M5);
-- adding agent orchestration to the CodeFire product;
-- using the large classified `/workspace/project` tree as a general write set;
-- implementing a hypothetical gap before the clean-room probe reproduces it.
+- HTTP transport, large graph/scale completion, all-command budget coverage, full installer, or Retrospect unless the exact file-backed path proves one is its smallest blocker;
+- CFR-171..173 adoption/product work (M2);
+- release, product-economics, or ecosystem work (M3–M5);
+- reopening CFB-133, CFR-169, or CFR-170 residual work;
+- mutating the canonical Algorithm project or treating `/workspace/project` as a general write set;
+- serializing the two independent classification lanes.
 
 ## M1 execution graph (current)
 
-This is the initial live plan for `MS-agent-local-contract`. It is a concrete graph, not a template.
-
 ```text
-Critical path: independent other-family audit → M1 exit and slot shift
-Progress: nodes 1–5 completed; node 5 sealed CF-COMMIT-2792b54ad730e6d644668c38 through public execution metadata with no private command correction
-Parallel now: node 6 only — fresh Grok 4.6 audit session, not the node-4 implementing session
-Blocked: node 7 exit waits on node 6
-Next legal action: audit exact integration HEAD into `ai/audit-latest.md` only; do not exit M1 inside the audit
+Critical path: public remote-fixture/happy-path probe -> smallest blocker admission -> isolated remote run/fix -> read-only confirmation -> independent audit -> M1 exit
+Parallel now: node 1 public fixture/command probe; node 2 CFR-168/CFB-136 implementation-residual classification. Both are read-only with disjoint packet writes
+Blocked: node 3 fan-in waits on 1 and 2; every mutation/fix/audit node waits on node 3
+Next legal action: launch both ready packets; do not run upload/request commands or implement before fan-in
 ```
 
-The prior sealed-loop transcript is the probe fixture, not evidence that the contract passes. Nodes 1 and 2 ran in parallel from exact base `4185a55` with disjoint packet writes. Node 3 admits only what their evidence requires.
+Nothing on this new M1 graph has run. The prior local sealed commit is an input candidate, not remote-path evidence.
 
 ### Nodes
 
 | # | Node | State | Owner | Waits on | Packet | Write set | Evidence |
 |---|---|---|---|---|---|---|---|
-| 1 | Clean-room public-contract probe — replay the prior M1 transcript from public help/JSON/next-actions only and identify the first missing, unsafe, or cyclic action | **completed** | Claude Opus 5 | — | `ai/task-packets/milestone-agent-local-contract-probe.md` | that packet only | `e80f84a` (integrated as `adf343f`); CFR-170 `block-m1`; missing resolution input contract and lost extinguish→verify path; CFB-133 not reproduced |
-| 2 | CFR-169 ownership-seam classification — decide whether any smallest contract fix actually requires the parked architecture seam | **completed** | Grok 4.6 | — | `ai/task-packets/milestone-agent-local-contract-seam.md` | that packet only | `bcafb9e`; CFR-169 `park`; existing automation/migration/help owners are sufficient |
-| 3 | Orchestrator admission and focused fix graph | **completed** | Orchestrator | 1, 2 | this fan-in commit | board, history, CFR-170 milestone label, new fix packet | only the reproduced CFR-170 local-loop slice admitted; CFB-133 not admitted; CFR-169 parked |
-| 4 | Focused contract fix and tests | **completed** | persistent Grok 4.6 node-2 session | 3 | `ai/task-packets/milestone-agent-local-contract-fix.md` | packet-fixed product/test/schema/public-doc files | `4d0f755`; 24 automation + 1 extinguish + 1 help tests passed; Rust manifest `95ee643b…` |
-| 5 | Fresh clean-room sealed-loop replay | **completed** | persistent Claude Opus 5 source-blind session, not the fix session | 4 + source-matching runner | `ai/task-packets/milestone-agent-local-contract-replay.md` | two exact clean dogfood files, CodeFire state, that packet | `9ee9485`; test 3 pass; Fires `FIRE-26974231BF82` / `FIRE-F530E483B5AF`; sealed `CF-COMMIT-2792b54ad730e6d644668c38`; post `open-clean`, Fire 0; no block-m1 |
-| 6 | Final independent audit | **ready** | fresh Grok 4.6 audit session, not node 4 | 5 | `ai/audit-latest.md` | audit file only | audit exact integration HEAD; rederive runner, action, sealed-state, and preservation evidence |
-| 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | written after audit | board, history, packet, current-state docs | — |
+| 1 | Public remote fixture/command probe — derive the smallest isolated file-backed `upload -> request-merge -> request-apply` fixture and stop at the first missing contract | **ready** | Claude Opus 5 or Grok 4.6 | — | `ai/task-packets/milestone-remote-happy-path-probe.md` | that packet only | — |
+| 2 | CFR-168/CFB-136 residual classification — map current implemented state and decide which, if any, smallest slice lies on the exact happy path | **ready** | the other provider family | — | `ai/task-packets/milestone-remote-happy-path-budget.md` | that packet only | — |
+| 3 | Orchestrator fan-in, fixture admission, and run/fix graph | **blocked** | Orchestrator | 1, 2 | written after fan-in | board and new packets only | — |
+| 4 | Isolated remote happy-path run or smallest focused fix | **blocked** | Individual agent | 3 | — | fixed after admission | — |
+| 5 | Read-only terminal confirmation and evidence record | **blocked** | Individual agent, persistent if serially dependent | 4 | — | packet/evidence only | — |
+| 6 | Final independent audit | **blocked** | Other-family audit agent | 5 | `ai/audit-latest.md` | audit file only | — |
+| 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
 
-Node 4 stayed with the Grok session that already mapped the relevant owners; Claude's source-blind session independently completed node 5. Node 6 deliberately requires a new Grok session: continuity is valuable across dependent implementation work, but reusing the implementing session would invalidate the final audit.
+Nodes 1 and 2 are parallel because fixture/public-contract selection does not depend on source ownership classification. After fan-in, keep serially dependent work with the agent that already owns the relevant context unless audit independence requires a fresh session.
 
 ## Open issue placement
 
-These remain `investigating`; the slot shift does not mark any issue fixed.
+All remain `investigating`; slot movement is not a status transition.
 
 | Issue | Slot / role | Admission rule |
 |---|---|---|
-| CFB-133 | M1 input, not admitted | Probe did not reproduce migrate drift; keep open but do not implement |
-| CFR-169 | M1 input, parked | Existing owners contain the fix; no architecture extraction in M1 |
-| CFR-170 | M1 admitted slice | Only the reproduced local-loop action execution/path contract; the all-command matrix remains later issue work |
-| CFR-168 | M2 parked | Graph/object/HTTP work budget belongs to the remote happy path |
-| CFB-136 | M2 parked | Validation-cache reuse is the admitted CFR-168 blocker |
-| CFR-171 | M3 parked | Machine-readable claim/proof descriptor for external consumers |
-| CFR-172 | M3 parked | Read-only adoption experiment |
-| CFR-173 | M3 parked | Product falsification / stop-rule experiment |
+| CFR-168 | M1 input | Admit only the smallest reproduced blocker of the exact file-backed happy path |
+| CFB-136 | M1 input | Admit only if validation-session/cache subject behavior blocks that path |
+| CFR-171 | M2 parked | Machine-readable claim/proof descriptor for external consumers |
+| CFR-172 | M2 parked | Read-only adoption experiment |
+| CFR-173 | M2 parked | Product falsification / stop-rule experiment |
+| CFB-133 | backlog parked | Migrate slice not reproduced by the completed local-contract M1 |
+| CFR-169 | backlog parked | Architecture seam classified off the critical path |
+| CFR-170 | backlog parked | Local-loop slice completed; all-command residual is not remote M1 permission |
 
-`BATCH-2026-07-review-portfolio-completion` is **frozen as history**. Only the three M1 inputs above may be classified now; M2–M3 roots stay parked.
+`BATCH-2026-07-review-portfolio-completion` is frozen as history. Backlog-parked residuals do not enter an active slot without a later evidence-triggered board update.
 
 ## M2 preview (queued)
 
-When M1 exits, M2 `MS-remote-happy-path` may admit CFR-168 and CFB-136 only to the extent required for one sealed `upload → request-merge → request-apply` happy path. It must not start early.
+When M1 exits, M2 `MS-adoption-wedge` may classify CFR-171..173 and select at most one bounded read-only adoption experiment. It must not start early.
 
 ## Shift rule
 

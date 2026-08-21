@@ -14,7 +14,7 @@ Reasoning tier: high
 
 Implement only the CFR-170 local-action contract slice reproduced by the clean-room probe, so a fresh worker can traverse `scan -> extinguish -> verify -> commit` from public machine-readable output plus caller-supplied resolution/rationale/message values, without source reading, shell parsing, or a private path correction.
 
-This is node 4 of active M1 `MS-agent-local-contract`. Node 3 admitted this packet after node 1 classified CFR-170 `block-m1` and node 2 classified CFR-169 `park`.
+This was node 4 of completed milestone `MS-agent-local-contract`. Node 3 admitted this packet after node 1 classified CFR-170 `block-m1` and node 2 classified CFR-169 `park`.
 
 ## Reproduced blockers
 

@@ -6,7 +6,7 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 Last audited: 2026-08-21.
 
-- Execution is milestone-based. The live board is `docs/development/milestones.md`. `MS-agent-local-contract` has implemented and clean-room replayed its bounded CFR-170 slice, sealing `CF-COMMIT-2792b54ad730e6d644668c38`; final independent audit is the only ready work. CFB-133 was not reproduced and CFR-169 remains parked.
+- Execution is milestone-based. The live board is `docs/development/milestones.md`. `MS-agent-local-contract` exited after sealing `CF-COMMIT-2792b54ad730e6d644668c38` and independent audit; M1 is now `MS-remote-happy-path`, beginning with two read-only classification packets.
 - Codex orchestrates. Individual and 30-minute audit agents are Claude Opus 5 or Grok 4.6. Codex does not implement or audit.
 - Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
 - CFB detail ledger: 137 total; 135 `fixed`, 2 `investigating`. Open/investigating count: 2.
@@ -16,7 +16,7 @@ Last audited: 2026-08-21.
 - CFB-120..132 and the complete Stage 1 Dogfood-blocker lifecycle are closed. Canonical Algorithm is now sealed at `CF-COMMIT-373468dbaf827a6cc2bae9a4`, `open-clean`, and zero Fires after the local-loop milestone; the stale separate repository was not mutated.
 - RVC-011 / CFR-161 is closed through Install, installed counterexample replay, both real-repository read-only probes, canonical trace-warning verification, and Retrospect. ADR-013 now owns the typed committable decision and non-relaxable safety floor.
 - RVC-039 / CFR-162 is closed through the full lifecycle. ADR-014 makes unresolved text, binary, and semantic merge facts authoritative blockers and makes `merge --continue` the explicit validated resolution boundary.
-- `BATCH-2026-07-review-portfolio-completion` is historical. CFB-133, CFB-136, and CFR-168..173 remain open in the ledgers. The live board admits only CFR-170's reproduced local-action slice in M1, retains CFB-133 as not admitted and CFR-169 as parked M1 inputs, parks CFB-136/CFR-168 on M2, and parks CFR-171..173 on M3.
+- `BATCH-2026-07-review-portfolio-completion` is historical. CFB-133, CFB-136, and CFR-168..173 remain open in the ledgers. CFR-168/CFB-136 are M1 classification inputs, CFR-171..173 are parked on M2, and residual CFB-133/CFR-169/CFR-170 are backlog-parked outside the active critical path.
 - The base environment still does not expose `cargo` on `PATH`; a durable pinned toolchain/CI identity remains release work.
 
 If any line above changes, update this snapshot and append the reason to `docs/development/history.md`.
@@ -53,12 +53,12 @@ Before starting implementation:
 
 ## Current Cleanup Priorities
 
-The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md`: `MS-agent-local-contract`. Classification, bounded fix, runner admission, and clean-room replay are complete; the only ready work is the final independent audit. Queued, not started:
+The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md`: `MS-remote-happy-path`. Its public-fixture probe and CFR-168/CFB-136 residual classification are the two ready read-only packets. Queued, not started:
 
-1. M2: remote happy path (CFR-168, CFB-136).
-2. M3: adoption wedge (CFR-171, CFR-172, CFR-173).
-3. M4: release and operational trust (bounded roadmap Stage 4 slice).
-4. M5: first product-value proof (bounded roadmap Stage 5 slice).
+1. M2: adoption wedge (CFR-171, CFR-172, CFR-173).
+2. M3: release and operational trust (bounded roadmap Stage 4 slice).
+3. M4: first product-value proof (bounded roadmap Stage 5 slice).
+4. M5: ecosystem conformance seed (bounded roadmap Stage 6 slice).
 
 ## Validation Matrix
 

@@ -14,7 +14,7 @@ Reasoning tier: high
 
 Classify whether the smallest plausible M1 local-contract fix actually requires a CFR-169 module/test ownership seam, or whether CFR-169 must remain parked while CFR-170/CFB-133 are handled in existing owners.
 
-This is node 2 of active M1 `MS-agent-local-contract`. It is read-only and runs in parallel with the clean-room public-contract probe.
+This was node 2 of completed milestone `MS-agent-local-contract`. It ran read-only in parallel with the clean-room public-contract probe.
 
 ## Inputs and questions
 

@@ -46,7 +46,7 @@ Priority experiments:
 6. root/path/symlink and server-verification trust-boundary red team;
 7. stale lock, pending transaction, corrupt object, and user-work recovery table.
 
-The CFB-120..132 correctness batch and the CFR-161..167 safety/contract roots completed source gates, isolated Install, Algorithm Dogfood, and Retrospect by 2026-07-19; same-root CFB-134/135 and CFR-174/175 are also closed. Live execution moved on 2026-08-21 to the five-ahead board `../milestones.md` (STR-015). Control restore and the local sealed loop exited that day. The active M1 is now the agent-consumable local contract; M2 is remote happy path, M3 adoption wedge, M4 a bounded Stage 4 release slice, and M5 a bounded Stage 5 product-value slice. Open issue status stays in the ledgers; the board alone controls which slice may run. This roadmap remains a stage/gate document, not a second task board.
+The CFB-120..132 correctness batch and the CFR-161..167 safety/contract roots completed source gates, isolated Install, Algorithm Dogfood, and Retrospect by 2026-07-19; same-root CFB-134/135 and CFR-174/175 are also closed. Live execution moved on 2026-08-21 to the five-ahead board `../milestones.md` (STR-015). Control restore, the local sealed loop, and the agent-consumable local contract exited that day. The active M1 is now remote happy path; M2 is adoption wedge, M3 a bounded Stage 4 release slice, M4 a bounded Stage 5 product-value slice, and M5 a bounded Stage 6 ecosystem-conformance seed. Open issue status stays in the ledgers; the board alone controls which slice may run. This roadmap remains a stage/gate document, not a second task board.
 
 Exit gate:
 
@@ -113,7 +113,7 @@ Exit gate:
 - a backup operator can publish, verify, roll back, and respond using documentation only;
 - no public beta label while cargo/source gates or release identity remain unresolved.
 
-Board slot M4 `MS-release-operational-trust` draws a **bounded** slice of this stage: the rights/license decision and one rehearsed, independently verified release-and-rollback path. The remaining deliverables above stay here as stage work and are not admitted by that slot.
+Board slot M3 `MS-release-operational-trust` draws a **bounded** slice of this stage: the rights/license decision and one rehearsed, independently verified release-and-rollback path. The remaining deliverables above stay here as stage work and are not admitted by that slot.
 
 ## Stage 5 — Product and Economics Proof
 
@@ -133,7 +133,7 @@ Exit gate:
 - at least one segment has repeatable value and an adoption owner;
 - the next product scope follows measured friction, not internal feature enthusiasm.
 
-Board slot M5 `MS-product-value-proof` draws a **bounded** slice of this stage: one candidate segment, one claims-comprehension/first-seal study, measured setup and friction, and an adopt / narrow / stop decision. Broad interviews, a three-repository pilot, and a four-week team pilot stay here until earlier slots permit them.
+Board slot M4 `MS-product-value-proof` draws a **bounded** slice of this stage: one candidate segment, one claims-comprehension/first-seal study, measured setup and friction, and an adopt / narrow / stop decision. Broad interviews, a three-repository pilot, and a four-week team pilot stay here until earlier slots permit them.
 
 ## Stage 6 — Ecosystem and De-facto Standardization
 
@@ -155,6 +155,8 @@ Exit gate:
 - funded maintainer capacity exists.
 
 Until then, keep a de-facto open specification and do not enter a standards body for signaling alone.
+
+Board slot M5 `MS-ecosystem-conformance-seed` draws a bounded slice of this stage: one maturity-labelled public profile, its extension rules, and one independently authored adapter/client passing a bounded conformance corpus. Multiple organizations, formal governance/IPR/trademark work, two release cycles, and standards-body activity remain roadmap work.
 
 ## Ordering Rules
 

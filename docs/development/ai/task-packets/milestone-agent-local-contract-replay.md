@@ -14,7 +14,7 @@ Reasoning tier: high
 
 As the same source-blind Claude session that found the contract blocker, prove the corrected public contract by taking one new bounded Algorithm change through `status -> edit -> focused test -> scan -> extinguish -> verify -> commit -> status` without reading CodeFire product source or receiving a private command correction.
 
-This is node 5 of active M1 `MS-agent-local-contract`. The implementation session must not perform this replay.
+This was node 5 of completed milestone `MS-agent-local-contract`. The implementation session did not perform this replay.
 
 ## Admitted runner
 
