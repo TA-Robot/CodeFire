@@ -87,7 +87,7 @@ An individual agent:
 ```bash
 dev-agent workspace init /workspace/project
 dev-agent --role manager --tier ultra --allow-codex --agent orchestrator-m1 \
-  "Drive only MS-2026-08-control-restore. Do not implement product code. Launch Claude/Grok workers. Call the auditor every 30 minutes."
+  "Drive only MS-local-sealed-loop. Keep the write set to the M1 card. Launch Claude/Grok workers on both ready packets. Call the auditor every 30 minutes."
 ```
 
 ### Individual agent — Claude (isolated worktree)

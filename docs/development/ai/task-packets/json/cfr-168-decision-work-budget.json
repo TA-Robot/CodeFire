@@ -1,7 +1,7 @@
 {
   "schema": "codefire.ai_task_packet.v1",
   "packet_id": "cfr-168-decision-work-budget",
-  "status": "in_progress",
+  "status": "cancelled",
   "objective": "Implement CFR-168 as one decision-equivalent resource contract: deterministic Trace work counters, iterative bounded ancestry/signature/object traversal, command-scoped validated memoization, and pre-publication HTTP response budgets without changing semantic results or corruption diagnostics.",
   "base_revision": "f1644122134d479333cf422fdb1d48b8fa92dd8e",
   "role": "manager",
@@ -40,7 +40,8 @@
     ],
     "evidence_refs": [
       "CFR-168 characterization: changed_atoms times links scan, recursive signature history, full ancestor map, full object/HTTP materialization",
-      "CFR-167 Retrospect completed; CFR-168 is the next frozen root"
+      "CFR-167 Retrospect completed; CFR-168 is the next frozen root",
+      "Cancelled 2026-08-21: this packet is an unbounded whole-root plan and is superseded by milestone admission on docs/development/milestones.md. Its scope is unchanged and nothing in it was implemented or withdrawn. CFR-168 itself remains investigating and parked on M3; any future work on it is admitted as the smallest slice that slot names, not by reactivating this packet."
     ]
   },
   "scope": {

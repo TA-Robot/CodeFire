@@ -231,7 +231,7 @@ Current named cycle:
 - Active strategic line: repository/development control, then invariant-backed correctness and recovery.
 - Current roadmap: `docs/development/strategy/modernization-roadmap.md`。
 - Release/format identity: `docs/development/strategy/release-and-format-roadmap.md`; old v0.6–v1.0 labels are internal milestones/plans, not current public release claims.
-- Current phase: milestone board `docs/development/milestones.md`. M1 is `MS-2026-08-control-restore`. `BATCH-2026-07-review-portfolio-completion` is historical; CFB-133, CFR-168 blocker CFB-136, and CFR-168..173 remain open in ledgers and are parked on M3–M5.
+- Current phase: milestone board `docs/development/milestones.md`. `MS-2026-08-control-restore` exited 2026-08-21; M1 is now `MS-local-sealed-loop` — one small real change through `open → edit → scan → extinguish → verify → commit`, with nothing on its graph run yet. `BATCH-2026-07-review-portfolio-completion` is historical; CFB-133, CFR-168 blocker CFB-136, and CFR-168..173 remain open in ledgers and are parked on M2–M4 after the slot shift.
 - Final isolated Rust binary: `/tmp/codefire-cfr167-final.KWa8TC/bin/codefire`, version output `codefire foundation 1`, source/installed SHA-256 `1483874b4c1de4a78478595d5d158cf34a12e5ec3b05255dfc8819f511f00272`。
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
 - Algorithm CodeFire state: canonical is `open-clean` at strict bridge `CF-COMMIT-e5ca290905c2a4b5e2c05bd4`, Fire 0 and no tool migration. The configured legacy workspace passes the installed read-only surface and its control hashes remain unchanged.

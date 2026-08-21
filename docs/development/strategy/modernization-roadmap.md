@@ -46,7 +46,7 @@ Priority experiments:
 6. root/path/symlink and server-verification trust-boundary red team;
 7. stale lock, pending transaction, corrupt object, and user-work recovery table.
 
-The CFB-120..132 correctness batch and the CFR-161..167 safety/contract roots completed source gates, isolated Install, Algorithm Dogfood, and Retrospect by 2026-07-19; same-root CFB-134/135 and CFR-174/175 are also closed. Live execution moved on 2026-08-21 to the five-ahead board `../milestones.md` (STR-015). Remaining CFB-133, CFB-136, and CFR-168..173 stay in the ledgers and are parked on M3–M5 rather than gating all further work. M1 is restoring milestone control; M2 is the local sealed loop; later slots consume the parked roots only when that slot names them.
+The CFB-120..132 correctness batch and the CFR-161..167 safety/contract roots completed source gates, isolated Install, Algorithm Dogfood, and Retrospect by 2026-07-19; same-root CFB-134/135 and CFR-174/175 are also closed. Live execution moved on 2026-08-21 to the five-ahead board `../milestones.md` (STR-015). The control-restore milestone exited the same day and the board shifted one slot: M1 is now the local sealed loop, M2 the agent-consumable local contract, M3 the remote happy path, M4 the adoption wedge, and M5 a bounded slice of Stage 4 below. Remaining CFB-133, CFB-136, and CFR-168..173 stay in the ledgers and are parked on M2–M4 rather than gating all further work; later slots consume those roots only when that slot names them. The board is the task board — this roadmap stays a stage/gate document.
 
 Exit gate:
 
@@ -112,6 +112,8 @@ Exit gate:
 - every public artifact has known rights and source identity;
 - a backup operator can publish, verify, roll back, and respond using documentation only;
 - no public beta label while cargo/source gates or release identity remain unresolved.
+
+Board slot M5 `MS-release-operational-trust` draws a **bounded** slice of this stage: the rights/license decision and one rehearsed, independently verified release-and-rollback path. The remaining deliverables above stay here as stage work and are not admitted by that slot.
 
 ## Stage 5 — Product and Economics Proof
 

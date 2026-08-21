@@ -6,7 +6,7 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 Last audited: 2026-08-21.
 
-- Execution is milestone-based. The live board is `docs/development/milestones.md`. M1 is `MS-2026-08-control-restore`. Remaining review-portfolio issues are parked on M2–M5 and are not active work.
+- Execution is milestone-based. The live board is `docs/development/milestones.md`. `MS-2026-08-control-restore` exited on 2026-08-21; M1 is now `MS-local-sealed-loop`. Remaining review-portfolio issues are parked on M2–M4 and are not active work.
 - Codex orchestrates. Individual and 30-minute audit agents are Claude Opus 5 or Grok 4.6. Codex does not implement or audit.
 - Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
 - CFB detail ledger: 137 total; 135 `fixed`, 2 `investigating`. Open/investigating count: 2.
@@ -16,7 +16,7 @@ Last audited: 2026-08-21.
 - CFB-120..132 and the complete Stage 1 Dogfood-blocker lifecycle are closed. Canonical Algorithm is now sealed at `CF-COMMIT-e5ca290905c2a4b5e2c05bd4` with Atom hash schema 4, `sealed-snapshot-v1`, `open-clean`, and zero Fires; the configured legacy repository was not mutated.
 - RVC-011 / CFR-161 is closed through Install, installed counterexample replay, both real-repository read-only probes, canonical trace-warning verification, and Retrospect. ADR-013 now owns the typed committable decision and non-relaxable safety floor.
 - RVC-039 / CFR-162 is closed through the full lifecycle. ADR-014 makes unresolved text, binary, and semantic merge facts authoritative blockers and makes `merge --continue` the explicit validated resolution boundary.
-- `BATCH-2026-07-review-portfolio-completion` is historical. CFB-133, CFB-136, and CFR-168..173 remain open in the ledgers but are parked on M3–M5. They are not M1 work.
+- `BATCH-2026-07-review-portfolio-completion` is historical. CFB-133, CFB-136, and CFR-168..173 remain open in the ledgers but are parked on M2–M4 after the 2026-08-21 slot shift. They are not M1 work.
 - The base environment still does not expose `cargo` on `PATH`; a durable pinned toolchain/CI identity remains release work.
 
 If any line above changes, update this snapshot and append the reason to `docs/development/history.md`.
@@ -53,12 +53,12 @@ Before starting implementation:
 
 ## Current Cleanup Priorities
 
-The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md` (restore milestone control). Parked, not started:
+The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md`: `MS-local-sealed-loop`, one small real change through `open → edit → scan → extinguish → verify → commit`. Nothing on its graph has run yet. Parked, not started:
 
-1. M2: one local sealed-commit loop increment.
-2. M3: agent-consumable local contract (CFR-169, CFR-170, CFB-133).
-3. M4: remote happy path (CFR-168, CFB-136).
-4. M5: adoption wedge (CFR-171, CFR-172, CFR-173).
+1. M2: agent-consumable local contract (CFR-169, CFR-170, CFB-133).
+2. M3: remote happy path (CFR-168, CFB-136).
+3. M4: adoption wedge (CFR-171, CFR-172, CFR-173).
+4. M5: release and operational trust (`MS-release-operational-trust`, a bounded slice of modernization-roadmap Stage 4).
 
 ## Validation Matrix
 
