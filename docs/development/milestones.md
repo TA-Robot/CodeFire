@@ -8,7 +8,7 @@ Last audited: 2026-08-21
 
 Update trigger: M1 exit, M1 blocker admission, or slot shift.
 
-M1 state after independent classification `f963345`: **ready for node 3**. The classifier found a source-matching, provenance-recorded Rust runner that node 1 missed, and the orchestrator admitted the no-build/no-install cached-binary resolution. Node 2's increment remains selected. The only ready work is the sealed-loop packet; no product behavior has yet been validated and M2–M5 remain parked.
+M1 state at integration head `011d961`: **ready for final independent audit**. Nodes 1–4 are complete. The canonical loop sealed `CF-COMMIT-373468dbaf827a6cc2bae9a4`, post-status is `open-clean` with zero Fires, and the focused test passed. M1 has not exited: node 5 must independently audit this exact evidence before the orchestrator may shift slots. M2–M5 remain parked.
 
 This is the only live five-ahead execution board. Historical burn-down narrative stays in `current-cycle-burn-down-plan.md` and `history.md`. Those files are not permission to work.
 
@@ -85,13 +85,13 @@ This is the live plan for `MS-local-sealed-loop`. It is a concrete graph, not a 
 
 ```text
 Critical path: loop runner readiness → sealed-loop run of the selected increment (pre-loop baseline first) → loop evidence record → final independent audit → M1 exit and slot shift
-Progress: nodes 1 and 2 are completed; independent classifier f963345 parked node 1's original environment complaint and identified the cached source-matching runner; the orchestrator admitted that runner and wrote node 3
-Parallel now: node 3 only — the loop is a single stateful transaction and must not have a competing writer
-Blocked: node 4 waits on 3; node 5 waits on 4; node 6 waits on 5
-Next legal action: launch `ai/task-packets/milestone-local-sealed-loop-run.md` with one individual agent
+Progress: nodes 1–4 completed; node 3 sealed CF-COMMIT-373468dbaf827a6cc2bae9a4 at c471b77 and node 4 recorded the evidence at 011d961
+Parallel now: node 5 only — final independent audit by a family/session that did not implement node 3
+Blocked: node 6 waits on 5
+Next legal action: audit exact integration HEAD and write `ai/audit-latest.md` only; do not exit or shift M1 inside the audit
 ```
 
-Nodes 1 and 2 have run. Node 1's first search returned a blocker, but independent classification found the missed runner and the orchestrator admitted it without a build or install. Node 2 supplied the one-line increment and focused test. Node 3 is ready but has not run.
+Nodes 1–4 have run. Node 1's search was independently corrected, node 2 supplied the increment, node 3 completed the canonical loop, and node 4 recorded its evidence. Only the independent audit and orchestrator exit decision remain.
 
 At `f52d489` no CodeFire command has run against the dogfood project, no product or dogfood file has been edited, no focused test has run, no product validation of any kind has run, there is no sealed commit, and there is no audit for this milestone. The two validations recorded so far are the child packets' docs checks, which say nothing about product behavior.
 
@@ -101,16 +101,16 @@ At `f52d489` no CodeFire command has run against the dogfood project, no product
 |---|---|---|---|---|---|---|---|
 | 1 | Loop runner readiness — decide which `codefire` executable runs the loop and record its path, provenance, and capability outcome, or record an exact blocker | **completed after independent correction** — cached source-matching runner admitted; no build/install | Individual agent, independent classifier, then orchestrator | — | `ai/task-packets/milestone-local-sealed-loop-runner.md` | that packet file only | original miss `eab877f`; classifier `f963345`; admitted runner SHA-256 `09d9fa2561de4b687200baa4b9fe54a4159e43def1a7a3cd28dc05c2741741e4`, current/recorded Rust manifest `96737474cfec261cd9891d3d986e49f81601ef0ce4b7a25ce138526395801435` over 99 files, build gate `rust-release-build-ddcfad8a1d7b4b94fa4daf94-0.json` decision `PASS` |
 | 2 | Increment selection — name the exact one-file small change, why it is the smallest real change, and which focused test covers it. Reading only: does **not** run or record CodeFire state | **completed** — one exact candidate and one focused test recorded | Individual agent | — | `ai/task-packets/milestone-local-sealed-loop-increment.md` | that packet file only | `f52d489`; increment packet `## Result`: one-line `improved_domains` change in `subprojects/algorithm-evolution-agent-lab/src/evoagent/external_validity.py`, focused test `PYTHONPATH=src python3 -m unittest tests.test_external_validity -v`. Selection is by reading only — the edit was **not** applied, and no CodeFire command and no test were run |
-| 3 | Sealed-loop run — capture the pre-loop `status --json` baseline with the admitted runner, then `open → edit → scan → extinguish → verify → commit` on the node 2 increment plus its focused test | **ready** — not started | Individual agent (Claude Opus 5) | 1, 2 | `ai/task-packets/milestone-local-sealed-loop-run.md` | exact clean dogfood file in the canonical open directory, plus the CodeFire state the loop writes; no other dirty-tree file | — |
-| 4 | Loop evidence record — sealed commit identity, before/after state, and which commands actually ran | **blocked** on 3 | Individual agent | 3 | parent packet | `docs/development/history.md`, `ai/task-packets/milestone-local-sealed-loop.md` | — |
-| 5 | Final independent audit (Claude Opus 5 or Grok 4.6, never Codex, not the implementing session) | **blocked** on 4 | Audit agent | 4 | — | `docs/development/ai/audit-latest.md` only | — |
+| 3 | Sealed-loop run — capture the pre-loop `status --json` baseline with the admitted runner, then `open → edit → scan → extinguish → verify → commit` on the node 2 increment plus its focused test | **completed** | Grok 4.6 individual agent | 1, 2 | `ai/task-packets/milestone-local-sealed-loop-run.md` | exact clean dogfood file in the canonical open directory, plus the CodeFire state the loop writes; no other dirty-tree file | `c471b77`; focused test 2/2; Fire `FIRE-C7EE54F7CE66` extinguished; verify passed; sealed `CF-COMMIT-373468dbaf827a6cc2bae9a4`; post-status `open-clean`, Fire 0 |
+| 4 | Loop evidence record — sealed commit identity, before/after state, and which commands actually ran | **completed** | same persistent Grok owner | 3 | parent packet | `docs/development/history.md`, `ai/task-packets/milestone-local-sealed-loop.md` | `011d961`; full evidence and preservation outcome recorded; M1 not exited |
+| 5 | Final independent audit (Claude Opus 5 or Grok 4.6, never Codex, not the implementing session) | **ready** | Claude Opus 5 audit agent | 4 | — | `docs/development/ai/audit-latest.md` only | — |
 | 6 | M1 exit and slot shift | **blocked** on 5 | Orchestrator | 5 | — | board, history, packet, current-state docs | — |
 
 `ai/task-packets/milestone-local-sealed-loop.md` is the parent packet. Nodes 1 and 2 fanned in, independent classification corrected the runner search, and `ai/task-packets/milestone-local-sealed-loop-run.md` now fixes node 3's runner, target, safety preconditions, commands, and write set.
 
 ### Two-lane concurrency, as executed (evidence, not currently ready work)
 
-This section records what actually ran in parallel. It is not a standing invitation to launch a second writer now — node 3 is the sole ready stateful lane.
+This section records what actually ran in parallel. It is not a standing invitation to launch another writer now — the product loop is complete and only a read-only final audit is ready.
 
 Node 1 initially answered *what runs the loop* with a blocker; independent classifier `f963345` showed that answer missed a cached `codefire-rs` because the search used the wrong filename and skipped `/workspace/.cache`. Node 2 answered *what the loop carries* by reading only. Their original concurrency remains valid; the correction does not retroactively claim product evidence.
 
@@ -118,13 +118,13 @@ The pre-loop `status --json` baseline stayed **node 3 work, not node 2 work**: i
 
 ### Not yet true
 
-M1 is **open**. Nodes 1 and 2 plus the blocker classification have run; nodes 3-6 have not. A runner is now admitted, but there is still no dogfood edit, focused-test run, loop evidence, sealed commit, or final audit.
+M1 is **open**. Nodes 1–4 have completed with product evidence and a sealed commit. The final independent audit has not run, node 6 has not made the exit decision, and no slot has shifted.
 
-Node 2's completion is **not** progress on the loop: a recorded candidate is not an applied change, and it does not clear the node 1 runner blocker. Do not read the previous milestone's green validations as evidence here either: those covered docs and control-plane scripts at `8b6c822` and said nothing about product behavior. The two child-packet doc checks at `eab877f` and `f52d489` are the same kind of evidence — docs-only. This milestone is the first slot that touches product/dogfood behavior, so its exit needs its own loop evidence and its own independent audit.
+The earlier docs-only results at `eab877f` and `f52d489` did not establish product behavior; node 3's recorded command envelopes and sealed identity now do. The previous milestone's green control-plane validations at `8b6c822` remain unrelated. M1 still needs node 5's independent audit of the new product evidence before exit.
 
 ### Next legal action
 
-Launch node 3 from `ai/task-packets/milestone-local-sealed-loop-run.md`. The cached runner is re-hashed before use; the exact target file must still be Git-clean and byte-equal to the integration copy. Any failed precondition is a new `block-m1`, not permission to widen the write set. Toolchain installation, rebuild, Python CLI expansion, and parked issues remain out of scope.
+Run the final independent audit against exact integration HEAD. It verifies the runner/source binding, command envelopes, focused test, Fire resolution, sealed commit, post-state, preservation boundary, and M1 scope. It may return `block-m1`, `park`, or `drop`; it may not implement, edit the board, exit M1, or start parked work.
 
 ## Parked open issues
 

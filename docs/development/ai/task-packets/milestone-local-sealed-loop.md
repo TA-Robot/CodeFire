@@ -57,7 +57,7 @@ Next legal action: run the final independent audit into docs/development/ai/audi
 
 Nodes 1 and 2 were independent and ran as such: node 1 settled *what executes the loop*, node 2 settled *what the loop carries*. Neither read the other's answer, and their write sets stayed disjoint — each child packet wrote only itself. That concurrency remains evidence of how those two lanes ran, not a standing second writer. Nodes 3 and 4 then ran serially. Node 5 is now the only ready work. Node 6 stays blocked on 5 and is orchestrator work; this record does not exit M1.
 
-The pre-loop `status --json` baseline is **node 3 work**. It cannot run until a runnable executable exists, so placing it in node 2 would have given node 2 a hidden dependency on node 1 and destroyed the parallelism this graph claims. Node 2 selected by reading only, and node 1's blocker is exactly why that baseline still has no executable.
+The pre-loop `status --json` baseline was **node 3 work**. It could not run until a runnable executable was admitted, so placing it in node 2 would have given node 2 a hidden dependency on node 1 and destroyed the parallelism this graph claims. Node 2 therefore selected by reading only; node 3 later captured the baseline with the admitted runner.
 
 ### Node 1 — loop runner readiness
 
