@@ -14,7 +14,7 @@ Reasoning tier: high
 
 Closed: 2026-08-21
 
-This packet is **historical evidence** for the milestone that exited on 2026-08-21. It is not permission to work and it is not evidence about any later milestone. The live board is `../../milestones.md`, where M1 is now `MS-local-sealed-loop`.
+This packet is **historical evidence** for the milestone that exited on 2026-08-21. It is not permission to work and it is not evidence about any later milestone. The live board is `../../milestones.md`; do not copy an old M1 name from this packet.
 
 ## Objective
 

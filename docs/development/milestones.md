@@ -8,7 +8,7 @@ Last audited: 2026-08-21
 
 Update trigger: M1 exit, M1 blocker admission, or slot shift.
 
-M1 state at integration head `011d961`: **ready for final independent audit**. Nodes 1–4 are complete. The canonical loop sealed `CF-COMMIT-373468dbaf827a6cc2bae9a4`, post-status is `open-clean` with zero Fires, and the focused test passed. M1 has not exited: node 5 must independently audit this exact evidence before the orchestrator may shift slots. M2–M5 remain parked.
+M1 state after the 2026-08-21 slot shift: **planning packets ready**. `MS-local-sealed-loop` exited on the independent audit of exact HEAD `e7e792f`; its sealed identity is `CF-COMMIT-373468dbaf827a6cc2bae9a4`. The active milestone is now `MS-agent-local-contract`. No product fix has started in this new M1.
 
 This is the only live five-ahead execution board. Historical burn-down narrative stays in `current-cycle-burn-down-plan.md` and `history.md`. Those files are not permission to work.
 
@@ -18,139 +18,95 @@ The previous milestone `MS-2026-08-control-restore` exited on 2026-08-21 and the
 
 | Slot | ID | Name | Exit (must all be true) | In-scope now |
 |---|---|---|---|---|
-| M1 | `MS-local-sealed-loop` | Daily local sealed-commit loop | One real change goes `open → edit → scan → extinguish → verify → commit` with only the loop's focused validation; no parked review root is started unless dogfood shows it currently blocks that loop | **Yes** |
-| M2 | `MS-agent-local-contract` | Agent-consumable local contract | Local `status` / `scan` / `verify` / `extinguish` / `commit` JSON, `next_actions`, and help are enough for a Claude or Grok worker to finish an M1-style local sealed-loop change without reading product source | No |
-| M3 | `MS-remote-happy-path` | Remote happy path of sealed history | `upload` → `request-merge` → `request-apply` of an already sealed commit works on the documented happy path; bounded HTTP/graph work is in scope only if it blocks that path | No |
-| M4 | `MS-adoption-wedge` | First adoption wedge | A second repository can inspect or import without becoming a Git bridge or an agent platform; remaining product experiments record adopt / narrow / stop | No |
-| M5 | `MS-release-operational-trust` | Release and operational trust | Derived from `strategy/modernization-roadmap.md` Stage 4, bounded to: a recorded rights/license decision for the artifacts CodeFire actually publishes, and **one** rehearsed release-and-rollback path a backup operator can execute from documentation only, with checksums and independent verification. No public beta label while source gates or release identity are unresolved. The rest of Stage 4 stays in the roadmap and is not admitted by this slot | No |
+| M1 | `MS-agent-local-contract` | Agent-consumable local contract | A fresh Claude or Grok worker can take one bounded local change from status through sealed commit using public help, JSON envelopes, and `next_actions`, without reading CodeFire product source or receiving private command corrections | **Yes** |
+| M2 | `MS-remote-happy-path` | Remote happy path of sealed history | `upload` → `request-merge` → `request-apply` of an already sealed commit works on the documented happy path; bounded HTTP/graph work is in scope only if it blocks that path | No |
+| M3 | `MS-adoption-wedge` | First adoption wedge | A second repository can inspect or import without becoming a Git bridge or an agent platform; remaining product experiments record adopt / narrow / stop | No |
+| M4 | `MS-release-operational-trust` | Release and operational trust | A recorded rights/license decision for published artifacts and one independently verified release-and-rollback rehearsal; no public beta label while source gates or release identity are unresolved | No |
+| M5 | `MS-product-value-proof` | First product-value proof | One candidate user segment completes a claims-comprehension and first-seal study with measured setup/friction and an explicit adopt / narrow / stop decision; broad market discovery and a four-week pilot remain in the roadmap | No |
 
-M5 is a bounded slice of Stage 4, not a copy of it. `strategy/modernization-roadmap.md` remains a stage/gate roadmap and must not be turned into a second task board.
+M4 and M5 are bounded slices of roadmap Stages 4 and 5, not copies of those stages. `strategy/modernization-roadmap.md` remains a stage/gate roadmap and must not be turned into a second task board.
 
-## M1 card — Daily local sealed-commit loop
+## M1 card — Agent-consumable local contract
 
-Objective: prove the local sealed-commit loop is usable for real day-to-day work by taking one small real change all the way through it.
+Objective: remove private source knowledge and orchestrator command correction from the local sealed-loop path.
 
 Exact M1 exit (nothing else counts):
 
-- one small real change goes `open → edit → scan → extinguish → verify → commit` in the canonical dogfood project;
-- the resulting commit is sealed and the post-loop state is reported by CodeFire itself, not asserted by an agent;
-- only the loop's focused validation was required to get there.
+- a fresh Claude or Grok worker receives only the public local command contract plus a bounded change packet and reaches a sealed commit;
+- every transition is chosen from command help, a versioned JSON envelope, or machine-readable `next_actions` with complete required arguments;
+- the worker does not read `crates/**` or the Python implementation to discover command syntax or state semantics;
+- an independent other-family audit reproduces the contract path and finds no unsafe or cyclic action.
 
-Required implementation (this slot only):
+Issue inputs admitted to M1:
 
-- resolve which `codefire` executable runs the loop, and record it;
-- select the one small real change, by reading only, before the loop starts;
-- capture the pre-loop state with `status --json`, then run the loop on that change;
-- record the loop evidence and the sealed commit identity.
+- CFR-170: typed executable outcomes and postcondition-driven actions — primary contract root;
+- CFB-133: admit only the stale `migrate apply` postcondition/action slice if the clean-room probe reproduces it;
+- CFR-169: admit only a module/test ownership seam that the smallest contract fix cannot avoid. Architecture cleanup by itself is not work permission.
 
-Capturing the baseline needs a working executable, so it belongs to the loop run, not to selection. Selection is a reading task and stays independent.
-
-The first product increment is **one small real change** in `subprojects/algorithm-evolution-agent-lab`. If the canonical dogfood state is already `open-clean`, the increment is a new small change, not a replay of a parked root.
-
-M1 validation (do not widen):
+M1 validation is packet-scoped. The clean-room probe and every admitted fix packet must name the exact public commands and focused tests it uses. The standing management checks are:
 
 ```bash
-RUNNER=/workspace/.cache/cargo-target-shared/source-keys/9c92559f4f4d51f270d27bcc5fff888936bda373dcb9150435607e6d33c861c6/release/codefire-rs
-DOGFOOD=/workspace/project/subprojects/algorithm-evolution-agent-lab
-"$RUNNER" status --path "$DOGFOOD" --json
-"$RUNNER" scan --path "$DOGFOOD" --json
-"$RUNNER" extinguish <each-scan-reported-fire-id> --path "$DOGFOOD" --resolution addressed --rationale "External-validity implementation corrected" --json
-"$RUNNER" verify --path "$DOGFOOD" --details --json
-"$RUNNER" commit --path "$DOGFOOD" -m "Fix unmapped benchmark transferability" --json
-(cd "$DOGFOOD" && PYTHONPATH=src python3 -m unittest tests.test_external_validity -v)
 python3 docs/development/tools/check_project_docs.py
+python3 docs/development/tools/check_ai_acceleration_docs.py
 ```
 
-If scan reports zero Fires, record that CodeFire-reported fact and do not manufacture an `extinguish` target. The validation requirement is to resolve every real scan-reported Fire before verify; bare `extinguish --path ...` is not an executable command. The commit message is mandatory and fixed above.
-
-Plus the **focused** test of the single module the increment touches, inside `subprojects/algorithm-evolution-agent-lab`.
-
-`cargo test --workspace`, `cargo clippy`, `cargo fmt`, the full installer, the full Algorithm suite, and dogfood Retrospect are **out of M1**. They belong to later slots if that slot names them.
+Workspace-wide Rust tests, full installer, full Algorithm suite, Retrospect, remote mutation, and review-portfolio discovery are out of M1 unless a later admitted fix packet proves one is the narrowest deterministic gate for its touched surface.
 
 M1 non-goals:
 
-- starting CFB-133, CFR-169, or CFR-170 (now parked on M2) or any other parked root;
-- building the agent-consumable JSON / `next_actions` contract (that is M2);
-- remote `upload` / `request-merge` / `request-apply` work (M3);
-- adoption or release work (M4, M5);
-- refactors, cleanups, or test expansion that the loop does not require;
-- treating the classified dirty tree in `/workspace/project` as a general write set. Node 3 has one recorded exception: the currently clean, byte-matched file `/workspace/project/subprojects/algorithm-evolution-agent-lab/src/evoagent/external_validity.py` plus the existing CodeFire state under `/workspace/project/subprojects/.codefire`; every other tracked path remains forbidden;
-- serializing independent M1 slices "to keep the tree simple".
-
-Parked-issue admission rule for this slot: a parked root enters M1 **only** if running the loop produces dogfood evidence that the loop cannot complete without it, and then only the smallest slice that restores the loop. Anticipating a block is not evidence. CFB-133 (`migrate apply` next-action loop) is the most likely candidate and is **not** admitted today.
+- CFR-168/CFB-136 graph, HTTP, cache, or remote-scale work (M2);
+- CFR-171..173 adoption/claim/product experiments (M3);
+- release or product-economics work (M4/M5);
+- adding agent orchestration to the CodeFire product;
+- using the large classified `/workspace/project` tree as a general write set;
+- implementing a hypothetical gap before the clean-room probe reproduces it.
 
 ## M1 execution graph (current)
 
-This is the live plan for `MS-local-sealed-loop`. It is a concrete graph, not a template. Every active M1 must carry one; the shape rule lives in `milestone-operating-model.md`. A single serial queue with no parallel set is not an M1 plan.
+This is the initial live plan for `MS-agent-local-contract`. It is a concrete graph, not a template.
 
 ```text
-Critical path: loop runner readiness → sealed-loop run of the selected increment (pre-loop baseline first) → loop evidence record → final independent audit → M1 exit and slot shift
-Progress: nodes 1–4 completed; node 3 sealed CF-COMMIT-373468dbaf827a6cc2bae9a4 at c471b77 and node 4 recorded the evidence at 011d961
-Parallel now: node 5 only — final independent audit by a family/session that did not implement node 3
-Blocked: node 6 waits on 5
-Next legal action: audit exact integration HEAD and write `ai/audit-latest.md` only; do not exit or shift M1 inside the audit
+Critical path: clean-room public-contract probe → orchestrator admission of the smallest reproduced blocker → focused fix → clean-room sealed-loop replay → independent audit → M1 exit
+Parallel now: node 1 clean-room contract probe; node 2 CFR-169 ownership-seam classification. Both are read-only and have disjoint packet write sets
+Blocked: node 3 admission waits on 1 and 2; later implementation/replay/audit nodes wait on node 3
+Next legal action: launch both ready read-only packets; do not implement before fan-in
 ```
 
-Nodes 1–4 have run. Node 1's search was independently corrected, node 2 supplied the increment, node 3 completed the canonical loop, and node 4 recorded its evidence. Only the independent audit and orchestrator exit decision remain.
-
-At `f52d489` no CodeFire command has run against the dogfood project, no product or dogfood file has been edited, no focused test has run, no product validation of any kind has run, there is no sealed commit, and there is no audit for this milestone. The two validations recorded so far are the child packets' docs checks, which say nothing about product behavior.
+Nothing on this new graph has run. The prior sealed-loop evidence is an input fixture, not evidence that the agent-local contract already passes.
 
 ### Nodes
 
 | # | Node | State | Owner | Waits on | Packet | Write set | Evidence |
 |---|---|---|---|---|---|---|---|
-| 1 | Loop runner readiness — decide which `codefire` executable runs the loop and record its path, provenance, and capability outcome, or record an exact blocker | **completed after independent correction** — cached source-matching runner admitted; no build/install | Individual agent, independent classifier, then orchestrator | — | `ai/task-packets/milestone-local-sealed-loop-runner.md` | that packet file only | original miss `eab877f`; classifier `f963345`; admitted runner SHA-256 `09d9fa2561de4b687200baa4b9fe54a4159e43def1a7a3cd28dc05c2741741e4`, current/recorded Rust manifest `96737474cfec261cd9891d3d986e49f81601ef0ce4b7a25ce138526395801435` over 99 files, build gate `rust-release-build-ddcfad8a1d7b4b94fa4daf94-0.json` decision `PASS` |
-| 2 | Increment selection — name the exact one-file small change, why it is the smallest real change, and which focused test covers it. Reading only: does **not** run or record CodeFire state | **completed** — one exact candidate and one focused test recorded | Individual agent | — | `ai/task-packets/milestone-local-sealed-loop-increment.md` | that packet file only | `f52d489`; increment packet `## Result`: one-line `improved_domains` change in `subprojects/algorithm-evolution-agent-lab/src/evoagent/external_validity.py`, focused test `PYTHONPATH=src python3 -m unittest tests.test_external_validity -v`. Selection is by reading only — the edit was **not** applied, and no CodeFire command and no test were run |
-| 3 | Sealed-loop run — capture the pre-loop `status --json` baseline with the admitted runner, then `open → edit → scan → extinguish → verify → commit` on the node 2 increment plus its focused test | **completed** | Grok 4.6 individual agent | 1, 2 | `ai/task-packets/milestone-local-sealed-loop-run.md` | exact clean dogfood file in the canonical open directory, plus the CodeFire state the loop writes; no other dirty-tree file | `c471b77`; focused test 2/2; Fire `FIRE-C7EE54F7CE66` extinguished; verify passed; sealed `CF-COMMIT-373468dbaf827a6cc2bae9a4`; post-status `open-clean`, Fire 0 |
-| 4 | Loop evidence record — sealed commit identity, before/after state, and which commands actually ran | **completed** | same persistent Grok owner | 3 | parent packet | `docs/development/history.md`, `ai/task-packets/milestone-local-sealed-loop.md` | `011d961`; full evidence and preservation outcome recorded; M1 not exited |
-| 5 | Final independent audit (Claude Opus 5 or Grok 4.6, never Codex, not the implementing session) | **ready** | Claude Opus 5 audit agent | 4 | — | `docs/development/ai/audit-latest.md` only | — |
-| 6 | M1 exit and slot shift | **blocked** on 5 | Orchestrator | 5 | — | board, history, packet, current-state docs | — |
+| 1 | Clean-room public-contract probe — replay the prior M1 transcript from public help/JSON/next-actions only and identify the first missing, unsafe, or cyclic action | **ready** | Claude Opus 5 or Grok 4.6 | — | `ai/task-packets/milestone-agent-local-contract-probe.md` | that packet only | — |
+| 2 | CFR-169 ownership-seam classification — decide whether any smallest contract fix actually requires the parked architecture seam | **ready** | the other provider family | — | `ai/task-packets/milestone-agent-local-contract-seam.md` | that packet only | — |
+| 3 | Orchestrator admission and focused fix graph | **blocked** | Orchestrator | 1, 2 | written after fan-in | board and new fix packets only | — |
+| 4 | Focused contract fix and tests | **blocked** | Individual agent | 3 | — | fixed after admission | — |
+| 5 | Fresh clean-room sealed-loop replay | **blocked** | Individual agent, not the fix session | 4 | — | one bounded dogfood change plus CodeFire state | — |
+| 6 | Final independent audit and M1 exit | **blocked** | Audit agent then orchestrator | 5 | — | audit file, board/history/current-state docs | — |
 
-`ai/task-packets/milestone-local-sealed-loop.md` is the parent packet. Nodes 1 and 2 fanned in, independent classification corrected the runner search, and `ai/task-packets/milestone-local-sealed-loop-run.md` now fixes node 3's runner, target, safety preconditions, commands, and write set.
+The two ready packets are deliberately read-only. Their fan-in decides whether CFR-170, CFB-133, and/or the narrowest CFR-169 seam is necessary. Filing or anticipating a gap is not permission to implement it.
 
-### Two-lane concurrency, as executed (evidence, not currently ready work)
+## Open issue placement
 
-This section records what actually ran in parallel. It is not a standing invitation to launch another writer now — the product loop is complete and only a read-only final audit is ready.
+These remain `investigating`; the slot shift does not mark any issue fixed.
 
-Node 1 initially answered *what runs the loop* with a blocker; independent classifier `f963345` showed that answer missed a cached `codefire-rs` because the search used the wrong filename and skipped `/workspace/.cache`. Node 2 answered *what the loop carries* by reading only. Their original concurrency remains valid; the correction does not retroactively claim product evidence.
-
-The pre-loop `status --json` baseline stayed **node 3 work, not node 2 work**: it requires a runnable executable, so it sits after the fan-in and immediately before `open`. Putting it in node 2 would have given node 2 a hidden dependency on node 1, and the two lanes would not have been parallel at all. The disjoint write sets held — each child packet wrote only itself — and the two lanes ran concurrently to completion, which is the evidence that the split was real.
-
-### Not yet true
-
-M1 is **open**. Nodes 1–4 have completed with product evidence and a sealed commit. The final independent audit has not run, node 6 has not made the exit decision, and no slot has shifted.
-
-The earlier docs-only results at `eab877f` and `f52d489` did not establish product behavior; node 3's recorded command envelopes and sealed identity now do. The previous milestone's green control-plane validations at `8b6c822` remain unrelated. M1 still needs node 5's independent audit of the new product evidence before exit.
-
-### Next legal action
-
-Run the final independent audit against exact integration HEAD. It verifies the runner/source binding, command envelopes, focused test, Fire resolution, sealed commit, post-state, preservation boundary, and M1 scope. It may return `block-m1`, `park`, or `drop`; it may not implement, edit the board, exit M1, or start parked work.
-
-## Parked open issues
-
-These remain `investigating` in the ledgers. They are not M1 work.
-
-| Issue | Parked on | Why not M1 |
+| Issue | Slot / role | Admission rule |
 |---|---|---|
-| CFB-133 | M2 | `migrate apply` next-action loop; an automation contract concern, not required to run the loop by hand |
-| CFR-169 | M2 | Module/test ownership seams; not required to run the loop |
-| CFR-170 | M2 | Typed executable outcomes; needed once agents consume local contracts |
-| CFR-168 | M3 | Graph/object/HTTP work budget is for remote/scale, not for the local loop |
-| CFB-136 | M3 | Validation-cache reuse is the admitted CFR-168 blocker |
-| CFR-171 | M4 | Machine-readable claim/proof descriptor for external consumers |
-| CFR-172 | M4 | Read-only adoption experiment |
-| CFR-173 | M4 | Product falsification / stop-rule experiment |
+| CFB-133 | M1 input | Admit only if the clean-room probe reproduces the stale postcondition/action loop |
+| CFR-169 | M1 input | Classification only until a smallest contract fix proves an ownership seam necessary |
+| CFR-170 | M1 input | Primary typed executable outcome/action root |
+| CFR-168 | M2 parked | Graph/object/HTTP work budget belongs to the remote happy path |
+| CFB-136 | M2 parked | Validation-cache reuse is the admitted CFR-168 blocker |
+| CFR-171 | M3 parked | Machine-readable claim/proof descriptor for external consumers |
+| CFR-172 | M3 parked | Read-only adoption experiment |
+| CFR-173 | M3 parked | Product falsification / stop-rule experiment |
 
-`BATCH-2026-07-review-portfolio-completion` is **frozen as history**. Remaining roots are parked as above. They do not gate M1 or M2 unless dogfood evidence shows the local sealed loop is actually unusable without them.
+`BATCH-2026-07-review-portfolio-completion` is **frozen as history**. Only the three M1 inputs above may be classified now; M2–M3 roots stay parked.
 
 ## M2 preview (queued)
 
-When M1 exits, M2 `MS-agent-local-contract` becomes active and the first allowed increment is:
-
-- make the local `status` / `scan` / `verify` / `extinguish` / `commit` JSON and `next_actions` sufficient for a worker to repeat an M1-style loop change without reading product source;
-- admit CFR-170 or CFB-133 only to the extent that contract requires them.
-
-Do not pull CFR-168 into M2 because it is unfinished.
+When M1 exits, M2 `MS-remote-happy-path` may admit CFR-168 and CFB-136 only to the extent required for one sealed `upload → request-merge → request-apply` happy path. It must not start early.
 
 ## Shift rule
 

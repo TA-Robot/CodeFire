@@ -1,6 +1,6 @@
 # AI Task Packet
 
-Status: in_progress
+Status: completed
 
 Packet ID: MS-local-sealed-loop
 
@@ -17,9 +17,11 @@ This is the **parent packet** for the milestone. Nodes 1 and 2 have their own ch
 - node 1 → `milestone-local-sealed-loop-runner.md` — completed after independent correction `f963345`; cached runner admitted
 - node 2 → `milestone-local-sealed-loop-increment.md` — ran; Status `completed`, integrated at `f52d489`
 - node 3 → `milestone-local-sealed-loop-run.md` — ran; Status `completed`, integrated at `c471b77`; sealed `CF-COMMIT-373468dbaf827a6cc2bae9a4`
-- node 4 → this file plus `docs/development/history.md` — **completed**; loop evidence recorded below. Node 5 is ready. M1 has **not** exited.
+- node 4 → this file plus `docs/development/history.md` — completed at `011d961`; loop evidence recorded below
+- node 5 → `docs/development/ai/audit-latest.md` — completed at `92a5282`; audited exact HEAD `e7e792f`, no `block-m1`, close authorized
+- node 6 → orchestrator exit and slot shift — completed in the close commit that marks this packet completed
 
-Everything from `## Objective` through `## Handoff` is the original **plan** and carries no evidence — do not read those sections as observations. The exceptions are the `Progress` / `Parallel now` / `Blocked` lines and the `State` and `Outcome` cells in `## Plan`, which this node 4 record updates, plus `## Fan-in result`, `## Orchestrator admission after independent classification`, and `## Loop evidence record`. Node 4 does not edit `docs/development/milestones.md`; the live board remains for node 6 / the orchestrator.
+Everything from `## Objective` through `## Handoff` is the original plan. Observed evidence is in the execution table and the `Fan-in result`, `Orchestrator admission`, `Loop evidence record`, and `Final audit and exit` sections.
 
 ## Objective
 
@@ -40,10 +42,10 @@ The live graph is on `docs/development/milestones.md` under "M1 execution graph 
 
 ```text
 Critical path: loop runner readiness → sealed-loop run of the selected increment (pre-loop baseline first) → loop evidence record → final independent audit → M1 exit and slot shift
-Progress: nodes 1–4 completed; node 3 sealed CF-COMMIT-373468dbaf827a6cc2bae9a4 (packet c471b77); node 4 records that evidence here
-Parallel now: node 5 only — final independent audit (Claude Opus 5 or Grok 4.6, never Codex, not the implementing session)
-Blocked: node 6 waits on 5
-Next legal action: run the final independent audit into docs/development/ai/audit-latest.md only. Do not exit M1.
+Progress: nodes 1–6 completed; node 3 sealed CF-COMMIT-373468dbaf827a6cc2bae9a4, node 5 independently audited exact HEAD e7e792f with no block-m1, and node 6 shifted the board
+Parallel now: none — this milestone is historical
+Blocked: none in this milestone
+Next legal action: follow the new M1 on docs/development/milestones.md
 ```
 
 | # | Node | State | Waits on | Packet | Write set | Outcome / current evidence |
@@ -51,11 +53,11 @@ Next legal action: run the final independent audit into docs/development/ai/audi
 | 1 | Loop runner readiness | **completed after independent correction** | — | `milestone-local-sealed-loop-runner.md` | that packet file only | cached source-matching runner admitted; original search miss preserved and classified at `f963345` |
 | 2 | Increment selection (reading only) | **completed** | — | `milestone-local-sealed-loop-increment.md` | that packet file only | one candidate file, one one-line edit, one focused unittest recorded; edit not applied, no command run. Integrated at `f52d489` |
 | 3 | Sealed-loop run, pre-loop `status --json` baseline first | **completed** — integrated at `c471b77` | 1, 2 | `milestone-local-sealed-loop-run.md` | exact clean file in canonical open directory plus loop-written CodeFire state | sealed `CF-COMMIT-373468dbaf827a6cc2bae9a4`; full envelopes in the child packet Result |
-| 4 | Loop evidence record | **completed** | 3 | this file | `docs/development/history.md`, this file | `## Loop evidence record` below; M1 not exited |
-| 5 | Final independent audit | **ready** — not started | 4 | — | `docs/development/ai/audit-latest.md` only | — |
-| 6 | M1 exit and slot shift | **blocked** — not started | 5 | — | board, history, packet, current-state docs | — |
+| 4 | Loop evidence record | **completed** | 3 | this file | `docs/development/history.md`, this file | `011d961`; `## Loop evidence record` below |
+| 5 | Final independent audit | **completed** | 4 | `docs/development/ai/audit-latest.md` | audit file only | `92a5282`; audited exact HEAD `e7e792f`; stalled no, scope creep no, no `block-m1`, close authorized |
+| 6 | M1 exit and slot shift | **completed** | 5 | this close commit | board, history, packet, current-state docs | old M2 became M1; new M5 named from roadmap Stage 5 |
 
-Nodes 1 and 2 were independent and ran as such: node 1 settled *what executes the loop*, node 2 settled *what the loop carries*. Neither read the other's answer, and their write sets stayed disjoint — each child packet wrote only itself. That concurrency remains evidence of how those two lanes ran, not a standing second writer. Nodes 3 and 4 then ran serially. Node 5 is now the only ready work. Node 6 stays blocked on 5 and is orchestrator work; this record does not exit M1.
+Nodes 1 and 2 were independent and ran as such; nodes 3 and 4 then stayed with one persistent Grok owner because they formed a serial context boundary. Claude Opus 5 audited independently, and the Codex orchestrator performed only the exit/shift.
 
 The pre-loop `status --json` baseline was **node 3 work**. It could not run until a runnable executable was admitted, so placing it in node 2 would have given node 2 a hidden dependency on node 1 and destroyed the parallelism this graph claims. Node 2 therefore selected by reading only; node 3 later captured the baseline with the admitted runner.
 
@@ -343,6 +345,10 @@ Post-state: `open-clean`, `open_fires: 0`, base **`CF-COMMIT-373468dbaf827a6cc2b
 
 `/workspace/project` Git `HEAD` stayed `f1644122134d479333cf422fdb1d48b8fa92dd8e`. Porcelain went 245 → 246 lines (`113 M`/`132 ??` → `114 M`/`132 ??`). The only newly dirty tracked path was the exact target file. Closed CodeFire feature-branch files unchanged. `.codefire-open` sha256 `60b133b3eeefcc79e20bda32843261897713b0d6e86b2f0d0111cd19862690d6` unchanged. `repo.json` unchanged. `opened/main.json` and `branches/main.json` advanced to the sealed head. Active `fires.json` / `scan.json` / `verification.json` were removed by commit `reset_active_state`; `active/state.json` remained `open-clean`. Stale `/workspace/algorithm-evolution-agent-lab` was unused. Sequencer leftovers under `/workspace/project/.git/sequencer` were untouched.
 
-### What remains
+## Final audit and exit
 
-Node 5 — final independent audit — is **ready** and has not started. Write set: `docs/development/ai/audit-latest.md` only. Auditor must not be Codex and must not be the implementing session. Node 6 (M1 exit and slot shift) stays **blocked**. Parked work stays parked. This packet Status remains `in_progress`.
+Claude Opus 5 final audit commit `92a5282` audited exact integration HEAD `e7e792fcdce4598798597cc33e3bca8702758b56` at `2026-08-21T22:36:37Z`, independently of the Grok 4.6 implementation session. Verdict: `stalled: no`, `scope_creep: no`, no `block-m1`, and explicit authorization for node 6 to close.
+
+The auditor freshly re-derived the 99-file Rust source manifest and runner hash, inspected the sealed commit and Fire/Resolution objects, reran the focused 2-test module gate, queried fresh post-loop `status --json`, and verified that the exact target file was the only newly dirty `subprojects/` path. All eight issue roots remained `investigating` at their queued slots and no validation was widened.
+
+Node 6 recorded the exit in `history.md`, fixed the two parked board-hygiene findings, shifted M2–M5 forward, named `MS-product-value-proof` as the new bounded Stage 5 M5, and made `MS-agent-local-contract` active. This milestone is complete; its evidence is not permission to start any old parked root outside the new board.

@@ -6,17 +6,17 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 Last audited: 2026-08-21.
 
-- Execution is milestone-based. The live board is `docs/development/milestones.md`. `MS-2026-08-control-restore` exited on 2026-08-21; M1 is now `MS-local-sealed-loop`. Remaining review-portfolio issues are parked on M2–M4 and are not active work.
+- Execution is milestone-based. The live board is `docs/development/milestones.md`. `MS-local-sealed-loop` exited on 2026-08-21 with sealed commit `CF-COMMIT-373468dbaf827a6cc2bae9a4`; M1 is now `MS-agent-local-contract`. CFR-170 is the primary issue input, while CFB-133/CFR-169 enter only if the two ready classification packets prove them necessary.
 - Codex orchestrates. Individual and 30-minute audit agents are Claude Opus 5 or Grok 4.6. Codex does not implement or audit.
 - Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
 - CFB detail ledger: 137 total; 135 `fixed`, 2 `investigating`. Open/investigating count: 2.
 - CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, 6 `investigating`. Open/investigating count: 6.
-- Final installed `/tmp/codefire-cfr167-final.KWa8TC/bin/codefire` has source-matching SHA-256 `1483874b4c1de4a78478595d5d158cf34a12e5ec3b05255dfc8819f511f00272`; policy/coverage reversal, sealed digest binding, and canonical Dogfood pass.
+- The current source-matching Rust runner is the retained cache artifact under `/workspace/.cache/cargo-target-shared/source-keys/9c92559f.../release/codefire-rs`, SHA-256 `09d9fa2561de4b687200baa4b9fe54a4159e43def1a7a3cd28dc05c2741741e4`; its recorded and freshly recomputed Rust source manifest is `96737474cfec261cd9891d3d986e49f81601ef0ce4b7a25ce138526395801435` over 99 files. The older July `/tmp` install is gone.
 - The current Git worktree contains the intentional uncommitted review, invariant-fix, regression, ADR, and management-document packages. They remain classified project state and must not be destructively cleaned or presented as a clean checkpoint.
-- CFB-120..132 and the complete Stage 1 Dogfood-blocker lifecycle are closed. Canonical Algorithm is now sealed at `CF-COMMIT-e5ca290905c2a4b5e2c05bd4` with Atom hash schema 4, `sealed-snapshot-v1`, `open-clean`, and zero Fires; the configured legacy repository was not mutated.
+- CFB-120..132 and the complete Stage 1 Dogfood-blocker lifecycle are closed. Canonical Algorithm is now sealed at `CF-COMMIT-373468dbaf827a6cc2bae9a4`, `open-clean`, and zero Fires after the local-loop milestone; the stale separate repository was not mutated.
 - RVC-011 / CFR-161 is closed through Install, installed counterexample replay, both real-repository read-only probes, canonical trace-warning verification, and Retrospect. ADR-013 now owns the typed committable decision and non-relaxable safety floor.
 - RVC-039 / CFR-162 is closed through the full lifecycle. ADR-014 makes unresolved text, binary, and semantic merge facts authoritative blockers and makes `merge --continue` the explicit validated resolution boundary.
-- `BATCH-2026-07-review-portfolio-completion` is historical. CFB-133, CFB-136, and CFR-168..173 remain open in the ledgers but are parked on M2–M4 after the 2026-08-21 slot shift. They are not M1 work.
+- `BATCH-2026-07-review-portfolio-completion` is historical. CFB-133, CFB-136, and CFR-168..173 remain open in the ledgers. The live board now treats CFB-133/CFR-169/CFR-170 as M1 inputs with explicit admission limits, parks CFB-136/CFR-168 on M2, and parks CFR-171..173 on M3.
 - The base environment still does not expose `cargo` on `PATH`; a durable pinned toolchain/CI identity remains release work.
 
 If any line above changes, update this snapshot and append the reason to `docs/development/history.md`.
@@ -53,12 +53,12 @@ Before starting implementation:
 
 ## Current Cleanup Priorities
 
-The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md`: `MS-local-sealed-loop`, one small real change through `open → edit → scan → extinguish → verify → commit`. Nothing on its graph has run yet. Parked, not started:
+The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md`: `MS-agent-local-contract`. Its two ready packets are a clean-room public-contract probe and a CFR-169 seam classification; neither is product implementation. Queued, not started:
 
-1. M2: agent-consumable local contract (CFR-169, CFR-170, CFB-133).
-2. M3: remote happy path (CFR-168, CFB-136).
-3. M4: adoption wedge (CFR-171, CFR-172, CFR-173).
-4. M5: release and operational trust (`MS-release-operational-trust`, a bounded slice of modernization-roadmap Stage 4).
+1. M2: remote happy path (CFR-168, CFB-136).
+2. M3: adoption wedge (CFR-171, CFR-172, CFR-173).
+3. M4: release and operational trust (bounded roadmap Stage 4 slice).
+4. M5: first product-value proof (bounded roadmap Stage 5 slice).
 
 ## Validation Matrix
 

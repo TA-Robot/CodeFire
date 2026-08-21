@@ -51,7 +51,9 @@ Before any CodeFire command or write:
 3. Capture `/workspace/project` Git status and the branch/opened/active CodeFire control-file hashes. These are preservation evidence, not permission to read or edit other tracked files.
 4. Confirm `/workspace/algorithm-evolution-agent-lab` is not used; it is a stale separate repository.
 
-## Allowed writes
+## Scope
+
+### Allowed writes
 
 - the exact target file above;
 - CodeFire state under `/workspace/project/subprojects/.codefire` and the existing `.codefire-open` marker only as written by the named loop commands;
@@ -59,6 +61,18 @@ Before any CodeFire command or write:
 - ignored command-output evidence under this agent worktree if needed.
 
 Every other tracked path in `/workspace/project` is forbidden. Do not stage, commit, format, or repair the surrounding Git dirty tree. Do not edit `crates/**`, the Python `codefire`, tests, links, specs, docs, or another dogfood file.
+
+## Non-Goals
+
+- changing CodeFire product behavior or command contracts;
+- touching a second dogfood file or adding a regression test;
+- cleaning, staging, or committing the surrounding Git dirty tree;
+- starting a parked CFB/CFR root;
+- widening to workspace tests, install, Retrospect, remote work, or discovery.
+
+## Validation
+
+The required validation is the exact procedure below: runner/target safety preflight, the focused external-validity unittest, scan, all real Fire resolutions, verify, commit, post-status, preservation comparison, and the project docs check recorded in the Result. No wider gate is allowed.
 
 ## Procedure
 
