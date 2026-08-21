@@ -12,7 +12,7 @@ The historical v0.6, v0.7, v0.8, v0.9, and v1.0 documents mixed completed implem
 
 ## Observed Identity Baseline
 
-As of 2026-07-11:
+As of 2026-07-12:
 
 | Axis | Observed value | Meaning / limitation |
 |---|---|---|
@@ -22,10 +22,10 @@ As of 2026-07-11:
 | Git releases | no tags in the local repository | No repository-tag evidence for a public release line. |
 | Repository layout | version `1` | Persistent repository compatibility axis. |
 | Core object/model structs | version `1` | Domain serialization axis. |
-| Atom hash schema | version `2` | Identity/extractor-related schema axis. |
+| Atom hash schema | current Rust-default writes use `4`; lower authenticated values remain historical inputs | Identity/extractor-related schema axis; source-unchanged drift is reported as tool migration rather than ordinary source change. |
 | Commit root schema | current Rust-default writes use `2`; legacy absence remains readable | Required-root compatibility axis; the Python fallback is not included in this writer claim. |
 | Automation envelope | Rust-default declared JSON surfaces use `codefire.command_result.v1` | Machine API envelope axis; the Python fallback has no shared `--json`/envelope surface. |
-| Remote protocol | no independent protocol version identifier observed | Compatibility is currently inferred from routes/payloads and needs an explicit profile decision. |
+| Remote/public support profile | `codefire.support.v1`; branch/MR version `1` | Capabilities advertise readable/current formats and checked public schema IDs; this is not product SemVer. |
 | License metadata | Cargo workspace `MIT`; `setup.py` says `UNLICENSED`; `pyproject.toml` has no license field; no root `LICENSE` file | Rights and distribution terms are unresolved and inconsistent. |
 
 This table is an observed worktree baseline, not a compatibility promise.
@@ -93,10 +93,10 @@ The Release Manager owns a real fixture matrix; old planned fixture names are no
 | Current Rust local commit/merge/remote/signed repositories | Current Rust read/write plus the documented Python emergency-read boundary. |
 | Legacy 12-hex and current 24-hex object IDs | Full digest agreement, no silent prefix alias, deterministic migration. |
 | Commit root schema 1 and 2 | Required-root validation and legacy readability. |
-| Atom hash schema 1 and 2 | Stable identity vectors and explicit resolution-staleness behavior. |
+| Atom hash schema 1 through 4 | Stable identity vectors, extractor-semantic provenance, source-unchanged migration classification, and explicit resolution-staleness behavior. |
 | Supported and unsupported automation/config/batch versions | Expected accept/reject result; unsupported never silently downgrades policy. |
 
-Each fixture records canonical bytes, full digests, expected public IDs, writer version, readable/writable consumers, migration result, and checksum. Release readiness remains blocked until the selected supported matrix exists and runs in CI or an equivalent clean environment.
+Each fixture records canonical bytes, full digests, expected public IDs, writer version, readable/writable consumers, migration result, and checksum. The checked `schemas/conformance/manifest-v1.json` now provides the initial canonical JSON, remote-branch version, and object-extension criticality vectors, verified by Rust, Python fallback, and an independent stdlib consumer. This is a base corpus rather than completion of the full matrix; release readiness remains blocked until the remaining selected families run in CI or an equivalent clean environment.
 
 ## Historical Milestone Mapping
 

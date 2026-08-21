@@ -1,3 +1,4 @@
+use super::assessment_subject::{live_open_subject, subject_json};
 use super::automation::{
     next_action as automation_next_action, verification_diagnostics_json, verification_next_actions,
 };
@@ -144,16 +145,21 @@ pub(crate) fn print_explain_result(result: &ExplainResult) {
 }
 
 fn explain_fire(options: &ExplainOptions, value: &str) -> Result<ExplainResult, CliError> {
-    let scan_execution = compute_scan(&options.path, false)?;
+    let scan_execution = compute_scan(&options.path)?;
     let fire = scan_execution
         .scan
         .open_fires
         .iter()
         .find(|fire| fire.display_id == value || fire.fire_uid == value)
         .ok_or_else(|| CliError::Usage(format!("unknown fire: {value}")))?;
+    let subject = subject_json(&live_open_subject(
+        &scan_execution.context,
+        &scan_execution.scan,
+    )?)?;
     let data = json!({
         "type": "codefire_explain",
         "version": 1,
+        "subject": subject,
         "target": {"kind": "fire", "value": value},
         "summary": format!("{} links {} to {} because {}", fire.display_id, fire.source.atom_id, fire.target.atom_id, fire.reason),
         "fire": {
@@ -209,6 +215,7 @@ fn explain_atom(options: &ExplainOptions, value: &str) -> Result<ExplainResult, 
     let data = json!({
         "type": "codefire_explain",
         "version": 1,
+        "subject": pack.data["subject"].clone(),
         "target": {"kind": "atom", "value": value},
         "summary": format!("{value} has {atoms} atom(s) in context and {fires} related open fire(s)"),
         "context": pack.data,
@@ -231,7 +238,7 @@ fn explain_atom(options: &ExplainOptions, value: &str) -> Result<ExplainResult, 
 
 fn explain_verify_failure(options: &ExplainOptions) -> Result<ExplainResult, CliError> {
     let context = open_context(&options.path)?;
-    let execution = compute_verify(&options.path, false)?;
+    let execution = compute_verify(&options.path)?;
     let scan = execution.scan;
     let verification = execution.verification;
     let diagnostics = verification_diagnostics_json(&verification);
@@ -244,19 +251,21 @@ fn explain_verify_failure(options: &ExplainOptions) -> Result<ExplainResult, Cli
         })
         .count();
     let warning_count = diagnostics.len().saturating_sub(blocker_count);
-    let summary = if verification.result == "passed" {
+    let decision = codefire_core::committable_decision(&verification);
+    let summary = if decision.is_committable() {
         format!(
             "verification passed with {warning_count} warning(s) and {blocker_count} blocker(s)"
         )
     } else {
         format!(
             "verification result is {} with {blocker_count} blocker(s) and {warning_count} warning(s)",
-            verification.result
+            decision.outcome.as_str()
         )
     };
     let data = json!({
         "type": "codefire_explain",
         "version": 1,
+        "subject": verification.subject.clone(),
         "target": {"kind": "verify-failure", "value": null},
         "summary": summary,
         "diagnostic_summary": {

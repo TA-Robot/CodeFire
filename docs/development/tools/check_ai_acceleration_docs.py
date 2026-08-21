@@ -20,6 +20,12 @@ REQUIRED_AI_FILES = [
     "docs/development/ai/context-packs.json",
     "docs/development/ai/operating-protocol.md",
     "docs/development/ai/role-routing-matrix.json",
+    "docs/development/ai/provider-routing-matrix.json",
+    "docs/development/ai/provider-routing-policy.md",
+    "docs/development/ai/orchestration-protocol.md",
+    "docs/development/ai/audit-cadence.md",
+    "docs/development/milestone-operating-model.md",
+    "docs/development/milestones.md",
     "docs/development/ai/model-routing-policy.md",
     "docs/development/ai/acceleration-master-plan.md",
     "docs/development/ai/capability-registry.v1.json",
@@ -46,6 +52,7 @@ REQUIRED_ROLES = {
     "validation_runner",
     "dogfood_runner",
     "classifier",
+    "auditor",
 }
 
 
@@ -65,6 +72,8 @@ ACTIVE_STATE_FILES = [
     "docs/development/README.md",
     "docs/development/project-management.md",
     "docs/development/current-cycle-burn-down-plan.md",
+    "docs/development/milestones.md",
+    "docs/development/milestone-operating-model.md",
     "docs/development/codefire-improvement-cycle.md",
     "docs/development/todo-checklist.md",
     "docs/development/worktree-cleanup-plan.md",
@@ -196,8 +205,47 @@ def check_role_routing(root: Path, findings: list[Finding]) -> None:
         if role_name in seen:
             findings.append(Finding("error", "duplicate-role", path, f"Duplicate role: {role_name}"))
         seen.add(role_name)
-        if role.get("model") != "gpt-5.6-sol":
-            findings.append(Finding("error", "bad-role-model", path, f"{role_name} must use gpt-5.6-sol"))
+        provider = role.get("provider")
+        model = role.get("model")
+        if role_name in {"manager", "architect"}:
+            if provider not in {None, "codex"} or model != "gpt-5.6-sol":
+                findings.append(
+                    Finding(
+                        "error",
+                        "bad-role-model",
+                        path,
+                        f"{role_name} is orchestrator-class and must use Codex gpt-5.6-sol",
+                    )
+                )
+        else:
+            allowed_models = {"claude-opus-5", "grok-4.6"}
+            if model not in allowed_models:
+                findings.append(
+                    Finding(
+                        "error",
+                        "bad-role-model",
+                        path,
+                        f"{role_name} must use claude-opus-5 or grok-4.6, not Codex",
+                    )
+                )
+            if provider not in {None, "claude", "grok"}:
+                findings.append(
+                    Finding(
+                        "error",
+                        "bad-role-provider",
+                        path,
+                        f"{role_name} provider must be claude or grok",
+                    )
+                )
+            if role_name == "auditor" and provider == "codex":
+                findings.append(
+                    Finding(
+                        "error",
+                        "auditor-must-not-be-codex",
+                        path,
+                        "auditor must not run on Codex",
+                    )
+                )
         tier = role.get("reasoning_tier")
         if tier not in {"medium", "high", "ultra"}:
             findings.append(Finding("error", "missing-reasoning-tier", path, f"{role_name} needs medium/high/ultra reasoning_tier"))
@@ -210,6 +258,125 @@ def check_role_routing(root: Path, findings: list[Finding]) -> None:
     missing_roles = sorted(REQUIRED_ROLES - seen)
     for role_name in missing_roles:
         findings.append(Finding("error", "missing-required-role", relative_path, f"Missing role: {role_name}"))
+
+
+def check_provider_routing(root: Path, findings: list[Finding]) -> None:
+    relative_path = "docs/development/ai/provider-routing-matrix.json"
+    data = load_json(root, relative_path, findings)
+    if data is None:
+        return
+    if data.get("schema") != "codefire.ai_provider_routing.v1":
+        findings.append(Finding("error", "bad-provider-schema", relative_path, "Unexpected provider-routing schema"))
+    routes = data.get("tier_routes")
+    expected = {"medium": "claude", "high": "claude", "ultra": "codex"}
+    if not isinstance(routes, dict):
+        findings.append(Finding("error", "missing-tier-routes", relative_path, "tier_routes is required"))
+    else:
+        for tier, provider in expected.items():
+            route = routes.get(tier)
+            if not isinstance(route, dict) or route.get("provider") != provider:
+                findings.append(
+                    Finding(
+                        "error",
+                        "bad-provider-tier-route",
+                        relative_path,
+                        f"{tier} must route to {provider}",
+                    )
+                )
+        for worker_tier in ("medium", "high"):
+            route = routes.get(worker_tier)
+            if not isinstance(route, dict):
+                continue
+            alternate = route.get("alternate")
+            if not isinstance(alternate, dict) or alternate.get("provider") != "grok" or alternate.get("model") != "grok-4.6":
+                findings.append(
+                    Finding(
+                        "error",
+                        "missing-grok-alternate",
+                        relative_path,
+                        f"{worker_tier} must name grok-4.6 as the alternate individual/audit model",
+                    )
+                )
+        medium = routes.get("medium")
+        if isinstance(medium, dict) and medium.get("model") != "claude-opus-5":
+            findings.append(
+                Finding(
+                    "error",
+                    "bad-medium-provider-model",
+                    relative_path,
+                    "Medium workers must use claude-opus-5 (Grok 4.6 is the alternate)",
+                )
+            )
+        high = routes.get("high")
+        if isinstance(high, dict):
+            models = high.get("models")
+            expected_claude_models = {
+                "implementation": "claude-opus-5",
+                "review_or_research": "claude-opus-5",
+            }
+            if not isinstance(models, dict) or models != expected_claude_models:
+                findings.append(
+                    Finding(
+                        "error",
+                        "bad-claude-provider-models",
+                        relative_path,
+                        "High Claude implementation and review/research must use claude-opus-5",
+                    )
+                )
+        ultra = routes.get("ultra")
+        if isinstance(ultra, dict):
+            if ultra.get("model") != "gpt-5.6-sol":
+                findings.append(Finding("error", "bad-codex-provider-model", relative_path, "Ultra Codex must use gpt-5.6-sol"))
+            if ultra.get("requires_explicit_allow_codex") is not True:
+                findings.append(Finding("error", "unguarded-codex-route", relative_path, "Ultra Codex must require explicit allow"))
+    concurrency = data.get("concurrency")
+    if not isinstance(concurrency, dict):
+        findings.append(Finding("error", "missing-provider-concurrency", relative_path, "concurrency is required"))
+    else:
+        for provider in ("claude", "grok", "codex"):
+            value = concurrency.get(provider)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                findings.append(Finding("error", "bad-provider-concurrency", relative_path, f"{provider} must be a positive integer"))
+        if isinstance(concurrency.get("codex"), int) and concurrency["codex"] != 1:
+            findings.append(Finding("error", "codex-concurrency-not-one", relative_path, "Codex control plane must stay at one lane"))
+    fallback = data.get("fallback")
+    if not isinstance(fallback, dict) or fallback.get("automatic_codex_fallback") is not False:
+        findings.append(Finding("error", "automatic-codex-fallback", relative_path, "automatic Codex fallback must be false"))
+    integration = data.get("integration")
+    if isinstance(integration, dict) and integration.get("auditor_must_not_be_codex") is not True:
+        findings.append(Finding("error", "auditor-on-codex", relative_path, "auditor must not run on Codex"))
+    role_defaults = data.get("role_defaults")
+    if not isinstance(role_defaults, dict):
+        findings.append(Finding("error", "missing-provider-role-defaults", relative_path, "role_defaults is required"))
+    else:
+        required = {
+            "implementer": "claude",
+            "reviewer": "claude",
+            "classifier": "claude",
+            "validation_runner": "claude",
+            "auditor": "claude",
+            "integrator": "codex",
+            "manager": "codex",
+        }
+        for role, provider in required.items():
+            if role_defaults.get(role) != provider:
+                findings.append(
+                    Finding(
+                        "error",
+                        "bad-provider-role-default",
+                        relative_path,
+                        f"{role} must default to {provider}",
+                    )
+                )
+        if role_defaults.get("auditor") == "codex":
+            findings.append(
+                Finding(
+                    "error",
+                    "auditor-must-not-be-codex",
+                    relative_path,
+                    "auditor must default to Claude or Grok",
+                )
+            )
 
 
 def check_task_packets(root: Path, findings: list[Finding]) -> None:
@@ -297,6 +464,7 @@ def run(root: Path) -> list[Finding]:
     check_required_files(root, findings)
     check_context_packs(root, findings)
     check_role_routing(root, findings)
+    check_provider_routing(root, findings)
     check_task_packets(root, findings)
     check_live_routing_smoke(root, findings)
     check_stale_active_state(root, findings)

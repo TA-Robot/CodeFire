@@ -11,12 +11,49 @@
 
 ## Count
 
-- Total: 160
-- High: 36
-- Medium: 121
+- Total: 175
+- Critical: 2
+- High: 45
+- Medium: 125
 - Low: 3
-- Fixed / closed: 160
-- Remaining open: 0
+- Fixed / closed: 169
+- Remaining open: 6
+
+## RVC Portfolio Promotion
+
+After the Stage 1 Dogfood-blocker Retrospect, the 60-review portfolio was re-audited against current
+source. Six reviews are implemented, three are accepted non-goals, and the 51 residual reviews were
+deduplicated into CFR-163..173 rather than expanded into 51 symptom issues. CFR-163..165 and the
+same-root CFR-174/175 blockers and CFR-163..167 are now closed; CFR-168..173 remain active.
+
+| ID | Type | Area | Title | Detail |
+|---|---|---|---|---|
+| CFR-161 | correctness-risk | Committable decision | policy falseでsafety floorとCLI projectionが分裂する | [CFR-161](code-review-issues/cfr-161.md) |
+| CFR-162 | correctness-risk | Merge state | unresolved merge stateをverify/commitがseal可能と判定する | [CFR-162](code-review-issues/cfr-162.md) |
+| CFR-163 | correctness-risk | Local authority/recovery | open/active multi-record stateが共通snapshot/recoveryを持たない | [CFR-163](code-review-issues/cfr-163.md) |
+| CFR-164 | security-risk | Subject trust | request/evidenceが完全subjectとresource profileへ束縛されない | [CFR-164](code-review-issues/cfr-164.md) |
+| CFR-165 | correctness/security | Remote publication | mutation/idempotency/GCが共通publication protocolを持たない | [CFR-165](code-review-issues/cfr-165.md) |
+| CFR-166 | compatibility-risk | Version/capability | runtime全境界のversion/conformance contractが未完 | [CFR-166](code-review-issues/cfr-166.md) |
+| CFR-167 | correctness/explainability | Policy/coverage | rule provenanceとnon-Atom coverageがtyped inputでない | [CFR-167](code-review-issues/cfr-167.md) |
+| CFR-168 | performance/resource | Bounded work | graph/object/HTTP workにdecision-equivalent budgetがない | [CFR-168](code-review-issues/cfr-168.md) |
+| CFR-169 | maintainability/proof | Architecture seam | lifecycle/object/test ownershipが巨大local moduleへ残る | [CFR-169](code-review-issues/cfr-169.md) |
+| CFR-170 | automation-contract | Outcome/actions | next actionがtyped executable postcondition contractでない | [CFR-170](code-review-issues/cfr-170.md) |
+| CFR-171 | product/proof | Claim descriptor | consistency claimとproof kindがmachine-readableに束縛されない | [CFR-171](code-review-issues/cfr-171.md) |
+| CFR-172 | product-experiment | Adoption/mental model | read-only adoptionを反証するbounded experimentがない | [CFR-172](code-review-issues/cfr-172.md) |
+| CFR-173 | product-experiment | Product falsification | progress/Fire価値/stop ruleのpilot protocolがない | [CFR-173](code-review-issues/cfr-173.md) |
+| CFR-174 | correctness/security | Remote apply subject | request-applyがMRで承認されたsource headを固定しない | [CFR-174](code-review-issues/cfr-174.md) |
+| CFR-175 | security/correctness | Remote authority path | file remote componentがcanonical containmentを持たない | [CFR-175](code-review-issues/cfr-175.md) |
+
+## Current Open Root View
+
+| Root | Issues |
+|---|---|
+| Bounded graph/resource work | [CFR-168](code-review-issues/cfr-168.md) |
+| Architecture and proof seam | [CFR-169](code-review-issues/cfr-169.md) |
+| Automation outcome/actions | [CFR-170](code-review-issues/cfr-170.md) |
+| Assurance claim/proof | [CFR-171](code-review-issues/cfr-171.md) |
+| Read-only adoption experiment | [CFR-172](code-review-issues/cfr-172.md) |
+| Product falsification experiment | [CFR-173](code-review-issues/cfr-173.md) |
 
 ## Cycle 2 Source Review Expansion
 
@@ -80,13 +117,15 @@ Cycle 2ではdogfooding CFB-066..085を20件まで増やした後、CodeFire本�
 | Operation locking/identity/dry-run検証不足 | [CFR-124](code-review-issues/cfr-124.md), [CFR-125](code-review-issues/cfr-125.md), [CFR-129](code-review-issues/cfr-129.md), [CFR-145](code-review-issues/cfr-145.md), [CFR-146](code-review-issues/cfr-146.md), [CFR-158](code-review-issues/cfr-158.md) |
 | Command capability registry不足 | [CFR-126](code-review-issues/cfr-126.md), [CFR-131](code-review-issues/cfr-131.md), [CFR-132](code-review-issues/cfr-132.md), [CFR-138](code-review-issues/cfr-138.md), [CFR-139](code-review-issues/cfr-139.md), [CFR-150](code-review-issues/cfr-150.md) |
 | Automation JSON/next_actions schema drift | [CFR-140](code-review-issues/cfr-140.md), [CFR-141](code-review-issues/cfr-141.md), [CFR-142](code-review-issues/cfr-142.md), [CFR-143](code-review-issues/cfr-143.md), [CFR-144](code-review-issues/cfr-144.md), [CFR-151](code-review-issues/cfr-151.md), [CFR-152](code-review-issues/cfr-152.md), [CFR-153](code-review-issues/cfr-153.md), [CFR-154](code-review-issues/cfr-154.md), [CFR-155](code-review-issues/cfr-155.md), [CFR-160](code-review-issues/cfr-160.md) |
+| Authoritative committable decision不足 | [CFR-161](code-review-issues/cfr-161.md) |
+| Merge resolution fact/transition不足 | [CFR-162](code-review-issues/cfr-162.md) |
 | Large repo/observability対応不足 | [CFR-128](code-review-issues/cfr-128.md), [CFR-134](code-review-issues/cfr-134.md), [CFR-135](code-review-issues/cfr-135.md), [CFR-136](code-review-issues/cfr-136.md), [CFR-137](code-review-issues/cfr-137.md), [CFR-147](code-review-issues/cfr-147.md), [CFR-148](code-review-issues/cfr-148.md), [CFR-149](code-review-issues/cfr-149.md), [CFR-156](code-review-issues/cfr-156.md), [CFR-157](code-review-issues/cfr-157.md) |
 
-## Current Open Expansion
+## Historical Cycle 1 Expansion
 
-Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCFR-081..120を追加した。これらは次version計画でroot causeごとに束ねて解消する。
+Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCFR-081..120を追加した。これらは後続batchでroot causeごとに束ねて解消済みであり、以下は発見時のpriorityを保持するhistorical inventoryである。
 
-### Open Priority Buckets
+### Original Priority Buckets
 
 #### High
 
@@ -163,7 +202,7 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | CFR-130 | global burn-down | commit multi-object transaction markerで途中失敗phaseと書き込み済みobjectを説明可能にした | `commit_transaction_marker_is_clean_after_success_and_doctor_reports_pending` |
 | CFR-120 | global burn-down | open issueをroot cause/fix group/target version/owner module/close evidenceへ接続するmachine-readable mapとdocs consistency testを追加 | `issue_root_cause_map_covers_open_issues` |
 
-### Open Area View
+### Historical Closed Area View
 
 | Area | Issues |
 |---|---|
@@ -179,11 +218,12 @@ Cycle 1 Phase Eで、dogfooding CFB-046..065を踏まえたsource reviewからCF
 | HTTP config | none |
 | Verification policy | none |
 | Object store and durability | none |
+| Merge state and resolution | none |
 | Development process | none |
 
 ## Historical v0.7 Grouping
 
-The rows below preserve the original internal batch grouping. All CFR details are now closed; v0.7 was an internal hardening milestone, not a tagged public release. The active roadmap is [Modernization Roadmap](strategy/modernization-roadmap.md), and historical plan removal is recorded in the [Deletion Manifest](archive/deletion-manifest.md).
+The rows below preserve the original internal batch grouping. All CFR-001..162 details are closed as of the CFR-162 Retrospect; v0.7 was an internal hardening milestone, not a tagged public release. The active roadmap is [Modernization Roadmap](strategy/modernization-roadmap.md), and historical plan removal is recorded in the [Deletion Manifest](archive/deletion-manifest.md).
 
 - Batch 1 fixed: [CFR-005](code-review-issues/cfr-005.md), [CFR-006](code-review-issues/cfr-006.md), [CFR-010](code-review-issues/cfr-010.md), [CFR-031](code-review-issues/cfr-031.md), [CFR-032](code-review-issues/cfr-032.md), [CFR-047](code-review-issues/cfr-047.md), [CFR-058](code-review-issues/cfr-058.md), [CFR-067](code-review-issues/cfr-067.md), [CFR-077](code-review-issues/cfr-077.md)
 - Batch 2/8 fixed: [CFR-001](code-review-issues/cfr-001.md), [CFR-002](code-review-issues/cfr-002.md), [CFR-003](code-review-issues/cfr-003.md), [CFR-004](code-review-issues/cfr-004.md), [CFR-007](code-review-issues/cfr-007.md), [CFR-008](code-review-issues/cfr-008.md), [CFR-009](code-review-issues/cfr-009.md), [CFR-036](code-review-issues/cfr-036.md), [CFR-037](code-review-issues/cfr-037.md), [CFR-038](code-review-issues/cfr-038.md), [CFR-039](code-review-issues/cfr-039.md), [CFR-040](code-review-issues/cfr-040.md), [CFR-057](code-review-issues/cfr-057.md), [CFR-059](code-review-issues/cfr-059.md), [CFR-060](code-review-issues/cfr-060.md), [CFR-061](code-review-issues/cfr-061.md), [CFR-062](code-review-issues/cfr-062.md), [CFR-063](code-review-issues/cfr-063.md), [CFR-064](code-review-issues/cfr-064.md), [CFR-065](code-review-issues/cfr-065.md), [CFR-066](code-review-issues/cfr-066.md), [CFR-071](code-review-issues/cfr-071.md), [CFR-072](code-review-issues/cfr-072.md), [CFR-073](code-review-issues/cfr-073.md), [CFR-074](code-review-issues/cfr-074.md), [CFR-075](code-review-issues/cfr-075.md), [CFR-076](code-review-issues/cfr-076.md), [CFR-080](code-review-issues/cfr-080.md)

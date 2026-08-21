@@ -1,4 +1,4 @@
-use super::CliError;
+use super::{parse_lock_option, CliError, LockOptions};
 use std::env;
 use std::path::PathBuf;
 
@@ -9,6 +9,7 @@ pub(crate) struct VerifyOptions {
     pub(crate) blocking_only: bool,
     pub(crate) json_output: bool,
     pub(crate) metrics: bool,
+    pub(crate) lock: LockOptions,
 }
 
 impl VerifyOptions {
@@ -27,8 +28,13 @@ pub(crate) fn parse_verify_args(args: &[String]) -> Result<VerifyOptions, CliErr
     let mut blocking_only = false;
     let mut json_output = false;
     let mut metrics = false;
+    let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
+        if parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         match args[index].as_str() {
             "--details" => details = true,
             "--blocking-only" => blocking_only = true,
@@ -64,6 +70,7 @@ pub(crate) fn parse_verify_args(args: &[String]) -> Result<VerifyOptions, CliErr
         blocking_only,
         json_output,
         metrics,
+        lock,
     })
 }
 
@@ -84,7 +91,8 @@ pub(crate) fn render_verification(
     blocking_only: bool,
 ) -> String {
     let mut output = String::new();
-    if verification.result == "passed" {
+    let decision = codefire_core::committable_decision(verification);
+    if decision.is_committable() {
         output.push_str("Verification passed.\n");
     } else {
         output.push_str("Verification failed.\n");
@@ -99,6 +107,10 @@ pub(crate) fn render_verification(
         }
     ));
     output.push('\n');
+    output.push_str(&format!(
+        "Unresolved merge conflicts: {}\n",
+        verification.unresolved_merge_conflicts.len()
+    ));
     output.push_str(&format!(
         "Open fires: {}\n",
         verification.open_required_fires
@@ -127,6 +139,36 @@ pub(crate) fn render_verification(
         "Failed checks: {}\n",
         verification.failed_checks.len()
     ));
+    if let Some(policy) = &verification.effective_policy {
+        output.push_str(&format!(
+            "Effective policy: {} ({} rule(s))\n",
+            policy.digest,
+            policy.rules.len()
+        ));
+    }
+    if let Some(coverage) = &verification.change_coverage {
+        output.push_str(&format!(
+            "Change coverage: {} changed file(s), {} non-Atom, {} deleted-Atom, {} out-of-Atom, {} Atom file(s) with unclassified spans [{}]\n",
+            coverage.summary.changed_files,
+            coverage.summary.non_atom_files,
+            coverage.summary.deleted_atom_files,
+            coverage.summary.out_of_atom_files,
+            coverage.summary.atom_files_with_unclassified_spans,
+            coverage.span_precision,
+        ));
+    }
+    if let Some(subject) = &verification.subject {
+        output.push_str(&format!(
+            "Assessment subject: {} ({})\n",
+            subject.subject_digest, subject.trust_kind
+        ));
+    }
+    if !verification.execution.is_empty() {
+        output.push_str(&format!(
+            "Execution profile: local_verification_v1 ({} command(s))\n",
+            verification.execution.len()
+        ));
+    }
     if details {
         if blocking_only {
             output.push_str("Detail filter: blocking-only\n");
@@ -137,26 +179,23 @@ pub(crate) fn render_verification(
 }
 
 fn blocking_check_names(verification: &codefire_core::Verification) -> Vec<&'static str> {
-    let mut blocking = Vec::new();
-    if verification.open_required_fires > 0 {
-        blocking.push("open fires");
+    codefire_core::committable_decision(verification)
+        .blocking_reasons
+        .into_iter()
+        .map(blocking_reason_label)
+        .collect()
+}
+
+fn blocking_reason_label(reason: codefire_core::CommittableReason) -> &'static str {
+    match reason {
+        codefire_core::CommittableReason::UnresolvedMergeConflicts => "unresolved merge conflicts",
+        codefire_core::CommittableReason::OpenRequiredFires => "open fires",
+        codefire_core::CommittableReason::MissingRequiredLinks => "missing required links",
+        codefire_core::CommittableReason::StaleResolutions => "stale resolutions",
+        codefire_core::CommittableReason::MissingEvidenceRefs => "missing evidence refs",
+        codefire_core::CommittableReason::DuplicateAtomIds => "duplicate atom ids",
+        codefire_core::CommittableReason::FailedChecks => "failed checks",
     }
-    if verification.trace_completeness_required && !verification.missing_required_links.is_empty() {
-        blocking.push("missing required links");
-    }
-    if !verification.stale_resolutions.is_empty() {
-        blocking.push("stale resolutions");
-    }
-    if !verification.missing_evidence_refs.is_empty() {
-        blocking.push("missing evidence refs");
-    }
-    if !verification.duplicate_atom_ids.is_empty() {
-        blocking.push("duplicate atom ids");
-    }
-    if !verification.failed_checks.is_empty() {
-        blocking.push("failed checks");
-    }
-    blocking
 }
 
 fn render_blocking_verification_details(
@@ -164,7 +203,15 @@ fn render_blocking_verification_details(
     blocking_only: bool,
     output: &mut String,
 ) {
-    if (!blocking_only || verification.trace_completeness_required)
+    let decision = codefire_core::committable_decision(verification);
+    if !verification.unresolved_merge_conflicts.is_empty() {
+        output.push_str("Unresolved merge conflict details:\n");
+        for item in verification.unresolved_merge_conflicts.iter().take(5) {
+            output.push_str(&format!("  {}: {}\n", item.kind.as_str(), item.subject));
+        }
+    }
+    if (!blocking_only
+        || decision.is_blocking(codefire_core::CommittableReason::MissingRequiredLinks))
         && !verification.missing_required_links.is_empty()
     {
         output.push_str("Missing required link details:\n");

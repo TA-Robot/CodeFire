@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build or execute a role-routed Codex task for CodeFire development."""
+"""Build or explicitly execute a guarded Codex task for CodeFire development."""
 
 from __future__ import annotations
 
@@ -256,7 +256,7 @@ def build_command(
     json_events: bool,
 ) -> list[str]:
     runtime = matrix["runtime_policy"]
-    adapter = runtime["adapters"]["codex_cli_0_144"][tier]
+    adapter = runtime["adapters"][runtime["active_cli_adapter"]][tier]
     effort = adapter["reasoning_effort"]
     command = [
         "codex",
@@ -287,7 +287,12 @@ def main() -> int:
     parser.add_argument("--prompt")
     parser.add_argument("--root", type=Path, default=repository_root())
     parser.add_argument("--sandbox", choices=("read-only", "workspace-write"), default="read-only")
-    parser.add_argument("--execute", action="store_true", help="Run Codex. The default only prints a manifest.")
+    parser.add_argument("--execute", action="store_true", help="Run guarded Codex. The default only prints a manifest.")
+    parser.add_argument(
+        "--allow-codex",
+        action="store_true",
+        help="Explicitly authorize Codex usage after provider routing selected an Ultra/final task.",
+    )
     parser.add_argument(
         "--allow-untyped-execution",
         action="store_true",
@@ -319,6 +324,17 @@ def main() -> int:
             raise ValueError("provide --role unless a JSON task packet declares it")
         role = select_role(matrix, role_name)
         tier = packet["risk"]["selected_tier"] if packet is not None else role["reasoning_tier"]
+        if args.execute and role_name not in {"manager", "architect"}:
+            raise ValueError(
+                "run_ai_role.py executes Codex only for orchestrator roles "
+                "(manager, architect). Individual and audit work uses Claude Opus 5 "
+                "or Grok 4.6 via dev-agent / grok, never Codex"
+            )
+        if args.execute and not args.allow_codex:
+            raise ValueError(
+                "Codex execution is guarded; pass --allow-codex only for the "
+                "orchestrator lane after provider routing selected Ultra"
+            )
         if args.execute and packet is not None and packet.get("status") not in {"ready", "in_progress"}:
             raise ValueError("only ready or in_progress JSON task packets can execute")
         if args.execute and packet is None and not args.allow_untyped_execution:
@@ -390,19 +406,21 @@ def main() -> int:
         return 2
 
     runtime = matrix["runtime_policy"]
+    active_cli_adapter = runtime["active_cli_adapter"]
     manifest = {
         "schema": "codefire.ai_run_manifest.v1",
         "role": role["role"],
         "model": role["model"],
         "reasoning_tier": tier,
-        "effective_effort": runtime["adapters"]["codex_cli_0_144"][tier]["reasoning_effort"],
-        "delegation": runtime["adapters"]["codex_cli_0_144"][tier]["delegation"],
+        "effective_effort": runtime["adapters"][active_cli_adapter][tier]["reasoning_effort"],
+        "delegation": runtime["adapters"][active_cli_adapter][tier]["delegation"],
         "sandbox": args.sandbox,
         "cwd": str(root),
         "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
         "prompt_bytes": len(prompt.encode("utf-8")),
         "command": shlex.join(command),
         "execute": args.execute,
+        "codex_usage_explicitly_allowed": args.allow_codex,
         "strict_config": True,
         "ignore_user_config": True,
         "head_revision": head_revision,

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "codefire.remote_doctor.v1",
+  "title": "CodeFire remote doctor report v1",
+  "type": "object",
+  "required": ["type", "version", "schema", "project", "transport", "semantic_profile", "project_exists", "layout", "checked_objects", "branch_count", "merge_request_count", "object_hash_errors", "missing_object_references", "invalid_sealed_commit_references", "invalid_record_versions", "diagnostics_truncated", "quick", "skipped_checks", "issues", "ok"],
+  "properties": {
+    "type": {"const": "codefire_remote_doctor_report"},
+    "version": {"const": 1},
+    "schema": {"const": "codefire.remote_doctor.v1"},
+    "project": {"type": "string", "minLength": 1},
+    "transport": {"enum": ["file", "http", "https"]},
+    "semantic_profile": {"type": "string", "minLength": 1},
+    "project_exists": {"type": "boolean"},
+    "layout": {"type": "object", "additionalProperties": {"type": "boolean"}},
+    "checked_objects": {"type": "integer", "minimum": 0},
+    "branch_count": {"type": "integer", "minimum": 0},
+    "merge_request_count": {"type": "integer", "minimum": 0},
+    "object_hash_errors": {"type": "integer", "minimum": 0},
+    "missing_object_references": {"type": "integer", "minimum": 0},
+    "invalid_sealed_commit_references": {"type": "integer", "minimum": 0},
+    "invalid_record_versions": {"type": "integer", "minimum": 0},
+    "diagnostics_truncated": {"type": "boolean"},
+    "quick": {"type": "boolean"},
+    "skipped_checks": {"type": "array", "items": {"type": "string"}},
+    "issues": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "required": ["kind", "message"],
+        "properties": {
+          "kind": {"type": "string", "minLength": 1},
+          "message": {"type": "string", "minLength": 1},
+          "subject": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "ok": {"type": "boolean"}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,103 @@
+{
+  "schema": "codefire.ai_provider_routing.v1",
+  "policy_version": "milestone-v1",
+  "decision_order": [
+    "task_packet_risk_tier",
+    "role_default",
+    "explicit_provider_override"
+  ],
+  "tier_routes": {
+    "medium": {
+      "provider": "claude",
+      "model": "claude-opus-5",
+      "alternate": {
+        "provider": "grok",
+        "model": "grok-4.6"
+      },
+      "default_timeout": "4h",
+      "use_for": [
+        "source_backed_docs",
+        "classification",
+        "deterministic_validation",
+        "bounded_repository_evidence"
+      ]
+    },
+    "high": {
+      "provider": "claude",
+      "models": {
+        "implementation": "claude-opus-5",
+        "review_or_research": "claude-opus-5"
+      },
+      "alternate": {
+        "provider": "grok",
+        "model": "grok-4.6"
+      },
+      "default_timeout": {
+        "implementation": "6h",
+        "review_or_research": "4h"
+      },
+      "use_for": [
+        "focused_implementation",
+        "debugging",
+        "root_cause_analysis",
+        "independent_review",
+        "dogfood",
+        "milestone_audit"
+      ]
+    },
+    "ultra": {
+      "provider": "codex",
+      "model": "gpt-5.6-sol",
+      "default_timeout": "3h",
+      "requires_explicit_allow_codex": true,
+      "use_for": [
+        "orchestration",
+        "milestone_admission",
+        "conflicting_evidence",
+        "integration_branch"
+      ]
+    }
+  },
+  "role_defaults": {
+    "manager": "codex",
+    "orchestrator": "codex",
+    "architect": "codex",
+    "integrator": "codex",
+    "final_auditor": "codex",
+    "implementer": "claude",
+    "reviewer": "claude",
+    "researcher": "claude",
+    "dogfood_runner": "claude",
+    "debugger": "claude",
+    "classifier": "claude",
+    "docs_synchronizer": "claude",
+    "validation_runner": "claude",
+    "triage": "claude",
+    "test_generator": "claude",
+    "auditor": "claude"
+  },
+  "strongest_models": {
+    "claude": "claude-opus-5",
+    "grok": "grok-4.6",
+    "codex": "gpt-5.6-sol"
+  },
+  "concurrency": {
+    "claude": 2,
+    "grok": 2,
+    "codex": 1,
+    "fugu": 1
+  },
+  "fallback": {
+    "automatic_codex_fallback": false,
+    "worker_families": ["claude", "grok"],
+    "fugu_is_overflow_only": true,
+    "unavailable_provider": "use_the_other_worker_family_or_stop_never_codex"
+  },
+  "integration": {
+    "implementation_and_review_must_use_independent_agents": true,
+    "review_decision_gate": "block-m1_only",
+    "automatic_main_merge": false,
+    "integration_branch_required": true,
+    "auditor_must_not_be_codex": true
+  }
+}

@@ -1,6 +1,6 @@
 use super::{
-    compute_scan, open_context, parse_lock_option, read_json, required_string, run_extinguish,
-    CliError, ExtinguishOptions, LockOptions,
+    compute_scan, open_context, parse_lock_option, read_json, run_extinguish, CliError,
+    ExtinguishOptions, LockOptions,
 };
 use serde_json::{json, Value};
 use std::env;
@@ -135,11 +135,8 @@ pub(super) fn run_interactive_extinguish(
     options: &InteractiveExtinguishOptions,
 ) -> Result<InteractiveExtinguishResult, CliError> {
     let context = open_context(&options.path)?;
-    let active_state_path = PathBuf::from(required_string(
-        &context.registry,
-        &["open", "active_state_path"],
-    )?);
-    let scan = compute_scan(&context.open_dir, false)?;
+    let active_state_path = context.active_state.path().to_path_buf();
+    let scan = compute_scan(&context.open_dir)?;
     let open_fires = scan
         .fires
         .iter()
@@ -332,7 +329,7 @@ pub(super) fn run_all_matching_extinguish(
     };
 
     let context = open_context(&options.path)?;
-    let scan = compute_scan(&context.open_dir, false)?;
+    let scan = compute_scan(&context.open_dir)?;
     let fire_ids = scan
         .fires
         .iter()

@@ -173,6 +173,7 @@ def check_matrix(root: Path, findings: list[Finding]) -> set[str]:
         findings.append(Finding("error", "missing-adapters", str(MATRIX_PATH), "adapters are required"))
     else:
         expected_efforts = {
+            "codex_cli_0_146": {"medium": "medium", "high": "high", "ultra": "ultra"},
             "codex_cli_0_144": {"medium": "medium", "high": "high", "ultra": "ultra"},
             "openai_responses_api": {"medium": "medium", "high": "high", "ultra": "max"},
             "portable_codex_fallback": {"medium": "medium", "high": "high", "ultra": "xhigh"},
@@ -199,6 +200,16 @@ def check_matrix(root: Path, findings: list[Finding]) -> set[str]:
                 findings.append(
                     Finding("error", "false-ultra-equivalence", str(MATRIX_PATH), f"{name}.ultra must be non-equivalent")
                 )
+        active_cli_adapter = runtime.get("active_cli_adapter")
+        if not isinstance(active_cli_adapter, str) or active_cli_adapter not in adapters:
+            findings.append(
+                Finding(
+                    "error",
+                    "missing-active-cli-adapter",
+                    str(MATRIX_PATH),
+                    "active_cli_adapter must name a declared adapter",
+                )
+            )
 
     roles = data.get("roles")
     if not isinstance(roles, list) or not roles:
@@ -368,6 +379,16 @@ def check_codex_installation(root: Path, findings: list[Finding], timeout: float
     if adapter_key not in adapters:
         findings.append(
             Finding("error", "missing-codex-version-adapter", str(MATRIX_PATH), adapter_key)
+        )
+    active_adapter = matrix.get("runtime_policy", {}).get("active_cli_adapter") if matrix else None
+    if active_adapter != adapter_key:
+        findings.append(
+            Finding(
+                "error",
+                "stale-active-codex-version-adapter",
+                str(MATRIX_PATH),
+                f"expected {adapter_key}, got {active_adapter!r}",
+            )
         )
 
     for tier in sorted(EXPECTED_TIERS):

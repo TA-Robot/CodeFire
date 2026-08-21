@@ -168,7 +168,7 @@ Verificationはinternal policy checkとexternal command checkをまとめた検�
 要求:
 
 - verifyはopen fires、missing required links、stale resolutions、missing evidence refs、duplicate Atom IDs、external command failuresを判定する。
-- policyによりblocking/non-blockingを分離できる。
+- policyによりmissing required linkのblocking/non-blockingを分離できる。open required Fire、stale resolution、missing evidence、duplicate Atom ID、failed required checkは非緩和のsafety floorである。
 - commit certificateには、検証対象、policy hash、各blocker count、verification result、base commitを含める。
 - successful verifyでも、何が0件だったのか人間とmachine-readable JSONの両方に出す。
 
@@ -180,7 +180,7 @@ Verificationはinternal policy checkとexternal command checkをまとめた検�
 | FR-002 | `open` でbranchをdirectoryへ展開する | marker、open registry、active stateが一致する |
 | FR-003 | `close` でclean open directoryを削除する | dirty/burning状態では拒否し、`--discard` のみ破棄を許す |
 | FR-004 | `clone` でsealed branchから新branchを作る | open-burning sourceからcloneできない |
-| FR-005 | `scan` でchanged atomsとopen firesを生成する | Atom変更、non-Atom変更、open fire countが表示・JSON出力される |
+| FR-005 | `scan` でchanged atoms、typed file-relation coverage、open firesを生成する | non-Atom、deleted-Atom、out-of-Atom、Atom-change-with-unclassified-spans、tool migrationがfalse span claimなしで表示・JSON出力される |
 | FR-006 | `fire` でmanual fireを作成する | source/target Atom存在、重複、dry-runが検証される |
 | FR-007 | `extinguish` でfireを解消する | resolution basis、rationale/evidence、stale判定が保存される |
 | FR-008 | `verify` でcommit可否を判定する | blocker種別ごとのexit codeとJSON diagnosticが一致する |

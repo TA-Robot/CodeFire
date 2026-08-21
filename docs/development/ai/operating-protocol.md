@@ -7,6 +7,10 @@ Use it with:
 - `context-packs.json` for bounded reading;
 - `schemas/` for the authoritative machine packet contracts;
 - `role-routing-matrix.json` for machine-readable role and reasoning-effort selection;
+- `provider-routing-matrix.json` for machine-readable Fugu/Claude/Codex selection and concurrency;
+- `provider-routing-policy.md` for milestone routing, timebox, swarm, and integration semantics;
+- `orchestration-protocol.md` for the Codex / Claude / Grok topology;
+- `audit-cadence.md` for the 30-minute auditor;
 - `model-routing-policy.md` for Medium/High/Ultra semantics and escalation;
 - `task-packets/` for ready-to-delegate concrete work.
 
@@ -26,19 +30,30 @@ No AI lane should start until it has:
 
 ## Role Routing
 
-Keep stable role semantics separate from the versioned runtime selection. The current runtime policy explicitly selects `gpt-5.6-sol`; CodeFire product semantics must not depend on that model.
+Keep stable role semantics separate from provider and model runtime selection. The default external topology uses Codex `gpt-5.6-sol` as the orchestrator, Claude Opus 5 / Grok 4.6 as individual agents, and a Claude or Grok auditor every 30 minutes. CodeFire product semantics must not depend on any provider. See `orchestration-protocol.md`.
 
 | Role | Default tier | Use for | Required output |
 |---|---|---|---|
-| Manager | Ultra | batch planning, lane assignment, integration, conflicting evidence, completion audit | task packets, integration plan, completion audit |
+| Manager / orchestrator | Ultra | M1 admission, packets, lane assignment, parking, integration | task packets, milestone board, integration plan |
 | Architect | Ultra | module boundaries, object/branch invariants, transaction/security design | alternatives, design note, falsification plan |
-| Implementer | High | focused code or docs changes with bounded scope | patch, focused tests, handoff |
-| Reviewer | Ultra | adversarial correctness, invariant, contract, and evidence review | approve/request/block |
-| Researcher | High | bounded exploration with evidence and competing hypotheses | evidence, alternatives, decision candidates |
+| Implementer | High | focused M1 code or docs changes | patch, focused tests, handoff |
+| Reviewer | High | `block-m1` vs `park` vs `drop` only | block-m1 findings, parked remainder |
+| Researcher | High | bounded exploration that M1 actually named | evidence, alternatives, decision candidates |
 | Docs synchronizer | Medium | source-backed tables, links, current-state synchronization | docs diff, source evidence |
-| Validation runner | Medium | deterministic commands and exact log summaries | validation table |
-| Dogfood runner | High | algorithm workflow, reproducible friction, CFB discovery | dogfood evidence |
+| Validation runner | Medium | the M1 validation list only | validation table |
+| Dogfood runner | High | algorithm workflow needed for the active milestone | dogfood evidence, parked CFB candidates |
 | Classifier | Medium | dirty tree grouping and declared ownership classification | classification table |
+| Auditor | High | 30-minute plan vs progress, stall and scope-creep | `audit-latest.md` |
+
+Provider routing is applied after role/risk selection:
+
+| Selected tier | Default provider | Execution shape |
+|---|---|---|
+| Medium | Claude `claude-opus-5` (alternate Grok `grok-4.6`) | M1-scoped packet, isolated worktree or Grok Build subagent |
+| High | Claude `claude-opus-5` (alternate Grok `grok-4.6`) | multi-hour worktree, checkpoint commits, independent review/audit |
+| Ultra | Codex `gpt-5.6-sol` | explicit `--allow-codex`, one orchestrator lane, no product implementation |
+
+No unavailable worker automatically falls back to Codex. Claude and Grok may substitute for each other. Auditor must not be Codex.
 
 Escalate Implementer, Researcher, Dogfood, or Docs work when the task crosses an invariant, migration, security, deletion, or release-completion boundary. Apply the score and mandatory escalation rules from `model-routing-policy.md`.
 
@@ -155,7 +170,11 @@ Each validation evidence row must carry the task packet's `validation_id`, exact
 
 ## Parallel Lane Rules
 
-Parallelism is safe only when lanes have non-overlapping write sets or a manager owns final integration.
+The orchestrator must plan M1 as a critical path plus a parallel set. Independent M1 packets start together. Parallelism is then safe only when lanes have non-overlapping write sets or a manager owns final integration. Serializing independent M1 work "to keep it simple" is a planning defect.
+
+For multi-hour batches, use the external `dev-swarm` scheduler. It binds the base revision, task tickets, DAG,
+write sets, provider concurrency, expected commits, and optional machine-readable review decision. Its default
+limits are Fugu 4, Claude 2, Codex 1. It creates an integration branch but never merges main automatically.
 
 | Lane | Writes allowed | Conflict risk |
 |---|---|---|
@@ -209,7 +228,9 @@ Do not maintain separate role-specific prompt documents. Build prompts from:
 2. the task or review packet;
 3. this protocol;
 4. `model-routing-policy.md` for risk and escalation;
-5. `role-routing-matrix.json` for machine-readable routing.
+5. `provider-routing-policy.md` and `provider-routing-matrix.json` for provider/concurrency/fallback;
+6. `orchestration-protocol.md` and `audit-cadence.md` for Codex orchestrator vs Claude/Grok workers;
+7. `role-routing-matrix.json` for Codex-specific machine-readable reasoning routing.
 
 Keep common instructions and stable context at the beginning so prompt caching can reuse a stable prefix. Put task-specific packet data and volatile repository evidence at the end.
 
@@ -227,7 +248,7 @@ python3 docs/development/tools/run_ai_role.py \
   --packet docs/development/ai/task-packets/json/branch-list-timeout.json
 ```
 
-`run_ai_role.py` defaults to a non-executing manifest and read-only sandbox. Execution and `workspace-write` are separate explicit choices. The Codex repository sandbox cannot enforce an individual packet's write-set, so write execution also requires explicit acknowledgement of that limitation and independent diff review.
+`run_ai_role.py` is a Codex-specific low-level adapter. It defaults to a non-executing manifest and read-only sandbox; every real run additionally requires `--allow-codex` under the Low-Codex policy. Execution and `workspace-write` are separate explicit choices. The Codex repository sandbox cannot enforce an individual packet's write-set, so write execution also requires explicit acknowledgement of that limitation and independent diff review. Routine Fugu/Claude work uses `dev-agent` or `dev-swarm` instead.
 
 The runner reconstructs the packet's content-addressed context from its exact packs, additional files, and all currently existing explicit read/write inputs. A declared manifest must match that reconstruction exactly. It binds the digest into the run manifest and verifies live file bytes before execution; missing read inputs block execution and remain visible in dry-run output. Typed execution rejects an extra `--prompt`, a stale `base_revision`, and any existing worktree change intersecting a workspace-write packet's declared write set. There is no broad dirty-write override: first split/save the existing work or create a future packet contract that binds each inherited file by digest.
 

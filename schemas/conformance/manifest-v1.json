@@ -1,0 +1,65 @@
+{
+  "type": "codefire_conformance_manifest",
+  "version": 1,
+  "support_profile": "codefire.support.v1",
+  "canonical_json_profile": "serde-json-compact-v1",
+  "consumers": ["rust-default", "python-fallback", "independent-python-stdlib-v1"],
+  "vectors": [
+    {
+      "id": "canonical-json-unicode-integer-v1",
+      "path": "fixtures/canonical-json-v1.json",
+      "sha256": "a1bcb7a67e6ebe290b299c5dc700045d3e088af2a194fdfc08db9759525f3fc1",
+      "canonical_sha256": "668cb5f69dada7f01da530c5efd110ea95f6ae3b186dc3017df590b4c4b34711",
+      "boundary": "canonical_json",
+      "expected": "accept",
+      "writers": ["rust-default", "python-fallback"],
+      "readers": ["rust-default", "python-fallback", "independent-python-stdlib-v1"]
+    },
+    {
+      "id": "remote-branch-current-v1",
+      "path": "fixtures/remote-branch-current-v1.json",
+      "sha256": "ba7c8c1bf2579e762f9226fdd6ffac497b437eb5291e77a492535cadaf110083",
+      "boundary": "remote_branch",
+      "expected": "accept",
+      "writers": ["rust-default", "python-fallback"],
+      "readers": ["rust-default", "python-fallback", "independent-python-stdlib-v1"]
+    },
+    {
+      "id": "remote-branch-future-v2",
+      "path": "fixtures/remote-branch-future-v2.json",
+      "sha256": "4f43a73f657d247037322d91d181fbf510198408f1627e902f68bd6275e5755c",
+      "boundary": "remote_branch",
+      "expected": "deny",
+      "writers": [],
+      "readers": ["rust-default", "python-fallback", "independent-python-stdlib-v1"]
+    },
+    {
+      "id": "remote-branch-missing-version",
+      "path": "fixtures/remote-branch-missing-version.json",
+      "sha256": "7556230c8c08201fae5e81d92867f1b4079eef70ca0de424627421b5bc435eb5",
+      "boundary": "remote_branch",
+      "expected": "deny",
+      "writers": [],
+      "readers": ["rust-default", "python-fallback", "independent-python-stdlib-v1"]
+    },
+    {
+      "id": "object-noncritical-extension-v1",
+      "path": "fixtures/object-noncritical-extension-v1.json",
+      "sha256": "50df2670eb4e891248c1d881679756b6593bc80389935f5895f29f5109d1a640",
+      "boundary": "object_record",
+      "expected": "accept",
+      "writers": [],
+      "readers": ["rust-default", "python-fallback", "independent-python-stdlib-v1"],
+      "round_trip": "preserve"
+    },
+    {
+      "id": "object-critical-extension-v1",
+      "path": "fixtures/object-critical-extension-v1.json",
+      "sha256": "9aeb36c7827dbd795ad822376e6ca8f63f84ec5c01d54a404a0a3d975a916add",
+      "boundary": "object_record",
+      "expected": "deny",
+      "writers": [],
+      "readers": ["rust-default", "python-fallback", "independent-python-stdlib-v1"]
+    }
+  ]
+}

@@ -172,6 +172,7 @@ verify
 commit
 clone
 merge
+merge --continue
 show
 diff
 upload
@@ -190,6 +191,7 @@ explain
 context
 migrate check
 migrate dry-run
+migrate apply
 serve
 completion
 capabilities
@@ -203,9 +205,11 @@ The major implemented areas include:
 - Atom extraction for Markdown, OpenAPI, SQL, and multiple programming languages;
 - Trace Link validation, Fire generation, extinguish workflows, and evidence capture;
 - structured JSON command envelopes, exit-code taxonomy, next actions, and context packs;
+- machine-readable capability/support manifests, checked base schemas, checksum conformance vectors, and snapshot-bound remote pagination;
 - file-backed, HTTP, and HTTPS remote flows;
-- commit and request HMAC signatures with key policy and nonce replay protection;
-- storage, doctor, migration, review-pack, patch import/export, and diff tooling.
+- commit signatures plus payload-bound versioned request HMAC subjects, key windows, and fail-closed nonce replay protection;
+- subject-bound verification/evidence execution with minimal environments, streaming output caps, redaction, and explicit trust profiles;
+- local and remote storage/doctor diagnostics, migration, review-pack, patch import/export, and diff tooling.
 
 Current limitations and compatibility notes are maintained in `docs/development/known-limitations.md`.
 
