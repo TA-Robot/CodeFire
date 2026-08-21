@@ -44,16 +44,6 @@ bash -n /workspace/scripts/dev-agent
 
 Rust workspace tests, installer, and Algorithm dogfood Retrospect are **out of M1**. They belong to later slots if that slot names them.
 
-Required plan shape (every active M1, including later slots after shift):
-
-```text
-Critical path: <packets that later M1 work waits on> → M1 exit
-Parallel now: <independent packets to launch together>
-Blocked: <packet> waits on <packet>
-```
-
-A single serial queue with no parallel set is not an M1 plan.
-
 M1 non-goals:
 
 - finishing CFR-168 remaining surfaces;
@@ -61,6 +51,55 @@ M1 non-goals:
 - adding a fourth second-agent protocol for Grok;
 - product CLI behavior changes.
 - serializing independent M1 slices "to keep the tree simple"
+
+## M1 execution graph (current)
+
+This is the live plan for `MS-2026-08-control-restore`. It is a concrete graph, not a template. Every active M1 must carry one, including later slots after a shift; the shape rule lives in `milestone-operating-model.md`. A single serial queue with no parallel set is not an M1 plan.
+
+```text
+Critical path: classified-worktree snapshot eb4fd0c → board/packet plan completion → integration → M1 focused validation → final independent Grok or Claude audit → M1 exit and slot shift
+Parallel now: board/packet plan-completion packet, independent baseline audit writing audit-latest.md
+Blocked: final independent audit waits on integration; M1 exit and slot shift wait on the final audit and on every validation named on this card
+```
+
+### Nodes on the critical path
+
+| # | Node | State | Owner | Waits on |
+|---|---|---|---|---|
+| 1 | Classified-worktree snapshot `eb4fd0c` | done, preservation-only | Orchestrator | — |
+| 2 | Board and packet plan completion | in progress | Individual agent (Claude Opus 5) | 1 |
+| 3 | Integration of M1 packet worktrees | not started | Orchestrator (Codex, integration branch only) | 2 |
+| 4 | M1 focused validation (the command list above, no wider) | not started | Validation lane | 3 |
+| 5 | Final independent audit (Grok 4.6 or Claude Opus 5, never Codex, not the implementing session) | not started | Audit agent | 3, and 4 for its evidence |
+| 6 | M1 exit and slot shift | not started | Orchestrator | 4 and 5 |
+
+### Parallel now
+
+Two lanes are live with disjoint write sets:
+
+| Lane | Write set | Why it is independent |
+|---|---|---|
+| Board/packet plan completion | `milestones.md`, `ai/task-packets/milestone-control-restore.md` | Records the graph; needs no audit result to exist |
+| Independent baseline audit | `ai/audit-latest.md` only | Read-only over plan vs progress; needs no board edit to observe stall |
+
+Neither lane may enter the other's write set. The baseline audit is **not** node 5: it observes the current state, it does not clear the M1 exit.
+
+### About snapshot `eb4fd0c`
+
+`eb4fd0c` (`snapshot: preserve classified pre-M1 worktree`) is **preservation-only**. It committed 339 files and roughly 198,000 inserted lines of already-accumulated pre-M1 work, product code included, so the classified worktree could not be lost between sessions.
+
+It is explicitly **not**:
+
+- a clean-tree checkpoint;
+- a release or a validated baseline;
+- evidence that any M1 exit criterion is met;
+- permission to continue the parked work it happens to contain.
+
+No M1 exit-gate command was run against it and it records no exit evidence in `history.md`. It is the starting point of this graph and nothing more.
+
+### Not yet true
+
+M1 is **open**. The exit criteria are not met, the final independent audit has not run, and no slot has shifted. Do not read node 1 or node 2 as an M1 close.
 
 ## Parked open issues
 

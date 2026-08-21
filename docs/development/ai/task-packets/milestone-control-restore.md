@@ -22,6 +22,40 @@ Install milestone-based scheduling and the Codex-orchestrator / Claude-or-Grok-w
 - Additional files: `docs/development/milestones.md`, `docs/development/milestone-operating-model.md`, `docs/development/ai/orchestration-protocol.md`
 - Related issue or observation: development stall from review-portfolio burn-down and extra gates
 
+## Plan
+
+The live graph is on `docs/development/milestones.md` under "M1 execution graph (current)". That board is authoritative; this section is the packet-local copy.
+
+```text
+Critical path: classified-worktree snapshot eb4fd0c → board/packet plan completion → integration → M1 focused validation → final independent Grok or Claude audit → M1 exit and slot shift
+Parallel now: board/packet plan-completion packet, independent baseline audit writing audit-latest.md
+Blocked: final independent audit waits on integration; M1 exit and slot shift wait on the final audit and on every validation named on the M1 card
+```
+
+Node states:
+
+| # | Node | State |
+|---|---|---|
+| 1 | Classified-worktree snapshot `eb4fd0c` | done, preservation-only |
+| 2 | Board and packet plan completion | in progress |
+| 3 | Integration of M1 packet worktrees | not started |
+| 4 | M1 focused validation | not started |
+| 5 | Final independent audit (Grok 4.6 or Claude Opus 5, never Codex) | not started |
+| 6 | M1 exit and slot shift | not started |
+
+Snapshot `eb4fd0c` is **preservation-only**: a 339-file, ~198,000-insertion commit of already-accumulated pre-M1 work, product code included, made so the classified worktree survived the session boundary. It is not a clean tree, not a release, not a validated baseline, and not evidence for any M1 exit criterion. No exit-gate command was run against it and it carries no `history.md` exit evidence.
+
+Parallel lanes and their disjoint write sets:
+
+| Lane | Write set |
+|---|---|
+| Board/packet plan completion (this lane) | `docs/development/milestones.md`, `docs/development/ai/task-packets/milestone-control-restore.md` |
+| Independent baseline audit | `docs/development/ai/audit-latest.md` only |
+
+The baseline audit is an observation lane, not node 5. It does not clear the M1 exit.
+
+M1 remains **open**. This packet stays `in_progress`; completing node 2 is not an M1 close and does not shift slots.
+
 ## Scope
 
 Allowed files:
@@ -81,6 +115,16 @@ bash -n /workspace/scripts/dev-agent
 ```
 
 If a command cannot run, report the exact command, failure, environment reason, and review risk.
+
+Lane scoping for node 2 (docs-only, two files, no product code): this lane runs
+
+```bash
+python3 docs/development/tools/check_project_docs.py
+python3 docs/development/tools/check_ai_acceleration_docs.py
+git diff --check -- docs/development/milestones.md docs/development/ai/task-packets/milestone-control-restore.md
+```
+
+`run_milestone_audit.py`, `bash -n /workspace/scripts/dev-agent`, and `/workspace/scripts/test-dev-agent.sh` are **not** run by this lane and remain unsatisfied for the packet as a whole. They belong to node 4 (M1 focused validation) after integration. The full list above is still the packet's exit contract; node 2 does not discharge it.
 
 ## Handoff
 
