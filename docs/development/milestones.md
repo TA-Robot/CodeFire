@@ -16,7 +16,7 @@ This is the only live five-ahead execution board. Historical burn-down narrative
 
 | Slot | ID | Name | Exit (must all be true) | In-scope now |
 |---|---|---|---|---|
-| M1 | `MS-remote-happy-path` | Remote happy path of sealed history | One already sealed commit completes documented `upload -> request-merge -> request-apply` against an isolated file-backed remote; CodeFire reports the applied remote head and a read-only replay confirms it; only the smallest reproduced CFR-168/CFB-136 blocker may be fixed | **Yes** |
+| M1 | `MS-remote-happy-path` | Remote happy path of sealed history | Already sealed history completes documented `upload -> request-merge -> request-review(approve) -> request-apply` against an isolated file-backed remote; CodeFire reports the applied remote head and a read-only replay confirms it; only the smallest reproduced CFR-168/CFB-136 blocker may be fixed | **Yes** |
 | M2 | `MS-adoption-wedge` | First adoption wedge | A second repository can inspect or import without becoming a Git bridge or an agent platform; remaining product experiments record adopt / narrow / stop | No |
 | M3 | `MS-release-operational-trust` | Release and operational trust | A recorded rights/license decision for published artifacts and one independently verified release-and-rollback rehearsal; no public beta label while source gates or release identity are unresolved | No |
 | M4 | `MS-product-value-proof` | First product-value proof | One candidate user segment completes a claims-comprehension and first-seal study with measured setup/friction and an explicit adopt / narrow / stop decision | No |
@@ -31,7 +31,7 @@ Objective: prove that CodeFire can move one already sealed history item through 
 Exact M1 exit (nothing else counts):
 
 - an isolated fixture and exact public commands are selected before any remote mutation;
-- one existing sealed local head completes `upload -> request-merge -> request-apply` on the file-backed happy path;
+- already sealed local history completes `upload -> request-merge -> request-review(approve) -> request-apply` on the file-backed happy path;
 - CodeFire's JSON envelopes identify the remote source/target/MR/applied head, and a separate read-only query confirms the terminal head/state;
 - an independent other-family audit verifies object closure, no partial remote mutation, preservation of canonical dogfood state, and no hidden retry/action loop.
 
@@ -61,10 +61,11 @@ M1 non-goals:
 ## M1 execution graph (current)
 
 ```text
-Critical path: public remote-fixture/happy-path probe -> smallest blocker admission -> isolated remote run/fix -> read-only confirmation -> independent audit -> M1 exit
-Parallel now: node 1 public fixture/command probe; node 2 CFR-168/CFB-136 implementation-residual classification. Both are read-only with disjoint packet writes
-Blocked: node 3 fan-in waits on 1 and 2; every mutation/fix/audit node waits on node 3
-Next legal action: launch both ready packets; do not run upload/request commands or implement before fan-in
+Critical path: isolated file-backed remote run -> read-only confirmation -> independent audit -> M1 exit
+Progress: nodes 1–3 completed; both classifiers parked CFR-168/CFB-136 and node 3 admitted a zero-product-write run packet
+Parallel now: node 4 only — continue the Claude public-fixture session to avoid reloading topology and preservation constraints
+Blocked: nodes 5–7 wait on node 4
+Next legal action: execute `milestone-remote-happy-path-run.md`; do not implement product code
 ```
 
 Nothing on this new M1 graph has run. The prior local sealed commit is an input candidate, not remote-path evidence.
@@ -73,10 +74,10 @@ Nothing on this new M1 graph has run. The prior local sealed commit is an input 
 
 | # | Node | State | Owner | Waits on | Packet | Write set | Evidence |
 |---|---|---|---|---|---|---|---|
-| 1 | Public remote fixture/command probe — derive the smallest isolated file-backed `upload -> request-merge -> request-apply` fixture and stop at the first missing contract | **ready** | Claude Opus 5 or Grok 4.6 | — | `ai/task-packets/milestone-remote-happy-path-probe.md` | that packet only | — |
-| 2 | CFR-168/CFB-136 residual classification — map current implemented state and decide which, if any, smallest slice lies on the exact happy path | **ready** | the other provider family | — | `ai/task-packets/milestone-remote-happy-path-budget.md` | that packet only | — |
-| 3 | Orchestrator fan-in, fixture admission, and run/fix graph | **blocked** | Orchestrator | 1, 2 | written after fan-in | board and new packets only | — |
-| 4 | Isolated remote happy-path run or smallest focused fix | **blocked** | Individual agent | 3 | — | fixed after admission | — |
+| 1 | Public remote fixture/command probe — derive the smallest isolated file-backed fixture and stop at the first missing contract | **completed** | Claude Opus 5 | — | `ai/task-packets/milestone-remote-happy-path-probe.md` | that packet only | `3504bd8` (integrated as `da3e691`); safe closed-branch copy plan; mandatory review gate; observed-field evidence required; CFR-168/CFB-136 park |
+| 2 | CFR-168/CFB-136 residual classification — map current implemented state and decide which, if any, smallest slice lies on the exact happy path | **completed** | Grok 4.6 | — | `ai/task-packets/milestone-remote-happy-path-budget.md` | that packet only | `b8b0a1b`; both park; file-backed owners already exist; no product write unavoidable |
+| 3 | Orchestrator fan-in, fixture admission, and run/fix graph | **completed** | Orchestrator | 1, 2 | this commit | board, history, run packet | four-command sequence admitted; no issue/product fix admitted |
+| 4 | Isolated remote happy-path run | **ready** | persistent Claude node-1 session | 3 | `ai/task-packets/milestone-remote-happy-path-run.md` | isolated temp fixture/remote plus that packet | — |
 | 5 | Read-only terminal confirmation and evidence record | **blocked** | Individual agent, persistent if serially dependent | 4 | — | packet/evidence only | — |
 | 6 | Final independent audit | **blocked** | Other-family audit agent | 5 | `ai/audit-latest.md` | audit file only | — |
 | 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
