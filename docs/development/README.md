@@ -6,7 +6,7 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 Last audited: 2026-08-21.
 
-- Execution is milestone-based. The live board is `docs/development/milestones.md`. `MS-local-sealed-loop` exited on 2026-08-21 with sealed commit `CF-COMMIT-373468dbaf827a6cc2bae9a4`; M1 is now `MS-agent-local-contract`. The two classifications completed: only the reproduced local-loop CFR-170 slice is admitted, CFB-133 was not reproduced, and CFR-169 is parked.
+- Execution is milestone-based. The live board is `docs/development/milestones.md`. `MS-agent-local-contract` has implemented and clean-room replayed its bounded CFR-170 slice, sealing `CF-COMMIT-2792b54ad730e6d644668c38`; final independent audit is the only ready work. CFB-133 was not reproduced and CFR-169 remains parked.
 - Codex orchestrates. Individual and 30-minute audit agents are Claude Opus 5 or Grok 4.6. Codex does not implement or audit.
 - Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
 - CFB detail ledger: 137 total; 135 `fixed`, 2 `investigating`. Open/investigating count: 2.
@@ -53,7 +53,7 @@ Before starting implementation:
 
 ## Current Cleanup Priorities
 
-The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md`: `MS-agent-local-contract`. Its two read-only classification packets are complete; the only ready work is the bounded CFR-170 fix packet. Queued, not started:
+The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md`: `MS-agent-local-contract`. Classification, bounded fix, runner admission, and clean-room replay are complete; the only ready work is the final independent audit. Queued, not started:
 
 1. M2: remote happy path (CFR-168, CFB-136).
 2. M3: adoption wedge (CFR-171, CFR-172, CFR-173).

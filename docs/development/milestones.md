@@ -8,7 +8,7 @@ Last audited: 2026-08-21
 
 Update trigger: M1 exit, M1 blocker admission, or slot shift.
 
-M1 state at `4d0f755`: **fresh clean-room replay ready**. The focused CFR-170 local-action fix passed its 26 focused Rust tests plus source/project docs checks. A source-bound release runner was admitted with Rust manifest `95ee643b…` and binary SHA-256 `207fae94…`. Node 5 is the only ready work.
+M1 state after replay evidence commit `9ee9485`: **final independent audit ready**. The source-blind Claude session consumed structured argv/actions, resolved two real Fires, and sealed `CF-COMMIT-2792b54ad730e6d644668c38` with post-state `open-clean` / Fire 0. No `block-m1` recurred. M1 has not exited.
 
 This is the only live five-ahead execution board. Historical burn-down narrative stays in `current-cycle-burn-down-plan.md` and `history.md`. Those files are not permission to work.
 
@@ -66,11 +66,11 @@ M1 non-goals:
 This is the initial live plan for `MS-agent-local-contract`. It is a concrete graph, not a template.
 
 ```text
-Critical path: fresh clean-room sealed-loop replay → independent other-family audit → M1 exit
-Progress: nodes 1–4 completed; node 4 implemented the bounded action contract at 4d0f755 and the orchestrator admitted its source-bound runner
-Parallel now: node 5 only — continue the source-blind Claude probe session for replay
-Blocked: node 6 waits on node 5
-Next legal action: execute `milestone-agent-local-contract-replay.md`; do not let the implementing session replay its own fix
+Critical path: independent other-family audit → M1 exit and slot shift
+Progress: nodes 1–5 completed; node 5 sealed CF-COMMIT-2792b54ad730e6d644668c38 through public execution metadata with no private command correction
+Parallel now: node 6 only — fresh Grok 4.6 audit session, not the node-4 implementing session
+Blocked: node 7 exit waits on node 6
+Next legal action: audit exact integration HEAD into `ai/audit-latest.md` only; do not exit M1 inside the audit
 ```
 
 The prior sealed-loop transcript is the probe fixture, not evidence that the contract passes. Nodes 1 and 2 ran in parallel from exact base `4185a55` with disjoint packet writes. Node 3 admits only what their evidence requires.
@@ -83,10 +83,11 @@ The prior sealed-loop transcript is the probe fixture, not evidence that the con
 | 2 | CFR-169 ownership-seam classification — decide whether any smallest contract fix actually requires the parked architecture seam | **completed** | Grok 4.6 | — | `ai/task-packets/milestone-agent-local-contract-seam.md` | that packet only | `bcafb9e`; CFR-169 `park`; existing automation/migration/help owners are sufficient |
 | 3 | Orchestrator admission and focused fix graph | **completed** | Orchestrator | 1, 2 | this fan-in commit | board, history, CFR-170 milestone label, new fix packet | only the reproduced CFR-170 local-loop slice admitted; CFB-133 not admitted; CFR-169 parked |
 | 4 | Focused contract fix and tests | **completed** | persistent Grok 4.6 node-2 session | 3 | `ai/task-packets/milestone-agent-local-contract-fix.md` | packet-fixed product/test/schema/public-doc files | `4d0f755`; 24 automation + 1 extinguish + 1 help tests passed; Rust manifest `95ee643b…` |
-| 5 | Fresh clean-room sealed-loop replay | **ready** | persistent Claude Opus 5 source-blind session, not the fix session | 4 + source-matching runner | `ai/task-packets/milestone-agent-local-contract-replay.md` | two exact clean dogfood files, CodeFire state, that packet | runner SHA-256 `207fae94…`; provenance validates against `4d0f755`; pre-status `open-clean` at `CF-COMMIT-373468dbaf827a6cc2bae9a4` |
-| 6 | Final independent audit and M1 exit | **blocked** | Audit agent then orchestrator | 5 | — | audit file, board/history/current-state docs | — |
+| 5 | Fresh clean-room sealed-loop replay | **completed** | persistent Claude Opus 5 source-blind session, not the fix session | 4 + source-matching runner | `ai/task-packets/milestone-agent-local-contract-replay.md` | two exact clean dogfood files, CodeFire state, that packet | `9ee9485`; test 3 pass; Fires `FIRE-26974231BF82` / `FIRE-F530E483B5AF`; sealed `CF-COMMIT-2792b54ad730e6d644668c38`; post `open-clean`, Fire 0; no block-m1 |
+| 6 | Final independent audit | **ready** | fresh Grok 4.6 audit session, not node 4 | 5 | `ai/audit-latest.md` | audit file only | audit exact integration HEAD; rederive runner, action, sealed-state, and preservation evidence |
+| 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | written after audit | board, history, packet, current-state docs | — |
 
-Node 4 stayed with the Grok session that already mapped the relevant owners; Claude's source-blind session remains independent for node 5 replay. The admitted `codefire` hardlink is byte-identical to the provenance-bound `codefire-rs`, so action argv can execute without replacing its public command name.
+Node 4 stayed with the Grok session that already mapped the relevant owners; Claude's source-blind session independently completed node 5. Node 6 deliberately requires a new Grok session: continuity is valuable across dependent implementation work, but reusing the implementing session would invalidate the final audit.
 
 ## Open issue placement
 
