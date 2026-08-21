@@ -12,7 +12,93 @@
     "repo": {"type": ["string", "null"]},
     "data": {"type": "object"},
     "diagnostics": {"type": "array", "items": {"type": "object"}},
-    "next_actions": {"type": "array", "items": {"type": "object"}}
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {"type": "string"},
+          "id": {"type": "string"},
+          "command": {"type": "string"},
+          "reason": {"type": "string"},
+          "description": {"type": "string"},
+          "target": {"type": "object"},
+          "context": {"type": "object"},
+          "execution": {"$ref": "#/$defs/actionExecution"}
+        }
+      }
+    }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "actionExecution": {
+      "type": "object",
+      "required": ["schema", "ready"],
+      "properties": {
+        "schema": {"const": "codefire.action_execution.v1"},
+        "ready": {"type": "boolean"},
+        "argv": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "argv_template": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {"type": "string"},
+              {
+                "type": "object",
+                "required": ["input"],
+                "properties": {"input": {"type": "string", "minLength": 1}},
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required_inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "cli_flag": {"type": "string"},
+              "value_kind": {"type": "string"},
+              "required": {"type": "boolean"},
+              "group": {"type": "string"},
+              "accepts": {"type": "string"},
+              "cli_default": {"type": "string"},
+              "examples": {"type": "array", "items": {"type": "string"}},
+              "notes": {"type": "string"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "required_input_groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "min_selected"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "min_selected": {"type": "integer", "minimum": 1},
+              "notes": {"type": "string"}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"ready": {"const": true}}, "required": ["ready"]},
+          "then": {"required": ["argv"]}
+        },
+        {
+          "if": {"properties": {"ready": {"const": false}}, "required": ["ready"]},
+          "then": {"required": ["argv_template", "required_inputs"]}
+        }
+      ]
+    }
+  }
 }

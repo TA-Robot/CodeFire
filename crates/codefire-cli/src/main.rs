@@ -58,8 +58,8 @@ mod storage;
 mod verification;
 mod view;
 use automation::{
-    change_coverage_data_json, cli_command, command_result_envelope, scan_data_json_with_full,
-    scan_diagnostics_json, scan_next_actions, status_data_json,
+    change_coverage_data_json, cli_command, command_result_envelope, ready_verify_details_action,
+    scan_data_json_with_full, scan_diagnostics_json, scan_next_actions, status_data_json,
     status_next_actions_with_prediction, verification_data_json_with_filter,
     verification_diagnostics_json_with_filter, verification_next_actions,
 };
@@ -1509,7 +1509,7 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--dry-run] [--full] [--json]\n       codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--full] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"from\":\"REQ-id\",\"to\":\"DES-id\",\"reason\":\"manual review\"}]}\n"
         }
         "extinguish" => {
-            "usage: codefire extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>) [--dry-run] [--json]\n       codefire extinguish --batch <file> [--path <open-dir>] [--dry-run] [--full] [--json]\n       codefire extinguish --batch-template [--path <open-dir>] [--resolution <type>] [--rationale <text>|--evidence <text>|--evidence-ref <id>] [--output <file>] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"id\":\"FIRE-1\",\"resolution\":\"addressed\",\"rationale\":\"fixed\"}]}\n"
+            "usage: codefire extinguish <fire-id> [--path <open-dir>] --resolution <type> (--rationale <text>|--evidence <text>|--evidence-ref <id>) [--dry-run] [--json]\n       codefire extinguish --batch <file> [--path <open-dir>] [--dry-run] [--full] [--json]\n       codefire extinguish --batch-template [--path <open-dir>] [--resolution <type>] [--rationale <text>|--evidence <text>|--evidence-ref <id>] [--output <file>] [--json]\n\n--resolution is an extensible string, not a closed enum; omitting it defaults to addressed. Common examples: addressed, changed, no-change-required. Supply at least one of --rationale, --evidence, or --evidence-ref.\nJSON next_actions may include optional execution metadata (schema codefire.action_execution.v1): ready=true actions expose a complete argv for exec without a shell; ready=false actions require named required_inputs before they are executable. The command string is a compatibility projection of that argv or argv_template.\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"id\":\"FIRE-1\",\"resolution\":\"addressed\",\"rationale\":\"fixed\"}]}\n"
         }
         "commit" => {
             "usage: codefire commit [path|--path <open-dir>] -m <message> [--dry-run] [--json] [--idempotency-key <key>]\n"
@@ -7678,7 +7678,11 @@ fn extinguish_operation_plan(
             {"kind": "append_resolution", "path": active_state_path.join("resolutions.json"), "resolution_uid": resolution_uid},
         ],
         "next_actions": [
-            {"kind": "verify", "command": "codefire verify --details --json", "target": {"branch": &context.branch}},
+            ready_verify_details_action(
+                &context.branch,
+                &context.open_dir,
+                Some(&context.repo_root),
+            ),
         ],
     })
 }

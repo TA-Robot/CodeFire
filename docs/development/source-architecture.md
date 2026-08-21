@@ -37,7 +37,7 @@ No machine may infer a stronger claim than its inputs. In particular, an automat
 |---|---|
 | `active_state` | pinned active-instance capability, bounded no-follow relative file I/O, identity rechecks, and deterministic transactional tree removal. | <!-- module: active_state -->
 | `assessment_subject` | canonical live-open and sealed-pair assessment identities shared by context, explain, verification, review, and certificates. | <!-- module: assessment_subject -->
-| `automation` | `codefire.command_result.v1`, diagnostics, bounded `next_actions`, state/scan/verification JSON. | <!-- module: automation -->
+| `automation` | `codefire.command_result.v1`, diagnostics, bounded `next_actions`, optional `codefire.action_execution.v1` on admitted local-loop actions, state/scan/verification JSON. | <!-- module: automation -->
 | `batch` | extinguish batch parsing, validation, planning, rendering, and shared active-ledger reducer integration. | <!-- module: batch -->
 | `branch_refs` | pinned `.codefire`/branch/opened directory capabilities, membership/document capture, retained-byte ownership, and final subject revalidation for local branch listing. | <!-- module: branch_refs -->
 | `cli_model` | shared command option/result types and the `OpenContextAuthority` proof carrier; no filesystem behavior. | <!-- module: cli_model -->

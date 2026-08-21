@@ -472,7 +472,7 @@ Every Rust command with declared JSON support uses this top-level shape:
 }
 ```
 
-There is no top-level payload `type`. `next_actions` are normalized and bounded; command-specific payloads/plans live under `data`.
+There is no top-level payload `type`. `next_actions` are normalized and bounded; command-specific payloads/plans live under `data`. Existing action fields remain. Admitted local-loop actions may add optional `execution` (`codefire.action_execution.v1`) with either ready `argv` or parameterized `argv_template` plus `required_inputs`; `command` on those actions is a projection of that object.
 
 Stage 1 contextual failures preserve their subject: `OpenTargetResolution` renders `open_target_resolution_failed` with reason/repo/branch/requested/resolved/boundary fields; `CoreContext` renders endpoint failures as `trace_graph_endpoint_integrity` with repo/path and bounded total/omitted issues; `StoreContext` renders `sealed_commit_invalid`, `object_not_found`, or full-identity `object_id_collision` with repo/path when known. Link-batch dry-run data separately exposes `diagnostic_total` and `diagnostics_omitted` beside its bounded detail array. Its plan uses full `item_count`, at most 100 projected `items`, and `items_omitted`; live success uses full `added_link_count`, at most 100 projected `added_links`, and `added_links_omitted`. Projected from/to/type strings reuse the 256-byte UTF-8-safe truncation fields.
 

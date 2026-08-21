@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 pub(crate) const COMMAND_RESULT_SCHEMA: &str = "codefire.command_result.v1";
+pub(crate) const ACTION_EXECUTION_SCHEMA: &str = "codefire.action_execution.v1";
 pub(crate) const CLI_DISPLAY_NAME: &str = "codefire";
 pub(crate) const MAX_NEXT_ACTIONS: usize = 12;
 pub(crate) const MAX_SCAN_JSON_SAMPLE: usize = 50;
@@ -363,24 +364,7 @@ pub(crate) fn scan_next_actions(
                 action_path,
             ),
         ));
-        actions.push(next_action(
-            "extinguish_fire",
-            cli_command(path_command(
-                format!(
-                    "extinguish {} --resolution <type> --rationale <text>",
-                    fire.display_id
-                ),
-                action_path,
-            )),
-            "record a resolution for the open fire",
-            action_target(
-                json!({
-                    "display_id": &fire.display_id,
-                    "fire_uid": &fire.fire_uid,
-                }),
-                action_path,
-            ),
-        ));
+        actions.push(extinguish_fire_next_action(fire, action_path));
     }
     if actions.is_empty() {
         actions.push(next_action(
@@ -596,12 +580,7 @@ pub(crate) fn verification_next_actions(
     let decision = committable_decision(verification);
     if decision.is_committable() {
         if has_pending_scan_changes(scan) {
-            actions.push(next_action(
-                "commit",
-                cli_command(path_command("commit -m <message>", action_path)),
-                "seal the verified open branch",
-                action_target(pending_changes_target(scan), action_path),
-            ));
+            actions.push(commit_message_next_action(scan, action_path));
         } else {
             actions.push(next_action(
                 "status",
@@ -890,6 +869,228 @@ fn command_arg(value: &str) -> String {
     }
 }
 
+fn argv_literal(value: impl Into<String>) -> Value {
+    Value::String(value.into())
+}
+
+fn argv_input(name: &'static str) -> Value {
+    json!({"input": name})
+}
+
+pub(crate) fn ready_execution(argv: Vec<String>) -> Value {
+    json!({
+        "schema": ACTION_EXECUTION_SCHEMA,
+        "ready": true,
+        "argv": argv,
+    })
+}
+
+pub(crate) fn parameterized_execution(
+    argv_template: Vec<Value>,
+    required_inputs: Vec<Value>,
+    required_input_groups: Vec<Value>,
+) -> Value {
+    let mut execution = json!({
+        "schema": ACTION_EXECUTION_SCHEMA,
+        "ready": false,
+        "argv_template": argv_template,
+        "required_inputs": required_inputs,
+    });
+    if !required_input_groups.is_empty() {
+        execution["required_input_groups"] = Value::Array(required_input_groups);
+    }
+    execution
+}
+
+fn command_from_execution(execution: &Value) -> String {
+    let ready = execution.get("ready").and_then(Value::as_bool) == Some(true);
+    let parts = if ready {
+        execution.get("argv")
+    } else {
+        execution.get("argv_template")
+    }
+    .and_then(Value::as_array)
+    .map(Vec::as_slice)
+    .unwrap_or(&[]);
+    command_from_argv_parts(parts)
+}
+
+fn command_from_argv_parts(parts: &[Value]) -> String {
+    let rendered = parts.iter().map(render_argv_part).collect::<Vec<_>>();
+    match rendered.split_first() {
+        Some((first, rest)) if first == CLI_DISPLAY_NAME => {
+            if rest.is_empty() {
+                CLI_DISPLAY_NAME.to_string()
+            } else {
+                format!("{CLI_DISPLAY_NAME} {}", rest.join(" "))
+            }
+        }
+        Some(_) => rendered.join(" "),
+        None => CLI_DISPLAY_NAME.to_string(),
+    }
+}
+
+fn render_argv_part(part: &Value) -> String {
+    if let Some(text) = part.as_str() {
+        if text == CLI_DISPLAY_NAME {
+            return text.to_string();
+        }
+        return command_arg(text);
+    }
+    if let Some(name) = part.get("input").and_then(Value::as_str) {
+        return format!("<{name}>");
+    }
+    command_arg(&part.to_string())
+}
+
+pub(crate) fn executable_next_action(
+    kind: impl Into<String>,
+    reason: impl Into<String>,
+    target: Value,
+    execution: Value,
+) -> Value {
+    let command = command_from_execution(&execution);
+    let mut action = next_action(kind, command, reason, target);
+    if let Some(map) = action.as_object_mut() {
+        map.insert("execution".to_string(), execution);
+    }
+    action
+}
+
+fn path_string(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+fn extinguish_fire_next_action(fire: &codefire_core::Fire, action_path: Option<&Path>) -> Value {
+    let mut argv_template = vec![
+        argv_literal(CLI_DISPLAY_NAME),
+        argv_literal("extinguish"),
+        argv_literal(fire.display_id.clone()),
+        argv_literal("--resolution"),
+        argv_input("resolution"),
+    ];
+    if let Some(path) = action_path {
+        argv_template.push(argv_literal("--path"));
+        argv_template.push(argv_literal(path_string(path)));
+    }
+    argv_template.push(argv_literal("--json"));
+    executable_next_action(
+        "extinguish_fire",
+        "record a resolution for the open fire; fill required_inputs before executing",
+        action_target(
+            json!({
+                "display_id": &fire.display_id,
+                "fire_uid": &fire.fire_uid,
+            }),
+            action_path,
+        ),
+        parameterized_execution(
+            argv_template,
+            vec![
+                json!({
+                    "name": "resolution",
+                    "cli_flag": "--resolution",
+                    "value_kind": "string",
+                    "required": true,
+                    "accepts": "extensible_string",
+                    "cli_default": "addressed",
+                    "examples": ["addressed", "changed", "no-change-required"],
+                    "notes": "resolution type is an extensible string; the CLI does not constrain it to a closed enum. If the flag is omitted the parser defaults to addressed. no-change-required additionally requires --rationale when policy requires it.",
+                }),
+                json!({
+                    "name": "rationale",
+                    "cli_flag": "--rationale",
+                    "value_kind": "string",
+                    "required": false,
+                    "group": "rationale_or_evidence",
+                }),
+                json!({
+                    "name": "evidence",
+                    "cli_flag": "--evidence",
+                    "value_kind": "string",
+                    "required": false,
+                    "group": "rationale_or_evidence",
+                }),
+                json!({
+                    "name": "evidence_ref",
+                    "cli_flag": "--evidence-ref",
+                    "value_kind": "string",
+                    "required": false,
+                    "group": "rationale_or_evidence",
+                }),
+            ],
+            vec![json!({
+                "name": "rationale_or_evidence",
+                "min_selected": 1,
+                "notes": "supply at least one of --rationale, --evidence, or --evidence-ref",
+            })],
+        ),
+    )
+}
+
+fn commit_message_next_action(
+    scan: &codefire_core::ScanResult,
+    action_path: Option<&Path>,
+) -> Value {
+    let mut argv_template = vec![
+        argv_literal(CLI_DISPLAY_NAME),
+        argv_literal("commit"),
+        argv_literal("-m"),
+        argv_input("message"),
+    ];
+    if let Some(path) = action_path {
+        argv_template.push(argv_literal("--path"));
+        argv_template.push(argv_literal(path_string(path)));
+    }
+    argv_template.push(argv_literal("--json"));
+    executable_next_action(
+        "commit",
+        "seal the verified open branch after supplying a caller-authored message",
+        action_target(pending_changes_target(scan), action_path),
+        parameterized_execution(
+            argv_template,
+            vec![json!({
+                "name": "message",
+                "cli_flag": "-m",
+                "value_kind": "string",
+                "required": true,
+                "notes": "caller-authored commit message",
+            })],
+            Vec::new(),
+        ),
+    )
+}
+
+pub(crate) fn ready_verify_details_action(
+    branch: &str,
+    open_dir: &Path,
+    repo_root: Option<&Path>,
+) -> Value {
+    let open_dir_str = path_string(open_dir);
+    let argv = vec![
+        CLI_DISPLAY_NAME.to_string(),
+        "verify".to_string(),
+        "--details".to_string(),
+        "--json".to_string(),
+        "--path".to_string(),
+        open_dir_str.clone(),
+    ];
+    let mut target = json!({
+        "branch": branch,
+        "path": open_dir_str,
+        "open_dir": open_dir_str,
+    });
+    if let Some(repo_root) = repo_root {
+        target["repo_root"] = json!(path_string(repo_root));
+    }
+    executable_next_action(
+        "verify",
+        "run policy checks against the changed branch",
+        target,
+        ready_execution(argv),
+    )
+}
+
 fn normalize_next_action(action: Value) -> Value {
     let Some(object) = action.as_object() else {
         return next_action(
@@ -921,13 +1122,24 @@ fn normalize_next_action(action: Value) -> Value {
         .or_else(|| object.get("context"))
         .cloned()
         .unwrap_or_else(|| json!({}));
+    let projected_command = object
+        .get("execution")
+        .filter(|execution| execution.is_object())
+        .map(command_from_execution)
+        .filter(|projected| !projected.is_empty());
+    let has_execution_command = projected_command.is_some();
+    let command = projected_command.unwrap_or(command);
     let mut normalized = action;
     if let Some(map) = normalized.as_object_mut() {
         map.entry("kind")
             .or_insert_with(|| Value::String(kind.clone()));
         map.entry("id").or_insert_with(|| Value::String(kind));
-        map.entry("command")
-            .or_insert_with(|| Value::String(command));
+        if has_execution_command {
+            map.insert("command".to_string(), Value::String(command));
+        } else {
+            map.entry("command")
+                .or_insert_with(|| Value::String(command));
+        }
         map.entry("reason")
             .or_insert_with(|| Value::String(reason.clone()));
         map.entry("description")
@@ -1185,6 +1397,66 @@ mod tests {
     }
 
     #[test]
+    fn scan_extinguish_fire_action_is_parameterized_with_named_inputs() {
+        let mut scan = empty_scan();
+        scan.open_fires.push(test_fire("FIRE-001"));
+        let actions = scan_next_actions(&scan, Some(Path::new("/tmp/open dir")));
+        let action = actions
+            .iter()
+            .find(|action| action["kind"] == "extinguish_fire")
+            .expect("extinguish_fire action");
+        let execution = &action["execution"];
+
+        assert_eq!(execution["schema"], ACTION_EXECUTION_SCHEMA);
+        assert_eq!(execution["ready"], false);
+        assert_eq!(
+            action["command"],
+            "codefire extinguish FIRE-001 --resolution <resolution> --path '/tmp/open dir' --json"
+        );
+        assert!(!action["command"]
+            .as_str()
+            .unwrap()
+            .contains("--path /tmp/open dir"));
+        assert_eq!(action["target"]["path"], "/tmp/open dir");
+        assert_eq!(action["target"]["display_id"], "FIRE-001");
+        assert_eq!(
+            execution["argv_template"],
+            json!([
+                "codefire",
+                "extinguish",
+                "FIRE-001",
+                "--resolution",
+                {"input": "resolution"},
+                "--path",
+                "/tmp/open dir",
+                "--json"
+            ])
+        );
+        assert_eq!(execution["required_inputs"][0]["name"], "resolution");
+        assert_eq!(
+            execution["required_inputs"][0]["accepts"],
+            "extensible_string"
+        );
+        assert!(execution["required_inputs"][0].get("enum").is_none());
+        assert_eq!(
+            execution["required_input_groups"][0]["name"],
+            "rationale_or_evidence"
+        );
+        assert_eq!(execution["required_input_groups"][0]["min_selected"], 1);
+        let envelope = command_result_envelope(
+            "scan",
+            true,
+            0,
+            None,
+            json!({}),
+            Vec::new(),
+            vec![action.clone()],
+        );
+        assert_eq!(envelope["next_actions"][0]["execution"]["ready"], false);
+        assert_eq!(envelope["next_actions"][0]["command"], action["command"]);
+    }
+
+    #[test]
     fn bounded_next_actions_report_omitted_kinds_and_recovery_command() {
         let mut scan = empty_scan();
         scan.changed_atoms.push("REQ-session".to_string());
@@ -1382,6 +1654,77 @@ mod tests {
         assert_eq!(actions[0]["kind"], "commit");
         assert_eq!(actions[0]["target"]["pending_changes"], true);
         assert_eq!(actions[0]["target"]["changed_atoms"][0], "REQ-session");
+    }
+
+    #[test]
+    fn verification_commit_action_is_parameterized_by_message_and_preserves_path() {
+        let verification = passed_verification();
+        let mut scan = empty_scan();
+        scan.changed_atoms.push("REQ-session".to_string());
+        let actions = verification_next_actions(
+            &verification,
+            &scan,
+            false,
+            Some(Path::new("/tmp/open dir")),
+        );
+        let action = &actions[0];
+        let execution = &action["execution"];
+
+        assert_eq!(action["kind"], "commit");
+        assert_eq!(execution["schema"], ACTION_EXECUTION_SCHEMA);
+        assert_eq!(execution["ready"], false);
+        assert_eq!(
+            action["command"],
+            "codefire commit -m <message> --path '/tmp/open dir' --json"
+        );
+        assert_eq!(action["target"]["path"], "/tmp/open dir");
+        assert_eq!(
+            execution["argv_template"],
+            json!([
+                "codefire",
+                "commit",
+                "-m",
+                {"input": "message"},
+                "--path",
+                "/tmp/open dir",
+                "--json"
+            ])
+        );
+        assert_eq!(execution["required_inputs"][0]["name"], "message");
+        assert_eq!(execution["required_inputs"][0]["required"], true);
+        assert_eq!(execution["required_inputs"][0]["cli_flag"], "-m");
+    }
+
+    #[test]
+    fn ready_verify_details_action_binds_path_in_argv_without_shell_tokens() {
+        let action = ready_verify_details_action(
+            "main",
+            Path::new("/tmp/open dir"),
+            Some(Path::new("/tmp/repo")),
+        );
+        let execution = &action["execution"];
+
+        assert_eq!(execution["schema"], ACTION_EXECUTION_SCHEMA);
+        assert_eq!(execution["ready"], true);
+        assert_eq!(
+            execution["argv"],
+            json!([
+                "codefire",
+                "verify",
+                "--details",
+                "--json",
+                "--path",
+                "/tmp/open dir"
+            ])
+        );
+        assert_eq!(
+            action["command"],
+            "codefire verify --details --json --path '/tmp/open dir'"
+        );
+        assert_eq!(action["target"]["path"], "/tmp/open dir");
+        assert_eq!(action["target"]["open_dir"], "/tmp/open dir");
+        assert_eq!(action["target"]["repo_root"], "/tmp/repo");
+        assert_eq!(action["target"]["branch"], "main");
     }
 
     #[test]

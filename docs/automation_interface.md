@@ -58,7 +58,34 @@ kind: stable action class
 command: suggested command or shell command
 reason: short machine-readable remediation reason
 target: action-specific target object
+execution: optional codefire.action_execution.v1 object
 ```
+
+Existing v1 fields are not renamed or removed. An action may omit `execution`; consumers must ignore unknown fields.
+
+When `execution` is present:
+
+```text
+schema: codefire.action_execution.v1
+ready: true means argv is complete and must be executed without a shell
+ready: false means the action is parameterized; fill required_inputs before executing
+argv: shell-free argv for a ready action, including the codefire display name
+argv_template: argv with {"input": "<name>"} slots for a parameterized action
+required_inputs: named caller-supplied values, including cli_flag and value_kind
+required_input_groups: groups such as rationale_or_evidence that require min_selected members
+```
+
+On actions that carry `execution`, `command` is a compatibility projection of `argv` or `argv_template` (placeholders render as `<name>`). It is not a separately authored executable string. A `ready: false` action must not be treated as directly executable.
+
+The local sealed-loop transitions currently publish `execution`:
+
+```text
+scan extinguish_fire: ready=false; required resolution (extensible string, not a closed enum) plus at least one of rationale/evidence/evidence_ref; fire and --path binding
+extinguish verify: ready=true; argv contains --path <open_dir> matching command and target.path/open_dir
+verify commit: ready=false; required caller-authored message; open-directory path preserved in argv_template and target
+```
+
+`--resolution` accepts an extensible string. The CLI parser defaults to `addressed` if the flag is omitted. Common examples include `addressed`, `changed`, and `no-change-required`; those examples are not a closed enum.
 
 `next_actions` is bounded to at most 12 entries per command result envelope. When additional actions are available, the final entry has `kind: "next_actions_omitted"` and includes `target.omitted` plus `target.limit`.
 

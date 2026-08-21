@@ -305,6 +305,7 @@ data.non_atom_changed_filesはpath/status/base_blob/current_blobを含むbounded
 data.change_coverageはsummary、optional tool_migration、digestとbounded entry sampleを返し、entries_omitted/entries_truncatedで省略を示す。`--full`は全entryを返す。永続verification/commit certificateはsampleではなく同じ完全contract/digestへ束縛する
 --full --jsonはchanged atom IDとopen fireを全量返す
 --jsonはchanged atoms、open fires、verifyに進むためのmachine-readable next_actionsを含める
+scanの`extinguish_fire` next_actionはready=falseのparameterized executionであり、fire/path bindingとresolutionおよびrationale/evidenceのnamed required_inputsを持つ。resolutionはclosed enumではなくextensible stringである。commandはargv_templateのprojectionであり、placeholderを実行可能とは表示しない
 --metricsはtext出力ではCodeFire metrics block、JSON出力ではdata.metricsを追加する
 metricsは `total_ms` / `scan_pipeline_ms` / `atom_extraction_ms` / `trace_parse_ms` / `fire_build_ms` の安定phase key、`phases[].measured`、cache status metadataを含める
 ```
@@ -400,6 +401,8 @@ basisとしてsource/target/link/policy hashを保存する
 --evidence-refが存在しない、またはevidence以外のobjectを指す場合は拒否する
 --edit-rationaleはCODEFIRE_EDITORまたはEDITORで一時draftを開き、保存後の本文をrationaleとして使う
 --dry-runはfire/resolution ledgerを書き換えず、codefire_operation_planを返す
+単発extinguish --jsonのnext_actionsはready=trueのverify actionで、argv/command/targetが同じ`--path <open_dir>`を持つ。targetはpath/open_dir/repo_rootを含む
+--resolutionはextensible stringでありclosed enumではない。省略時のparser defaultはaddressed。例: addressed, changed, no-change-required
 --idempotency-keyは成功したextinguish resultを.codefire/idempotency/extinguish/へ記録する
 同じ--idempotency-keyかつ同じextinguish request payloadは保存済みextinguish resultを返し、新しいledger entryを作らない
 同じ--idempotency-keyでfire/resolution/rationale/evidence/evidence-ref/refresh/open_dir/branchが異なるpayloadはexit code 33で拒否する
@@ -460,6 +463,7 @@ resolution.evidence_refsが存在しないevidence objectを指す場合はmissi
 --blocking-onlyはblocking diagnosticsだけを表示/返すことを明示する。JSON data.diagnostic_filterはblocking_onlyになる
 require_trace_completeness=falseのmissing_required_linkはseverity=warning/blocking=falseになり、--blocking-only diagnosticsから除外される
 --jsonはcodefire.command_result.v1 envelopeを出力し、verification data、policy-aware diagnostics、next_actionsを含める
+committableかつpending changesがある場合のcommit next_actionはready=falseで、caller-authored messageをrequired inputとし、open directory pathをargv_templateとtargetに保持する
 verification dataは`profile=local_verification_v1`、`phase=post_execution`、versioned `subject`、bounded execution metadataを落とさず返す
 verification dataの`decision`は`outcome`、`primary_reason`、順序付き`blocking_reasons` / `warning_reasons`を持ち、既存`result`はoutcomeの互換projectionである
 --jsonのexit_codeはprocess exit codeと一致する

@@ -486,6 +486,10 @@ fn extinguish_help_documents_batch_wrapper_schema() {
 
     assert!(help.contains("Batch JSON example"));
     assert!(help.contains("{\"version\":1,\"fires\""));
+    assert!(help.contains("extensible string, not a closed enum"));
+    assert!(help.contains("codefire.action_execution.v1"));
+    assert!(help.contains("ready=true"));
+    assert!(help.contains("required_inputs"));
 }
 
 fn assert_batch_missing_envelope(command: &str, error: &CliError) {
@@ -7621,6 +7625,31 @@ fn extinguish_dry_run_returns_plan_without_writing_ledgers() {
     assert_eq!(result.plan["type"], "codefire_operation_plan");
     assert_eq!(result.plan["command"], "extinguish");
     assert_eq!(result.plan["dry_run"], true);
+    let verify = &result.plan["next_actions"][0];
+    assert_eq!(verify["kind"], "verify");
+    assert_eq!(verify["execution"]["ready"], true);
+    assert_eq!(
+        verify["execution"]["argv"],
+        json!([
+            "codefire",
+            "verify",
+            "--details",
+            "--json",
+            "--path",
+            open_dir
+        ])
+    );
+    assert_eq!(
+        verify["target"]["path"],
+        open_dir.to_string_lossy().as_ref()
+    );
+    assert_eq!(
+        verify["target"]["open_dir"],
+        open_dir.to_string_lossy().as_ref()
+    );
+    let command = verify["command"].as_str().unwrap();
+    assert!(command.contains("--path"));
+    assert!(command.contains(open_dir.to_string_lossy().as_ref()));
     assert!(!active.join("fires.json").exists());
     assert!(!active.join("resolutions.json").exists());
     assert_eq!(read_status(&open_dir).unwrap().state, "open-clean");
