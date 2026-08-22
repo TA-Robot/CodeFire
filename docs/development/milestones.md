@@ -77,11 +77,11 @@ M1 non-goals:
 ## M1 execution graph (current)
 
 ```text
-Critical path: fresh source-bound build -> atomic local publication -> independent operator verification/install/rollback -> final audit -> M1 exit
-Progress: nodes 1–3 completed; both classifiers found no product blocker, fan-in admits an internal-only rehearsal and no node-4 fix
-Parallel now: none — node 5a is the single serial build/publication lane and stays with the persistent Grok topology owner
-Blocked: nodes 5b–7 wait on the fresh candidate and operator handoff
-Next legal action: execute `milestone-release-operational-trust-run.md` Stage A; no external publication or retained-runner reuse
+Critical path: independent operator verification/install/rollback -> final audit -> M1 exit
+Progress: nodes 1–5a completed; fresh source-bound candidate is atomically published under the isolated release root with internal-only rights fields
+Parallel now: none — node 5b is the independent fresh-operator lane
+Blocked: nodes 6–7 wait on operator verification and rollback evidence
+Next legal action: execute `milestone-release-operational-trust-run.md` Stage B once; no rebuild, external publication, or private correction
 ```
 
 ### Nodes
@@ -92,8 +92,8 @@ Next legal action: execute `milestone-release-operational-trust-run.md` Stage A;
 | 2 | Release/verify/rollback topology — derive the smallest isolated artifact and independent-operator procedure | **completed** | Grok 4.6 | — | `ai/task-packets/milestone-release-operational-trust-rehearsal.md` | that packet only | `cfafb5f` (integrated as `b6adfc9`); fresh build required, local atomic pointer/isolated rollback, no product blocker |
 | 3 | Orchestrator fan-in and bounded rehearsal/fix admission | **completed** | Orchestrator | 1, 2 | `ai/task-packets/milestone-release-operational-trust-run.md` | board plus run packet | internal-only exact artifact set admitted; internal strategy doc removed; no node-4 fix |
 | 4 | Smallest reproduced release-contract fix, if any | **not required** | — | 3 | — | — | both lanes found none; no source/package/licence edit admitted |
-| 5a | Source-bound artifact build and isolated local publication | **ready** | persistent Grok node-2 session | 3 | `ai/task-packets/milestone-release-operational-trust-run.md` | isolated release root plus run packet | — |
-| 5b | Fresh operator verification, isolated install/smoke, and rollback | **blocked** | fresh other-family operator | 5a | — | handed release root/evidence only | — |
+| 5a | Source-bound artifact build and isolated local publication | **completed** | persistent Grok node-2 session | 3 | `ai/task-packets/milestone-release-operational-trust-run.md` | isolated release root plus run packet | `76975ea` (integrated as `34ec8f5`); source `01a4de0`, provenance `7998bcf6…`, atomic current pointer, internal-only candidate root `/tmp/codefire-m1-release.vT1Uzs` |
+| 5b | Fresh operator verification, isolated install/smoke, and rollback | **ready** | fresh Claude Opus 5 operator | 5a | `ai/task-packets/milestone-release-operational-trust-run.md` | handed release root/evidence plus packet only | one pass; prefix/prior start empty |
 | 6 | Final independent audit | **blocked** | fresh other-family audit agent | 5b | `ai/audit-latest.md` | audit file only | — |
 | 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
 
