@@ -8,10 +8,9 @@ Last audited: 2026-08-22
 
 Update trigger: M1 exit, M1 blocker admission, or slot shift.
 
-`MS-remote-happy-path` exited after attempt 3 completed the isolated file-backed collaboration path,
-a distinct read-only confirmation pass, and a fresh Grok audit. The audit authorized the exit at
-integration HEAD `68a94b4`; its follow-up commit `51e3164` confirmed the docs-only manifest correction.
-The active milestone is now `MS-adoption-wedge`. No adoption experiment or later-slot work has run.
+`MS-adoption-wedge` exited after the source-blind post-B1 rerun scored 7/7 with zero undocumented
+field reliance and the fresh Grok node-6 audit returned `ACCEPT` with no `block-m1`. The active
+milestone is now `MS-release-operational-trust`. No release rehearsal or later-slot work has run.
 
 This is the only live five-ahead execution board. Historical burn-down narrative stays in
 `current-cycle-burn-down-plan.md` and `history.md`; those files are not permission to work.
@@ -20,44 +19,43 @@ This is the only live five-ahead execution board. Historical burn-down narrative
 
 | Slot | ID | Name | Exit (must all be true) | In-scope now |
 |---|---|---|---|---|
-| M1 | `MS-adoption-wedge` | First adoption wedge | A second repository or clean-room consumer completes one bounded inspect-or-import path without a Git bridge or agent platform; preservation and comprehension are measured; the experiment records adopt / narrow / stop | **Yes** |
-| M2 | `MS-release-operational-trust` | Release and operational trust | A recorded rights/license decision for published artifacts and one independently verified release-and-rollback rehearsal; no public beta label while source gates or release identity are unresolved | No |
-| M3 | `MS-product-value-proof` | First product-value proof | One candidate user segment completes a claims-comprehension and first-seal study with measured setup/friction and an explicit adopt / narrow / stop decision | No |
-| M4 | `MS-ecosystem-conformance-seed` | Ecosystem interoperability seed | One maturity-labelled public profile plus extension rules is consumed by one independently authored adapter/client that passes its bounded conformance corpus | No |
-| M5 | `MS-ecosystem-multi-implementation-proof` | Ecosystem multi-implementation proof | A second independent integration from a distinct organization consumes a compatibility-preserving profile update and passes the bounded conformance corpus; formal standards/governance remain roadmap work | No |
+| M1 | `MS-release-operational-trust` | Release and operational trust | A recorded rights/license decision for rehearsed artifacts and one independently verified release-and-rollback rehearsal; no public beta label while source gates or release identity are unresolved | **Yes** |
+| M2 | `MS-product-value-proof` | First product-value proof | One candidate user segment completes a claims-comprehension and first-seal study with measured setup/friction and an explicit adopt / narrow / stop decision | No |
+| M3 | `MS-ecosystem-conformance-seed` | Ecosystem interoperability seed | One maturity-labelled public profile plus extension rules is consumed by one independently authored adapter/client that passes its bounded conformance corpus | No |
+| M4 | `MS-ecosystem-multi-implementation-proof` | Ecosystem multi-implementation proof | A second independent integration from a distinct organization consumes a compatibility-preserving profile update and passes the bounded conformance corpus; formal standards/governance remain roadmap work | No |
+| M5 | `MS-ecosystem-third-organization-proof` | Ecosystem third-organization proof | A third distinct organization consumes the stable public profile without a compatibility exception and passes the bounded conformance corpus; release-cycle and formal-governance gates remain roadmap work | No |
 
-M2–M5 are bounded slices of roadmap Stages 4–6, not copies of those stages.
+M1–M5 are bounded slices of roadmap Stages 4–6, not copies of those stages.
 `strategy/modernization-roadmap.md` remains a stage/gate roadmap and must not become a second task board.
 
-## M1 card — First adoption wedge
+## M1 card — Release and operational trust
 
-Objective: prove or falsify that a second repository or source-blind consumer can obtain a useful,
-truthful CodeFire result with a small read-only or isolated-import surface, without turning CodeFire
-into a Git bridge, telemetry service, or agent platform.
+Objective: prove or falsify that one exact CodeFire artifact set can be identified, locally published,
+independently verified, installed into an isolated prefix, and rolled back without pretending the
+project already has public-release rights, SemVer, signing, or operational maturity it has not earned.
 
 Exact M1 exit (nothing else counts):
 
-- the second repository/consumer, exact public surface, task, falsifier, measurements, and stop rule
-  are selected before any experiment mutation;
-- one bounded inspect-or-import experiment completes, with before/after preservation hashes for every
-  repository not explicitly admitted as an isolated target;
-- the consumer identifies repository, branch, base/head, claim/proof kind, and any missing authority
-  without source code or private clarification, or the failure is retained as the terminal result;
-- setup time, time to first useful result, misunderstanding/wrong-action count, and maintenance cost
-  are recorded with an explicit adopt / narrow / stop decision;
-- an independent other-family audit verifies the evidence, preservation boundary, and absence of a
-  hidden Git bridge, mutation authority, telemetry collection, or agent-orchestration dependency.
+- the rehearsed Rust/Python/docs artifacts have an explicit rights/license and source-identity decision;
+  a missing right remains a public-distribution blocker rather than being inferred from repository access;
+- one exact source revision, version-axis statement, artifact manifest, checksum/provenance set, local
+  publication target, verification procedure, isolated install target, and rollback target are fixed
+  before the rehearsal mutates its isolated release area;
+- a separate operator follows only the recorded release/verify/rollback handoff, verifies identity and
+  checksums, exercises the bounded artifact, and restores the declared prior state with before/after hashes;
+- the result records publishable / internal-only / stop, unresolved signing/SBOM/support/security limits,
+  and explicitly refuses a public beta label while source or release identity is unresolved;
+- an independent other-family audit verifies the rights record, source binding, artifact closure,
+  preservation boundary, operator independence, rollback result, and absence of hidden external publication.
 
 Issue inputs:
 
-- CFR-171: admit only the smallest claim/proof descriptor slice actually required by the selected
-  independent consumer;
-- CFR-172: primary bounded read-only adoption/mental-model experiment input;
-- CFR-173: admit only the measurement, falsifier, privacy, and terminal-decision slice required by
-  this one experiment.
+- no open CFB/CFR root is pre-admitted;
+- a root may enter only if one of the two read-only classifiers reproduces it as the smallest blocker
+  of the exact rights decision or isolated release/verify/rollback path.
 
-The two classification packets are read-only and may not implement, mutate canonical repositories,
-start a broad pilot, or work on M2–M5.
+The two classification packets are read-only and may not publish externally, build or install, change
+license text, mutate canonical repositories, or work on M2–M5.
 
 M1 validation is packet-scoped. Every admitted run/fix packet must name exact commands, subjects,
 hashes, and focused tests. Standing management checks:
@@ -69,47 +67,39 @@ python3 docs/development/tools/check_ai_acceleration_docs.py
 
 M1 non-goals:
 
-- a Git compatibility writer/bridge, background telemetry, hosted service, or agent marketplace;
-- full CFR-171 cross-surface descriptor implementation unless the selected consumer reproduces it as
-  the smallest unavoidable blocker;
-- broad user research, multi-repository/team pilots, release work, product-economics work, or
-  ecosystem standardization;
-- CFR-168/CFB-136 residuals, CFB-133, CFR-169, or CFR-170;
-- mutating canonical Algorithm or treating `/workspace/project` as a general write set;
+- a public GitHub/PyPI/crates.io release, public beta claim, external upload, or credential use;
+- inventing legal permission, changing copyright/license ownership, or treating an audit as legal advice;
+- completing every Stage 4 policy, production signing, two-person incident response, or hosted service;
+- broad product research, ecosystem standardization, CFR-168..173 residual implementation, or new issue discovery;
+- mutating canonical Algorithm or the user's current install, or treating `/workspace/project` as a general write set;
 - serializing the two independent classification lanes.
 
 ## M1 execution graph (current)
 
 ```text
-Critical path: refreshed-pack fresh-consumer rerun -> final audit -> M1 exit
-Progress: nodes 1–5d completed; the bounded B1 fix, focused tests, canonical source docs, and source-bound runner are accepted
-Parallel now: node 5e controller setup only — resume the persistent Claude fixture owner with fresh roots and the refreshed public pack
-Blocked: nodes 6–7 wait on the single authorized post-B1 rerun and its frozen adopt / narrow / stop decision
-Next legal action: prepare the post-B1 rerun from `milestone-adoption-wedge-run.md`; do not disclose first-run evidence or broaden to full CFR-171
+Critical path: parallel rights/artifact classification -> orchestrator fan-in -> bounded local rehearsal -> independent operator verification/rollback -> final audit -> M1 exit
+Progress: adoption M1 closed and release slot activated; no release artifact has been built, published, installed, or rolled back
+Parallel now: node 1 rights/source-identity classification + node 2 release/verify/rollback topology classification
+Blocked: nodes 3–7 wait on both read-only classifiers
+Next legal action: dispatch both ready packets concurrently; do not infer rights or start a release rehearsal before node 3 admission
 ```
 
 ### Nodes
 
 | # | Node | State | Owner | Waits on | Packet | Write set | Evidence |
 |---|---|---|---|---|---|---|---|
-| 1 | Public consumer/fixture contract — select the smallest second-repository or clean-room task and exact public commands | **completed** | Claude Opus 5 | — | `ai/task-packets/milestone-adoption-wedge-contract.md` | that packet only | `0b8d69e` (integrated as `624f28c`); frozen C1–C6, preservation, rubric, thresholds; conditional B1 |
-| 2 | CFR-171..173 experiment/falsifier classification — map existing owners and decide the smallest admissible slice | **completed** | Grok 4.6 | — | `ai/task-packets/milestone-adoption-wedge-experiment.md` | that packet only | `3173a91` (integrated as `ef4aa46`); same sealed inspect topology; no product blocker/write |
-| 3 | Orchestrator fan-in and experiment/fix admission | **completed** | Orchestrator | 1, 2 | `ai/task-packets/milestone-adoption-wedge-run.md` | board plus run packet | first experiment admitted without product change; B1 depends on measured result |
-| 4a | Isolated fixture, controller evidence, and consumer handoff | **completed** | persistent Claude node-1 session | 3 | `ai/task-packets/milestone-adoption-wedge-run.md` | isolated roots plus packet | `420bd88` (integrated as `507dda1`); consumer-ready root and sealed external key |
-| 4b | Fresh source-blind consumer comprehension run | **completed** | fresh Grok 4.6 session | 4a | handed task/docs only | consumer-root answer/evidence only | C1–C5 once, answer SHA `187812d6…`, no off-contract command |
-| 4c | Score and terminal adopt/narrow/stop decision | **completed: narrow** | persistent Claude node-1 session | 4b | run packet | packet/evidence only | `2207b88` (integrated as `7f7b86e`); 7/7, Q5/Q6 correct, field reliance 7 → narrow |
-| 5 | Read-only preservation and comprehension confirmation | **completed** | persistent Claude node-1 session | 4c | run packet | packet/evidence only | distinct C2–C5 pass; answer/fixture/canonical hashes frozen |
-| 5a | B1 source/schema/write-set classification | **completed** | persistent Grok node-2 session | 5 | `ai/task-packets/milestone-adoption-wedge-b1.md` | that packet only | `5a72a0e` (integrated as `ae8d291`); additive schema/capability/docs projection, no Store change |
-| 5b | Independent first-run score/preservation/decision audit | **completed** | fresh Claude Opus 5 audit session | 5 | `ai/audit-latest.md` | audit file only | `760a10c` (integrated as `07f3fb6`); confirms 7/7 narrow, B1-only next slice, refreshed-pack rerun requirement |
-| 5c | Orchestrator fan-in and bounded fix/rerun admission | **completed** | Orchestrator | 5a, 5b | `ai/task-packets/milestone-adoption-wedge-b1-fix.md` | board plus fix/rerun packet | schema/docs/additive claim projection admitted; first evidence/task/thresholds frozen |
-| 5d | Bounded B1 contract fix | **completed** | persistent Grok node-2 session | 5c | `ai/task-packets/milestone-adoption-wedge-b1-fix.md` | exact admitted product/docs/test set | `c78d5e0` + provenance `93cd289` (integrated as `0f5e9f9` + `6a80adb`); 3 focused tests, fmt/clippy/source/project/AI docs green; runner SHA `90cb2895…` |
-| 5e | One identical fresh-consumer rerun and decision | **ready** | fresh other-family consumer + persistent controller | 5d | run packet | isolated evidence plus packet | fresh controller/key/consumer roots and refreshed 14-file public pack required |
-| 6 | Final independent audit | **blocked** | fresh other-family audit agent | 5e | `ai/audit-latest.md` | audit file only | — |
+| 1 | Rights/license and artifact-source decision — classify what may be rehearsed or published and what must remain blocked | **ready** | Claude Opus 5 | — | `ai/task-packets/milestone-release-operational-trust-rights.md` | that packet only | — |
+| 2 | Release/verify/rollback topology — derive the smallest isolated artifact and independent-operator procedure | **ready** | Grok 4.6 | — | `ai/task-packets/milestone-release-operational-trust-rehearsal.md` | that packet only | — |
+| 3 | Orchestrator fan-in and bounded rehearsal/fix admission | **blocked** | Orchestrator | 1, 2 | — | board plus admitted run/fix packet | — |
+| 4 | Smallest reproduced release-contract fix, if any | **blocked** | persistent source-context owner | 3 | — | exact admitted source/docs/test set | — |
+| 5a | Source-bound artifact build and isolated local publication | **blocked** | persistent topology owner | 3, optional 4 | — | isolated release root plus run packet | — |
+| 5b | Fresh operator verification, isolated install/smoke, and rollback | **blocked** | fresh other-family operator | 5a | — | handed release root/evidence only | — |
+| 6 | Final independent audit | **blocked** | fresh other-family audit agent | 5b | `ai/audit-latest.md` | audit file only | — |
 | 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
 
-Nodes 1 and 2 are independent: consumer/public-contract selection does not depend on source ownership
-or experiment-metric classification. After fan-in, keep serially dependent work with the context owner
-unless audit independence requires a fresh session.
+Nodes 1 and 2 are independent: legal/source-identity evidence does not depend on the mechanical
+release/rollback topology. After fan-in, keep serially dependent work with the context owner unless
+operator or audit independence requires a fresh session.
 
 ## Open issue placement
 
@@ -117,25 +107,25 @@ All remain `investigating`; slot movement is not a status transition.
 
 | Issue | Slot / role | Admission rule |
 |---|---|---|
-| CFR-171 | M1 input | Only the smallest reproduced claim/proof descriptor blocker |
-| CFR-172 | M1 input | Primary read-only adoption and mental-model experiment |
-| CFR-173 | M1 input | Only bounded measurement/falsifier/privacy/decision evidence |
+| CFR-171 | backlog parked | Bounded branch/show data-schema slice measured sufficient; full descriptor unadmitted |
+| CFR-172 | backlog parked | Read-only sealed-inspect experiment ended terminal `adopt`; broader adapter work unadmitted |
+| CFR-173 | backlog parked | Bounded metric/falsifier slice satisfied; cohort, telemetry, and pilot residuals unadmitted |
 | CFR-168 | backlog parked | Remote M1 did not reproduce decision-work budgeting as its blocker |
 | CFB-136 | backlog parked | Remote M1 did not reproduce validation-cache subject reuse as its blocker |
 | CFB-133 | backlog parked | Migrate slice not reproduced by completed local milestones |
 | CFR-169 | backlog parked | Architecture seam classified off the critical path |
 | CFR-170 | backlog parked | Local-loop slice completed; all-command residual is not adoption permission |
 
-The remote-M1 finding that `request-list` omits `applied_head` is parked as a future contract
-candidate, not active adoption work unless node 1 independently reproduces it as the smallest blocker.
+The adoption audit also parked `open-clean` versus `opened=0`, historical `claim.subject.kind=live_open`,
+and the remote `request-list.applied_head` omission. None is release-M1 permission.
 
 `BATCH-2026-07-review-portfolio-completion` is frozen as history. Backlog-parked residuals do not
 enter an active slot without a later evidence-triggered board update.
 
 ## M2 preview (queued)
 
-When M1 exits, M2 `MS-release-operational-trust` may select the bounded rights/license decision and
-one release/verify/rollback rehearsal. It must not start early.
+When M1 exits, M2 `MS-product-value-proof` may select one candidate segment and one bounded
+claims-comprehension/first-seal study. It must not start early.
 
 ## Shift rule
 

@@ -20,7 +20,7 @@ Current known issue count and lifecycle position, audited 2026-07-19 after CFR-1
 - `CFB-120`..`CFB-132` are fixed; final canonical state is `open-clean`, Fire 0, tool migration none. The separately configured repository's branch/open/active control hashes remain unchanged.
 - RVC-011/CFR-161 completed Discover through Retrospect. Installed unsafe-policy replay fails before writes, both real read-only matrices pass without hash drift, and canonical trace-warning policy returns a typed passed decision with no blockers.
 - CFR-162 completed Discover, Freeze, Plan, Implement, Close, Install, Dogfood, and Retrospect. All unresolved merge classes now block the authoritative decision until an explicit validated continue transition.
-- The 60-review current-source audit classified 6 implemented, 3 accepted non-goals, and 51 residual reviews. The residuals remain mapped exactly once to CFR-163..173. Roots through CFR-167/CFB-134 completed the full lifecycle; open CFB-133/136 and CFR-168..173 remain `investigating`. After `MS-remote-happy-path` exited, CFR-171..173 became M1 adoption classification inputs, while CFR-168/CFB-136 and residual CFB-133/CFR-169/CFR-170 are backlog-parked. `BATCH-2026-07-review-portfolio-completion` is historical; live work is `milestones.md` M1 `MS-adoption-wedge`.
+- The 60-review current-source audit classified 6 implemented, 3 accepted non-goals, and 51 residual reviews. The residuals remain mapped exactly once to CFR-163..173. Roots through CFR-167/CFB-134 completed the full lifecycle; open CFB-133/136 and CFR-168..173 remain `investigating`. `MS-adoption-wedge` satisfied only bounded CFR-171..173 slices and ended terminal `adopt`; all broader roots are now backlog-parked. `BATCH-2026-07-review-portfolio-completion` is historical; live work is `milestones.md` M1 `MS-release-operational-trust`.
 - Historical cycle sections were moved to `archive/completed-cycle-ledger.md`. Do not infer current issue counts from historical headings or remaining-count notes.
 - The management hub `docs/development/README.md` is the current-state entry point; update it and append `history.md` when this section changes.
 
@@ -28,11 +28,11 @@ Current known issue count and lifecycle position, audited 2026-07-19 after CFR-1
 
 Batch ID: `BATCH-2026-07-review-portfolio-completion`
 
-Lifecycle: historical. The first five ordered roots completed through Retrospect. Remaining roots are governed only by `milestones.md`: CFR-171..173 are adoption-M1 classification inputs, while CFR-168/CFB-136 and CFB-133/CFR-169/CFR-170 residuals are backlog-parked.
+Lifecycle: historical. The first five ordered roots completed through Retrospect. Remaining roots are governed only by `milestones.md`; all eight open roots are backlog-parked after the adoption milestone satisfied only its bounded CFR-171..173 slices.
 
 Frozen scope:
 
-- Dogfood/admitted blockers: CFR-171..173 are M1 classification inputs only; CFR-168/CFB-136 and open CFB-133 were not reproduced as blockers by completed milestones, while CFB-134/CFB-135 are fixed.
+- Dogfood/admitted blockers: none for active release M1. Bounded CFR-171..173 adoption slices completed; broader residuals and CFR-168/CFB-136/open CFB-133 remain parked, while CFB-134/CFB-135 are fixed.
 - Current-source review roots: fixed `CFR-163`..`CFR-167` and `CFR-174`/`CFR-175`; active `CFR-168`..`CFR-173`.
 - RVC terminal audit: 60/60 mapped exactly once; 6 implemented, 3 accepted non-goals, 51 promoted to the eleven root owners.
 
@@ -48,9 +48,9 @@ Root execution order:
 | 6 | CFR-168 + CFB-136 | RVC-014/015/029/042/047/048/058 | bounded graph/object/HTTP work with stable counters and snapshot-safe validation reuse | backlog parked after the exact file-backed path did not reproduce either root |
 | 7 | CFR-169 | RVC-031/051/052/054 | behavior-preserving lifecycle/Store/test proof seams | backlog parked; no extraction admitted |
 | 8 | CFR-170 + CFB-133 | RVC-034/035 | typed postcondition-driven outcomes and executable actions | bounded local slice completed; residual backlog parked |
-| 9 | CFR-171 | RVC-001/019 | machine-readable claim/proof descriptor | parked on M2 |
-| 10 | CFR-172 | RVC-002/009 | bounded read-only adoption/mental-model experiment | parked on M2 |
-| 11 | CFR-173 | RVC-003/004/010 | privacy-preserving product falsification pilot and stop decision | parked on M2 |
+| 9 | CFR-171 | RVC-001/019 | machine-readable claim/proof descriptor | bounded branch/show data-schema slice satisfied; full descriptor backlog parked |
+| 10 | CFR-172 | RVC-002/009 | bounded read-only adoption/mental-model experiment | sealed-inspect experiment terminal `adopt`; broader adapter work backlog parked |
+| 11 | CFR-173 | RVC-003/004/010 | privacy-preserving product falsification pilot and stop decision | bounded metrics/falsifier slice satisfied; pilot residual backlog parked |
 
 Implemented/non-goal terminal rows:
 
