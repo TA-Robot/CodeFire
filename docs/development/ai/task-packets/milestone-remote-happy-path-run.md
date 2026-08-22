@@ -120,12 +120,11 @@ after every one of the 24 commands.
 | Provenance SHA-256 | `d87653d0a6e4a00216ab47816167744ce2e35c3df142a7ccd9810472d35e61d8` — matches; `base_revision 510a1855cb8753219aae416c6cbfea58f059415d`, `source_file_count 100`, `cargo 1.97.0`, `rustc 1.97.0`, `binary_sha256` equal to the rehash above |
 | Source-binding check run here | `git diff --quiet 510a185 f060842 -- Cargo.toml Cargo.lock crates .cargo rust-toolchain rust-toolchain.toml` → exit 0, so the integrated tree is byte-identical to the runner-bound revision for Rust inputs |
 
-One transcription nit, recorded because the packet's Exact inputs names it: the admitted
+The admitted
 `source_manifest_sha256` reads `c59e8c229bc31e71b8b5d5b1adfaed7defd2557d0286d06efdb74dc664a274`
-(62 hex characters), while the provenance file itself records the full 64-character
-`c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274`. The binary and provenance digests
-both match exactly, so runner identity is proven; only the packet's copy of the manifest digest is
-short by one byte pair. Not a gate failure.
+(64 hex characters), and the provenance file records the same
+`c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274`. Binary, provenance, and
+source-manifest digests all match exactly, so runner identity is proven.
 
 #### Node-4b sequence — exact argv, exit, duration, preservation
 
@@ -335,9 +334,9 @@ Node 6 independent other-family audit against `$ROOT = /tmp/m1-remote-happy-path
 left intact together with both earlier attempt roots. Everything the audit needs is re-readable without
 running a mutator: the remote project, both branch records, the MR record with `applied_head`, the
 `remote_request_apply` receipt, the before/after domain manifests, and per-command envelopes for all 24
-commands. Two items the audit should weigh, both recorded above and neither blocking: `request-list`
-still omits `applied_head` from its per-MR projection, and the packet's copy of
-`source_manifest_sha256` is two characters short of the provenance value.
+commands. One item the audit should weigh, without a pre-classified verdict: `request-list` omits
+`applied_head` from its per-MR projection, while the apply envelope identifies the applied head and
+the terminal `show` envelope independently confirms it.
 
 ### Attempt 2 — historical blocker resolved for attempt 3
 

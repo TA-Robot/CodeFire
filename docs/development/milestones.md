@@ -61,11 +61,11 @@ M1 non-goals:
 ## M1 execution graph (current)
 
 ```text
-Critical path: corrected remote rerun -> read-only confirmation -> independent audit -> M1 exit
-Progress: nodes 1–4a completed; the two reporting blockers are fixed, independently challenged, focused-tested, and bound to a release runner
-Parallel now: node 4b only — reuse the persistent Claude run context with the corrected source-bound runner
-Blocked: nodes 5–7 wait on successful node 4b, except node 5 may continue serially in the same session immediately after node 4b succeeds
-Next legal action: execute attempt 3 in `milestone-remote-happy-path-run.md`; do not admit CFR-168/CFB-136 or broaden remote behavior
+Critical path: independent audit -> M1 exit
+Progress: nodes 1–5 completed; attempt 3 passed all 20 run commands and the distinct four-command read-only confirmation with canonical preservation intact
+Parallel now: node 6 only — a fresh Grok session audits exact integration HEAD and preserved evidence without mutation
+Blocked: node 7 waits on node 6
+Next legal action: run the independent node-6 audit; do not admit CFR-168/CFB-136 or broaden remote behavior
 ```
 
 Nothing on this new M1 graph has run. The prior local sealed commit is an input candidate, not remote-path evidence.
@@ -79,9 +79,9 @@ Nothing on this new M1 graph has run. The prior local sealed commit is an input 
 | 3 | Orchestrator fan-in, fixture admission, and run/fix graph | **completed** | Orchestrator | 1, 2 | this commit | board, history, run packet | four-command sequence admitted; no issue/product fix admitted |
 | 4 | Isolated remote happy-path run | **blocked at final reporting gate** | persistent Claude node-1 session | 3 | `ai/task-packets/milestone-remote-happy-path-run.md` | isolated temp fixture/remote plus that packet | attempt 1 `3ce12d1` (`8f45917`) stopped before mutation; attempt 2 `9329fe6` (`564fd5e`) completed apply but exposed replay/status projection defects |
 | 4a | Bounded replay and terminal-status reporting fix | **completed** | persistent remote-source individual agent | 4 evidence | `ai/task-packets/milestone-remote-happy-path-reporting-fix.md` | packet's exact product/docs/test set | `726eae4` + review correction `510a185` (integrated as `9d1aca1` + `babe14b`); 5 focused tests; runner SHA `70301c87…`; CFR-168/CFB-136 parked |
-| 4b | Build source-bound runner and rerun isolated happy path | **ready** | persistent Claude node-4 session after runner handoff | 4a | `ai/task-packets/milestone-remote-happy-path-run.md` | isolated fixture/remote plus packet | corrected source-bound runner and provenance rehashed at integration HEAD |
-| 5 | Read-only terminal confirmation and evidence record | **blocked** | Individual agent, persistent if serially dependent | 4b | — | packet/evidence only | — |
-| 6 | Final independent audit | **blocked** | Other-family audit agent | 5 | `ai/audit-latest.md` | audit file only | — |
+| 4b | Build source-bound runner and rerun isolated happy path | **completed** | persistent Claude node-4 session after runner handoff | 4a | `ai/task-packets/milestone-remote-happy-path-run.md` | isolated fixture/remote plus packet | `30b306f` (integrated as `3c64620`); 20/20 commands, applied MR and truthful replay |
+| 5 | Read-only terminal confirmation and evidence record | **completed** | persistent Claude node-4 session | 4b | `ai/task-packets/milestone-remote-happy-path-run.md` | packet/evidence only | distinct pass; 4/4 read-only commands; remote/fixture digests unchanged |
+| 6 | Final independent audit | **ready** | fresh other-family Grok audit agent | 5 | `ai/audit-latest.md` | audit file only | exact HEAD plus preserved attempt-3 root |
 | 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
 
 Nodes 1 and 2 are parallel because fixture/public-contract selection does not depend on source ownership classification. After fan-in, keep serially dependent work with the agent that already owns the relevant context unless audit independence requires a fresh session.
