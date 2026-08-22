@@ -8,7 +8,7 @@ Last audited: 2026-08-21
 
 Update trigger: M1 exit, M1 blocker admission, or slot shift.
 
-M1 state after the 2026-08-21 slot shift: **two read-only planning packets ready**. `MS-agent-local-contract` exited after the independent Grok audit of exact HEAD `b9ea932`; its product evidence is sealed `CF-COMMIT-2792b54ad730e6d644668c38`. The active milestone is now `MS-remote-happy-path`. No remote command or product fix has run in this new M1.
+M1 state after the 2026-08-21 slot shift: `MS-agent-local-contract` exited after the independent Grok audit of exact HEAD `b9ea932`; its product evidence is sealed `CF-COMMIT-2792b54ad730e6d644668c38`. The active milestone is now `MS-remote-happy-path`. The first isolated-run attempt stopped before every mutator because the copied `opened/main.json` retained canonical absolute paths. Canonical state was preserved, no remote project was created, and a harness-only retry is admitted with `opened/` and `active/` empty in the copy.
 
 This is the only live five-ahead execution board. Historical burn-down narrative stays in `current-cycle-burn-down-plan.md` and `history.md`. Those files are not permission to work.
 
@@ -61,11 +61,11 @@ M1 non-goals:
 ## M1 execution graph (current)
 
 ```text
-Critical path: isolated file-backed remote run -> read-only confirmation -> independent audit -> M1 exit
-Progress: nodes 1–3 completed; both classifiers parked CFR-168/CFB-136 and node 3 admitted a zero-product-write run packet
-Parallel now: node 4 only — continue the Claude public-fixture session to avoid reloading topology and preservation constraints
-Blocked: nodes 5–7 wait on node 4
-Next legal action: execute `milestone-remote-happy-path-run.md`; do not implement product code
+Critical path: corrected isolated file-backed remote run -> read-only confirmation -> independent audit -> M1 exit
+Progress: nodes 1–3 completed; node 4 attempt 1 stopped safely at fixture admission and proved that the original whole-copy recipe was not isolated
+Parallel now: node 4 retry only — continue the same Claude public-fixture session to retain topology, command, and preservation context
+Blocked: nodes 5–7 wait on a successful node 4 retry
+Next legal action: retry `milestone-remote-happy-path-run.md` with empty copied `opened/` and `active/`; do not implement product code
 ```
 
 Nothing on this new M1 graph has run. The prior local sealed commit is an input candidate, not remote-path evidence.
@@ -77,7 +77,7 @@ Nothing on this new M1 graph has run. The prior local sealed commit is an input 
 | 1 | Public remote fixture/command probe — derive the smallest isolated file-backed fixture and stop at the first missing contract | **completed** | Claude Opus 5 | — | `ai/task-packets/milestone-remote-happy-path-probe.md` | that packet only | `3504bd8` (integrated as `da3e691`); safe closed-branch copy plan; mandatory review gate; observed-field evidence required; CFR-168/CFB-136 park |
 | 2 | CFR-168/CFB-136 residual classification — map current implemented state and decide which, if any, smallest slice lies on the exact happy path | **completed** | Grok 4.6 | — | `ai/task-packets/milestone-remote-happy-path-budget.md` | that packet only | `b8b0a1b`; both park; file-backed owners already exist; no product write unavoidable |
 | 3 | Orchestrator fan-in, fixture admission, and run/fix graph | **completed** | Orchestrator | 1, 2 | this commit | board, history, run packet | four-command sequence admitted; no issue/product fix admitted |
-| 4 | Isolated remote happy-path run | **ready** | persistent Claude node-1 session | 3 | `ai/task-packets/milestone-remote-happy-path-run.md` | isolated temp fixture/remote plus that packet | — |
+| 4 | Isolated remote happy-path run | **ready (retry)** | persistent Claude node-1 session | 3 | `ai/task-packets/milestone-remote-happy-path-run.md` | isolated temp fixture/remote plus that packet | attempt 1 `3ce12d1` (integrated as `8f45917`) stopped before mutation; corrected harness admitted |
 | 5 | Read-only terminal confirmation and evidence record | **blocked** | Individual agent, persistent if serially dependent | 4 | — | packet/evidence only | — |
 | 6 | Final independent audit | **blocked** | Other-family audit agent | 5 | `ai/audit-latest.md` | audit file only | — |
 | 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |

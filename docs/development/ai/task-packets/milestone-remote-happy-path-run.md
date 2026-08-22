@@ -1,6 +1,6 @@
 # AI Task Packet
 
-Status: blocked
+Status: ready (attempt 2)
 
 Packet ID: MS-remote-happy-path-run
 
@@ -38,7 +38,7 @@ Canonical `/workspace/project` and CodeFire state are read-only preservation sub
 ## Procedure
 
 1. Rehash the runner and capture every canonical preservation value from the probe packet §5. Stop on any mismatch.
-2. Create `$ROOT/repo` and `$ROOT/remote`; `cp -a` only canonical `subprojects/.codefire` to `$ROOT/repo/.codefire`. This is the sole non-CodeFire fixture materialization step.
+2. Create `$ROOT/repo`, `$ROOT/remote`, and `$ROOT/repo/.codefire`. Copy only canonical `repo.json`, `objects/`, and `branches/` into the copied `.codefire`; create empty layout directories `opened/`, `active/`, `cache/`, `idempotency/`, `locks/`, and `remotes/`. Do not copy any canonical file from `opened/`, `active/`, `cache/`, `idempotency/`, `locks/`, or `remotes/`. These explicit copies and empty-directory creations are the sole non-CodeFire fixture materialization steps.
 3. Run `doctor "$FIX" --quick --json` and `branch list --path "$FIX" --json`. Stop on any open-target/capability problem. Never name branch `main`, never run `close`/`discard`, and never pass a canonical path to a mutator.
 4. With cwd `$FIX`, run public JSON commands in this exact order:
    - dry-run then live `clone feature/docs-doubling-plan base`;
@@ -87,6 +87,14 @@ No build, product test, installer, HTTP, scale test, Retrospect, or canonical do
 - next legal action: node 5 read-only evidence confirmation, preferably same session if no independence boundary requires otherwise.
 
 ## Result
+
+Attempt 2 was re-admitted by the orchestrator after attempt 1 proved that the whole-directory copy
+retained canonical absolute paths. The retry changes only fixture materialization: sealed objects,
+branch heads, and `repo.json` are copied, while repository-local runtime registries are created empty.
+The `doctor "$FIX" --quick --json` exit-0 gate remains mandatory. Continue the same Claude session;
+do not implement product code or weaken the gate.
+
+### Attempt 1 — blocked safely
 
 Status **blocked** at Procedure step 3. Verdict **`block-m1` against the admitted fixture
 materialization recipe** — not against product code, and not CFR-168 or CFB-136.
@@ -266,7 +274,7 @@ No build, product test, installer, HTTP, scale test, Retrospect, or canonical do
 only canonical commands issued were read-only: `status --path … --json` (twelve times, inside the
 preservation sweeps) and the single `doctor … --quick --json` control.
 
-### Next legal action
+### Attempt 1 next legal action (superseded by attempt-2 re-admission)
 
 Node 3 re-admission of the fixture recipe, then a fresh node 4 attempt. Node 5 read-only confirmation
 cannot proceed yet — there is no remote terminal state to confirm. `$ROOT` is left intact so node 3 or
