@@ -154,5 +154,26 @@ and consumer rerun remain parked.
 
 ### Source-bound runner
 
-Recorded in the follow-up commit after `python3 docs/development/tools/build_source_bound_rust.py`
-on the accepted source commit.
+Built after the accepted-source commit with
+`python3 docs/development/tools/build_source_bound_rust.py`. Public `codefire` is a hardlink of
+`codefire-rs` (same inode and digest). Do not start the consumer rerun from this packet.
+
+| Item | Value |
+|---|---|
+| Accepted source commit | `c78d5e0e5e151a1489744c21340716a439597e71` |
+| Provenance schema | `codefire.rust_build_provenance.v1` |
+| `ok` | true |
+| `base_revision` | `c78d5e0e5e151a1489744c21340716a439597e71` |
+| Source file count | 101 |
+| Source manifest sha256 | `3925fc035690296fa5e132b630dab65a7fbd5ddb1a55f0fb1226e6efd295d97a` |
+| Binary path | `target/release/codefire-rs` |
+| Public runner | `target/release/codefire` (hardlink) |
+| Binary bytes | 14590776 |
+| Binary sha256 | `90cb2895aadc45b559a96207cdd5ae3b08485f9a7e5a07014db8cca8b5b90ce9` |
+| Build command | `cargo build --release --locked -p codefire-cli --bin codefire-rs` |
+| cargo | 1.97.0 (c980f4866 2026-06-30) |
+| rustc | 1.97.0 (2d8144b78 2026-07-07) |
+| Build log sha256 | `02b6c20a84e29b592b7ec208a2754d2703fa0f0c41f4d8595649ee737052ad6c` |
+| Provenance path | `target/codefire-ai/rust-build-provenance.json` |
+| Provenance sha256 | `1731b8636330841f20dcad9265710eacc3830767e8c693b34ad75b5907688dea` |
+| `codefire --version` | `codefire foundation 1` |
