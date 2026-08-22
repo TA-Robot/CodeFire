@@ -118,6 +118,28 @@ adopt/narrow/stop decision, issue admission/parking, stall/scope-creep risk, and
 
 ## Result
 
+### Rerun amendment admitted after the first `narrow` decision
+
+The first run, score, and thresholds are frozen. A single post-B1 rerun is authorized only after the
+bounded fix packet completes and a corrected source-bound runner exists. It is identical in subject,
+C1–C6 commands, seven questions, scoring key semantics, ordered thresholds, privacy, preservation,
+and source-blind process, with exactly these evidence-driven changes:
+
+1. create fresh controller/key/consumer roots and refresh the public docs pack from the post-B1 HEAD;
+2. extend the 12-file pack only with the two new advertised branch-list/show data schemas; existing
+   docs/schema files are refreshed because the experiment measures their public contract;
+3. derive a new external answer key from the post-B1 envelopes while retaining the same Q1–Q7 accept
+   clauses and score/decision table;
+4. replace the setup leak gate that rejected public type/field names with an answer-value leak gate:
+   the task/template may name schema IDs and field paths, but must not contain repository-specific
+   branch names, commit IDs, counts, certificate result, signature presence, warning set, or answers;
+5. use a fresh consumer session with no access to first-run roots/evidence or the implementation/audit
+   context. Do not disclose the first decision, cutoff outcome, or observed reliance count.
+
+No other deviation is authorized. In particular, the consumer may not receive source/tests/internal
+docs, private clarification, review-pack/import/live commands, first-run output, or answer values.
+The post-B1 rerun is the one retry permitted by the original `narrow` contract.
+
 ### Stage A — completed. Packet status `consumer-ready`. Stage B has not run.
 
 Every Stage A gate passed. The fixture, docs pack, label-only harness, task sheet, and sealed answer
