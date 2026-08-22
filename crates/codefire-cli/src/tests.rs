@@ -22,6 +22,7 @@ mod open_snapshot;
 mod open_transaction_boundary;
 mod policy_coverage;
 mod remote_doctor;
+mod request_apply_replay;
 mod sealed_token_boundary;
 mod signature_boundary;
 mod state_transaction;

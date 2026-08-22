@@ -151,6 +151,7 @@ extinguish --idempotency-key <key>
 ```
 
 Same key + same payload returns the stored result. Same key + different payload returns exit code 33.
+File-backed `request-apply` replay keeps `data.type=codefire_plan_result` and puts `replayed: true` plus `would_apply: false` on `data.plan`, with `operations` empty. The live apply plan is unchanged. File-backed `request-list` keeps persisted terminal MR `status` values such as `applied`; `stale` is a projection only for a non-terminal MR whose target precondition drifted.
 
 `import` uses a version-2 hash-only record: operation, normalized target scope, key, payload version/hash/mode, and original result are persisted without the raw canonical payload. Replay also validates the persistent bootstrap lock, durable import transaction, repository initialization provenance, sealed recorded base, and current marker/opened/branch subject. A result-only legacy marker is not replayable. `.codefire-import.lock` and `.codefire/locks/repo.lock` are persistent files whose kernel locks express ownership; `repo.lock.owner.json` is only diagnostic metadata. Automation must not delete any of them or treat existence as contention.
 

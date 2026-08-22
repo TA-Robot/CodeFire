@@ -878,6 +878,7 @@ cf+http request-* dry-runはHTTP write requestを送らず、transport/URL/opera
 --idempotency-keyは成功したrequest-merge/review/apply resultをremote projectのidempotency/remote_request_*/へ記録する
 同じ--idempotency-keyかつ同じremote request payloadは保存済みresultを返し、MR status/stale/approved checkより先にreplayする
 同じ--idempotency-keyでsource/target/MR/reviewer/decision/comment/projectが異なるpayloadはexit code 33で拒否する
-remote request idempotency recordもhash-only保存で、payload全文やoperation planを保存しない。replay responseは`replayed: true`で識別できる
+remote request idempotency recordもhash-only保存で、payload全文やoperation planを保存しない。file-backed request-apply replay planは`replayed: true`、`would_apply: false`、空の`operations`を持つ軽量metadataになり、保存済みreceiptは書き換えない
+request-listのfile-backed JSON `status`は、非terminal MRのtarget headが`target_head_at_request`から進んだときだけ`stale`を投影する。persistされた`applied`（および`rejected`）はそのまま返す
 cf+http request-* はserver側remote projectのidempotency recordで同じ規則を適用する
 ```

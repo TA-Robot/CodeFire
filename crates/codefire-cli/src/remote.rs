@@ -1934,18 +1934,17 @@ pub(crate) fn list_merge_requests(
         )?;
         validate_merge_request_record(&mr)?;
         let current_target = read_optional_remote_branch(&target.project_root, &target.branch)?;
-        let mut status = mr
-            .get("status")
-            .and_then(Value::as_str)
-            .unwrap_or("open")
-            .to_string();
+        let persisted_status = mr.get("status").and_then(Value::as_str).unwrap_or("open");
+        let mut status = persisted_status.to_string();
         if let Some(current_target) = current_target {
             let current_head = required_string(&current_target, &["head"])?;
             codefire_store::validate_sealed_commit(
                 &remote_dirs(&target.project_root).objects,
                 &current_head,
             )?;
-            if current_head != required_string(&mr, &["target_head_at_request"])? {
+            if !persisted_merge_request_status_is_terminal(persisted_status)
+                && current_head != required_string(&mr, &["target_head_at_request"])?
+            {
                 status = "stale".to_string();
             }
         }
@@ -2335,10 +2334,12 @@ pub(crate) fn apply_merge_request(
         if let Some(published) =
             replay_json_publication(gate, &project.project_root, &publication_request)?
         {
+            let target_branch = required_string(&published, &["target_branch"])?;
+            let head = required_string(&published, &["head"])?;
             return Ok(RequestApplyResult {
-                target_branch: required_string(&published, &["target_branch"])?,
-                head: required_string(&published, &["head"])?,
-                plan,
+                plan: request_apply_replay_plan(options, "file", &target_branch, &head),
+                target_branch,
+                head,
             });
         }
     }
@@ -3686,6 +3687,33 @@ pub(crate) fn validate_merge_request_record(mr: &Value) -> Result<(), CliError> 
         )?;
     }
     Ok(())
+}
+
+fn persisted_merge_request_status_is_terminal(status: &str) -> bool {
+    matches!(status, "applied" | "rejected")
+}
+
+fn request_apply_replay_plan(
+    options: &RequestApplyOptions,
+    transport: &str,
+    target_branch: &str,
+    apply_head: &str,
+) -> Value {
+    json!({
+        "type": "codefire_operation_plan",
+        "version": 1,
+        "command": "request-apply",
+        "dry_run": false,
+        "would_apply": false,
+        "replayed": true,
+        "project_url": &options.project_url,
+        "merge_request_id": &options.mr_id,
+        "target_branch": target_branch,
+        "head": apply_head,
+        "transport": transport,
+        "operations": [],
+        "next_actions": [],
+    })
 }
 
 fn reject_stale_merge_request(mr: &Value) -> Result<(), CliError> {

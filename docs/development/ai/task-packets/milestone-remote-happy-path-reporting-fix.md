@@ -1,6 +1,6 @@
 # AI Task Packet
 
-Status: ready
+Status: completed
 
 Packet ID: MS-remote-happy-path-reporting-fix
 
@@ -107,4 +107,53 @@ and the admitted write set.
 
 ## Result
 
-Not implemented.
+Status **completed**. No `block-m1`. CFR-168 and CFB-136 remain **parked**. Integration base `564bb808ba23294033a625b07535f1777ab8b69f`.
+
+Exact source seam:
+
+- `crates/codefire-cli/src/remote.rs::apply_merge_request` — on a completed `replay_json_publication` receipt only, replace the live five-operation plan with `request_apply_replay_plan` (`replayed: true`, `would_apply: false`, empty `operations` / `next_actions`). Live apply still uses `request_apply_operation_plan`. Receipt lookup, gate, signature, and `execute_json_publication` are unchanged.
+- `crates/codefire-cli/src/remote.rs::list_merge_requests` — still validates the current target sealed head and malformed MR records; `stale` is projected only when the persisted status is non-terminal and `target_head_at_request` drifted. Persisted `applied` and `rejected` remain the list status.
+
+Invariant: reporting only. The completed v2 receipt stays the replay identity and result. Replay does not regenerate or rewrite receipt, branch, generation, or MR authorities. First live apply plan is unchanged. Stale remains a list projection, not a persisted lifecycle state.
+
+Focused tests (`cargo test -p codefire-cli --bin codefire-rs`):
+
+- `tests::request_apply_replay::file_backed_request_apply_replay_and_applied_list_status` — ok
+- `tests::request_apply_replay::file_backed_request_list_keeps_stale_projection_for_open_mr` — ok
+- `tests::remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts` — ok (existing conflict/replay-head coverage)
+
+Counts: 2/2 new focused tests passed; 1/1 related existing idempotency test passed; `2 passed; 0 failed; 771 filtered out` for the new pair, then `1 passed; 0 failed; 772 filtered out` for the existing test.
+
+Validation:
+
+```text
+cargo fmt --check
+cargo clippy -p codefire-cli --all-targets -- -D warnings
+python3 docs/development/tools/check_source_docs.py   -> 44 modules, 34 commands, 12 object kinds
+python3 docs/development/tools/check_project_docs.py  -> 547 Markdown files
+git diff --check                                      -> clean
+```
+
+Changed files:
+
+- `crates/codefire-cli/src/remote.rs`
+- `crates/codefire-cli/src/tests.rs`
+- `crates/codefire-cli/src/tests/request_apply_replay.rs`
+- `docs/development/source-architecture.md`
+- `docs/development/command-source-trace.md`
+- `docs/development/source-data-model-catalog.md`
+- `docs/development/change-playbook.md`
+- `docs/04_cli_spec.md`
+- `docs/automation_interface.md`
+- `docs/development/ai/task-packets/milestone-remote-happy-path-reporting-fix.md`
+
+HTTP, scale, publication/receipt formats, lock sidecars, CFR-168, and CFB-136 were not touched. Isolated evidence roots and canonical Algorithm state were not mutated.
+
+Active milestone: `MS-remote-happy-path`.
+This packet is the admitted reporting fix on the critical path.
+Parked instead of done: CFR-168, CFB-136, HTTP apply/list projection, upload/merge/review replay plans, lock-owner mtimes.
+Next allowed action: build the source-bound runner from the accepted rust HEAD and hand it to node 4b; do not rerun the remote scenario from this packet.
+
+### Source-bound runner
+
+Recorded after the accepted source commit. See the runner identity block below once the release binary is built from that HEAD.
