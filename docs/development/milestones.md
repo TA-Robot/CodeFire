@@ -77,11 +77,11 @@ M1 non-goals:
 ## M1 execution graph (current)
 
 ```text
-Critical path: source-blind participant first seal -> score/confirmation -> final audit -> M1 exit
-Progress: nodes 1–5a completed; clean uppercase baseline is sealed, public docs/key/wrapper are frozen, and the handed transcript is empty
-Parallel now: none — node 5b begins with one fresh Claude participant, then returns to the persistent Grok controller for one score and confirmation
-Blocked: nodes 6–7 wait on the frozen participant run and literal decision
-Next legal action: launch the exact Stage B handoff once; no controller hint, retry, product fix, or threshold change
+Critical path: final audit -> M1 exit
+Progress: nodes 1–5b completed; participant sealed the lowercase change, scored 7/7 with task value 3/3, and the frozen table returned literal `narrow` because four cited JSON keys were undocumented
+Parallel now: none — node 6 is the fresh final-audit lane
+Blocked: node 7 waits on an `ACCEPT` / no-`block-m1` audit of the retained study root
+Next legal action: independently re-score the frozen narrow evidence once; do not retry, fix README/docs/product, or change thresholds
 ```
 
 ### Nodes
@@ -93,8 +93,8 @@ Next legal action: launch the exact Stage B handoff once; no controller hint, re
 | 3 | Orchestrator fan-in and bounded study/fix admission | **completed** | Orchestrator | 1, 2 | `ai/task-packets/milestone-product-value-proof-run.md` | board plus run packet | controller-sealed uppercase base + participant lowercase change; no node-4 fix |
 | 4 | Smallest reproduced product-contract fix, if any | **not required** | — | 3 | — | — | import action gap parked in controller setup; no source/docs change admitted |
 | 5a | Controller setup and source-blind participant handoff | **completed** | persistent Grok node-2 session | 3 | `ai/task-packets/milestone-product-value-proof-run.md` | isolated fixture/key/evidence plus run packet | `a95ba68` (integrated as `4c7d0bc`); source-bound runner, uppercase baseline `CF-COMMIT-3456…`, open-clean/Fire 0, wrapper and frozen handoff root `/tmp/codefire-m1-pvp.rh8k89q9` |
-| 5b | Fresh participant first-seal run, score, and distinct confirmation | **ready** | fresh Claude participant + persistent Grok controller | 5a | `ai/task-packets/milestone-product-value-proof-run.md` | handed root/evidence plus packet only | one participant pass; no private correction or retry |
-| 6 | Final independent audit | **blocked** | fresh other-family audit agent | 5b | `ai/audit-latest.md` | audit file only | — |
+| 5b | Fresh participant first-seal run, score, and distinct confirmation | **completed: narrow** | fresh Claude participant + persistent Grok controller | 5a | `ai/task-packets/milestone-product-value-proof-run.md` | handed root/evidence plus packet only | `73e1455` (integrated as `4d25c09`); head `CF-COMMIT-d6bb…`, 7/7, task value 3, M12=4, one intended refusal cleared, no private correction |
+| 6 | Final independent audit | **ready** | fresh Grok 4.6 audit agent | 5b | `ai/audit-latest.md` | audit file only | audit literal `narrow`, README coverage limit, edit order, and M12 field classification |
 | 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
 
 Nodes 1 and 2 are independent: segment/value/falsifier selection does not depend on fixture/source
