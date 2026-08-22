@@ -261,9 +261,9 @@ Classified only as `block-m1`, `park`, or `drop`, per `milestone-operating-model
 
 `park` — valid, not required for M1 exit:
 
-1. **`park` — `request-list` omits `applied_head`.** Per-MR JSON is still `id` / `source_url` / `status` / `target_url`. Apply `plan.head`, `list` branch heads, and `show` commit independently identify `CF-COMMIT-126555fdb84822a0c09c9e6a`; `request-list` identifies MR/source/target and terminal `applied`. Public contract after the reporting fix requires persisted `applied` status, not this extra field. Do not implement before M1 exit.
-2. **`park` — run-packet Exact inputs quotes a 62-character truncation of the source-manifest SHA-256** and calls it 64 hex characters. The provenance file and `build_source_manifest()` at this HEAD are the 64-character digest `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274`. Node 7 must cite that 64-character value. Runner binding itself holds.
-3. **`park` → node 7 board refresh.** `milestones.md` still has node 4 as "blocked at final reporting gate", "Last audited: 2026-08-21", and a leftover sentence that nothing on the graph has run. Fold node-6 completion and the attempt-3 evidence root into the same exit/slot-shift edit. Do not open a separate packet.
+1. **`park` — `request-list` omits `applied_head`.** Per-MR JSON is still `id` / `source_url` / `status` / `target_url`. Apply `plan.head`, `list` branch heads, and `show` commit independently identify `CF-COMMIT-126555fdb84822a0c09c9e6a`; `request-list` identifies MR/source/target and terminal `applied`. Public contract after the reporting fix requires persisted `applied` status, not this extra field. Do not implement before M1 exit. **Retained after the `68a94b4` docs-only follow-up.**
+2. **`superseded` — run-packet 62-character source-manifest truncation.** Corrected at integration `68a94b4` (`docs: correct M1 runner manifest citation`). The run packet now quotes `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274` (64 hex characters) in all three claim sites. No longer a park finding.
+3. **`park` → node 7 board refresh.** `milestones.md` still has node 4 as "blocked at final reporting gate", "Last audited: 2026-08-21", and a leftover sentence that nothing on the graph has run. Fold node-6 completion, this follow-up HEAD, and the attempt-3 evidence root into the same exit/slot-shift edit. Do not open a separate packet.
 4. **`park` — file-backed `upload` / `request-merge` / `request-review` replay still omit `replayed: true`.** Review P1/P2. Not exercised by attempt-3's apply replay, which is the admitted path.
 5. **`park` — HTTP and Python `request-list` still overwrite applied with `stale`.** Review P3. Deliberate `cf://` vs `cf+http://`/Python divergence. Out of this file-backed M1.
 6. **`park` — no dedicated T6 regression that corrupts the current target head under an `applied` MR and expects `request-list` to fail closed.** Source still validates the current target sealed head unconditionally (`remote.rs` list path). Live `request-list` succeeded against a valid head. Missing test does not falsify this run.
@@ -280,8 +280,8 @@ Classified only as `block-m1`, `park`, or `drop`, per `milestone-operating-model
 
 ## Advice (at most five bullets)
 
-- Node 7 may proceed: run the M1 exit, record exit evidence in `history.md`, shift every slot forward one step, and name a new M5 from `strategy/modernization-roadmap.md` without turning that roadmap into a second board.
-- Fold `park` findings 2 and 3 into that same node 7 board/history edit: cite the 64-character source-manifest digest, the attempt-3 root `/tmp/m1-remote-happy-path-a3.VbZTZ8`, and this audit's HEAD. Do not copy the 62-character truncated hash.
+- Node 7 may proceed on integration HEAD `68a94b4`: run the M1 exit, record exit evidence in `history.md`, shift every slot forward one step, and name a new M5 from `strategy/modernization-roadmap.md` without turning that roadmap into a second board.
+- Fold remaining `park` finding 3 into that same node 7 board/history edit. Cite the 64-character source-manifest digest `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274`, the attempt-3 root `/tmp/m1-remote-happy-path-a3.VbZTZ8`, and integration HEAD `68a94b4`.
 - Keep `park` finding 1 (`request-list` `applied_head`) parked. Do not admit a follow-up product packet before the slot shift.
 - Keep CFR-168 and CFB-136 `investigating` and unadmitted. Keep HTTP, Python parity, upload/merge/review replay markers, and adoption (CFR-171..173) parked on later slots.
 - Do not widen validation at exit. The standing docs checks plus this audit's already-run focused product tests are the gate; workspace-wide Rust, installer, and Retrospect stay out.
@@ -292,6 +292,25 @@ Classified only as `block-m1`, `park`, or `drop`, per `milestone-operating-model
 
 All four exact exit criteria are true, and each was verified against the environment rather than from packet prose: an isolated fixture and preselected public commands completed sealed `upload -> request-merge -> request-review(approve) -> request-apply` on file-backed `cf://`; JSON envelopes identify source/target/MR and the applied head `CF-COMMIT-126555fdb84822a0c09c9e6a`; a separate read-only query (node 5 and this audit) confirms terminal head/state `applied`; object closure is intact; completed-receipt replay is truthful and does not rewrite domain authorities; canonical dogfood preservation holds; runner SHA-256 `70301c87…` is bound to 64-character source manifest `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274` at Rust tree `510a185`, byte-identical to this HEAD.
 
-There is no `block-m1` finding. `request-list` omitting `applied_head` is `park`. The 62-character manifest typo is `park` for citation only.
+There is no `block-m1` finding. `request-list` omitting `applied_head` is `park`. The 62-character manifest typo is superseded by `68a94b4`; see Follow-up.
 
 Scope of this authorization: node 7 only — M1 exit, exit evidence in `history.md`, and the slot shift. It does not authorize starting any parked root, widening validation, projecting `applied_head` onto `request-list`, or beginning M2 implementation before the shift is recorded. This audit itself did not exit M1, did not shift any slot, did not edit the board, `history.md`, issues, or packets, and did not start parked work.
+
+## Follow-up — docs-only delta at integration `68a94b4`
+
+- time (ISO): `2026-08-22T01:47:02Z`
+- integration HEAD (exact): `68a94b4bc9e1519a83ef5ada9575e92348f33cc8` (`68a94b4`, "docs: correct M1 runner manifest citation")
+- this worktree merge: `fba21b19f5754785f1cbfcec4a089ab9d3fd150c`
+- original audit blob: `35c9bff` tree-identical to integration `370f230`; `docs/development/ai/audit-latest.md` blob `a93a8014012d8019d015b4c2637a9400c6cb76ea` is unchanged through `68a94b4`
+
+`git diff 74bbcd6..68a94b4` is three docs files only (audit integration, two run-packet hash quotes, node 6/7 board rows). No `crates/`, tests, schemas, Python CLI, evidence root, or canonical dogfood change. No exit fact moved. No broad re-audit.
+
+Verified:
+
+1. **Audit integrated unchanged.** `git diff --quiet 35c9bff 370f230` (full trees) and the `audit-latest.md` blob is identical at `35c9bff`, `370f230`, and `68a94b4`.
+2. **Run packet manifest citation.** All three `c59e8c22…` claims in `milestone-remote-happy-path-run.md` at `68a94b4` are the exact 64-character provenance digest `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274`. Zero remaining 62-character truncations in that packet.
+3. **Board nodes 6/7 only.** Graph and table advance node 6 `ready` → `completed` (`35c9bff` integrated as `370f230`) and node 7 `blocked` → `ready`. Nodes 1–5 rows are untouched in this delta. Remaining stale node-4 / "Last audited" / leftover graph-prose lines are pre-existing `park` finding 3, not new scope.
+
+**`block-m1`: none.** Finding 2 is **superseded**. Finding 1 (`request-list` omits `applied_head`) is **retained `park`**.
+
+**Authorized.** Node 7 may close M1 `MS-remote-happy-path` on integration HEAD `68a94b4bc9e1519a83ef5ada9575e92348f33cc8` with preserved evidence root `/tmp/m1-remote-happy-path-a3.VbZTZ8`. Same scope as the original close: slot shift and `history.md` only; no parked product work.
