@@ -18,7 +18,7 @@ This is node 4 of active M1. Node 3 admitted the run after both classifiers park
 
 ## Exact inputs
 
-- runner/public name: `/workspace/worktrees/ms-remote-happy-path-budget-20260821/target/release/codefire`, SHA-256 `70301c874d7220a71be988562df0e5188ede6a85c65c63dcbd3dcdee09f4706c`, source manifest SHA-256 `c59e8c229bc31e71b8b5d5b1adfaed7defd2557d0286d06efdb74dc664a274` (100 files), provenance SHA-256 `d87653d0a6e4a00216ab47816167744ce2e35c3df142a7ccd9810472d35e61d8`;
+- runner/public name: `/workspace/worktrees/ms-remote-happy-path-budget-20260821/target/release/codefire`, SHA-256 `70301c874d7220a71be988562df0e5188ede6a85c65c63dcbd3dcdee09f4706c`, source manifest SHA-256 `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274` (100 files), provenance SHA-256 `d87653d0a6e4a00216ab47816167744ce2e35c3df142a7ccd9810472d35e61d8`;
 - canonical copy source: `/workspace/project/subprojects/.codefire` (read-only);
 - local target alias: `base`, cloned from `feature/docs-doubling-plan` at `CF-COMMIT-d068d2c3995f6da0a0959b98`;
 - local source alias: `topic`, cloned from `feature/docs-full-doubling` at `CF-COMMIT-126555fdb84822a0c09c9e6a`;
@@ -121,7 +121,7 @@ after every one of the 24 commands.
 | Source-binding check run here | `git diff --quiet 510a185 f060842 -- Cargo.toml Cargo.lock crates .cargo rust-toolchain rust-toolchain.toml` → exit 0, so the integrated tree is byte-identical to the runner-bound revision for Rust inputs |
 
 The admitted
-`source_manifest_sha256` reads `c59e8c229bc31e71b8b5d5b1adfaed7defd2557d0286d06efdb74dc664a274`
+`source_manifest_sha256` reads `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274`
 (64 hex characters), and the provenance file records the same
 `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274`. Binary, provenance, and
 source-manifest digests all match exactly, so runner identity is proven.

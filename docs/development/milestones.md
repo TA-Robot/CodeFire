@@ -61,11 +61,11 @@ M1 non-goals:
 ## M1 execution graph (current)
 
 ```text
-Critical path: independent audit -> M1 exit
-Progress: nodes 1–5 completed; attempt 3 passed all 20 run commands and the distinct four-command read-only confirmation with canonical preservation intact
-Parallel now: node 6 only — a fresh Grok session audits exact integration HEAD and preserved evidence without mutation
-Blocked: node 7 waits on node 6
-Next legal action: run the independent node-6 audit; do not admit CFR-168/CFB-136 or broaden remote behavior
+Critical path: M1 exit and slot shift
+Progress: nodes 1–6 completed; fresh Grok audit of exact `74bbcd6` authorizes node 7 with no `block-m1`
+Parallel now: none — node 7 is the single atomic management transition
+Blocked: later milestone work waits on the slot shift
+Next legal action: confirm the manifest-typo docs-only correction, then close M1 and shift all five slots atomically
 ```
 
 Nothing on this new M1 graph has run. The prior local sealed commit is an input candidate, not remote-path evidence.
@@ -81,8 +81,8 @@ Nothing on this new M1 graph has run. The prior local sealed commit is an input 
 | 4a | Bounded replay and terminal-status reporting fix | **completed** | persistent remote-source individual agent | 4 evidence | `ai/task-packets/milestone-remote-happy-path-reporting-fix.md` | packet's exact product/docs/test set | `726eae4` + review correction `510a185` (integrated as `9d1aca1` + `babe14b`); 5 focused tests; runner SHA `70301c87…`; CFR-168/CFB-136 parked |
 | 4b | Build source-bound runner and rerun isolated happy path | **completed** | persistent Claude node-4 session after runner handoff | 4a | `ai/task-packets/milestone-remote-happy-path-run.md` | isolated fixture/remote plus packet | `30b306f` (integrated as `3c64620`); 20/20 commands, applied MR and truthful replay |
 | 5 | Read-only terminal confirmation and evidence record | **completed** | persistent Claude node-4 session | 4b | `ai/task-packets/milestone-remote-happy-path-run.md` | packet/evidence only | distinct pass; 4/4 read-only commands; remote/fixture digests unchanged |
-| 6 | Final independent audit | **ready** | fresh other-family Grok audit agent | 5 | `ai/audit-latest.md` | audit file only | exact HEAD plus preserved attempt-3 root |
-| 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
+| 6 | Final independent audit | **completed** | fresh other-family Grok audit agent | 5 | `ai/audit-latest.md` | audit file only | `35c9bff` (integrated as `370f230`); no `block-m1`; node 7 authorized; manifest citation typo parked then corrected |
+| 7 | M1 exit and slot shift | **ready** | Orchestrator | 6 | — | board/history/current-state docs | — |
 
 Nodes 1 and 2 are parallel because fixture/public-contract selection does not depend on source ownership classification. After fan-in, keep serially dependent work with the agent that already owns the relevant context unless audit independence requires a fresh session.
 
