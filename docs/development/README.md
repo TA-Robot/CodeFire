@@ -6,12 +6,12 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 Last audited: 2026-08-22.
 
-- Execution is milestone-based. The live board is `docs/development/milestones.md`. `MS-adoption-wedge` exited after the post-B1 source-blind rerun reached terminal `adopt` and a fresh Grok audit returned `ACCEPT`; M1 is now `MS-release-operational-trust`, beginning with two parallel read-only classification packets.
+- Execution is milestone-based. The live board is `docs/development/milestones.md`. `MS-release-operational-trust` exited after an internal-only candidate passed independent verification/install/smoke/rollback and a fresh Grok audit returned `ACCEPT`; M1 is now `MS-product-value-proof`, beginning with two parallel read-only classification packets.
 - Codex orchestrates. Individual and 30-minute audit agents are Claude Opus 5 or Grok 4.6. Codex does not implement or audit.
 - Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
 - CFB detail ledger: 137 total; 135 `fixed`, 2 `investigating`. Open/investigating count: 2.
 - CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, 6 `investigating`. Open/investigating count: 6.
-- The latest accepted source-bound Rust runner is `/workspace/worktrees/ms-adoption-experiment-20260822/target/release/codefire-rs`, SHA-256 `90cb2895aadc45b559a96207cdd5ae3b08485f9a7e5a07014db8cca8b5b90ce9`; provenance `1731b863…` binds it to source `c78d5e0e`, manifest `3925fc03…` over 101 files. It is adoption evidence, not yet a public release candidate.
+- The latest release-rehearsal runner is `/workspace/worktrees/m1-release-rehearsal-20260822/target/release/codefire-rs`, SHA-256 `90cb2895aadc45b559a96207cdd5ae3b08485f9a7e5a07014db8cca8b5b90ce9`; provenance `7998bcf6…` binds it to source `01a4de0`, manifest `3925fc03…` over 101 files. It is internal-only evidence, not a public release candidate or permission to publish.
 - The current Git worktree contains the intentional uncommitted review, invariant-fix, regression, ADR, and management-document packages. They remain classified project state and must not be destructively cleaned or presented as a clean checkpoint.
 - CFB-120..132 and the complete Stage 1 Dogfood-blocker lifecycle are closed. Canonical Algorithm is sealed at `CF-COMMIT-2792b54ad730e6d644668c38`, `open-clean`, and zero Fires after the agent-local-contract milestone; all remote-M1 attempts preserved it exactly.
 - RVC-011 / CFR-161 is closed through Install, installed counterexample replay, both real-repository read-only probes, canonical trace-warning verification, and Retrospect. ADR-013 now owns the typed committable decision and non-relaxable safety floor.
@@ -53,12 +53,12 @@ Before starting implementation:
 
 ## Current Cleanup Priorities
 
-The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md`: `MS-release-operational-trust`. Its rights/source-identity classification and isolated release/verify/rollback topology classification are the two ready read-only packets. Queued, not started:
+The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md`: `MS-product-value-proof`. Its segment/claim/value contract and isolated first-seal fixture/command classification are the two ready read-only packets. Queued, not started:
 
-1. M2: first product-value proof (bounded roadmap Stage 5 slice).
-2. M3: ecosystem conformance seed (bounded roadmap Stage 6 slice).
-3. M4: ecosystem multi-implementation proof (next bounded roadmap Stage 6 slice).
-4. M5: ecosystem third-organization proof (next bounded roadmap Stage 6 slice).
+1. M2: ecosystem conformance seed (bounded roadmap Stage 6 slice).
+2. M3: ecosystem multi-implementation proof (next bounded roadmap Stage 6 slice).
+3. M4: ecosystem third-organization proof (next bounded roadmap Stage 6 slice).
+4. M5: ecosystem compatible release cycles (next bounded roadmap Stage 6 slice).
 
 ## Validation Matrix
 

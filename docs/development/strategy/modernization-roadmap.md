@@ -46,7 +46,7 @@ Priority experiments:
 6. root/path/symlink and server-verification trust-boundary red team;
 7. stale lock, pending transaction, corrupt object, and user-work recovery table.
 
-The CFB-120..132 correctness batch and the CFR-161..167 safety/contract roots completed source gates, isolated Install, Algorithm Dogfood, and Retrospect by 2026-07-19; same-root CFB-134/135 and CFR-174/175 are also closed. Live execution moved on 2026-08-21 to the five-ahead board `../milestones.md` (STR-015). Control restore, the local sealed loop, the agent-consumable local contract, the remote happy path, and the adoption wedge have exited. The active M1 is now a bounded Stage 4 release slice, M2 a bounded Stage 5 product-value slice, and M3–M5 are successive bounded Stage 6 interoperability slices. Open issue status stays in the ledgers; the board alone controls which slice may run. This roadmap remains a stage/gate document, not a second task board.
+The CFB-120..132 correctness batch and the CFR-161..167 safety/contract roots completed source gates, isolated Install, Algorithm Dogfood, and Retrospect by 2026-07-19; same-root CFB-134/135 and CFR-174/175 are also closed. Live execution moved on 2026-08-21 to the five-ahead board `../milestones.md` (STR-015). Control restore, the local sealed loop, the agent-consumable local contract, the remote happy path, the adoption wedge, and the bounded internal release rehearsal have exited. The active M1 is now a bounded Stage 5 product-value slice, and M2–M5 are successive bounded Stage 6 interoperability slices. Open issue status stays in the ledgers; the board alone controls which slice may run. This roadmap remains a stage/gate document, not a second task board.
 
 Exit gate:
 
@@ -113,7 +113,7 @@ Exit gate:
 - a backup operator can publish, verify, roll back, and respond using documentation only;
 - no public beta label while cargo/source gates or release identity remain unresolved.
 
-Board slot M1 `MS-release-operational-trust` draws a **bounded** slice of this stage: the rights/license decision and one rehearsed, independently verified release-and-rollback path. The remaining deliverables above stay here as stage work and are not admitted by that slot.
+The completed `MS-release-operational-trust` milestone exercised only a bounded internal-only rights decision and one independently verified release-and-rollback path. Missing outbound rights, SBOM/signing, external publication, and the remaining deliverables above stay here as Stage 4 work.
 
 ## Stage 5 — Product and Economics Proof
 
@@ -133,7 +133,7 @@ Exit gate:
 - at least one segment has repeatable value and an adoption owner;
 - the next product scope follows measured friction, not internal feature enthusiasm.
 
-Board slot M2 `MS-product-value-proof` draws a **bounded** slice of this stage: one candidate segment, one claims-comprehension/first-seal study, measured setup and friction, and an adopt / narrow / stop decision. Broad interviews, a three-repository pilot, and a four-week team pilot stay here until earlier slots permit them.
+Board slot M1 `MS-product-value-proof` draws a **bounded** slice of this stage: one candidate segment, one claims-comprehension/first-seal study, measured setup and friction, and an adopt / narrow / stop decision. Broad interviews, a three-repository pilot, and a four-week team pilot stay here until earlier slots permit them.
 
 ## Stage 6 — Ecosystem and De-facto Standardization
 
@@ -156,7 +156,7 @@ Exit gate:
 
 Until then, keep a de-facto open specification and do not enter a standards body for signaling alone.
 
-Board slot M3 `MS-ecosystem-conformance-seed` draws a bounded slice of this stage: one maturity-labelled public profile, its extension rules, and one independently authored adapter/client passing a bounded conformance corpus. Board slot M4 `MS-ecosystem-multi-implementation-proof` is the next bounded slice: a second integration from a distinct organization consumes one compatibility-preserving profile update and passes the corpus. Board slot M5 `MS-ecosystem-third-organization-proof` is the next bounded slice: a third distinct organization consumes the stable profile without a compatibility exception and passes the corpus. Formal governance/IPR/trademark work, two full release cycles, funded-maintainer proof, and standards-body activity remain roadmap work.
+Board slot M2 `MS-ecosystem-conformance-seed` draws a bounded slice of this stage: one maturity-labelled public profile, its extension rules, and one independently authored adapter/client passing a bounded conformance corpus. Board slot M3 `MS-ecosystem-multi-implementation-proof` is the next bounded slice: a second integration from a distinct organization consumes one compatibility-preserving profile update and passes the corpus. Board slot M4 `MS-ecosystem-third-organization-proof` is the next bounded slice: a third distinct organization consumes the stable profile without a compatibility exception and passes the corpus. Board slot M5 `MS-ecosystem-compatible-release-cycles` is the next bounded slice: two successive compatibility-preserving profile releases pass the corpus without an emergency exception. Formal governance/IPR/trademark work, funded-maintainer proof, and standards-body activity remain roadmap work.
 
 ## Ordering Rules
 
