@@ -156,22 +156,22 @@ Next allowed action: node 4b uses the source-bound runner below for the isolated
 
 ### Source-bound runner
 
-Built from accepted source commit `726eae4855c1cbcdefa96fe13310eb25a4c3d9d5` after focused tests and packet validation passed. Public `codefire` is a hardlink of `codefire-rs` (same inode and bytes).
+Superseded first runner from `726eae4`. Corrected runner is bound to `510a1855cb8753219aae416c6cbfea58f059415d` after the review follow-up. Public `codefire` is a hardlink of `codefire-rs` (same inode and bytes).
 
 | Item | Value |
 |---|---|
-| source HEAD | `726eae4855c1cbcdefa96fe13310eb25a4c3d9d5` |
-| source manifest SHA-256 | `4c30b19e13c5b3491d92e9a53436ebc0f5b0296acff23e5441d5de4e2100ab34` |
+| source HEAD | `510a1855cb8753219aae416c6cbfea58f059415d` |
+| source manifest SHA-256 | `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274` |
 | source file count | 100 |
 | `codefire-rs` path | `/workspace/worktrees/ms-remote-happy-path-budget-20260821/target/release/codefire-rs` |
 | public `codefire` path | `/workspace/worktrees/ms-remote-happy-path-budget-20260821/target/release/codefire` |
-| runner SHA-256 | `bd63ae8f0a23f34ead299b251c7238b31e86e310e6c21644ea0ca4d812012f2b` |
-| inode | `1360977` (both names) |
-| binary bytes | 14606472 |
-| provenance | `target/codefire-ai/rust-build-provenance.json` (`6fabb299829161d92be6351ec3314fc8e6600bc5a2912027ac0c47c435b6c1dd`) |
+| runner SHA-256 | `70301c874d7220a71be988562df0e5188ede6a85c65c63dcbd3dcdee09f4706c` |
+| inode | `1361045` (both names) |
+| binary bytes | 14594080 |
+| provenance | `target/codefire-ai/rust-build-provenance.json` (`d87653d0a6e4a00216ab47816167744ce2e35c3df142a7ccd9810472d35e61d8`) |
 | build command | `cargo build --release --locked -p codefire-cli --bin codefire-rs` |
 | toolchain | rustc 1.97.0 (2d8144b78 2026-07-07); cargo 1.97.0 (c980f4866 2026-06-30) |
-| build_log SHA-256 | `cd6cf1d6b213bc943a6ce0c2d069e49108cfb30714f58d7d1526497683603a1c` |
+| build_log SHA-256 | `26da50e66f62723cd4e5222a73300c4d0079172d8949d715fce92b9bf3a9fc22` |
 
 Node 4b must prepend `target/release` to `PATH` and use this `codefire` / `codefire-rs` pair. Do not substitute another executable. CFR-168/CFB-136 remain parked. No `block-m1`.
 
