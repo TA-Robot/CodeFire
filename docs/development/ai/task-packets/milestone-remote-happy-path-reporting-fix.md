@@ -42,6 +42,9 @@ idempotency authorities; this is a reporting correction, not a remote transactio
 ## Exact write set
 
 - `crates/codefire-cli/src/remote.rs`;
+- `crates/codefire-cli/src/remote/plans.rs` and
+  `crates/codefire-cli/src/remote/publication.rs`, only if required to distinguish a completed-receipt
+  replay from pending/quarantine recovery without overloading the publication result;
 - focused Rust tests under `crates/codefire-cli/src/tests.rs` or one responsibility-named file below
   `crates/codefire-cli/src/tests/` if separation is clearer;
 - only the directly relevant paragraphs/rows in the canonical source docs:
@@ -57,14 +60,20 @@ editing it. Do not broaden the write set silently.
 ## Required behavior
 
 - Preserve the existing completed receipt as the source of replay identity and result.
-- On the replay branch only, return a plan that is observably a replay: `replayed: true`,
+- Do not equate every `replay_json_publication` `Some(...)` result with a pure replay: that path also
+  finishes quarantine or a pending transaction and may publish authorities, including without an
+  idempotency key. Carry or derive an explicit completed-receipt fact before reporting replay.
+- On the completed-receipt replay branch only, return a plan that is observably a replay: `replayed: true`,
   `would_apply: false`, and no live mutation operations. Do not regenerate or rewrite the receipt.
 - Keep the first live apply plan unchanged.
-- In `request-list`, perform stale projection only for a non-terminal MR whose target precondition has
-  drifted. Persisted terminal states remain authoritative; at minimum `applied` must remain `applied`.
+- In `request-list`, preserve the current target-head sealed validation, but perform the `stale`
+  assignment only when the persisted status is not `applied` and the target precondition has drifted.
+  `rejected` remains re-reviewable and therefore still receives actionable stale projection.
 - Preserve validation of current target sealed heads and malformed MR records.
 - Add regression coverage proving the live apply, idempotent replay metadata, unchanged persisted
   authorities, and terminal `request-list` status in one bounded file-backed flow.
+- Add a separate regression proving a drifted non-terminal MR still lists as `stale`; a change that
+  deletes stale detection must fail. Keep the existing upload replay-plan equality test unchanged.
 
 ## Validation
 

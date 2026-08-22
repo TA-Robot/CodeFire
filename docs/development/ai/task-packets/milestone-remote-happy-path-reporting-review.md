@@ -24,6 +24,16 @@ This ran in parallel with node 4a implementation, in a separate worktree, other-
 remote-source context owner. No product code was written and the implementer's worktree was not
 inspected.
 
+## Scope
+
+Read-only inspection of the fixed evidence, the two admitted reporting seams, their directly related
+tests and contracts, and this review packet only.
+
+## Non-Goals
+
+No product/source implementation, remote mutation, implementer-worktree inspection, CFR-168/CFB-136
+work, HTTP/Python parity repair, scale work, or later-milestone work.
+
 ## Fixed evidence
 
 - integration HEAD reviewed: `564bb808ba23294033a625b07535f1777ab8b69f` (`docs: admit M1 remote reporting fix`);
