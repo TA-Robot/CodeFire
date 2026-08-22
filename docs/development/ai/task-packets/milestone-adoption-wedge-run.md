@@ -1,6 +1,6 @@
 # AI Task Packet
 
-Status: completed
+Status: rerun-consumer-ready
 
 Packet ID: MS-adoption-wedge-run
 
@@ -703,3 +703,254 @@ agent-orchestration dependency. Node 7 must not exit M1 on this packet: the deci
 after the audit the orchestrator admits the B1 slice and one identical rerun, and only that rerun can
 produce a terminal `adopt`/`stop`. Do not implement beyond the B1 slice, do not start a second
 consumer, and do not alter the section-6 thresholds.
+
+### Post-B1 rerun Stage A — completed. Status `rerun-consumer-ready`. No consumer launched, nothing scored.
+
+This is the single retry the first `narrow` decision permits. Subject, C1–C6 commands, Q1–Q7 semantics,
+answer-template fields, scoring-key accept clauses, ordered thresholds, privacy rules, and the
+one-rerun limit are unchanged. Only the five amendment-authorized deviations were applied. No product
+or source file was touched; no repository was mutated; first-run evidence was neither used nor
+disclosed to the handed root.
+
+Setup ran `2026-08-22T03:08:16Z` → `2026-08-22T03:16:53Z`, **8m37s**.
+
+#### R.1 Fresh roots (no prior root reused)
+
+```text
+$CTRL2  /tmp/m1-adopt2-ctrl.hx1vCY    controller: baselines, mirror, harness self-test evidence   (700)
+$ROOT2  /tmp/m1-adopt2-root.N622xo    HANDED consumer root                                       (755)
+$KEY2   /tmp/m1-adopt2-key.3Qj9MY     answer key + derivation; referenced nowhere in $ROOT2       (700)
+$FIX2   /tmp/m1-adopt2-root.N622xo/repo   the only admitted target
+```
+
+Verified distinct from the three first-run roots, which remain intact as node 4b/4c/5 evidence
+(3038 files retained).
+
+#### R.2 Admitted runner and provenance, rehashed against the packet
+
+```text
+runner                  /workspace/worktrees/ms-adoption-experiment-20260822/target/release/codefire
+sha256                  90cb2895aadc45b559a96207cdd5ae3b08485f9a7e5a07014db8cca8b5b90ce9   matches packet
+bytes                   14590776                                                            matches packet
+inode / nlink / mode    1374942 / 3 / -rwxr-xr-x
+provenance              .../target/codefire-ai/rust-build-provenance.json
+provenance sha256       1731b8636330841f20dcad9265710eacc3830767e8c693b34ad75b5907688dea   matches packet
+provenance schema / ok   codefire.rust_build_provenance.v1 / true
+base_revision           c78d5e0e5e151a1489744c21340716a439597e71                            matches packet
+binary_sha256           90cb2895…                                                           matches binary
+source manifest         3925fc035690296fa5e132b630dab65a7fbd5ddb1a55f0fb1226e6efd295d97a   matches packet
+source file count       101                                                                 matches packet
+build command           cargo build --release --locked -p codefire-cli --bin codefire-rs
+toolchain               cargo 1.97.0 (c980f4866 2026-06-30) / rustc 1.97.0 (2d8144b78 2026-07-07)
+```
+
+Source binding to this worktree, both exit 0 and therefore byte-identical:
+`git diff --quiet c78d5e0e HEAD -- Cargo.toml Cargo.lock crates .cargo rust-toolchain rust-toolchain.toml`
+and `git diff --quiet c78d5e0e HEAD -- schemas/public`. No build ran.
+
+#### R.3 Preservation baseline rehashed before setup and re-verified at every phase
+
+All 14 canonical values, the three remote-milestone roots, and the four first-run adoption evidence
+digests were rehashed at setup start and again at final handoff — `PASS` both times, no drift:
+
+```text
+canonical  git_head f1644122…  porcelain 248  repo_json bf6d978b…  branches_main bfd52e35…
+           branches_rollup 8fba5dcb…  opened_main 5721d710…  active_state 54ecb285…
+           .codefire-open 60b133b3…  objects 2891 / 114921765  no_codefire_server 0
+           store_all_files e5f6f7c2…  store_file_count 2904  store_bytes 114968174
+remote     .TaHMir 87746102…   a2.zvrbzn d2ee53b3…   a3.VbZTZ8 3fdd2867…
+first run  answer 187812d6…  key b5996cff…  transcript 83a3f915…  confirm 6e4f4649…
+```
+
+No CodeFire command was issued against any canonical path. The rerun harness additionally re-checks the
+two first-run evidence digests after every command, so a consumer cannot silently disturb the frozen
+prior run.
+
+#### R.4 Fresh isolated closed fixture
+
+```text
+copied members          2900   (1 repo.json + 2891 objects + 8 branches)
+member content manifest cccd8814a66dd3236c4a85e5752ab7bb6aa8ea09db2e74d35ab1a53998c07452
+  canonical side        cccd8814a66dd3236c4a85e5752ab7bb6aa8ea09db2e74d35ab1a53998c07452   EXACT MATCH
+member file bytes       114657290 both sides
+empty registries        opened active cache idempotency locks remotes — 0 entries each
+fixture total files     2900, unchanged after the six self-test commands (no lock file, no write)
+```
+
+#### R.5 Refreshed public docs pack — 14 files
+
+```text
+422174c3a419d846abce1844461e449c4cbb8178a0983aac2afc3911f355110e  README.md                                  unchanged
+c4511be600d8e7405ae7afd840b8c5bf5d2053499aa474961dc883cb92c8e55d  docs/02_core_concepts.md                   unchanged
+b71428806556534f1d50fd0538e7680eded78a08db673d4b24c876146264b28e  docs/04_cli_spec.md                        REFRESHED
+6a70b6b7e83f07b261587e7231f66c6836516a67e5ccc0baaba9e92f2e14927b  docs/05_consistency_model.md               unchanged
+9c87a4c98e4d2b9c24dd35d4fe6a76feb79a6e6e95938c4ef713497eb034efe6  docs/automation_interface.md               REFRESHED
+bc8943c63109d238e7c27a7d418b45b29f1e8477618e606a3684c914df7e035b  docs/runbook.md                            unchanged
+d67a1a21c49c9ec952444312801523b17e5a59a65fc88f0bad400738bb125793  schemas/conformance/manifest-v1.json       unchanged
+8403a6631c4ae39645278de1ec62cb599b73f29aa046eeeb73ead75a7e8938be  schemas/public/branch-list-v1.schema.json  NEW
+d559c164dbdf5039502cf482b82eb4c41246138d14d9344f5925f8ccf5ca12ee  schemas/public/capabilities-v1.schema.json REFRESHED
+f7f00b62350367a561147e5a11aea1d4f74c4f0977d3c8396bc535199f4dc372  schemas/public/command-result-v1.schema.json unchanged
+461da6adc376e8f29932d338adb4f1293da8fabe3ed22c76c892dc8fb9e72b56  schemas/public/page-cursor-v1.schema.json  unchanged
+fb93c97deb7382d7a4b55239644b9f2dc3aca337c7058e8e2465cdd2c0fb442e  schemas/public/page-v1.schema.json         unchanged
+981231921326e1eb40bd5c694792c7d8853388dbd99ecea15f9ecd4eae2559e3  schemas/public/remote-doctor-v1.schema.json unchanged
+1a7e283f11a51c7d7b8e316cacd4d94dab41c2a0b70253e2ac1cce255784b1f6  schemas/public/show-result-v1.schema.json  NEW
+
+docs_pack_digest 813edc85203a97b58e5efc56129db467723a16d8f61fed8e792369badde6fd7a
+```
+
+Two new files and three refreshed — exactly what the amendment allows (the three refreshes are the
+files the B1 fix changed, and the experiment measures their public contract). Nine unchanged. Zero
+matches for `crates`, `tests`, `development`, `11_internal_architecture`, `08_object_store`,
+`09_index_trace_policy`, `adr`, or any product doc outside the frozen list.
+
+The fix is substantive, not merely documentary: `show --json` now carries a `claim` object
+(`result`, `profile`, `phase`, `subject.{kind,trust_kind,immutable}`), and `capabilities` now emits a
+per-command `data_schema` that distinguishes `codefire.show_result.v1` from `codefire.branch_list.v1`.
+Independently validated during derivation: C4, C5 validate against `show-result-v1`, C3 against
+`branch-list-v1`, C1 against `capabilities-v1` (whose `command` object is `additionalProperties: false`
+and now lists `data_schema`). All four **VALID**.
+
+#### R.6 Amended answer-value leak gate — and two real leaks it caught
+
+The gate now permits public schema IDs and field names and forbids repository-specific branch names,
+commit IDs, counts, certificate result, signature presence, the warning set, and answers. Applied to
+every controller-authored handed file, it initially failed and **two genuine leaks were fixed before
+handoff**:
+
+1. **The answer template disclosed the certificate result.** Its `claim_scope_explanation` prompt read
+   "what does this repository's `'passed'`/verified state actually claim" — naming the exact Q5 value.
+   This text was present in the first run and the old gate did not catch it, because that gate scanned
+   for public type/field names rather than answer values. Reworded to "this repository's certificate
+   state". Scored questions and every template field are otherwise unchanged.
+2. **The harness embedded repository-derived baselines**, including the canonical store digest and file
+   count. All preservation constants were moved to controller-owned
+   `$CTRL2/evidence/preserve-baseline.env` (mode 600) and are now sourced at run time. The handed
+   harness contains **zero** 64-hex digests.
+3. **A first-run path leaked into the harness.** The first-run evidence guard hardcoded
+   `/tmp/m1-adoption-root.d1YEhz/evidence/consumer-answer.json` and the first-run key path. Same uid,
+   so a consumer reading the harness could have read the previous answer and key — a direct violation of
+   the amendment's no-first-run-evidence rule. Both paths were moved into the controller baseline file
+   and are referenced only by variable. Rescan: **0** references to any first-run root and **0** to the
+   key root anywhere in the handed tree.
+
+One pattern match was adjudicated a false positive and is recorded rather than silently dropped:
+`docs/runbook.md:397` contains `cf://.../feature%2Fsession`, a generic URL-encoding example using the
+docs' standard `session` placeholder, not one of this repository's branch names. `runbook.md` is
+byte-identical to the first run.
+
+One disclosure is accepted and stated rather than hidden: the token `main` appears in the frozen C4
+command and in Q3's wording, unchanged since the contract froze them and present in the first run that
+node 6 audited. It is not an answer value — Q2 still requires all eight names and their states, Q3 still
+requires the head commit ID — and C3 reveals the name immediately.
+
+#### R.7 Label-only harness
+
+Derived from the corrected first-run harness by substituting only `ROOT`, `RUNNER`, and `CTRL_LOG`, so
+C1–C6 semantics cannot drift; the diff before hardening was exactly those three lines.
+
+```text
+path            $ROOT2/bin/cf   (mode 555)
+sha256          5c7558a901835aec0056f5558fbce86cef5c897a5f8076208f70faf61f3458cf
+labels          C1 C2 C3 C4 C5 <CF-COMMIT-...> C6, plus non-executing `labels` and `log`
+baselines       sourced from $CTRL2/evidence/preserve-baseline.env (controller-owned, mode 600)
+guards          canonical + fixture + 3 remote roots + 2 first-run evidence digests, after every command
+failure modes   refusal exit 64; PRESERVE=DRIFT exit 71 + permanent HALT; internal fault exit 72 + HALT
+```
+
+Refusal self-test — all nine refused with exit 64: `cf status`, `cf C7`, `cf` (no label),
+`cf capabilities`, `cf C1 --json`, `cf C5` (missing id), `cf C5 deadbeef`, `cf verify`, `cf show`; plus a
+second `cf C6` correctly refused after the first.
+
+Happy-path self-test — all six labels exit 0, stderr empty, every verdict `PRESERVE=OK`, durations
+3 / 1414 / 2184 / 1997 / 1903 / 3389 ms, and **all six stdout digests byte-identical to the sealed key
+derivation**. Handed transcript, `seq`, `c6.used`, and `HALT` were then reset; the smoke bundle is
+retained controller-side (`cfa30e5a…` for the six-label pass, re-archived as
+`smoke_bundle_digest cfa30e5a6a466208c1da9f0d74039bebfb3a72110a8fd66fccc89e4c65ba2c4b`).
+
+#### R.8 Fresh answer key, sealed before handoff
+
+```text
+derive script          $KEY2/derive-key.sh   sha256 1a50db3492c0fb3ce617d6fdceb6797427201d354065126a9151915f21161c38
+                       (diff vs first run: the three path constants only)
+derive bundle digest   fb2a5cd86bea70821e158d69cd075e5b061ff7dbfb0557e5eb6aa724a9aa22a2
+answer key             $KEY2/answer-key.json sha256 cea8bee0ceeac21822cf6327dcf2b783450de4025d82af53be191c0616eff7b7
+```
+
+| label | exit | duration | stdout sha256 |
+|---|---|---|---|
+| C1 | 0 | 3ms | `f3f18424d8aa5bcd4a22a8ced1a51b967892f25901dc23bdc42ec2c5712d9d65` |
+| C2 | 0 | 1419ms | `74fed7e56d8c30384c4005067df3859d4406d7bf7325641af8d914df178b4980` |
+| C3 | 0 | 1271ms | `34b48004d25819ffa2bfca006279160681db6654cb88c870a1a6219009b386bd` |
+| C4 | 0 | 1251ms | `43a6e72eb2d1b3746a544df59e35224be75f9ce59dc075ce5d431e8691286cdc` |
+| C5 | 0 | 1214ms | `9881736f238dabe6cdb4891076e3a61086b6bfa4803821f93c2f9005d6126eee` |
+| C6 | 0 | 2346ms | `fbe5b2fdfc419cd8876d27700794218b5589d1700c7ec2011849813ac26a935d` |
+
+All stderr empty. Single-parent chain, no key ambiguity. Accept clauses for Q1–Q7 are carried over
+verbatim; Q5's accept clause additionally allows the documented `claim` object as justification while
+still accepting the original `signature.present` route, and still scores `signed`/`portable`/
+`legacy/unproven` as wrong.
+
+The key records the post-B1 documentation status so Stage C recomputes
+`undocumented_field_reliance` against the **14-file** pack, not the 12-file one, and records three
+hazards for Stage C — the unchanged `open-clean`-versus-`opened=0` mismatch; a **new** hazard where
+`claim.subject.kind=live_open` / `immutable=false` on a sealed commit in a closed repository is the
+historical commit-time subject and not current state; and the redundancy of `certificate` with
+`claim.result` on this fixture.
+
+#### R.9 Handed root — final inventory
+
+```text
+$ROOT2/TASK.md                                sha256 776a9a45b9e1404ed9c895ddd9300e4eb22f4a0fc8238e684ab31e79e5122cd2  (444)
+$ROOT2/bin/cf                                 sha256 5c7558a901835aec0056f5558fbce86cef5c897a5f8076208f70faf61f3458cf  (555)
+$ROOT2/evidence/setup-metadata.json           sha256 62faafe21af6af1967ca52811c99d45057187208a3c319b9313f502656f9616c  (444)
+$ROOT2/evidence/consumer-answer.template.json sha256 e414421998f1a60fbf465ace98b565c08954599c19a7920496bcbf26bcae6e7c  (444)
+$ROOT2/docs-pack/                             14 files, digest 813edc85…
+$ROOT2/repo/                                  2900 files, members digest cccd8814…
+$ROOT2/evidence/transcript/                   absent until the consumer's first command
+```
+
+`TASK.md` differs from the first run only in the docs-pack listing (two added schema paths and sort
+order); hard rules, the six labels, Q1–Q7, the citation shape, and the published thresholds are
+byte-identical. The template differs only in the neutralized `claim_scope_explanation` prompt.
+`setup-metadata.json` publishes `answer_key_sha256 cea8bee0…` and states the key is outside the handed
+directory with its path withheld.
+
+Honest limit, unchanged and restated: `$CTRL2` and `$KEY2` share the consumer's uid, so containment is
+operational, not kernel-enforced. `$CTRL2` is referenced by the harness for its log mirror and baseline
+file; `$KEY2` is referenced nowhere reachable. Stage C must scan the consumer transcript and read set
+for access outside `$ROOT2`, and must additionally confirm the first-run digests in R.3 are untouched.
+
+#### R.10 Validation
+
+```bash
+python3 docs/development/tools/check_project_docs.py
+python3 docs/development/tools/check_ai_acceleration_docs.py
+git diff --check
+```
+
+All pass. Write set is this packet only. No build, product test, import, Git bridge, live workspace
+command, dogfood mutation, or later-slot gate. Preservation: `RERUN_STAGE_A_GATE=PASS` on all 25
+checked values.
+
+#### R.11 Next legal action — rerun Stage B only
+
+Launch **one** fresh Grok 4.6 session with no prior CodeFire context, no subagents, no web, no
+maintainer channel, and no knowledge of the first run — not its roots, evidence, answer, score,
+`narrow` decision, cutoff outcome, or reliance count — authorized to read and write only under
+`/tmp/m1-adopt2-root.N622xo`. Hand it exactly this and nothing more:
+
+```text
+Your entire working directory is /tmp/m1-adopt2-root.N622xo.
+Read TASK.md first and follow it exactly.
+Run commands only through ./bin/cf using the labels C1-C6. Do not invoke any other binary.
+Do not read, list, or search anything outside this directory. Do not use the network.
+Write exactly one file: evidence/consumer-answer.json, following
+evidence/consumer-answer.template.json.
+Record your start time before your first command and your submit time when you write the answer.
+When the answer file is written, stop.
+```
+
+Then rerun Stage C: score once against key `cea8bee0…`, recompute
+`undocumented_field_reliance` against the 14-file pack, and apply the unchanged section-6 table in
+order. This is the last retry the `narrow` contract allows, so its outcome is terminal `adopt` or
+`stop`. Do not launch a second consumer, do not alter thresholds, and do not widen product scope.
