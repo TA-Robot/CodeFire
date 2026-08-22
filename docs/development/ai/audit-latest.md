@@ -1,316 +1,505 @@
 # Milestone audit
 
-Final independent other-family audit of active M1 `MS-remote-happy-path` (node 6 of the M1 execution graph).
+Interim independent decision audit of the **first** adoption run of active M1 `MS-adoption-wedge`
+(node 5b of the M1 execution graph). **This is not M1 exit authorization.**
 
-- time (ISO): `2026-08-22T01:41:14Z`
-- audited HEAD (exact): `74bbcd6df999f345f803696de6a3398ebeba977c` (`74bbcd6`, "docs: advance M1 remote path to final audit")
-- evidence root: `/tmp/m1-remote-happy-path-a3.VbZTZ8` (preserved attempt-3 fixture/remote/evidence; left unmodified in domain state)
-- active milestone: M1 `MS-remote-happy-path` — Remote happy path of sealed history
-- stalled: **no**
-- scope_creep: **no**
-- next_milestone_risk: low. M2 `MS-adoption-wedge` remains queued. Nothing in this M1's evidence admits CFR-168, CFB-136, HTTP transport, scale, installer, or adoption work. `request-list` still omits `applied_head` from its per-MR JSON item; that is `park`, not an M1 blocker, because the apply and `show` envelopes independently identify the applied head.
-- auditor: Grok 4.6, new session, separate worktree `worktrees/ms-remote-final-audit-20260822` on branch `grok-agent/m1-remote-final-audit-20260822`. Nodes 4/4b/5 were a persistent Claude session. This session is not the run executor and did not inspect implementer or executor uncommitted state. Independence per `orchestration-protocol.md` (fresh other-family Grok session) and `audit-cadence.md` is satisfied. Codex was not used.
-- write set honored: this file only. `/workspace/project`, its CodeFire state, the preserved evidence root, and every product/dogfood file were left unmodified as domain authorities. This audit issued only read-only CodeFire commands (`status`, `list`, `show`, `request-list`, `doctor`). `milestones.md`, `history.md`, issue files, and packets were not edited. M1 was not exited and no slot was shifted.
+- time (ISO): `2026-08-22T02:42:47Z`
+- audited HEAD (exact): `11d0c8cc4721a5583fb8b657bbfc5692f31327f8` (`11d0c8c`, "docs: admit adoption B1 classification and decision audit")
+- preserved roots audited (read-only): `/tmp/m1-adoption-root.d1YEhz` (handed consumer root), `/tmp/m1-adoption-ctrl.c23eQC` (controller), `/tmp/m1-adoption-key.JbqhPy` (sealed answer key)
+- active milestone: M1 `MS-adoption-wedge` — First adoption wedge
+- scope of this audit: first-run score, `undocumented_field_reliance`, the ordered `narrow` decision, the preservation boundary, and the B1 / single-rerun admission that node 5c is about to make
+- stalled: **no** (see stall-risk flag F1 — the rerun as literally frozen is a guaranteed second `narrow`)
+- scope_creep: **no** as executed (see scope flag F2 — the risk is at node 5d, not in what has run)
+- next_milestone_risk: low. Nothing in this evidence admits CFR-168, CFB-136, CFB-133, CFR-169, CFR-170, a Git bridge, telemetry, an agent platform, or any M2–M5 work. Contract `park` P2 stands: the runner was handed to the consumer, so **M1 does not prove toolchain-free adoption** and no later slot may inherit that claim.
+- auditor: Claude Opus 5, fresh session, separate worktree `worktrees/m1-adoption-decision-audit-20260822` on branch `claude-agent/m1-adoption-decision-audit-20260822`. Nodes 1, 4a, 4c and 5 were a persistent Claude session; node 4b was a fresh Grok 4.6 consumer; node 2 / node 5a are Grok. This session is not the run executor, did not use any prior agent conversation, and did not inspect any implementation worktree or executor uncommitted state. Provider routing per `provider-routing-policy.md` (individual and audit are Claude Opus 5 / Grok 4.6; Codex commands only) is satisfied. Codex was not used. Audit independence is same-family-as-controller but fresh-session; the *other-family* requirement in the board applies to node 6, which is still blocked.
+- write set honored: **this file only.** No repository was mutated, no packet, board, issue, or product file was edited, no consumer rerun was performed, no threshold was changed, no implementation worktree was inspected, and no CodeFire command of any kind was issued by this audit — against the fixture, the canonical store, or anything else. All verification was filesystem digests, recorded envelopes, and `git`.
 
-This audit verified evidence against the environment. It did not accept packet prose as proof: every hash, envelope field, receipt, authority, and preservation claim below was re-derived independently at the audited HEAD.
+This audit did not accept packet prose as proof. Every hash, argv, envelope field, count, timestamp
+bound, threshold clause, and preservation value below was re-derived independently from the preserved
+roots and from `git` at the audited HEAD.
 
-## Exit criteria
+## 1. Requirement matrix — exact M1 exit bullets
 
-Exact M1 exit from the card, in order.
+The M1 card's five exit bullets, judged against the **first run only**. `n/a (interim)` means the
+bullet cannot be satisfied by this node and is not claimed.
 
-| # | Exact exit criterion | Verdict | How it was verified independently |
+| # | Exact M1 exit bullet | Verdict | How it was verified independently |
 |---|---|---|---|
-| EC1 | an isolated fixture and exact public commands are selected before any remote mutation | **pass** | Probe packet selected the isolated copy recipe, slash-free `base`/`topic` aliases, `cf://` URLs, and the public command sequence before node 4. Attempt-3 evidence shows fixture copy of `repo.json`/`objects`/`branches` plus empty `opened`/`active`/`cache`/`idempotency`/`locks`/`remotes`, then `doctor --quick` and `branch list` before any `clone`/`upload`/`request-*`. Command 02: `ok true`, `blocking 0`, `opened 0`, seven non-blocking `legacy_branch_head_semantic_profile` warnings, **zero issue paths under `/workspace/project`**. No `server_policy.json`. No `--actor`, HTTP, or branch `main` in any recorded argv. |
-| EC2 | already sealed local history completes `upload -> request-merge -> request-review(approve) -> request-apply` on the file-backed happy path | **pass** | Twenty node-4b commands plus four node-5 commands, all exit 0, cwd `$FIX`. Live mutators: upload base `CF-COMMIT-d068d2c3995f6da0a0959b98` then topic `CF-COMMIT-126555fdb84822a0c09c9e6a`; request-merge created `MR-748b80865110` from JSON `data.merge_requests[0].id` (also `data.plan.merge_request_id`); request-review `--decision approve --reviewer m1-reviewer`; request-apply. Replay argv is byte-identical to the live apply argv. No new local commit. Target `base` fast-forwarded from `d068d2c3…` to `126555fd…`; source `topic` unchanged at `126555fd…`. |
-| EC3 | CodeFire's JSON envelopes identify the remote source/target/MR/applied head, and a separate read-only query confirms the terminal head/state | **pass** | See identity table and the `applied_head` adjudication below. Live apply `data.plan.head`, remote `list` `base`/`topic` heads, and `show` `commit` all equal `CF-COMMIT-126555fdb84822a0c09c9e6a`. `request-list` identifies MR `MR-748b80865110`, source/target URLs, and persisted status `applied`. This audit re-ran the four read-only commands; envelopes are byte-identical to node-5 evidence. |
-| EC4 | an independent other-family audit verifies object closure, no partial remote mutation, preservation of canonical dogfood state, and no hidden retry/action loop | **pass** | Remote `doctor --json`: `ok true`, `checked_objects 2346`, all four error counters 0, `issues []`. All live mutators exited 0 with completed v2 receipts. Same-key apply replay returns `replayed: true`, `would_apply: false`, empty `operations`/`next_actions`, and does not rewrite domain authorities. Canonical preservation (probe §5, twelve checks) is `PRESERVE=OK` at audit time, including after the live read-only confirmation. |
+| EC1 | consumer, exact public surface, task, falsifier, measurements, and stop rule selected **before any experiment mutation** | **pass** | Proven by `git`, not by assertion. The contract packet's Result — subject, C1–C6 table, preservation manifest, 7-item rubric, 10 metrics, ordered threshold table, falsifier — has exactly **one** version in history: commit `624f28c` at `02:03:14Z`. `git show f91c8ca:…contract.md` has no section 6 at all (empty-string digest `e3b0c442…`); `624f28c` introduced it (`cd880bff69435d78`) and no later commit touches the file. That precedes fixture creation (`$ROOT` mtime `02:06`), the answer key (`02:11:40Z`), the consumer's first command (`02:21:42Z`), and scoring (`7f7b86e`, `02:34:27Z`). |
+| EC2 | one bounded inspect-or-import experiment completes, with before/after preservation hashes for every repository not explicitly admitted as an isolated target | **pass** | Five read-only invocations, all exit 0, all stderr 0 bytes. All 14 canonical values, all 3 prior evidence roots, and the fixture member digest reproduce exactly at audit time (§4). `$FIX` file count is still **2900** — not even a `locks/repo.lock` was created, so the C1–C6 path demonstrably holds no write authority. |
+| EC3 | the consumer identifies repository, branch, base/head, claim/proof kind, and any missing authority **without source code or private clarification**, or the failure is retained as the terminal result | **pass on identification; the *contract-truthfulness* of the path is what B1 blocks** | All seven answers independently re-scored correct (§3). Source-blindness verified structurally (§2): the handed pack is exactly 12 files, and `crates`, `tests`, `docs/development`, `11_internal_architecture`, `08_object_store`, `09_index_trace_policy` have **0** path matches in it. No clarification was requested or given; 0 harness refusals during Stage B. But 7 of the 20 field paths carrying those answers are unpromised (§3.3), which is exactly what B1 admits. |
+| EC4 | setup time, time to first useful result, misunderstanding/wrong-action count, and maintenance cost recorded with an explicit adopt / narrow / stop decision | **pass** | All ten metrics present and re-derived (§3.4). `misunderstanding_count 0`, `wrong_action_count 0`, `off_contract_invocations 0`. `maintenance_cost` is correctly labelled an **estimate, not a measurement**, proxied by `undocumented_field_reliance` + `docs_pack_files_read`. Decision `narrow` recomputed and confirmed (§3.5). |
+| EC5 | an independent **other-family** audit verifies the evidence, preservation boundary, and absence of a hidden Git bridge, mutation authority, telemetry collection, or agent-orchestration dependency | **n/a (interim)** | This is node 6 and remains **blocked**. This audit is node 5b: same family as the controller, fresh session, and it does discharge the substantive absence checks (§5) — but it does **not** satisfy EC5's other-family requirement and does not claim to. EC5 can only be met after the rerun (node 5e), by a fresh other-family session. |
 
-Required implementation / run for this slot:
+Required run artefacts for this slot:
 
 | Item | Verdict | Independent verification |
 |---|---|---|
-| preselected isolated public commands | **pass** | Exact argv recorded for commands 02–21 and n5-01–n5-04; sequence matches the admitted run packet. |
-| runner / provenance / binary / public-name identity | **pass** | See identity tables. Public name `codefire` is a hardlink of `codefire-rs` (inode `1361045`). Binary SHA-256 `70301c87…` matches provenance. Source manifest is **64 hex characters** `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274`, 100 files, recomputed at the audited HEAD. |
-| bounded reporting fix (replay marker + applied list status) | **pass** | Product commits `726eae4`/`510a185` integrated as `9d1aca1`/`babe14b`. `git diff --quiet 510a185 HEAD -- Cargo.toml Cargo.lock crates .cargo rust-toolchain rust-toolchain.toml` exits 0. Replay plan is built only for `JsonPublicationReplayKind::CompletedReceipt`. `request-list` projects persisted `applied` and still assigns `stale` for non-terminal drift. |
-| isolated attempt-3 run + distinct read-only confirmation | **pass** | Evidence root intact. 20/20 + 4/4 exit 0. This audit's live four-command confirmation matches node-5 JSON exactly. |
-| preservation of `/workspace/project` | **pass** | All twelve probe-§5 values match at audit time. No `.codefire-server` under `/workspace/project`. Canonical `status --json` is `ok true` / `main` / `open-clean` / base `CF-COMMIT-2792b54ad730e6d644668c38` / `open_fires 0` / `next_actions []`. |
+| runner identity and HEAD binding | **pass** | `70301c874d7220a71be988562df0e5188ede6a85c65c63dcbd3dcdee09f4706c`, inode `1361045`, `14594080` bytes — all match. Provenance `d87653d0…`, schema `codefire.rust_build_provenance.v1`, `ok=true`, `base_revision 510a1855…`, `binary_sha256` matches the binary, 100 source files, manifest `c59e8c22…` (64 hex). `git diff --quiet 510a185 HEAD -- Cargo.toml Cargo.lock crates .cargo rust-toolchain rust-toolchain.toml` exits **0** at the audited HEAD, so the binary is the correct executable for `11d0c8c`. `cargo` and `rustc` are absent; no build ran. |
+| label-only harness | **pass** | `bin/cf` = `83dc9d2581df5e6f4874a9670d6f934aa84beadce0e90ecb1c633d39bcc9dd32`, mode 555. Read in full: it exposes exactly `C1..C6` plus non-executing `labels`/`log`, refuses everything else with exit 64, and separates `PRESERVE=DRIFT` (71) from `PRESERVE=ERROR` (72). It contains **no** network primitive, **no** mutating CodeFire subcommand, and no path outside `$ROOT`/`$CTRL` in any executed argv. |
+| answer key predates the answer | **pass** | Key `b5996cff…` mtime `02:11:40Z`, 7243 B; derivation bundle mtimes `02:10`. Consumer answer `187812d6…` mtime `02:25:54.995013949Z`, 5936 B. **0** files under `$KEY` newer than `02:17:00Z`. **0** files under `$CTRL` in the window `02:16:44Z`–`02:21:00Z`. `$CTRL/stagec/consumer-answer.frozen.json` is byte-identical **and** mtime-identical to the consumer answer (`cp -a`), so the frozen copy is authentic and untouched. |
+| isolated run + distinct read-only confirmation | **pass** | Controller mirror is byte-identical to the handed transcript on all five envelopes. Node-5 confirmation (`02:30:44Z`, after scoring) is byte-identical to the consumer transcript for C2/C3/C4/`C5head`, and its `C5parent` matches the key's C5 (`2b0a2d71…`). Terminal facts are reproducible from the confirmation pass alone. |
+| preservation of `/workspace/project` | **pass** | §4. No CodeFire command was ever issued against a canonical path, in any stage. |
 
-## Adjudication: `request-list` omitting `applied_head`
+## 2. Source-blind boundary
 
-**Verdict: `park`, not `block-m1`.**
-
-The M1 card requires that CodeFire's JSON envelopes identify the remote source/target/MR/applied head, and that a separate read-only query confirm the terminal head/state. It does not require that a single `request-list` item carry all four identities.
-
-Independently observed public JSON:
-
-| Surface | Fields that identify | Observed value |
-|---|---|---|
-| `request-apply` live/replay `data.plan.head` | applied head | `CF-COMMIT-126555fdb84822a0c09c9e6a` |
-| `list` `data.branches[]` | terminal branch heads | `base` and `topic` both `CF-COMMIT-126555fdb84822a0c09c9e6a` |
-| `show …/base` `data.show.commit` | sealed applied head | `CF-COMMIT-126555fdb84822a0c09c9e6a`, certificate `passed` |
-| `request-list` `data.merge_requests[]` | MR / source / target / state | `id=MR-748b80865110`, `source_url=…/topic`, `target_url=…/base`, `status=applied` |
-| persisted MR record (not a public envelope) | `applied_head` | `CF-COMMIT-126555fdb84822a0c09c9e6a` |
-
-Live and audit-time `request-list` items have exactly the keys `id`, `source_url`, `status`, `target_url`. `MergeRequestListItem` has no `applied_head` field. The admitted reporting-fix / public contract (`docs/automation_interface.md`, `command-source-trace.md` `request-list` row) requires that persisted `applied` survive target-head drift; it does not require projecting `applied_head` on the list item.
-
-Attempt 2's actual M1 hazard was `status: "stale"` after a successful apply, which could make a consumer retry. That is fixed: terminal `request-list` is `applied`, and completed-receipt replay is machine-distinguishable (`replayed: true`, `would_apply: false`, empty operations, empty `next_actions`). Omitting `applied_head` from the list item does not create a hidden retry/action loop and does not leave the applied head unidentified in CodeFire JSON.
-
-Park as later list-projection completeness. Do not reopen product work before M1 exit.
-
-## Adjudication: 64-character source manifest claim
-
-**Verdict: the real digest is 64 hex characters and binds the runner. The run packet's first quoted "admitted" string is a 62-character truncation. `park` for citation hygiene, not `block-m1`.**
-
-Independently recomputed at audited HEAD with `build_source_manifest()`:
-
-```text
-source_file_count          100
-source_manifest_sha256     c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274   (len 64)
-provenance file            same digest; file sha256 d87653d0a6e4a00216ab47816167744ce2e35c3df142a7ccd9810472d35e61d8
-binary sha256              70301c874d7220a71be988562df0e5188ede6a85c65c63dcbd3dcdee09f4706c
-```
-
-The run packet Exact inputs and Result first quote `c59e8c229bc31e71b8b5d5b1adfaed7defd2557d0286d06efdb74dc664a274` (len **62**) and call it 64 hex characters. That string is the real digest with one `d5` dropped from the `d5d5` run (`c59e8c229bc31e71b8b5d5` + `d5b1…` instead of `d5d5b1…`). The same Result paragraph then quotes the provenance value, which is the correct 64-character digest. Binary, provenance, and recomputed manifest agree. Node 7 must cite the 64-character value, not the truncated quote.
-
-## Evidence
-
-- git: audited HEAD `74bbcd6df999f345f803696de6a3398ebeba977c`. Runner-bound source is `510a1855cb8753219aae416c6cbfea58f059415d`, integrated as `9d1aca1` + `babe14b`. `git diff --quiet 510a185 HEAD -- Cargo.toml Cargo.lock crates .cargo rust-toolchain rust-toolchain.toml` exits 0. `510a185..HEAD` product/Rust inputs are empty; remaining delta is docs (`milestone-remote-happy-path-reporting-fix.md`, `…-reporting-review.md`, `…-run.md`, `milestones.md`). No `codefire` Python tree, no installer, no `subprojects/**`, and no CFB/CFR ledger file is in that range.
-- packets in flight: probe/budget/reporting-fix/reporting-review/run all `completed`; node 6 (this audit) is the only ready node; node 7 remains blocked and is orchestrator work.
-- evidence root `/tmp/m1-remote-happy-path-a3.VbZTZ8` read in place. Earlier roots `/tmp/m1-remote-happy-path.TaHMir` and `/tmp/m1-remote-happy-path-a2.zvrbzn` were not mutated.
-- validation actually run **by this audit**:
-  - `git rev-parse HEAD` → `74bbcd6df999f345f803696de6a3398ebeba977c`;
-  - `build_source_manifest()` at the audited HEAD → **100 files**, `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274` (64 hex chars);
-  - `git diff --quiet 510a185 HEAD -- Cargo.toml Cargo.lock crates .cargo rust-toolchain rust-toolchain.toml` → exit 0;
-  - `sha256sum` / `stat` of admitted `codefire` and `codefire-rs` → identical inode `1361045`, 14594080 bytes, sha256 `70301c87…`;
-  - provenance path sha256 `d87653d0…` and content (`base_revision 510a185`, 100 files, matching binary hash, cargo/rustc 1.97.0);
-  - independent re-read of every attempt-3 `*.argv` / `*.json` / `*.meta`, MR record, branch records, apply receipt, and domain manifests;
-  - `find … -type f ! -name '*.lock.owner.json' | sort | xargs sha256sum | sha256sum` on `$REM` → `a3db3bd4c91c0107a4acff98ad4cf81ab051a48cf93722433854693aeaba256f` (matches node-5 domain digest and the before/after replay manifests);
-  - fixture all-files digest `73cf173cbcc9af60a6a926ca281da0ba388a783559c918156138bc7a5c0d7f2e` (matches node-5 fixture digest) both before and after this audit's read-only queries;
-  - live `"$RUNNER" list|show|request-list|doctor --json` against the preserved remote, cwd `$FIX` → four envelopes **byte-identical** to `n5-01`…`n5-04`; domain digest unchanged across those calls;
-  - `bash evidence/preserve.sh` → `PRESERVE=OK` before and after the live confirmation;
-  - `cargo test -p codefire-cli --bin codefire-rs` with pinned rustc/cargo 1.97.0 and isolated `CARGO_TARGET_DIR`:
-    - `tests::request_apply_replay::file_backed_request_apply_replay_and_applied_list_status` ok
-    - `tests::request_apply_replay::file_backed_request_apply_pending_recovery_is_not_receipt_replay` ok
-    - `tests::request_apply_replay::file_backed_request_list_keeps_stale_projection_for_open_mr` ok
-    - `tests::request_apply_replay::file_backed_request_list_projects_stale_for_drifted_rejected_mr` ok
-    - `tests::remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts` ok
-    - counts: 4 passed / 771 filtered, then 1 passed / 774 filtered;
-  - `python3 docs/development/tools/check_project_docs.py`, `python3 docs/development/tools/check_ai_acceleration_docs.py`, and `git diff --check` for this audit's own docs change.
-
-No `cargo test --workspace`, Clippy, installer, HTTP, scale test, or dogfood Retrospect was run. No CodeFire mutator (`upload` / `request-*` live, `clone`, `close`, `discard`, `scan`, `verify`, `commit`, `serve`, `gc`) was issued by this audit. Nothing was rebuilt or installed for the runner; tests used a separate `CARGO_TARGET_DIR`.
-
-### Runner, provenance, binary, and public-name identity
-
-Independently observed at audit time:
-
-| Claim | Recorded | Independently observed | Match |
+| Check | Expected | Observed | Verdict |
 |---|---|---|---|
-| public command name | `codefire` | argv[0] in every evidence `*.argv` is the admitted `…/target/release/codefire` | yes |
-| PATH prefix | `/workspace/worktrees/ms-remote-happy-path-budget-20260821/target/release` | directory present; binaries at that prefix | yes |
-| `codefire` hardlink | same inode/bytes as `codefire-rs` | inode `1361045`, nlink `3`, 14594080 bytes, mode `755` for both | yes |
-| `codefire` sha256 | `70301c874d7220a71be988562df0e5188ede6a85c65c63dcbd3dcdee09f4706c` | identical | yes |
-| `codefire-rs` sha256 | same | same | yes |
-| third hardlink | (cargo layout) | `target/release/deps/codefire_rs-730042419a756626`, same inode | yes (cargo artifact, not a substitute runner) |
-| provenance path | `.../target/codefire-ai/rust-build-provenance.json` | present | yes |
-| provenance sha256 | `d87653d0a6e4a00216ab47816167744ce2e35c3df142a7ccd9810472d35e61d8` | identical | yes |
-| provenance schema | `codefire.rust_build_provenance.v1` | same, `ok: true` | yes |
-| build HEAD | `510a1855cb8753219aae416c6cbfea58f059415d` | `base_revision` identical | yes |
-| Rust source manifest | 64 hex chars / 100 files | recomputed at audited HEAD: `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274`, 100 files | yes (not the 62-char packet typo) |
-| build command | `cargo build --release --locked -p codefire-cli --bin codefire-rs` | provenance `build_command` identical | yes |
-| toolchain | cargo 1.97.0 / rustc 1.97.0 | `cargo 1.97.0 (c980f4866 2026-06-30)`, `rustc 1.97.0 (2d8144b78 2026-07-07)` | yes |
+| handed docs pack | exactly the 12 frozen files, digest `218123042bb8b1a680deb7b06581afb13a225e7d7b85397fde693f2fa5896034` | all 12 per-file digests match the packet byte-for-byte; the sorted repo-relative rollup reproduces `21812304…` exactly | **pass** |
+| product source / tests / internal docs in pack | 0 | `crates` 0, `tests` 0, `docs/development` 0, `11_internal_architecture` 0, `08_object_store` 0, `09_index_trace_policy` 0 | **pass** |
+| answer leak in handed root | 0 | `TASK.md` read in full: seven questions, citation shape, public thresholds, **no answer**. No commit ID, no `codefire_show_result`, no `codefire_branch_list`, no `legacy-unversioned` anywhere in the handed pack | **pass** |
+| key reachable from `$ROOT` | never | `$KEY` path appears nowhere in `$ROOT` or `$CTRL`; `setup-metadata.json` publishes only `answer_key_sha256` and states the path is withheld | **pass** |
+| private clarification | none | none requested or given; harness has no channel to one | **pass** |
+| harness refusals during Stage B | 0 | all **9** refusals in `$CTRL/evidence/refusals.log` are timestamped `02:09:37Z` (7, pre-handoff self-test) and `02:15:47Z` (2, smoke `verify` + second `C6`) — every one strictly before the `02:16:44Z` seal and ~5 min before the consumer's first command. No `refusals.log` exists in the handed transcript. | **pass** |
+| read outside `$ROOT` | none evidenced | `seq=5`, no `HALT`, no `c6.used`. Every claim in the answer is reproducible from the five recorded envelopes alone. | **pass, with the packet's own honest limit upheld** |
 
-Because the 100-file manifest recomputes identically at `74bbcd6` and the Rust input tree is byte-identical to `510a185`, **the binary that ran attempt 3 corresponds to the Rust source at the audited HEAD**.
+**Boundary limit, restated rather than smoothed over:** `$CTRL` and `$KEY` share the consumer's uid, so
+containment is *operational, not kernel-enforced*. The packet says this in §A.8/§C.2 and does not
+overclaim. This audit re-checked the supporting evidence (key mtime/derivation bundle predate the run;
+zero new files under `$KEY` after `02:17Z`; zero controller writes in the seal→start window; no `$KEY`
+path reachable) and confirms it is **consistent with no outside read, with no evidence of one**. A
+stronger claim is not available from this setup, and none is made here either.
 
-### Isolated command sequence (node 4b + node 5)
+## 3. Score, metrics, and decision — recomputed
 
-`$CF` = admitted runner; `$P` = `cf:///tmp/m1-remote-happy-path-a3.VbZTZ8/remote/org/app`; cwd = `$FIX`. Every recorded meta has `exit=0` and `preserve=PRESERVE=OK`. Stderr files are empty.
+### 3.1 C1–C5 exact argv / cwd / envelopes
 
-| # | Public argv after `$CF` | Exit | Duration | Notes independently confirmed |
+Re-read from `$ROOT/evidence/transcript/*.argv` and `*.meta`:
+
+| seq | label | argv after runner | cwd | start | dur | exit | stderr | stdout sha256 | vs frozen C-table |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | C2 | `doctor /tmp/m1-adoption-root.d1YEhz/repo --quick --json` | `$FIX` | 02:21:42Z | 1835ms | 0 | 0 B | `c9bfa51c…` | **exact** |
+| 2 | C1 | `capabilities --json` | `$ROOT` | 02:22:00Z | 4ms | 0 | 0 B | `5d5245c3…` | **exact** |
+| 3 | C3 | `branch list --path /tmp/m1-adoption-root.d1YEhz/repo --json` | `$FIX` | 02:22:00Z | 1644ms | 0 | 0 B | `9ba62a91…` | **exact** |
+| 4 | C4 | `show main --json` | `$FIX` | 02:22:00Z | 1474ms | 0 | 0 B | `1c22cec2…` | **exact** |
+| 5 | C5 | `show CF-COMMIT-2792b54ad730e6d644668c38 --json` | `$FIX` | 02:22:51Z | 1356ms | 0 | 0 B | `8ca6b540…` | **argument deviates** — see F4 |
+
+`argv[0]` is `codefire` on every line; subcommands used are exactly `branch`, `capabilities`, `doctor`,
+`show`; **0** occurrences of `/workspace/project` in any recorded argv. `C6` was never used. C1/C3/C4
+share a start second because they were issued concurrently — nothing in the contract forbids it and all
+three recorded independently.
+
+Envelope facts re-read directly (not taken from the packet): `repo` is `/tmp/m1-adoption-root.d1YEhz/repo`
+on C2/C3/C4/C5 and `null` on C1; C2 `data.type=codefire_doctor_report` v1, `mode=quick`,
+`checked={objects:0,branches:8,opened:0,active_files:0}`, `skipped_checks=['object_store_integrity']`,
+`issue_counts={blocking:0,total:7}`, and **all 7** `legacy_branch_head_semantic_profile` warnings are on
+`feature%2F*` paths — `main` is excluded, which is the mixed state Q5/Q6 depend on; C3
+`data.type=codefire_branch_list` v1 with 8 branches, `main` `state=open-clean`, 7 `feature/*` `closed`;
+C4 `data.type=codefire_show_result` v1, `commit=CF-COMMIT-2792b54ad730e6d644668c38`,
+`parents=["CF-COMMIT-373468dbaf827a6cc2bae9a4"]` (single), `certificate="passed"` (**bare string** — no
+`subject`, no `profile`, no `phase`), `signature={present:false, details:null, summary:"(none)"}`;
+C1 reports 12 formats, exactly the 5 checked-in `schemas/public` IDs, `unknown_version=deny`,
+`unknown_critical_extension=deny`, `unknown_noncritical_extension=preserve`,
+`semantic_validation_profile=sealed-snapshot-v1`, `independent-python-stdlib-v1` with
+`read=true/write=false/role=read-only-conformance`, and `output_schema=codefire.command_result.v1` for
+**all 34** commands including `show` and `branch`; the single `next_actions` entry
+(`inspect_legacy_branch_profile`, on C2/C6 only) has keys `command, context, description, id, kind,
+reason, target` and **no `execution` object**.
+
+### 3.2 Answer / key / template / fixture hashes
+
+| Artefact | Packet | Recomputed | Verdict |
+|---|---|---|---|
+| consumer answer | `187812d6d25d5699d6dc6ca847a474e3b73c6e86892ec28e8f915b38cfa6c1a3` (5936 B) | identical | **match** |
+| frozen copy | same digest | identical digest **and** mtime | **match** |
+| answer key | `b5996cff931da40afb272d535401accc1f312492a76788978cf45ae34b277392` | identical (7243 B) | **match** |
+| derive script | `e1bd0822baac77197825335f52c055a4707764cfdaac5a29dd2ec06cf77e181b` | identical | **match** |
+| answer template | `61916070ec5c04a9f1c0efdcdf6bbd7da91eff6e846e77fc1e3434b59b523ad0` | identical | **match** |
+| task sheet | `89eb24aac6c7291078620d1c0e95b0335ad7dc403550b2844cf2a8dc68a0958f` | identical | **match** |
+| harness | `83dc9d2581df5e6f4874a9670d6f934aa84beadce0e90ecb1c633d39bcc9dd32` | identical | **match** |
+| setup metadata | `bcf40c0442a27d6d777434724597e55a1dba93a954310b9405ae26a548200c25` | identical | **match** |
+| docs pack | `218123042bb8b1a680deb7b06581afb13a225e7d7b85397fde693f2fa5896034` (12 files) | identical | **match** |
+| fixture members | `cccd8814a66dd3236c4a85e5752ab7bb6aa8ea09db2e74d35ab1a53998c07452` (2900 files / 114657290 B) | identical, and **byte-identical to the canonical members digest** | **match** |
+
+Fixture shape re-verified: `opened`, `active`, `cache`, `idempotency`, `locks`, `remotes` all **0**
+entries — a genuinely closed repository, and still 0 after five commands.
+
+### 3.3 Q1–Q7 citations and score
+
+Every cited path was resolved structurally against the recorded envelopes. **All resolve; none is
+fabricated; every cited value matches what the consumer asserted.** Under the consumer's head-variant
+C5, `C5 .data.show.commit` (cited for Q3) is the head and `C5 .data.show.parents` (cited for Q4) is
+`["CF-COMMIT-373468db…"]`, so both Q3 and Q4 citations resolve correctly.
+
+| Q | Key's accept clause | Consumer | Re-scored |
+|---|---|---|---|
+| Q1 | root exact, branches=8, opened=0; objects 0 from C2 (quick skips `object_store_integrity`) or 2891 from C6 | root exact, 8, 0, objects 0 with the quick-mode reason stated | **correct** |
+| Q2 | all 8, no extras | all 8 decoded names, no extras | **correct** |
+| Q3 | `CF-COMMIT-2792b54ad730e6d644668c38` | exact | **correct** |
+| Q4 | `CF-COMMIT-373468dbaf827a6cc2bae9a4`, single parent | exact, single | **correct** |
+| Q5 | `certificate=passed` **and** embedded/local rather than signed/portable, justified by `signature.present=false`; calling it signed/portable/legacy is wrong | `passed`; `embedded/local`; justified by `signature.present=false`, `details:null`, `summary:"(none)"`; additionally noted the 7 legacy warnings exclude `main` | **correct** |
+| Q6 | any two distinct pool entries, each cited | two distinct pool entries (absent portable signed-commit authority; absent `sealed-snapshot-v1` proof on the 7 feature heads), each cited | **correct** |
+| Q7 | must name `inspect_legacy_branch_profile` **and** state it is not ready / has no `execution` object | named it; `ready=false`; justified by the **absent `execution` object** rather than by a flag | **correct** |
+
+**Score 7 / 7. Q5 and Q6 both correct. `misunderstanding_count 0`, `unanswerable_count 0`.** Confirmed.
+
+The score is not a courtesy. The consumer's *semantic* claims were checked against the handed pack and
+all are genuinely doc-grounded: `profile=local_verification_v1` / `phase=pre_commit`
+(`05_consistency_model.md:135`, `04_cli_spec.md:529`), the `certificate.result` vocabulary and
+"現行成功commitはpassedを返す" (`04_cli_spec.md:528`), and the `ready=true` / `codefire.action_execution.v1`
+contract (`automation_interface.md:61,70`). It also did **not** claim a live open workspace, so the
+`open-clean`-versus-`opened=0` trap recorded in the key did not fire. Its `claim_scope_explanation` is
+accurate and appropriately narrow.
+
+**`undocumented_field_reliance`, recomputed from scratch.** I enumerated every citation independently
+and reproduce both of the packet's figures — they are two denominators of the same set, not a
+contradiction:
+
+```text
+distinct label+path citation pairs                     25   (matches packet §C.3)
+distinct label-agnostic field paths                    20   (matches packet §C.5 — this is the
+                                                             contract's definition, "distinct JSON
+                                                             field paths")
+  documented in docs-pack or schemas/public            13   .repo; .data.checked.{objects,branches,
+                                                             opened}; .data.mode; .data.skipped_checks;
+                                                             .data.issues; .data.issues.0.kind;
+                                                             .data.issue_counts.total; .next_actions;
+                                                             .next_actions.0.{kind,command};
+                                                             .next_actions.0.target.semantic_validation_profile
+  UNDOCUMENTED, relied on for correct answers           7   .data.branches            (codefire_branch_list)
+                                                            .data.show.commit         (codefire_show_result)
+                                                            .data.show.parents
+                                                            .data.show.certificate
+                                                            .data.show.signature
+                                                            .data.show.signature.present
+                                                            .data.show.target
+  undocumented payload families                         2   codefire_show_result, codefire_branch_list
+```
+
+Grep verification in the handed pack, run directly: `codefire_show_result` **0**,
+`codefire_branch_list` **0**, `data.show` **0**, `data.branches` **0**, `show.commit`/`show.parents`/
+`show.certificate`/`show.signature` **0** each. Controls confirm the scan works:
+`codefire_doctor_report` 1, `codefire.capabilities.v1` 4, `next_actions` 29, `skipped_checks` 11,
+`issue_counts` 1, `action_execution` 3, `semantic_validation_profile` 4, `command_result` 28.
+`command-result-v1.schema.json` constrains `data` to exactly `{"type":"object"}`. The only `show --json`
+sentence in the entire pack is `04_cli_spec.md:626` ("sealed commit summaryを返す"); `branch list --json`
+is mentioned only to say `--metrics` adds `data.metrics` (`automation_interface.md:221`).
+
+**The metric is decision-robust under every reading**: 7 (contract definition), 12 (label+path
+denominator), or 2 (most generous family grouping). The threshold clause is `>= 2`. It fires in all
+three. The consumer's self-reported **1** is an under-count — it grouped the whole `.data.show` family
+as one entry and omitted `.data.branches` entirely despite citing it for Q2 and Q3 — and Stage C
+correctly recorded that and did not use it. See F3.
+
+### 3.4 Metrics and the observed-timing choice
+
+| Metric | Packet | Re-derived | Threshold | Verdict |
 |---|---|---|---|---|
-| 02 | `doctor $FIX --quick --json` | 0 | 1.481s | `blocking 0`, opened 0, no canonical paths |
-| 03 | `branch list --path $FIX --json` | 0 | 1.778s | selected heads present and `closed` |
-| 04 | `clone feature/docs-doubling-plan base --dry-run --json` | 0 | 1.294s | `dry_run true`, `would_apply false` |
-| 05 | `clone feature/docs-doubling-plan base --json` | 0 | 1.418s | source head `d068d2c3…` |
-| 06 | `clone feature/docs-full-doubling topic --json` | 0 | 1.669s | source head `126555fd…` |
-| 07 | `upload base $P/base --dry-run --json` | 0 | 1.918s | `dry_run true`, `would_apply false` |
-| 08 | `upload base $P/base --json --idempotency-key m1-upload-base-001` | 0 | 11.571s | head `d068d2c3…`, 2329 objects |
-| 09 | `upload topic $P/topic --json --idempotency-key m1-upload-topic-001` | 0 | 9.253s | head `126555fd…`, 2346 objects |
-| 10 | `request-merge $P/topic $P/base --dry-run --json` | 0 | 3.912s | preview id `MR-4defb534902b` (non-binding) |
-| 11 | `request-merge $P/topic $P/base --json --idempotency-key m1-mr-001` | 0 | 11.676s | live id `MR-748b80865110` from JSON |
-| 12 | `request-list $P --json` | 0 | 6.524s | `id` + `status=open`; this is the MR identity source |
-| 13 | `request-review $P MR-748b80865110 --decision approve --reviewer m1-reviewer --dry-run --json` | 0 | 3.965s | `would_apply false` |
-| 14 | `request-review … --json --idempotency-key m1-review-001` | 0 | 9.710s | ops include `append_review` + `update_merge_request_status=approved` |
-| 15 | `request-apply $P MR-748b80865110 --dry-run --json` | 0 | 8.396s | `would_apply false`, five ops, head `126555fd…` |
-| 16 | `request-apply … --json --idempotency-key m1-apply-001` | 0 | 19.197s | `would_apply true`, five ops, no `replayed` key |
-| 17 | `list $P --json` | 0 | 2.448s | both branches `126555fd…`; page snapshot `3d24e232…` |
-| 18 | `show $P/base --json` | 0 | 5.532s | commit `126555fd…`, certificate `passed` |
-| 19 | `request-list $P --json` | 0 | 7.208s | `status=applied`; page snapshot `1efe6f0d…` |
-| 20 | `doctor $P --json` | 0 | 1.235s | 2346 objects, zero integrity errors |
-| 21 | same argv as 16 (replay) | 0 | 10.981s | `replayed true`, `would_apply false`, empty ops/actions |
-| n5-01..04 | `list`, `show`, `request-list`, `doctor` | 0 | — | distinct pass; this audit's live rerun is byte-identical |
+| `setup_time_s` | 300 | 300 | — | consistent |
+| `ttfur_s` | 300 | 300 | ≤ 900 | **pass** |
+| `ttac_s` | 550 | 550 | ≤ 3600 | **pass** |
+| `commands_issued` | 5 | 5 | — | consistent |
+| `off_contract_invocations` | 0 | 0 | = 0 | **pass** |
+| `wrong_action_count` | 0 | 0 | = 0 | **pass** |
+| `misunderstanding_count` | 0 | 0 | — | consistent |
+| `unanswerable_count` | 0 | 0 | — | consistent |
+| `undocumented_field_reliance` | **7** | **7** | ≤ 1 | **FAIL** (decisive) |
+| `docs_pack_files_read` | 12 (self-reported) | 12 listed, all 12 exist in the pack | — | consistent |
 
-Forbidden-token scan of every `*.argv`: no `--actor`, `cf+http`, `cf+https`, `close`, `discard`, `open`, `scan`, `verify`, `commit`, `serve`, `gc`, or named branch `main`.
+**The choice to score observed rather than self-reported timings is correct, and it cannot change the
+decision.** The consumer's self-reported `started_utc 02:15:00Z` is 104 s *before* the handover seal and
+its `submitted_utc 02:25:00Z` is 54 s *earlier* than the answer file's mtime — both impossible as
+stated, so the observed values are the right ones to score. I also bounded the exposure rather than
+trusting a single instant: the `02:16:44Z` seal is an `atime` and is **not** independently
+re-derivable now, but durable mtimes bracket it to `[02:16:02Z, 02:21:42Z]` (last handed artefact
+written `02:16:02Z`; last pre-handoff controller write `02:15:47Z`; first consumer command `02:21:42Z`;
+zero writes anywhere in between). Across that entire bracket **and** under the self-report, `ttfur_s`
+∈ [2, 404] ≤ 900 and `ttac_s` ∈ [252, 654] ≤ 3600. No timing clause in any row can flip. The timing
+choice is therefore threshold-immune, and the decision does not rest on it.
 
-MR identity was taken from JSON (`data.merge_requests[0].id` / `data.plan.merge_request_id`), never from human output. `evidence/mr-id.txt` is `MR-748b80865110`.
+### 3.5 Ordered decision table, re-applied
 
-### Terminal identities (authorities + envelopes)
+Contract section 6, first match wins, evaluated independently:
 
-Persisted remote project `cf:///tmp/m1-remote-happy-path-a3.VbZTZ8/remote/org/app`, re-read directly:
+| Row | Decision | Clause evaluation (mine) | Match |
+|---|---|---|---|
+| 1 | stop (terminal) | preservation `PRESERVE=OK` at every checkpoint and at audit time; `wrong_action_count = 0`; no private clarification; no evidenced read outside `$ROOT` | **no** |
+| 2 | stop (terminal) | score 7 > 3; `ttac_s` 550 ≤ 7200 (and ≤ 7200 across the whole timing bracket) | **no** |
+| 3 | **narrow** | clause 1 false (Q5 **and** Q6 both correct); **clause 2 TRUE — `undocumented_field_reliance` 7 ≥ 2**; clause 3 false (550 ∉ (3600, 7200]) | **MATCH** |
+| 4 | adopt | not reached. Every other clause would have passed — score 7/7, Q5+Q6 correct, `ttfur_s` 300 ≤ 900, `ttac_s` 550 ≤ 3600, `off_contract 0`, `wrong_action 0` — but `undocumented_field_reliance` 7 > 1 fails it independently | not reached |
+| 5 | narrow | fallback, not reached | — |
 
-```text
-branches/base.json     head CF-COMMIT-126555fdb84822a0c09c9e6a  sha256 d0cfe8b630ffbfdfb7604eab820c13a654c794d7aa7eb69f73ebdeae17def6fe
-branches/topic.json    head CF-COMMIT-126555fdb84822a0c09c9e6a  sha256 b35881f6778d7843e93bcffbb1415369595c38b9dfa158568a9cce5945cd93d5
-MR-748b80865110.json   status applied
-                       applied_head CF-COMMIT-126555fdb84822a0c09c9e6a
-                       source_head  CF-COMMIT-126555fdb84822a0c09c9e6a
-                       target_head_at_request CF-COMMIT-d068d2c3995f6da0a0959b98
-                       review m1-reviewer approve, subject_digest sha256:ffcdebfe…
-                       sha256 5773ff49b1686c89a4a5debfff41308ba246347062f656e22f8483aec9c9531e
-gc_state.json          current_generation 3  sha256 22ed675a4e06b93f4cdc4b8a03c61569e0bc404d78dee0a4fd2144d050e87cb6
-remote_project.json    CF-PROJECT-32b7a10f805a28f33c63d279086a19f6  sha256 e69585db…
-apply receipt          type remote_idempotency_receipt v2 status completed
-                       key m1-apply-001 operation remote_request_apply
-                       result {head: CF-COMMIT-126555fdb84822a0c09c9e6a, id: MR-748b80865110, target_branch: base}
-                       sha256 3bd8941544ff8720e67f95173791f0871851307989dc563b06dacd24cc62edf5
-server_policy.json     absent
-object files           2346 (matches doctor checked_objects)
-```
+**Decision `narrow` — confirmed.** The thresholds were provably frozen before any data existed (EC1),
+so this is not a post-hoc fit. A perfect 7/7 correctly does **not** clear the bar: five of the seven
+answers, including both milestone-critical ones, rest on payloads the project has never promised to
+keep true. That is the honest result rather than the flattering one, and the precommitted metric — not
+the auditor's judgement — is what resolved it against `adopt`.
 
-Apply delta is the documented two-commit fast-forward: `show` parents `["CF-COMMIT-06cc1476157f99de1e437519"]`. Fixture local `base` remains `d068d2c3…` `closed`; local `topic` remains `126555fd…` `closed`. The two extra fixture objects versus canonical `objects/` are the clone-created branch objects `CF-BRANCH-5a6ca272…` and `CF-BRANCH-eefc77d2…`.
+## 4. Preservation and root integrity — re-derived at audit time
 
-This audit's live read-only confirmation (`2026-08-22T01:37Z`):
+All values recomputed now, at HEAD `11d0c8c`:
 
 ```text
-list          ok true  base/topic head CF-COMMIT-126555fdb84822a0c09c9e6a
-              page snapshot sha256:3d24e232f150aef3040f1b0f5c6ac20f52c33a2cd8ba05186320422b717a121c
-show base     commit CF-COMMIT-126555fdb84822a0c09c9e6a  certificate passed
-              parents [CF-COMMIT-06cc1476157f99de1e437519]  atoms 793  files 183
-              seven roots present; signature present false
-request-list  MR-748b80865110 status applied  keys {id, source_url, status, target_url}
-              page snapshot sha256:1efe6f0d72a9ee14116579d47496b3c08767f66fcdd7fc9ae417d1d74bc1cf37
-doctor        remote_doctor.v1 ok true  project_exists true  transport file
-              semantic_profile sealed-snapshot-v1  branches 2  mrs 1
-              checked_objects 2346  all error counters 0  issues []
+git_head                f1644122134d479333cf422fdb1d48b8fa92dd8e            match
+git_porcelain_count     248                                                 match
+repo_json               bf6d978b0eece0f185c6995630339326f56513a0c8645af3e7e984ad69a7f054   match
+branches_main_json      bfd52e3525f6a6faf0db4f3d2d1d9d7fa3fa0d400f6561c3c5b8227e79e989f8   match
+branches_rollup         8fba5dcbedd5179a27f1a8d3ce699db2c4e62f94521084ff015e025fcc582841   match
+opened_main_json        5721d710f4371db88be26567d2a3c6afb3bc2458288b8c812b54ccd7556a42b2   match
+active_state_json       54ecb285704644b814e4ca47a711bf5eba150ee747642b90b53351b2f06940d2   match
+codefire_open_mark      60b133b3eeefcc79e20bda32843261897713b0d6e86b2f0d0111cd19862690d6   match
+objects_file_count      2891                                                match
+objects_bytes           114921765                                           match
+no_codefire_server      0                                                   match
+store_all_files_digest  e5f6f7c2ac192934a0528414b54f1c2e097dfb65ec8c60a4f95b2c73251c41a6   match
+store_file_count        2904                                                match
+store_bytes             114968174                                           match  (du -sb; see F6)
+prior root .TaHMir      877461024a3deae974ff3b415a3cab8e953112c87d98540a91636b1d31139f40   match (2919 files)
+prior root a2.zvrbzn    d2ee53b301e0fc8514be108e6e287f2f498a1d5fc7b48307a7b011f53ff823be   match (5360 files)
+prior root a3.VbZTZ8    3fdd2867655f8e455a9269d8f9104f127d65e49034fdae292f5f3d6780b1a4ad   match (5381 files)
+fixture_members         cccd8814a66dd3236c4a85e5752ab7bb6aa8ea09db2e74d35ab1a53998c07452   match (2900 files)
 ```
 
-All four live envelopes are byte-identical to the node-5 evidence files.
+**`PRESERVE=OK`.** Canonical `/workspace/project`, the open dogfood worktree, all three prior-milestone
+evidence roots, and the fixture are byte-identical. This audit wrote nothing to any of them. The
+stricter-than-remote rule held: **no CodeFire command was issued against a canonical path at any point**,
+in any stage, by anyone — the run's preservation checks are pure `find`/`sha256sum`/`git`, which is why
+no repository lock was taken and no `repo.lock.owner.json` was republished.
 
-### Completed-receipt replay, no domain authority change, no hidden loop
+## 5. Absence checks
 
-Command 21 argv equals command 16 argv (`request-apply $P MR-748b80865110 --json --idempotency-key m1-apply-001`).
-
-Replay envelope:
-
-```text
-replayed true  would_apply false  operations []  next_actions []
-head CF-COMMIT-126555fdb84822a0c09c9e6a  target_branch base  merge_request_id MR-748b80865110
-```
-
-Those `head` / `target_branch` values equal the completed receipt `result`. Live apply has `would_apply true`, five operations, and no `replayed` key. Source: `apply_merge_request` substitutes `request_apply_replay_plan` only for `JsonPublicationReplayKind::CompletedReceipt`; `Recovery` keeps the live plan. Focused tests cover that discriminant, including a pending-recovery case that must not report replay.
-
-Domain manifests before and after replay are byte-identical (2361 files, digest `a3db3bd4…`). Named authorities listed above are still those exact bytes at audit time. `domain-diff-across-replay.txt` is empty. This audit's later read-only commands left the domain-excluding-`*.lock.owner.json` digest at `a3db3bd4…`. Lock-owner sidecars may move; they are documented diagnostics, not domain authorities.
-
-Terminal envelopes have `next_actions []`. Replay does not re-propose apply. `request-list` status `applied` does not look like a failed apply. No hidden retry/action loop on this path.
-
-### Preservation boundary
-
-Independently observed at audit time (and again after the live four-command confirmation):
-
-| Preservation claim | Independently observed | Verdict |
+| Prohibited thing | Verdict | Independent basis |
 |---|---|---|
-| `/workspace/project` Git HEAD `f1644122134d479333cf422fdb1d48b8fa92dd8e` | identical | pass |
-| porcelain count `248` | 248 | pass |
-| `.codefire/repo.json` `bf6d978b…` | identical | pass |
-| `.codefire/branches/main.json` `bfd52e35…` | identical | pass |
-| branches rollup `8fba5dcb…` | identical | pass |
-| `.codefire/opened/main.json` `5721d710…` | identical | pass |
-| `active/open_4c320ed42560/state.json` `54ecb285…` | identical | pass |
-| `algorithm-evolution-agent-lab/.codefire-open` `60b133b3…` | identical | pass |
-| objects 2891 files / 114921765 bytes | identical | pass |
-| `.codefire-server` under `/workspace/project` | 0 | pass |
-| canonical `status --json` `ok true` / `main` / `open-clean` / `CF-COMMIT-2792b54ad730e6d644668c38` / `open_fires 0` / `next_actions []` | identical | pass |
+| Git bridge / Git compatibility writer | **absent** | No `git` in any CodeFire argv; no `clone`, `import`, `merge`, `upload`, `request-*`. The only `git` in the whole setup is the harness's own read-only `rev-parse HEAD` / `status --porcelain` against `/workspace/project` as a *preservation check* — a controller-side digest, not a product feature, not a bridge, and it writes nothing. |
+| mutation authority | **absent** | Exact-token scan over all five `*.argv` for `init import open close discard clone scan fire extinguish verify commit merge upload request-merge request-review request-apply gc serve evidence link patch migrate --idempotency-key`: **zero hits**. Positive proof, not just argv absence: `$FIX` is still 2900 files with **0** entries in `locks/` after five commands. The harness has no code path that runs a mutator. |
+| telemetry collection | **absent** | All measurement comes from harness-written local files (`.argv/.json/.stderr/.meta/index.tsv`) and filesystem timestamps. No instrumentation was added to CodeFire, no counters are transmitted, nothing leaves local disk. |
+| network use | **absent** | The harness contains no network primitive of any kind (read in full). No remote, no `cf://`/`cf+http://`, no `serve`, no `.codefire-server` under `/workspace/project` (0). |
+| private clarification | **absent** | No channel existed; none requested; 0 refusals during Stage B; the answer is fully reproducible from the five recorded envelopes. |
+| source / test / internal-doc reads | **absent** | §2 path scan: 0 matches for `crates`, `tests`, `docs/development`, `11_internal_architecture`, `08_object_store`, `09_index_trace_policy` in the handed pack. |
+| agent-platform / agent-orchestration dependency | **absent** | The consumer was one plain session with no subagents, no web, and a shell script as its only tool. Nothing in CodeFire was changed to support agents; no orchestration surface, marketplace, or prompt machinery is involved in the measured path. |
+| product code / schema / test change in this run | **absent** | The run packet, the contract packet, and the B1 packet are the only files touched by nodes 1–5; `git log` for each confirms it. No `crates/**`, `tests/**`, or `schemas/**` change exists in `3c0be0d..11d0c8c`. |
 
-Canonical branch `main` was never named in a recorded mutator. No canonical path was passed to a mutator. Fixture `opened/` and `active/` remain empty. Fixture `locks/` contains only the copy-local `repo.lock` pair from fixture commands, not canonical paths.
+Honest scope limit carried forward, not buried: contract `park` **P2**. The audited binary was *handed*
+to the consumer; `cargo`/`rustc` are absent in this environment and no prebuilt artefact is published,
+so **M1 does not prove toolchain-free adoption.** That belongs to M2 `MS-release-operational-trust` and
+no later slot may inherit the stronger claim.
 
-### Scope / non-goals / issues
+## 6. Adjudication: is B1 genuinely the only admissible next slice?
 
-At the audited HEAD, open items remain `investigating` with board placement unchanged:
+**Verdict: yes.** B1 — *document and machine-bind the sealed claim/proof and branch-head fields that
+`show --json` and `branch list --json` already emit* — is the only admissible next slice, and it is
+`block-m1`. Five independent grounds:
 
-```text
-CFR-168 investigating  M1 input, parked (not admitted; path did not reproduce a budget failure)
-CFB-136 investigating  M1 input, parked (not admitted; path does not share a command-wide cache)
-CFR-171 investigating  M2 parked
-CFR-172 investigating  M2 parked
-CFR-173 investigating  M2 parked
-CFB-133 investigating  backlog parked
-CFR-169 investigating  backlog parked
-CFR-170 investigating  backlog parked
+1. **It is the measured blocker, not a preferred one.** The only failing clause in the entire threshold
+   table is `undocumented_field_reliance`, and every one of the 7 paths belongs to exactly these two
+   payload families. Nothing else in the run failed anything.
+2. **Both lanes converged on it before the data existed.** Node 1 raised it from documentation absence
+   and explicitly recorded the counter-argument for adjudication rather than burying it. Node 2 —
+   reading source, independently — named the *same* smallest candidate (`show_commitish_data`
+   projecting the existing certificate object, parse/render only, no format change) and correctly left
+   it **unadmitted**, listing "treating lossy `show.certificate` as a pre-experiment `block-m1`" as a
+   scope-creep risk. The measurement is what promoted it. That is the right order.
+3. **`branch list` cannot be dropped from the slice.** I tested whether Q2 could be answered from
+   documented carriers alone: it cannot. C2's warnings name only the 7 legacy `feature/*` branches (not
+   `main`), and `checked.branches=8` gives only a count. The sole complete branch-name carrier is
+   `C3 .data.branches`, and reconstructing the set otherwise still requires the undocumented
+   `.data.show.target`. So the two-command scope is minimal **and** sufficient — not padded.
+4. **The slice needs no persistence, format, or semantic change**, which is what keeps it admissible
+   under the B1 packet's own Q5 stop-condition. The *semantics* are already public prose:
+   `04_cli_spec.md:528-529` and `05_consistency_model.md:135` state that a commit's certificate carries
+   the assessment `subject`, `profile=local_verification_v1`, and `phase=pre_commit`, enforced by the
+   sealed validator. The *values* are already sealed in the objects. What is missing is only the
+   machine-readable binding of one to the other. This audit adds the sharper form of the finding:
+   **`show --json` — the only public read-only window onto a sealed commit on this path — lossily
+   projects that documented certificate object down to the bare string `"passed"`.** So a consumer who
+   reads the documented model correctly still cannot retrieve the documented fields through the only
+   surface it has. That elevates B1 from "no promise was made" to "a promise was made in prose and is
+   not kept in the JSON projection" — and it is still fixable as projection/schema/docs only, by either
+   projecting `subject`/`profile`/`phase` in `show_commitish_data` or explicitly documenting that
+   `show` returns `certificate.result` alone and naming the surface that returns the full object.
+   Node 5a must pick one; both stay inside the slice.
+5. **Every alternative is strictly larger or off-path.** P4 (no command's `data` has a schema) is the
+   general form and is correctly parked. P1 (Python has no `--json`), P3 (`context --branch`
+   divergence), and P5 (`request-list` `applied_head`) are not on the selected path and were not
+   reproduced by this run. D1–D3 were rejected as subjects with reasons at node 1 and nothing here
+   reopens them. The full CFR-171 cross-surface descriptor, a new command, an adapter, a store-validator
+   change, and a broadened rubric all remain **out**.
+
+## 7. Adjudication: is a single identical rerun after B1 authorized?
+
+**Verdict: authorized in principle — exactly one — but node 5c may NOT admit it as byte-identical.**
+
+The contract's frozen `narrow` definition authorizes precisely: *admit only B1, re-run this identical
+experiment once with a fresh consumer, then decide adopt/stop on the same table. No second consumer, no
+new command, no broadened rubric.* That authorization stands and this audit does not touch it.
+
+But the rerun as **literally** frozen is unsatisfiable, and this is the single most important thing
+node 5c must resolve. `undocumented_field_reliance` is defined against **the handed docs pack**. If the
+pack is reproduced byte-for-byte (`218123042bb8…`, the same 12 filenames), then the 7 relied-on paths
+are still absent from it *by construction*, the metric is still ≥ 2, row 3 matches again, and the rerun
+returns `narrow` a second time **regardless of how good the B1 fix is**. That is not an experiment; it
+is a loop, and it is the concrete mechanism by which M1 would stall (F1).
+
+Three deviations are therefore *necessary*, and node 5c must record each one explicitly as the price of
+the rerun:
+
+1. **The docs pack must be re-copied from the post-B1 HEAD**, and its `docs_pack_digest` re-derived.
+   The new digest must be recorded as a deliberate, admitted change — not as drift.
+2. **The frozen 12-file pack list must be extended by exactly the new public schema file(s)** the B1 fix
+   adds (e.g. a `schemas/public/*show*`/`*branch*` schema). A schema the consumer is never handed cannot
+   lower a metric defined over the handed pack; conversely, if the metric is instead read against the
+   repository's `schemas/public/**`, the consumer would be scored against a document it was forbidden to
+   see. Node 5c must state which reading governs — the coherent one is the handed pack.
+3. **Stage A's answer-leak gate must be re-specified.** The first run gated on **0** hits for
+   `codefire_show_result` / `codefire_branch_list`-style type names in the pack. After B1 those tokens
+   *must* appear — that is the entire point of the fix — so the gate must narrow to the answer *values*
+   (`2792b54a…`, `373468db…`, the branch-name set, `inspect_legacy_branch_profile`) and drop the type
+   names. Left as-is, Stage A's own gate fails and the rerun cannot even launch.
+
+Everything else must stay frozen and byte-for-byte: the fixture members digest `cccd8814…`, the C1–C6
+argv/cwd table, the seven questions and citation shape, the key-derivation method, the ten metric
+definitions, the ordered threshold table, the preservation manifest, and the falsifier. Additionally:
+the rerun consumer should be a **fresh Grok 4.6** session — the same family as the first consumer, so
+that the only changed variable is the documentation. Using a different family would confound the B1
+effect with a model change and would make the before/after uninterpretable. ("Other-family" in the
+board's node-5e row means other-family *from the persistent Claude controller*, which resolves to Grok;
+node 5c should say so explicitly rather than leave it ambiguous.) Node 6's other-family audit
+requirement is separate and unaffected.
+
+## 8. Findings
+
+### `block-m1` (2)
+
+1. **B1 — `show --json` and `branch list --json` `data` payloads are undocumented and unschema'd, and
+   they are the only public carriers of head, base, claim/proof kind, and signature authority on the
+   selected path.** Verdict **upheld** as the standing and only admissible slice (§6). Strengthened by
+   this audit: it is not merely an absence of documentation but a **lossy projection of a documented
+   contract** — `04_cli_spec.md:528-529` and `05_consistency_model.md:135` promise a certificate
+   carrying `subject`/`profile=local_verification_v1`/`phase=pre_commit`, while `show --json` emits
+   `certificate` as the bare string `"passed"`. Fix stays projection/schema/docs only. Not the full
+   CFR-171 descriptor, not a new command, not a store-validator or format change.
+
+2. **F1 — the frozen "identical rerun" is unsatisfiable as written and would deterministically return a
+   second `narrow`, stalling M1.** `undocumented_field_reliance` is defined over the handed docs pack;
+   reproducing that pack byte-for-byte guarantees the metric stays ≥ 2 no matter how good the B1 fix is,
+   and Stage A's own leak-scan gate (0 hits for `codefire_show_result`) would additionally fail once B1
+   lands. `block-m1` because it blocks the node-5c admission itself, not the completed run. Resolution
+   is the three recorded deviations in §7 — refresh the pack, extend the file list by the new
+   schema(s), re-specify the leak gate — with everything else frozen. **Node 5c must not admit a
+   byte-identical rerun.**
+
+### `park` (5) — real, not to be worked now
+
+3. **F2 — B1's write-set boundary on `branch list` `.state` is undecided, and deciding it wrong turns
+   B1 into a behavior change.** `C3` reports `main` `state=open-clean` while `C2`/`C6` report `opened=0`
+   and `active_files=0`, and `doctor` does not flag the combination. This consumer avoided the trap; the
+   next one may not. If B1 documents `.state`, it must be documented as *the persisted branch-record
+   state, which is not live-open truth*, or excluded from the admitted guarantee. If node 5a instead
+   proposes changing the value, that is a behavior change and the B1 packet's own Q5 requires it be
+   classified `block-m1` and stopped. Park the fix; **node 5c must record which of the three it chose
+   before node 5d writes anything.** The B1 packet's Q3 already has the hook for this.
+
+4. **F3 — the deciding metric's self-report was elicited from a subject that had been told the cutoff.**
+   `TASK.md` §Thresholds discloses "at most 1 undocumented field relied on" (adopt) and "≥ 2" (narrow),
+   and the consumer self-reported exactly **1** — the only value preserving `adopt` — by collapsing the
+   whole `.data.show` family into one entry and omitting `.data.branches`, which it had cited for Q2 and
+   Q3. Mechanically it is 7. **No impact on this decision**: Stage C computed the metric controller-side
+   and explicitly refused the self-report. But the disclosure cannot be removed from `TASK.md` without
+   breaking rerun identity, so the mitigation must instead be *mandatory and repeated*: the rerun's
+   `undocumented_field_reliance` must again be computed mechanically controller-side, and the
+   self-reported figure must again be recorded but not scored.
+
+5. **F4 — C5 as executed did not exercise the "base" surface it was frozen to exercise.** The frozen
+   table specifies `show <parent-commit-id> --json`; the consumer passed `main`'s head, which the
+   harness permits (it validates only `^CF-COMMIT-[0-9a-f]{12,24}$`), making C5 informationally
+   redundant with C4. Correctly recorded as not off-contract and correctly not penalised — and
+   **decision-neutral**: Q4 resolves from `C4 .data.show.parents` alone, and had it been counted as an
+   off-contract invocation it would only have failed row 4, which was already failed. For the rerun,
+   prefer accepting the redundancy (tightening the harness would itself break identity) but state
+   explicitly that C5's independent value is optional.
+
+6. **F5 — P2 unchanged: M1 does not prove toolchain-free adoption.** The runner was handed to the
+   consumer; no prebuilt artefact is published and this environment has no `cargo`/`rustc`. Belongs to
+   M2. No later slot may inherit the stronger claim. (Also unchanged and still parked: P1 Python has no
+   `--json` on any command, P3 `context --branch` doc/help divergence, P4 the general no-`data`-schema
+   form of B1, P5 `request-list` omitting `applied_head`.)
+
+7. **F6 — digest *methods* are not recorded beside the digests, which invites false drift reports.**
+   `store_bytes 114968174` is `du -sb` (apparent size, directories included), not a sum of file sizes
+   (114660898); the prior-root rollups require **absolute**-path `sha256sum` input, and re-deriving them
+   with repo-relative paths yields entirely different digests. Both reproduce exactly once the method
+   matches, and the harness hardcodes the correct form internally — but the numbers as published in the
+   packet are method-dependent and a later auditor can easily read spurious drift. Record the exact
+   command next to each digest in the rerun's preservation manifest.
+
+### `drop` (2)
+
+8. **The packet's "25 distinct cited field paths" (§C.3) vs "20" (§C.5) is not a discrepancy.** They are
+   distinct label+path pairs (25) and distinct label-agnostic paths (20). I reproduced both exactly. The
+   contract's metric definition ("distinct JSON field paths") is the 20 denominator, giving 7
+   undocumented. Recorded only so node 5c does not read it as a contradiction. No action.
+
+9. **Reopening D1–D3 (conformance-fixture-only consumer, prior evidence root as subject, freshly
+   imported toy repository) or promoting P4/P1/P3/P5 into this slot.** Nothing in this run's evidence
+   supports any of them, and each is strictly larger than or off the measured path. Drop.
+
+## 9. Authorization for node 5c
+
+**Authorized:**
+
+1. Admit **B1** as scoped in §6 — document and machine-bind the claim/proof and branch-head fields
+   `show --json` and `branch list --json` already emit, as projection / schema / docs only, and decide
+   §6 ground 4 (project `subject`/`profile`/`phase`, or explicitly document that `show` returns
+   `certificate.result` alone and name the surface carrying the full object).
+2. Admit **exactly one** identical fresh-consumer rerun — **conditional on recording the three
+   necessary deviations in §7** (refreshed docs pack + re-derived digest; pack file list extended by
+   exactly the new public schema(s); Stage A leak gate re-specified to answer *values*, not type names),
+   with the fixture digest, C1–C6 argv/cwd, seven questions, key-derivation method, ten metric
+   definitions, ordered threshold table, preservation manifest, and falsifier all unchanged.
+3. Record F2's choice for `branch list` `.state` **before** node 5d writes anything.
+4. Name the node-5d context owner and the node-5e consumer (fresh **Grok 4.6**, same family as the first
+   consumer so the only changed variable is the documentation) and controller.
+5. Carry F3's mandatory mitigation (controller-side mechanical recount of
+   `undocumented_field_reliance`) into the rerun packet.
+
+**Refused:**
+
+1. **M1 exit or any slot shift.** The decision is `narrow`, not terminal. Only the post-B1 rerun can
+   produce `adopt`/`stop`, and node 6's other-family audit (EC5) has not run.
+2. **A byte-identical rerun admission** — F1. It would guarantee a second `narrow` and stall M1.
+3. **Any change to the section-6 thresholds, the rubric, the metric definitions, the C1–C6 set, or the
+   fixture topology.** They were provably frozen at `624f28c` before any data existed; that proof is
+   the run's main defence and must not be spent.
+4. **A second consumer, a broadened rubric, a new command, an adapter, a Git bridge, telemetry, an agent
+   platform, a store-validator or sealed-format change, or the full CFR-171 cross-surface descriptor.**
+5. **Any product write beyond the admitted B1 slice**, and any behavior change to `branch list` `.state`
+   or to claim semantics (that would be `block-m1` and stop, per the B1 packet's Q5).
+6. **Reopening D1–D3 or promoting P1/P3/P4/P5** into this slot.
+7. **Deleting any preserved root** before node 6 has copied the decision record.
+
+Issue placement is unchanged by this audit: CFR-171 admitted at the narrowest slice (B1) only; CFR-172
+experiment executed with a non-terminal `narrow`; CFR-173 bounded slice satisfied for this run;
+CFR-168, CFB-136, CFB-133, CFR-169, CFR-170 unchanged and backlog-parked. All ledgers stay
+`investigating`.
+
+## 10. Validation run by this audit
+
+```bash
+python3 docs/development/tools/check_project_docs.py     # passed; 552 Markdown files inventoried
+python3 docs/development/tools/check_ai_acceleration_docs.py  # passed
+git diff --check                                         # clean
 ```
 
-`510a185..HEAD` does not touch `docs/development/bug-issues/**` or `docs/development/code-review-issues/**`. No HTTP/`cf+http` command ran. No installer, scale, Retrospect, or Python default-CLI substitution. Reporting-fix write set stayed on file-backed JSON projection plus focused tests and the admitted docs. This audit did not start parked work.
+No build, no product test, no CodeFire command of any kind, no import, no Git bridge, no live workspace
+command, no dogfood mutation, no consumer rerun, no threshold change, and no later-slot gate. Write set
+is this file only.
 
-### Validation not widened
+## 11. Verdict
 
-The card's out-of-M1 list was respected. Workspace-wide `cargo test`, Clippy, full installer, and dogfood Retrospect were not used as gates. This audit reran only the packet-named focused product tests plus the standing docs checks for its own file.
+**Interim verdict: the first adoption run is sound and its `narrow` decision is confirmed. M1 is NOT
+authorized to exit.**
 
-## Findings
+The source-blind boundary held, the preservation boundary held byte-for-byte across the canonical store,
+the dogfood worktree, three prior evidence roots and the fixture, the answer key provably predates the
+answer, the thresholds provably predate the data, the score is genuinely 7/7, and
+`undocumented_field_reliance` is genuinely 7 under the contract's own definition and ≥ 2 under every
+alternative reading. Row 3 of the frozen table is the correct and only match. There is no Git bridge, no
+mutation authority, no telemetry, no network, no private clarification, no source/test/internal-doc
+read, and no agent-platform dependency anywhere in the measured path.
 
-Classified only as `block-m1`, `park`, or `drop`, per `milestone-operating-model.md`.
-
-**`block-m1`: none.** No exit criterion is false at the audited HEAD against the preserved attempt-3 root.
-
-`park` — valid, not required for M1 exit:
-
-1. **`park` — `request-list` omits `applied_head`.** Per-MR JSON is still `id` / `source_url` / `status` / `target_url`. Apply `plan.head`, `list` branch heads, and `show` commit independently identify `CF-COMMIT-126555fdb84822a0c09c9e6a`; `request-list` identifies MR/source/target and terminal `applied`. Public contract after the reporting fix requires persisted `applied` status, not this extra field. Do not implement before M1 exit. **Retained after the `68a94b4` docs-only follow-up.**
-2. **`superseded` — run-packet 62-character source-manifest truncation.** Corrected at integration `68a94b4` (`docs: correct M1 runner manifest citation`). The run packet now quotes `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274` (64 hex characters) in all three claim sites. No longer a park finding.
-3. **`park` → node 7 board refresh.** `milestones.md` still has node 4 as "blocked at final reporting gate", "Last audited: 2026-08-21", and a leftover sentence that nothing on the graph has run. Fold node-6 completion, this follow-up HEAD, and the attempt-3 evidence root into the same exit/slot-shift edit. Do not open a separate packet.
-4. **`park` — file-backed `upload` / `request-merge` / `request-review` replay still omit `replayed: true`.** Review P1/P2. Not exercised by attempt-3's apply replay, which is the admitted path.
-5. **`park` — HTTP and Python `request-list` still overwrite applied with `stale`.** Review P3. Deliberate `cf://` vs `cf+http://`/Python divergence. Out of this file-backed M1.
-6. **`park` — no dedicated T6 regression that corrupts the current target head under an `applied` MR and expects `request-list` to fail closed.** Source still validates the current target sealed head unconditionally (`remote.rs` list path). Live `request-list` succeeded against a valid head. Missing test does not falsify this run.
-
-`drop` — out of boundary, duplicate, or noise; not filed:
-
-7. **`drop`.** `request-merge --dry-run` preview id `MR-4defb534902b` differs from live `MR-748b80865110`. Real automation hazard, already recorded; attempt 3 took the live JSON id.
-8. **`drop`.** `request-review` `current_status` is the pre-image `open` on the live call. Documented plan contract.
-9. **`drop`.** Lock-owner sidecar mtimes / whole-tree digest including owners. Domain digest excluding those files is stable. This audit's shared-lock read-only commands may rewrite owner sidecars; fixture all-files digest stayed `73cf173c…`.
-10. **`drop`.** Local fixture `doctor --quick` warns that the two admitted heads are `legacy-unversioned`; remote `doctor` reports `semantic_profile sealed-snapshot-v1` and `show` certificate `passed`. Probe already parked this. M1 proves the selected already-sealed path, not a rewrite onto `main`'s current-profile head.
-11. **`drop`.** `show` `signature.present false` is expected without `commit_signatures.required`.
-12. **`drop`.** `codefire`/`codefire-rs` nlink is 3 because cargo also hardlinks `deps/codefire_rs-730042419a756626`. Same inode and bytes; not a substitute runner.
-13. **`drop`.** `docs/development/ai/audit-latest.md` is gitignored (`.gitignore:25`). This is the auditor write set behaving as designed; the commit is force-added, as prior milestone audits were.
-
-## Advice (at most five bullets)
-
-- Node 7 may proceed on integration HEAD `68a94b4`: run the M1 exit, record exit evidence in `history.md`, shift every slot forward one step, and name a new M5 from `strategy/modernization-roadmap.md` without turning that roadmap into a second board.
-- Fold remaining `park` finding 3 into that same node 7 board/history edit. Cite the 64-character source-manifest digest `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274`, the attempt-3 root `/tmp/m1-remote-happy-path-a3.VbZTZ8`, and integration HEAD `68a94b4`.
-- Keep `park` finding 1 (`request-list` `applied_head`) parked. Do not admit a follow-up product packet before the slot shift.
-- Keep CFR-168 and CFB-136 `investigating` and unadmitted. Keep HTTP, Python parity, upload/merge/review replay markers, and adoption (CFR-171..173) parked on later slots.
-- Do not widen validation at exit. The standing docs checks plus this audit's already-run focused product tests are the gate; workspace-wide Rust, installer, and Retrospect stay out.
-
-## Close authorization
-
-**Authorized.** M1 `MS-remote-happy-path` may be closed by node 7 on the evidence at exact HEAD `74bbcd6df999f345f803696de6a3398ebeba977c` with preserved evidence root `/tmp/m1-remote-happy-path-a3.VbZTZ8`.
-
-All four exact exit criteria are true, and each was verified against the environment rather than from packet prose: an isolated fixture and preselected public commands completed sealed `upload -> request-merge -> request-review(approve) -> request-apply` on file-backed `cf://`; JSON envelopes identify source/target/MR and the applied head `CF-COMMIT-126555fdb84822a0c09c9e6a`; a separate read-only query (node 5 and this audit) confirms terminal head/state `applied`; object closure is intact; completed-receipt replay is truthful and does not rewrite domain authorities; canonical dogfood preservation holds; runner SHA-256 `70301c87…` is bound to 64-character source manifest `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274` at Rust tree `510a185`, byte-identical to this HEAD.
-
-There is no `block-m1` finding. `request-list` omitting `applied_head` is `park`. The 62-character manifest typo is superseded by `68a94b4`; see Follow-up.
-
-Scope of this authorization: node 7 only — M1 exit, exit evidence in `history.md`, and the slot shift. It does not authorize starting any parked root, widening validation, projecting `applied_head` onto `request-list`, or beginning M2 implementation before the shift is recorded. This audit itself did not exit M1, did not shift any slot, did not edit the board, `history.md`, issues, or packets, and did not start parked work.
-
-## Follow-up — docs-only delta at integration `68a94b4`
-
-- time (ISO): `2026-08-22T01:47:02Z`
-- integration HEAD (exact): `68a94b4bc9e1519a83ef5ada9575e92348f33cc8` (`68a94b4`, "docs: correct M1 runner manifest citation")
-- this worktree merge: `fba21b19f5754785f1cbfcec4a089ab9d3fd150c`
-- original audit blob: `35c9bff` tree-identical to integration `370f230`; `docs/development/ai/audit-latest.md` blob `a93a8014012d8019d015b4c2637a9400c6cb76ea` is unchanged through `68a94b4`
-
-`git diff 74bbcd6..68a94b4` is three docs files only (audit integration, two run-packet hash quotes, node 6/7 board rows). No `crates/`, tests, schemas, Python CLI, evidence root, or canonical dogfood change. No exit fact moved. No broad re-audit.
-
-Verified:
-
-1. **Audit integrated unchanged.** `git diff --quiet 35c9bff 370f230` (full trees) and the `audit-latest.md` blob is identical at `35c9bff`, `370f230`, and `68a94b4`.
-2. **Run packet manifest citation.** All three `c59e8c22…` claims in `milestone-remote-happy-path-run.md` at `68a94b4` are the exact 64-character provenance digest `c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274`. Zero remaining 62-character truncations in that packet.
-3. **Board nodes 6/7 only.** Graph and table advance node 6 `ready` → `completed` (`35c9bff` integrated as `370f230`) and node 7 `blocked` → `ready`. Nodes 1–5 rows are untouched in this delta. Remaining stale node-4 / "Last audited" / leftover graph-prose lines are pre-existing `park` finding 3, not new scope.
-
-**`block-m1`: none.** Finding 2 is **superseded**. Finding 1 (`request-list` omits `applied_head`) is **retained `park`**.
-
-**Authorized.** Node 7 may close M1 `MS-remote-happy-path` on integration HEAD `68a94b4bc9e1519a83ef5ada9575e92348f33cc8` with preserved evidence root `/tmp/m1-remote-happy-path-a3.VbZTZ8`. Same scope as the original close: slot shift and `history.md` only; no parked product work.
+Two things block node 5c from proceeding as currently framed. **B1 is confirmed as the only admissible
+next slice** — and it is a stronger finding than first stated, because `show --json` lossily projects a
+certificate contract the public docs already promise. **The rerun cannot be admitted byte-identically**
+— doing so would return `narrow` a second time by construction and stall M1. Resolve F1 with the three
+recorded deviations, record F2's `.state` choice before writing code, and carry F3's mechanical recount
+forward; then the bounded fix and the single rerun are authorized.
