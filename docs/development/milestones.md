@@ -77,22 +77,22 @@ M1 non-goals:
 ## M1 execution graph (current)
 
 ```text
-Critical path: parallel segment/study classification -> orchestrator fan-in -> frozen isolated first-seal study -> score/confirmation -> final audit -> M1 exit
-Progress: release M1 closed and product-value slot activated; no study fixture, participant run, or product write exists
-Parallel now: node 1 segment/claims/value contract + node 2 first-seal fixture/command/friction classification
-Blocked: nodes 3–7 wait on both read-only classifiers
-Next legal action: dispatch both ready packets concurrently; do not run a participant or implement before node 3 admission
+Critical path: controller baseline/setup -> source-blind participant first seal -> score/confirmation -> final audit -> M1 exit
+Progress: nodes 1–3 completed; both classifiers found no product blocker, and fan-in moved import to controller setup so the participant's first seal has a retrievable pre-change base
+Parallel now: none — node 5a is the persistent Grok controller/setup lane
+Blocked: nodes 5b–7 wait on a frozen participant-ready handoff
+Next legal action: execute `milestone-product-value-proof-run.md` Stage A; no participant, product fix, or threshold change yet
 ```
 
 ### Nodes
 
 | # | Node | State | Owner | Waits on | Packet | Write set | Evidence |
 |---|---|---|---|---|---|---|---|
-| 1 | Segment, claim-comprehension, value hypothesis, and frozen decision contract | **ready** | Claude Opus 5 | — | `ai/task-packets/milestone-product-value-proof-segment.md` | that packet only | — |
-| 2 | Isolated first-seal fixture, command path, evidence, and friction classification | **ready** | Grok 4.6 | — | `ai/task-packets/milestone-product-value-proof-first-seal.md` | that packet only | — |
-| 3 | Orchestrator fan-in and bounded study/fix admission | **blocked** | Orchestrator | 1, 2 | — | board plus admitted run/fix packet | — |
-| 4 | Smallest reproduced product-contract fix, if any | **blocked** | persistent source-context owner | 3 | — | exact admitted source/docs/test set | — |
-| 5a | Controller setup and source-blind participant handoff | **blocked** | persistent study owner | 3, optional 4 | — | isolated fixture/key/evidence plus run packet | — |
+| 1 | Segment, claim-comprehension, value hypothesis, and frozen decision contract | **completed** | Claude Opus 5 | — | `ai/task-packets/milestone-product-value-proof-segment.md` | that packet only | `80899a3` (integrated as `aa95b98`); AI-assisted solo maintainer, Q1–Q7, 16 metrics, frozen ordered table, no blocker |
+| 2 | Isolated first-seal fixture, command path, evidence, and friction classification | **completed** | Grok 4.6 | — | `ai/task-packets/milestone-product-value-proof-first-seal.md` | that packet only | `ca02b27` (integrated as `d968f52`); receipt-digest, public live loop, roots/preservation/falsifiers, no blocker |
+| 3 | Orchestrator fan-in and bounded study/fix admission | **completed** | Orchestrator | 1, 2 | `ai/task-packets/milestone-product-value-proof-run.md` | board plus run packet | controller-sealed uppercase base + participant lowercase change; no node-4 fix |
+| 4 | Smallest reproduced product-contract fix, if any | **not required** | — | 3 | — | — | import action gap parked in controller setup; no source/docs change admitted |
+| 5a | Controller setup and source-blind participant handoff | **ready** | persistent Grok node-2 session | 3 | `ai/task-packets/milestone-product-value-proof-run.md` | isolated fixture/key/evidence plus run packet | — |
 | 5b | Fresh participant first-seal run, score, and distinct confirmation | **blocked** | fresh other-family participant + persistent controller | 5a | — | handed root/evidence plus packet only | — |
 | 6 | Final independent audit | **blocked** | fresh other-family audit agent | 5b | `ai/audit-latest.md` | audit file only | — |
 | 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
