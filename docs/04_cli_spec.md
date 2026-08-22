@@ -103,6 +103,18 @@ local workflowがopened registryのactive stateを使う場合、`open.active_st
 - close/discardのactive-state tree削除はtransactionに記録したstable directory identityとdeterministic sibling quarantine nameを使う。移動はkernel atomic no-replace renameで行い、collision entryを上書きしない。削除開始後の失敗は部分削除treeを元nameへ戻さず、errorに示したquarantineをretry/recoveryのため保持する。
 - `doctor`と`storage report`によるactive root/instanceの列挙・metadata readもno-follow directory capabilityを使い、active rootまたはchild symlinkをrepository外のreadへ使わない。
 
+### 4.1.2 `branch list --json`
+
+```bash
+codefire branch list --json
+codefire branch list --path <repo-or-open> --json
+codefire branch list --json --metrics
+```
+
+`--json`は共有`codefire.command_result.v1` envelopeを返す。`data`は`codefire.branch_list.v1`で、`type=codefire_branch_list`、`version=1`、`branches[]`の各要素は`name`、`head`、persisted `state`を必須とする。`capabilities`の`branch` commandは`output_schema=codefire.command_result.v1`のまま、`data_schema=codefire.branch_list.v1`をadvertizeする。envelopeの`command`は`branch-list`である。
+
+`branches[].state`はbranch recordに保存された状態である。copied repositoryで`state=open-clean`でも、liveな`opened/`登録の存在は証明しない。live openの正は`doctor`のopened/active検査とopened registryである。未知の非critical fieldはpreserveし、`version`が1以外のdataはschema上denyする。
+
 ## 4.2 作らないコマンド
 
 ```text
@@ -623,7 +635,7 @@ codefire diff --impact --json main feature-login
 ```text
 local branch、sealed commit ID、cf:// URL、cf+http:// URLを参照できる
 参照先のsealed commit妥当性を検証してから表示する
-show --jsonは `codefire.command_result.v1` envelopeでsealed commit summaryを返す
+show --jsonは `codefire.command_result.v1` envelopeでsealed commit summaryを返す。`data`は`codefire.show_result.v1`で、`type=codefire_show_result`、`version=1`、`show.target`、`show.commit`、`show.parents`、`show.certificate`（certificate result string）、`show.signature.present`、およびadditive `show.claim`を必須とする。`certificate`はobjectへ置き換えない。`claim`は既にvalidate済みのpersisted certificateから`result`を投影し、存在するときだけ`profile`、`phase`、subjectの`kind`/`trust_kind`/`immutable`を出す。legacy omissionはfieldを足さず、強いauthorityを合成しない。`capabilities`の`show` commandは`output_schema=codefire.command_result.v1`のまま、`data_schema=codefire.show_result.v1`をadvertizeする。human textのCertificate行はresult stringのままである。未知の非critical fieldはpreserveし、`version`が1以外のdataはschema上denyする。
 diffのdefault algorithmはmyers
 --algorithmはmyers、patience、histogramを受け付ける
 --contextはtext diff hunkに含める前後context行数を指定する。defaultは3

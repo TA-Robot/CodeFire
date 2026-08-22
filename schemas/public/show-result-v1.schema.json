@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "codefire.show_result.v1",
+  "title": "CodeFire show command data v1",
+  "type": "object",
+  "required": ["type", "version", "show"],
+  "properties": {
+    "type": {"const": "codefire_show_result"},
+    "version": {"const": 1},
+    "show": {
+      "type": "object",
+      "required": ["target", "commit", "parents", "certificate", "signature", "claim"],
+      "properties": {
+        "target": {"type": "string", "minLength": 1},
+        "label": {"type": "string"},
+        "commit": {"type": "string", "minLength": 1},
+        "message": {"type": "string"},
+        "parents": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "files": {"type": "integer", "minimum": 0},
+        "atoms": {"type": "integer", "minimum": 0},
+        "certificate": {"type": "string", "minLength": 1},
+        "roots": {"type": "object"},
+        "signature": {
+          "type": "object",
+          "required": ["present"],
+          "properties": {
+            "present": {"type": "boolean"},
+            "summary": {"type": "string"},
+            "details": {"type": ["object", "null"]}
+          },
+          "additionalProperties": true
+        },
+        "claim": {
+          "type": "object",
+          "required": ["result"],
+          "properties": {
+            "result": {"type": "string", "minLength": 1},
+            "profile": {"type": "string", "minLength": 1},
+            "phase": {"type": "string", "minLength": 1},
+            "subject": {
+              "type": "object",
+              "properties": {
+                "kind": {"type": "string", "minLength": 1},
+                "trust_kind": {"type": "string", "minLength": 1},
+                "immutable": {"type": "boolean"}
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

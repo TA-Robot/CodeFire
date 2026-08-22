@@ -1,6 +1,6 @@
 # AI Task Packet
 
-Status: ready
+Status: completed
 
 Packet ID: MS-adoption-wedge-b1-fix
 
@@ -94,4 +94,65 @@ Commit only the admitted write set.
 
 ## Result
 
-Not implemented.
+Status **completed** at admission HEAD `1710251f78a84487adfcb109f86cfd213581580a`
+(merge of `0cee171`). Implemented only the admitted B1 slice. No Store/core/object/
+Python/HTTP/conformance-fixture change. Envelope `output_schema`, certificate result
+string, branch/show resolution, sealed validation, and write behavior are unchanged.
+
+### Schemas and IDs
+
+| ID | Path | Advertiser |
+|---|---|---|
+| `codefire.branch_list.v1` | `schemas/public/branch-list-v1.schema.json` | `capabilities.commands[name=branch].data_schema` |
+| `codefire.show_result.v1` | `schemas/public/show-result-v1.schema.json` | `capabilities.commands[name=show].data_schema` |
+
+`commands[].output_schema` remains `codefire.command_result.v1`. Other commands omit
+`data_schema`. Both IDs/paths are in `support.schemas`. `data.version` other than `1`
+is denied by schema; required comprehension fields fail when missing; noncritical extra
+keys are accepted (`additionalProperties: true`).
+
+Required branch-list fields: `type`, `version`, `branches[]{name,head,state}`.
+`state` is persisted branch-record state, not live `opened/` authority.
+
+Required show fields: `type`, `version`, `show.{target,commit,parents,certificate,signature,claim}`;
+`signature.present`; `claim.result`. `certificate` stays a string.
+
+### Additive claim projection
+
+`show.claim` copies the already-validated persisted certificate: always `result`;
+`profile` / `phase` / subject `{kind,trust_kind,immutable}` only when those fields are
+present. Init/legacy certificates therefore project `{result}` only and do not invent
+`local_verification_v1`. Current `run_commit` certificates project profile/phase/subject
+kind facts. Human text still prints `Certificate: <result>` only.
+
+### Focused tests
+
+`crates/codefire-cli/src/tests/show_branch_list_contract.rs` — 3 tests, all passed:
+
+- `capabilities_advertise_branch_and_show_data_schemas_only`
+- `branch_list_and_show_payloads_match_public_data_schemas`
+- `show_claim_projects_persisted_certificate_fields_without_inventing_proof`
+
+### Validation
+
+```text
+cargo test -p codefire-cli --bin codefire-rs -- show_branch_list_contract
+  3 passed; 0 failed; 775 filtered out
+cargo fmt --check
+cargo clippy -p codefire-cli --all-targets -- -D warnings
+python3 docs/development/tools/check_source_docs.py
+  Source docs check passed: 44 modules, 34 commands, 12 object kinds
+python3 docs/development/tools/check_project_docs.py
+  Project docs check passed; 553 Markdown files inventoried
+python3 docs/development/tools/check_ai_acceleration_docs.py
+  AI acceleration docs check passed
+git diff --check
+```
+
+No `block-m1` beyond the admitted B1 slice. Full CFR-171, Store validator, Python/HTTP,
+and consumer rerun remain parked.
+
+### Source-bound runner
+
+Recorded in the follow-up commit after `python3 docs/development/tools/build_source_bound_rust.py`
+on the accepted source commit.

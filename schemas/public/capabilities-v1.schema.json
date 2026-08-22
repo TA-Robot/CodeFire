@@ -31,6 +31,7 @@
           "items": {"enum": ["local", "cf", "cf+http", "cf+https"]}
         },
         "output_schema": {"type": ["string", "null"]},
+        "data_schema": {"type": "string", "minLength": 1},
         "pagination": {"type": "object"}
       },
       "additionalProperties": false

@@ -1,6 +1,9 @@
 use serde_json::{json, Value};
 
-use crate::compatibility::{support_manifest_json, CAPABILITIES_SCHEMA, COMMAND_RESULT_SCHEMA};
+use crate::compatibility::{
+    support_manifest_json, BRANCH_LIST_SCHEMA, CAPABILITIES_SCHEMA, COMMAND_RESULT_SCHEMA,
+    SHOW_RESULT_SCHEMA,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct CommandCapability {
@@ -117,18 +120,35 @@ pub(crate) fn capabilities_data_json() -> Value {
         "schema": CAPABILITIES_SCHEMA,
         "command_result_schema": COMMAND_RESULT_SCHEMA,
         "support": support_manifest_json(),
-        "commands": COMMAND_CAPABILITIES.iter().map(|capability| {
-            json!({
-                "name": capability.name,
-                "supports_json": capability.supports_json,
-                "supports_metrics": capability.supports_metrics,
-                "help_key": capability.help_key,
-                "targets": command_targets(capability.name),
-                "output_schema": capability.supports_json.then_some(COMMAND_RESULT_SCHEMA),
-                "pagination": command_pagination(capability.name),
-            })
-        }).collect::<Vec<_>>(),
+        "commands": COMMAND_CAPABILITIES.iter().map(command_capability_json).collect::<Vec<_>>(),
     })
+}
+
+fn command_capability_json(capability: &CommandCapability) -> Value {
+    let mut entry = json!({
+        "name": capability.name,
+        "supports_json": capability.supports_json,
+        "supports_metrics": capability.supports_metrics,
+        "help_key": capability.help_key,
+        "targets": command_targets(capability.name),
+        "output_schema": capability.supports_json.then_some(COMMAND_RESULT_SCHEMA),
+        "pagination": command_pagination(capability.name),
+    });
+    if let Some(data_schema) = command_data_schema(capability.name) {
+        entry
+            .as_object_mut()
+            .expect("command capability is an object")
+            .insert("data_schema".to_string(), json!(data_schema));
+    }
+    entry
+}
+
+fn command_data_schema(name: &str) -> Option<&'static str> {
+    match name {
+        "branch" => Some(BRANCH_LIST_SCHEMA),
+        "show" => Some(SHOW_RESULT_SCHEMA),
+        _ => None,
+    }
 }
 
 fn command_pagination(name: &str) -> Value {

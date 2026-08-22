@@ -180,11 +180,12 @@ pub(crate) fn show_commitish_data(
         .and_then(Value::as_array)
         .map(|items| items.iter().filter_map(Value::as_str).collect::<Vec<_>>())
         .unwrap_or_default();
-    let certificate = commit
-        .get("certificate")
+    let certificate_object = commit.get("certificate");
+    let certificate = certificate_object
         .and_then(|value| value.get("result"))
         .and_then(Value::as_str)
         .unwrap_or("unknown");
+    let claim = certificate_claim_projection(certificate_object);
     let signature = commit.get("signature").and_then(Value::as_object);
     let signature_summary = signature
         .map(|item| {
@@ -212,6 +213,7 @@ pub(crate) fn show_commitish_data(
             "files": files,
             "atoms": atoms,
             "certificate": certificate,
+            "claim": claim,
             "roots": commit.get("roots").cloned().unwrap_or_else(|| json!({})),
             "signature": {
                 "present": signature.is_some(),
@@ -220,6 +222,50 @@ pub(crate) fn show_commitish_data(
             },
         },
     }))
+}
+
+fn certificate_claim_projection(certificate: Option<&Value>) -> Value {
+    let object = certificate.and_then(Value::as_object);
+    let result = object
+        .and_then(|certificate| certificate.get("result"))
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let mut claim = serde_json::Map::new();
+    claim.insert("result".to_string(), Value::String(result.to_string()));
+    if let Some(profile) = object
+        .and_then(|certificate| certificate.get("profile"))
+        .and_then(Value::as_str)
+    {
+        claim.insert("profile".to_string(), Value::String(profile.to_string()));
+    }
+    if let Some(phase) = object
+        .and_then(|certificate| certificate.get("phase"))
+        .and_then(Value::as_str)
+    {
+        claim.insert("phase".to_string(), Value::String(phase.to_string()));
+    }
+    if let Some(subject) = object
+        .and_then(|certificate| certificate.get("subject"))
+        .and_then(Value::as_object)
+    {
+        let mut projected = serde_json::Map::new();
+        if let Some(kind) = subject.get("kind").and_then(Value::as_str) {
+            projected.insert("kind".to_string(), Value::String(kind.to_string()));
+        }
+        if let Some(trust_kind) = subject.get("trust_kind").and_then(Value::as_str) {
+            projected.insert(
+                "trust_kind".to_string(),
+                Value::String(trust_kind.to_string()),
+            );
+        }
+        if let Some(immutable) = subject.get("immutable").and_then(Value::as_bool) {
+            projected.insert("immutable".to_string(), Value::Bool(immutable));
+        }
+        if !projected.is_empty() {
+            claim.insert("subject".to_string(), Value::Object(projected));
+        }
+    }
+    Value::Object(claim)
 }
 
 pub(crate) fn diff_commitish_with_options(

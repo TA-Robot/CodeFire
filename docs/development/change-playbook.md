@@ -37,7 +37,7 @@ python3 docs/development/tools/probe_validation_capabilities.py
 | Commit | commit transaction and active-reset sections in architecture | `commit_active_reset`, open/ledger pending guards, store validators, signatures, doctor fixtures |
 | Diff/show/review/patch/merge | `view` and its submodules | bounded output, object reads, merge/patch idempotency |
 | Remote/HTTP/signatures | `remote`, `http`, `http_tls`, `signatures` | path/resource limits, nonce/key policy, structured remote errors |
-| Version/schema/capability/page | `compatibility`, `command_registry`, `pagination`, `schemas/public/` | checksum conformance corpus, Rust/Python/minimal-consumer decisions, parser/manifest agreement |
+| Version/schema/capability/page | `compatibility`, `command_registry`, `pagination`, `schemas/public/` | checksum conformance corpus, Rust/Python/minimal-consumer decisions, parser/manifest agreement. Command-specific `data` contracts are optional `data_schema` on capabilities plus checked-in public data schemas; do not retarget envelope `output_schema`. |
 | Doctor/migration/layout | `repo_layout`, `doctor`, `migration`, shared transaction/snapshot validator | typed divergence/pending vocabulary, store registry, ledger-bound raw/parsed opened-registry snapshot ownership, recovery fixtures |
 | AI development system | `ai/README.md`, schemas, model policy | strategy decision register and local AI gate |
 

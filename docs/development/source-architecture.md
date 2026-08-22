@@ -43,8 +43,8 @@ No machine may infer a stronger claim than its inputs. In particular, an automat
 | `cli_model` | shared command option/result types and the `OpenContextAuthority` proof carrier; no filesystem behavior. | <!-- module: cli_model -->
 | `close_transaction` | durable close/discard evidence, phase validation, deterministic quarantine recovery, and ordered multi-record publication. | <!-- module: close_transaction -->
 | `close_worktree` | capability-bound close/discard marker validation, exact-marker removal, and quarantined no-follow worktree deletion. | <!-- module: close_worktree -->
-| `command_registry` | declared public command capabilities used by help/completion/metrics/capability output. | <!-- module: command_registry -->
-| `compatibility` | one generated support manifest for readable/writable format versions, public schemas, runtime roles, and unknown-version/extension decisions. | <!-- module: compatibility -->
+| `command_registry` | declared public command capabilities used by help/completion/metrics/capability output, including optional per-command `data_schema` for `branch` and `show`. | <!-- module: command_registry -->
+| `compatibility` | one generated support manifest for readable/writable format versions, public schemas, runtime roles, and unknown-version/extension decisions. Public schema IDs include command-data `codefire.branch_list.v1` and `codefire.show_result.v1`. | <!-- module: compatibility -->
 | `commit_active_reset` | byte-snapshot authority, ordered progress, preflight, and idempotent roll-forward for post-commit active-state reset. | <!-- module: commit_active_reset -->
 | `command_execution` | streaming bounded child output, explicit environment profiles, timeout, and platform-reported process-tree termination. | <!-- module: command_execution -->
 | `completion` | top-level help and shell completion rendering. | <!-- module: completion -->
@@ -78,7 +78,7 @@ No machine may infer a stronger claim than its inputs. In particular, an automat
 | `storage` | bounded local/remote storage report and warnings. | <!-- module: storage -->
 | `tests` | CLI-wide regression module compiled only for tests; focused module tests should stay near their owners. | <!-- module: tests -->
 | `verification` | verify argument parsing plus text rendering of a core `Verification`. | <!-- module: verification -->
-| `view` | show/diff/review-pack/patch views, algorithms, bounded payload handling. | <!-- module: view -->
+| `view` | show/diff/review-pack/patch views, algorithms, bounded payload handling. `show --json` keeps the certificate result string and adds `claim` by projecting persisted certificate result/profile/phase and subject kind/trust_kind/immutable when present. | <!-- module: view -->
 
 ## Core Domain Flow
 

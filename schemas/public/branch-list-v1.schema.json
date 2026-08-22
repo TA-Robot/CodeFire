@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "codefire.branch_list.v1",
+  "title": "CodeFire branch list command data v1",
+  "type": "object",
+  "required": ["type", "version", "branches"],
+  "properties": {
+    "type": {"const": "codefire_branch_list"},
+    "version": {"const": 1},
+    "branches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "head", "state"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "head": {"type": "string", "minLength": 1},
+          "state": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": true
+      }
+    },
+    "metrics": {"type": "object"}
+  },
+  "additionalProperties": true
+}

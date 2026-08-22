@@ -20,6 +20,7 @@ This catalog records current shapes at the level required for safe changes. Unle
 | Automation envelope | Rust declared JSON commands use `codefire.command_result.v1` | Python fallback is primarily a human-text CLI and does not provide a shared `--json` surface or common envelope; isolated JSON-producing commands are separate contracts. Payload types are independently versioned inside Rust `data`. |
 | Capability/support manifest | `codefire.capabilities.v1` plus `codefire.support.v1` | Unknown versions and critical extensions deny; noncritical object extensions preserve. Checked schemas and the checksum corpus live under `schemas/public/` and `schemas/conformance/`. |
 | Collection page/cursor | `codefire.page.v1` / `codefire.page_cursor.v1` | Cursor binds collection, complete sorted-result snapshot, offset, and limit. Mutation causes explicit stale-cursor rejection; cursor payload is bounded and canonical-hex encoded. |
+| Command data payloads | `codefire.branch_list.v1` / `codefire.show_result.v1` | Advertised only as optional `commands[].data_schema` on `branch` and `show`. Envelope `output_schema` remains `codefire.command_result.v1`. `show.certificate` is the result string; additive `show.claim` projects persisted certificate `result` and, when present, `profile`, `phase`, and subject `kind`/`trust_kind`/`immutable`. `branches[].state` is persisted branch-record state, not live opened authority. |
 
 Product/package/SemVer is independent; see `strategy/release-and-format-roadmap.md`.
 

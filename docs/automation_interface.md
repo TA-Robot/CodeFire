@@ -40,6 +40,65 @@ missing-version policy, canonical JSON and public-ID profiles, runtime roles, co
 pagination mode. A schema is not advertised until it is checked in. Unknown persisted versions fail
 closed unless that format explicitly declares a legacy missing-version case.
 
+`commands[].output_schema` remains the shared envelope ID `codefire.command_result.v1`. Command-specific
+`data` contracts are advertised separately as optional `commands[].data_schema`. Current advertisers are
+`branch` → `codefire.branch_list.v1` and `show` → `codefire.show_result.v1`. Other commands omit
+`data_schema`. Envelope `data` stays an object; consumers use `data_schema` plus `data.type`/`data.version`
+to bind the payload. `data.version` other than `1` is denied by those schemas. Noncritical extra keys are
+preserved.
+
+`branch list --json` data:
+
+```json
+{
+  "type": "codefire_branch_list",
+  "version": 1,
+  "branches": [
+    {
+      "name": "main",
+      "head": "CF-COMMIT-...",
+      "state": "closed"
+    }
+  ]
+}
+```
+
+`branches[].state` is the persisted branch-record state. A copied repository may still say
+`open-clean` after `opened/` is empty; that field is not live open-directory authority. Use `doctor`
+opened/active checks for current registration. Envelope `command` is `branch-list`.
+
+`show --json` data:
+
+```json
+{
+  "type": "codefire_show_result",
+  "version": 1,
+  "show": {
+    "target": "main",
+    "commit": "CF-COMMIT-...",
+    "parents": ["CF-COMMIT-..."],
+    "certificate": "passed",
+    "signature": {"present": false},
+    "claim": {
+      "result": "passed",
+      "profile": "local_verification_v1",
+      "phase": "pre_commit",
+      "subject": {
+        "kind": "live_open",
+        "trust_kind": "local_unisolated",
+        "immutable": false
+      }
+    }
+  }
+}
+```
+
+`show.certificate` remains the certificate result string (`passed` / `failed`; `consistent` is the
+legacy alias of `passed`). Do not read it as the certificate object. Additive `show.claim` copies
+`result` and, only when present on the already-validated persisted certificate, `profile`, `phase`, and
+subject `kind` / `trust_kind` / `immutable`. Missing claim fields mean those facts were not on the
+certificate; they are not unknown-as-success and they are not synthesized proof.
+
 `next_actions` entries use this shape:
 
 ```json

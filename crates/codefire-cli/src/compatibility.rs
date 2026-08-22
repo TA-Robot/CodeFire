@@ -7,6 +7,8 @@ pub(crate) const CAPABILITIES_SCHEMA: &str = "codefire.capabilities.v1";
 pub(crate) const REMOTE_DOCTOR_SCHEMA: &str = "codefire.remote_doctor.v1";
 pub(crate) const PAGE_SCHEMA: &str = "codefire.page.v1";
 pub(crate) const PAGE_CURSOR_SCHEMA: &str = "codefire.page_cursor.v1";
+pub(crate) const BRANCH_LIST_SCHEMA: &str = "codefire.branch_list.v1";
+pub(crate) const SHOW_RESULT_SCHEMA: &str = "codefire.show_result.v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum VersionSupport {
@@ -125,6 +127,8 @@ pub(crate) fn support_manifest_json() -> Value {
             {"id": REMOTE_DOCTOR_SCHEMA, "path": "schemas/public/remote-doctor-v1.schema.json"},
             {"id": PAGE_SCHEMA, "path": "schemas/public/page-v1.schema.json"},
             {"id": PAGE_CURSOR_SCHEMA, "path": "schemas/public/page-cursor-v1.schema.json"},
+            {"id": BRANCH_LIST_SCHEMA, "path": "schemas/public/branch-list-v1.schema.json"},
+            {"id": SHOW_RESULT_SCHEMA, "path": "schemas/public/show-result-v1.schema.json"},
         ],
     })
 }

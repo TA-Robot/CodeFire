@@ -24,6 +24,7 @@ mod policy_coverage;
 mod remote_doctor;
 mod request_apply_replay;
 mod sealed_token_boundary;
+mod show_branch_list_contract;
 mod signature_boundary;
 mod state_transaction;
 mod subject_trust;
