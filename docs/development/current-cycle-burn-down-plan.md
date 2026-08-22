@@ -20,7 +20,7 @@ Current known issue count and lifecycle position, audited 2026-07-19 after CFR-1
 - `CFB-120`..`CFB-132` are fixed; final canonical state is `open-clean`, Fire 0, tool migration none. The separately configured repository's branch/open/active control hashes remain unchanged.
 - RVC-011/CFR-161 completed Discover through Retrospect. Installed unsafe-policy replay fails before writes, both real read-only matrices pass without hash drift, and canonical trace-warning policy returns a typed passed decision with no blockers.
 - CFR-162 completed Discover, Freeze, Plan, Implement, Close, Install, Dogfood, and Retrospect. All unresolved merge classes now block the authoritative decision until an explicit validated continue transition.
-- The 60-review current-source audit classified 6 implemented, 3 accepted non-goals, and 51 residual reviews. The residuals remain mapped exactly once to CFR-163..173. Roots through CFR-167/CFB-134 completed the full lifecycle; open CFB-133/136 and CFR-168..173 remain `investigating`. After `MS-agent-local-contract` exited, CFR-168/CFB-136 became M1 classification inputs, CFR-171..173 moved to M2, and residual CFB-133/CFR-169/CFR-170 became backlog-parked. `BATCH-2026-07-review-portfolio-completion` is historical; live work is `milestones.md` M1 `MS-remote-happy-path`.
+- The 60-review current-source audit classified 6 implemented, 3 accepted non-goals, and 51 residual reviews. The residuals remain mapped exactly once to CFR-163..173. Roots through CFR-167/CFB-134 completed the full lifecycle; open CFB-133/136 and CFR-168..173 remain `investigating`. After `MS-remote-happy-path` exited, CFR-171..173 became M1 adoption classification inputs, while CFR-168/CFB-136 and residual CFB-133/CFR-169/CFR-170 are backlog-parked. `BATCH-2026-07-review-portfolio-completion` is historical; live work is `milestones.md` M1 `MS-adoption-wedge`.
 - Historical cycle sections were moved to `archive/completed-cycle-ledger.md`. Do not infer current issue counts from historical headings or remaining-count notes.
 - The management hub `docs/development/README.md` is the current-state entry point; update it and append `history.md` when this section changes.
 
@@ -28,11 +28,11 @@ Current known issue count and lifecycle position, audited 2026-07-19 after CFR-1
 
 Batch ID: `BATCH-2026-07-review-portfolio-completion`
 
-Lifecycle: historical. The first five ordered roots completed through Retrospect. Remaining roots are governed only by `milestones.md`: CFR-168/CFB-136 may only be classified for the remote M1 happy path, CFR-171..173 stay on M2, and CFB-133/CFR-169/CFR-170 residuals are backlog-parked.
+Lifecycle: historical. The first five ordered roots completed through Retrospect. Remaining roots are governed only by `milestones.md`: CFR-171..173 are adoption-M1 classification inputs, while CFR-168/CFB-136 and CFB-133/CFR-169/CFR-170 residuals are backlog-parked.
 
 Frozen scope:
 
-- Dogfood/admitted blockers: CFR-168 and same-root CFB-136 are M1 classification inputs only; open CFB-133 was not reproduced by the completed local-contract M1, and CFB-134/CFB-135 are fixed.
+- Dogfood/admitted blockers: CFR-171..173 are M1 classification inputs only; CFR-168/CFB-136 and open CFB-133 were not reproduced as blockers by completed milestones, while CFB-134/CFB-135 are fixed.
 - Current-source review roots: fixed `CFR-163`..`CFR-167` and `CFR-174`/`CFR-175`; active `CFR-168`..`CFR-173`.
 - RVC terminal audit: 60/60 mapped exactly once; 6 implemented, 3 accepted non-goals, 51 promoted to the eleven root owners.
 
@@ -45,7 +45,7 @@ Root execution order:
 | 3 | CFR-165 + CFR-174 + CFR-175 | RVC-026/030/044/050/056 | one contained remote lock/idempotency/MR/GC publication protocol whose apply head is the immutable reviewed source | fixed; 596 Rust / 115 Python gates, fresh Install, installed race reversal, real/canonical Dogfood, independent ACCEPT |
 | 4 | CFR-166 + CFB-134 | RVC-006/007/013/017/020/022/032/033/049/053/055/057/059 | complete version/capability/schema/conformance contract and Rust remote doctor | fixed; 613 Rust / 117 Python gates, fresh Install, file/HTTP/future/cursor reversal, canonical Dogfood |
 | 5 | CFR-167 | RVC-008/016 | typed effective-policy provenance and ChangeCoverage | fixed; 622 Rust / 117 Python gates, fresh Install, installed policy/coverage/seal reversal, canonical Dogfood |
-| 6 | CFR-168 + CFB-136 | RVC-014/015/029/042/047/048/058 | bounded graph/object/HTTP work with stable counters and snapshot-safe validation reuse | M1 classification inputs for exact file-backed path only |
+| 6 | CFR-168 + CFB-136 | RVC-014/015/029/042/047/048/058 | bounded graph/object/HTTP work with stable counters and snapshot-safe validation reuse | backlog parked after the exact file-backed path did not reproduce either root |
 | 7 | CFR-169 | RVC-031/051/052/054 | behavior-preserving lifecycle/Store/test proof seams | backlog parked; no extraction admitted |
 | 8 | CFR-170 + CFB-133 | RVC-034/035 | typed postcondition-driven outcomes and executable actions | bounded local slice completed; residual backlog parked |
 | 9 | CFR-171 | RVC-001/019 | machine-readable claim/proof descriptor | parked on M2 |
