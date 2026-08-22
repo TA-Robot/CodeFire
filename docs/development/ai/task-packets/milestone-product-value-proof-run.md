@@ -1,6 +1,6 @@
 # AI Task Packet
 
-Status: participant-ready
+Status: scored
 
 Packet ID: MS-product-value-proof-run
 
@@ -384,4 +384,201 @@ requirement/design/code/test files under the fixture. Write answers once into AN
 No retry, no extra files, no questions back to the controller.
 
 Next legal action: Stage B participant run. Not Stage C. Not a product fix.
+
+### Stage C freeze (before conclusions)
+
+Scored at clean branch HEAD `a95ba684d409744bceae2700d3bb8170d05f8dbb`. Integration was **not**
+merged. Wrapper P1 baseline remains this HEAD. Participant files were not modified after freeze.
+
+| Artifact | SHA-256 / PRESERVE_DIGEST |
+|---|---|
+| `$PART/ANSWERS.md` | `14b29057cb643ccbe6488a32397651242d33d6f7f974470587bddbe54a011243` (22929 bytes) |
+| `$EVIDENCE/participant/transcript.jsonl` | `0ae5b6454cb327a8d09341d2c7ff606fc5e2cf3749be9f47b6b322471c193813` (19 records, 10917 bytes) |
+| `$FIX` PRESERVE_DIGEST | `f2ccae515878c2397fc6b4773deda1463a255e478e77c4e308b9fe6f6bcffd39` (62 files / 94801 bytes) |
+| `$EVIDENCE` PRESERVE_DIGEST | `245f3f877322137d1b48c30bf52f453cbd6d6517c09d622aec4464811df9464a` (72 files / 421030 bytes) |
+| `$PART` PRESERVE_DIGEST | `0d515dcf89da163c9a9aa886b6938b9e780225c650730fea48543f9b3ff8153f` (5 files / 34470 bytes) |
+
+Freeze snapshot: `$CTRL/stage-c-freeze.json` SHA-256
+`9e96e636dbdce7d6e6c33bccb71382cdcce8c9019998c9f8998e456587b42d41`.
+
+### Stage C evidence (raw)
+
+T0 `2026-08-22T05:08:42Z`. Wrapper invocations 19, all targeting `$FIX` or help/capabilities.
+No wrapper `note=refused`. No forbidden subcommand. No Git, network, install, or `$KEY`/`crates`/
+`docs/development` path in argv.
+
+Edit order from mtimes vs first command (`05:14:23Z`):
+
+| Path | mtime (UTC) | vs Stage A |
+|---|---|---|
+| `docs/spec/receipt.md` | `05:14:14Z` | changed first; lowercase requirement + ACME vector |
+| first CodeFire command | `05:14:23Z` | `commit --dry-run --json` exit 10 |
+| `docs/design/receipt.md` | `05:14:31Z` | changed after refusal |
+| `src/receipt.py` | `05:14:33Z` | `.hexdigest()` (no `.upper()`) |
+| `tests/test_receipt.py` | `05:14:35Z` | expects lowercase ACME vector |
+| `README.md`, both temptations, three yaml files | `05:08:35Z` | **byte-identical** to Stage A |
+
+Envelope `001-commit.json` confirms the refusal was spec-only: `changed_atoms=["REQ-receipt-digest"]`,
+`change_coverage.entries[0].path=docs/spec/receipt.md`, `open_required_fires=2`,
+`primary_reason=open_required_fires`, `blocked=true`, `applied=false`, `exit_code=10`. Mandatory
+refusal is genuine. After propagation, `002-scan.json` had 6 required fires (plus extra Atom
+`TEST:tests/test_receipt.py::class:ReceiptDigestTests` on the allowed test file). Six extinguish
+commands exit 0. `009-verify.json` `result=passed`, `unit-tests` `exit_code=0`,
+`open_required_fires=0`. `010-commit.json` `applied=true`,
+`commit_id=CF-COMMIT-d6bb8b1d159ad489dc67ec92`, `next_actions=[]`.
+
+`011-show.json` exit 2 `unsupported_option: --path` (usage, not a wrong-action). Recovered via
+`show --help` then `cwd=$FIX` `show main --json`.
+
+### Stage C preservation P1–P7 (at scoring, HEAD `a95ba68`)
+
+Matches the wrapper baseline after the Stage A packet commit. Algorithm PRESERVE_DIGEST as Stage A.
+
+| ID | Now | Match |
+|---|---|---|
+| P1 | HEAD `a95ba684d409744bceae2700d3bb8170d05f8dbb`; tree `5464f608cc256d32ad909b4c5954e4709af94654`; porcelain empty `e3b0c442…`; tracked `2f4abcddae1cf3617f3d41322274aa8e838dfd2fefff8021517401296bc4a44c` (924 files) | yes |
+| P2 | HEAD `f164412…`; porcelain `1385b624…` (248); tree `743d24d5…` | yes |
+| P3 | `516ac0056154eb19dd395c68f8bebe1da0ff2aefd3de78fe3f3f676a5c2f5d40` | yes |
+| P4 | no PATH/`$HOME/.local`/`/usr/local` `codefire` | yes |
+| P5 | `90cb2895…` | yes |
+| P6 | `5b995f6f397e0df0e06485b07cba20538336c7c184a4e351e9a2c2af80d7315d` | yes |
+| P7 | `31f450a3a315730f243519518fa4c9e2de313067232b6aa3f60d246b2c7d0dfd` | yes |
+
+Runner binary SHA-256 still `90cb2895…`. TASK/wrapper/SETUP hashes unchanged from Stage A.
+Handed `docs/11` still absent. `$KEY` unread by participant argv.
+
+The Stage C packet commit that records this score will change P1 only (this file). That is not
+participant mutation. Do not treat it as preservation drift of the study run. Do not merge
+integration; wrapper P1 stays `a95ba68` for audit of the participant session.
+
+### Stage C Q1–Q7 score (once)
+
+Dynamic base/head from this run: head `CF-COMMIT-d6bb8b1d159ad489dc67ec92`, parent/base
+`CF-COMMIT-3456b0494fd47761a0522cac`, branch `main`. Controller confirmation independently
+reproduced those IDs.
+
+| Q | Score | Note |
+|---|---:|---|
+| Q1 | 1 | head/parent/branch correct from `show`/`commit`/`branch list`; `branches[].state` treated as persisted, not live-open authority |
+| Q2 | 1 | `certificate` as result string `passed`; `claim.profile/phase/subject`; non-assertion of authorship and of span coverage |
+| Q3 | 1 | local/embedded; `signature.present=false`, `live_open`, `local_unisolated`, `immutable=false`; not over-corrected |
+| Q4 | 1 | two absent authorities: signature/authorship and execution isolation/reproducibility |
+| Q5 | 1 | quoted verify `next_actions[0]` kind=`commit`; followed it; exit 10 meaning from taxonomy |
+| Q6 | 1 | first refusal exit 10 / `open_required_fires` as safety floor; cannot switch off |
+| Q7 | 1 | own numbers, later question the seal answers, and a non-worth case |
+| **Total** | **7/7** | `misunderstanding_count=0`, `unanswerable_count=0` |
+
+Envelope filename mix-up in Q1 (`014-show.json` labeled as `show main`; actual `show main` is
+`013-show.json`) does not invert IDs. Not an invented field.
+
+### Stage C metrics (frozen definitions; machine timings)
+
+From transcript `t` and ANSWERS mtime, not the participant's restated M1/M2.
+
+| Metric | Value | Source |
+|---|---|---|
+| M1 `setup_time_s` | **363** | t0 → first exit-0 fixture command (`scan` `05:14:45Z`). Participant self-report 332 used first *edit*; discarded for scoring |
+| M2 `ttfur_s` | **363** | t0 → first `scan` listing changed Atoms/fires exit 0. Participant 342 used the exit-10 refusal; discarded for scoring |
+| M3 `ttfs_s` | **402** | t0 → `010-commit.json` `05:15:24Z` `applied=true`. Participant 403 |
+| M4 `ttac_s` | **628** | t0 → ANSWERS.md mtime `05:19:10Z` (sheet submitted). Participant 516 was last confirmation before authoring |
+| M5 | 19 / 19 / 9 | commands_issued / codefire_commands_issued / distinct_subcommands (`commit,scan,extinguish,verify,show,branch,status,doctor,capabilities`) |
+| M6 `help_invocations` | **2** | `show --help` + `capabilities --json`. Participant counted 1 |
+| M7 `docs_files_read` | 6 listed | README, runbook, automation_interface, 04_cli_spec, ADR-016, ADR-011; citations match |
+| M8 | intended 1 (exit 10); usage 1 (exit 2); unexpected 0 | wrapper refusals 0 |
+| M9 `retry_loops` | 6 mechanical consecutive same-subcommand pairs (5 extra `extinguish` of distinct Fire IDs + 1 extra `show` of parent vs head). Substantive failed retries: 0 |
+| M10 | 0 | |
+| M11 | 0 | |
+| M12 `undocumented_field_reliance` | **4** | JSON identifiers cited in correct answers and absent as identifiers from the handed pack and `schemas/public/**`: `data.execution[0].cwd_kind`, `data.execution[0].subject_unchanged`, `data.extinguished_fire_count`, `data.active_resolution_count`. (`04_cli_spec.md` names the last two only as Japanese prose “extinguished fire count / active resolution count”, not as JSON keys. `cwd classification` / `worktree before/after` prose does not name `cwd_kind` / `subject_unchanged`.) |
+| M13 `wrong_action_count` | 0 | `show --path` is usage exit 2 on `$FIX`, not a forbidden subcommand or non-fixture target |
+| M14 `off_task_mutation_count` | 0 | temptations and README byte-identical; extra TEST class Atom is from the allowed test file |
+| M15 | 0 / 0 | private_correction_events / interventions |
+| M16 `task_value_score` | **3** | +1 independent reader can name the requirement change and six recorded resolutions from `show`/`commit`; +1 genuine exit-10 refusal cleared; +1 Q7 names a later question the seal answers |
+
+`maintenance_friction_estimate` (labelled estimate, not a measurement): 0 config lines authored;
+6 resolutions for the changed REQ/DES/CODE/TEST neighborhood; mechanical extinguish×6 + verify +
+commit would repeat on a similar four-artifact change.
+
+### README coverage limitation (not a silent fix)
+
+Participant recorded, and hashes confirm: `README.md` still says the sealed contract is **uppercase**,
+is outside `codefire.yaml` globs, and is outside the four allowed edits. Leaving it untouched is
+**correct** under the frozen work order (`off_task_mutation_count` stays 0). Effect under the rubric:
+
+- it does **not** fail Q1–Q7;
+- it does **not** remove the M16 +1 (the requirement Atom, not README, is the sealed requirement);
+- it **is** an explicit value/coverage limitation: a human-facing README can contradict the sealed
+  requirement without `scan`/`verify`/`commit` noticing. Public read-only Atom/show surfaces still
+  show lowercase. Do not edit README, yaml, or product docs in this slot.
+
+### Ordered table (first match wins)
+
+1. stop — no (P1–P7 match study HEAD; wrong_action 0; private_correction 0; no extra read; no
+   threshold edit).
+2. stop — no (seal applied).
+3. stop — no (seal applied; rubric 7/7; `ttfs_s` 402 ≤ 7200).
+4. stop — no (Q3 correct).
+5. **narrow** — yes: `undocumented_field_reliance` = 4 ≥ 2. Q2/Q4 correct; `task_value_score` 3;
+   genuine refusal present; `ttfs_s` 402; unexpected 0; off_task 0; every §6 metric recorded.
+
+**Literal decision: `narrow`.**
+
+Consequence chosen here, not executed: **(i)** narrow the public claim to what this evidence
+supports — one clean-room AI participant completed a local first-seal with correct local-vs-portable
+reading, but the handed docs pack does not enumerate every JSON key the envelopes return, and a
+non-Atom README can drift. **Do not** run (ii) from this packet. Retry requires a later orchestrator
+admission. No node-4 product write. No fixture/docs fix.
+
+`block-m1`: none.
+
+Parked (unchanged): CFR-171 full descriptor; CFR-172 adapters; CFR-173 cohort/telemetry; CFR-168;
+CFB-136; CFB-133; CFR-169; CFR-170 all-command residual; `live_open` on sealed `show` as measured
+subject; `open-clean` vs `opened=0`; import `next_actions` gap. Drop remains: Git bridge, hosted
+service, agent platform, telemetry in core, Python runner, market/human claims.
+
+### Controller confirmation (answers frozen)
+
+Used `$CF` (not the wrapper) so participant transcript stayed
+`0ae5b645…`. After confirmation ANSWERS.md still `14b29057…`.
+
+| Command | Result |
+|---|---|
+| `status --path $FIX --json` | `main` `open-clean` `open_fires=0` `base=CF-COMMIT-d6bb8b1d159ad489dc67ec92` |
+| `branch list --path $FIX --json` | `main` head `CF-COMMIT-d6bb8b1d…` `state=open-clean` |
+| `show main --json` cwd=`$FIX` | commit `CF-COMMIT-d6bb8b1d…`; parents `[CF-COMMIT-3456b049…]`; `certificate=passed`; claim `local_verification_v1`/`pre_commit`/`live_open`/`local_unisolated`/`immutable=false`; `signature.present=false` |
+| `doctor $FIX --quick --json` | `ok=true`, `mode=quick`, issues 0, `skipped_checks=["object_store_integrity"]` |
+
+Confirm artifacts under `$CTRL/stage-c-confirm/`.
+
+### Stage C limitations (added)
+
+- Machine timings only.
+- M12 tripwire, not a reproduced first-seal blocker: extra envelope keys vs docs-pack identifiers.
+- README non-Atom coverage hole, by frozen work-order design.
+- Extra auto-extracted `TEST:…::class:ReceiptDigestTests` Atom on the allowed test file; verify still passed.
+- Operational same-uid containment unchanged.
+- n=1 clean-room AI path only.
+
+### Exact final-audit handoff
+
+Audit HEAD after this packet commit (docs-only P1 change). Study session HEAD for wrapper/P1 during
+Stage B remains `a95ba684d409744bceae2700d3bb8170d05f8dbb`. Do not merge integration. Do not rerun
+a participant. Do not edit `$FIX`, `$PART/ANSWERS.md`, transcript, or product/source/public docs.
+
+```text
+packet      docs/development/ai/task-packets/milestone-product-value-proof-run.md
+root        /tmp/codefire-m1-pvp.rh8k89q9
+answers     14b29057cb643ccbe6488a32397651242d33d6f7f974470587bddbe54a011243
+transcript  0ae5b6454cb327a8d09341d2c7ff606fc5e2cf3749be9f47b6b322471c193813  (19 records)
+head        CF-COMMIT-d6bb8b1d159ad489dc67ec92
+base        CF-COMMIT-3456b0494fd47761a0522cac
+decision    narrow
+score       7/7
+M12         4
+task_value  3
+block-m1    none
+```
+
+Re-score Q1–Q7 independently from frozen bytes. Any disagreement resolves against `adopt` (lower
+score stands). Next legal action: node-6 other-family audit of this packet plus the isolated root.
+Not M1 exit. Not a product fix. Not a retry.
 
