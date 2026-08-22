@@ -1,6 +1,6 @@
 # AI Task Packet
 
-Status: rerun-consumer-ready
+Status: completed
 
 Packet ID: MS-adoption-wedge-run
 
@@ -954,3 +954,283 @@ Then rerun Stage C: score once against key `cea8bee0…`, recompute
 `undocumented_field_reliance` against the 14-file pack, and apply the unchanged section-6 table in
 order. This is the last retry the `narrow` contract allows, so its outcome is terminal `adopt` or
 `stop`. Do not launch a second consumer, do not alter thresholds, and do not widen product scope.
+
+### Post-B1 rerun Stage B — completed
+
+One fresh Grok 4.6 session, no first-run context, no subagents, no web, only the R.11 launch prompt,
+no maintainer clarification. It ran C1–C5 once each, did not use C6, wrote the answer, and stopped.
+
+```text
+answer            $ROOT2/evidence/consumer-answer.json
+answer sha256     fea6223d2a4394e1822f8636d4649288e1b47fcd8d3e3420e75a90edc9247113   (5229 bytes)
+answer mtime      2026-08-22T03:24:22Z
+frozen copy       $CTRL2/stagec/consumer-answer.frozen.json  (same digest, taken before scoring)
+transcript bundle d74af2d40744300292a8f16f6b4cd809b4595d971ec7c1e8553ace26ba5305dc   (21 files)
+labels            C1, C3, C2, C4, C5 — one each; C6 unused; seq ended at 5; zero refusals
+```
+
+| seq | label | start | cwd | duration | exit | preserve |
+|---|---|---|---|---|---|---|
+| 1 | C1 | 03:21:00Z | `$ROOT2` | 4ms | 0 | `PRESERVE=OK` |
+| 2 | C3 | 03:21:00Z | `$FIX2` | 1815ms | 0 | `PRESERVE=OK` |
+| 3 | C2 | 03:21:00Z | `$FIX2` | 1849ms | 0 | `PRESERVE=OK` |
+| 4 | C4 | 03:21:00Z | `$FIX2` | 1683ms | 0 | `PRESERVE=OK` |
+| 5 | C5 | 03:21:58Z | `$FIX2` | 1808ms | 0 | `PRESERVE=OK` |
+
+Four commands share a start second because they were issued concurrently; each recorded independently.
+This consumer ran C5 on the parent commit, so all five stdout digests are byte-identical to the sealed
+key derivation — it saw exactly the envelopes the key was derived from.
+
+### Post-B1 rerun Stage C — completed. Score 7/7. Literal decision **adopt**.
+
+#### S.1 Integrity of the scoring inputs
+
+```text
+harness sha256           5c7558a901835aec0056f5558fbce86cef5c897a5f8076208f70faf61f3458cf   unchanged
+task sheet sha256        776a9a45b9e1404ed9c895ddd9300e4eb22f4a0fc8238e684ab31e79e5122cd2   unchanged
+answer template sha256   e414421998f1a60fbf465ace98b565c08954599c19a7920496bcbf26bcae6e7c   unchanged
+setup metadata sha256    62faafe21af6af1967ca52811c99d45057187208a3c319b9313f502656f9616c   unchanged
+docs pack digest         813edc85203a97b58e5efc56129db467723a16d8f61fed8e792369badde6fd7a   unchanged, 14 files
+fixture members digest   cccd8814a66dd3236c4a85e5752ab7bb6aa8ea09db2e74d35ab1a53998c07452   unchanged, 2900 files
+answer key sha256        cea8bee0ceeac21822cf6327dcf2b783450de4025d82af53be191c0616eff7b7   unchanged
+```
+
+The key predates the answer and was not opened during Stage B: rerun key `mtime 03:12:13Z`,
+`atime 03:16:53Z` (the Stage A final gate), first consumer command `03:21:00Z`, nothing new under
+`$KEY2` after `03:17Z`. The first-run key and answer were not touched either — their access times are
+still `02:16:44Z` and `02:25:57Z`, from the first run's own session. The 22 files that appeared under
+`$CTRL2` are the harness's own mirror, `seq`, and `preserve-*` logs, all byte-identical to the
+consumer-visible copies (`MIRROR_MATCH` on all five envelopes).
+
+#### S.2 Gate results
+
+```text
+exact-token forbidden scan over all five *.argv        NONE
+  (init import open close discard clone scan fire extinguish verify commit merge upload
+   request-merge request-review request-apply gc serve evidence link patch migrate
+   --idempotency-key, /workspace/project, and any first-run root path)
+argv[0] == codefire on every line                      true
+subcommands used                                       branch, capabilities, doctor, show
+subcommands outside the frozen set                     NONE
+harness refusals during Stage B                        0
+files created in $ROOT2                                evidence/consumer-answer.json + 21 transcript files, nothing else
+files created outside $ROOT2 by the consumer           none attributable; harness mirror only
+new files under $KEY2                                  0
+fixture file count                                     2900, unchanged — no lock file, no write of any kind
+answer-value leak gate, re-verified post-run           TASK.md / template / harness / setup-metadata all clean
+first-run and key-root references in handed tree       0 / 0
+```
+
+Read-boundary honesty, unchanged and restated: `$CTRL2` and `$KEY2` share the consumer's uid, so
+absence of an outside read is evidenced, not enforced. The evidence — both keys' access times
+predating the first command, zero new files under `$KEY2`, no key path reachable from `$ROOT2`, the
+first-run digests intact, and an answer whose every claim reproduces from the five recorded envelopes
+alone — is consistent with no outside read, and no evidence of one exists. No stronger claim is made.
+
+#### S.3 Citation audit
+
+All **23** distinct cited field paths resolve against the recorded envelopes: **23 resolve, 0
+unresolvable, 0 fabricated**, and every cited value matches what the consumer asserted.
+
+#### S.4 Score — one pass against key `cea8bee0…`
+
+| Q | Result | Basis |
+|---|---|---|
+| Q1 | **correct** | root `/tmp/m1-adopt2-root.N622xo/repo`, branches 8, opened 0; `objects_checked=0` cited from C2, which the key accepts because quick mode skips `object_store_integrity` |
+| Q2 | **correct** | all 8 decoded branch names, no extras |
+| Q3 | **correct** | `CF-COMMIT-2792b54ad730e6d644668c38` |
+| Q4 | **correct** | `CF-COMMIT-373468dbaf827a6cc2bae9a4`, single parent |
+| Q5 | **correct** | `certificate=passed`; claim class `embedded/local`; justified by **both** admissible routes — `signature.present=false` with `summary "(none)"`, and the newly documented `claim` object (`result=passed`, `profile=local_verification_v1`, `phase=pre_commit`, `subject.trust_kind=local_unisolated`) |
+| Q6 | **correct** | two distinct pool entries, each cited: absent signed/portable commit-signature authority, and absent `sealed-snapshot-v1` semantic proof on the 7 feature heads, with `main` correctly excluded from that warning set |
+| Q7 | **correct** | `inspect_legacy_branch_profile`, `ready=false`, justified by the omitted `execution` object rather than by a `ready:false` flag |
+
+```text
+score                   7 / 7
+Q5                      correct
+Q6                      correct
+misunderstanding_count  0
+unanswerable_count      0
+```
+
+One imprecision is recorded without penalty, because the accept clause governs and thresholds may not
+be changed after seeing data: Q5's sub-argument "it is not legacy/unproven because `claim.profile`,
+`claim.phase`, and `claim.subject` are present rather than omitted" is not the real discriminator —
+the legacy/unproven distinction comes from doctor's semantic-profile warnings, not from claim-field
+presence. The consumer nonetheless drew the correct conclusion by the required route
+(`signature.present=false` plus the claim object) and separately got the warning-set exclusion right
+in Q6, and the key's accept clause explicitly makes the legacy observation strengthening but not
+required. It is a reasoning wobble inside a correct answer, and worth the next reviewer's attention.
+
+The `claim_scope_explanation` is accurate and narrow, and it correctly named both non-claims of the
+quick pass. Neither the unchanged `open-clean`-versus-`opened=0` hazard nor the new
+`claim.subject.kind=live_open` hazard fired: the consumer wrote that the run "did not prove any live
+open directory (`checked.opened` is 0)" and described the subject as the worktree that was committed.
+
+#### S.5 Metrics
+
+Observed values come from harness records and filesystem timestamps and are authoritative.
+
+| Metric | Observed | Threshold |
+|---|---|---|
+| `setup_time_s` | 249 (handover seal 03:16:53Z → first exit-0 command end 03:21:02Z) | — |
+| `ttfur_s` | 249 (first useful result = C2) | ≤ 900 — **pass** |
+| `ttac_s` | 449 (→ answer written 03:24:22Z) | ≤ 3600 — **pass** |
+| `commands_issued` | 5 | — |
+| `off_contract_invocations` | 0 | = 0 — **pass** |
+| `wrong_action_count` | 0 | = 0 — **pass** |
+| `misunderstanding_count` | 0 | — |
+| `unanswerable_count` | 0 | — |
+| **`undocumented_field_reliance`** | **0** | ≤ 1 — **pass** |
+| `docs_pack_files_read` | 14 (the whole pack, self-reported) | — |
+
+Self-reported timestamps are close and not used for scoring: `started_utc 03:18:00Z` is 67s after the
+handover seal (plausible, unlike the first run's pre-handover value), and `submitted_utc 03:24:30Z` is
+8s later than the observed mtime. Every timing threshold passes under either reading.
+
+`undocumented_field_reliance`, recomputed mechanically against the **14-file** pack by indexing every
+field path the handed schemas bind and classifying each cited path:
+
+```text
+distinct cited field paths                 23
+documented / schema-bound                  23
+UNDOCUMENTED relied on                      0
+undocumented payload families               0
+consumer self-reported                      0   (agrees with the mechanical count)
+```
+
+**The B1 contracts eliminated first-run reliance completely.** Every path the first-run consumer had to
+rely on undocumented is now schema-bound:
+
+| path | first run | after B1 |
+|---|---|---|
+| `.data.branches` | undocumented | `codefire.branch_list.v1` |
+| `.data.show.commit` | undocumented | `codefire.show_result.v1` |
+| `.data.show.parents` | undocumented | `codefire.show_result.v1` |
+| `.data.show.certificate` | undocumented | `codefire.show_result.v1` |
+| `.data.show.signature` / `.present` | undocumented | `codefire.show_result.v1` |
+| `.data.show.target` | undocumented | `codefire.show_result.v1` |
+
+Independently validated during derivation: C4/C5 validate against `show-result-v1`, C3 against
+`branch-list-v1`, C1 against `capabilities-v1`, whose `command` object is `additionalProperties: false`
+and now carries `data_schema`, so `capabilities` distinguishes the two payloads that it could not
+distinguish in the first run.
+
+#### S.6 Original frozen table, applied in order — first match wins
+
+Thresholds are the first run's, unchanged. No clause was reinterpreted after seeing data, and no
+literal result was coerced in either direction.
+
+| Row | Decision | Match | Evaluation |
+|---|---|---|---|
+| 1 | stop (terminal) | no | no drift; `wrong_action_count=0`; no clarification; no evidenced outside read |
+| 2 | stop (terminal) | no | score 7 > 3; `ttac_s` 449 ≤ 7200 |
+| 3 | narrow | no | Q5/Q6 both correct → clause 1 false; **`undocumented_field_reliance` 0, so the ≥2 clause is false**; `ttac_s` 449 ∉ (3600, 7200] → clause 3 false |
+| 4 | **adopt** | **MATCH** | score 7 ≥ 6, Q5 correct, Q6 correct, `ttfur_s` 249 ≤ 900, `ttac_s` 449 ≤ 3600, `off_contract_invocations` 0, `wrong_action_count` 0, `undocumented_field_reliance` 0 ≤ 1 |
+| 5 | narrow | not reached | fallback |
+
+**Literal decision: `adopt`.** The single clause that forced `narrow` on the first run —
+`undocumented_field_reliance` 7 against a ceiling of 1 — is now 0. Nothing else about the subject, the
+commands, the questions, the accept clauses, or the thresholds changed, so the difference between the
+two runs is attributable to the B1 schema binding and to nothing else.
+
+#### S.7 Terminal consequence — this was the last permitted rerun
+
+The `narrow` contract permitted exactly one identical rerun, and this was it. The decision is therefore
+**terminal**: the read-only sealed-inspect surface is an adoption wedge that a source-blind consumer
+can use correctly, from documented and schema-bound public fields alone, in under five minutes, with
+zero mutation and zero off-contract commands.
+
+Precommitted `adopt` consequences, applied exactly and no further:
+
+```text
+record the read-only sealed-inspect surface as a proven adoption wedge;
+admit ONLY the B1 slice, which is already landed at 0f5e9f9 + 6a80adb and is now measured as
+  sufficient — no follow-up product work is authorized by this result;
+do NOT promote a new command, adapter, thin client, Git bridge, telemetry, or agent surface;
+do NOT widen to the full CFR-171 cross-surface descriptor;
+no further rerun, no second consumer, no threshold change.
+```
+
+**`block-m1`: none.** B1 was the only `block-m1` on this path; it is landed, and the rerun measured it
+as closed at the consumer's own hands. No new blocker was found in Stage B, Stage C, or node 5.
+
+#### S.8 Issue placement after the terminal decision
+
+| Issue | Disposition | Basis |
+|---|---|---|
+| CFR-171 | **satisfied at the admitted slice; nothing further admitted** | The bounded slice (`codefire.show_result.v1`, `codefire.branch_list.v1`, per-command `data_schema`) is landed and measured sufficient: reliance went 7 → 0 with no other change. The full cross-surface descriptor stays out of scope and unadmitted. |
+| CFR-172 | **terminal `adopt` recorded** | The read-only sealed-inspect adoption path completed twice with before/after hashes and zero mutation, and the second run cleared every precommitted threshold. No thin adapter, new surface, or Git bridge was added or is authorized. |
+| CFR-173 | **bounded slice satisfied; otherwise parked** | The ten metrics, seven-item rubric, and ordered thresholds were applied unchanged across both runs. No cohort replay, Fire-actionability protocol, metric calculator, or telemetry. |
+| CFR-168, CFB-136, CFB-133, CFR-169, CFR-170 | **unchanged, backlog parked** | Not reproduced by either run. |
+| contract `park` P1–P5 | **unchanged and still parked** | **P2 stands and must not be inherited**: the audited runner was handed to the consumer, so neither run proves toolchain-free adoption. P1 (Python CLI has no `--json`), P3 (`context --branch` doc/help divergence), P4 (no `data` schema for commands outside the B1 slice), P5 (`request-list` `applied_head`) all remain parked. |
+
+Two comprehension hazards are recorded for the audit as **`park`**, not as blockers, since neither
+fired and neither is on the adopted path's critical claims:
+
+1. `branch list` reports `main` `state=open-clean` while `doctor` reports `opened=0` / `active_files=0`,
+   and `doctor` does not flag the combination. Both consumers avoided it; the trap remains.
+2. `show`'s new `claim.subject.kind=live_open` with `immutable=false` on a sealed commit in a closed
+   repository is the historical commit-time subject, not current state. This hazard was created by the
+   B1 fix and did not exist in the first run.
+
+#### S.9 Node 5 — distinct read-only confirmation, answer bytes frozen
+
+Run controller-side after scoring, same runner and cwd, into `$CTRL2/stagec/confirm`, without the
+harness and without touching the consumer transcript (`seq` still 5, 21 files).
+
+```text
+confirm bundle digest  41c445bf5b3ec70f7057ad4a01f19ca5efe6f97ea1798b4f47d4eedad73ad2f1
+answer sha256 before   fea6223d2a4394e1822f8636d4649288e1b47fcd8d3e3420e75a90edc9247113
+answer sha256 after    fea6223d2a4394e1822f8636d4649288e1b47fcd8d3e3420e75a90edc9247113   FROZEN
+```
+
+| command | exit | stderr | vs consumer transcript | vs sealed key |
+|---|---|---|---|---|
+| `doctor $FIX2 --quick --json` | 0 | empty | **byte-identical** | **byte-identical** |
+| `branch list --path $FIX2 --json` | 0 | empty | **byte-identical** | **byte-identical** |
+| `show main --json` | 0 | empty | **byte-identical** | **byte-identical** |
+| `show CF-COMMIT-373468dbaf827a6cc2bae9a4 --json` | 0 | empty | **byte-identical** | **byte-identical** |
+
+Terminal facts re-derived independently: repo `/tmp/m1-adopt2-root.N622xo/repo`; branches 8 / opened 0;
+`issue_counts {blocking:0, total:7}`; head `CF-COMMIT-2792b54ad730e6d644668c38`; parents
+`["CF-COMMIT-373468dbaf827a6cc2bae9a4"]`; `certificate "passed"`; `claim {result:passed,
+profile:local_verification_v1, phase:pre_commit, subject:{kind:live_open, trust_kind:local_unisolated,
+immutable:false}}`; `signature.present false`; `branch main state "open-clean"`; one next action
+`inspect_legacy_branch_profile` with no `execution` key; C5 commit/parents consistent. Every scored
+answer reproduces from this independent pass.
+
+Preservation recheck after the confirmation — **all 25 values, `NODE5_PRESERVATION=PASS`**:
+
+```text
+canonical (14)  git_head f1644122…  porcelain 248  repo_json bf6d978b…  branches_main bfd52e35…
+                branches_rollup 8fba5dcb…  opened_main 5721d710…  active_state 54ecb285…
+                .codefire-open 60b133b3…  objects 2891 / 114921765  no_codefire_server 0
+                store_all_files e5f6f7c2…  store_file_count 2904  store_bytes 114968174
+remote (3)      .TaHMir 87746102…  a2.zvrbzn d2ee53b3…  a3.VbZTZ8 3fdd2867…
+first run (4)   answer 187812d6…  key b5996cff…  transcript 83a3f915…  confirm 6e4f4649…
+rerun (4)       fixture_members cccd8814…  fixture_file_count 2900  docs_pack 813edc85…
+                answer_key cea8bee0…
+```
+
+No CodeFire command was issued against any canonical path in Stage B, Stage C, or node 5. The consumer
+answer was never modified, no second consumer was run, and no product scope was broadened.
+
+#### S.10 Validation and next legal action
+
+```bash
+python3 docs/development/tools/check_project_docs.py
+python3 docs/development/tools/check_ai_acceleration_docs.py
+git diff --check
+```
+
+All three pass. Write set is this packet only. No build, product test, import, Git bridge, live
+workspace command, dogfood mutation, or later-slot gate.
+
+Next legal action: **node 6, a fresh other-family independent audit** (`ai/audit-latest.md`, that file
+only) of the terminal `adopt`. It should verify the score against key `cea8bee0…`, the mechanical
+`undocumented_field_reliance = 0` against the 14-file pack, that the ordered table was applied without
+threshold change or coercion, that the one-rerun limit was honored, the byte-identity of the three
+independent C2–C5 passes, all 25 preservation values including the four first-run digests, and the
+absence of a Git bridge, mutation authority, telemetry, or agent-orchestration dependency. Then node 7
+may exit M1 and shift slots. Do not start any parked root, do not widen CFR-171, and do not treat
+either run as evidence of toolchain-free adoption (`park` P2).
