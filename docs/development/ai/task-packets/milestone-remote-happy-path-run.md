@@ -1,6 +1,6 @@
 # AI Task Packet
 
-Status: blocked (attempt 2)
+Status: ready (attempt 3)
 
 Packet ID: MS-remote-happy-path-run
 
@@ -18,7 +18,7 @@ This is node 4 of active M1. Node 3 admitted the run after both classifiers park
 
 ## Exact inputs
 
-- runner/public name: `/workspace/worktrees/ms-agent-local-contract-seam-20260821/target/release/codefire`, SHA-256 `207fae943c09c2f739611e37050cbc83f34d3b53318fcefaf9d7304ba03d708b`;
+- runner/public name: `/workspace/worktrees/ms-remote-happy-path-budget-20260821/target/release/codefire`, SHA-256 `70301c874d7220a71be988562df0e5188ede6a85c65c63dcbd3dcdee09f4706c`, source manifest SHA-256 `c59e8c229bc31e71b8b5d5b1adfaed7defd2557d0286d06efdb74dc664a274` (100 files), provenance SHA-256 `d87653d0a6e4a00216ab47816167744ce2e35c3df142a7ccd9810472d35e61d8`;
 - canonical copy source: `/workspace/project/subprojects/.codefire` (read-only);
 - local target alias: `base`, cloned from `feature/docs-doubling-plan` at `CF-COMMIT-d068d2c3995f6da0a0959b98`;
 - local source alias: `topic`, cloned from `feature/docs-full-doubling` at `CF-COMMIT-126555fdb84822a0c09c9e6a`;
@@ -87,6 +87,15 @@ No build, product test, installer, HTTP, scale test, Retrospect, or canonical do
 - next legal action: node 5 read-only evidence confirmation, preferably same session if no independence boundary requires otherwise.
 
 ## Result
+
+Attempt 3 is re-admitted after the bounded reporting fix and independent seam review. Product commits
+`726eae4` and `510a185` are integrated as `9d1aca1` and `babe14b`; the integration source tree is
+byte-identical to runner-bound `510a185` for Cargo/Rust inputs. Five focused regressions, fmt, clippy,
+source/project/AI docs checks, and `git diff --check` pass at integration HEAD `f6f9519`. Use a new
+isolated root, preserve both earlier roots, repeat the complete public sequence, and continue directly
+to a distinct node-5 read-only confirmation only if every node-4b gate passes.
+
+### Attempt 2 — historical blocker resolved for attempt 3
 
 Attempt 2 was re-admitted by the orchestrator after attempt 1 proved that the whole-directory copy
 retained canonical absolute paths. The retry changes only fixture materialization: sealed objects,
