@@ -77,11 +77,11 @@ M1 non-goals:
 ## M1 execution graph (current)
 
 ```text
-Critical path: independent operator verification/install/rollback -> final audit -> M1 exit
-Progress: nodes 1–5a completed; fresh source-bound candidate is atomically published under the isolated release root with internal-only rights fields
-Parallel now: none — node 5b is the independent fresh-operator lane
-Blocked: nodes 6–7 wait on operator verification and rollback evidence
-Next legal action: execute `milestone-release-operational-trust-run.md` Stage B once; no rebuild, external publication, or private correction
+Critical path: final audit -> M1 exit
+Progress: nodes 1–5b completed; fresh operator independently verified identity/rights/provenance, installed and smoked both CLIs in the isolated prefix, then rolled back to the empty prior with zero preservation drift
+Parallel now: none — node 6 is the fresh final-audit lane
+Blocked: node 7 waits on an `ACCEPT` / no-`block-m1` audit
+Next legal action: audit the retained release/source/evidence roots once; do not rebuild, reinstall, rerun, or publish
 ```
 
 ### Nodes
@@ -93,8 +93,8 @@ Next legal action: execute `milestone-release-operational-trust-run.md` Stage B 
 | 3 | Orchestrator fan-in and bounded rehearsal/fix admission | **completed** | Orchestrator | 1, 2 | `ai/task-packets/milestone-release-operational-trust-run.md` | board plus run packet | internal-only exact artifact set admitted; internal strategy doc removed; no node-4 fix |
 | 4 | Smallest reproduced release-contract fix, if any | **not required** | — | 3 | — | — | both lanes found none; no source/package/licence edit admitted |
 | 5a | Source-bound artifact build and isolated local publication | **completed** | persistent Grok node-2 session | 3 | `ai/task-packets/milestone-release-operational-trust-run.md` | isolated release root plus run packet | `76975ea` (integrated as `34ec8f5`); source `01a4de0`, provenance `7998bcf6…`, atomic current pointer, internal-only candidate root `/tmp/codefire-m1-release.vT1Uzs` |
-| 5b | Fresh operator verification, isolated install/smoke, and rollback | **ready** | fresh Claude Opus 5 operator | 5a | `ai/task-packets/milestone-release-operational-trust-run.md` | handed release root/evidence plus packet only | one pass; prefix/prior start empty |
-| 6 | Final independent audit | **blocked** | fresh other-family audit agent | 5b | `ai/audit-latest.md` | audit file only | — |
+| 5b | Fresh operator verification, isolated install/smoke, and rollback | **completed** | fresh Claude Opus 5 operator | 5a | `ai/task-packets/milestone-release-operational-trust-run.md` | handed release root/evidence plus packet only | `9ce0581` (integrated as `ff5eb39`); 11/11 checksums, provenance, 4/4 smoke, rollback to empty prior, reproducible T0/T1 preservation digest |
+| 6 | Final independent audit | **ready** | fresh Grok 4.6 audit agent | 5b | `ai/audit-latest.md` | audit file only | audit must adjudicate the parked legacy tree-digest-method gap |
 | 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
 
 Nodes 1 and 2 are independent: legal/source-identity evidence does not depend on the mechanical
