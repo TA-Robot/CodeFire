@@ -1,6 +1,6 @@
 # AI Task Packet
 
-Status: ready (attempt 3)
+Status: completed (attempt 3)
 
 Packet ID: MS-remote-happy-path-run
 
@@ -94,6 +94,250 @@ byte-identical to runner-bound `510a185` for Cargo/Rust inputs. Five focused reg
 source/project/AI docs checks, and `git diff --check` pass at integration HEAD `f6f9519`. Use a new
 isolated root, preserve both earlier roots, repeat the complete public sequence, and continue directly
 to a distinct node-5 read-only confirmation only if every node-4b gate passes.
+
+### Attempt 3 — node 4b passed, node 5 passed
+
+Node 4b verdict: **completed**, every gate passed. Node 5 verdict: **completed**, terminal state
+independently confirmed read-only. No `block-m1`. No product or source edit was made by this packet;
+CFR-168 and CFB-136 remain parked and untouched.
+
+The complete public sequence ran end to end — fixture admission through same-key `request-apply`
+replay, 20 node-4b commands plus 4 node-5 commands, **all exit 0** — and canonical preservation held
+after every one of the 24 commands.
+
+#### Roots and runner identity
+
+| Item | Value |
+|---|---|
+| Attempt-3 isolated root `$ROOT` | `/tmp/m1-remote-happy-path-a3.VbZTZ8` (**left in place**) |
+| Attempt-1 root | `/tmp/m1-remote-happy-path.TaHMir` — **preserved untouched** |
+| Attempt-2 root | `/tmp/m1-remote-happy-path-a2.zvrbzn` — **preserved untouched** |
+| Fixture `$FIX` | `$ROOT/repo` — copied `repo.json`, `objects/` (2891 files), `branches/` (8 files); empty `opened/`, `active/`, `cache/`, `idempotency/`, `locks/`, `remotes/`; materialized in 0.156s |
+| Remote `$REM` | `$ROOT/remote` → `$REM/.codefire-server/projects/org/app` |
+| Evidence | `$ROOT/evidence/` — `preserve.sh`, `step.sh`, `mr-id.txt`, `NN-<label>.{argv,json,meta,stderr}`, domain/authority manifests, node-5 digests |
+| Runner | `/workspace/worktrees/ms-remote-happy-path-budget-20260821/target/release/codefire` |
+| Runner SHA-256 rehashed at attempt-3 start | `70301c874d7220a71be988562df0e5188ede6a85c65c63dcbd3dcdee09f4706c` — matches the admitted input |
+| Provenance SHA-256 | `d87653d0a6e4a00216ab47816167744ce2e35c3df142a7ccd9810472d35e61d8` — matches; `base_revision 510a1855cb8753219aae416c6cbfea58f059415d`, `source_file_count 100`, `cargo 1.97.0`, `rustc 1.97.0`, `binary_sha256` equal to the rehash above |
+| Source-binding check run here | `git diff --quiet 510a185 f060842 -- Cargo.toml Cargo.lock crates .cargo rust-toolchain rust-toolchain.toml` → exit 0, so the integrated tree is byte-identical to the runner-bound revision for Rust inputs |
+
+One transcription nit, recorded because the packet's Exact inputs names it: the admitted
+`source_manifest_sha256` reads `c59e8c229bc31e71b8b5d5b1adfaed7defd2557d0286d06efdb74dc664a274`
+(62 hex characters), while the provenance file itself records the full 64-character
+`c59e8c229bc31e71b8b5d5d5b1adfaed7defd2557d0286d06efdb74dc664a274`. The binary and provenance digests
+both match exactly, so runner identity is proven; only the packet's copy of the manifest digest is
+short by one byte pair. Not a gate failure.
+
+#### Node-4b sequence — exact argv, exit, duration, preservation
+
+`$CF` = the runner above; `$P` = `cf:///tmp/m1-remote-happy-path-a3.VbZTZ8/remote/org/app`. Every
+command ran with `cwd = $FIX` through `evidence/step.sh`, which recorded argv/exit/duration and then
+reran all twelve canonical preservation checks.
+
+| # | argv (after `$CF`) | Exit | Duration | Preserve |
+|---|---|---|---|---|
+| 00 | preservation baseline | — | 10.4s | OK |
+| 01 | fixture copy + six empty layout dirs | 0 | 0.156s | OK |
+| 02 | `doctor $FIX --quick --json` | 0 | 1.481s | OK |
+| 03 | `branch list --path $FIX --json` | 0 | 1.778s | OK |
+| 04 | `clone feature/docs-doubling-plan base --dry-run --json` | 0 | 1.294s | OK |
+| 05 | `clone feature/docs-doubling-plan base --json` | 0 | 1.418s | OK |
+| 06 | `clone feature/docs-full-doubling topic --json` | 0 | 1.669s | OK |
+| 07 | `upload base $P/base --dry-run --json` | 0 | 1.918s | OK |
+| 08 | `upload base $P/base --json --idempotency-key m1-upload-base-001` | 0 | 11.571s | OK |
+| 09 | `upload topic $P/topic --json --idempotency-key m1-upload-topic-001` | 0 | 9.253s | OK |
+| 10 | `request-merge $P/topic $P/base --dry-run --json` | 0 | 3.912s | OK |
+| 11 | `request-merge $P/topic $P/base --json --idempotency-key m1-mr-001` | 0 | 11.676s | OK |
+| 12 | `request-list $P --json` | 0 | 6.524s | OK |
+| 13 | `request-review $P MR-748b80865110 --decision approve --reviewer m1-reviewer --dry-run --json` | 0 | 3.965s | OK |
+| 14 | `request-review $P MR-748b80865110 --decision approve --reviewer m1-reviewer --json --idempotency-key m1-review-001` | 0 | 9.710s | OK |
+| 15 | `request-apply $P MR-748b80865110 --dry-run --json` | 0 | 8.396s | OK |
+| 16 | `request-apply $P MR-748b80865110 --json --idempotency-key m1-apply-001` | 0 | 19.197s | OK |
+| 17 | `list $P --json` | 0 | 2.448s | OK |
+| 18 | `show $P/base --json` | 0 | 5.532s | OK |
+| 19 | `request-list $P --json` | 0 | 7.208s | OK |
+| 20 | `doctor $P --json` | 0 | 1.235s | OK |
+| 21 | `request-apply $P MR-748b80865110 --json --idempotency-key m1-apply-001` (replay) | 0 | 10.981s | OK |
+
+Fixture admission (command 02) passed the strict gate: `ok: true`, `exit_code: 0`,
+`issue_counts {total: 7, blocking: 0}`, `checked {branches: 8, opened: 0, active_files: 0}`, only
+`legacy_branch_head_semantic_profile` kinds, and **zero issues referencing any canonical path**.
+Command 07's dry-run wrote nothing — `$REM` still contained 0 files afterwards.
+
+MR identity was taken from JSON only, never from human output: `MR-748b80865110` read from
+`data.merge_requests[0].id` of command 12 and written to `evidence/mr-id.txt`. As in attempt 2, the
+`request-merge --dry-run` preview ID (`MR-4defb534902b`) differs from the live ID, confirming the
+preview is non-binding.
+
+#### Node-4b gate results — all five required gates pass
+
+| Required gate | Observed | Verdict |
+|---|---|---|
+| `request-list` status `applied` | command 19 → `data.merge_requests[0].status = "applied"` | **pass** |
+| `applied_head` correct | persisted MR record `applied_head = CF-COMMIT-126555fdb84822a0c09c9e6a`, equal to `data.plan.head` of commands 16 and 21, to `list`'s `base` head, and to `show`'s `commit` | **pass** |
+| `replayed: true` | command 21 → `data.plan.replayed = true` | **pass** |
+| `would_apply: false` | command 21 → `data.plan.would_apply = false` | **pass** |
+| empty `operations` | command 21 → `data.plan.operations = []`, and `next_actions = []` | **pass** |
+| no domain authority change across replay | per-file domain manifest byte-identical, see below | **pass** |
+
+The replay envelope in full:
+
+```json
+{"schema": "codefire.command_result.v1", "command": "request-apply", "ok": true, "exit_code": 0,
+ "repo": null, "diagnostics": [], "next_actions": [],
+ "data": {"type": "codefire_plan_result",
+   "plan": {"type": "codefire_operation_plan", "version": 1, "command": "request-apply",
+     "dry_run": false, "replayed": true, "would_apply": false, "operations": [], "next_actions": [],
+     "merge_request_id": "MR-748b80865110", "head": "CF-COMMIT-126555fdb84822a0c09c9e6a",
+     "target_branch": "base", "transport": "file",
+     "project_url": "cf:///tmp/m1-remote-happy-path-a3.VbZTZ8/remote/org/app"}}}
+```
+
+Attempt 2's first failure is therefore resolved: the replay now self-identifies, plans nothing, and
+still reports the correct applied head. `applied_head` is observable from the persisted record and from
+three independent public envelopes, but it is still not projected into `request-list --json`, whose
+per-MR shape remains `id` / `source_url` / `status` / `target_url`. Noted as an observation, not a gate
+failure — the gate asks that the applied head be correct, and every surface that reports it agrees.
+
+#### Replay proof — no domain authority changed
+
+Digests captured immediately before command 21 and again immediately after:
+
+```text
+domain file count (excluding *.lock.owner.json)   2361  ->  2361
+domain manifest digest                            a3db3bd4c91c0107a4acff98ad4cf81ab051a48cf93722433854693aeaba256f
+                                              ->  a3db3bd4c91c0107a4acff98ad4cf81ab051a48cf93722433854693aeaba256f
+diff -u of the two per-file manifests             no differences
+```
+
+Named authorities, byte-identical before and after:
+
+```text
+branches/base.json                                     d0cfe8b630ffbfdfb7604eab820c13a654c794d7aa7eb69f73ebdeae17def6fe
+branches/topic.json                                    b35881f6778d7843e93bcffbb1415369595c38b9dfa158568a9cce5945cd93d5
+merge_requests/MR-748b80865110.json                    5773ff49b1686c89a4a5debfff41308ba246347062f656e22f8483aec9c9531e
+gc_state.json (generation authority)                   22ed675a4e06b93f4cdc4b8a03c61569e0bc404d78dee0a4fd2144d050e87cb6
+remote_project.json                                    e69585db64cfa8232fa4e45d04f2aa330022a3bb7dd06a1e841e6c1bc72a8d75
+idempotency/v2/remote_request_apply/1d8dee1b….json     3bd8941544ff8720e67f95173791f0871851307989dc563b06dacd24cc62edf5
+```
+
+Exactly three files were touched in the replay window, all of them best-effort diagnostic lock owner
+sidecars, none a domain authority:
+
+```text
+locks/project-gate.lock.owner.json
+.bootstrap-locks/project-a0d68a1f….lock.owner.json
+.bootstrap-locks/bootstrap-namespace.lock.owner.json
+```
+
+The whole-tree digest including those sidecars is `cd297e881f7b5d279e23a1162ba07dd27440d6587597ac1f38ce93dd3770ea6f`.
+Stated explicitly so the distinction between domain state and lock diagnostics is on the record rather
+than hidden inside an aggregate.
+
+#### Node-5 — distinct read-only terminal confirmation pass
+
+Separate pass, run after node 4b closed, using only public JSON read commands. **No mutator was
+issued.** Every command ran through the same harness with a full canonical preservation sweep.
+
+| # | argv (after `$CF`) | Exit | Duration | Preserve |
+|---|---|---|---|---|
+| n5-01 | `list $P --json` | 0 | 2.066s | OK |
+| n5-02 | `show $P/base --json` | 0 | 6.089s | OK |
+| n5-03 | `request-list $P --json` | 0 | 7.215s | OK |
+| n5-04 | `doctor $P --json` | 0 | 1.691s | OK |
+
+Node-5 non-mutation proof — digests taken before n5-01 and after n5-04:
+
+```text
+remote domain digest   a3db3bd4c91c0107a4acff98ad4cf81ab051a48cf93722433854693aeaba256f  (unchanged)
+fixture repo digest    73cf173cbcc9af60a6a926ca281da0ba388a783559c918156138bc7a5c0d7f2e  (unchanged)
+```
+
+Node-5 observed identities:
+
+```text
+n5-01  data.type codefire_remote_branch_list, version 1
+       base   head CF-COMMIT-126555fdb84822a0c09c9e6a
+       topic  head CF-COMMIT-126555fdb84822a0c09c9e6a
+       data.page codefire_page v1 | returned 2 | total 2 | next_cursor null
+                 snapshot sha256:3d24e232f150aef3040f1b0f5c6ac20f52c33a2cd8ba05186320422b717a121c
+n5-02  data.type codefire_show_result, version 1
+       commit CF-COMMIT-126555fdb84822a0c09c9e6a | certificate passed
+       parents ["CF-COMMIT-06cc1476157f99de1e437519"]
+       message "Complete algorithm documentation doubling" | atoms 793 | files 183
+       label  cf:///tmp/m1-remote-happy-path-a3.VbZTZ8/remote/org/app/base@CF-COMMIT-126555fdb84822a0c09c9e6a
+       roots  atom_index CF-ATOMINDEX-24f628bb0d9a72dba6061301 | content_manifest CF-MANIFEST-4c24305f67679af1e16f501c
+              fire_delta CF-FIRELEDGER-c2447ab21d9f8c97ec81c2c6 | policy CF-POLICY-51801547345c23982278647a
+              resolution_ledger CF-RESOLUTION-757ee27797fa6334f13e6d18 | trace_graph CF-TRACE-06d75d13d7f9c3bbf1c081f2
+              verification CF-VERIFY-78f3b9ee76879c86e54e8a40
+       signature present false
+n5-03  data.type codefire_merge_request_list, version 1
+       MR-748b80865110 | status applied
+       source cf://…/org/app/topic -> target cf://…/org/app/base
+       data.page snapshot sha256:1efe6f0d72a9ee14116579d47496b3c08767f66fcdd7fc9ae417d1d74bc1cf37
+n5-04  codefire.remote_doctor.v1 | project_exists true | semantic_profile sealed-snapshot-v1 | transport file
+       branch_count 2 | merge_request_count 1 | checked_objects 2346
+       object_hash_errors 0 | missing_object_references 0 | invalid_sealed_commit_references 0
+       invalid_record_versions 0 | issues [] | quick false | skipped_checks [] | ok true
+       layout branches/idempotency/locks/merge_requests/objects all true
+```
+
+Both `codefire_page` snapshot digests are identical to the ones node 4b observed at commands 17 and 19,
+so the terminal collections did not shift between the two passes — an independent stability check
+beyond the digest comparison.
+
+#### Terminal remote state
+
+```text
+remote project   cf:///tmp/m1-remote-happy-path-a3.VbZTZ8/remote/org/app
+target branch    base   CF-COMMIT-d068d2c3995f6da0a0959b98 -> CF-COMMIT-126555fdb84822a0c09c9e6a  (fast-forward applied)
+source branch    topic  CF-COMMIT-126555fdb84822a0c09c9e6a  (unchanged, as required)
+merge request    MR-748b80865110 | status applied | applied_head CF-COMMIT-126555fdb84822a0c09c9e6a
+                 applied_at 2026-08-22T01:24:47Z | applied_by local | review m1-reviewer approve
+apply delta      2 commits: CF-COMMIT-06cc1476157f99de1e437519, CF-COMMIT-126555fdb84822a0c09c9e6a
+object closure   2346 checked objects, zero hash/reference/sealed-commit/version errors
+sealed proof     show base -> certificate passed, seven roots present, signature absent by policy
+```
+
+#### Canonical preservation outcome
+
+`PRESERVE=OK` after **every** command — 27 sweeps of all twelve checks (baseline, post-copy, one after
+each of the 24 commands, and a final sweep before commit). No drift at any point.
+
+```text
+git HEAD                              f1644122134d479333cf422fdb1d48b8fa92dd8e
+git porcelain count                   248
+.codefire/repo.json                   bf6d978b0eece0f185c6995630339326f56513a0c8645af3e7e984ad69a7f054
+.codefire/branches/main.json          bfd52e3525f6a6faf0db4f3d2d1d9d7fa3fa0d400f6561c3c5b8227e79e989f8
+branches rollup digest                8fba5dcbedd5179a27f1a8d3ce699db2c4e62f94521084ff015e025fcc582841
+.codefire/opened/main.json            5721d710f4371db88be26567d2a3c6afb3bc2458288b8c812b54ccd7556a42b2
+active/open_4c320ed42560/state.json   54ecb285704644b814e4ca47a711bf5eba150ee747642b90b53351b2f06940d2
+algorithm-…-lab/.codefire-open        60b133b3eeefcc79e20bda32843261897713b0d6e86b2f0d0111cd19862690d6
+objects                               2891 files / 114921765 bytes
+.codefire-server under /workspace/project   0
+canonical status --json                ok true | main | open-clean | base CF-COMMIT-2792b54ad730e6d644668c38 | open_fires 0 | next_actions []
+```
+
+Canonical branch `main` was never named in any command; no `close`, `discard`, `open`, `scan`,
+`verify`, `commit`, `serve` or `gc` was issued; no canonical path was ever passed to a mutator.
+
+#### Validation actually run by attempt 3
+
+```text
+python3 docs/development/tools/check_project_docs.py          -> OK
+git diff --check                                              -> clean
+```
+
+No build, product test, installer, HTTP, scale test, Retrospect, or canonical dogfood mutation.
+
+#### Attempt-3 next legal action
+
+Node 6 independent other-family audit against `$ROOT = /tmp/m1-remote-happy-path-a3.VbZTZ8`, which is
+left intact together with both earlier attempt roots. Everything the audit needs is re-readable without
+running a mutator: the remote project, both branch records, the MR record with `applied_head`, the
+`remote_request_apply` receipt, the before/after domain manifests, and per-command envelopes for all 24
+commands. Two items the audit should weigh, both recorded above and neither blocking: `request-list`
+still omits `applied_head` from its per-MR projection, and the packet's copy of
+`source_manifest_sha256` is two characters short of the provenance value.
 
 ### Attempt 2 — historical blocker resolved for attempt 3
 
