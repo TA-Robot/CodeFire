@@ -1,6 +1,6 @@
 # AI Task Packet
 
-Status: ready (attempt 2)
+Status: blocked (attempt 2)
 
 Packet ID: MS-remote-happy-path-run
 
@@ -93,6 +93,224 @@ retained canonical absolute paths. The retry changes only fixture materializatio
 branch heads, and `repo.json` are copied, while repository-local runtime registries are created empty.
 The `doctor "$FIX" --quick --json` exit-0 gate remains mandatory. Continue the same Claude session;
 do not implement product code or weaken the gate.
+
+### Attempt 2 — node 4 blocked at the final replay gate; node 5 not run
+
+Node 4 state: **blocked** at the last item of Procedure step 4. Node 5 state: **not started** — the
+packet's own gate failed, so no confirmation pass was performed and no further command was issued.
+Verdict **`block-m1`**, product-side, on the exact admitted happy path. Neither CFR-168 nor CFB-136;
+both stay parked.
+
+The corrected fixture recipe worked. The whole collaboration path ran clean: 20 commands, all exit 0,
+the target remote branch fast-forwarded to the source head, and canonical preservation held after every
+single command. The run then failed the packet's explicit idempotency requirement — "replay the exact
+same `request-apply` idempotency key and require `replayed: true` with no state change".
+
+#### Isolated roots and runner
+
+| Item | Value |
+|---|---|
+| Attempt-2 isolated root `$ROOT` | `/tmp/m1-remote-happy-path-a2.zvrbzn` (**left in place**) |
+| Attempt-1 evidence root | `/tmp/m1-remote-happy-path.TaHMir` (**preserved untouched**) |
+| Fixture `$FIX` | `$ROOT/repo` — `.codefire` with copied `repo.json`, `objects/` (2891 files), `branches/` (8 files) and empty `opened/`, `active/`, `cache/`, `idempotency/`, `locks/`, `remotes/` |
+| Remote `$REM` | `$ROOT/remote` → project root `$REM/.codefire-server/projects/org/app` |
+| Evidence | `$ROOT/evidence/` — `preserve.sh`, `step.sh`, `mr-id.txt`, and `NN-<label>.{argv,json,meta,stderr}` for every command |
+| Runner | `/workspace/worktrees/ms-agent-local-contract-seam-20260821/target/release/codefire` |
+| Runner SHA-256 rehashed at attempt-2 start | `207fae943c09c2f739611e37050cbc83f34d3b53318fcefaf9d7304ba03d708b` — matches the admitted input |
+
+Fixture materialization (the only non-CodeFire steps, 0.388s): `cp -a` of canonical `repo.json`,
+`objects/`, `branches/` plus `mkdir` of the six empty layout directories. Nothing was copied from
+canonical `opened/`, `active/`, `cache/`, `idempotency/`, `locks/` or `remotes/`.
+
+#### Node-4 command sequence — exact argv, exit, duration, preservation
+
+`$CF` = the runner above; `$P` = `cf:///tmp/m1-remote-happy-path-a2.zvrbzn/remote/org/app`. Every
+command ran with `cwd = $FIX` through `evidence/step.sh`, which recorded argv/exit/duration and then
+reran all twelve canonical preservation checks.
+
+| # | argv (after `$CF`) | Exit | Duration | Preserve |
+|---|---|---|---|---|
+| 00 | preservation baseline | — | 10.4s | OK |
+| 01 | fixture copy + empty layout dirs | 0 | 0.388s | OK |
+| 02 | `doctor $FIX --quick --json` | 0 | 3.204s | OK |
+| 03 | `branch list --path $FIX --json` | 0 | 3.528s | OK |
+| 04 | `clone feature/docs-doubling-plan base --dry-run --json` | 0 | 2.729s | OK |
+| 05 | `clone feature/docs-doubling-plan base --json` | 0 | 2.907s | OK |
+| 06 | `clone feature/docs-full-doubling topic --json` | 0 | 2.825s | OK |
+| 07 | `upload base $P/base --dry-run --json` | 0 | 4.048s | OK |
+| 08 | `upload base $P/base --json --idempotency-key m1-upload-base-001` | 0 | 16.094s | OK |
+| 09 | `upload topic $P/topic --json --idempotency-key m1-upload-topic-001` | 0 | 15.628s | OK |
+| 10 | `request-merge $P/topic $P/base --dry-run --json` | 0 | 7.327s | OK |
+| 11 | `request-merge $P/topic $P/base --json --idempotency-key m1-mr-001` | 0 | 17.311s | OK |
+| 12 | `request-list $P --json` | 0 | 9.376s | OK |
+| 13 | `request-review $P MR-e191c85315e9 --decision approve --reviewer m1-reviewer --dry-run --json` | 0 | 7.301s | OK |
+| 14 | `request-review $P MR-e191c85315e9 --decision approve --reviewer m1-reviewer --json --idempotency-key m1-review-001` | 0 | 16.886s | OK |
+| 15 | `request-apply $P MR-e191c85315e9 --dry-run --json` | 0 | 14.572s | OK |
+| 16 | `request-apply $P MR-e191c85315e9 --json --idempotency-key m1-apply-001` | 0 | 28.186s | OK |
+| 17 | `list $P --json` | 0 | 4.958s | OK |
+| 18 | `show $P/base --json` | 0 | 8.943s | OK |
+| 19 | `request-list $P --json` | 0 | 11.609s | OK |
+| 20 | `doctor $P --json` | 0 | 3.038s | OK |
+| 21 | `request-apply $P MR-e191c85315e9 --json --idempotency-key m1-apply-001` (replay) | 0 | 16.726s | OK |
+
+Fixture admission passed strictly: command 02 returned `ok: true`, `exit_code: 0`,
+`issue_counts {total: 7, blocking: 0}`, `checked {branches: 8, opened: 0, active_files: 0}`, and **no
+issue referenced any canonical path**. The seven remaining issues are the known non-blocking
+`legacy_branch_head_semantic_profile` warnings. Attempt 1's two blocking `opened_registry` issues are
+gone, confirming the recipe fix.
+
+#### Observed identity, status and head fields — the probe's open question answered
+
+The MR identity **is** carried in JSON; only its documentation was missing.
+
+| Fact | Field path | Observed value |
+|---|---|---|
+| MR ID (creation) | `data.plan.merge_request_id`, and `next_actions[].target.merge_request_id` | `MR-e191c85315e9` |
+| MR ID (list) | `data.merge_requests[].id` | `MR-e191c85315e9` |
+| MR list type | `data.type` / `version` | `codefire_merge_request_list` / `1` |
+| MR status | `data.merge_requests[].status` | `open` at cmd 12, **`stale`** at cmd 19 |
+| MR endpoints | `data.merge_requests[].source_url` / `.target_url` | `$P/topic` / `$P/base` |
+| source/target heads at MR creation | `data.plan.source_head` / `.target_head` / `.target_branch` | `CF-COMMIT-126555fdb84822a0c09c9e6a` / `CF-COMMIT-d068d2c3995f6da0a0959b98` / `base` |
+| upload head | `data.plan.head`, `.branch`, `.remote_branch`, `.remote_url`, `.transport`, `.object_count` | `d068d2c3…` / 2329 objects (base); `126555fd…` / 2346 objects (topic) |
+| applied head | `data.plan.head` on `request-apply` | `CF-COMMIT-126555fdb84822a0c09c9e6a` |
+| remote branch heads | `data.branches[].name` / `.head`, `data.type = codefire_remote_branch_list` | `base` → `126555fd…`, `topic` → `126555fd…` |
+| remote sealed head detail | `data.show.commit` / `.certificate` / `.parents` / `.roots` / `.atoms` / `.files` / `.message` / `.label` / `.signature`, `data.type = codefire_show_result` | see below |
+| remote health | `data` = `codefire.remote_doctor.v1` | all counters 0, `issues []`, `ok true` |
+| review plan | `data.plan.decision` / `.reviewer` / `.current_status` + `operations[]` `append_review`, `update_merge_request_status → approved` | `approve` / `m1-reviewer` / `open` |
+| pagination | `data.page` = `codefire_page` v1 with `collection`, `snapshot`, `offset`, `limit`, `returned`, `total`, `next_cursor` | present on `list` / `request-list` even without `--limit` |
+
+All plan payloads were `data.type = codefire_plan_result` wrapping `data.plan.type =
+codefire_operation_plan` version 1, exactly as the probe predicted. Dry-runs wrote nothing: after
+command 07 the entire `$REM` tree was still empty.
+
+Two field-semantics notes for node 6, both observed rather than inferred:
+
+- `request-merge --dry-run` returns a `merge_request_id` (`MR-192f323d4a7e`) that is **not** the ID the
+  live call later creates (`MR-e191c85315e9`). The dry-run ID is a non-binding preview; automation must
+  not cache it.
+- `request-review`'s `current_status` is the **pre-image** (`open`) even on the live call. The resulting
+  status appears only inside `operations[].kind = update_merge_request_status`.
+
+#### Remote terminal identities after the apply (commands 17–20)
+
+```text
+remote project   cf:///tmp/m1-remote-happy-path-a2.zvrbzn/remote/org/app
+branch base      head CF-COMMIT-126555fdb84822a0c09c9e6a   (fast-forwarded from CF-COMMIT-d068d2c3995f6da0a0959b98)
+branch topic     head CF-COMMIT-126555fdb84822a0c09c9e6a   (unchanged, as required)
+show base        commit CF-COMMIT-126555fdb84822a0c09c9e6a | certificate passed
+                 parents ["CF-COMMIT-06cc1476157f99de1e437519"] | message "Complete algorithm documentation doubling"
+                 atoms 793 | files 183 | signature present=false
+                 roots atom_index CF-ATOMINDEX-24f628bb0d9a72dba6061301 | content_manifest CF-MANIFEST-4c24305f67679af1e16f501c
+                       fire_delta CF-FIRELEDGER-c2447ab21d9f8c97ec81c2c6 | policy CF-POLICY-51801547345c23982278647a
+                       resolution_ledger CF-RESOLUTION-757ee27797fa6334f13e6d18 | trace_graph CF-TRACE-06d75d13d7f9c3bbf1c081f2
+                       verification CF-VERIFY-78f3b9ee76879c86e54e8a40
+remote doctor    semantic_profile sealed-snapshot-v1 | branch_count 2 | merge_request_count 1
+                 checked_objects 2346 | object_hash_errors 0 | missing_object_references 0
+                 invalid_sealed_commit_references 0 | invalid_record_versions 0 | issues [] | ok true
+MR-e191c85315e9  request-list status "stale"   <-- see first failure
+```
+
+The terminal **head** is therefore confirmed twice over by independent public read-only commands, and
+the remote object closure is intact.
+
+#### First failure — `request-apply` replay reports no `replayed` marker (Procedure step 4, final item)
+
+Command 21 re-ran the exact command 16 argv with the same `--idempotency-key m1-apply-001`:
+
+```text
+exit 0, ok true, data.type codefire_plan_result
+data.replayed        -> absent
+data.plan.replayed   -> absent
+data.plan.would_apply -> true
+data.plan.operations -> validate_merge_request(required_status approved), validate_fast_forward,
+                        copy_object_graph, write_remote_branch(base -> CF-COMMIT-126555fdb84822a0c09c9e6a),
+                        update_merge_request_status(applied)
+duration 16.726s
+```
+
+The envelope is byte-shaped identically to the original live apply: `would_apply: true` and the full
+five-operation mutation plan, with no `replayed` field anywhere. `docs/04_cli_spec.md` §4.15/§4.24
+require that a same-key/same-payload replay return the stored result and that the file-backed replay
+plan carry `replayed: true`. It does not. An automation consumer cannot distinguish a replay from a
+fresh mutation, which is exactly the discrimination the M1 exit's "no partial remote mutation, no
+hidden retry/action loop" audit criterion depends on.
+
+Effect-level idempotency does hold, and this run proves it rather than assuming it:
+
+```text
+domain-only tree digest (excluding *.lock.owner.json): 6ef65d3a33d2f8976e5f26c93d8c917bcec4b312496ec5005a2c1964061b67e1
+domain file count: 2361
+files with mtime inside the replay window: exactly three, all diagnostic lock sidecars
+  locks/project-gate.lock.owner.json
+  .bootstrap-locks/project-a0d68a1f….lock.owner.json
+  .bootstrap-locks/bootstrap-namespace.lock.owner.json
+merge_requests/MR-e191c85315e9.json  mtime 1787359156 (original apply, NOT rewritten)
+branches/base.json                    mtime 1787359156 (original apply, NOT rewritten)
+idempotency/v2/remote_request_apply/1d8dee1b….json  mtime 1787359156 (NOT rewritten)
+```
+
+The stored receipt was consulted, not regenerated: `type remote_idempotency_receipt`, `version 2`,
+`status completed`, `key m1-apply-001`, `operation remote_request_apply`, `result {head:
+CF-COMMIT-126555fdb84822a0c09c9e6a, id: MR-e191c85315e9, target_branch: base}`, plus `effects[]`
+after-hashes for the generation, branch and merge-request authorities. So no branch head, MR record,
+object, or receipt was rewritten by the replay. The whole-tree digest nevertheless moved
+(`99e95668…` → `7f08971e…`) purely because the three lock-owner sidecars were atomically replaced;
+those are documented best-effort diagnostics, not domain state. Reported here explicitly so the packet's
+"no state change" wording is not read as satisfied by a naive whole-tree digest.
+
+Earlier observation on the same terminal-state axis, recorded because a single fix pass should cover
+both: at command 19 the applied MR is projected as `status: "stale"`, while the persisted server record
+is `status: "applied"` with `applied_head: CF-COMMIT-126555fdb84822a0c09c9e6a`, `applied_at`,
+`applied_by`, and the recorded `m1-reviewer` approve review. `stale` is derived by comparing
+`target_head_at_request` (`d068d2c3…`) against the current target head (`126555fd…`) — a comparison
+that is unconditionally true after any successful apply, because applying is what moves the target head.
+So every applied MR is permanently reported `stale`, the terminal MR state is unreadable from public
+JSON, and a consumer polling for terminal state could conclude the apply failed and recreate or retry
+the request. The M1 exit's "a separate read-only query confirms the terminal head/state" is satisfied
+for the head and unsatisfied for the state.
+
+Both findings are read-only projection/reporting defects on the exact admitted path. Neither is a
+CFR-168 decision-work budget issue nor a CFB-136 validation-cache subject issue.
+
+#### Canonical preservation outcome
+
+`PRESERVE=OK` after **every** command — 22 sweeps of all twelve checks (baseline, post-copy, one after
+each of commands 02–21, plus a final sweep before commit). No drift at any point. Git HEAD
+`f1644122134d479333cf422fdb1d48b8fa92dd8e`, porcelain 248, `repo.json` `bf6d978b…`,
+`branches/main.json` `bfd52e35…`, branches rollup `8fba5dcb…`, `opened/main.json` `5721d710…`,
+`active/open_4c320ed42560/state.json` `54ecb285…`, `.codefire-open` `60b133b3…`, objects 2891 files /
+114921765 bytes, zero `.codefire-server` under `/workspace/project`, and canonical `status --json` still
+`ok true` / `main` / `open-clean` / base `CF-COMMIT-2792b54ad730e6d644668c38` / `open_fires 0` /
+`next_actions []`. Canonical branch `main` was never named in any command.
+
+#### Next smallest resolution (not implemented — node 4 has no product write set)
+
+Surface the replay marker that the contract already promises: have the file-backed
+`request-apply`/`request-merge`/`request-review`/`upload` replay path return the stored receipt's result
+with `replayed: true` on the envelope's plan (and `would_apply` reflecting that nothing was re-planned)
+instead of re-emitting a fresh mutation plan. The receipt already holds everything needed
+(`result`, `effects[]`, `status: completed`), so this is a reporting change at the replay boundary, not
+new remote logic. Pair it with projecting the persisted `status`/`applied_head` in `request-list --json`
+so an applied MR is not reported `stale`. Both are product changes outside this packet's write set and
+outside the parked CFR-168/CFB-136 scope, so node 3 must admit them — as one bounded reporting slice,
+or by narrowing the M1 exit to the head-only proof that this run already delivers.
+
+#### Validation actually run by attempt 2
+
+```text
+python3 docs/development/tools/check_project_docs.py          -> OK
+git diff --check                                              -> clean
+```
+
+No build, product test, installer, HTTP, scale test, Retrospect, or canonical dogfood mutation. Node 5
+was not started: no confirmation-pass command was issued, and no mutator ran after command 21.
+
+#### Attempt-2 next legal action
+
+Node 3 arbitration of the two reporting defects, then either a bounded product slice followed by a
+fresh node 4 replay check, or a narrowed M1 exit. Node 5 read-only confirmation can run against the
+preserved `$ROOT` without re-running any mutator — the remote project, both branch records, the MR
+record, and all receipts are intact.
 
 ### Attempt 1 — blocked safely
 
