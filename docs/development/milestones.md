@@ -81,11 +81,11 @@ M1 non-goals:
 ## M1 execution graph (current)
 
 ```text
-Critical path: bounded B1 contract fix -> refreshed-pack fresh-consumer rerun -> final audit -> M1 exit
-Progress: nodes 1–5c completed; source classification and independent audit agree on the narrow decision, B1-only scope, and one rerun with frozen task/thresholds plus refreshed public docs/schema pack
-Parallel now: node 5d only — continue the Grok source owner to avoid reloading the branch/show schema seams
-Blocked: nodes 5e–7 wait on the accepted fix and source-bound runner
-Next legal action: execute `milestone-adoption-wedge-b1-fix.md`; do not broaden to full CFR-171
+Critical path: refreshed-pack fresh-consumer rerun -> final audit -> M1 exit
+Progress: nodes 1–5d completed; the bounded B1 fix, focused tests, canonical source docs, and source-bound runner are accepted
+Parallel now: node 5e controller setup only — resume the persistent Claude fixture owner with fresh roots and the refreshed public pack
+Blocked: nodes 6–7 wait on the single authorized post-B1 rerun and its frozen adopt / narrow / stop decision
+Next legal action: prepare the post-B1 rerun from `milestone-adoption-wedge-run.md`; do not disclose first-run evidence or broaden to full CFR-171
 ```
 
 ### Nodes
@@ -102,8 +102,8 @@ Next legal action: execute `milestone-adoption-wedge-b1-fix.md`; do not broaden 
 | 5a | B1 source/schema/write-set classification | **completed** | persistent Grok node-2 session | 5 | `ai/task-packets/milestone-adoption-wedge-b1.md` | that packet only | `5a72a0e` (integrated as `ae8d291`); additive schema/capability/docs projection, no Store change |
 | 5b | Independent first-run score/preservation/decision audit | **completed** | fresh Claude Opus 5 audit session | 5 | `ai/audit-latest.md` | audit file only | `760a10c` (integrated as `07f3fb6`); confirms 7/7 narrow, B1-only next slice, refreshed-pack rerun requirement |
 | 5c | Orchestrator fan-in and bounded fix/rerun admission | **completed** | Orchestrator | 5a, 5b | `ai/task-packets/milestone-adoption-wedge-b1-fix.md` | board plus fix/rerun packet | schema/docs/additive claim projection admitted; first evidence/task/thresholds frozen |
-| 5d | Bounded B1 contract fix | **ready** | persistent Grok node-2 session | 5c | `ai/task-packets/milestone-adoption-wedge-b1-fix.md` | exact admitted product/docs/test set | — |
-| 5e | One identical fresh-consumer rerun and decision | **blocked** | fresh other-family consumer + persistent controller | 5d | run packet | isolated evidence plus packet | — |
+| 5d | Bounded B1 contract fix | **completed** | persistent Grok node-2 session | 5c | `ai/task-packets/milestone-adoption-wedge-b1-fix.md` | exact admitted product/docs/test set | `c78d5e0` + provenance `93cd289` (integrated as `0f5e9f9` + `6a80adb`); 3 focused tests, fmt/clippy/source/project/AI docs green; runner SHA `90cb2895…` |
+| 5e | One identical fresh-consumer rerun and decision | **ready** | fresh other-family consumer + persistent controller | 5d | run packet | isolated evidence plus packet | fresh controller/key/consumer roots and refreshed 14-file public pack required |
 | 6 | Final independent audit | **blocked** | fresh other-family audit agent | 5e | `ai/audit-latest.md` | audit file only | — |
 | 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
 

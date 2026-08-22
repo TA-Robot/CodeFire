@@ -140,7 +140,25 @@ No other deviation is authorized. In particular, the consumer may not receive so
 docs, private clarification, review-pack/import/live commands, first-run output, or answer values.
 The post-B1 rerun is the one retry permitted by the original `narrow` contract.
 
-### Stage A — completed. Packet status `consumer-ready`. Stage B has not run.
+### Corrected runner admitted for the single rerun
+
+Node 5d completed and was integrated as `0f5e9f9` plus provenance record `6a80adb`. The rerun must use
+the following source-bound runner and must rehash both the binary and provenance before setup:
+
+```text
+runner       /workspace/worktrees/ms-adoption-experiment-20260822/target/release/codefire
+sha256       90cb2895aadc45b559a96207cdd5ae3b08485f9a7e5a07014db8cca8b5b90ce9
+bytes        14590776
+source       c78d5e0e5e151a1489744c21340716a439597e71
+manifest     3925fc035690296fa5e132b630dab65a7fbd5ddb1a55f0fb1226e6efd295d97a (101 files)
+provenance   /workspace/worktrees/ms-adoption-experiment-20260822/target/codefire-ai/rust-build-provenance.json
+prov sha256  1731b8636330841f20dcad9265710eacc3830767e8c693b34ad75b5907688dea
+```
+
+This admission authorizes fresh Stage A setup only. It does not carry first-run roots, answer values,
+or evidence into the new consumer session.
+
+### First-run Stage A — completed. Packet status was `consumer-ready`; first-run Stage B had not run yet.
 
 Every Stage A gate passed. The fixture, docs pack, label-only harness, task sheet, and sealed answer
 key exist; the answer key was derived and hashed **before** handoff and is not reachable from the
