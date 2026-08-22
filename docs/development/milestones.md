@@ -81,22 +81,24 @@ M1 non-goals:
 ## M1 execution graph (current)
 
 ```text
-Critical path: parallel classification -> orchestrator fan-in -> one bounded experiment -> read-only confirmation -> independent audit -> M1 exit
-Progress: remote M1 closed and slot shift completed; adoption nodes 1–2 are ready and no experiment has run
-Parallel now: node 1 Claude public-consumer/fixture contract + node 2 Grok experiment/falsifier/source-owner classification
-Blocked: nodes 3–7 wait on both classifiers
-Next legal action: dispatch both ready packets concurrently; do not implement before node 3 admission
+Critical path: fixture setup -> source-blind consumer -> decision/read-only confirmation -> independent audit -> M1 exit
+Progress: nodes 1–3 completed; both classifiers selected the same sealed inspect topology and no product write is admitted before experiment evidence
+Parallel now: node 4a only — continue the Claude contract owner for fixture/harness setup without re-onboarding
+Blocked: nodes 4b–7 wait on the consumer-ready handoff
+Next legal action: execute Stage A of `milestone-adoption-wedge-run.md`; do not implement CFR-171 yet
 ```
 
 ### Nodes
 
 | # | Node | State | Owner | Waits on | Packet | Write set | Evidence |
 |---|---|---|---|---|---|---|---|
-| 1 | Public consumer/fixture contract — select the smallest second-repository or clean-room task and exact public commands | **ready** | Claude Opus 5 | — | `ai/task-packets/milestone-adoption-wedge-contract.md` | that packet only | — |
-| 2 | CFR-171..173 experiment/falsifier classification — map existing owners and decide the smallest admissible slice | **ready** | Grok 4.6 | — | `ai/task-packets/milestone-adoption-wedge-experiment.md` | that packet only | — |
-| 3 | Orchestrator fan-in and experiment/fix admission | **blocked** | Orchestrator | 1, 2 | — | board, history, admitted packet | — |
-| 4 | Bounded adoption experiment | **blocked** | persistent context owner selected at node 3 | 3 | — | isolated fixture/evidence plus admitted packet | — |
-| 5 | Read-only preservation and comprehension confirmation | **blocked** | persistent if serially dependent | 4 | — | packet/evidence only | — |
+| 1 | Public consumer/fixture contract — select the smallest second-repository or clean-room task and exact public commands | **completed** | Claude Opus 5 | — | `ai/task-packets/milestone-adoption-wedge-contract.md` | that packet only | `0b8d69e` (integrated as `624f28c`); frozen C1–C6, preservation, rubric, thresholds; conditional B1 |
+| 2 | CFR-171..173 experiment/falsifier classification — map existing owners and decide the smallest admissible slice | **completed** | Grok 4.6 | — | `ai/task-packets/milestone-adoption-wedge-experiment.md` | that packet only | `3173a91` (integrated as `ef4aa46`); same sealed inspect topology; no product blocker/write |
+| 3 | Orchestrator fan-in and experiment/fix admission | **completed** | Orchestrator | 1, 2 | `ai/task-packets/milestone-adoption-wedge-run.md` | board plus run packet | first experiment admitted without product change; B1 depends on measured result |
+| 4a | Isolated fixture, controller evidence, and consumer handoff | **ready** | persistent Claude node-1 session | 3 | `ai/task-packets/milestone-adoption-wedge-run.md` | isolated roots plus packet | — |
+| 4b | Fresh source-blind consumer comprehension run | **blocked** | fresh Grok 4.6 session | 4a | handed task/docs only | consumer-root answer/evidence only | — |
+| 4c | Score and terminal adopt/narrow/stop decision | **blocked** | persistent Claude node-1 session | 4b | run packet | packet/evidence only | — |
+| 5 | Read-only preservation and comprehension confirmation | **blocked** | persistent Claude node-1 session | 4c | run packet | packet/evidence only | — |
 | 6 | Final independent audit | **blocked** | fresh other-family audit agent | 5 | `ai/audit-latest.md` | audit file only | — |
 | 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
 
