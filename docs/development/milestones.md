@@ -77,22 +77,22 @@ M1 non-goals:
 ## M1 execution graph (current)
 
 ```text
-Critical path: parallel rights/artifact classification -> orchestrator fan-in -> bounded local rehearsal -> independent operator verification/rollback -> final audit -> M1 exit
-Progress: adoption M1 closed and release slot activated; no release artifact has been built, published, installed, or rolled back
-Parallel now: node 1 rights/source-identity classification + node 2 release/verify/rollback topology classification
-Blocked: nodes 3–7 wait on both read-only classifiers
-Next legal action: dispatch both ready packets concurrently; do not infer rights or start a release rehearsal before node 3 admission
+Critical path: fresh source-bound build -> atomic local publication -> independent operator verification/install/rollback -> final audit -> M1 exit
+Progress: nodes 1–3 completed; both classifiers found no product blocker, fan-in admits an internal-only rehearsal and no node-4 fix
+Parallel now: none — node 5a is the single serial build/publication lane and stays with the persistent Grok topology owner
+Blocked: nodes 5b–7 wait on the fresh candidate and operator handoff
+Next legal action: execute `milestone-release-operational-trust-run.md` Stage A; no external publication or retained-runner reuse
 ```
 
 ### Nodes
 
 | # | Node | State | Owner | Waits on | Packet | Write set | Evidence |
 |---|---|---|---|---|---|---|---|
-| 1 | Rights/license and artifact-source decision — classify what may be rehearsed or published and what must remain blocked | **ready** | Claude Opus 5 | — | `ai/task-packets/milestone-release-operational-trust-rights.md` | that packet only | — |
-| 2 | Release/verify/rollback topology — derive the smallest isolated artifact and independent-operator procedure | **ready** | Grok 4.6 | — | `ai/task-packets/milestone-release-operational-trust-rehearsal.md` | that packet only | — |
-| 3 | Orchestrator fan-in and bounded rehearsal/fix admission | **blocked** | Orchestrator | 1, 2 | — | board plus admitted run/fix packet | — |
-| 4 | Smallest reproduced release-contract fix, if any | **blocked** | persistent source-context owner | 3 | — | exact admitted source/docs/test set | — |
-| 5a | Source-bound artifact build and isolated local publication | **blocked** | persistent topology owner | 3, optional 4 | — | isolated release root plus run packet | — |
+| 1 | Rights/license and artifact-source decision — classify what may be rehearsed or published and what must remain blocked | **completed** | Claude Opus 5 | — | `ai/task-packets/milestone-release-operational-trust-rights.md` | that packet only | `131be1b` (integrated as `4a2cad4`); internal-only, nothing publishable, no product blocker |
+| 2 | Release/verify/rollback topology — derive the smallest isolated artifact and independent-operator procedure | **completed** | Grok 4.6 | — | `ai/task-packets/milestone-release-operational-trust-rehearsal.md` | that packet only | `cfafb5f` (integrated as `b6adfc9`); fresh build required, local atomic pointer/isolated rollback, no product blocker |
+| 3 | Orchestrator fan-in and bounded rehearsal/fix admission | **completed** | Orchestrator | 1, 2 | `ai/task-packets/milestone-release-operational-trust-run.md` | board plus run packet | internal-only exact artifact set admitted; internal strategy doc removed; no node-4 fix |
+| 4 | Smallest reproduced release-contract fix, if any | **not required** | — | 3 | — | — | both lanes found none; no source/package/licence edit admitted |
+| 5a | Source-bound artifact build and isolated local publication | **ready** | persistent Grok node-2 session | 3 | `ai/task-packets/milestone-release-operational-trust-run.md` | isolated release root plus run packet | — |
 | 5b | Fresh operator verification, isolated install/smoke, and rollback | **blocked** | fresh other-family operator | 5a | — | handed release root/evidence only | — |
 | 6 | Final independent audit | **blocked** | fresh other-family audit agent | 5b | `ai/audit-latest.md` | audit file only | — |
 | 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
