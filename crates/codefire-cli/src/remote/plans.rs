@@ -130,3 +130,26 @@ pub(super) fn request_apply_operation_plan(
         ],
     })
 }
+
+pub(super) fn request_apply_replay_plan(
+    options: &RequestApplyOptions,
+    transport: &str,
+    target_branch: &str,
+    apply_head: &str,
+) -> Value {
+    json!({
+        "type": "codefire_operation_plan",
+        "version": 1,
+        "command": "request-apply",
+        "dry_run": false,
+        "would_apply": false,
+        "replayed": true,
+        "project_url": &options.project_url,
+        "merge_request_id": &options.mr_id,
+        "target_branch": target_branch,
+        "head": apply_head,
+        "transport": transport,
+        "operations": [],
+        "next_actions": [],
+    })
+}

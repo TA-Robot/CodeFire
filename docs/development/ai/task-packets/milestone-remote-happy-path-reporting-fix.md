@@ -111,8 +111,8 @@ Status **completed**. No `block-m1`. CFR-168 and CFB-136 remain **parked**. Inte
 
 Exact source seam:
 
-- `crates/codefire-cli/src/remote.rs::apply_merge_request` — on a completed `replay_json_publication` receipt only, replace the live five-operation plan with `request_apply_replay_plan` (`replayed: true`, `would_apply: false`, empty `operations` / `next_actions`). Live apply still uses `request_apply_operation_plan`. Receipt lookup, gate, signature, and `execute_json_publication` are unchanged.
-- `crates/codefire-cli/src/remote.rs::list_merge_requests` — still validates the current target sealed head and malformed MR records; `stale` is projected only when the persisted status is non-terminal and `target_head_at_request` drifted. Persisted `applied` and `rejected` remain the list status.
+- `crates/codefire-cli/src/remote.rs::apply_merge_request` — `replay_json_publication_outcome` kind `CompletedReceipt` only replaces the live plan with `plans::request_apply_replay_plan` (`replayed: true`, `would_apply: false`, empty `operations` / `next_actions`). `Recovery` keeps the live `request_apply_operation_plan`. Receipt lookup, gate, signature, and `execute_json_publication` are otherwise unchanged.
+- `crates/codefire-cli/src/remote.rs::list_merge_requests` — still validates the current target sealed head and malformed MR records; `stale` is projected when the persisted status is not `applied` and `target_head_at_request` drifted. Persisted `applied` remains the list status; drifted `rejected` still projects `stale`.
 
 Invariant: reporting only. The completed v2 receipt stays the replay identity and result. Replay does not regenerate or rewrite receipt, branch, generation, or MR authorities. First live apply plan is unchanged. Stale remains a list projection, not a persisted lifecycle state.
 
@@ -174,3 +174,37 @@ Built from accepted source commit `726eae4855c1cbcdefa96fe13310eb25a4c3d9d5` aft
 | build_log SHA-256 | `cd6cf1d6b213bc943a6ce0c2d069e49108cfb30714f58d7d1526497683603a1c` |
 
 Node 4b must prepend `target/release` to `PATH` and use this `codefire` / `codefire-rs` pair. Do not substitute another executable. CFR-168/CFB-136 remain parked. No `block-m1`.
+
+### Follow-up correction (review 317af117 / admission 0676537)
+
+Status **completed**. The two `block-m1` items are corrected. CFR-168 and CFB-136 remain **parked**.
+
+Recovery discriminant: `publication.rs::replay_json_publication_outcome` returns
+`Option<(Value, JsonPublicationReplayKind)>`. Kind is `Recovery` for
+`recover_completed_pending_quarantine` and pending `recover_publication`, and
+`CompletedReceipt` only after a keyed v2 receipt is read and
+`validate_completed_receipt_value` accepts it. Existing `replay_json_publication`
+discards the kind, so upload/merge/review and HTTP callers stay unchanged.
+`apply_merge_request` reports `replayed: true` / `would_apply: false` / empty
+operations only for `CompletedReceipt`; `Recovery` keeps the live five-operation
+plan. The replay plan builder lives in `remote/plans.rs`. A test-only failpoint
+stops `execute_json_publication` after `prepare_publication` so a keyless retry
+hits the pending recovery kind.
+
+List stale assignment is `persisted_status != "applied"` after unconditional
+current-head sealed validation. Drifted `rejected` still projects `stale`.
+
+Focused tests (`cargo test -p codefire-cli --bin codefire-rs`):
+
+- `file_backed_request_apply_replay_and_applied_list_status` — ok
+- `file_backed_request_apply_pending_recovery_is_not_receipt_replay` — ok
+- `file_backed_request_list_keeps_stale_projection_for_open_mr` — ok
+- `file_backed_request_list_projects_stale_for_drifted_rejected_mr` — ok
+- `remote_mutator_idempotency_replays_same_payload_and_rejects_conflicts` — ok (upload replay plan equality unchanged)
+
+Counts: `5 passed; 0 failed; 770 filtered out`.
+
+Validation: `cargo fmt --check`; `cargo clippy -p codefire-cli --all-targets -- -D warnings`;
+`check_source_docs.py` (44/34/12); `check_project_docs.py` (547); `git diff --check` clean.
+
+The source-bound runner below is rebuilt from the correction commit.

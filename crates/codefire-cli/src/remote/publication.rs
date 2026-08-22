@@ -14,6 +14,27 @@ use std::ffi::OsStr;
 use std::io::{ErrorKind, Write};
 use std::path::Path;
 
+#[cfg(test)]
+thread_local! {
+    static INJECT_FAIL_AFTER_PREPARE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+pub(crate) fn inject_publication_fail_after_prepare_once() {
+    INJECT_FAIL_AFTER_PREPARE.set(true);
+}
+
+#[cfg(test)]
+fn take_fail_after_prepare() -> bool {
+    INJECT_FAIL_AFTER_PREPARE.with(|flag| flag.replace(false))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum JsonPublicationReplayKind {
+    CompletedReceipt,
+    Recovery,
+}
+
 const PENDING_BYTE_LIMIT: u64 = 1024 * 1024;
 const POSTIMAGE_BYTE_LIMIT: u64 = codefire_store::MAX_OBJECT_RECORD_BYTES;
 const MAX_AUTHORITY_WRITES: usize = 64;
@@ -3293,6 +3314,12 @@ pub(crate) fn execute_json_publication(
         }
     }
     prepare_publication(gate.project(), request, writes, result, &request_hash)?;
+    #[cfg(test)]
+    if take_fail_after_prepare() {
+        return Err(CliError::InvalidRepository(
+            "injected publication failure after pending prepare".to_string(),
+        ));
+    }
     let pending = read_optional_authority_bounded(
         gate.project(),
         &RemoteAuthority::PendingTransaction,
@@ -3316,6 +3343,14 @@ pub(crate) fn replay_json_publication(
     project_root: &Path,
     request: &PublicationRequest,
 ) -> Result<Option<Value>, CliError> {
+    Ok(replay_json_publication_outcome(gate, project_root, request)?.map(|(value, _)| value))
+}
+
+pub(crate) fn replay_json_publication_outcome(
+    gate: &RemoteProjectGate,
+    project_root: &Path,
+    request: &PublicationRequest,
+) -> Result<Option<(Value, JsonPublicationReplayKind)>, CliError> {
     gate.ensure_exclusive(project_root)?;
     validate_request(request)?;
     validate_object_roots(project_root, request)?;
@@ -3327,7 +3362,7 @@ pub(crate) fn replay_json_publication(
         &request_hash,
         receipt.as_ref(),
     )? {
-        return Ok(Some(result));
+        return Ok(Some((result, JsonPublicationReplayKind::Recovery)));
     }
     if let Some(pending) = read_optional_authority_bounded(
         gate.project(),
@@ -3342,7 +3377,7 @@ pub(crate) fn replay_json_publication(
             receipt.as_ref(),
             pending,
         )
-        .map(Some);
+        .map(|result| Some((result, JsonPublicationReplayKind::Recovery)));
     }
     let Some(receipt_authority) = receipt.as_ref() else {
         return Ok(None);
@@ -3378,11 +3413,17 @@ pub(crate) fn replay_json_publication(
             "remote v2 idempotency receipt has unknown or missing fields".to_string(),
         ));
     }
+    if receipt.get("status").and_then(Value::as_str) != Some("completed") {
+        return Err(CliError::InvalidRepository(
+            "remote v2 idempotency receipt is not completed".to_string(),
+        ));
+    }
     let effects = validate_receipt_effects(&receipt)?;
     let result = receipt.get("result").cloned().ok_or_else(|| {
         CliError::InvalidRepository("remote v2 receipt result is missing".to_string())
     })?;
-    validate_completed_receipt_value(&receipt, request, &request_hash, &effects, &result).map(Some)
+    validate_completed_receipt_value(&receipt, request, &request_hash, &effects, &result)
+        .map(|result| Some((result, JsonPublicationReplayKind::CompletedReceipt)))
 }
 
 fn validate_request(request: &PublicationRequest) -> Result<(), CliError> {

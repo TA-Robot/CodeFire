@@ -34,8 +34,8 @@ pub(crate) use operations::{
     ReviewPublicationIdentity, UploadPostimages, UploadPublicationIdentity,
 };
 use plans::{
-    request_apply_operation_plan, request_merge_operation_plan, request_review_operation_plan,
-    upload_operation_plan, UploadPlanRemote,
+    request_apply_operation_plan, request_apply_replay_plan, request_merge_operation_plan,
+    request_review_operation_plan, upload_operation_plan, UploadPlanRemote,
 };
 pub(crate) use project::{
     ensure_remote_project_layout, remote_project_stable_id, validate_remote_component,
@@ -47,13 +47,15 @@ pub(crate) use project::{
     inject_ledger_bootstrap_rename_failure_once, ledger_bootstrap_rename_attempts,
     reset_ledger_bootstrap_rename_attempts,
 };
+#[cfg(test)]
+pub(crate) use publication::inject_publication_fail_after_prepare_once;
 pub(crate) use publication::{
     execute_json_publication, missing_upload_publication_footprint,
     preflight_publication_signature_with_recovery_and_poll,
     prepare_json_publication_plan_lazy_with_nonce_and_provisional_roots, replay_json_publication,
-    validate_publication_signature_with_recovery_and_poll,
+    replay_json_publication_outcome, validate_publication_signature_with_recovery_and_poll,
     validate_publication_signature_with_recovery_evidence_and_poll, AuthorityWrite,
-    PreparedJsonPublication, PublicationRequest,
+    JsonPublicationReplayKind, PreparedJsonPublication, PublicationRequest,
 };
 
 #[derive(Debug)]
@@ -1942,7 +1944,7 @@ pub(crate) fn list_merge_requests(
                 &remote_dirs(&target.project_root).objects,
                 &current_head,
             )?;
-            if !persisted_merge_request_status_is_terminal(persisted_status)
+            if persisted_status != "applied"
                 && current_head != required_string(&mr, &["target_head_at_request"])?
             {
                 status = "stale".to_string();
@@ -2331,13 +2333,19 @@ pub(crate) fn apply_merge_request(
         },
     );
     if let Some(gate) = _project_gate.as_ref() {
-        if let Some(published) =
-            replay_json_publication(gate, &project.project_root, &publication_request)?
+        if let Some((published, kind)) =
+            replay_json_publication_outcome(gate, &project.project_root, &publication_request)?
         {
             let target_branch = required_string(&published, &["target_branch"])?;
             let head = required_string(&published, &["head"])?;
+            let plan = match kind {
+                JsonPublicationReplayKind::CompletedReceipt => {
+                    request_apply_replay_plan(options, "file", &target_branch, &head)
+                }
+                JsonPublicationReplayKind::Recovery => plan,
+            };
             return Ok(RequestApplyResult {
-                plan: request_apply_replay_plan(options, "file", &target_branch, &head),
+                plan,
                 target_branch,
                 head,
             });
@@ -3687,33 +3695,6 @@ pub(crate) fn validate_merge_request_record(mr: &Value) -> Result<(), CliError> 
         )?;
     }
     Ok(())
-}
-
-fn persisted_merge_request_status_is_terminal(status: &str) -> bool {
-    matches!(status, "applied" | "rejected")
-}
-
-fn request_apply_replay_plan(
-    options: &RequestApplyOptions,
-    transport: &str,
-    target_branch: &str,
-    apply_head: &str,
-) -> Value {
-    json!({
-        "type": "codefire_operation_plan",
-        "version": 1,
-        "command": "request-apply",
-        "dry_run": false,
-        "would_apply": false,
-        "replayed": true,
-        "project_url": &options.project_url,
-        "merge_request_id": &options.mr_id,
-        "target_branch": target_branch,
-        "head": apply_head,
-        "transport": transport,
-        "operations": [],
-        "next_actions": [],
-    })
 }
 
 fn reject_stale_merge_request(mr: &Value) -> Result<(), CliError> {

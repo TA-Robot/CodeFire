@@ -654,10 +654,12 @@ pre/postimages, object roots, progress, and immutable result; keyed success adds
 File and HTTP are adapters over that model, and the Python fallback writes and replays the same
 persisted contract. Cross-runtime replay tests exercise actual Rust and Python processes in both
 directions rather than relying only on a digest fixture.
-File-backed `request-apply` JSON replay reports from that completed receipt: the plan is
-`replayed: true` with `would_apply: false` and no live mutation operations, and the receipt is not
-rewritten. File-backed `request-list` may project `stale` only for a non-terminal MR whose recorded
-target head has drifted; persisted terminal statuses such as `applied` remain the list status.
+File-backed `request-apply` JSON replay reports `replayed: true` with `would_apply: false` and no live
+mutation operations only when `replay_json_publication_outcome` resolves a verified completed
+receipt. Quarantine finish and pending-transaction recovery remain a separate `Recovery` kind and
+keep the live mutation plan, including for keyless requests. File-backed `request-list` may project
+`stale` when the persisted status is not `applied` and the recorded target head has drifted;
+persisted `applied` remains the list status, while drifted `rejected` still projects `stale`.
 
 The core work ledger now exposes an opaque identity for ledger-independent prepared owners and
 ledger-bound publication permits: upper-bound reservation
