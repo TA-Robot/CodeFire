@@ -6,7 +6,8 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 Last audited: 2026-08-22.
 
-- Execution is milestone-based. The live board is `docs/development/milestones.md`. `MS-release-operational-trust` exited after an internal-only candidate passed independent verification/install/smoke/rollback and a fresh Grok audit returned `ACCEPT`; M1 is now `MS-product-value-proof`, beginning with two parallel read-only classification packets.
+- Execution is milestone-based. The live board is `docs/development/milestones.md`. `MS-product-value-proof` exited with literal `narrow`: one source-blind clean-room AI-assisted maintainer sealed the isolated first-seal task (base `CF-COMMIT-3456b0494fd47761a0522cac`, head `CF-COMMIT-d6bb8b1d159ad489dc67ec92`), scored Q1–Q7 7/7 with task value 3/3, and the fresh final Grok audit `218ef86` returned `ACCEPT` with no `block-m1`. The frozen table matched `narrow` on undocumented JSON identifier reliance (fresh auditor 6; controller 4), so the admitted consequence is a narrowed public claim — no retry and no product/README/docs/schema/threshold fix. M1 is now `MS-ecosystem-conformance-seed`, beginning with two parallel read-only classification packets. No ecosystem work has run.
+- The product-value result is bounded: n=1 clean-room AI-assisted maintainer/operator, which is not human adoption and not market validation; timings are machine timings, with time to first successful seal 402s; one genuine exit-10 refusal occurred and its six Fires were cleared; no wrong action, off-task mutation, or private correction was observed. The study fixture's own unconfigured `README.md`, outside that fixture's configured globs, can contradict the sealed requirement without the first-seal loop noticing, and the handed public docs pack does not enumerate every JSON identifier the envelopes return. The earlier adoption milestone remains terminal `adopt` and the release milestone remains internal-only `ACCEPT`.
 - Codex orchestrates. Individual and 30-minute audit agents are Claude Opus 5 or Grok 4.6. Codex does not implement or audit.
 - Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
 - CFB detail ledger: 137 total; 135 `fixed`, 2 `investigating`. Open/investigating count: 2.
@@ -53,12 +54,12 @@ Before starting implementation:
 
 ## Current Cleanup Priorities
 
-The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md`: `MS-product-value-proof`. Its segment/claim/value contract and isolated first-seal fixture/command classification are the two ready read-only packets. Queued, not started:
+The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md`: `MS-ecosystem-conformance-seed`. Its public profile/maturity/extension/corpus classification and its independent client/corpus/falsifier topology classification are the two ready read-only packets. Queued, not started:
 
-1. M2: ecosystem conformance seed (bounded roadmap Stage 6 slice).
-2. M3: ecosystem multi-implementation proof (next bounded roadmap Stage 6 slice).
-3. M4: ecosystem third-organization proof (next bounded roadmap Stage 6 slice).
-4. M5: ecosystem compatible release cycles (next bounded roadmap Stage 6 slice).
+1. M2: ecosystem multi-implementation proof (bounded roadmap Stage 6 slice).
+2. M3: ecosystem third-organization proof (next bounded roadmap Stage 6 slice).
+3. M4: ecosystem compatible release cycles (next bounded roadmap Stage 6 slice).
+4. M5: ecosystem funded-maintainer capacity (next bounded roadmap Stage 6 slice).
 
 ## Validation Matrix
 

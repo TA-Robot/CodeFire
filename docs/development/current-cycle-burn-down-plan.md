@@ -20,7 +20,7 @@ Current known issue count and lifecycle position, audited 2026-07-19 after CFR-1
 - `CFB-120`..`CFB-132` are fixed; final canonical state is `open-clean`, Fire 0, tool migration none. The separately configured repository's branch/open/active control hashes remain unchanged.
 - RVC-011/CFR-161 completed Discover through Retrospect. Installed unsafe-policy replay fails before writes, both real read-only matrices pass without hash drift, and canonical trace-warning policy returns a typed passed decision with no blockers.
 - CFR-162 completed Discover, Freeze, Plan, Implement, Close, Install, Dogfood, and Retrospect. All unresolved merge classes now block the authoritative decision until an explicit validated continue transition.
-- The 60-review current-source audit classified 6 implemented, 3 accepted non-goals, and 51 residual reviews. The residuals remain mapped exactly once to CFR-163..173. Roots through CFR-167/CFB-134 completed the full lifecycle; open CFB-133/136 and CFR-168..173 remain `investigating`. Adoption satisfied only bounded CFR-171..173 slices; release admitted no open root and completed internal-only. All broader roots remain backlog-parked. `BATCH-2026-07-review-portfolio-completion` is historical; live work is `milestones.md` M1 `MS-product-value-proof`.
+- The 60-review current-source audit classified 6 implemented, 3 accepted non-goals, and 51 residual reviews. The residuals remain mapped exactly once to CFR-163..173. Roots through CFR-167/CFB-134 completed the full lifecycle; open CFB-133/136 and CFR-168..173 remain `investigating`. Adoption satisfied only bounded CFR-171..173 slices and ended terminal `adopt`; release admitted no open root and completed internal-only `ACCEPT`; product value admitted no open root and ended literal `narrow` with no product or docs fix. All broader roots remain backlog-parked. `BATCH-2026-07-review-portfolio-completion` is historical; live work is `milestones.md` M1 `MS-ecosystem-conformance-seed`, and no ecosystem work has run.
 - Historical cycle sections were moved to `archive/completed-cycle-ledger.md`. Do not infer current issue counts from historical headings or remaining-count notes.
 - The management hub `docs/development/README.md` is the current-state entry point; update it and append `history.md` when this section changes.
 
@@ -32,7 +32,7 @@ Lifecycle: historical. The first five ordered roots completed through Retrospect
 
 Frozen scope:
 
-- Dogfood/admitted blockers: none for active release M1. Bounded CFR-171..173 adoption slices completed; broader residuals and CFR-168/CFB-136/open CFB-133 remain parked, while CFB-134/CFB-135 are fixed.
+- Dogfood/admitted blockers: none for the active ecosystem M1. Bounded CFR-171..173 adoption slices completed; broader residuals and CFR-168/CFB-136/open CFB-133 remain parked, while CFB-134/CFB-135 are fixed.
 - Current-source review roots: fixed `CFR-163`..`CFR-167` and `CFR-174`/`CFR-175`; active `CFR-168`..`CFR-173`.
 - RVC terminal audit: 60/60 mapped exactly once; 6 implemented, 3 accepted non-goals, 51 promoted to the eleven root owners.
 
