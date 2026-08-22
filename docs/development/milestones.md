@@ -81,11 +81,11 @@ M1 non-goals:
 ## M1 execution graph (current)
 
 ```text
-Critical path: fixture setup -> source-blind consumer -> decision/read-only confirmation -> independent audit -> M1 exit
-Progress: nodes 1–4a completed; isolated closed fixture, public docs pack, label-only harness, and controller answer key are sealed with preservation intact
-Parallel now: node 4b only — launch a fresh source-blind Grok consumer inside the handed root
-Blocked: nodes 4c–7 wait on the submitted answer file
-Next legal action: run Stage B with the exact frozen launch text; do not disclose the packet/key/controller paths
+Critical path: parallel B1 classification/decision audit -> bounded contract fix -> one identical fresh-consumer rerun -> final audit -> M1 exit
+Progress: nodes 1–5 completed; first consumer scored 7/7 but the frozen table returned `narrow` because seven relied-on fields span two undocumented/unschema'd payload families
+Parallel now: node 5a Grok B1 source/schema classification + node 5b fresh Claude score/preservation/decision audit
+Blocked: nodes 5c–7 wait on both lanes; no fix or rerun is admitted yet
+Next legal action: dispatch both ready packets concurrently; keep thresholds and first-run evidence frozen
 ```
 
 ### Nodes
@@ -96,10 +96,15 @@ Next legal action: run Stage B with the exact frozen launch text; do not disclos
 | 2 | CFR-171..173 experiment/falsifier classification — map existing owners and decide the smallest admissible slice | **completed** | Grok 4.6 | — | `ai/task-packets/milestone-adoption-wedge-experiment.md` | that packet only | `3173a91` (integrated as `ef4aa46`); same sealed inspect topology; no product blocker/write |
 | 3 | Orchestrator fan-in and experiment/fix admission | **completed** | Orchestrator | 1, 2 | `ai/task-packets/milestone-adoption-wedge-run.md` | board plus run packet | first experiment admitted without product change; B1 depends on measured result |
 | 4a | Isolated fixture, controller evidence, and consumer handoff | **completed** | persistent Claude node-1 session | 3 | `ai/task-packets/milestone-adoption-wedge-run.md` | isolated roots plus packet | `420bd88` (integrated as `507dda1`); consumer-ready root and sealed external key |
-| 4b | Fresh source-blind consumer comprehension run | **ready** | fresh Grok 4.6 session | 4a | handed task/docs only | consumer-root answer/evidence only | — |
-| 4c | Score and terminal adopt/narrow/stop decision | **blocked** | persistent Claude node-1 session | 4b | run packet | packet/evidence only | — |
-| 5 | Read-only preservation and comprehension confirmation | **blocked** | persistent Claude node-1 session | 4c | run packet | packet/evidence only | — |
-| 6 | Final independent audit | **blocked** | fresh other-family audit agent | 5 | `ai/audit-latest.md` | audit file only | — |
+| 4b | Fresh source-blind consumer comprehension run | **completed** | fresh Grok 4.6 session | 4a | handed task/docs only | consumer-root answer/evidence only | C1–C5 once, answer SHA `187812d6…`, no off-contract command |
+| 4c | Score and terminal adopt/narrow/stop decision | **completed: narrow** | persistent Claude node-1 session | 4b | run packet | packet/evidence only | `2207b88` (integrated as `7f7b86e`); 7/7, Q5/Q6 correct, field reliance 7 → narrow |
+| 5 | Read-only preservation and comprehension confirmation | **completed** | persistent Claude node-1 session | 4c | run packet | packet/evidence only | distinct C2–C5 pass; answer/fixture/canonical hashes frozen |
+| 5a | B1 source/schema/write-set classification | **ready** | persistent Grok node-2 session | 5 | `ai/task-packets/milestone-adoption-wedge-b1.md` | that packet only | — |
+| 5b | Independent first-run score/preservation/decision audit | **ready** | fresh Claude Opus 5 audit session | 5 | `ai/audit-latest.md` | audit file only | — |
+| 5c | Orchestrator fan-in and bounded fix/rerun admission | **blocked** | Orchestrator | 5a, 5b | — | board plus fix/rerun packet | — |
+| 5d | Bounded B1 contract fix | **blocked** | context owner selected at 5c | 5c | — | exact admitted product/docs/test set | — |
+| 5e | One identical fresh-consumer rerun and decision | **blocked** | fresh other-family consumer + persistent controller | 5d | run packet | isolated evidence plus packet | — |
+| 6 | Final independent audit | **blocked** | fresh other-family audit agent | 5e | `ai/audit-latest.md` | audit file only | — |
 | 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
 
 Nodes 1 and 2 are independent: consumer/public-contract selection does not depend on source ownership
