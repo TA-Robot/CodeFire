@@ -29,6 +29,7 @@ CLEAN_GATE: dict[str, Any] = {
     "source_revision": "f" * 40,
     "source_tree": "e" * 40,
     "state": "clean_committed",
+    "worktree": {"status": [], "index_flagged_entries": []},
     "artifacts": [
         {
             "path": "docs/development/tools/check_review_recurrence.py",
@@ -51,6 +52,7 @@ def clean_gate(repo: "FixtureRepo", revision: str) -> dict[str, Any]:
         "source_revision": revision,
         "source_tree": repo.git("rev-parse", f"{revision}^{{tree}}"),
         "state": "clean_committed",
+        "worktree": {"status": [], "index_flagged_entries": []},
         "artifacts": [
             {
                 "path": GATE_PATH,
@@ -712,7 +714,10 @@ def build_second(
     packet_commit = repo.commit(
         "second repair packet and manifest", [SECOND_PACKET_PATH, SECOND_MANIFEST_PATH]
     )
-    repo.write("product.txt", "repaired twice\n")
+    repo.write(
+        "product.txt",
+        "repaired twice\n" if generation == 2 else f"repaired generation {generation}\n",
+    )
     candidate = repo.commit("second repair", ["product.txt"])
     candidate_tree = repo.git("rev-parse", f"{candidate}^{{tree}}")
 

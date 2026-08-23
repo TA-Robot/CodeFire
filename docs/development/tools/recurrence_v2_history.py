@@ -34,14 +34,18 @@ from recurrence_v2_evidence import (
 )
 from recurrence_v2_git import GitError, GitRepo
 from recurrence_v2_model import (
+    AUTHORITY_SCHEMA_IDS,
     LegacyRoot,
     PROVENANCE_LIMITS,
+    RECORD_SCHEMA_PATH,
     RECORD_SCHEMA,
+    RESULT_SCHEMA_PATH,
     RecordModel,
     error,
     parse_record,
     path_components_safe,
     strict_decode_json,
+    validate_schema_definition_identity,
     validate_live_arm_pin_semantics,
 )
 from recurrence_v2_topology import scan_interval_paths, verify_generation
@@ -284,22 +288,55 @@ def revalidate_history(
             continue
 
         local: list[Finding] = []
-        if schema is not None:
-            record_schema_findings = validate_json_schema(raw, schema, "record")
-            local.extend(record_schema_findings)
-            if record_schema_findings:
-                findings.extend(_prefixed(local, prefix))
-                prefix_valid = False
-                continue
-        if result_schema is not None:
-            result_schema_findings = validate_json_schema(
-                result, result_schema, "result"
+        if schema is None:
+            local.append(
+                error(
+                    "history-record-schema-unavailable",
+                    "record",
+                    "the registered recurrence-v2 record schema is required before replay",
+                )
             )
-            local.extend(result_schema_findings)
-            if result_schema_findings:
-                findings.extend(_prefixed(local, prefix))
-                prefix_valid = False
-                continue
+        if result_schema is None:
+            local.append(
+                error(
+                    "history-result-schema-unavailable",
+                    "result",
+                    "the registered recurrence-v2 result schema is required before replay",
+                )
+            )
+        if not local:
+            local.extend(
+                validate_schema_definition_identity(
+                    schema,
+                    AUTHORITY_SCHEMA_IDS[RECORD_SCHEMA_PATH],
+                    "record.schema_definition",
+                )
+            )
+            local.extend(
+                validate_schema_definition_identity(
+                    result_schema,
+                    AUTHORITY_SCHEMA_IDS[RESULT_SCHEMA_PATH],
+                    "result.schema_definition",
+                )
+            )
+        if local:
+            findings.extend(_prefixed(local, prefix))
+            prefix_valid = False
+            continue
+        record_schema_findings = validate_json_schema(raw, schema, "record")
+        local.extend(record_schema_findings)
+        if record_schema_findings:
+            findings.extend(_prefixed(local, prefix))
+            prefix_valid = False
+            continue
+        result_schema_findings = validate_json_schema(
+            result, result_schema, "result"
+        )
+        local.extend(result_schema_findings)
+        if result_schema_findings:
+            findings.extend(_prefixed(local, prefix))
+            prefix_valid = False
+            continue
         pin_semantic_findings = validate_live_arm_pin_semantics(
             result.get("live_arm_pin"), "result.live_arm_pin"
         )

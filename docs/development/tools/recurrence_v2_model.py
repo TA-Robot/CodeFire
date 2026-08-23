@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
@@ -544,17 +545,221 @@ def strict_decode_json(
     return (None, boundary_findings) if boundary_findings else (value, [])
 
 
+def _schema_reference_target(
+    root: dict[str, Any], reference: Any
+) -> tuple[dict[str, Any] | None, str | None]:
+    if not isinstance(reference, str) or not reference.startswith("#/"):
+        return None, f"only local string JSON Schema references are supported: {reference!r}"
+    target: Any = root
+    for raw_part in reference[2:].split("/"):
+        part = raw_part.replace("~1", "/").replace("~0", "~")
+        if not isinstance(target, dict) or part not in target:
+            return None, f"unresolvable JSON Schema reference: {reference}"
+        target = target[part]
+    if not isinstance(target, dict):
+        return None, f"JSON Schema reference is not an object: {reference}"
+    return target, None
+
+
+def _schema_definition_structure_findings(
+    root: dict[str, Any], location: str
+) -> list[Finding]:
+    """Check every operand the repository's compact evaluator may consume."""
+
+    supported_assertions = {
+        "$ref",
+        "type",
+        "const",
+        "enum",
+        "required",
+        "properties",
+        "additionalProperties",
+        "items",
+        "minItems",
+        "maxItems",
+        "uniqueItems",
+        "minLength",
+        "maxLength",
+        "pattern",
+        "minimum",
+        "maximum",
+    }
+    annotations = {"$schema", "$id", "$defs", "title", "description"}
+    allowed_types = {
+        "object",
+        "array",
+        "string",
+        "integer",
+        "number",
+        "boolean",
+        "null",
+    }
+    findings: list[Finding] = []
+    active: set[int] = set()
+    validated: set[int] = set()
+
+    def invalid(path: str, message: str) -> None:
+        findings.append(error("schema-definition-error", path, message))
+
+    def visit(node: Any, path: str) -> None:
+        if not isinstance(node, dict):
+            invalid(path, f"schema node must be an object, got {type(node).__name__}")
+            return
+        identity = id(node)
+        if identity in active:
+            invalid(path, "recursive JSON Schema references are not supported")
+            return
+        if identity in validated:
+            return
+        active.add(identity)
+
+        unknown = sorted(
+            key
+            for key in node
+            if key not in supported_assertions and key not in annotations
+        )
+        if unknown:
+            invalid(path, f"unsupported schema keywords: {', '.join(unknown)}")
+
+        if "$ref" in node:
+            target, problem = _schema_reference_target(root, node["$ref"])
+            if problem is not None:
+                invalid(f"{path}.$ref", problem)
+            elif target is not None:
+                visit(target, f"{path}.$ref")
+
+        expected_type = node.get("type")
+        if expected_type is not None:
+            expected_types = (
+                [expected_type] if isinstance(expected_type, str) else expected_type
+            )
+            if (
+                not isinstance(expected_types, list)
+                or not expected_types
+                or not all(
+                    isinstance(item, str) and item in allowed_types
+                    for item in expected_types
+                )
+                or len(set(expected_types)) != len(expected_types)
+            ):
+                invalid(
+                    f"{path}.type",
+                    "type must be a nonempty unique supported string or string list",
+                )
+
+        enum = node.get("enum")
+        if "enum" in node and (not isinstance(enum, list) or not enum):
+            invalid(f"{path}.enum", "enum must be a nonempty array")
+
+        required = node.get("required")
+        if "required" in node and (
+            not isinstance(required, list)
+            or not all(isinstance(item, str) for item in required)
+            or len(set(required)) != len(required)
+        ):
+            invalid(
+                f"{path}.required",
+                "required must be an array of unique strings",
+            )
+
+        properties = node.get("properties")
+        if "properties" in node:
+            if not isinstance(properties, dict):
+                invalid(f"{path}.properties", "properties must be an object")
+            else:
+                for name, child in properties.items():
+                    visit(child, f"{path}.properties.{name}")
+
+        additional = node.get("additionalProperties")
+        if "additionalProperties" in node:
+            if isinstance(additional, dict):
+                visit(additional, f"{path}.additionalProperties")
+            elif not isinstance(additional, bool):
+                invalid(
+                    f"{path}.additionalProperties",
+                    "additionalProperties must be a boolean or schema object",
+                )
+
+        if "items" in node:
+            items = node.get("items")
+            if isinstance(items, dict):
+                visit(items, f"{path}.items")
+            else:
+                invalid(f"{path}.items", "items must be a schema object")
+
+        for keyword in ("minItems", "maxItems", "minLength", "maxLength"):
+            if keyword not in node:
+                continue
+            bound = node[keyword]
+            if not isinstance(bound, int) or isinstance(bound, bool) or bound < 0:
+                invalid(f"{path}.{keyword}", f"{keyword} must be a nonnegative integer")
+        for lower, upper in (("minItems", "maxItems"), ("minLength", "maxLength")):
+            if (
+                isinstance(node.get(lower), int)
+                and not isinstance(node.get(lower), bool)
+                and isinstance(node.get(upper), int)
+                and not isinstance(node.get(upper), bool)
+                and node[lower] > node[upper]
+            ):
+                invalid(path, f"{lower} must not exceed {upper}")
+
+        if "uniqueItems" in node and not isinstance(node["uniqueItems"], bool):
+            invalid(f"{path}.uniqueItems", "uniqueItems must be a boolean")
+
+        if "pattern" in node:
+            pattern = node["pattern"]
+            if not isinstance(pattern, str):
+                invalid(f"{path}.pattern", "pattern must be a string")
+            else:
+                try:
+                    re.compile(pattern)
+                except re.error as exc:
+                    invalid(f"{path}.pattern", f"invalid pattern: {exc}")
+
+        for keyword in ("minimum", "maximum"):
+            if keyword not in node:
+                continue
+            bound = node[keyword]
+            if (
+                not isinstance(bound, (int, float))
+                or isinstance(bound, bool)
+                or (isinstance(bound, float) and not math.isfinite(bound))
+            ):
+                invalid(f"{path}.{keyword}", f"{keyword} must be a finite number")
+        if (
+            isinstance(node.get("minimum"), (int, float))
+            and not isinstance(node.get("minimum"), bool)
+            and isinstance(node.get("maximum"), (int, float))
+            and not isinstance(node.get("maximum"), bool)
+            and node["minimum"] > node["maximum"]
+        ):
+            invalid(path, "minimum must not exceed maximum")
+
+        definitions = node.get("$defs")
+        if "$defs" in node:
+            if not isinstance(definitions, dict):
+                invalid(f"{path}.$defs", "$defs must be an object")
+            else:
+                for name, child in definitions.items():
+                    visit(child, f"{path}.$defs.{name}")
+
+        for annotation in ("$schema", "$id", "title", "description"):
+            if annotation in node and not isinstance(node[annotation], str):
+                invalid(f"{path}.{annotation}", f"{annotation} must be a string")
+
+        active.remove(identity)
+        validated.add(identity)
+
+    visit(root, location)
+    return findings
+
+
 def validate_schema_definition_identity(
     value: Any,
     expected_id: str,
     location: str,
 ) -> list[Finding]:
-    """Apply the existing schema-registry object and exact-ID checks.
-
-    This intentionally is not recursive JSON Schema meta-validation. Runtime
-    artifacts are validated by the compact evaluator after their schema blob
-    has passed the strict decoder and this identity boundary.
-    """
+    """Validate exact registry identity and the compact evaluator's operands."""
 
     if not isinstance(value, dict):
         return [
@@ -572,7 +777,7 @@ def validate_schema_definition_identity(
                 f"expected {expected_id}, got {value.get('$id')!r}",
             )
         ]
-    return []
+    return _schema_definition_structure_findings(value, location)
 
 
 def validate_live_arm_pin_semantics(
@@ -603,6 +808,100 @@ def validate_live_arm_pin_semantics(
             "unavailable requires null anchor and arm; verified requires both objects",
         )
     ]
+
+
+def validate_deciding_gate_semantics(
+    value: Any,
+    location: str,
+    *,
+    code_prefix: str = "deciding-gate",
+) -> list[Finding]:
+    """Bind ``clean_committed`` to its non-path gate identity facts."""
+
+    if not isinstance(value, dict):
+        return [
+            error(
+                f"{code_prefix}-not-an-object",
+                location,
+                f"expected object, got {type(value).__name__}",
+            )
+        ]
+    if value.get("state") != "clean_committed":
+        return [
+            error(
+                f"{code_prefix}-not-clean-committed",
+                location,
+                f"state is {value.get('state')!r}",
+            )
+        ]
+
+    findings: list[Finding] = []
+    for field in ("source_revision", "source_tree"):
+        commit = value.get(field)
+        if not (
+            isinstance(commit, str)
+            and len(commit) == 40
+            and all(character in "0123456789abcdef" for character in commit)
+        ):
+            findings.append(
+                error(
+                    f"{code_prefix}-clean-{field.replace('_', '-')}-invalid",
+                    f"{location}.{field}",
+                    "clean_committed requires one canonical 40-hex Git identity",
+                )
+            )
+
+    artifacts = value.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        findings.append(
+            error(
+                f"{code_prefix}-clean-artifacts-invalid",
+                f"{location}.artifacts",
+                "clean_committed requires a nonempty gate artifact set",
+            )
+        )
+
+    worktree = value.get("worktree")
+    expected_worktree_keys = {"status", "index_flagged_entries"}
+    if not isinstance(worktree, dict):
+        findings.append(
+            error(
+                f"{code_prefix}-worktree-invalid",
+                f"{location}.worktree",
+                "clean_committed requires its closed worktree state",
+            )
+        )
+    else:
+        actual_worktree_keys = set(worktree)
+        if actual_worktree_keys != expected_worktree_keys:
+            findings.append(
+                error(
+                    f"{code_prefix}-worktree-shape-invalid",
+                    f"{location}.worktree",
+                    f"expected keys {sorted(expected_worktree_keys)}, "
+                    f"got {sorted(actual_worktree_keys)}",
+                )
+            )
+        if (
+            worktree.get("status") != []
+            or worktree.get("index_flagged_entries") != []
+        ):
+            findings.append(
+                error(
+                    f"{code_prefix}-worktree-not-clean",
+                    f"{location}.worktree",
+                    "clean_committed requires empty status and index_flagged_entries",
+                )
+            )
+    if "detail" in value:
+        findings.append(
+            error(
+                f"{code_prefix}-clean-detail-present",
+                f"{location}.detail",
+                "clean_committed gate identities must not retain an error detail",
+            )
+        )
+    return findings
 
 
 def path_components_safe(value: str) -> bool:

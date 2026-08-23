@@ -1329,15 +1329,50 @@ def evaluate_v2(
     findings.extend(boundary_findings)
     findings.extend(v2_raw_repository_path_findings(raw, location))
 
+    schema_definition_findings: list[Finding] = []
+    for schema_value, schema_path, schema_location in (
+        (schema, v2_model.RECORD_SCHEMA_PATH, "schemas.record"),
+        (manifest_schema, v2_model.MANIFEST_SCHEMA_PATH, "schemas.manifest"),
+        (timed_schema, v2_model.TIMED_SCHEMA_PATH, "schemas.timed_result"),
+        (result_schema, v2_model.RESULT_SCHEMA_PATH, "schemas.result"),
+        (
+            anchor_schema,
+            v2_model.LIVE_ARM_ANCHOR_SCHEMA_PATH,
+            "schemas.live_arm_anchor",
+        ),
+    ):
+        if schema_value is None:
+            continue
+        schema_definition_findings.extend(
+            v2_model.validate_schema_definition_identity(
+                schema_value,
+                v2_model.AUTHORITY_SCHEMA_IDS[schema_path],
+                schema_location,
+            )
+        )
+    findings.extend(schema_definition_findings)
+
     if not isinstance(raw, dict):
         findings.append(
             v2_model.error("record-not-an-object", location, type(raw).__name__)
         )
 
     schema_findings: list[Finding] = []
-    if schema is not None and not boundary_findings and isinstance(raw, dict):
+    if schema is None:
+        schema_findings.append(
+            v2_model.error(
+                "record-schema-unavailable",
+                location,
+                "the registered recurrence-v2 record schema is required before typed use",
+            )
+        )
+    elif (
+        not boundary_findings
+        and not schema_definition_findings
+        and isinstance(raw, dict)
+    ):
         schema_findings = validate_json_schema(raw, schema, location)
-        findings.extend(schema_findings)
+    findings.extend(schema_findings)
 
     if findings:
         raw_dict = raw if isinstance(raw, dict) else {}
@@ -1542,10 +1577,16 @@ def evaluate_v2(
     )
     findings.extend(decision.findings)
     blockers.extend(decision.blockers)
-    if deciding_gate.get("state") != "clean_committed":
+    _, gate_identity_findings = v2_authority.verify_current_deciding_gate(
+        deciding_gate,
+        GitRepo(validator_root),
+        "result.deciding_gate",
+    )
+    findings.extend(gate_identity_findings)
+    if gate_identity_findings:
         blockers.append(
-            "deciding_gate: the validator artifacts do not match a clean committed revision "
-            f"(state {deciding_gate.get('state')!r}), so this decision is not reproducible"
+            "deciding_gate: the validator identity is not an exact Git-verified clean "
+            "committed gate, so this decision is not reproducible"
         )
     if live_arm is not None and result["live_arm_pin"]["state"] == "unavailable":
         blockers.append(
@@ -1601,22 +1642,30 @@ def evaluate_v2(
             "finding_count": len(findings),
         }
     )
-    if result_schema is not None:
+    if result_schema is None:
+        rendered_findings = [
+            v2_model.error(
+                "result-schema-unavailable",
+                "result",
+                "the registered recurrence-v2 result schema is required before ALLOW",
+            )
+        ]
+    else:
         rendered_findings = validate_json_schema(result, result_schema, "result")
-        if rendered_findings:
-            findings.extend(rendered_findings)
-            blockers.append(
-                "result: the assembled v2 decision does not satisfy its closed schema"
-            )
-            result.update(
-                {
-                    "record_valid": False,
-                    "integration_decision": "BLOCK",
-                    "blockers": blockers,
-                    "findings": [asdict(finding) for finding in findings],
-                    "finding_count": len(findings),
-                }
-            )
+    if rendered_findings:
+        findings.extend(rendered_findings)
+        blockers.append(
+            "result: the assembled v2 decision does not satisfy its closed schema"
+        )
+        result.update(
+            {
+                "record_valid": False,
+                "integration_decision": "BLOCK",
+                "blockers": blockers,
+                "findings": [asdict(finding) for finding in findings],
+                "finding_count": len(findings),
+            }
+        )
     return result
 
 

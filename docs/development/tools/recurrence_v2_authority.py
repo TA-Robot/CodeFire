@@ -26,7 +26,9 @@ from recurrence_v2_model import (
     BLOB_MODE,
     AUTHORITY_SCHEMA_IDS,
     LEGACY_ROOTS,
+    RECORD_SCHEMA_PATH,
     RESULT_SCHEMA,
+    RESULT_SCHEMA_PATH,
     Authority,
     Finding,
     RecordModel,
@@ -34,6 +36,7 @@ from recurrence_v2_model import (
     parse_record,
     path_components_safe,
     strict_decode_json,
+    validate_deciding_gate_semantics,
     validate_schema_definition_identity,
     validate_live_arm_pin_semantics,
 )
@@ -320,14 +323,11 @@ def _check_deciding_gate(
             error("link-deciding-gate-incomplete", location, f"missing {missing}")
         )
         return {}
-    if raw.get("state") != "clean_committed":
-        findings.append(
-            error(
-                "link-deciding-gate-not-clean-committed",
-                location,
-                f"state is {raw.get('state')!r}",
-            )
+    findings.extend(
+        validate_deciding_gate_semantics(
+            raw, location, code_prefix="link-deciding-gate"
         )
+    )
     revision = raw.get("source_revision")
     if not isinstance(revision, str):
         findings.append(
@@ -453,6 +453,118 @@ def _check_deciding_gate(
             )
         )
     return raw
+
+
+def verify_current_deciding_gate(
+    raw: Any,
+    repo: GitRepo,
+    location: str = "result.deciding_gate",
+) -> tuple[dict[str, Any], list[Finding]]:
+    """Git-verify the exact current gate identity before it can authorize."""
+
+    findings: list[Finding] = []
+    expected = raw if isinstance(raw, dict) else {}
+    verified = _check_deciding_gate(raw, repo, expected, location, findings)
+    if not verified:
+        return verified, findings
+    try:
+        head_revision, head_tree = repo.head_identity()
+        live_status = list(repo.worktree_status())
+        live_index_flags = list(repo.index_flagged_entries())
+    except GitError as exc:
+        findings.append(
+            error(
+                "current-gate-live-state-unreadable",
+                location,
+                str(exc),
+            )
+        )
+        return verified, findings
+
+    if verified.get("source_root") != str(repo.root):
+        findings.append(
+            error(
+                "current-gate-source-root-mismatch",
+                f"{location}.source_root",
+                f"recorded {verified.get('source_root')!r}, evaluated {str(repo.root)!r}",
+            )
+        )
+    if (
+        verified.get("source_revision") != head_revision
+        or verified.get("source_tree") != head_tree
+    ):
+        findings.append(
+            error(
+                "current-gate-head-mismatch",
+                location,
+                f"recorded {verified.get('source_revision')}/{verified.get('source_tree')}, "
+                f"live HEAD is {head_revision}/{head_tree}",
+            )
+        )
+
+    recorded_worktree = verified.get("worktree")
+    recorded_status = (
+        recorded_worktree.get("status")
+        if isinstance(recorded_worktree, dict)
+        else None
+    )
+    recorded_index_flags = (
+        recorded_worktree.get("index_flagged_entries")
+        if isinstance(recorded_worktree, dict)
+        else None
+    )
+    if recorded_status != live_status or recorded_index_flags != live_index_flags:
+        findings.append(
+            error(
+                "current-gate-worktree-drift",
+                f"{location}.worktree",
+                f"recorded status/index {recorded_status!r}/{recorded_index_flags!r}, "
+                f"live {live_status!r}/{live_index_flags!r}",
+            )
+        )
+    if live_status or live_index_flags:
+        findings.append(
+            error(
+                "current-gate-worktree-not-clean",
+                f"{location}.worktree",
+                "the validator worktree or index flags changed before evaluation",
+            )
+        )
+
+    rows = verified.get("artifacts")
+    for index, row in enumerate(rows if isinstance(rows, list) else []):
+        if not isinstance(row, dict):
+            continue
+        path = row.get("path")
+        if not isinstance(path, str) or not path_components_safe(path):
+            continue
+        where = f"{location}.artifacts[{index}]"
+        on_disk_path = repo.root / path
+        if on_disk_path.is_symlink() or not on_disk_path.is_file():
+            findings.append(
+                error(
+                    "current-gate-artifact-not-regular-file",
+                    where,
+                    path,
+                )
+            )
+            continue
+        try:
+            on_disk_digest = sha256_bytes(on_disk_path.read_bytes())
+        except OSError as exc:
+            findings.append(
+                error("current-gate-artifact-unreadable", where, str(exc))
+            )
+            continue
+        if row.get("sha256") != on_disk_digest:
+            findings.append(
+                error(
+                    "current-gate-artifact-digest-mismatch",
+                    where,
+                    f"recorded {row.get('sha256')!r}, on disk {on_disk_digest}",
+                )
+            )
+    return verified, findings
 
 
 def _gate_fingerprint(identity: dict[str, Any]) -> tuple[str, ...]:
@@ -617,25 +729,56 @@ def resolve_predecessor_authority_chain(
                     f"computed {prior_result_digest}",
                 )
             )
-        if schema is not None:
-            schema_findings = validate_json_schema(
-                prior_raw, schema, f"{current_location}.record"
+        if schema is None:
+            findings.append(
+                error(
+                    "prior-record-schema-unavailable",
+                    f"{current_location}.record",
+                    "the registered recurrence-v2 record schema is required before typed use",
+                )
             )
-            findings.extend(schema_findings)
-            if schema_findings:
-                return ChainResult(depth=depth), findings
+            return ChainResult(depth=depth), findings
+        if result_schema is None:
+            findings.append(
+                error(
+                    "prior-result-schema-unavailable",
+                    f"{current_location}.result",
+                    "the registered recurrence-v2 result schema is required before typed use",
+                )
+            )
+            return ChainResult(depth=depth), findings
+        schema_definition_findings = (
+            validate_schema_definition_identity(
+                schema,
+                AUTHORITY_SCHEMA_IDS[RECORD_SCHEMA_PATH],
+                f"{current_location}.record.schema_definition",
+            )
+            + validate_schema_definition_identity(
+                result_schema,
+                AUTHORITY_SCHEMA_IDS[RESULT_SCHEMA_PATH],
+                f"{current_location}.result.schema_definition",
+            )
+        )
+        findings.extend(schema_definition_findings)
+        if schema_definition_findings:
+            return ChainResult(depth=depth), findings
+        schema_findings = validate_json_schema(
+            prior_raw, schema, f"{current_location}.record"
+        )
+        findings.extend(schema_findings)
+        if schema_findings:
+            return ChainResult(depth=depth), findings
         prior, parse_findings = parse_record(prior_raw, f"{current_location}.record")
         findings.extend(parse_findings)
         if prior is None:
             return ChainResult(depth=depth), findings
 
-        if result_schema is not None:
-            result_schema_findings = validate_json_schema(
-                prior_result, result_schema, f"{current_location}.result"
-            )
-            findings.extend(result_schema_findings)
-            if result_schema_findings:
-                return ChainResult(depth=depth), findings
+        result_schema_findings = validate_json_schema(
+            prior_result, result_schema, f"{current_location}.result"
+        )
+        findings.extend(result_schema_findings)
+        if result_schema_findings:
+            return ChainResult(depth=depth), findings
         pin_findings = validate_live_arm_pin_semantics(
             prior_result.get("live_arm_pin") if isinstance(prior_result, dict) else None,
             f"{current_location}.result.live_arm_pin",

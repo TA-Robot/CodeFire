@@ -26,6 +26,7 @@ from ai_contracts import validate_json_schema
 from recurrence_v2_authority import ChainResult
 from recurrence_v2_git import GitError, GitRepo, sha256_bytes
 from recurrence_v2_model import (
+    AUTHORITY_SCHEMA_IDS,
     BLOB_MODE,
     LEGACY_ROOTS,
     LIVE_ARM_ANCHOR_SCHEMA_PATH,
@@ -48,6 +49,7 @@ from recurrence_v2_model import (
     parse_manifest,
     path_components_safe,
     strict_decode_json,
+    validate_schema_definition_identity,
 )
 
 GATE_SOURCE_PATHS = (
@@ -624,6 +626,23 @@ def load_manifest(
                 "the record does not bind both packet artifacts",
             )
         ]
+    if manifest_schema is None:
+        findings.append(
+            error(
+                "manifest-schema-unavailable",
+                location,
+                "the registered repair-manifest schema is required before typed use",
+            )
+        )
+        return None, findings
+    definition_findings = validate_schema_definition_identity(
+        manifest_schema,
+        AUTHORITY_SCHEMA_IDS[MANIFEST_SCHEMA_PATH],
+        f"{location}.schema_definition",
+    )
+    findings.extend(definition_findings)
+    if definition_findings:
+        return None, findings
     try:
         payload = repo.blob(
             manifest_artifact.commit, manifest_artifact.path.encode("utf-8")
@@ -633,15 +652,6 @@ def load_manifest(
     raw, decode_findings = strict_decode_json(payload, location)
     findings.extend(decode_findings)
     if raw is None or decode_findings:
-        return None, findings
-    if manifest_schema is None:
-        findings.append(
-            error(
-                "manifest-schema-unavailable",
-                location,
-                "the registered repair-manifest schema is required before typed use",
-            )
-        )
         return None, findings
     schema_findings = validate_json_schema(raw, manifest_schema, location)
     findings.extend(schema_findings)
@@ -1136,6 +1146,21 @@ def bind_timed_validations(
 ) -> tuple[dict[str, TimedFacts], list[Finding]]:
     findings: list[Finding] = []
     facts: dict[str, TimedFacts] = {}
+    if timed_schema is None:
+        return facts, [
+            error(
+                "timed-result-schema-unavailable",
+                "schemas.timed_result",
+                "the registered timed-result schema is required before typed use",
+            )
+        ]
+    definition_findings = validate_schema_definition_identity(
+        timed_schema,
+        AUTHORITY_SCHEMA_IDS[TIMED_SCHEMA_PATH],
+        "schemas.timed_result",
+    )
+    if definition_findings:
+        return facts, definition_findings
     argv_map = manifest.validation_argv() if manifest is not None else {}
     duplicate_ids = frozenset(duplicates([row.id for row in record.validations]))
     if duplicate_ids:
@@ -1166,15 +1191,6 @@ def bind_timed_validations(
         )
         findings.extend(decode_findings)
         if payload is None or decode_findings:
-            continue
-        if timed_schema is None:
-            findings.append(
-                error(
-                    "timed-result-schema-unavailable",
-                    f"{location}.result",
-                    "the registered timed-result schema is required before typed use",
-                )
-            )
             continue
         schema_findings = validate_json_schema(
             payload, timed_schema, f"{location}.result"
@@ -1385,6 +1401,13 @@ def _decode_live_arm_anchor(
                 "the registered live-arm-anchor schema is required before typed use",
             )
         ]
+    definition_findings = validate_schema_definition_identity(
+        anchor_schema,
+        AUTHORITY_SCHEMA_IDS[LIVE_ARM_ANCHOR_SCHEMA_PATH],
+        f"{location}.schema_definition",
+    )
+    if definition_findings:
+        return None, definition_findings
     schema_findings = validate_json_schema(raw, anchor_schema, location)
     if schema_findings:
         return None, schema_findings
