@@ -200,7 +200,27 @@ closeはpayload→carrier/pair/semantic→combined control→stable gateの順�
 処理し、ownerは最後にcontrol解放済みを検証する。公開getter、effect、
 publication、response、handlerは持たない。
 
-既存の`_PreparedHTTPMutationResponses`をこのownerの前後へ単純接続する案は
+liveなUpload routeのresponse lifecycle自体はADR-021として実装済みである。
+`handle_http_upload`は最後のpre-effect fenceでresponse permitをsealし、
+その直後・first fallible effectの直前に一方向marker `EFFECT_MAY_HAVE_STARTED`
+を立てる。両者の間にあるのはlocal state代入ひとつだけで、markerはdurable byte
+の可視化を証明せず「no-effectをもう証明できない」ことだけを示す。selectionは
+destination-firstで、exact selected ownerがslotへ移りdirectionがimmutableに
+なった後でのみrejected ownerのfallible releaseが走る。`do_POST`は`take()`せず
+slotを唯一のownerとして保持し、publishは凍結header/bodyをborrowして最初の
+write前に`WIRE_STARTED`を記録するため、second documentは発生しえない。
+`transport_boundary`は2回のsocket writeのみを覆い、write後のaccounting
+`OSError`はtransport originにならない。pre-effect abortとpost-effect finishは
+別operationで、abort中のdisposal faultはresponseを一切publishせずconnectionを
+閉じ、post-effect faultはfrozen success/durable responseに対して常にsecondaryで
+ある。failed releaseは同一の非消費ownerを保持し、failed boundaryごとに
+request loopでちょうど1回だけsynchronous retryする。recoveryはbounded
+diagnosticを1回だけ消費し、persistent failureはconnectionを閉じてreachable
+ownerとexact debtを報告し、既存の`cleanup_incomplete` terminalを使う。
+新しいpublication/wire terminalは追加しない。
+
+一方、既存の`_PreparedHTTPMutationResponses`を上記production-unwired
+effect-input ownerの前後へ単純接続する案は引き続き
 Freezeされている。terminal前にresponseをprepareするとlast callbackによる
 header/body差替えがterminal probe外に残り、terminal後にprepareするとresponse
 deadline callbackが検証済みgate subjectを変更できる。またsealed後の正規response

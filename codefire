@@ -15668,7 +15668,12 @@ def handle_http_upload(
             response_slot.select_durable()
             return 503, HTTP_MUTATION_RETRY_PAYLOAD
         if response_slot is not None:
-            response_slot.close()
+            # The cleanup policy is chosen by the slot's asserted phase, never
+            # by one generic close reading an already-damaged set of pointers.
+            if response_slot.effect_started:
+                response_slot.finish_after_effect()
+            else:
+                response_slot.abort_before_effect()
         raise
     finally:
         cleanup_error: BaseException | None = None
@@ -16547,13 +16552,26 @@ class _PreparedHTTPResponseOwner:
         self.header_retained = 0
         self.body_retained = 0
 
-    def publish(self, destination: Any) -> None:
+    def write_to(self, destination: Any) -> None:
+        """Write the exact frozen header and body, and nothing else.
+
+        This is the whole socket-facing operation, so the transport boundary
+        starts and stops here.  An accounting fault raised by a later ``close``
+        is therefore never attributed to the client socket merely because it
+        followed a write.  Ownership is not transferred: a borrowed publication
+        writes through this method and leaves the release to its owner.
+        """
         if self.header is None or self.body is None:
             raise CFError("prepared HTTP response owner is already closed")
-        try:
+        with transport_boundary():
             destination.write(self.header)
             destination.write(self.body)
-            self.published = True
+        self.published = True
+
+    def publish(self, destination: Any) -> None:
+        """Write the frozen response, then release its own accounting."""
+        try:
+            self.write_to(destination)
         finally:
             self.close()
 
@@ -16567,10 +16585,36 @@ class _PreparedHTTPResponseOwner:
 class _PreparedHTTPMutationResponses:
     """Own success and fixed durable-retry responses until one is selected.
 
-    Selection retains both pointers until the rejected owner's drop-before-
-    release cleanup succeeds. A release fault therefore leaves an exact retry
-    state instead of losing either the selected payload or accounting owner.
+    Selection is a destination-first handoff.  ``select_success`` and
+    ``select_durable`` validate the ledger, record the immutable direction and
+    hand the exact selected owner back; they run nothing fallible, so the caller
+    installs that owner in its destination before anything can fail.  The pair
+    then owns only the rejected owner, and ``release_rejected`` is the single
+    fallible step.  A release fault therefore leaves an exact retry state that
+    can neither lose the selected payload nor release either owner twice, and no
+    generic cleanup on this object can reach the selected response at all.
+
+    ``state`` is production state, not test-only evidence:
+
+    * ``open``              — both owners and both permits are held;
+    * ``sealed``            — both owners are held and no permit is open;
+    * ``selecting_success`` / ``selecting_durable`` — the direction is fixed and
+      the reference handoff is in progress;
+    * ``selected_success`` / ``selected_durable``   — the selected owner has
+      left and only the rejected owner remains here;
+    * ``cleanup_pending``   — a release failed and the identical owner is
+      retained for its retry;
+    * ``closed``            — no owner and no permit remain.
     """
+
+    OPEN = "open"
+    SEALED = "sealed"
+    SELECTING_SUCCESS = "selecting_success"
+    SELECTING_DURABLE = "selecting_durable"
+    SELECTED_SUCCESS = "selected_success"
+    SELECTED_DURABLE = "selected_durable"
+    CLEANUP_PENDING = "cleanup_pending"
+    CLOSED = "closed"
 
     def __init__(
         self,
@@ -16587,6 +16631,10 @@ class _PreparedHTTPMutationResponses:
         self.ledger = ledger
         self.success: _PreparedHTTPResponseOwner | None = success
         self.durable: _PreparedHTTPResponseOwner | None = durable
+        # Set only by the handoff, and only to the owner the caller rejected.
+        # The selected owner is never reachable from this object again.
+        self.rejected: _PreparedHTTPResponseOwner | None = None
+        self.state = self.OPEN
         self.response_permit: DecisionWorkPermit | None = response_permit
         self.header_permit: DecisionWorkPermit | None = header_permit
         self.success_body_bytes = success_body_bytes
@@ -16595,12 +16643,41 @@ class _PreparedHTTPMutationResponses:
         self.durable_header_bytes = durable_header_bytes
         self.selection: str | None = None
 
+    @property
+    def pending_release(self) -> bool:
+        """True while this pair still owns an exact, unreleased remainder."""
+        return (
+            self.success is not None
+            or self.durable is not None
+            or self.rejected is not None
+            or self.response_permit is not None
+            or self.header_permit is not None
+        )
+
     def _select(
         self, ledger: DecisionWorkLedger, durable: bool
     ) -> _PreparedHTTPResponseOwner:
+        """Fix the direction and hand the selected owner to its destination.
+
+        Nothing fallible runs here.  Every rejection below leaves the pair
+        byte-for-byte as it was, the direction becomes immutable the moment it
+        is recorded, and the rejected owner is retained for the separate
+        ``release_rejected`` step the caller drives after the handoff.
+        """
         if ledger is not self.ledger:
             raise CFError(
                 "prepared HTTP mutation responses belong to a different decision-work ledger"
+            )
+        requested_selection = "durable" if durable else "success"
+        if self.selection is not None and self.selection != requested_selection:
+            raise CFError(
+                "prepared HTTP mutation response selection cannot be changed"
+            )
+        if self.selection is not None:
+            # The direction already completed its handoff.  The selected owner
+            # belongs to its destination and is never yielded a second time.
+            raise CFError(
+                "prepared HTTP mutation response selection already completed"
             )
         selected = self.durable if durable else self.success
         rejected = self.success if durable else self.durable
@@ -16610,16 +16687,40 @@ class _PreparedHTTPMutationResponses:
             raise CFError(
                 "prepared HTTP mutation response work is not sealed for effect"
             )
-        requested_selection = "durable" if durable else "success"
-        if self.selection is not None and self.selection != requested_selection:
-            raise CFError(
-                "prepared HTTP mutation response selection cannot be changed"
-            )
         self.selection = requested_selection
-        rejected.close()
+        self.state = (
+            self.SELECTING_DURABLE if durable else self.SELECTING_SUCCESS
+        )
+        # One logical handoff of three local references.  No user code, no
+        # allocation proportional to input and no fallible call may intervene,
+        # so the caller's destination owns the selected payload before the
+        # rejected owner's release is ever attempted.
         self.success = None
         self.durable = None
+        self.rejected = rejected
+        self.state = (
+            self.SELECTED_DURABLE if durable else self.SELECTED_SUCCESS
+        )
         return selected
+
+    def release_rejected(self) -> None:
+        """Release the exact rejected owner; a fault retains that same owner.
+
+        ``_PreparedHTTPResponseOwner.close`` drops the payload references before
+        its ledger release, so a failed release leaves the byte counts owned and
+        this identical owner can be retried without reviving the payload or
+        double-releasing it.  No replacement owner is ever constructed.
+        """
+        rejected = self.rejected
+        if rejected is None:
+            if not self.pending_release:
+                self.state = self.CLOSED
+            return
+        self.state = self.CLEANUP_PENDING
+        rejected.close()
+        self.rejected = None
+        if not self.pending_release:
+            self.state = self.CLOSED
 
     def seal_for_effect(self, ledger: DecisionWorkLedger) -> None:
         if ledger is not self.ledger:
@@ -16654,6 +16755,7 @@ class _PreparedHTTPMutationResponses:
         if self.ledger.permit_is_open(header_permit):
             self.ledger.cancel_permit(header_permit)
         self.header_permit = None
+        self.state = self.SEALED
 
     def select_success(
         self, ledger: DecisionWorkLedger
@@ -16666,9 +16768,18 @@ class _PreparedHTTPMutationResponses:
         return self._select(ledger, True)
 
     def close(self) -> None:
+        """Dispose everything this pair still owns.
+
+        After a handoff the selected owner is unreachable from here, so this
+        generic cleanup can only ever release the rejected owner and the
+        permits.  It is therefore safe on both the pre-selection abort path and
+        the post-selection remainder path, and it can never destroy a response
+        that a slot has already selected for publication.
+        """
         first_error: BaseException | None = None
         success = self.success
         durable = self.durable
+        rejected = self.rejected
         response_permit = self.response_permit
         header_permit = self.header_permit
         if success is not None:
@@ -16681,6 +16792,13 @@ class _PreparedHTTPMutationResponses:
             try:
                 durable.close()
                 self.durable = None
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+        if rejected is not None:
+            try:
+                rejected.close()
+                self.rejected = None
             except BaseException as error:
                 if first_error is None:
                     first_error = error
@@ -16709,7 +16827,9 @@ class _PreparedHTTPMutationResponses:
         else:
             self.header_permit = None
         if first_error is not None:
+            self.state = self.CLEANUP_PENDING
             raise first_error
+        self.state = self.CLOSED
 
     def __del__(self) -> None:
         try:
@@ -16728,46 +16848,139 @@ HTTP_MUTATION_RETRY_PAYLOAD = {
 }
 
 
+#: Upper bound on one retained secondary cleanup diagnostic.  A cleanup fault is
+#: never allowed to become a new primary outcome, so its text is bounded before
+#: it is retained or logged.
+HTTP_MUTATION_CLEANUP_DIAGNOSTIC_LIMIT = 240
+
+
 class _HTTPMutationResponseSlot:
-    """Transfer one prepared mutation response from a route to the handler."""
+    """Own one mutation response through effect, wire and cleanup.
+
+    The Upload route reaches its conservative ``EFFECT_MAY_HAVE_STARTED`` marker
+    with this slot already holding a sealed success/durable pair.  From that
+    point the slot is the single canonical owner: selection installs the exact
+    selected owner here *before* any fallible rejected-owner cleanup, wire
+    publication borrows that owner instead of taking it, and the handler keeps
+    this same slot through its one synchronous cleanup retry and the terminal
+    request observation.  Nothing splits ownership between the pair, a local
+    variable and the publisher.
+
+    ``state`` is production state, not test-only evidence:
+
+    * ``empty`` / ``prepared`` / ``sealed`` — pre-effect; ``abort_before_effect``
+      is legal and publishes nothing;
+    * ``effect_may_have_started`` — ``M`` is set, so no-effect can no longer be
+      proved and the pre-effect abort is permanently illegal;
+    * ``selected``      — exactly one immutable selected owner is installed here;
+    * ``wire_started``  — the first header write was attempted, so a second HTTP
+      document is permanently forbidden;
+    * ``wire_complete`` — both write calls returned; this asserts nothing about
+      peer receipt, flush or any durable byte;
+    * ``cleanup_pending`` — an exact accounting remainder is still owned;
+    * ``closed``        — no permit, no debt, no payload and no state that could
+      reach a later request.
+    """
+
+    EMPTY = "empty"
+    PREPARED = "prepared"
+    SEALED = "sealed"
+    EFFECT_MAY_HAVE_STARTED = "effect_may_have_started"
+    SELECTED = "selected"
+    WIRE_STARTED = "wire_started"
+    WIRE_COMPLETE = "wire_complete"
+    CLEANUP_PENDING = "cleanup_pending"
+    CLOSED = "closed"
+
+    WIRE_NOT_STARTED = "not_started"
+    WIRE_ATTEMPTED = "started"
+    WIRE_RETURNED = "complete"
+
+    #: Two total attempts at one failed release boundary: the initial attempt at
+    #: the owning transition plus exactly one synchronous retry on the identical
+    #: owner, driven by the request loop.  There is no third attempt, no
+    #: replacement owner, no aggregate release and no loop.  The bound is per
+    #: failed boundary, so a rejected-owner release that already succeeded never
+    #: spends the selected owner's one retry.
+    CLEANUP_ATTEMPT_LIMIT = 2
 
     def __init__(self, handler: Any) -> None:
         self.handler = handler
         self.responses: _PreparedHTTPMutationResponses | None = None
         self.selected: _PreparedHTTPResponseOwner | None = None
-        self.effect_started = False
+        self.selection: str | None = None
+        self.state = self.EMPTY
+        self.wire_state = self.WIRE_NOT_STARTED
+        self.cleanup_attempts = 0
+        self._boundary_attempts = 0
+        self.cleanup_faults: list[str] = []
+        self.cleanup_recovered = False
+        self.recovery_reported = False
+        self.publication_forbidden = False
+        self._effect_started = False
+        self._wire_settled = False
 
     @property
     def is_prepared(self) -> bool:
         return self.responses is not None
 
+    @property
+    def has_selected(self) -> bool:
+        return self.selected is not None
+
+    @property
+    def effect_started(self) -> bool:
+        """``M``.  One-way: no cleanup, failure or reset ever clears it."""
+        return self._effect_started
+
+    @property
+    def wire_started(self) -> bool:
+        """True once a header write was attempted; no second document may go."""
+        return self.wire_state != self.WIRE_NOT_STARTED
+
+    @property
+    def selected_release_due(self) -> bool:
+        """The selected owner is released only after its one wire attempt.
+
+        Until the wire attempt happened -- or the request loop proved it can
+        never happen -- the selected payload is not a cleanup remainder, because
+        destroying it would lose the frozen response it is holding.
+        """
+        return self.wire_started or self._wire_settled
+
+    @property
+    def cleanup_incomplete(self) -> bool:
+        """True while this slot still owns an exact, unreleased remainder."""
+        responses = self.responses
+        if responses is not None and responses.pending_release:
+            return True
+        return self.selected is not None and self.selected_release_due
+
     def prepare(self, status: int, payload: Any) -> None:
         if self.responses is not None or self.selected is not None:
             raise CFError("upload mutation response is already prepared")
+        if self._effect_started:
+            raise CFError(
+                "upload mutation response cannot be prepared after its effect"
+            )
         self.responses = self.handler.prepare_mutation_json(status, payload)
-
-    def select_success(self) -> None:
-        if self.responses is None:
-            raise CFError("upload success response was not prepared")
-        responses = self.responses
-        selected = responses.select_success(self.handler.decision_work)
-        self.responses = None
-        self.selected = selected
-
-    def select_durable(self) -> None:
-        if self.responses is None:
-            raise CFError("upload durable response was not prepared")
-        responses = self.responses
-        selected = responses.select_durable(self.handler.decision_work)
-        self.responses = None
-        self.selected = selected
+        self.state = self.PREPARED
 
     def seal_for_effect(self) -> None:
         if self.responses is None or self.selected is not None:
             raise CFError("upload mutation response is not available to seal")
         self.responses.seal_for_effect(self.handler.decision_work)
+        self.state = self.SEALED
 
     def mark_effect_started(self) -> None:
+        """Set the one-way conservative marker ``M``.
+
+        Exactly one local enum assignment separates this from the route's first
+        fallible effect.  It is not evidence that an effect happened, that a
+        publication was confirmed, that a client received bytes or that any
+        durable byte became visible.  It establishes only that the route can no
+        longer prove that no effect began.
+        """
         if self.responses is None or self.selected is not None:
             raise CFError("upload response must be prepared before its effect")
         if (
@@ -16775,23 +16988,274 @@ class _HTTPMutationResponseSlot:
             or self.responses.header_permit is not None
         ):
             raise CFError("upload response work must be sealed before its effect")
-        self.effect_started = True
+        self._effect_started = True
+        self.state = self.EFFECT_MAY_HAVE_STARTED
 
-    def take(self) -> _PreparedHTTPResponseOwner | None:
+    def select_success(self) -> None:
+        self._select(False)
+
+    def select_durable(self) -> None:
+        self._select(True)
+
+    def _select(self, durable: bool) -> None:
+        """Install the selected owner here, then release the rejected owner.
+
+        The handoff runs first and cannot fail, so the exact selected owner is
+        already this slot's property before the rejected owner's fallible
+        release is attempted.  A release fault is secondary: it is recorded, the
+        identical rejected owner is retained for one synchronous retry, and the
+        selected response stays eligible for its one wire attempt.
+        """
+        responses = self.responses
+        if responses is None:
+            raise CFError(
+                "upload durable response was not prepared"
+                if durable
+                else "upload success response was not prepared"
+            )
+        if not self._effect_started:
+            raise CFError(
+                "upload mutation response cannot be selected before its effect"
+            )
+        selected = (
+            responses.select_durable(self.handler.decision_work)
+            if durable
+            else responses.select_success(self.handler.decision_work)
+        )
+        # Destination-first.  The slot owns the selected payload before anything
+        # fallible runs, and the pair now holds only the rejected cleanup owner.
+        self.selected = selected
+        self.selection = responses.selection
+        self.state = self.SELECTED
+        self._attempt_cleanup()
+
+    def publish_selected(self) -> None:
+        """Attempt exactly one framing of the borrowed selected response.
+
+        The slot keeps ownership throughout: the wire layer borrows the frozen
+        header and body, so a transport fault cannot destroy the payload and an
+        accounting fault cannot be attributed to the socket.  ``WIRE_STARTED``
+        is recorded *before* the first write is attempted, because a header
+        write may already have put a prefix on the wire before raising, so no
+        second document may ever follow -- an apparently empty capture buffer is
+        not authority to send a fallback.
+        """
         selected = self.selected
-        self.selected = None
-        return selected
+        if selected is None:
+            raise CFError("upload mutation response was not selected")
+        if self.wire_started:
+            raise CFError(
+                "upload mutation response was already written to the wire"
+            )
+        handler = self.handler
+        wire_error: BaseException | None = None
+        try:
+            self.wire_state = self.WIRE_ATTEMPTED
+            self.state = self.WIRE_STARTED
+            selected.write_to(handler.wfile)
+            self.wire_state = self.WIRE_RETURNED
+            self.state = self.WIRE_COMPLETE
+        except BaseException as error:
+            wire_error = error
+        finally:
+            handler._response_body_dropped_before_release = True
+        # Accounting release, diagnostics and terminal observation all run
+        # outside the transport boundary and outside the framing attempt.
+        self._attempt_cleanup()
+        if wire_error is not None:
+            handler.close_connection = True
+            raise wire_error
+
+    def abort_before_effect(self) -> None:
+        """Dispose both response choices before ``M``; publish nothing.
+
+        Legal only while no effect can have started.  It never selects, never
+        writes and never leaves a fallback: once disposal is uncertain the
+        request publishes zero response bytes and the connection closes, so a
+        later recovered release can never be mistaken for permission to resume
+        response selection.  The route's original primary error keeps its own
+        exception/diagnostic channel.
+        """
+        if self._effect_started:
+            raise CFError(
+                "upload mutation response cannot abort after its effect may have started"
+            )
+        if self.selected is not None:
+            raise CFError("upload mutation response cannot abort after selection")
+        if self.responses is None:
+            self._settle_cleanup_state()
+            return
+        if not self._attempt_cleanup():
+            self.publication_forbidden = True
+            self.handler.close_connection = True
+
+    def finish_after_effect(self) -> None:
+        """Settle cleanup at or after ``M`` without ever losing the selection.
+
+        The selected owner is never released here before its one wire attempt,
+        and a cleanup fault stays strictly secondary to the frozen
+        success/durable response.
+        """
+        if not self._effect_started:
+            raise CFError(
+                "upload mutation response cannot finish before its effect"
+            )
+        self._attempt_cleanup()
+
+    def finish_request_cleanup(self) -> None:
+        """Run the request loop's one synchronous retry, then settle.
+
+        By this point the wire attempt either happened or can never happen, so
+        the selected owner's accounting is due either way.  The retry uses the
+        identical retained owners; nothing is reconstructed, and nothing is
+        cleared to make the observation look clean.
+        """
+        self._wire_settled = True
+        self._attempt_cleanup()
+        self._report_recovered_cleanup()
+
+    def _attempt_cleanup(self) -> bool:
+        """Release every exact remainder once; return True when nothing is owed.
+
+        Both retained owners are the identical objects the route selected over.
+        They are never replaced, reconstructed or aggregated, and the attempt
+        counter bounds the whole boundary at two.
+        """
+        if not self.cleanup_incomplete:
+            self._boundary_attempts = 0
+            self._settle_cleanup_state()
+            return True
+        if self._boundary_attempts >= self.CLEANUP_ATTEMPT_LIMIT:
+            return False
+        self.cleanup_attempts += 1
+        self._boundary_attempts += 1
+        responses = self.responses
+        if responses is not None and responses.pending_release:
+            try:
+                if self.selection is not None:
+                    responses.release_rejected()
+                else:
+                    responses.close()
+            except BaseException as error:
+                self._record_cleanup_fault(error)
+            if not responses.pending_release:
+                self.responses = None
+        selected = self.selected
+        if selected is not None and self.selected_release_due:
+            try:
+                selected.close()
+                self.selected = None
+            except BaseException as error:
+                self._record_cleanup_fault(error)
+        settled = not self.cleanup_incomplete
+        if settled:
+            self._boundary_attempts = 0
+            if self.cleanup_faults:
+                self.cleanup_recovered = True
+        self._settle_cleanup_state()
+        return settled
+
+    def _record_cleanup_fault(self, error: BaseException) -> None:
+        """Retain one bounded secondary diagnostic; never a new primary."""
+        if len(self.cleanup_faults) >= self.CLEANUP_ATTEMPT_LIMIT:
+            return
+        text = f"{type(error).__name__}: {error}"
+        self.cleanup_faults.append(text[:HTTP_MUTATION_CLEANUP_DIAGNOSTIC_LIMIT])
+
+    def _settle_cleanup_state(self) -> None:
+        """Reach ``closed`` only once the exact debt was actually released."""
+        if self.cleanup_incomplete:
+            self.state = self.CLEANUP_PENDING
+        elif self.selected is None:
+            self.state = self.CLOSED
+
+    def _report_recovered_cleanup(self) -> None:
+        """Consume the bounded recovered-cleanup diagnostic exactly once.
+
+        A fault a retry repaired is not silently dropped and never replaces the
+        exact selected response: it reaches the handler's own error log, which
+        is this route's stable production diagnostic channel, and stays in the
+        request observation.  A clean request emits nothing.
+        """
+        if self.recovery_reported or not self.cleanup_recovered:
+            return
+        if not self.cleanup_faults:
+            return
+        self.recovery_reported = True
+        self.handler.log_error(
+            "recovered cleanup fault: %s",
+            canonical_json(
+                {
+                    "selection": self.selection,
+                    "attempts": self.cleanup_attempts,
+                    "faults": list(self.cleanup_faults),
+                }
+            ).decode("utf-8", "replace"),
+        )
+
+    def observation(self) -> dict[str, Any]:
+        """Report exactly what this slot still owns; nothing is cleared first."""
+        ledger = self.handler.decision_work
+        selected = self.selected
+        responses = self.responses
+        rejected = None if responses is None else responses.rejected
+        return {
+            "selection": self.selection,
+            "slot_state": self.state,
+            "pair_state": None if responses is None else responses.state,
+            "wire_state": self.wire_state,
+            "second_document_forbidden": self.wire_started,
+            "effect_started": self._effect_started,
+            "cleanup_attempts": self.cleanup_attempts,
+            "cleanup_faults": list(self.cleanup_faults),
+            "cleanup_recovered": self.cleanup_recovered,
+            "cleanup_incomplete": self.cleanup_incomplete,
+            "publication_forbidden": self.publication_forbidden,
+            "selected_owner_reachable": selected is not None,
+            "selected_owner_retained_bytes": (
+                0 if selected is None else selected.retained_bytes
+            ),
+            "rejected_owner_reachable": rejected is not None,
+            "rejected_owner_retained_bytes": (
+                0 if rejected is None else rejected.retained_bytes
+            ),
+            "current": dict(ledger.current),
+            "open_permit_count": len(ledger._reserved),
+            "terminal_reason": ledger.terminal_reason,
+        }
 
     def close(self) -> None:
+        """Best-effort disposal for the destructor only.
+
+        Neither production cleanup operation is implemented in terms of this:
+        the route calls ``abort_before_effect`` or ``finish_after_effect`` so
+        the policy is chosen by an asserted state instead of inferred from
+        whatever pointers happened to survive.  This is never acceptance
+        evidence for either operation.
+        """
+        self._wire_settled = True
         responses = self.responses
         selected = self.selected
+        first_error: BaseException | None = None
         if responses is not None:
-            responses.close()
-            self.responses = None
+            try:
+                if self.selection is not None:
+                    responses.release_rejected()
+                else:
+                    responses.close()
+                self.responses = None
+            except BaseException as error:
+                first_error = error
         if selected is not None:
-            selected.close()
-            self.selected = None
-        self.effect_started = False
+            try:
+                selected.close()
+                self.selected = None
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+        self._settle_cleanup_state()
+        if first_error is not None:
+            raise first_error
 
     def __del__(self) -> None:
         try:
@@ -17701,8 +18165,11 @@ def make_http_handler(
             try:
                 # Publication is the exact point the first response byte reaches
                 # the client, and the only transport boundary a route can reach.
-                with transport_boundary():
-                    prepared.publish(self.wfile)
+                # ``publish`` opens that boundary around its two socket writes
+                # only, so the accounting release that follows them is outside
+                # it and a cleanup ``OSError`` is never marked transport merely
+                # because it came after a write.
+                prepared.publish(self.wfile)
             except BaseException:
                 # The prepared owner keeps its exact byte counts when a release
                 # fails, so one retry finishes the accounting without publishing
@@ -17718,6 +18185,24 @@ def make_http_handler(
                     raise
             finally:
                 self._response_body_dropped_before_release = True
+
+        def _abort_mutation_slot(
+            self, slot: "_HTTPMutationResponseSlot"
+        ) -> None:
+            """Dispose a mutation slot that never reached selection.
+
+            The phase decides the operation: before ``M`` this is the pre-effect
+            abort, whose disposal fault permanently forbids any response for
+            this request; at or after ``M`` it is the post-effect finish, whose
+            fault is only secondary.  A slot that already selected never reaches
+            this path, so no cleanup here can destroy a selected response.
+            """
+            if slot.effect_started:
+                slot.finish_after_effect()
+            else:
+                slot.abort_before_effect()
+            if slot.publication_forbidden:
+                self._mutation_publication_forbidden = True
 
         def send_json(self, status: int, payload: Any) -> None:
             self.publish_prepared(self.prepare_json(status, payload))
@@ -17759,6 +18244,12 @@ def make_http_handler(
             self._request_ast_dropped_before_release = False
             self._response_body_dropped_before_release = False
             self._response_owner_observation: dict[str, Any] | None = None
+            # Every A2 mutation-response field is re-established here, so no
+            # selection, wire state, cleanup fault, owner, debt or permit can
+            # survive into a reused connection's next request.
+            self._mutation_slot: "_HTTPMutationResponseSlot | None" = None
+            self._mutation_response_observation: dict[str, Any] | None = None
+            self._mutation_publication_forbidden = False
             header_permit = None
             reader: _BoundedHTTPHeaderReader | None = None
             raw_reader = self.rfile
@@ -17843,6 +18334,26 @@ def make_http_handler(
                 self._parsing_request = False
                 self.cancel_if_open(header_permit)
                 self.release_request_header_storage()
+                mutation_slot = self._mutation_slot
+                if mutation_slot is not None:
+                    # The one synchronous retry, on the identical retained
+                    # owners, before anything is observed or terminated.
+                    try:
+                        mutation_slot.finish_request_cleanup()
+                    except BaseException:
+                        pass
+                    # Observe before the handler's pointer is dropped, so a
+                    # persistent remainder is reported as reachable instead of
+                    # being made to look clean.
+                    self._mutation_response_observation = (
+                        mutation_slot.observation()
+                    )
+                    if (
+                        mutation_slot.cleanup_incomplete
+                        or mutation_slot.publication_forbidden
+                    ):
+                        self.close_connection = True
+                    self._mutation_slot = None
                 if self.decision_work.has_open_permits():
                     self.close_connection = True
                 elif any(self.decision_work.current.values()):
@@ -17890,6 +18401,9 @@ def make_http_handler(
                                 self._response_body_dropped_before_release
                             ),
                             "response_owner": self._response_owner_observation,
+                            "mutation_response": (
+                                self._mutation_response_observation
+                            ),
                         }
                     )
 
@@ -18239,6 +18753,10 @@ def make_http_handler(
                 if len(rest) == 3 and rest[0] == "branches" and rest[2] == "upload":
                     self._mutation_deadline_active = True
                     mutation_slot = _HTTPMutationResponseSlot(self)
+                    # The request loop keeps the same slot through its one
+                    # synchronous cleanup retry and the terminal observation, so
+                    # ownership is never split across uncoordinated holders.
+                    self._mutation_slot = mutation_slot
                     status, payload = handle_http_upload(
                         storage_root,
                         org,
@@ -18249,7 +18767,8 @@ def make_http_handler(
                         decision_work=self.decision_work,
                         deadline=self.request_deadline,
                     )
-                    prepared = mutation_slot.take()
+                    # No ``take``: the slot stays the canonical owner and the
+                    # wire borrows its selected response below.
                 elif rest == ["gc"]:
                     status, payload = handle_http_gc(storage_root, org, app, request)
                 elif rest == ["merge-requests"]:
@@ -18284,9 +18803,9 @@ def make_http_handler(
                 authority = classify_route_os_error(exc)
                 payload = None
                 request = None
-                if mutation_slot is not None:
+                if mutation_slot is not None and not mutation_slot.has_selected:
                     try:
-                        mutation_slot.close()
+                        self._abort_mutation_slot(mutation_slot)
                     except BaseException:
                         pass
                     mutation_slot = None
@@ -18311,8 +18830,8 @@ def make_http_handler(
                 status, payload = http_filesystem_authority_error(authority)
             if self.decision_work.terminal_reason is not None:
                 request = None
-                if mutation_slot is not None:
-                    mutation_slot.close()
+                if mutation_slot is not None and not mutation_slot.has_selected:
+                    self._abort_mutation_slot(mutation_slot)
                     mutation_slot = None
                 if request_retained:
                     self._request_ast_retained = 0
@@ -18322,13 +18841,15 @@ def make_http_handler(
                     )
                     request_retained = 0
             try:
-                if prepared is None:
+                if prepared is None and (
+                    mutation_slot is None or not mutation_slot.has_selected
+                ):
                     prepared = self.prepare_json(status, payload)
             finally:
                 payload = None
                 request = None
-                if mutation_slot is not None:
-                    mutation_slot.close()
+                if mutation_slot is not None and not mutation_slot.has_selected:
+                    self._abort_mutation_slot(mutation_slot)
                     mutation_slot = None
                 if request_retained:
                     self._request_ast_dropped_before_release = True
@@ -18337,7 +18858,23 @@ def make_http_handler(
                     )
                     request_retained = 0
                     self._request_ast_retained = 0
-            self.publish_prepared(prepared)
+            if mutation_slot is not None:
+                # The frozen success/durable response stays primary after ``M``
+                # even when cleanup is incomplete, and the wire only borrows it.
+                mutation_slot.publish_selected()
+            elif self._mutation_publication_forbidden:
+                # A pre-effect disposal fault publishes zero response bytes and
+                # closes the connection.  The route's primary error keeps its
+                # own channel; no fallback document is framed here.
+                self.close_connection = True
+                if prepared is not None:
+                    try:
+                        prepared.close()
+                    except BaseException:
+                        pass
+                    prepared = None
+            else:
+                self.publish_prepared(prepared)
             if deadline_failed and self.decision_work.terminal_reason is None:
                 self.decision_work.terminate("deadline_exceeded")
 

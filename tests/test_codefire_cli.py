@@ -1958,7 +1958,19 @@ class CodeFireCliTests(unittest.TestCase):
 
         responses = pair()
         responses.seal_for_effect(owner_ledger)
+        self.assertEqual(responses.state, "sealed")
         selected = responses.select_durable(owner_ledger)
+        # Destination-first: the selected owner has already left the pair, so no
+        # generic pair cleanup can reach it, and the rejected owner is retained
+        # for the separate fallible release step.
+        self.assertIsNone(responses.success)
+        self.assertIsNone(responses.durable)
+        self.assertIsNotNone(responses.rejected)
+        self.assertEqual(responses.state, "selected_durable")
+        self.assertEqual(owner_ledger.current["retained_bytes"], 4)
+        responses.release_rejected()
+        self.assertIsNone(responses.rejected)
+        self.assertEqual(responses.state, "closed")
         self.assertEqual(owner_ledger.current["retained_bytes"], 2)
         selected.close()
         self.assertEqual(owner_ledger.current.get("retained_bytes", 0), 0)
@@ -1978,19 +1990,37 @@ class CodeFireCliTests(unittest.TestCase):
             return release(dimension, amount)
 
         owner_ledger.release = fail_once
+        # The handoff itself runs nothing fallible, so it completes even though
+        # the very next release is about to fail.
+        selected = responses.select_durable(owner_ledger)
+        rejected = responses.rejected
+        self.assertIsNotNone(selected)
+        self.assertIsNotNone(rejected)
         with self.assertRaisesRegex(
             namespace["CFError"], "injected mutation response release failure"
         ):
-            responses.select_durable(owner_ledger)
-        self.assertIsNotNone(responses.success)
-        self.assertIsNotNone(responses.durable)
+            responses.release_rejected()
+        # The identical rejected owner is retained for its retry and the
+        # selected payload was never touched by the failure.
+        self.assertIs(responses.rejected, rejected)
+        self.assertEqual(responses.state, "cleanup_pending")
+        self.assertIsNotNone(selected.header)
+        self.assertIsNotNone(selected.body)
         owner_before = owner_ledger.snapshot()
         with self.assertRaisesRegex(
             namespace["CFError"], "selection cannot be changed"
         ):
             responses.select_success(owner_ledger)
         self.assertEqual(owner_ledger.snapshot(), owner_before)
-        selected = responses.select_durable(owner_ledger)
+        with self.assertRaisesRegex(
+            namespace["CFError"], "selection already completed"
+        ):
+            responses.select_durable(owner_ledger)
+        self.assertEqual(owner_ledger.snapshot(), owner_before)
+        # The one retry releases the identical owner under the same direction.
+        responses.release_rejected()
+        self.assertIsNone(responses.rejected)
+        self.assertEqual(responses.selection, "durable")
         selected.close()
         owner_ledger.release = release
         self.assertEqual(owner_ledger.current.get("retained_bytes", 0), 0)

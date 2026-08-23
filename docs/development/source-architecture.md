@@ -184,6 +184,19 @@ After bootstrap exposes the random stable project ID, the project/nonce gates re
 into the full semantic `RemoteJSONPublicationPreflight`. Existing-project recovery/fast-forward planning and exact
 pending/receipt request-hash precedence remain unchanged. The response adapter freezes the exact success and fixed retry
 response before effects, and direct/adapter paths both append a fresh signed nonce as the reducer's last authority.
+That live adapter now carries the ADR-021 response lifecycle. The slot seals every prepared-response permit at the last
+pre-effect fence and sets the one-way `EFFECT_MAY_HAVE_STARTED` marker immediately before the first fallible effect, with
+only one local state assignment in between; the marker proves no durable byte, only that no-effect is no longer provable.
+Selection is a destination-first handoff: the exact selected owner reaches the slot and the direction becomes immutable
+before any fallible rejected-owner release, so generic pair cleanup can no longer reach a selected response. The handler
+keeps that one slot through publication and the terminal observation and performs no `take()`; the wire borrows the frozen
+header/body, records `WIRE_STARTED` before the first write attempt, and can never frame a second document. `transport_boundary`
+wraps only the two socket writes, so a post-write accounting `OSError` is not transport-origin. Pre-effect abort and
+post-effect finish are separate operations: an abort disposal fault publishes zero response bytes and closes the connection,
+while a post-effect fault stays secondary to the frozen success/durable response. A failed release keeps its identical
+non-consuming owner and gets exactly one synchronous request-loop retry per failed boundary; recovery consumes one bounded
+diagnostic, and persistent failure closes the connection, reports the reachable owner and exact debt, and uses the existing
+`cleanup_incomplete` terminal without adding a publication or wire terminal variant.
 Generic publication preserves its historical validation precedence: write count, identity/root, request/intent, authority
 proof, then result/consume. The stage-input closure projection now has two closed owners on the same request ledger.
 `AccountedHTTPUploadPlanner` reserves all incoming-index `PyLong` owners before enumeration, runtime-reported
@@ -337,8 +350,11 @@ the carrier and optional stable gate, then verifies release of the combined
 control scalar.  This owner still has no effect/publication/response API and is
 not connected to the production handler or missing-project transaction.
 
-The legacy `_PreparedHTTPMutationResponses` pair cannot be placed on either
-side of that boundary as-is. Before terminal, its mutable response fields are
+The `_PreparedHTTPMutationResponses` pair cannot be placed on either
+side of *that successor* boundary as-is, even though its live-route lifecycle is
+now repaired under ADR-021. The two concerns are distinct: ADR-021 governs the
+production Upload slot, while the paragraph below governs connecting the pair to
+the production-unwired effect-input owner. Before terminal, its mutable response fields are
 not part of the final callback-free state proof and can change during the last
 callback. After terminal, response preparation runs a deadline callback that
 can change the already-accepted gate subject. Allocating its normal accounting

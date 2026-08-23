@@ -197,8 +197,32 @@ after pair/semantic payload cleanup, closes the stable gate last, and then
 verifies the completed control release.  Keep effect execution, publication, response
 selection, missing bootstrap, and handler wiring outside this prerequisite.
 
+### Changing the live Upload mutation-response lifecycle
+
+Read ADR-021 before touching `_PreparedHTTPResponseOwner`,
+`_PreparedHTTPMutationResponses`, `_HTTPMutationResponseSlot`, the
+`handle_http_upload` seal/marker/selection seams, or the handler's
+`publish_prepared` / `do_POST` / `handle_one_request` response path. The
+invariants to re-review on every such change are: `EFFECT_MAY_HAVE_STARTED` sits
+after the last pre-effect fence and response seal with only one local state
+assignment before the first fallible effect; the selected owner reaches the slot
+and the direction becomes immutable before any fallible rejected-owner release;
+the Upload path never calls `take()` and the wire only borrows; `WIRE_STARTED`
+is recorded before the first write attempt and no second document may follow;
+`transport_boundary` covers socket writes only; pre-effect abort and post-effect
+finish stay separate operations; a failed release keeps its identical
+non-consuming owner and gets exactly one synchronous retry per failed boundary;
+and residual debt uses the existing `cleanup_incomplete` terminal rather than a
+new publication or wire terminal. Validate with
+`tests/test_python_http_post_effect_response.py` (the full `T01`-`T15` matrix)
+plus the two bound oracles in `tests/test_codefire_cli.py`, then the
+A1-touching modules `tests.test_python_http_upload_accounted_traversal` and
+`tests.test_python_external_production`, then the full Python discovery and
+`./demo.sh`.
+
 Do not attach the current mutable HTTP mutation response pair directly before
-or after that terminal boundary. Preparing it before terminal leaves its
+or after the *successor* effect-input terminal boundary; that composition is
+separate from the live lifecycle above and remains frozen. Preparing it before terminal leaves its
 public header/body fields outside the last callback recheck; preparing it after
 terminal runs the response deadline callback after the project subject was
 accepted. A normally accounted response allocated after sealed construction
