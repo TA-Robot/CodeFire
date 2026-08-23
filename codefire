@@ -17115,6 +17115,11 @@ class AccountedHTTPUploadSemantic:
         self._terminal_revalidated = False
         self._terminal_failed = False
         self._terminal_complete = False
+        self._terminal_payload_committed = False
+        # Set only by the single ledger-registry owner that adopts this
+        # semantic.  The registry check blocks stale public aliases even
+        # before this diagnostic mirror is published.
+        self._effect_input_owner: Any | None = None
         self._closing = False
         self._close_requested = False
         self._closed = False
@@ -17163,8 +17168,23 @@ class AccountedHTTPUploadSemantic:
         ):
             raise CFError("HTTP upload semantic belongs to a different ledger")
 
-    def _ensure_bound(self) -> None:
+    def _ensure_effect_input_access(self, owner: Any | None) -> None:
+        bound = self._effect_input_owner
+        registry = self._ledger._upload_terminal_owner
+        if bound is not None and bound is not owner:
+            raise CFError("HTTP upload immutable input owner adopted semantic")
+        if (
+            registry is not None
+            and registry is not owner
+            and type(registry)
+            is AccountedHTTPUploadExistingImmutableInputOwner
+            and object.__getattribute__(registry, "_semantic_owner") is self
+        ):
+            raise CFError("HTTP upload immutable input owner adopted semantic")
+
+    def _ensure_bound(self, owner: Any | None = None) -> None:
         self._ensure_ledger(self._ledger)
+        self._ensure_effect_input_access(owner)
         if self._closed:
             raise CFError("HTTP upload semantic owner is closed")
 
@@ -17436,10 +17456,17 @@ class AccountedHTTPUploadSemantic:
         if type(expected) is not str or not hmac.compare_digest(actual, expected):
             raise CFError("HTTP upload semantic digest changed before terminal")
 
-    def terminal_detach(self, ledger: DecisionWorkLedger) -> None:
+    def _terminal_detach(
+        self,
+        ledger: DecisionWorkLedger,
+        *,
+        effect_input_owner: Any | None,
+        poll_terminal: bool,
+        revalidate_inputs: Any,
+    ) -> None:
         """Revalidate mutable input, then detach private effect slots."""
         self._ensure_ledger(ledger)
-        self._ensure_bound()
+        self._ensure_bound(effect_input_owner)
         if not self._prepared:
             raise CFError("HTTP upload semantic owner is not prepared")
         if self._terminal_complete:
@@ -17458,14 +17485,25 @@ class AccountedHTTPUploadSemantic:
                 # This is the last callback-rich fence. Any mutation it
                 # triggers is observed by the callback-free revalidation that
                 # immediately follows.
-                if self._deadline is not None:
+                if poll_terminal and self._deadline is not None:
                     self._deadline.check("upload semantic terminal")
-                self._revalidate_terminal_inputs()
+                revalidate_inputs(self)
                 # All locals in the revalidation frame are gone before the
                 # parser source can release its mutable AST scalar.
                 self._record_refs = None
                 self._sorted_refs = None
                 self._terminal_revalidated = True
+                if effect_input_owner is not None:
+                    # The adopter's last callback-free probe passed. Publish
+                    # immutable effect slots before parser/allocation release,
+                    # whose ledger hooks may re-enter or request close.
+                    self._effect_semantic = self._semantic_view
+                    self._effect_copy_bytes = self._copy_bytes
+                    self._semantic = None
+                    self._semantic_view = None
+                    self._copy_bytes = None
+                    self._request_digest = None
+                    self._terminal_payload_committed = True
             source = self._source
             if source is not None:
                 source._close_from_destination(self)
@@ -17494,16 +17532,41 @@ class AccountedHTTPUploadSemantic:
         if close_requested:
             raise CFError("HTTP upload semantic terminal was cancelled by close")
         # Callback-free final detach: only prepublished field assignments.
-        self._effect_semantic = self._semantic_view
-        self._effect_copy_bytes = self._copy_bytes
-        self._semantic = None
-        self._semantic_view = None
-        self._copy_bytes = None
-        self._request_digest = None
+        if not self._terminal_payload_committed:
+            self._effect_semantic = self._semantic_view
+            self._effect_copy_bytes = self._copy_bytes
+            self._semantic = None
+            self._semantic_view = None
+            self._copy_bytes = None
+            self._request_digest = None
+            self._terminal_payload_committed = True
         self._terminal_complete = True
 
-    def close(self, ledger: DecisionWorkLedger) -> None:
+    def terminal_detach(self, ledger: DecisionWorkLedger) -> None:
+        """Run the public callback-rich terminal path before adoption."""
+        self._terminal_detach(
+            ledger,
+            effect_input_owner=None,
+            poll_terminal=True,
+            revalidate_inputs=AccountedHTTPUploadSemantic._revalidate_terminal_inputs,
+        )
+
+    def _terminal_detach_for_effect_input(
+        self,
+        owner: Any,
+        revalidate_inputs: Any,
+    ) -> None:
+        """Token-gated callback-free terminal path for one exact adopter."""
+        self._terminal_detach(
+            self._ledger,
+            effect_input_owner=owner,
+            poll_terminal=False,
+            revalidate_inputs=revalidate_inputs,
+        )
+
+    def _close(self, ledger: DecisionWorkLedger, owner: Any | None) -> None:
         self._ensure_ledger(ledger)
+        self._ensure_effect_input_access(owner)
         if self._closed:
             return
         if self._preparing or self._terminal_active:
@@ -17520,6 +17583,7 @@ class AccountedHTTPUploadSemantic:
             self._semantic_view = None
             self._copy_bytes = None
             self._request_digest = None
+            self._terminal_payload_committed = False
             self._copy_build = None
             self._record_refs = None
             self._sorted_refs = None
@@ -17542,9 +17606,16 @@ class AccountedHTTPUploadSemantic:
                 self._closed = True
             self._closing = False
 
+    def close(self, ledger: DecisionWorkLedger) -> None:
+        self._close(ledger, None)
+
+    def _close_from_effect_input(self, owner: Any) -> None:
+        self._close(self._ledger, owner)
+
     def __del__(self) -> None:
         try:
-            self.close(self._ledger)
+            if self._effect_input_owner is None:
+                self.close(self._ledger)
         except BaseException:
             pass
 
@@ -20443,6 +20514,9 @@ class AccountedHTTPUploadExistingTerminalOwner:
         self._closing = False
         self._close_requested = False
         self._pair_resources_released = False
+        # Diagnostic mirror for a later immutable input adopter.  The ledger
+        # registry remains the authoritative stale-alias gate.
+        self._effect_input_owner: Any | None = None
         self._closed = False
         self._binding = True
 
@@ -20496,6 +20570,18 @@ class AccountedHTTPUploadExistingTerminalOwner:
             raise CFError("existing upload terminal belongs to a different ledger")
 
     def _ensure_available(self) -> None:
+        bound = self._effect_input_owner
+        registry = self._ledger._upload_terminal_owner
+        if bound is not None:
+            raise CFError("HTTP upload immutable input owner adopted pair")
+        if (
+            registry is not None
+            and registry is not self
+            and type(registry)
+            is AccountedHTTPUploadExistingImmutableInputOwner
+            and object.__getattribute__(registry, "_pair_owner") is self
+        ):
+            raise CFError("HTTP upload immutable input owner adopted pair")
         if self._binding:
             raise CFError("existing upload terminal binding is in progress")
         if self._closed:
@@ -20860,8 +20946,22 @@ class AccountedHTTPUploadExistingTerminalOwner:
         ledger: DecisionWorkLedger,
         *,
         _preserve_pair: bool = False,
+        _effect_input_owner: Any | None = None,
     ) -> None:
         self._ensure_ledger(ledger)
+        bound = self._effect_input_owner
+        registry = self._ledger._upload_terminal_owner
+        if bound is not None and bound is not _effect_input_owner:
+            raise CFError("HTTP upload immutable input owner adopted pair")
+        if (
+            registry is not None
+            and registry is not self
+            and registry is not _effect_input_owner
+            and type(registry)
+            is AccountedHTTPUploadExistingImmutableInputOwner
+            and object.__getattribute__(registry, "_pair_owner") is self
+        ):
+            raise CFError("HTTP upload immutable input owner adopted pair")
         if self._binding:
             object.__setattr__(self, "_close_requested", True)
             return
@@ -20975,9 +21075,10 @@ class AccountedHTTPUploadExistingTerminalOwner:
                 if not _preserve_pair:
                     self._verified_branch = None
                     self._verified_head = None
-                    object.__setattr__(
-                        self._ledger, "_upload_terminal_owner", None
-                    )
+                    if _effect_input_owner is None:
+                        object.__setattr__(
+                            self._ledger, "_upload_terminal_owner", None
+                        )
                     self._closed = True
         finally:
             object.__setattr__(self, "_closing", False)
@@ -20990,11 +21091,763 @@ class AccountedHTTPUploadExistingTerminalOwner:
         ):
             raise CFError("existing upload terminal cleanup is incomplete")
 
+    def _close_from_effect_input(self, owner: Any) -> None:
+        self.close(
+            self._ledger,
+            _effect_input_owner=owner,
+        )
+
+    def __del__(self) -> None:
+        try:
+            if self._effect_input_owner is None:
+                self.close(self._ledger)
+        except BaseException:
+            pass
+
+
+class AccountedHTTPUploadExistingImmutableInputOwner:
+    """Own one immutable existing-upload input without authorizing an effect.
+
+    This production-unwired owner combines an already detached sealed/policy
+    pair with one prepared request semantic.  It proves only branch/head
+    agreement and immutable request inputs.  In particular, the semantic's
+    stable-project string remains an unproved candidate: no project,
+    publication, effect, or handler authority is minted here.
+    """
+
+    ADOPTING = "ADOPTING"
+    ADOPTED = "ADOPTED"
+    FINALIZING = "FINALIZING"
+    READY = "READY"
+    ABORT_ONLY = "ABORT_ONLY"
+    CLOSED = "CLOSED"
+    FIXED_RETAINED_BYTES = 4096
+
+    @staticmethod
+    def _callback_free_semantic_probe(
+        semantic: AccountedHTTPUploadSemantic,
+        expected_source: AccountedHTTPUploadRequestSource,
+        expected_request: dict[str, Any],
+        expected_records_list: list[dict[str, Any]],
+        expected_records: tuple[dict[str, Any], ...],
+        expected_request_digest: str,
+        encode_string: Any,
+        sort_list: Any,
+        digest_constructor: Any,
+        compare_digest: Any,
+        encode_text: Any,
+        integer_text: Any,
+        integer_bits: Any,
+        float_text: Any,
+        positive_infinity: float,
+        negative_infinity: float,
+        selected_type: Any,
+        length_of: Any,
+        index_range: Any,
+        get_attribute: Any,
+        dict_keys: Any,
+        dict_get: Any,
+        dict_item: Any,
+        list_item: Any,
+        dict_type: type,
+        list_type: type,
+        str_type: type,
+        int_type: type,
+        float_type: type,
+        bool_type: type,
+    ) -> None:
+        """Re-encode an exact built-in JSON tree without user hooks."""
+        source = get_attribute(semantic, "_source")
+        if source is not expected_source:
+            raise CFError("HTTP upload immutable input source changed")
+        request = get_attribute(source, "_request")
+        records = get_attribute(source, "_records")
+        if request is not expected_request or records is not expected_records_list:
+            raise CFError("HTTP upload immutable input source identity changed")
+        if (
+            selected_type(request) is not dict_type
+            or selected_type(records) is not list_type
+        ):
+            raise CFError("HTTP upload immutable input requires exact built-in JSON")
+        if dict_get(request, "objects") is not records:
+            raise CFError("HTTP upload immutable input object array changed")
+
+        limit = get_attribute(source, "_parser_canonical_bytes")
+        if selected_type(limit) is not int_type or limit < 0:
+            raise CFError("HTTP upload immutable input source bound changed")
+        digest = digest_constructor()
+        observed = 0
+
+        def emit(text: str) -> None:
+            nonlocal observed
+            encoded = encode_text(text, "utf-8")
+            observed += length_of(encoded)
+            if observed > limit:
+                raise CFError("HTTP upload immutable input request exceeds its bound")
+            digest.update(encoded)
+
+        # One continuation frame per nesting level, plus sorted key arrays
+        # whose total entries cannot exceed the bounded canonical output.
+        # The output/step limits make cycles and exponential alias expansion
+        # finite without a separately growing visited set.
+        stack: list[tuple[Any, ...]] = [("value", request)]
+        steps = 0
+        while stack:
+            steps += 1
+            if steps > 4 * (limit + 1):
+                raise CFError("HTTP upload immutable input JSON tree exceeds its bound")
+            frame = stack.pop()
+            action = frame[0]
+            if action == "dict":
+                item, keys, index = frame[1:]
+                if index == length_of(keys):
+                    emit("}")
+                    continue
+                if index:
+                    emit(",")
+                key = keys[index]
+                if length_of(key) > limit:
+                    raise CFError("HTTP upload immutable input key exceeds its bound")
+                emit(encode_string(key))
+                emit(":")
+                stack.append(("dict", item, keys, index + 1))
+                stack.append(("value", dict_item(item, key)))
+                continue
+            if action == "list":
+                item, index = frame[1:]
+                if index == length_of(item):
+                    emit("]")
+                    continue
+                if index:
+                    emit(",")
+                stack.append(("list", item, index + 1))
+                stack.append(("value", list_item(item, index)))
+                continue
+            item = frame[1]
+            selected = selected_type(item)
+            if selected is dict_type:
+                if length_of(item) > limit:
+                    raise CFError("HTTP upload immutable input map exceeds its bound")
+                keys = []
+                for key in dict_keys(item):
+                    if selected_type(key) is not str_type:
+                        raise CFError(
+                            "HTTP upload immutable input requires exact string JSON keys"
+                        )
+                    keys.append(key)
+                sort_list(keys)
+                emit("{")
+                stack.append(("dict", item, keys, 0))
+            elif selected is list_type:
+                if length_of(item) > limit:
+                    raise CFError("HTTP upload immutable input array exceeds its bound")
+                emit("[")
+                stack.append(("list", item, 0))
+            elif selected is str_type:
+                if length_of(item) > limit:
+                    raise CFError("HTTP upload immutable input string exceeds its bound")
+                emit(encode_string(item))
+            elif selected is int_type:
+                if integer_bits(item) > 4 * (limit + 1):
+                    raise CFError("HTTP upload immutable input integer exceeds its bound")
+                emit(integer_text(item))
+            elif selected is float_type:
+                if (
+                    item != item
+                    or item == positive_infinity
+                    or item == negative_infinity
+                ):
+                    raise CFError(
+                        "HTTP upload immutable input rejects non-finite JSON numbers"
+                    )
+                else:
+                    emit(float_text(item))
+            elif selected is bool_type:
+                emit("true" if item else "false")
+            elif item is None:
+                emit("null")
+            else:
+                raise CFError(
+                    "HTTP upload immutable input requires exact built-in JSON"
+                )
+        if observed != limit:
+            raise CFError("HTTP upload immutable input request size changed")
+        actual_digest = "sha256:" + digest.hexdigest()
+        if not compare_digest(actual_digest, expected_request_digest):
+            raise CFError("HTTP upload immutable input full request changed")
+        if length_of(records) != length_of(expected_records):
+            raise CFError("HTTP upload immutable input record count changed")
+        for index in index_range(length_of(records)):
+            if list_item(records, index) is not expected_records[index]:
+                raise CFError("HTTP upload immutable input record identity changed")
+
+    @staticmethod
+    def _swap_registry(
+        ledger: DecisionWorkLedger,
+        pair: AccountedHTTPUploadExistingTerminalOwner,
+        owner: "AccountedHTTPUploadExistingImmutableInputOwner",
+    ) -> None:
+        if object.__getattribute__(ledger, "_upload_terminal_owner") is not pair:
+            raise CFError("HTTP upload immutable input requires the exact pair registry")
+        object.__setattr__(ledger, "_upload_terminal_owner", owner)
+
+    @staticmethod
+    def _bind_source_tokens(
+        pair: AccountedHTTPUploadExistingTerminalOwner,
+        semantic: AccountedHTTPUploadSemantic,
+        owner: "AccountedHTTPUploadExistingImmutableInputOwner",
+    ) -> None:
+        object.__setattr__(pair, "_effect_input_owner", owner)
+        object.__setattr__(semantic, "_effect_input_owner", owner)
+
+    def __init__(
+        self,
+        pair: AccountedHTTPUploadExistingTerminalOwner,
+        semantic: AccountedHTTPUploadSemantic,
+        ledger: DecisionWorkLedger,
+    ) -> None:
+        if type(pair) is not AccountedHTTPUploadExistingTerminalOwner:
+            raise CFError("HTTP upload immutable input requires an exact detached pair")
+        if type(semantic) is not AccountedHTTPUploadSemantic:
+            raise CFError("HTTP upload immutable input requires an exact semantic owner")
+        pair._ensure_ledger(ledger)
+        semantic._ensure_ledger(ledger)
+        if pair._closed or pair._state != pair.PAIR_DETACHED:
+            raise CFError("HTTP upload immutable input requires a live detached pair")
+        if not pair._pair_resources_released:
+            raise CFError("HTTP upload immutable input requires a resource-zero pair")
+        if pair._effect_input_owner is not None:
+            raise CFError("HTTP upload immutable input pair is already adopted")
+        if (
+            semantic._closed
+            or semantic._preparing
+            or semantic._terminal_active
+            or semantic._closing
+            or semantic._close_requested
+            or not semantic._prepared
+            or semantic._terminal_started
+            or semantic._terminal_complete
+            or semantic._terminal_failed
+            or semantic._digest_owner is not None
+            or semantic._effect_input_owner is not None
+        ):
+            raise CFError("HTTP upload immutable input requires a prepared semantic")
+        if object.__getattribute__(ledger, "_upload_terminal_owner") is not pair:
+            raise CFError("HTTP upload immutable input requires the exact pair registry")
+
+        mapping = semantic._semantic
+        view = semantic._semantic_view
+        source = semantic._source
+        record_refs = semantic._record_refs
+        sorted_refs = semantic._sorted_refs
+        copy_bytes = semantic._copy_bytes
+        request_digest = semantic._request_digest
+        request_ref = None if source is None else source._request
+        records_list_ref = None if source is None else source._records
+        if (
+            type(mapping) is not dict
+            or type(view) is not MappingProxyType
+            or source is None
+            or type(record_refs) is not tuple
+            or type(sorted_refs) is not tuple
+            or type(copy_bytes) is not tuple
+            or type(request_digest) is not str
+            or type(request_ref) is not dict
+            or type(records_list_ref) is not list
+            or len(mapping) != 5
+        ):
+            raise CFError("HTTP upload immutable input semantic is incomplete")
+        stable_project_candidate = dict.get(mapping, "stable_project_id")
+        remote_branch = dict.get(mapping, "remote_branch")
+        local_branch = dict.get(mapping, "local_branch")
+        head = dict.get(mapping, "head")
+        object_set_digest = dict.get(mapping, "object_set_digest")
+        verified_branch = pair._verified_branch
+        verified_head = pair._verified_head
+        if any(
+            type(value) is not str
+            for value in (
+                stable_project_candidate,
+                remote_branch,
+                local_branch,
+                head,
+                object_set_digest,
+                verified_branch,
+                verified_head,
+            )
+        ):
+            raise CFError("HTTP upload immutable input subject is incomplete")
+        if not hmac.compare_digest(verified_branch, remote_branch):
+            raise CFError("HTTP upload immutable input branch subject mismatch")
+        if not hmac.compare_digest(verified_head, head):
+            raise CFError("HTTP upload immutable input head subject mismatch")
+
+        self._ledger = ledger
+        self._ledger_identity = id(ledger)
+        self._pair_owner: AccountedHTTPUploadExistingTerminalOwner | None = pair
+        self._semantic_owner: AccountedHTTPUploadSemantic | None = semantic
+        self._allocation = _StablePermitTransition(
+            ledger, retained_primary=self.FIXED_RETAINED_BYTES
+        )
+        # Exact reference pins detect replacement of any semantic private
+        # input before the callback-free terminal fence.  No payload is
+        # exposed through a getter or generic callback.
+        self._mapping = mapping
+        self._view = view
+        self._source = source
+        self._request_ref = request_ref
+        self._records_list_ref = records_list_ref
+        self._record_refs = record_refs
+        self._sorted_refs = sorted_refs
+        self._copy_bytes = copy_bytes
+        self._request_digest = request_digest
+        self._stable_project_candidate = stable_project_candidate
+        self._remote_branch = remote_branch
+        self._local_branch = local_branch
+        self._head = head
+        self._object_set_digest = object_set_digest
+        self._deadline = semantic._deadline
+        # Resolve every replaceable helper before fixed-allocation ledger
+        # callbacks. The callback-free interval uses only these exact refs.
+        swap_registry = (
+            AccountedHTTPUploadExistingImmutableInputOwner._swap_registry
+        )
+        bind_source_tokens = (
+            AccountedHTTPUploadExistingImmutableInputOwner._bind_source_tokens
+        )
+        pins_intact = (
+            AccountedHTTPUploadExistingImmutableInputOwner._pins_intact
+        )
+        callback_free_probe = (
+            AccountedHTTPUploadExistingImmutableInputOwner
+            ._callback_free_semantic_probe
+        )
+        encode_string = json.encoder.encode_basestring
+        sort_list = list.sort
+        digest_constructor = hashlib.sha256
+        compare_digest = hmac.compare_digest
+        encode_text = str.encode
+        integer_text = str
+        integer_bits = int.bit_length
+        float_text = repr
+        positive_infinity = float("inf")
+        negative_infinity = float("-inf")
+        selected_type = type
+        length_of = len
+        index_range = range
+        get_attribute = object.__getattribute__
+        dict_keys = dict.keys
+        dict_get = dict.get
+        dict_item = dict.__getitem__
+        list_item = list.__getitem__
+        dict_type = dict
+        list_type = list
+        str_type = str
+        int_type = int
+        float_type = float
+        bool_type = bool
+
+        def semantic_revalidate(selected: AccountedHTTPUploadSemantic) -> None:
+            callback_free_probe(
+                selected,
+                source,
+                request_ref,
+                records_list_ref,
+                record_refs,
+                request_digest,
+                encode_string,
+                sort_list,
+                digest_constructor,
+                compare_digest,
+                encode_text,
+                integer_text,
+                integer_bits,
+                float_text,
+                positive_infinity,
+                negative_infinity,
+                selected_type,
+                length_of,
+                index_range,
+                get_attribute,
+                dict_keys,
+                dict_get,
+                dict_item,
+                list_item,
+                dict_type,
+                list_type,
+                str_type,
+                int_type,
+                float_type,
+                bool_type,
+            )
+
+        self._terminal_detach = (
+            AccountedHTTPUploadSemantic._terminal_detach_for_effect_input
+        )
+        self._semantic_revalidate = semantic_revalidate
+        self._pins_check = pins_intact
+        self._deadline_check = (
+            None if self._deadline is None else self._deadline.check
+        )
+        self._state = self.ADOPTING
+        self._operating = False
+        self._closing = False
+        self._close_requested = False
+        self._closed = False
+
+        failure: BaseException | None = None
+        try:
+            self._allocation.reserve(
+                "query",
+                charges={"aggregate_bytes": source._parser_canonical_bytes},
+                acquires={"retained_bytes": self.FIXED_RETAINED_BYTES},
+            )
+            self._allocation.consume(
+                phase="query",
+                charges={"aggregate_bytes": source._parser_canonical_bytes},
+                acquires={"retained_bytes": self.FIXED_RETAINED_BYTES},
+            )
+            self._allocation.cancel()
+            if (
+                object.__getattribute__(ledger, "_upload_terminal_owner") is not pair
+                or pair._closed
+                or pair._operating
+                or pair._closing
+                or pair._close_requested
+                or pair._state != pair.PAIR_DETACHED
+                or not pair._pair_resources_released
+                or pair._effect_input_owner is not None
+                or pair._verified_branch is not verified_branch
+                or pair._verified_head is not verified_head
+                or semantic._closed
+                or semantic._preparing
+                or semantic._terminal_active
+                or semantic._closing
+                or semantic._close_requested
+                or not semantic._prepared
+                or semantic._terminal_started
+                or semantic._terminal_complete
+                or semantic._terminal_failed
+                or semantic._digest_owner is not None
+                or semantic._effect_input_owner is not None
+                or semantic._deadline is not self._deadline
+                or not pins_intact(self, semantic, False)
+                or source._destination is not semantic
+                or source._closed
+            ):
+                raise CFError(
+                    "HTTP upload immutable input source changed during allocation"
+                )
+            semantic_revalidate(semantic)
+            swap_registry(ledger, pair, self)
+            bind_source_tokens(pair, semantic, self)
+            if (
+                object.__getattribute__(ledger, "_upload_terminal_owner") is not self
+                or object.__getattribute__(pair, "_effect_input_owner") is not self
+                or object.__getattribute__(semantic, "_effect_input_owner") is not self
+            ):
+                raise CFError("HTTP upload immutable input transfer is incomplete")
+            object.__setattr__(self, "_state", self.ADOPTED)
+        except BaseException as exc:
+            _detach_exception_chain(exc)
+            failure = exc
+        if failure is not None:
+            cleanup_failure: BaseException | None = None
+            if object.__getattribute__(ledger, "_upload_terminal_owner") is self:
+                object.__setattr__(self, "_state", self.ABORT_ONLY)
+                try:
+                    self.close(ledger)
+                except BaseException as exc:
+                    _detach_exception_chain(exc)
+                    cleanup_failure = exc
+            else:
+                self._pair_owner = None
+                self._semantic_owner = None
+                try:
+                    self._allocation.release_all()
+                except BaseException as exc:
+                    _detach_exception_chain(exc)
+                    cleanup_failure = exc
+                self._clear_pins()
+                self._closed = cleanup_failure is None
+            if cleanup_failure is not None:
+                raise cleanup_failure.with_traceback(None) from failure
+            raise failure.with_traceback(None)
+
+    def _ensure_ledger(self, ledger: DecisionWorkLedger) -> None:
+        if ledger is not self._ledger or id(ledger) != self._ledger_identity:
+            raise CFError("HTTP upload immutable input belongs to a different ledger")
+
+    def _pins_intact(
+        self,
+        semantic: AccountedHTTPUploadSemantic,
+        require_bound: bool = True,
+    ) -> bool:
+        mapping = self._mapping
+        source = self._source
+        return (
+            type(mapping) is dict
+            and len(mapping) == 5
+            and source is not None
+            and semantic._semantic is mapping
+            and semantic._semantic_view is self._view
+            and semantic._source is self._source
+            and semantic._record_refs is self._record_refs
+            and semantic._sorted_refs is self._sorted_refs
+            and semantic._copy_bytes is self._copy_bytes
+            and semantic._request_digest is self._request_digest
+            and semantic._stable_project_id is self._stable_project_candidate
+            and semantic._remote_branch is self._remote_branch
+            and semantic._prepared
+            and not semantic._preparing
+            and not semantic._terminal_active
+            and not semantic._terminal_started
+            and not semantic._terminal_complete
+            and not semantic._terminal_failed
+            and not semantic._closing
+            and not semantic._close_requested
+            and not semantic._closed
+            and semantic._digest_owner is None
+            and (
+                semantic._effect_input_owner is self
+                if require_bound
+                else semantic._effect_input_owner is None
+            )
+            and source._destination is semantic
+            and not source._closing
+            and not source._closed
+            and source._request is not None
+            and source._records is not None
+            and source._request is self._request_ref
+            and source._records is self._records_list_ref
+            and dict.get(source._request, "objects") is source._records
+            and dict.get(mapping, "stable_project_id")
+            is self._stable_project_candidate
+            and dict.get(mapping, "remote_branch") is self._remote_branch
+            and dict.get(mapping, "local_branch") is self._local_branch
+            and dict.get(mapping, "head") is self._head
+            and dict.get(mapping, "object_set_digest")
+            is self._object_set_digest
+        )
+
+    def finalize(self, ledger: DecisionWorkLedger) -> None:
+        """Mint one payload-opaque READY input after a callback-free fence."""
+        self._ensure_ledger(ledger)
+        if self._closed:
+            raise CFError("HTTP upload immutable input is closed")
+        if self._operating:
+            raise CFError("HTTP upload immutable input operation is in progress")
+        if self._state == self.READY:
+            raise CFError("HTTP upload immutable input finalize is single-use")
+        if self._state == self.ABORT_ONLY:
+            raise CFError("HTTP upload immutable input is abort-only")
+        if self._state != self.ADOPTED:
+            raise CFError("HTTP upload immutable input is not adopted")
+        pair = self._pair_owner
+        semantic = self._semantic_owner
+        if pair is None or semantic is None:
+            raise CFError("HTTP upload immutable input has no source owners")
+
+        failure: BaseException | None = None
+        terminal_detach = self._terminal_detach
+        semantic_revalidate = self._semantic_revalidate
+        pins_check = self._pins_check
+        deadline_check = self._deadline_check
+        retry_cleanup = (
+            semantic._terminal_started
+            and semantic._terminal_revalidated
+            and not semantic._terminal_complete
+            and not semantic._terminal_failed
+        )
+        try:
+            object.__setattr__(self, "_state", self.FINALIZING)
+            object.__setattr__(self, "_operating", True)
+            if retry_cleanup:
+                terminal_detach(
+                    semantic,
+                    self,
+                    semantic_revalidate,
+                )
+            elif (
+                object.__getattribute__(ledger, "_upload_terminal_owner") is not self
+                or object.__getattribute__(pair, "_effect_input_owner") is not self
+                or object.__getattribute__(semantic, "_effect_input_owner") is not self
+                or pair._state != pair.PAIR_DETACHED
+                or pair._closed
+                or not pair._pair_resources_released
+                or pair._verified_branch is not self._remote_branch
+                and not hmac.compare_digest(pair._verified_branch, self._remote_branch)
+                or pair._verified_head is not self._head
+                and not hmac.compare_digest(pair._verified_head, self._head)
+                or not pins_check(self, semantic)
+            ):
+                raise CFError("HTTP upload immutable input changed before finalize")
+            else:
+                # Exactly one final cooperative callback closes the adoption
+                # to terminal-fence mutation window. Every helper used after
+                # it was captured before allocation callbacks and is local.
+                if deadline_check is not None:
+                    deadline_check("upload immutable input terminal")
+                if self._close_requested:
+                    raise CFError(
+                        "HTTP upload immutable input finalize was cancelled before probe"
+                    )
+                if (
+                    object.__getattribute__(ledger, "_upload_terminal_owner") is not self
+                    or object.__getattribute__(pair, "_effect_input_owner") is not self
+                    or object.__getattribute__(semantic, "_effect_input_owner") is not self
+                    or pair._closed
+                    or pair._state != pair.PAIR_DETACHED
+                    or not pair._pair_resources_released
+                    or not pins_check(self, semantic)
+                ):
+                    raise CFError("HTTP upload immutable input changed before probe")
+                terminal_detach(
+                    semantic,
+                    self,
+                    semantic_revalidate,
+                )
+            if (
+                not semantic._terminal_complete
+                or semantic._effect_semantic is not self._view
+                or semantic._effect_copy_bytes is not self._copy_bytes
+            ):
+                raise CFError("HTTP upload immutable input terminal transfer is incomplete")
+            object.__setattr__(self, "_state", self.READY)
+        except BaseException as exc:
+            _detach_exception_chain(exc)
+            failure = exc
+        finally:
+            object.__setattr__(self, "_operating", False)
+            terminal_detach = None
+            semantic_revalidate = None
+            pins_check = None
+            deadline_check = None
+        if (
+            failure is not None
+            and semantic._terminal_revalidated
+            and not semantic._terminal_failed
+            and not self._close_requested
+        ):
+            object.__setattr__(self, "_state", self.ADOPTED)
+            raise failure.with_traceback(None)
+        if failure is not None or self._close_requested:
+            object.__setattr__(self, "_state", self.ABORT_ONLY)
+            cleanup_failure: BaseException | None = None
+            try:
+                self.close(ledger)
+            except BaseException as exc:
+                _detach_exception_chain(exc)
+                cleanup_failure = exc
+            if cleanup_failure is not None:
+                if failure is not None:
+                    raise cleanup_failure.with_traceback(None) from failure
+                raise cleanup_failure.with_traceback(None)
+            if failure is not None:
+                raise failure.with_traceback(None)
+            raise CFError("HTTP upload immutable input finalize was cancelled by close")
+
+    def _clear_pins(self) -> None:
+        self._mapping = None
+        self._view = None
+        self._source = None
+        self._request_ref = None
+        self._records_list_ref = None
+        self._record_refs = None
+        self._sorted_refs = None
+        self._copy_bytes = None
+        self._request_digest = None
+        self._stable_project_candidate = None
+        self._remote_branch = None
+        self._local_branch = None
+        self._head = None
+        self._object_set_digest = None
+        self._terminal_detach = None
+        self._semantic_revalidate = None
+        self._pins_check = None
+        self._deadline_check = None
+        self._deadline = None
+
+    def close(self, ledger: DecisionWorkLedger) -> None:
+        """Discard once; cleanup stops at the first fault and is retryable."""
+        self._ensure_ledger(ledger)
+        if self._closed:
+            return
+        if self._operating:
+            self._close_requested = True
+            return
+        if self._closing:
+            return
+        object.__setattr__(self, "_closing", True)
+        failure: BaseException | None = None
+        try:
+            semantic = self._semantic_owner
+            if semantic is not None:
+                try:
+                    semantic._close_from_effect_input(self)
+                except BaseException as exc:
+                    _detach_exception_chain(exc)
+                    failure = exc
+                if semantic._closed:
+                    object.__setattr__(semantic, "_effect_input_owner", None)
+                    self._semantic_owner = None
+            semantic = None
+
+            pair = self._pair_owner
+            if failure is None and pair is not None:
+                try:
+                    pair._close_from_effect_input(self)
+                except BaseException as exc:
+                    _detach_exception_chain(exc)
+                    failure = exc
+                if pair._closed:
+                    object.__setattr__(pair, "_effect_input_owner", None)
+                    self._pair_owner = None
+            pair = None
+
+            if failure is None:
+                try:
+                    self._allocation.release_all()
+                except BaseException as exc:
+                    _detach_exception_chain(exc)
+                    failure = exc
+
+            completed = (
+                failure is None
+                and self._semantic_owner is None
+                and self._pair_owner is None
+                and self._allocation._retained_primary_released
+                and self._allocation._temporary_released
+                and self._allocation._permit is None
+            )
+            if completed:
+                self._clear_pins()
+                if object.__getattribute__(ledger, "_upload_terminal_owner") is self:
+                    object.__setattr__(ledger, "_upload_terminal_owner", None)
+                self._close_requested = False
+                self._state = self.CLOSED
+                self._closed = True
+        finally:
+            object.__setattr__(self, "_closing", False)
+        if failure is not None:
+            raise failure.with_traceback(None)
+        if not self._closed:
+            raise CFError("HTTP upload immutable input cleanup is incomplete")
+
     def __del__(self) -> None:
         try:
             self.close(self._ledger)
         except BaseException:
             pass
+
+
+def prepare_http_upload_existing_immutable_input(
+    pair: AccountedHTTPUploadExistingTerminalOwner,
+    semantic: AccountedHTTPUploadSemantic,
+    ledger: DecisionWorkLedger,
+) -> AccountedHTTPUploadExistingImmutableInputOwner:
+    """Adopt exact pair/semantic owners without minting effect authority."""
+    return AccountedHTTPUploadExistingImmutableInputOwner(pair, semantic, ledger)
 
 
 class _HTTPUploadSealedValidationReservation:
