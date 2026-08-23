@@ -1,3 +1,6 @@
+use fs2::FileExt as Fs2FileExt;
+use serde::ser::{SerializeSeq, Serializer};
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
@@ -6,17 +9,23 @@ use std::fmt;
 use std::fs::{self, File};
 use std::io::{ErrorKind, Write};
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 #[cfg(test)]
 use std::sync::Mutex;
-use std::thread;
 use std::time::{Duration, Instant};
 
+mod active_state;
+mod assessment_subject;
 mod automation;
 mod batch;
+mod branch_refs;
 mod cli_model;
+mod close_transaction;
+mod close_worktree;
+mod command_execution;
 mod command_registry;
+mod commit_active_reset;
+mod compatibility;
 mod completion;
 mod context;
 mod doctor;
@@ -32,34 +41,53 @@ mod import_workflow;
 mod limited_yaml;
 mod link_batch;
 mod merge_patch_idempotency;
+mod merge_resolution;
 mod metrics;
 mod migration;
 mod open_clone_idempotency;
+mod open_snapshot;
+mod open_transaction;
+mod pagination;
 mod remote;
 mod repo_layout;
+mod secret_redaction;
+mod secure_worktree;
 mod signatures;
+mod stable_lock;
 mod storage;
 mod verification;
 mod view;
 use automation::{
-    cli_command, command_result_envelope, scan_data_json_with_full, scan_diagnostics_json,
-    scan_next_actions, status_data_json, status_next_actions_with_prediction,
-    verification_data_json_with_filter, verification_diagnostics_json_with_filter,
-    verification_next_actions,
+    change_coverage_data_json, cli_command, command_result_envelope, scan_data_json_with_full,
+    scan_diagnostics_json, scan_next_actions, status_data_json,
+    status_next_actions_with_prediction, verification_data_json_with_filter,
+    verification_diagnostics_json_with_filter, verification_next_actions,
 };
 use batch::{
     batch_extinguish_data_json, batch_template_data_json, has_batch_extinguish_arg,
     has_batch_template_arg, parse_batch_template_args, parse_extinguish_batch_args,
     print_batch_template_result, run_batch_template, run_extinguish_batch,
 };
+#[cfg(test)]
+use branch_refs::{BranchRefSnapshot, DIRECTORY_ITERATION_SCRATCH_BYTES};
+use branch_refs::{
+    BranchRefSnapshotError, BranchRefWork, OpenedRegistrySnapshot, RepositoryMetadataSnapshot,
+};
 pub(crate) use cli_model::*;
 use command_registry::{capabilities_data_json, supports_metrics};
+#[cfg(test)]
+use commit_active_reset::commit_active_reset_state_postimage_bytes;
+use commit_active_reset::{
+    build_commit_active_reset_authority, commit_active_reset_complete,
+    commit_active_reset_unstarted, preflight_commit_active_reset_authority,
+    reset_commit_active_state, transition_commit_transaction_to_active_reset,
+    validate_commit_active_reset_authority,
+};
 use completion::{completion_script, help_text};
 use context::{build_context_pack, parse_context_args, print_context_summary};
-use doctor::{
-    doctor_report_data_json, doctor_report_diagnostics_json, doctor_report_next_actions,
-    parse_doctor_args, print_doctor_report, run_doctor,
-};
+#[cfg(test)]
+use doctor::{doctor_report_data_json, doctor_report_diagnostics_json, doctor_report_next_actions};
+use doctor::{parse_doctor_args, run_doctor};
 use evidence::{
     evidence_add_data_json, evidence_batch_data_json, parse_evidence_add_args,
     print_evidence_add_result, run_evidence_add, run_evidence_batch,
@@ -73,6 +101,12 @@ use extinguish_ux::{
     parse_all_matching_extinguish_args, parse_interactive_extinguish_args,
     prepare_extinguish_options, print_all_matching_extinguish_result,
     print_interactive_extinguish_result, run_all_matching_extinguish, run_interactive_extinguish,
+};
+use fire::active_ledger_transaction::{
+    active_ledger_hash_is_valid, active_ledger_request_hash, apply_active_ledger_transition,
+    ensure_completed_active_ledger_transition, recover_active_ledger_transition,
+    reject_pending_active_ledger_transition, release_completed_active_ledger_transition,
+    validate_active_ledger_descriptor, ActiveLedgerPublicationStatus, ActiveLedgerWrite,
 };
 use fire::{
     fire_batch_data_json, fire_data_json, parse_fire_args, parse_fire_batch_args,
@@ -89,9 +123,14 @@ use merge_patch_idempotency::{
     load_merge_idempotency, load_patch_import_idempotency, merge_idempotency_payload,
     patch_import_idempotency_payload, save_merge_idempotency, save_patch_import_idempotency,
 };
+use merge_resolution::{
+    merge_continue_data_json, merge_continue_diagnostics_json, merge_continue_next_actions,
+    parse_merge_continue_args, render_merge_continue, run_merge_continue,
+    unresolved_merge_conflicts_from_state,
+};
 use metrics::{
-    attach_metrics, branch_list_metrics, print_metrics, scan_metrics, status_metrics,
-    verification_metrics,
+    attach_metrics, branch_list_metrics, metrics_wire, print_metrics, scan_metrics, status_metrics,
+    verification_metrics, write_metrics, CommandMetrics, MetricsWire,
 };
 use migration::{
     migration_report_data_json, migration_report_diagnostics_json, migration_report_next_actions,
@@ -99,14 +138,17 @@ use migration::{
 };
 use open_clone_idempotency::{
     clone_idempotency_payload, load_clone_idempotency, load_open_idempotency,
-    open_idempotency_payload, save_clone_idempotency, save_open_idempotency,
+    open_idempotency_payload, save_clone_idempotency,
 };
+use pagination::{paginate, parse_page_limit, PageRequest};
 use remote::{
     apply_merge_request, copy_object_graph, list_merge_requests, list_remote_branches,
-    load_remote_branch, parse_cf_url, read_optional_json, remote_dirs, request_merge,
-    review_merge_request, upload_branch, write_object_records, RemoteProjectOptions,
+    load_remote_branch, parse_cf_url, print_remote_doctor_report, read_optional_json, remote_dirs,
+    remote_doctor_data_json, remote_doctor_diagnostics_json, request_merge, review_merge_request,
+    run_remote_doctor, upload_branch, write_object_records, RemoteProjectOptions,
     RequestApplyOptions, RequestMergeOptions, RequestReviewOptions, UploadOptions,
 };
+use secure_worktree::{ExistingWorktree, StagedWorktree};
 use storage::{
     parse_storage_report_args, print_storage_report, run_storage_report, storage_report_data_json,
     storage_report_diagnostics_json, storage_report_next_actions,
@@ -250,10 +292,20 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         }
         Some("trace-graph") => {
             let options = parse_read_only_debug_args(&args[1..], "trace-graph")?;
+            let atom_index = codefire_core::build_atom_index(&options.path)?;
             let trace_graph = codefire_core::current_trace_graph(&options.path)?;
-            let repo_root = open_context(&options.path)
-                .ok()
-                .map(|context| context.repo_root);
+            let open = open_context(&options.path).ok();
+            codefire_core::validate_trace_graph_endpoints(&atom_index, &trace_graph).map_err(
+                |error| match open.as_ref() {
+                    Some(context) => CliError::CoreContext {
+                        error,
+                        repo_root: context.repo_root.clone(),
+                        path: context.open_dir.join("codefire.links.yaml"),
+                    },
+                    None => CliError::Core(error),
+                },
+            )?;
+            let repo_root = open.map(|context| context.repo_root);
             if options.json_output {
                 println!(
                     "{}",
@@ -278,10 +330,18 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
         }
         Some("missing-links") => {
             let options = parse_read_only_debug_args(&args[1..], "missing-links")?;
-            let missing = codefire_core::current_required_link_missing(&options.path)?;
-            let repo_root = open_context(&options.path)
-                .ok()
-                .map(|context| context.repo_root);
+            let open = open_context(&options.path).ok();
+            let missing = codefire_core::current_required_link_missing(&options.path).map_err(
+                |error| match open.as_ref() {
+                    Some(context) => CliError::CoreContext {
+                        error,
+                        repo_root: context.repo_root.clone(),
+                        path: context.open_dir.join("codefire.links.yaml"),
+                    },
+                    None => CliError::Core(error),
+                },
+            )?;
+            let repo_root = open.map(|context| context.repo_root);
             if options.json_output {
                 println!(
                     "{}",
@@ -416,26 +476,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             let options = parse_list_args(&args[1..])?;
             match options.target {
                 ListTarget::Local(path) => {
-                    let repo_root = find_repo_root(&path)?;
-                    let branches = list_branches(&path)?;
-                    let opened = list_opened_registries(&repo_root)?;
-                    let data = local_list_data_json(&branches, opened);
-                    if options.json_output {
-                        println!(
-                            "{}",
-                            serde_json::to_string_pretty(&command_result_envelope(
-                                "list",
-                                true,
-                                0,
-                                Some(&repo_root),
-                                data,
-                                Vec::new(),
-                                Vec::new(),
-                            ))?
-                        );
-                    } else {
-                        print_local_list(&branches, &data);
+                    if options.page != PageRequest::default() {
+                        return Err(CliError::Usage(
+                            "--limit/--cursor currently require a remote list target".to_string(),
+                        ));
                     }
+                    list_branches(&path)?
+                        .prepare_opened_registries()?
+                        .output_local_list(options.json_output)?;
                 }
                 ListTarget::Remote(project_url) => {
                     let branches = match list_remote_branches(&project_url) {
@@ -446,6 +494,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         }
                         Err(error) => return Err(error),
                     };
+                    let page = paginate(
+                        &format!("remote-branches:{project_url}"),
+                        branches
+                            .iter()
+                            .map(|branch| json!({"name": branch.name, "head": branch.head}))
+                            .collect(),
+                        &options.page,
+                    )?;
                     if options.json_output {
                         println!(
                             "{}",
@@ -454,14 +510,18 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                                 true,
                                 0,
                                 None,
-                                remote_branch_list_data_json(&project_url, &branches),
+                                remote_branch_list_data_json(&project_url, &page),
                                 Vec::new(),
                                 Vec::new(),
                             ))?
                         );
                     } else {
-                        for branch in branches {
-                            println!("{}\t{}", branch.name, branch.head);
+                        for branch in page.items {
+                            println!(
+                                "{}\t{}",
+                                branch["name"].as_str().unwrap_or_default(),
+                                branch["head"].as_str().unwrap_or_default()
+                            );
                         }
                     }
                 }
@@ -502,6 +562,21 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 }
                 Err(error) => return Err(error),
             };
+            let page = paginate(
+                &format!("merge-requests:{}", options.project_url),
+                requests
+                    .iter()
+                    .map(|request| {
+                        json!({
+                            "id": request.id,
+                            "status": request.status,
+                            "source_url": request.source_url,
+                            "target_url": request.target_url,
+                        })
+                    })
+                    .collect(),
+                &options.page,
+            )?;
             if options.json_output {
                 println!(
                     "{}",
@@ -510,16 +585,19 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                         true,
                         0,
                         None,
-                        merge_request_list_data_json(&options.project_url, &requests),
+                        merge_request_list_data_json(&options.project_url, &page),
                         Vec::new(),
                         Vec::new(),
                     ))?
                 );
             } else {
-                for request in requests {
+                for request in page.items {
                     println!(
                         "{}\t{}\t{}\t{}",
-                        request.id, request.status, request.source_url, request.target_url
+                        request["id"].as_str().unwrap_or_default(),
+                        request["status"].as_str().unwrap_or_default(),
+                        request["source_url"].as_str().unwrap_or_default(),
+                        request["target_url"].as_str().unwrap_or_default(),
                     );
                 }
             }
@@ -746,6 +824,32 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             )),
         },
         Some("merge") => {
+            if args.get(1).map(String::as_str) == Some("--continue") {
+                let options = parse_merge_continue_args(&args[1..])?;
+                let result = run_merge_continue(&options)?;
+                let exit_code = result.exit_code();
+                if options.json_output {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&command_result_envelope(
+                            "merge",
+                            !result.blocked,
+                            exit_code.code(),
+                            Some(&result.repo_root),
+                            merge_continue_data_json(&result),
+                            merge_continue_diagnostics_json(&result),
+                            merge_continue_next_actions(&result),
+                        ))?
+                    );
+                } else {
+                    print!("{}", render_merge_continue(&result));
+                }
+                return if result.blocked {
+                    Err(CliError::CommandFailed(exit_code))
+                } else {
+                    Ok(())
+                };
+            }
             let options = parse_merge_args(&args[1..])?;
             let result = merge_branch(&env::current_dir()?, &options)?;
             if options.json_output {
@@ -846,34 +950,17 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 let options = parse_path_json_args(&args[2..], "branch list")?;
                 let start = options.path;
                 let started = Instant::now();
-                let branches = list_branches(&start)?;
-                let metrics = options
-                    .metrics
-                    .then(|| branch_list_metrics(started.elapsed(), &branches));
-                if options.json_output {
-                    let repo_root = find_repo_root(&start).ok();
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&command_result_envelope(
-                            "branch-list",
-                            true,
-                            0,
-                            repo_root.as_deref(),
-                            attach_metrics(json!({
-                                "type": "codefire_branch_list",
-                                "version": 1,
-                                "branches": branches.iter().map(branch_json).collect::<Vec<_>>(),
-                            }), metrics.as_ref()),
-                            Vec::new(),
-                            Vec::new(),
-                        ))?
-                    );
-                } else {
-                    print_branches(&branches);
-                    if let Some(metrics) = metrics.as_ref() {
-                        print_metrics(metrics);
-                    }
-                }
+                let branch_list = list_branches(&start)?;
+                let metrics = options.metrics.then(|| {
+                    branch_list_metrics(
+                        started.elapsed(),
+                        &branch_list.branches,
+                        branch_list.store_work,
+                        branch_list.ref_work,
+                        branch_list.decision_work_snapshot(),
+                    )
+                });
+                branch_list.output_branch_list(options.json_output, metrics)?;
                 Ok(())
             }
             Some("show") => {
@@ -927,14 +1014,19 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             }
             let options = parse_path_json_args(&args[1..], "status")?;
             let started = Instant::now();
-            let context = open_context(&options.path)?;
-            let status = read_status(&options.path)?;
+            let context = open_context_for_status(&options.path)?;
+            let mut validation_cache = codefire_store::SealedCommitValidationCache::default();
+            let status = read_status_with_cache(&options.path, &mut validation_cache)?;
             let metrics = options
                 .metrics
                 .then(|| status_metrics(started.elapsed(), &status));
             if options.json_output {
                 let data = attach_metrics(
-                    status_data_json_with_prediction(&status, &options.path),
+                    status_data_json_with_prediction(
+                        &status,
+                        &options.path,
+                        &mut validation_cache,
+                    ),
                     metrics.as_ref(),
                 );
                 let next_actions =
@@ -1019,30 +1111,59 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     }
                     Err(error) => return Err(error),
                 };
+                let target = options.start.to_string_lossy();
+                if let Some(report) = run_remote_doctor(&target, options.quick)? {
+                    let exit_code = if report.ok {
+                        ExitCode::Success
+                    } else {
+                        ExitCode::RepositoryCorruption
+                    };
+                    if options.json_output {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&command_result_envelope(
+                                "doctor",
+                                report.ok,
+                                exit_code.code(),
+                                None,
+                                remote_doctor_data_json(&report),
+                                remote_doctor_diagnostics_json(&report),
+                                Vec::new(),
+                            ))?
+                        );
+                    } else {
+                        print_remote_doctor_report(&report);
+                    }
+                    return if report.ok {
+                        Ok(())
+                    } else {
+                        Err(CliError::CommandFailed(exit_code))
+                    };
+                }
                 let report = run_doctor(&options)?;
-                let exit_code = if report.ok {
+                let exit_code = if report.is_ok() {
                     ExitCode::Success
                 } else {
                     ExitCode::RepositoryCorruption
                 };
                 if options.json_output {
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&command_result_envelope(
-                            "doctor",
-                            report.ok,
-                            exit_code.code(),
-                            Some(&report.repo_root),
-                            doctor_report_data_json(&report),
-                            doctor_report_diagnostics_json(&report),
-                            doctor_report_next_actions(&report),
-                        ))?
-                    );
+                    let ok = report.is_ok();
+                    report.write_json(&mut std::io::stdout().lock())?;
+                    if ok {
+                        return Ok(());
+                    }
                 } else {
-                    print_doctor_report(&report);
+                    let ok = report.is_ok();
+                    report.write_text(&mut std::io::stdout().lock())?;
+                    if ok {
+                        return Ok(());
+                    }
                 }
-                if report.ok {
-                    Ok(())
+                if options.json_output {
+                    // The detailed doctor envelope above owns JSON rendering. Return only the
+                    // process-status sentinel so `main` does not append a second generic error
+                    // envelope to stdout.
+                    Err(CliError::CommandFailed(exit_code))
                 } else {
                     Err(CliError::InvalidRepository(
                         "doctor found repository problems".to_string(),
@@ -1260,6 +1381,11 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             }
             if report.compatible {
                 Ok(())
+            } else if options.json_output {
+                // The detailed migration envelope above owns JSON rendering. Return only the
+                // process-status sentinel so `main` does not append a second generic error
+                // envelope to stdout.
+                Err(CliError::CommandFailed(exit_code))
             } else {
                 Err(CliError::MigrationIncompatibility(
                     "migration compatibility check failed".to_string(),
@@ -1350,19 +1476,19 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire discard <branch> [--keep-dir] [--dry-run] [--json]\n\nDiscard an open branch worktree and close its open registry entry.\n"
         }
         "merge" => {
-            "usage: codefire merge <source-branch> --into <target-branch> [--dry-run] [--json] [--idempotency-key <key>]\n\nMerge a sealed source branch head into an open-clean target branch.\n"
+            "usage: codefire merge <source-branch> --into <target-branch> [--dry-run] [--json] [--idempotency-key <key>]\n       codefire merge --continue [path|--path <open-dir>] [--accept-semantic-conflicts] [--dry-run] [--json]\n\nMerge a sealed source branch head into an open-clean target branch, then explicitly continue after resolving conflicts.\n"
         }
         "upload" => {
             "usage: codefire upload <branch> <remote-url> [--dry-run] [--json] [--idempotency-key <key>] [--request-key-id <key>]\n\nUpload a sealed branch to a remote project.\n"
         }
         "list" => {
-            "usage: codefire list [path|<remote-project-url>] [--json]\n\nList local repository branches/open worktrees or remote project branches.\n"
+            "usage: codefire list [path|<remote-project-url>] [--json] [--limit N] [--cursor CURSOR]\n\nList local repository branches/open worktrees or remote project branches. Pagination options require a remote target and bind the cursor to one immutable result snapshot.\n"
         }
         "request-merge" => {
             "usage: codefire request-merge <source-url> <target-url> [--dry-run] [--json] [--idempotency-key <key>]\n\nCreate a remote merge request.\n"
         }
         "request-list" => {
-            "usage: codefire request-list <remote-project-url> [--json]\n\nList remote merge requests.\n"
+            "usage: codefire request-list <remote-project-url> [--json] [--limit N] [--cursor CURSOR]\n\nList remote merge requests with a snapshot-bound cursor.\n"
         }
         "request-review" => {
             "usage: codefire request-review <remote-project-url> <mr-id> --decision approve|reject [--reviewer <name>] [--dry-run] [--json] [--idempotency-key <key>]\n"
@@ -1374,10 +1500,10 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire status [path|--path <path>] [--json] [--metrics]\n\nShow the current open branch state.\n"
         }
         "scan" => {
-            "usage: codefire scan [path|--path <path>] [--json] [--metrics] [--full]\n\nDetect changed atoms and open fires for an open directory.\n"
+            "usage: codefire scan [path|--path <path>] [--json] [--metrics] [--full] [--wait-lock] [--lock-timeout <duration>]\n\nDetect changed atoms and open fires for an open directory.\n"
         }
         "verify" => {
-            "usage: codefire verify [path|--path <path>] [--details] [--blocking-only] [--json] [--metrics]\n\nRun CodeFire verification checks for an open directory.\n"
+            "usage: codefire verify [path|--path <path>] [--details] [--blocking-only] [--json] [--metrics] [--wait-lock] [--lock-timeout <duration>]\n\nRun CodeFire verification checks for an open directory.\n"
         }
         "fire" => {
             "usage: codefire fire <source-atom> --to <target-atom> --reason <text> [--path <open-dir>] [--dry-run] [--full] [--json]\n       codefire fire --batch <file> [--path <open-dir>] [--dry-run] [--full] [--json]\n\nBatch JSON example:\n  {\"version\":1,\"fires\":[{\"from\":\"REQ-id\",\"to\":\"DES-id\",\"reason\":\"manual review\"}]}\n"
@@ -1404,7 +1530,7 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire explain (fire <fire-id>|atom <atom-id>|verify-failure|storage-warning) [--path <open-dir>] [--json]\n\nExplain CodeFire state, diagnostics, and next actions.\n"
         }
         "migrate" | "migrate check" => {
-            "usage: codefire migrate check [path] [--json] [--target-format v0.6]\n       codefire migrate dry-run [path] [--json] [--target-format v0.6]\n       codefire migrate apply [path] [--json] [--target-format v0.6]\n\nCheck or prepare CodeFire repository layout migration.\n"
+            "usage: codefire migrate check [path] [--json] [--target-format current|v0.6] [--quick|--full]\n       codefire migrate dry-run [path] [--json] [--target-format current|v0.6] [--quick|--full]\n       codefire migrate apply [path] [--json] [--target-format current|v0.6] [--full] [--wait-lock] [--lock-timeout <duration>]\n\nCheck, plan, or apply registered layout-only repository repairs. Target formats select a compatibility profile; migrate does not rewrite repository format metadata.\n"
         }
         "atom-index" => {
             "usage: codefire atom-index [path]\n\nPrint the current Atom index as JSON for a repository or open directory.\n"
@@ -1474,20 +1600,55 @@ fn run_storage_report_command(options: storage::StorageReportOptions) -> Result<
 }
 
 #[derive(Debug)]
+struct OpenTargetResolutionError {
+    message: String,
+    reason: &'static str,
+    repo_root: PathBuf,
+    branch: String,
+    requested_path: PathBuf,
+    resolved_path: Option<PathBuf>,
+    workspace_boundary: PathBuf,
+}
+
+#[derive(Debug)]
+struct OpenRecoveryPendingError {
+    operation: String,
+    phase: String,
+    repo_root: PathBuf,
+    branch: String,
+    open_dir: PathBuf,
+}
+
+#[derive(Debug)]
 enum CliError {
     Io(std::io::Error),
     Json(serde_json::Error),
     Core(codefire_core::CoreError),
-    Store(codefire_store::StoreError),
+    CoreContext {
+        error: codefire_core::CoreError,
+        repo_root: PathBuf,
+        path: PathBuf,
+    },
+    Store(Box<codefire_store::StoreError>),
+    StoreContext {
+        error: Box<codefire_store::StoreError>,
+        repo_root: PathBuf,
+        path: PathBuf,
+    },
     Usage(String),
     AuthenticationOrSignature(String),
     IdempotencyConflict(String),
-    HttpPayloadTooLarge(String),
+    ResourceBudget(Box<codefire_core::DecisionWorkBudgetExceeded>),
+    RequestDeadlineExceeded {
+        phase: &'static str,
+        limit_ms: u64,
+    },
     RemoteDiagnostic {
         status: u16,
         exit_code: ExitCode,
         kind: String,
         message: String,
+        resource_budget: Option<Box<codefire_core::DecisionWorkBudgetExceeded>>,
     },
     MigrationIncompatibility(String),
     VerificationFailed(ExitCode),
@@ -1495,6 +1656,17 @@ enum CliError {
     NotOpen(PathBuf),
     InvalidMarker(String),
     InvalidRepository(String),
+    BranchReferenceSubjectChanged {
+        subject: PathBuf,
+        message: String,
+    },
+    OpenedRegistrySubjectChanged {
+        subject: PathBuf,
+        message: String,
+    },
+    OpenSnapshotDivergence(Box<open_snapshot::OpenSnapshotDivergence>),
+    OpenRecoveryPending(Box<OpenRecoveryPendingError>),
+    ActiveStateCapability(Box<active_state::ActiveStateError>),
     LockContention(String),
     RepositoryLockContention {
         message: String,
@@ -1507,6 +1679,7 @@ enum CliError {
         branch: Option<String>,
         path: Option<PathBuf>,
     },
+    OpenTargetResolution(Box<OpenTargetResolutionError>),
     BatchFileRead {
         operation: &'static str,
         path: PathBuf,
@@ -1516,7 +1689,7 @@ enum CliError {
     EvidenceCommandFailed {
         exit_code: Option<i32>,
         timed_out: bool,
-        cwd: PathBuf,
+        cwd: String,
         message: String,
     },
     MissingEvidenceRef {
@@ -1531,11 +1704,14 @@ impl CliError {
             CliError::Io(_) => ExitCode::GenericFailure,
             CliError::Json(_) => ExitCode::RepositoryCorruption,
             CliError::Core(error) => core_error_exit_code(error),
+            CliError::CoreContext { error, .. } => core_error_exit_code(error),
             CliError::Store(error) => store_error_exit_code(error),
+            CliError::StoreContext { error, .. } => store_error_exit_code(error),
             CliError::Usage(message) => usage_exit_code(message),
             CliError::AuthenticationOrSignature(_) => ExitCode::AuthenticationOrSignatureFailure,
             CliError::IdempotencyConflict(_) => ExitCode::IdempotencyConflict,
-            CliError::HttpPayloadTooLarge(_) => ExitCode::InvalidUsageOrConfig,
+            CliError::ResourceBudget(_) => ExitCode::ResourceBudgetExceeded,
+            CliError::RequestDeadlineExceeded { .. } => ExitCode::ResourceBudgetExceeded,
             CliError::RemoteDiagnostic { exit_code, .. } => *exit_code,
             CliError::MigrationIncompatibility(_) => ExitCode::MigrationIncompatibility,
             CliError::VerificationFailed(exit_code) => *exit_code,
@@ -1544,10 +1720,16 @@ impl CliError {
             CliError::InvalidMarker(_) | CliError::InvalidRepository(_) => {
                 ExitCode::RepositoryCorruption
             }
+            CliError::BranchReferenceSubjectChanged { .. }
+            | CliError::OpenedRegistrySubjectChanged { .. } => ExitCode::RepositoryCorruption,
+            CliError::OpenSnapshotDivergence(_) => ExitCode::RepositoryCorruption,
+            CliError::OpenRecoveryPending(_) => ExitCode::RepositoryCorruption,
+            CliError::ActiveStateCapability(_) => ExitCode::RepositoryCorruption,
             CliError::LockContention(_) | CliError::RepositoryLockContention { .. } => {
                 ExitCode::LockContention
             }
             CliError::BranchOperation { message, .. } => usage_exit_code(message),
+            CliError::OpenTargetResolution(error) => usage_exit_code(&error.message),
             CliError::BatchFileRead { .. } => ExitCode::InvalidUsageOrConfig,
             CliError::EvidenceCommandFailed { .. } => ExitCode::InvalidUsageOrConfig,
             CliError::MissingEvidenceRef { .. } => ExitCode::ObjectReferenceInvalid,
@@ -1638,31 +1820,57 @@ impl CliError {
             }),
             CliError::Io(_) => self.simple_diagnostic("io_error", true),
             CliError::Json(_) => self.simple_diagnostic("json_error", false),
-            CliError::Core(_) => self.simple_diagnostic("core_error", true),
-            CliError::Store(_) => self.simple_diagnostic("store_error", false),
+            CliError::Core(error) => core_error_diagnostic(error, None, None, self.exit_code()),
+            CliError::CoreContext {
+                error,
+                repo_root,
+                path,
+            } => core_error_diagnostic(error, Some(repo_root), Some(path), self.exit_code()),
+            CliError::Store(error) => store_error_diagnostic(error, None, None, self.exit_code()),
+            CliError::StoreContext {
+                error,
+                repo_root,
+                path,
+            } => store_error_diagnostic(error, Some(repo_root), Some(path), self.exit_code()),
             CliError::AuthenticationOrSignature(_) => {
                 self.simple_diagnostic("authentication_or_signature_error", true)
             }
             CliError::IdempotencyConflict(_) => {
                 self.simple_diagnostic("idempotency_conflict", true)
             }
-            CliError::HttpPayloadTooLarge(_) => {
-                self.simple_diagnostic("http_payload_too_large", true)
+            CliError::ResourceBudget(error) => {
+                resource_budget_diagnostic(error, None, &self.to_string())
             }
+            CliError::RequestDeadlineExceeded { phase, limit_ms } => json!({
+                "kind": "request_deadline_exceeded",
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "phase": phase,
+                "limit_ms": limit_ms,
+                "exit_code": self.exit_code(),
+                "message": self.to_string(),
+            }),
             CliError::RemoteDiagnostic {
                 status,
                 exit_code,
                 kind,
+                resource_budget,
                 ..
-            } => json!({
-                "kind": kind,
-                "severity": "blocking",
-                "blocking": true,
-                "repairable": true,
-                "http_status": status,
-                "exit_code": exit_code.code(),
-                "message": self.to_string(),
-            }),
+            } => resource_budget.as_ref().map_or_else(
+                || {
+                    json!({
+                        "kind": kind,
+                        "severity": "blocking",
+                        "blocking": true,
+                        "repairable": true,
+                        "http_status": status,
+                        "exit_code": exit_code.code(),
+                        "message": self.to_string(),
+                    })
+                },
+                |budget| resource_budget_diagnostic(budget, Some(*status), &self.to_string()),
+            ),
             CliError::MigrationIncompatibility(_) => {
                 self.simple_diagnostic("migration_incompatibility", true)
             }
@@ -1679,6 +1887,63 @@ impl CliError {
             }),
             CliError::InvalidMarker(_) => self.simple_diagnostic("invalid_marker", true),
             CliError::InvalidRepository(_) => self.simple_diagnostic("invalid_repository", true),
+            CliError::BranchReferenceSubjectChanged { subject, .. } => json!({
+                "kind": "branch_reference_subject_changed",
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": false,
+                "subject": subject,
+                "exit_code": self.exit_code(),
+                "message": self.to_string(),
+            }),
+            CliError::OpenedRegistrySubjectChanged { subject, .. } => json!({
+                "kind": "opened_registry_subject_changed",
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": false,
+                "subject": subject,
+                "exit_code": self.exit_code(),
+                "message": self.to_string(),
+            }),
+            CliError::OpenSnapshotDivergence(divergence) => json!({
+                "kind": open_snapshot::OPEN_SNAPSHOT_DIVERGENCE_KIND,
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": false,
+                "phase": &divergence.phase,
+                "authority": divergence.authority,
+                "expected": &divergence.expected,
+                "actual": &divergence.actual,
+                "expected_record": &divergence.expected_record,
+                "actual_record": &divergence.actual_record,
+                "repo": &divergence.repo_root,
+                "branch": &divergence.branch,
+                "exit_code": self.exit_code(),
+                "message": divergence.to_string(),
+            }),
+            CliError::OpenRecoveryPending(pending) => json!({
+                "kind": "open_recovery_pending",
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "operation": &pending.operation,
+                "phase": &pending.phase,
+                "repo": &pending.repo_root,
+                "branch": &pending.branch,
+                "open_dir": &pending.open_dir,
+                "exit_code": self.exit_code(),
+                "message": self.to_string(),
+            }),
+            CliError::ActiveStateCapability(error) => json!({
+                "kind": "active_state_capability_invalid",
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": false,
+                "operation": error.operation(),
+                "path": error.path(),
+                "exit_code": self.exit_code(),
+                "message": error.to_string(),
+            }),
             CliError::LockContention(_) => self.simple_diagnostic("lock_contention", true),
             CliError::RepositoryLockContention {
                 repo_root,
@@ -1710,6 +1975,20 @@ impl CliError {
                 "exit_code": self.exit_code(),
                 "message": self.to_string(),
             }),
+            CliError::OpenTargetResolution(error) => json!({
+                "kind": "open_target_resolution_failed",
+                "severity": "blocking",
+                "blocking": true,
+                "repairable": true,
+                "reason": error.reason,
+                "repo": error.repo_root,
+                "branch": error.branch,
+                "requested_path": error.requested_path,
+                "resolved_path": error.resolved_path,
+                "workspace_boundary": error.workspace_boundary,
+                "exit_code": self.exit_code(),
+                "message": self.to_string(),
+            }),
         }
     }
 
@@ -1725,17 +2004,155 @@ impl CliError {
     }
 }
 
+fn resource_budget_diagnostic(
+    error: &codefire_core::DecisionWorkBudgetExceeded,
+    http_status: Option<u16>,
+    message: &str,
+) -> Value {
+    let mut diagnostic = serde_json::to_value(error).unwrap_or_else(|_| {
+        json!({
+            "kind": "resource_budget_exceeded",
+            "exit_code": ExitCode::ResourceBudgetExceeded.code(),
+        })
+    });
+    if let Some(fields) = diagnostic.as_object_mut() {
+        fields.insert("severity".to_string(), json!("blocking"));
+        fields.insert("blocking".to_string(), json!(true));
+        fields.insert("repairable".to_string(), json!(true));
+        fields.insert("message".to_string(), json!(message));
+        if let Some(status) = http_status {
+            fields.insert("http_status".to_string(), json!(status));
+        }
+    }
+    diagnostic
+}
+
+fn core_error_diagnostic(
+    error: &codefire_core::CoreError,
+    repo_root: Option<&Path>,
+    path: Option<&Path>,
+    exit_code: i32,
+) -> Value {
+    match error {
+        codefire_core::CoreError::TraceGraphEndpointIntegrity(error) => json!({
+            "kind": "trace_graph_endpoint_integrity",
+            "severity": "blocking",
+            "blocking": true,
+            "repairable": true,
+            "repo": repo_root,
+            "path": path,
+            "total_issues": error.total_issues,
+            "issues_omitted": error.omitted_issues,
+            "issues": &error.issues,
+            "exit_code": exit_code,
+            "message": error.to_string(),
+        }),
+        codefire_core::CoreError::SealedSnapshotSemanticIntegrity(error) => json!({
+            "kind": "sealed_snapshot_semantic_integrity",
+            "severity": "blocking",
+            "blocking": true,
+            "repairable": true,
+            "repo": repo_root,
+            "path": path,
+            "total_issues": error.issues.len(),
+            "issues": &error.issues,
+            "exit_code": exit_code,
+            "message": error.to_string(),
+        }),
+        _ => json!({
+            "kind": "core_error",
+            "severity": "blocking",
+            "blocking": true,
+            "repairable": true,
+            "repo": repo_root,
+            "path": path,
+            "exit_code": exit_code,
+            "message": error.to_string(),
+        }),
+    }
+}
+
+fn store_error_diagnostic(
+    error: &codefire_store::StoreError,
+    repo_root: Option<&Path>,
+    path: Option<&Path>,
+    exit_code: i32,
+) -> Value {
+    match error {
+        codefire_store::StoreError::ObjectCollision {
+            object_id,
+            requested_type,
+            existing_type,
+            requested_hash,
+            existing_hash,
+            canonical_payload_matches,
+        } => json!({
+            "kind": "object_id_collision",
+            "severity": "blocking",
+            "blocking": true,
+            "repairable": false,
+            "repo": repo_root,
+            "path": path,
+            "object_id": object_id,
+            "requested_type": requested_type,
+            "existing_type": existing_type,
+            "requested_hash": requested_hash,
+            "existing_hash": existing_hash,
+            "canonical_payload_matches": canonical_payload_matches,
+            "exit_code": exit_code,
+            "message": error.to_string(),
+        }),
+        codefire_store::StoreError::InvalidSealedCommit(_) => json!({
+            "kind": "sealed_commit_invalid",
+            "severity": "blocking",
+            "blocking": true,
+            "repairable": false,
+            "repo": repo_root,
+            "path": path,
+            "exit_code": exit_code,
+            "message": error.to_string(),
+        }),
+        codefire_store::StoreError::ObjectNotFound(object_id) => json!({
+            "kind": "object_not_found",
+            "severity": "blocking",
+            "blocking": true,
+            "repairable": false,
+            "repo": repo_root,
+            "path": path,
+            "object_id": object_id,
+            "exit_code": exit_code,
+            "message": error.to_string(),
+        }),
+        _ => json!({
+            "kind": "store_error",
+            "severity": "blocking",
+            "blocking": true,
+            "repairable": false,
+            "repo": repo_root,
+            "path": path,
+            "exit_code": exit_code,
+            "message": error.to_string(),
+        }),
+    }
+}
+
 impl fmt::Display for CliError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CliError::Io(error) => write!(f, "{error}"),
             CliError::Json(error) => write!(f, "{error}"),
             CliError::Core(error) => write!(f, "{error}"),
+            CliError::CoreContext { error, .. } => write!(f, "{error}"),
             CliError::Store(error) => write!(f, "{error}"),
+            CliError::StoreContext { error, .. } => write!(f, "{error}"),
             CliError::Usage(message) => write!(f, "{message}"),
             CliError::AuthenticationOrSignature(message) => write!(f, "{message}"),
             CliError::IdempotencyConflict(message) => write!(f, "{message}"),
-            CliError::HttpPayloadTooLarge(message) => write!(f, "{message}"),
+            CliError::ResourceBudget(error) => write!(f, "{error}"),
+            CliError::RequestDeadlineExceeded { phase, limit_ms } => write!(
+                f,
+                "HTTP request deadline of {limit_ms} ms exceeded during {phase}"
+            ),
             CliError::RemoteDiagnostic { message, .. } => write!(f, "{message}"),
             CliError::MigrationIncompatibility(message) => write!(f, "{message}"),
             CliError::VerificationFailed(_) => write!(f, "verification failed"),
@@ -1751,9 +2168,27 @@ impl fmt::Display for CliError {
             CliError::InvalidRepository(message) => {
                 write!(f, "invalid CodeFire repository: {message}")
             }
+            CliError::BranchReferenceSubjectChanged { subject, message } => write!(
+                f,
+                "branch reference subject changed at {}: {message}",
+                subject.display()
+            ),
+            CliError::OpenedRegistrySubjectChanged { subject, message } => write!(
+                f,
+                "opened registry subject changed at {}: {message}",
+                subject.display()
+            ),
+            CliError::OpenSnapshotDivergence(divergence) => write!(f, "{divergence}"),
+            CliError::OpenRecoveryPending(pending) => write!(
+                f,
+                "open recovery is pending for {} at phase {} on branch {}",
+                pending.operation, pending.phase, pending.branch
+            ),
+            CliError::ActiveStateCapability(error) => write!(f, "{error}"),
             CliError::LockContention(message) => write!(f, "{message}"),
             CliError::RepositoryLockContention { message, .. } => write!(f, "{message}"),
             CliError::BranchOperation { message, .. } => write!(f, "{message}"),
+            CliError::OpenTargetResolution(error) => write!(f, "{}", error.message),
             CliError::BatchFileRead {
                 operation,
                 path,
@@ -1792,9 +2227,21 @@ impl From<codefire_core::CoreError> for CliError {
     }
 }
 
+impl From<codefire_core::DecisionWorkBudgetExceeded> for CliError {
+    fn from(error: codefire_core::DecisionWorkBudgetExceeded) -> Self {
+        CliError::ResourceBudget(Box::new(error))
+    }
+}
+
 impl From<codefire_store::StoreError> for CliError {
     fn from(error: codefire_store::StoreError) -> Self {
-        CliError::Store(error)
+        CliError::Store(Box::new(error))
+    }
+}
+
+impl From<active_state::ActiveStateError> for CliError {
+    fn from(error: active_state::ActiveStateError) -> Self {
+        CliError::ActiveStateCapability(Box::new(error))
     }
 }
 
@@ -1823,7 +2270,7 @@ fn local_workflow_handler(command: &str) -> Option<CommandHandler> {
 fn run_scan_command(args: &[String]) -> Result<(), CliError> {
     let options = parse_path_json_args(args, "scan")?;
     let started = Instant::now();
-    let scan = run_scan(&options.path)?;
+    let scan = run_scan_with_lock_options(&options.path, &options.lock)?;
     let metrics = options
         .metrics
         .then(|| scan_metrics(started.elapsed(), &scan));
@@ -1858,12 +2305,13 @@ fn run_scan_command(args: &[String]) -> Result<(), CliError> {
 fn run_verify_command(args: &[String]) -> Result<(), CliError> {
     let options = parse_verify_args(args)?;
     let started = Instant::now();
-    let execution = compute_verify(&options.path, true)?;
+    let execution = run_verify_with_lock_options(&options.path, &options.lock)?;
     let verification = execution.verification;
     let scan = execution.scan;
     let metrics = options
         .metrics
         .then(|| verification_metrics(started.elapsed(), &verification));
+    let decision = codefire_core::committable_decision(&verification);
     let exit_code = verification_exit_code(&verification);
     if options.json_output {
         let repo_root = open_context(&options.path)
@@ -1873,7 +2321,7 @@ fn run_verify_command(args: &[String]) -> Result<(), CliError> {
             "{}",
             serde_json::to_string_pretty(&command_result_envelope(
                 "verify",
-                verification.result == "passed",
+                decision.is_committable(),
                 exit_code.code(),
                 repo_root.as_deref(),
                 attach_metrics(
@@ -1895,7 +2343,7 @@ fn run_verify_command(args: &[String]) -> Result<(), CliError> {
             print_metrics(metrics);
         }
     }
-    if verification.result == "passed" {
+    if decision.is_committable() {
         Ok(())
     } else {
         Err(CliError::VerificationFailed(exit_code))
@@ -2180,17 +2628,20 @@ fn run_commit_command(args: &[String]) -> Result<(), CliError> {
         }
         Err(error) => return Err(error),
     };
+    if result.blocked {
+        if options.json_output {
+            print_commit_result_json(&result)?;
+        } else {
+            println!(
+                "commit blocked: verification failed with exit code {}",
+                result.exit_code.code()
+            );
+        }
+        return Err(CliError::CommandFailed(result.exit_code));
+    }
     if options.json_output {
         print_commit_result_json(&result)?;
-        if result.blocked {
-            return Err(CliError::CommandFailed(result.exit_code));
-        }
     } else if options.dry_run {
-        if result.blocked {
-            return Err(CliError::Usage(
-                "commit blocked: verification failed or consistency blockers remain".to_string(),
-            ));
-        }
         println!("commit dry-run: branch {} would be sealed", result.branch);
         println!(
             "Changed atoms: {}",
@@ -2253,9 +2704,13 @@ fn print_status(status: &Status) {
     println!("Open fires: {}", status.open_fires);
 }
 
-fn status_data_json_with_prediction(status: &Status, path: &Path) -> Value {
+fn status_data_json_with_prediction(
+    status: &Status,
+    path: &Path,
+    validation_cache: &mut codefire_store::SealedCommitValidationCache,
+) -> Value {
     let mut data = status_data_json(status);
-    if let Ok(scan_execution) = compute_scan(path, false) {
+    if let Ok(scan_execution) = compute_scan_with_cache(path, None, validation_cache) {
         let scan = scan_execution.scan;
         data["scan_prediction"] = json!({
             "source": "preview_recomputed",
@@ -2265,16 +2720,14 @@ fn status_data_json_with_prediction(status: &Status, path: &Path) -> Value {
             "non_atom_changed_file_count": scan.non_atom_changed_files.len(),
             "open_fire_count": scan.open_fires.len(),
             "tool_migration": &scan.tool_migration,
+            "change_coverage": change_coverage_data_json(
+                scan.change_coverage.as_ref(),
+                automation::MAX_SCAN_JSON_SAMPLE,
+            ),
             "base_commit": &scan.base_commit,
         });
     }
     data
-}
-
-fn print_branches(branches: &[Branch]) {
-    for branch in branches {
-        println!("{}\t{}\t{}", branch.name, branch.head, branch.state);
-    }
 }
 
 fn print_branch_show(data: &Value) {
@@ -2313,6 +2766,7 @@ fn print_branch_show(data: &Value) {
     }
 }
 
+#[cfg(test)]
 fn branch_json(branch: &Branch) -> Value {
     json!({
         "name": &branch.name,
@@ -2325,30 +2779,7 @@ fn is_remote_project_url(value: &str) -> bool {
     value.starts_with("cf://") || is_cf_http_url(value)
 }
 
-fn print_local_list(branches: &[Branch], data: &Value) {
-    println!("Branches:");
-    print_branches(branches);
-    println!("Opened:");
-    let opened = data
-        .get("opened")
-        .and_then(Value::as_array)
-        .map(Vec::as_slice)
-        .unwrap_or(&[]);
-    if opened.is_empty() {
-        println!("none");
-        return;
-    }
-    for item in opened {
-        println!(
-            "{}\t{}",
-            item.get("branch")
-                .and_then(Value::as_str)
-                .unwrap_or("(unknown)"),
-            item.get("path").and_then(Value::as_str).unwrap_or("")
-        );
-    }
-}
-
+#[cfg(test)]
 fn local_list_data_json(branches: &[Branch], opened: Vec<Value>) -> Value {
     json!({
         "type": "codefire_local_list",
@@ -2358,75 +2789,36 @@ fn local_list_data_json(branches: &[Branch], opened: Vec<Value>) -> Value {
     })
 }
 
-fn remote_branch_list_data_json(project_url: &str, branches: &[remote::RemoteBranch]) -> Value {
+fn remote_branch_list_data_json(project_url: &str, page: &pagination::Page) -> Value {
     json!({
         "type": "codefire_remote_branch_list",
         "version": 1,
         "project_url": project_url,
-        "branches": branches.iter().map(|branch| json!({
-            "name": &branch.name,
-            "head": &branch.head,
-        })).collect::<Vec<_>>(),
+        "branches": &page.items,
+        "page": &page.metadata,
     })
 }
 
-fn merge_request_list_data_json(
-    project_url: &str,
-    requests: &[remote::MergeRequestListItem],
-) -> Value {
+fn merge_request_list_data_json(project_url: &str, page: &pagination::Page) -> Value {
     json!({
         "type": "codefire_merge_request_list",
         "version": 1,
         "project_url": project_url,
-        "merge_requests": requests.iter().map(|request| json!({
-            "id": &request.id,
-            "status": &request.status,
-            "source_url": &request.source_url,
-            "target_url": &request.target_url,
-        })).collect::<Vec<_>>(),
+        "merge_requests": &page.items,
+        "page": &page.metadata,
     })
-}
-
-fn list_opened_registries(repo_root: &Path) -> Result<Vec<Value>, CliError> {
-    let opened_root = repo_root.join(".codefire").join("opened");
-    if !opened_root.exists() {
-        return Ok(Vec::new());
-    }
-    let mut paths = Vec::new();
-    for entry in fs::read_dir(opened_root)? {
-        let path = entry?.path();
-        if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
-            paths.push(path);
-        }
-    }
-    paths.sort();
-    let mut opened = Vec::with_capacity(paths.len());
-    for path in paths {
-        let registry = read_json(&path)?;
-        let branch = required_string(&registry, &["branch", "name"])?;
-        let open = registry.get("open").cloned().unwrap_or_else(|| json!({}));
-        let open_path = open
-            .get("path")
-            .or_else(|| open.get("opened_path"))
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        opened.push(json!({
-            "branch": branch,
-            "path": open_path,
-            "open_instance_id": open.get("open_instance_id").cloned().unwrap_or(Value::Null),
-            "current_base_commit": open.get("current_base_commit").cloned().unwrap_or(Value::Null),
-            "opened_from_commit": open.get("opened_from_commit").cloned().unwrap_or(Value::Null),
-            "registry_path": path,
-        }));
-    }
-    Ok(opened)
 }
 
 fn branch_show_data(start: &Path, branch: Option<&str>) -> Result<(PathBuf, Value), CliError> {
     let repo_root = find_repo_root(start)?;
     let branch_name = match branch {
         Some(branch) => branch.to_string(),
-        None => open_context(start)?.branch,
+        None => {
+            let marker_path =
+                find_open_marker(start)?.ok_or_else(|| CliError::NotOpen(start.to_path_buf()))?;
+            let marker = read_json(&marker_path)?;
+            required_string(&marker, &["branch", "name"])?
+        }
     };
     let record = load_branch_record(&repo_root, &branch_name)?;
     let head = required_string(&record, &["head"])?;
@@ -2571,6 +2963,17 @@ fn render_scan(scan: &codefire_core::ScanResult) -> String {
             migration.affected_atoms.len()
         ));
     }
+    if let Some(coverage) = &scan.change_coverage {
+        output.push_str(&format!(
+            "Change coverage: {} changed file(s), {} non-Atom, {} deleted-Atom, {} out-of-Atom, {} Atom file(s) with unclassified spans [{}]\n",
+            coverage.summary.changed_files,
+            coverage.summary.non_atom_files,
+            coverage.summary.deleted_atom_files,
+            coverage.summary.out_of_atom_files,
+            coverage.summary.atom_files_with_unclassified_spans,
+            coverage.span_precision,
+        ));
+    }
     if scan.open_fires.is_empty() {
         output.push_str("Open fires: none\n");
     } else {
@@ -2666,6 +3069,7 @@ fn commit_result_data_json(result: &CommitResult) -> Value {
         "non_atom_changed_file_count": &result.plan["non_atom_changed_file_count"],
         "non_atom_changed_files": &result.plan["non_atom_changed_files"],
         "non_atom_changed_files_omitted": &result.plan["non_atom_changed_files_omitted"],
+        "change_coverage": &result.plan["change_coverage"],
         "extinguished_fire_count": &result.plan["extinguished_fire_count"],
         "active_resolution_count": &result.plan["active_resolution_count"],
         "evidence_ref_count": &result.plan["evidence_ref_count"],
@@ -2757,6 +3161,12 @@ fn cli_error_envelope(command: &str, error: &CliError) -> Value {
         CliError::MissingEvidenceRef { repo_root, .. } => Some(repo_root.as_path()),
         CliError::RepositoryLockContention { repo_root, .. } => Some(repo_root.as_path()),
         CliError::BranchOperation { repo_root, .. } => Some(repo_root.as_path()),
+        CliError::OpenTargetResolution(error) => Some(error.repo_root.as_path()),
+        CliError::OpenSnapshotDivergence(divergence) => Some(divergence.repo_root.as_path()),
+        CliError::OpenRecoveryPending(pending) => Some(pending.repo_root.as_path()),
+        CliError::CoreContext { repo_root, .. } | CliError::StoreContext { repo_root, .. } => {
+            Some(repo_root.as_path())
+        }
         _ => None,
     };
     command_result_envelope(
@@ -2794,6 +3204,21 @@ fn cli_error_next_actions(command: &str, error: &CliError) -> Vec<Value> {
             branch,
             path,
         } => branch_error_next_actions(message, repo_root, branch.as_deref(), path.as_deref()),
+        CliError::OpenTargetResolution(error) => vec![json!({
+            "kind": "choose_safe_open_target",
+            "command": cli_command(format!(
+                "open {} <path-under-{}> --dry-run --json",
+                command_arg(&error.branch),
+                command_arg(&error.workspace_boundary.to_string_lossy())
+            )),
+            "reason": "choose a non-overlapping target below the resolved workspace boundary and preview it before applying",
+            "target": {
+                "repo": error.repo_root,
+                "branch": error.branch,
+                "requested_path": error.requested_path,
+                "workspace_boundary": error.workspace_boundary,
+            },
+        })],
         CliError::Usage(message) if unknown_target_parts(message).is_some() => vec![json!({
             "kind": "refresh_scan",
             "command": cli_command("scan --json"),
@@ -2866,6 +3291,37 @@ fn cli_error_next_actions(command: &str, error: &CliError) -> Vec<Value> {
             "reason": "inspect repository/open-directory discovery before retrying",
             "target": {"path": path},
         })],
+        CliError::OpenSnapshotDivergence(divergence) => vec![json!({
+            "kind": "inspect_open_snapshot_divergence",
+            "command": cli_command(format!(
+                "doctor --path {} --json",
+                command_arg(&divergence.repo_root.to_string_lossy())
+            )),
+            "reason": "inspect divergent open authorities without rewriting branch, registry, marker, or active state",
+            "target": {
+                "repo": &divergence.repo_root,
+                "branch": &divergence.branch,
+                "phase": &divergence.phase,
+                "authority": divergence.authority,
+                "expected": &divergence.expected,
+                "actual": &divergence.actual,
+            },
+        })],
+        CliError::OpenRecoveryPending(pending) => vec![json!({
+            "kind": "inspect_pending_open_recovery",
+            "command": cli_command(format!(
+                "doctor --path {} --json",
+                command_arg(&pending.repo_root.to_string_lossy())
+            )),
+            "reason": "inspect the pending transaction and rerun only its exact owning operation",
+            "target": {
+                "repo": &pending.repo_root,
+                "branch": &pending.branch,
+                "open_dir": &pending.open_dir,
+                "operation": &pending.operation,
+                "phase": &pending.phase,
+            },
+        })],
         CliError::InvalidMarker(_) | CliError::InvalidRepository(_) => vec![
             json!({
                 "kind": "doctor",
@@ -2913,6 +3369,42 @@ fn cli_error_next_actions(command: &str, error: &CliError) -> Vec<Value> {
             "reason": "retry after the resource lock is released or wait up to a bounded timeout",
             "target": {"error": error.to_string()},
         })],
+        CliError::CoreContext {
+            repo_root, path, ..
+        }
+        | CliError::StoreContext {
+            repo_root, path, ..
+        } => {
+            let doctor_command = cli_command(format!(
+                "doctor --path {} --json",
+                command_arg(&repo_root.to_string_lossy())
+            ));
+            let mut actions = vec![json!({
+                "kind": "doctor",
+                "command": doctor_command,
+                "reason": "inspect repository integrity before retrying the command",
+                "target": {
+                    "repo": repo_root,
+                    "path": path,
+                    "error": error.to_string(),
+                },
+            })];
+            if command == "commit" {
+                actions.push(json!({
+                    "kind": "inspect_pending_commit_transaction",
+                    "command": cli_command(format!(
+                        "doctor --path {} --json",
+                        command_arg(&repo_root.to_string_lossy())
+                    )),
+                    "reason": "inspect the pending commit transaction before recovery or retry",
+                    "target": {
+                        "repo": repo_root,
+                        "candidate_object_path": path,
+                    },
+                }));
+            }
+            actions
+        }
         _ => Vec::new(),
     }
 }
@@ -3137,6 +3629,7 @@ enum ListTarget {
 struct ListOptions {
     target: ListTarget,
     json_output: bool,
+    page: PageRequest,
 }
 
 fn parse_show_args(args: &[String]) -> Result<ShowOptions, CliError> {
@@ -3169,9 +3662,33 @@ fn parse_show_args(args: &[String]) -> Result<ShowOptions, CliError> {
 fn parse_list_args(args: &[String]) -> Result<ListOptions, CliError> {
     let mut positional = Vec::new();
     let mut json_output = false;
-    for value in args {
+    let mut page = PageRequest::default();
+    let mut index = 0usize;
+    while index < args.len() {
+        let value = &args[index];
         match value.as_str() {
             "--json" => json_output = true,
+            "--limit" => {
+                index += 1;
+                let raw = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--limit requires a value".to_string()))?;
+                page.limit = Some(parse_page_limit(raw)?);
+            }
+            value if value.starts_with("--limit=") => {
+                page.limit = Some(parse_page_limit(value.trim_start_matches("--limit="))?);
+            }
+            "--cursor" => {
+                index += 1;
+                page.cursor = Some(
+                    args.get(index)
+                        .ok_or_else(|| CliError::Usage("--cursor requires a value".to_string()))?
+                        .clone(),
+                );
+            }
+            value if value.starts_with("--cursor=") => {
+                page.cursor = Some(value.trim_start_matches("--cursor=").to_string());
+            }
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported list option: {option}"
@@ -3179,6 +3696,7 @@ fn parse_list_args(args: &[String]) -> Result<ListOptions, CliError> {
             }
             value => positional.push(value.to_string()),
         }
+        index += 1;
     }
     let target = match positional.as_slice() {
         [] => ListTarget::Local(env::current_dir()?),
@@ -3186,13 +3704,14 @@ fn parse_list_args(args: &[String]) -> Result<ListOptions, CliError> {
         [value] => ListTarget::Local(PathBuf::from(value)),
         _ => {
             return Err(CliError::Usage(
-                "usage: codefire list [path|<remote-project-url>] [--json]".to_string(),
+                "usage: codefire list [path|<remote-project-url>] [--json] [--limit N] [--cursor CURSOR]".to_string(),
             ));
         }
     };
     Ok(ListOptions {
         target,
         json_output,
+        page,
     })
 }
 
@@ -3360,9 +3879,14 @@ fn parse_path_json_args(args: &[String], command: &str) -> Result<PathJsonOption
     let mut json_output = false;
     let mut metrics = false;
     let mut full = false;
+    let mut lock = LockOptions::default();
     let mut index = 0usize;
     while index < args.len() {
         let arg = &args[index];
+        if command == "scan" && parse_lock_option(args, &mut index, &mut lock)? {
+            index += 1;
+            continue;
+        }
         if parse_path_json_metrics_option(arg, &mut json_output, &mut metrics) {
             if arg == "--metrics" && !supports_metrics(command) {
                 return Err(CliError::Usage(format!(
@@ -3407,6 +3931,7 @@ fn parse_path_json_args(args: &[String], command: &str) -> Result<PathJsonOption
         json_output,
         metrics,
         full,
+        lock,
     })
 }
 
@@ -4032,9 +4557,33 @@ fn parse_remote_project_args(
 ) -> Result<RemoteProjectOptions, CliError> {
     let mut positional = Vec::new();
     let mut json_output = false;
-    for value in args {
+    let mut page = PageRequest::default();
+    let mut index = 0usize;
+    while index < args.len() {
+        let value = &args[index];
         match value.as_str() {
             "--json" => json_output = true,
+            "--limit" => {
+                index += 1;
+                let raw = args
+                    .get(index)
+                    .ok_or_else(|| CliError::Usage("--limit requires a value".to_string()))?;
+                page.limit = Some(parse_page_limit(raw)?);
+            }
+            value if value.starts_with("--limit=") => {
+                page.limit = Some(parse_page_limit(value.trim_start_matches("--limit="))?);
+            }
+            "--cursor" => {
+                index += 1;
+                page.cursor = Some(
+                    args.get(index)
+                        .ok_or_else(|| CliError::Usage("--cursor requires a value".to_string()))?
+                        .clone(),
+                );
+            }
+            value if value.starts_with("--cursor=") => {
+                page.cursor = Some(value.trim_start_matches("--cursor=").to_string());
+            }
             option if option.starts_with("--") => {
                 return Err(CliError::Usage(format!(
                     "unsupported {command} option: {option}"
@@ -4042,14 +4591,16 @@ fn parse_remote_project_args(
             }
             value => positional.push(value.to_string()),
         }
+        index += 1;
     }
     match positional.as_slice() {
         [project_url] => Ok(RemoteProjectOptions {
             project_url: project_url.clone(),
             json_output,
+            page,
         }),
         _ => Err(CliError::Usage(format!(
-            "usage: codefire {command} <cf-project-url> [--json]"
+            "usage: codefire {command} <cf-project-url> [--json] [--limit N] [--cursor CURSOR]"
         ))),
     }
 }
@@ -4489,6 +5040,14 @@ fn parse_merge_args(args: &[String]) -> Result<MergeOptions, CliError> {
 }
 
 fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
+    init_repo_with_metadata(path, force, None)
+}
+
+fn init_repo_with_metadata(
+    path: &Path,
+    force: bool,
+    initialization: Option<&Value>,
+) -> Result<InitResult, CliError> {
     let repo_root = absolute_path(path)?;
     let cf = repo_root.join(".codefire");
     if cf.exists() && !force {
@@ -4497,21 +5056,29 @@ fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
 
     ensure_repo_layout(&repo_root)?;
     let now = now_iso_utc();
-    write_json_atomic(
-        &cf.join("repo.json"),
-        &json!({
-            "version": 1,
-            "repository_id": stable_repo_id(&repo_root),
-            "created_at": now,
-        }),
-    )?;
+    let mut repo = json!({
+        "version": 1,
+        "repository_id": stable_repo_id(&repo_root),
+        "created_at": now,
+    });
+    if let Some(initialization) = initialization {
+        repo["initialization"] = initialization.clone();
+    }
+    write_json_atomic(&cf.join("repo.json"), &repo)?;
 
     let objects = cf.join("objects");
-    let roots = initial_roots(&objects, &now)?;
+    let (initial_effective_policy, initial_change_coverage) = initial_decision_contracts()?;
+    let roots = initial_roots(
+        &objects,
+        &now,
+        &initial_effective_policy,
+        &initial_change_coverage,
+    )?;
     let commit_payload = json!({
         "type": "commit",
         "version": 1,
         "root_schema_version": 2,
+        "semantic_validation_profile": codefire_store::CURRENT_SEMANTIC_VALIDATION_PROFILE,
         "parents": [],
         "message": "Initial empty CodeFire repository",
         "roots": roots,
@@ -4521,7 +5088,10 @@ fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
             "failed_checks": 0,
             "missing_required_links": 0,
             "stale_resolutions": 0,
+            "missing_evidence_refs": 0,
             "duplicate_atom_ids": 0,
+            "effective_policy_digest": &initial_effective_policy.digest,
+            "change_coverage_digest": &initial_change_coverage.digest,
         },
         "changed_atoms": [],
         "extinguished_fires": [],
@@ -4551,7 +5121,11 @@ fn init_repo(path: &Path, force: bool) -> Result<InitResult, CliError> {
 
 fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, CliError> {
     let repo_root = find_repo_root(start)?;
-    let _lock = RepoLock::acquire_with_options(&repo_root, &options.lock)?;
+    let lock = if options.dry_run {
+        None
+    } else {
+        Some(RepoLock::acquire_with_options(&repo_root, &options.lock)?)
+    };
     if options.source_branch == options.target_branch {
         return Err(branch_operation_error(
             &repo_root,
@@ -4571,18 +5145,26 @@ fn merge_branch(start: &Path, options: &MergeOptions) -> Result<MergeResult, Cli
             }
         }
     }
-    let mut result = build_merge_result(&repo_root, options)?;
+    let mut result = build_merge_result(&repo_root, options, lock.as_ref())?;
     if options.dry_run {
         return Ok(result);
     }
-    apply_merge_result(&repo_root, &mut result)?;
+    apply_merge_result(
+        &repo_root,
+        &mut result,
+        lock.as_ref().expect("live merge must hold repo lock"),
+    )?;
     if let Some(key) = options.idempotency_key.as_deref() {
         save_merge_idempotency(&repo_root, key, &idempotency_payload, &result)?;
     }
     Ok(result)
 }
 
-fn build_merge_result(repo_root: &Path, options: &MergeOptions) -> Result<MergeResult, CliError> {
+fn build_merge_result(
+    repo_root: &Path,
+    options: &MergeOptions,
+    lock: Option<&RepoLock>,
+) -> Result<MergeResult, CliError> {
     if options.source_branch == options.target_branch {
         return Err(branch_operation_error(
             repo_root,
@@ -4620,14 +5202,26 @@ fn build_merge_result(repo_root: &Path, options: &MergeOptions) -> Result<MergeR
     }
     let registry = read_json(&registry_path)?;
     let target_dir = PathBuf::from(required_string(&registry, &["open", "path"])?);
-    refresh_open_clean_for_branch_operation(repo_root, &options.target_branch, &target_dir)?;
-    let registry = read_json(&registry_path)?;
-    if required_string(&registry, &["state", "last_known"])? != "open-clean" {
+    let target_state = if let Some(lock) = lock {
+        refresh_open_clean_for_branch_operation(
+            repo_root,
+            &options.target_branch,
+            &target_dir,
+            lock,
+        )?;
+        required_string(&read_json(&registry_path)?, &["state", "last_known"])?
+    } else {
+        let scan = compute_scan(&target_dir)?;
+        scan_branch_state(scan_change_count(&scan.scan), scan.scan.open_fires.len()).to_string()
+    };
+    if target_state != "open-clean" {
         return Err(branch_operation_error(
             repo_root,
             Some(&options.target_branch),
             Some(&target_dir),
-            "target branch must be open-clean before merge",
+            format!(
+                "target branch has unsealed open work ({target_state}); it must be open-clean before merge"
+            ),
         ));
     }
     let base = common_ancestor(&objects, &source_head, &target_head)?
@@ -4716,20 +5310,20 @@ fn build_merge_result(repo_root: &Path, options: &MergeOptions) -> Result<MergeR
     })
 }
 
-fn apply_merge_result(repo_root: &Path, result: &mut MergeResult) -> Result<(), CliError> {
+fn apply_merge_result(
+    repo_root: &Path,
+    result: &mut MergeResult,
+    lock: &RepoLock,
+) -> Result<(), CliError> {
+    let target = ExistingWorktree::bind(&result.target_dir)?;
     for action in &result.file_actions {
-        write_merged_file(&result.target_dir, &action.path, action.content.as_deref())?;
+        write_merged_file(&target, &action.path, action.content.as_deref())?;
     }
     let registry_path = opened_registry_path(repo_root, &result.target_branch);
     let registry = read_json(&registry_path)?;
-    let active_state_path =
-        PathBuf::from(required_string(&registry, &["open", "active_state_path"])?);
-    let state_path = active_state_path.join("state.json");
-    let mut state = if state_path.exists() {
-        read_json(&state_path)?
-    } else {
-        json!({})
-    };
+    let active_state = validated_active_state_dir(repo_root, &registry)?;
+    let mut state = read_active_json_optional(&active_state, Path::new("state.json"))?
+        .unwrap_or_else(|| json!({}));
     state["pending_merge_parent"] = Value::String(result.source_head.clone());
     state["pending_merge_base"] = Value::String(result.base.clone());
     state["merge_conflicts"] = Value::Array(
@@ -4754,16 +5348,10 @@ fn apply_merge_result(repo_root: &Path, result: &mut MergeResult) -> Result<(), 
             .map(semantic_conflict_json)
             .collect(),
     );
-    write_json_atomic(&state_path, &state)?;
-    compute_scan(&result.target_dir, true)?;
-    let context = OpenContext {
-        repo_root: repo_root.to_path_buf(),
-        open_dir: result.target_dir.clone(),
-        branch: result.target_branch.clone(),
-        registry_path,
-        registry,
-    };
-    set_open_state(&context, &active_state_path, "open-burning")?;
+    write_active_json_atomic(&active_state, Path::new("state.json"), &state)?;
+    compute_scan_locked(&result.target_dir, lock)?;
+    let context = open_context(&result.target_dir)?;
+    set_open_state(&context, "open-burning")?;
     result.applied = true;
     Ok(())
 }
@@ -5034,8 +5622,16 @@ fn merge_next_actions(result: &MergeResult) -> Vec<Value> {
 }
 
 fn import_patch(start: &Path, options: &PatchImportOptions) -> Result<Value, CliError> {
-    let context = open_context(start)?;
-    let _lock = RepoLock::acquire_with_options(&context.repo_root, &options.lock)?;
+    let _lock;
+    let context;
+    if options.dry_run {
+        _lock = None;
+        context = open_context(start)?;
+    } else {
+        let (lock, locked_context) = acquire_locked_open_context(start, &options.lock)?;
+        _lock = Some(lock);
+        context = locked_context;
+    }
     let patch = read_json(&options.path)?;
     if patch.get("type").and_then(Value::as_str) != Some("codefire_patch") {
         return Err(CliError::Usage(
@@ -5061,7 +5657,7 @@ fn import_patch(start: &Path, options: &PatchImportOptions) -> Result<Value, Cli
     let mut paths = Vec::with_capacity(entries.len());
     for entry in entries {
         let path = required_string(entry, &["path"])?;
-        safe_manifest_output_path(&context.open_dir, &path)?;
+        safe_relative_manifest_path(&path)?;
         paths.push(path);
     }
 
@@ -5078,19 +5674,12 @@ fn import_patch(start: &Path, options: &PatchImportOptions) -> Result<Value, Cli
     }
 
     if !options.dry_run {
+        let open_worktree = ExistingWorktree::bind(&context.open_dir)?;
         for entry in entries {
-            apply_patch_entry(&context.open_dir, entry)?;
+            apply_patch_entry(&open_worktree, entry)?;
         }
-        let active_state_path = PathBuf::from(required_string(
-            &context.registry,
-            &["open", "active_state_path"],
-        )?);
-        let state_path = active_state_path.join("state.json");
-        let mut state = if state_path.exists() {
-            read_json(&state_path)?
-        } else {
-            json!({})
-        };
+        let mut state = read_active_json_optional(&context.active_state, Path::new("state.json"))?
+            .unwrap_or_else(|| json!({}));
         state["pending_patch_base"] = Value::String(patch_base.clone());
         state["pending_patch_source"] = patch
             .get("source")
@@ -5098,8 +5687,8 @@ fn import_patch(start: &Path, options: &PatchImportOptions) -> Result<Value, Cli
             .cloned()
             .unwrap_or(Value::Null);
         state["patch_paths"] = Value::Array(paths.iter().cloned().map(Value::String).collect());
-        write_json_atomic(&state_path, &state)?;
-        set_open_state(&context, &active_state_path, "open-burning")?;
+        write_active_json_atomic(&context.active_state, Path::new("state.json"), &state)?;
+        set_open_state(&context, "open-burning")?;
     }
 
     let result = json!({
@@ -5120,7 +5709,7 @@ fn import_patch(start: &Path, options: &PatchImportOptions) -> Result<Value, Cli
     Ok(result)
 }
 
-fn apply_patch_entry(open_dir: &Path, entry: &Value) -> Result<(), CliError> {
+fn apply_patch_entry(open_worktree: &ExistingWorktree, entry: &Value) -> Result<(), CliError> {
     let path = required_string(entry, &["path"])?;
     match required_string(entry, &["action"])?.as_str() {
         "write" => {
@@ -5132,9 +5721,9 @@ fn apply_patch_entry(open_dir: &Path, entry: &Value) -> Result<(), CliError> {
             }
             let content = required_string(entry, &["content"])?;
             let bytes = decode_base64(&content)?;
-            write_merged_file(open_dir, &path, Some(&bytes))
+            write_merged_file(open_worktree, &path, Some(&bytes))
         }
-        "delete" => write_merged_file(open_dir, &path, None),
+        "delete" => write_merged_file(open_worktree, &path, None),
         action => Err(CliError::Usage(format!(
             "unsupported patch entry action: {action}"
         ))),
@@ -5143,7 +5732,11 @@ fn apply_patch_entry(open_dir: &Path, entry: &Value) -> Result<(), CliError> {
 
 fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, CliError> {
     let repo_root = find_repo_root(start)?;
-    let _lock = RepoLock::acquire_with_options(&repo_root, &options.lock)?;
+    let _lock = if options.dry_run {
+        None
+    } else {
+        Some(RepoLock::acquire_with_options(&repo_root, &options.lock)?)
+    };
     let idempotency_payload = clone_idempotency_payload(options, &repo_root);
     if !options.dry_run {
         if let Some(key) = options.idempotency_key.as_deref() {
@@ -5289,118 +5882,52 @@ fn clone_branch(start: &Path, options: &CloneOptions) -> Result<CloneResult, Cli
 }
 
 fn close_branch(start: &Path, options: &CloseOptions) -> Result<CloseResult, CliError> {
-    let repo_root = find_repo_root(start)?;
-    let _lock = RepoLock::acquire_with_options(&repo_root, &options.lock)?;
-    if is_primary_branch(&options.branch) {
-        return Err(branch_operation_error(
-            &repo_root,
-            Some(&options.branch),
-            None,
-            format!(
-                "refusing to close primary branch {}; use feature branches for close/discard",
-                options.branch
-            ),
-        ));
-    }
-    let registry_path = opened_registry_path(&repo_root, &options.branch);
-    if !registry_path.exists() {
-        return Err(branch_operation_error(
-            &repo_root,
-            Some(&options.branch),
-            None,
-            format!("branch is not open: {}", options.branch),
-        ));
-    }
-    let registry = read_json(&registry_path)?;
-    let open_dir = PathBuf::from(required_string(&registry, &["open", "path"])?);
-    if !options.discard {
-        refresh_open_clean_for_branch_operation(&repo_root, &options.branch, &open_dir)?;
-    }
-    let registry = read_json(&registry_path)?;
-    let state = required_string(&registry, &["state", "last_known"])?;
-    if state != "open-clean" && !options.discard {
-        return Err(branch_operation_error(
-            &repo_root,
-            Some(&options.branch),
-            Some(&open_dir),
-            format!(
-                "branch {} is {state}; use --discard to close and discard unsealed open work",
-                options.branch
-            ),
-        ));
-    }
-    let active_state_path =
-        PathBuf::from(required_string(&registry, &["open", "active_state_path"])?);
-    let plan = close_operation_plan(
-        options,
-        &repo_root,
-        &open_dir,
-        &registry_path,
-        &active_state_path,
-        &state,
-    );
-    if options.dry_run {
-        return Ok(CloseResult {
-            branch: options.branch.clone(),
-            open_dir,
-            plan,
-        });
-    }
-
-    remove_open_dir_marker_or_tree(&repo_root, &open_dir, &options.branch, options.keep_dir)?;
-    if active_state_path.exists() {
-        fs::remove_dir_all(&active_state_path)?;
-    }
-    fs::remove_file(&registry_path)?;
-    if let Some(parent) = registry_path.parent() {
-        sync_directory_best_effort(parent)?;
-    }
-    let mut branch = load_branch_record(&repo_root, &options.branch)?;
-    branch["state"] = Value::String("closed".to_string());
-    save_branch_record(&repo_root, &branch)?;
-
-    Ok(CloseResult {
-        branch: options.branch.clone(),
-        open_dir,
-        plan,
-    })
+    close_transaction::close_branch_from(start, options)
 }
 
-fn remove_open_dir_marker_or_tree(
+fn validate_close_open_marker(
     repo_root: &Path,
     open_dir: &Path,
     branch: &str,
-    keep_dir: bool,
+    registry: &Value,
+    marker: &Value,
 ) -> Result<(), CliError> {
-    let marker_path = open_dir.join(".codefire-open");
-    let marker = read_json(&marker_path)?;
-    let marker_branch = required_string(&marker, &["branch", "name"])?;
+    let marker_branch = required_string(marker, &["branch", "name"])?;
     if marker_branch != branch {
-        return Err(CliError::InvalidRepository(format!(
+        return Err(CliError::InvalidMarker(format!(
             "open marker branch mismatch: expected {branch}, found {marker_branch}"
         )));
     }
-    let marker_repo_path = PathBuf::from(required_string(&marker, &["repository", "path"])?);
+    let marker_repo_path = PathBuf::from(required_string(marker, &["repository", "path"])?);
     if marker_repo_path != repo_root.join(".codefire") {
-        return Err(CliError::InvalidRepository(format!(
+        return Err(CliError::InvalidMarker(format!(
             "open marker repository mismatch for {}",
             open_dir.display()
         )));
     }
-    if keep_dir {
-        fs::remove_file(marker_path)?;
-        sync_directory_best_effort(open_dir)?;
-        return Ok(());
-    }
-    if open_dir == repo_root || open_dir.join(".codefire").exists() {
-        return Err(CliError::Usage(format!(
-            "refusing to remove repository root {}; rerun with --keep-dir",
+    let repository = read_json(&repo_root.join(".codefire").join("repo.json"))?;
+    let expected_repository_id = required_string(&repository, &["repository_id"])?;
+    let marker_repository_id = required_string(marker, &["repository", "repository_id"])?;
+    if marker_repository_id != expected_repository_id {
+        return Err(CliError::InvalidMarker(format!(
+            "open marker repository identity mismatch for {}",
             open_dir.display()
         )));
     }
-    fs::remove_dir_all(open_dir)?;
-    if let Some(parent) = open_dir.parent() {
-        sync_directory_best_effort(parent)?;
+    let marker_open_path = PathBuf::from(required_string(marker, &["open", "opened_path"])?);
+    if marker_open_path != open_dir {
+        return Err(CliError::InvalidMarker(format!(
+            "open marker path mismatch: expected {}, found {}",
+            open_dir.display(),
+            marker_open_path.display()
+        )));
+    }
+    let marker_instance = required_string(marker, &["open", "open_instance_id"])?;
+    let registry_instance = required_string(registry, &["open", "open_instance_id"])?;
+    if marker_instance != registry_instance {
+        return Err(CliError::InvalidMarker(format!(
+            "open marker instance mismatch: expected {registry_instance}, found {marker_instance}"
+        )));
     }
     Ok(())
 }
@@ -5447,127 +5974,7 @@ fn open_branch(options: &OpenOptions) -> Result<OpenResult, CliError> {
 }
 
 fn open_branch_from(start: &Path, options: &OpenOptions) -> Result<OpenResult, CliError> {
-    let repo_root = find_repo_root(start)?;
-    let _lock = RepoLock::acquire_with_options(&repo_root, &options.lock)?;
-    let cf = repo_root.join(".codefire");
-    let objects = cf.join("objects");
-    let mut branch = load_branch_record(&repo_root, &options.branch).map_err(|error| {
-        with_branch_operation_context(error, &repo_root, Some(&options.branch), None)
-    })?;
-    let branch_head = required_string(&branch, &["head"])?;
-    codefire_store::validate_sealed_commit(&objects, &branch_head)?;
-
-    let target = absolute_path(&options.path)?;
-    ensure_open_target_allowed(&repo_root, &target).map_err(|error| {
-        with_branch_operation_context(error, &repo_root, Some(&options.branch), Some(&target))
-    })?;
-    let idempotency_payload = open_idempotency_payload(options, &repo_root, &target, &branch_head);
-    if !options.dry_run {
-        if let Some(key) = options.idempotency_key.as_deref() {
-            if let Some(result) = load_open_idempotency(&repo_root, key, &idempotency_payload)? {
-                return Ok(result);
-            }
-        }
-    }
-    if target.exists() && !is_empty_dir(&target)? {
-        return Err(branch_operation_error(
-            &repo_root,
-            Some(&options.branch),
-            Some(&target),
-            format!(
-                "target path must not exist or must be empty: {}",
-                target.display()
-            ),
-        ));
-    }
-    let registry_path = opened_registry_path(&repo_root, &options.branch);
-    if registry_path.exists() {
-        return Err(branch_operation_error(
-            &repo_root,
-            Some(&options.branch),
-            Some(&target),
-            format!("branch is already open: {}", options.branch),
-        ));
-    }
-    let state = branch_state(&branch);
-    if state != "closed" {
-        return Err(branch_operation_error(
-            &repo_root,
-            Some(&options.branch),
-            Some(&target),
-            format!(
-                "branch {} is {state}; recover or close the existing open branch state before opening it again",
-                options.branch
-            ),
-        ));
-    }
-    let opened_at = now_iso_utc();
-    let open_instance_id = format!(
-        "open_{:012x}",
-        stable_hash_48(format!("{}:{}:{opened_at}", options.branch, target.display()).as_bytes())
-    );
-    let active_path = cf.join("active").join(&open_instance_id);
-    let plan = open_operation_plan(
-        options,
-        &repo_root,
-        &target,
-        &branch_head,
-        &registry_path,
-        &active_path,
-    );
-    if options.dry_run {
-        return Ok(OpenResult {
-            branch: options.branch.clone(),
-            open_dir: target,
-            plan,
-        });
-    }
-
-    fs::create_dir_all(&target)?;
-    materialize_commit(&objects, &branch_head, &target)?;
-    let repo_json = read_json(&cf.join("repo.json"))?;
-    let repository_id = required_string(&repo_json, &["repository_id"])?;
-    write_json_atomic(
-        &target.join(".codefire-open"),
-        &json!({
-            "version": 1,
-            "repository": {"path": cf, "repository_id": repository_id},
-            "branch": {"name": options.branch, "opened_from_commit": branch_head},
-            "open": {"open_instance_id": open_instance_id, "opened_path": target, "opened_at": opened_at},
-        }),
-    )?;
-    write_json_atomic(
-        &registry_path,
-        &json!({
-            "version": 1,
-            "branch": {"name": options.branch},
-            "open": {
-                "open_instance_id": open_instance_id,
-                "path": target,
-                "opened_from_commit": branch_head,
-                "current_base_commit": branch_head,
-                "active_state_path": active_path,
-            },
-            "state": {"last_known": "open-clean"},
-        }),
-    )?;
-    fs::create_dir_all(&active_path)?;
-    write_json_atomic(
-        &active_path.join("state.json"),
-        &json!({"state": "open-clean"}),
-    )?;
-    branch["state"] = Value::String("open-clean".to_string());
-    save_branch_record(&repo_root, &branch)?;
-
-    let result = OpenResult {
-        branch: options.branch.clone(),
-        open_dir: target,
-        plan,
-    };
-    if let Some(key) = options.idempotency_key.as_deref() {
-        save_open_idempotency(&repo_root, key, &idempotency_payload, &result)?;
-    }
-    Ok(result)
+    open_transaction::open_branch_from(start, options)
 }
 
 fn open_operation_plan(
@@ -5589,8 +5996,9 @@ fn open_operation_plan(
         "target": target,
         "base_commit": branch_head,
         "operations": [
-            {"kind": "materialize_commit", "commit": branch_head, "target": target},
-            {"kind": "write_open_marker", "path": target.join(".codefire-open")},
+            {"kind": "materialize_commit", "commit": branch_head, "target": target, "publication": "sibling_stage"},
+            {"kind": "write_open_marker", "path": target.join(".codefire-open"), "publication": "sibling_stage"},
+            {"kind": "publish_open_target", "path": target, "visibility": "single_sibling_rename"},
             {"kind": "write_open_registry", "path": registry_path},
             {"kind": "create_active_state", "path": active_path},
             {"kind": "update_branch_state", "branch": &options.branch, "state": "open-clean"},
@@ -5687,14 +6095,82 @@ fn is_primary_branch(branch: &str) -> bool {
     branch == "main"
 }
 
-fn ensure_open_target_allowed(repo_root: &Path, target: &Path) -> Result<(), CliError> {
-    let boundary = repo_root.parent().unwrap_or(repo_root);
-    if !target.starts_with(boundary) {
-        return Err(CliError::Usage(format!(
-            "open target must stay under workspace boundary {}: {}",
-            boundary.display(),
-            target.display()
-        )));
+fn resolve_open_target(
+    repo_root: &Path,
+    requested: &Path,
+    requested_branch: &str,
+) -> Result<(PathBuf, secure_worktree::PinnedTargetResolution), CliError> {
+    let boundary = fs::canonicalize(repo_root.parent().unwrap_or(repo_root))?;
+    let requested_absolute = absolute_path(requested)?;
+    let contains_parent = requested_absolute
+        .components()
+        .any(|component| component == Component::ParentDir);
+    let mut lexical_target = PathBuf::new();
+    for component in requested_absolute.components() {
+        if component != Component::CurDir {
+            lexical_target.push(component.as_os_str());
+        }
+    }
+    if !contains_parent && !lexical_target.starts_with(&boundary) {
+        return Err(open_target_resolution_error(
+            repo_root,
+            requested_branch,
+            requested,
+            Some(&lexical_target),
+            &boundary,
+            "outside_workspace_boundary",
+            format!(
+                "open target must stay under resolved workspace boundary {}: requested {}, resolved {}",
+                boundary.display(),
+                requested.display(),
+                lexical_target.display()
+            ),
+        ));
+    }
+    let target_resolution = secure_worktree::PinnedTargetResolution::resolve(&boundary, requested)
+        .map_err(|error| {
+            open_target_resolution_error(
+                repo_root,
+                requested_branch,
+                requested,
+                None,
+                &boundary,
+                "unsafe_path_component",
+                error.to_string(),
+            )
+        })?;
+    let target = target_resolution.target_path().to_path_buf();
+    if !target.starts_with(&boundary) {
+        return Err(open_target_resolution_error(
+            repo_root,
+            requested_branch,
+            requested,
+            Some(&target),
+            &boundary,
+            "outside_workspace_boundary",
+            format!(
+                "open target must stay under resolved workspace boundary {}: requested {}, resolved {}",
+                boundary.display(),
+                requested.display(),
+                target.display()
+            ),
+        ));
+    }
+    if target == repo_root || target.starts_with(repo_root) || repo_root.starts_with(&target) {
+        return Err(open_target_resolution_error(
+            repo_root,
+            requested_branch,
+            requested,
+            Some(&target),
+            &boundary,
+            "repository_overlap",
+            format!(
+                "open target must not overlap repository root {}: requested {}, resolved {}",
+                repo_root.display(),
+                requested.display(),
+                target.display()
+            ),
+        ));
     }
     let opened_dir = repo_root.join(".codefire").join("opened");
     if opened_dir.is_dir() {
@@ -5702,29 +6178,163 @@ fn ensure_open_target_allowed(repo_root: &Path, target: &Path) -> Result<(), Cli
             let entry = entry?;
             if entry.file_type()?.is_file() {
                 let registry = read_json(&entry.path())?;
-                let open_path = PathBuf::from(required_string(&registry, &["open", "path"])?);
-                if target != open_path && target.starts_with(&open_path) {
-                    return Err(CliError::Usage(format!(
-                        "open target must not be nested inside existing open directory {}: {}",
-                        open_path.display(),
-                        target.display()
-                    )));
+                let registered_path = PathBuf::from(required_string(&registry, &["open", "path"])?);
+                let open_path = resolve_path_without_symlinks(&registered_path)?;
+                let registered_branch = required_string(&registry, &["branch", "name"])?;
+                if target == open_path && registered_branch == requested_branch {
+                    continue;
+                }
+                if target.starts_with(&open_path) || open_path.starts_with(&target) {
+                    return Err(open_target_resolution_error(
+                        repo_root,
+                        requested_branch,
+                        requested,
+                        Some(&target),
+                        &boundary,
+                        "open_directory_overlap",
+                        format!(
+                            "open target must not be nested inside existing open directory or overlap it {}: requested {}, resolved {}",
+                            open_path.display(),
+                            requested.display(),
+                            target.display()
+                        ),
+                    ));
                 }
             }
         }
     }
-    Ok(())
+    target_resolution.ensure_current().map_err(|error| {
+        open_target_resolution_error(
+            repo_root,
+            requested_branch,
+            requested,
+            Some(&target),
+            &boundary,
+            "identity_changed_during_resolution",
+            format!("open target ancestor changed during resolution: {error}"),
+        )
+    })?;
+    Ok((target, target_resolution))
+}
+
+fn open_target_resolution_error(
+    repo_root: &Path,
+    branch: &str,
+    requested_path: &Path,
+    resolved_path: Option<&Path>,
+    workspace_boundary: &Path,
+    reason: &'static str,
+    message: String,
+) -> CliError {
+    CliError::OpenTargetResolution(Box::new(OpenTargetResolutionError {
+        message,
+        reason,
+        repo_root: repo_root.to_path_buf(),
+        branch: branch.to_string(),
+        requested_path: requested_path.to_path_buf(),
+        resolved_path: resolved_path.map(Path::to_path_buf),
+        workspace_boundary: workspace_boundary.to_path_buf(),
+    }))
+}
+
+fn resolve_path_without_symlinks(path: &Path) -> Result<PathBuf, CliError> {
+    let absolute = absolute_path(path)?;
+    if absolute
+        .components()
+        .any(|component| component == Component::ParentDir)
+    {
+        return Err(CliError::Usage(format!(
+            "path traversal with '..' is not allowed for open targets: {}",
+            path.display()
+        )));
+    }
+
+    let mut normalized = PathBuf::new();
+    for component in absolute.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => unreachable!("parent components were rejected above"),
+            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
+                normalized.push(component.as_os_str());
+            }
+        }
+    }
+
+    let mut existing_ancestor = normalized.as_path();
+    let mut suffix = Vec::new();
+    loop {
+        match fs::symlink_metadata(existing_ancestor) {
+            Ok(metadata) => {
+                if metadata.file_type().is_symlink() {
+                    return Err(CliError::Usage(format!(
+                        "symlink components are not allowed for open targets: {}",
+                        existing_ancestor.display()
+                    )));
+                }
+                if !suffix.is_empty() && !metadata.is_dir() {
+                    return Err(CliError::Usage(format!(
+                        "open target ancestor is not a directory: {}",
+                        existing_ancestor.display()
+                    )));
+                }
+                break;
+            }
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                let name = existing_ancestor.file_name().ok_or_else(|| {
+                    CliError::Usage(format!(
+                        "open target has no existing filesystem ancestor: {}",
+                        path.display()
+                    ))
+                })?;
+                suffix.push(name.to_os_string());
+                existing_ancestor = existing_ancestor.parent().ok_or_else(|| {
+                    CliError::Usage(format!(
+                        "open target has no existing filesystem ancestor: {}",
+                        path.display()
+                    ))
+                })?;
+            }
+            Err(error) => return Err(CliError::Io(error)),
+        }
+    }
+
+    let mut prefix = PathBuf::new();
+    for component in existing_ancestor.components() {
+        prefix.push(component.as_os_str());
+        if fs::symlink_metadata(&prefix)?.file_type().is_symlink() {
+            return Err(CliError::Usage(format!(
+                "symlink components are not allowed for open targets: {}",
+                prefix.display()
+            )));
+        }
+    }
+
+    let mut resolved = fs::canonicalize(existing_ancestor)?;
+    for component in suffix.iter().rev() {
+        resolved.push(component);
+    }
+    Ok(resolved)
 }
 
 fn refresh_open_clean_for_branch_operation(
     repo_root: &Path,
     branch: &str,
     open_dir: &Path,
+    lock: &RepoLock,
 ) -> Result<(), CliError> {
     let registry_path = opened_registry_path(repo_root, branch);
     let registry = read_json(&registry_path)?;
     let base_commit = required_string(&registry, &["open", "current_base_commit"])?;
     let objects = repo_root.join(".codefire").join("objects");
+    let base_path = codefire_store::object_record_path(&objects, &base_commit)
+        .unwrap_or_else(|| objects.clone());
+    codefire_store::validate_sealed_commit(&objects, &base_commit).map_err(|error| {
+        CliError::StoreContext {
+            error: Box::new(error),
+            repo_root: repo_root.to_path_buf(),
+            path: base_path,
+        }
+    })?;
     if source_manifest_unchanged(&objects, &base_commit, open_dir)? {
         let state = required_string(&registry, &["state", "last_known"])?;
         if state == "open-clean" {
@@ -5737,7 +6347,7 @@ fn refresh_open_clean_for_branch_operation(
             format!("branch {branch} is {state}; commit, verify, or discard before continuing"),
         ));
     }
-    let scan = compute_scan(open_dir, true).map_err(|error| {
+    let scan = compute_scan_locked(open_dir, lock).map_err(|error| {
         with_branch_operation_context(error, repo_root, Some(branch), Some(open_dir))
     })?;
     let state = scan_branch_state(scan_change_count(&scan.scan), scan.scan.open_fires.len());
@@ -5777,51 +6387,111 @@ fn validate_http_bundle_commit(records: &[Value], source_head: &str) -> Result<(
     }
 }
 
+#[cfg(test)]
 fn run_scan(start: &Path) -> Result<codefire_core::ScanResult, CliError> {
-    Ok(compute_scan(start, true)?.scan)
+    run_scan_with_lock_options(start, &LockOptions::default())
 }
 
-fn compute_scan(start: &Path, persist: bool) -> Result<ScanExecution, CliError> {
-    let context = open_context(start)?;
+fn run_scan_with_lock_options(
+    start: &Path,
+    options: &LockOptions,
+) -> Result<codefire_core::ScanResult, CliError> {
+    let repo_root = find_repo_root(start)?;
+    let lock = RepoLock::acquire_with_options(&repo_root, options)?;
+    let mut validation_cache = codefire_store::SealedCommitValidationCache::default();
+    Ok(compute_scan_with_cache_for_recovery(
+        start,
+        Some(&lock),
+        &mut validation_cache,
+        Some("scan"),
+    )?
+    .scan)
+}
+
+fn compute_scan(start: &Path) -> Result<ScanExecution, CliError> {
+    let mut validation_cache = codefire_store::SealedCommitValidationCache::default();
+    compute_scan_with_cache(start, None, &mut validation_cache)
+}
+
+fn compute_scan_locked(start: &Path, lock: &RepoLock) -> Result<ScanExecution, CliError> {
+    let mut validation_cache = codefire_store::SealedCommitValidationCache::default();
+    compute_scan_with_cache(start, Some(lock), &mut validation_cache)
+}
+
+fn compute_scan_with_cache(
+    start: &Path,
+    lock: Option<&RepoLock>,
+    validation_cache: &mut codefire_store::SealedCommitValidationCache,
+) -> Result<ScanExecution, CliError> {
+    compute_scan_with_cache_for_recovery(start, lock, validation_cache, None)
+}
+
+fn compute_scan_with_cache_for_recovery(
+    start: &Path,
+    lock: Option<&RepoLock>,
+    validation_cache: &mut codefire_store::SealedCommitValidationCache,
+    recovery_operation: Option<&str>,
+) -> Result<ScanExecution, CliError> {
+    let context = match recovery_operation {
+        Some(operation) => open_context_for_recovery(start, operation)?,
+        None => open_context(start)?,
+    };
+    let recovering_verify_state = recovery_operation == Some("verify")
+        && matches!(
+            &context.authority,
+            OpenContextAuthority::Verified(snapshot)
+                if matches!(
+                    &snapshot.disposition,
+                    open_snapshot::OpenSnapshotDisposition::PendingState { operation, .. }
+                        if operation == "verify"
+                )
+        );
+    if let Some(lock) = lock {
+        lock.ensure_repo_root(&context.repo_root)?;
+    }
+    maybe_swap_active_state_after_validation_for_test(&context)?;
     let objects = context.repo_root.join(".codefire").join("objects");
     let base_commit = required_string(&context.registry, &["open", "current_base_commit"])?;
-    let active_state_path = PathBuf::from(required_string(
-        &context.registry,
-        &["open", "active_state_path"],
-    )?);
+    let base_commit_path = codefire_store::object_record_path(&objects, &base_commit)
+        .unwrap_or_else(|| objects.clone());
+    let validated_base = codefire_store::validate_sealed_commit_pinned_with_cache(
+        &objects,
+        &base_commit,
+        validation_cache,
+    )
+    .map_err(|error| CliError::StoreContext {
+        error: Box::new(error),
+        repo_root: context.repo_root.clone(),
+        path: base_commit_path,
+    })?;
+    let active_state = &context.active_state;
     let current = codefire_core::build_atom_index(&context.open_dir)?;
-    let base_index = load_base_atom_index(&objects, &base_commit)?;
+    let base_index = load_validated_base_atom_index(&validated_base)?;
     let trace_graph = codefire_core::current_trace_graph(&context.open_dir)?;
-    let fires_path = active_state_path.join("fires.json");
-    let fires = if fires_path.exists() {
-        serde_json::from_value(read_json(&fires_path)?)?
-    } else {
-        Vec::new()
-    };
-    let state_path = active_state_path.join("state.json");
-    let state_data = if state_path.exists() {
-        read_json(&state_path)?
-    } else {
-        json!({"state": "open-clean"})
-    };
+    codefire_core::validate_trace_graph_endpoints(&current, &trace_graph).map_err(|error| {
+        CliError::CoreContext {
+            error,
+            repo_root: context.repo_root.clone(),
+            path: context.open_dir.join("codefire.links.yaml"),
+        }
+    })?;
+    let fires = read_active_json_optional(active_state, Path::new("fires.json"))?
+        .map(serde_json::from_value)
+        .transpose()?
+        .unwrap_or_default();
+    let state_data = read_active_json_optional(active_state, Path::new("state.json"))?
+        .unwrap_or_else(|| json!({"state": "open-clean"}));
     let reason = if state_data.get("pending_merge_parent").is_some() {
         "merge_changed"
     } else {
         "atom_changed"
     };
     let now = now_iso_utc();
-    let source_unchanged =
-        source_manifest_unchanged(&objects, &base_commit, &context.open_dir).unwrap_or(false);
-    let non_atom_changed_files = non_atom_changed_files_since_base(
-        &objects,
-        &base_commit,
-        &context.open_dir,
-        &current,
-        &base_index,
-    )?;
-    let (mut scan, fires) = codefire_core::build_scan_result_with_options(
+    let source_unchanged = source_manifest_unchanged_validated(&validated_base, &context.open_dir)?;
+    let manifest_changes = manifest_file_changes_since_base(&validated_base, &context.open_dir)?;
+    let (mut scan, fires) = codefire_core::build_scan_result_against_base(
         current,
-        base_index,
+        &base_index,
         trace_graph,
         fires,
         base_commit,
@@ -5831,84 +6501,212 @@ fn compute_scan(start: &Path, persist: bool) -> Result<ScanExecution, CliError> 
             source_unchanged,
         },
     )?;
-    scan.non_atom_changed_files = non_atom_changed_files;
-    if persist {
-        fs::create_dir_all(&active_state_path)?;
-        write_json_atomic(&fires_path, &serde_json::to_value(&fires)?)?;
-        write_json_atomic(
-            &active_state_path.join("scan.json"),
+    let coverage = codefire_core::build_change_coverage(
+        manifest_changes,
+        &scan.atom_index,
+        &base_index,
+        &scan.changed_atoms,
+        scan.tool_migration.clone(),
+    )?;
+    scan.non_atom_changed_files = coverage
+        .entries
+        .iter()
+        .filter(|entry| {
+            entry.relation != codefire_core::ChangeCoverageRelation::AtomChangeWithUnclassifiedSpans
+        })
+        .map(|entry| codefire_core::NonAtomFileChange {
+            path: entry.path.clone(),
+            status: entry.status.clone(),
+            base_blob: entry.base_blob.clone(),
+            current_blob: entry.current_blob.clone(),
+        })
+        .collect();
+    scan.change_coverage = Some(coverage);
+    if lock.is_some() && !recovering_verify_state {
+        ensure_validated_store_subject(&context, &validated_base)?;
+        let state = scan_branch_state(scan_change_count(&scan), scan.open_fires.len());
+        begin_state_transaction(&context, "scan", state)?;
+        maybe_fail_state_transaction_for_test(active_state.path(), "scan", "started")?;
+        invalidate_active_verification(active_state)?;
+        update_state_transaction_phase(active_state, "verification_invalidated")?;
+        maybe_fail_state_transaction_for_test(
+            active_state.path(),
+            "scan",
+            "verification_invalidated",
+        )?;
+        write_active_json_atomic(
+            active_state,
+            Path::new("fires.json"),
+            &serde_json::to_value(&fires)?,
+        )?;
+        update_state_transaction_phase(active_state, "fires_written")?;
+        maybe_fail_state_transaction_for_test(active_state.path(), "scan", "fires_written")?;
+        write_active_json_atomic(
+            active_state,
+            Path::new("scan.json"),
             &serde_json::to_value(&scan)?,
         )?;
-        let state = scan_branch_state(scan_change_count(&scan), scan.open_fires.len());
-        set_open_state(&context, &active_state_path, state)?;
+        update_state_transaction_phase(active_state, "scan_written")?;
+        maybe_fail_state_transaction_for_test(active_state.path(), "scan", "scan_written")?;
+        persist_transactional_open_state(
+            &context,
+            "scan",
+            state,
+            &validated_base,
+            StateTransactionAuthority::Scan {
+                scan: &scan,
+                fires: &fires,
+            },
+        )?;
     }
     Ok(ScanExecution {
         context,
-        active_state_path,
         scan,
         fires,
+        validated_base,
     })
 }
 
 #[cfg(test)]
 fn run_verify(start: &Path) -> Result<codefire_core::Verification, CliError> {
-    Ok(compute_verify(start, true)?.verification)
+    Ok(run_verify_with_lock(start)?.verification)
 }
 
-fn compute_verify(start: &Path, persist: bool) -> Result<VerifyExecution, CliError> {
-    let scan_execution = compute_scan(start, persist)?;
-    let context = scan_execution.context;
-    let active_state_path = scan_execution.active_state_path;
-    let scan = scan_execution.scan;
-    let policy = codefire_core::parse_verification_policy(&context.open_dir)?;
+#[cfg(test)]
+fn run_verify_with_lock(start: &Path) -> Result<VerifyExecution, CliError> {
+    run_verify_with_lock_options(start, &LockOptions::default())
+}
+
+fn run_verify_with_lock_options(
+    start: &Path,
+    options: &LockOptions,
+) -> Result<VerifyExecution, CliError> {
+    let repo_root = find_repo_root(start)?;
+    let lock = RepoLock::acquire_with_options(&repo_root, options)?;
+    compute_verify_locked(start, &lock)
+}
+
+fn compute_verify(start: &Path) -> Result<VerifyExecution, CliError> {
+    let mut validation_cache = codefire_store::SealedCommitValidationCache::default();
+    compute_verify_with_cache(start, None, &mut validation_cache)
+}
+
+fn compute_verify_locked(start: &Path, lock: &RepoLock) -> Result<VerifyExecution, CliError> {
+    let mut validation_cache = codefire_store::SealedCommitValidationCache::default();
+    compute_verify_with_cache(start, Some(lock), &mut validation_cache)
+}
+
+fn compute_verify_with_cache(
+    start: &Path,
+    lock: Option<&RepoLock>,
+    validation_cache: &mut codefire_store::SealedCommitValidationCache,
+) -> Result<VerifyExecution, CliError> {
+    // Verification must reject an invalid/unsafe policy before its scan phase publishes any
+    // active-state mutation. Parse again from the post-scan context below so the decision uses the
+    // same final path resolution as the scan authority.
+    let policy_preflight = if lock.is_some() {
+        open_context_for_recovery(start, "verify")?
+    } else {
+        open_context(start)?
+    };
+    if let Some(lock) = lock {
+        lock.ensure_repo_root(&policy_preflight.repo_root)?;
+    }
+    let preflight_policy =
+        codefire_core::parse_effective_verification_policy(&policy_preflight.open_dir)?;
+    validate_verification_command_plans(&policy_preflight.open_dir, &preflight_policy.policy)?;
+    let merge_state_preflight =
+        read_active_json_required(&policy_preflight.active_state, Path::new("state.json"))?;
+    unresolved_merge_conflicts_from_state(&merge_state_preflight)?;
+    let ScanExecution {
+        context,
+        scan,
+        fires,
+        validated_base,
+    } = compute_scan_with_cache_for_recovery(
+        start,
+        lock,
+        validation_cache,
+        lock.map(|_| "verify"),
+    )?;
+    let parsed_policy = codefire_core::parse_effective_verification_policy(&context.open_dir)?;
+    let policy = &parsed_policy.policy;
+    validate_verification_command_plans(&context.open_dir, policy)?;
     let trace_policy = codefire_core::TracePolicy {
         required_links: policy.required_links.clone(),
     };
     let missing_required_links =
         codefire_core::required_link_missing(&scan.atom_index, &scan.trace_graph, &trace_policy);
-    let failed_checks = run_verification_commands(&context.open_dir, &policy)?;
-    let resolutions_path = active_state_path.join("resolutions.json");
-    let resolutions: Vec<codefire_core::Resolution> = if resolutions_path.exists() {
-        serde_json::from_value(read_json(&resolutions_path)?)?
-    } else {
-        Vec::new()
-    };
+    let subject = assessment_subject::live_open_subject(&context, &scan)?;
+    let command_results = run_verification_commands(&context.open_dir, policy, &subject)?;
+    let resolutions: Vec<codefire_core::Resolution> =
+        read_active_json_optional(&context.active_state, Path::new("resolutions.json"))?
+            .map(serde_json::from_value)
+            .transpose()?
+            .unwrap_or_default();
     let stale_resolutions = codefire_core::stale_resolutions(
         &scan.atom_index,
         &scan.trace_graph,
-        &policy,
+        policy,
         &resolutions,
     )?;
     let missing_evidence_refs = collect_missing_evidence_refs(&context.repo_root, &resolutions);
-    let verification = codefire_core::build_verification(
+    let state = read_active_json_required(&context.active_state, Path::new("state.json"))?;
+    let unresolved_merge_conflicts = unresolved_merge_conflicts_from_state(&state)?;
+    let mut verification = codefire_core::build_verification(
         &scan,
-        missing_required_links,
-        failed_checks,
-        stale_resolutions,
-        missing_evidence_refs,
-        &policy,
+        codefire_core::VerificationInputs {
+            unresolved_merge_conflicts,
+            missing_required_links,
+            failed_checks: command_results.failures,
+            stale_resolutions,
+            missing_evidence_refs,
+            subject: Some(subject),
+            execution: command_results.records,
+        },
+        policy,
         &now_iso_utc(),
     );
-    if persist {
-        persist_verification_result_state(&context, &active_state_path, &scan, &verification)?;
+    verification.effective_policy = Some(parsed_policy.effective);
+    if lock.is_some() {
+        maybe_swap_validated_store_before_verify_persist_for_test(&context.repo_root)?;
+        persist_verification_result_state(&context, &scan, &fires, &verification, &validated_base)?;
     }
     Ok(VerifyExecution { scan, verification })
 }
 
 fn persist_verification_result_state(
     context: &OpenContext,
-    active_state_path: &Path,
     scan: &codefire_core::ScanResult,
+    fires: &[codefire_core::Fire],
     verification: &codefire_core::Verification,
+    validated_base: &codefire_store::ValidatedSealedCommit,
 ) -> Result<(), CliError> {
-    write_json_atomic(
-        &active_state_path.join("verification.json"),
+    ensure_validated_store_subject(context, validated_base)?;
+    let state = verification_open_state(verification, scan);
+    begin_state_transaction(context, "verify", state)?;
+    maybe_fail_state_transaction_for_test(context.active_state.path(), "verify", "started")?;
+    write_active_json_atomic(
+        &context.active_state,
+        Path::new("verification.json"),
         &serde_json::to_value(verification)?,
     )?;
-    set_open_state(
+    update_state_transaction_phase(&context.active_state, "verification_written")?;
+    maybe_fail_state_transaction_for_test(
+        context.active_state.path(),
+        "verify",
+        "verification_written",
+    )?;
+    persist_transactional_open_state(
         context,
-        active_state_path,
-        verification_open_state(verification, scan),
+        "verify",
+        state,
+        validated_base,
+        StateTransactionAuthority::Verify {
+            scan,
+            fires,
+            verification,
+        },
     )
 }
 
@@ -5916,7 +6714,7 @@ fn verification_open_state(
     verification: &codefire_core::Verification,
     scan: &codefire_core::ScanResult,
 ) -> &'static str {
-    if verification.result != "passed" {
+    if !codefire_core::committable_decision(verification).is_committable() {
         return "open-burning";
     }
     if scan_change_count(scan) == 0 && scan.open_fires.is_empty() {
@@ -5927,9 +6725,47 @@ fn verification_open_state(
 }
 
 fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliError> {
-    let context = open_context(&options.path)?;
-    let _lock = RepoLock::acquire_with_options(&context.repo_root, &options.lock)?;
+    let lock;
+    let context;
+    if options.dry_run {
+        lock = None;
+        context = open_context(&options.path)?;
+    } else {
+        let (acquired_lock, locked_context) =
+            acquire_locked_open_context_for_recovery(&options.path, &options.lock, "extinguish")?;
+        lock = Some(acquired_lock);
+        context = locked_context;
+    }
     let idempotency_payload = extinguish_idempotency_payload(options, &context);
+    let ledger_request = (!options.dry_run)
+        .then(|| extinguish_ledger_transition_request(&context, &idempotency_payload))
+        .transpose()?;
+    if let Some(request) = ledger_request.as_ref() {
+        ensure_active_ledger_state_transaction_request(&context, "extinguish", request)?;
+    }
+    if options.dry_run {
+        reject_pending_active_ledger_transition(&context.active_state)?;
+    } else if let Some(durable) = recover_active_ledger_transition(
+        &context.active_state,
+        "extinguish",
+        ledger_request
+            .as_ref()
+            .expect("live extinguish must have a ledger request"),
+    )? {
+        let (result, target_state) = extinguish_result_from_ledger_transition(durable)?;
+        set_open_state_transactional(
+            &context,
+            "extinguish",
+            &target_state,
+            ledger_request
+                .as_ref()
+                .expect("live extinguish must have a ledger request"),
+        )?;
+        if let Some(key) = options.idempotency_key.as_deref() {
+            save_extinguish_idempotency(&context.repo_root, key, &idempotency_payload, &result)?;
+        }
+        return Ok(result);
+    }
     if !options.dry_run {
         if let Some(key) = options.idempotency_key.as_deref() {
             if let Some(result) =
@@ -5939,11 +6775,9 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
             }
         }
     }
-    let active_state_path = PathBuf::from(required_string(
-        &context.registry,
-        &["open", "active_state_path"],
-    )?);
-    let policy = codefire_core::parse_verification_policy(&context.open_dir)?;
+    let active_state_path = context.active_state.path().to_path_buf();
+    let parsed_policy = codefire_core::parse_effective_verification_policy(&context.open_dir)?;
+    let policy = &parsed_policy.policy;
     if options.resolution == "no-change-required"
         && policy.no_change_required_requires_rationale
         && options.rationale.is_empty()
@@ -5962,9 +6796,15 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
     }
     validate_evidence_refs(&context.repo_root, &options.evidence_refs)?;
 
-    let scan_execution = compute_scan(&context.open_dir, !options.dry_run)?;
+    let scan_execution = if options.dry_run {
+        compute_scan(&context.open_dir)?
+    } else {
+        compute_scan_locked(
+            &context.open_dir,
+            lock.as_ref().expect("live extinguish must hold repo lock"),
+        )?
+    };
     let scan = scan_execution.scan;
-    let fires_path = active_state_path.join("fires.json");
     let mut fires = scan_execution.fires;
     let fire_index = fires
         .iter()
@@ -5986,7 +6826,7 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
         &fires[fire_index],
         &scan.atom_index,
         &scan.trace_graph,
-        &policy,
+        policy,
         codefire_core::ResolutionRequest {
             resolution_uid: resolution_uid.clone(),
             resolution_type: options.resolution.clone(),
@@ -6022,12 +6862,14 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
     fires[fire_index].status = "extinguished".to_string();
     fires[fire_index].resolution_uid = Some(resolution_uid);
 
-    let resolutions_path = active_state_path.join("resolutions.json");
-    let mut resolutions: Vec<codefire_core::Resolution> = if resolutions_path.exists() {
-        serde_json::from_value(read_json(&resolutions_path)?)?
-    } else {
-        Vec::new()
-    };
+    let fires_before = read_active_json_optional(&context.active_state, Path::new("fires.json"))?;
+    let resolutions_before =
+        read_active_json_optional(&context.active_state, Path::new("resolutions.json"))?;
+    let mut resolutions: Vec<codefire_core::Resolution> = resolutions_before
+        .clone()
+        .map(serde_json::from_value)
+        .transpose()?
+        .unwrap_or_default();
     if options.refresh {
         for existing in &mut resolutions {
             if existing.fire_uid == fires[fire_index].fire_uid && existing.status == "active" {
@@ -6037,13 +6879,8 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
     }
     resolutions.push(resolution);
     let remaining_open_fires = fires.iter().filter(|fire| fire.status == "open").count();
-    write_json_atomic(&fires_path, &serde_json::to_value(fires)?)?;
-    write_json_atomic(&resolutions_path, &serde_json::to_value(resolutions)?)?;
-    set_open_state(
-        &context,
-        &active_state_path,
-        scan_branch_state(scan.changed_atoms.len(), remaining_open_fires),
-    )?;
+    let target_state =
+        scan_branch_state(scan.changed_atoms.len(), remaining_open_fires).to_string();
     let result = ExtinguishResult {
         display_id,
         fire_uid,
@@ -6053,10 +6890,122 @@ fn run_extinguish(options: &ExtinguishOptions) -> Result<ExtinguishResult, CliEr
         remaining_open_fire_count: remaining_open_fires,
         plan,
     };
+    let durable_result = extinguish_ledger_transition_result(&result, &target_state);
+    let durable_result = apply_active_ledger_transition(
+        &context.active_state,
+        "extinguish",
+        ledger_request
+            .as_ref()
+            .expect("live extinguish must have a ledger request"),
+        vec![
+            ActiveLedgerWrite::new("fires.json", fires_before, serde_json::to_value(&fires)?),
+            ActiveLedgerWrite::new(
+                "resolutions.json",
+                resolutions_before,
+                serde_json::to_value(&resolutions)?,
+            ),
+        ],
+        &durable_result,
+    )?;
+    let (result, target_state) = extinguish_result_from_ledger_transition(durable_result)?;
+    set_open_state_transactional(
+        &context,
+        "extinguish",
+        &target_state,
+        ledger_request
+            .as_ref()
+            .expect("live extinguish must have a ledger request"),
+    )?;
     if let Some(key) = options.idempotency_key.as_deref() {
         save_extinguish_idempotency(&context.repo_root, key, &idempotency_payload, &result)?;
     }
     Ok(result)
+}
+
+fn extinguish_ledger_transition_request(
+    context: &OpenContext,
+    idempotency_payload: &Value,
+) -> Result<Value, CliError> {
+    Ok(json!({
+        "type": "codefire_extinguish_ledger_transition_request",
+        "version": 1,
+        "branch": &context.branch,
+        "open_instance_id": required_string(&context.registry, &["open", "open_instance_id"] )?,
+        "current_base_commit": required_string(&context.registry, &["open", "current_base_commit"] )?,
+        "request": idempotency_payload,
+    }))
+}
+
+fn extinguish_ledger_transition_result(result: &ExtinguishResult, target_state: &str) -> Value {
+    json!({
+        "type": "codefire_extinguish_ledger_transition_result",
+        "version": 1,
+        "display_id": &result.display_id,
+        "fire_uid": &result.fire_uid,
+        "source_atom": &result.source_atom,
+        "target_atom": &result.target_atom,
+        "reason": &result.reason,
+        "remaining_open_fire_count": result.remaining_open_fire_count,
+        "target_state": target_state,
+        "plan": &result.plan,
+    })
+}
+
+fn extinguish_result_from_ledger_transition(
+    value: Value,
+) -> Result<(ExtinguishResult, String), CliError> {
+    if value.get("type").and_then(Value::as_str)
+        != Some("codefire_extinguish_ledger_transition_result")
+        || value.get("version").and_then(Value::as_u64) != Some(1)
+    {
+        return Err(CliError::InvalidRepository(
+            "active ledger extinguish transaction contains an invalid durable result".to_string(),
+        ));
+    }
+    let required = |field: &str| -> Result<String, CliError> {
+        value
+            .get(field)
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .ok_or_else(|| {
+                CliError::InvalidRepository(format!(
+                    "active ledger extinguish durable result has invalid {field}"
+                ))
+            })
+    };
+    let remaining_open_fire_count = value
+        .get("remaining_open_fire_count")
+        .and_then(Value::as_u64)
+        .and_then(|count| usize::try_from(count).ok())
+        .ok_or_else(|| {
+            CliError::InvalidRepository(
+                "active ledger extinguish durable result has invalid remaining_open_fire_count"
+                    .to_string(),
+            )
+        })?;
+    let target_state = required("target_state")?;
+    if !matches!(
+        target_state.as_str(),
+        "open-clean" | "open-burning" | "open-consistent"
+    ) {
+        return Err(CliError::InvalidRepository(format!(
+            "active ledger extinguish durable result has unsupported target_state {target_state}"
+        )));
+    }
+    let result = ExtinguishResult {
+        display_id: required("display_id")?,
+        fire_uid: required("fire_uid")?,
+        source_atom: required("source_atom")?,
+        target_atom: required("target_atom")?,
+        reason: required("reason")?,
+        remaining_open_fire_count,
+        plan: value.get("plan").cloned().ok_or_else(|| {
+            CliError::InvalidRepository(
+                "active ledger extinguish durable result is missing plan".to_string(),
+            )
+        })?,
+    };
+    Ok((result, target_state))
 }
 
 fn extinguish_idempotency_payload(options: &ExtinguishOptions, context: &OpenContext) -> Value {
@@ -6088,7 +7037,7 @@ fn validate_evidence_refs(repo_root: &Path, refs: &[String]) -> Result<(), CliEr
                     repo_root: repo_root.to_path_buf(),
                 }
             } else {
-                CliError::Store(error)
+                CliError::Store(Box::new(error))
             }
         })?;
         if payload.get("type").and_then(Value::as_str) != Some("evidence") {
@@ -6201,9 +7150,32 @@ fn save_extinguish_idempotency(
 }
 
 fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
-    let context = open_context(&options.path)?;
-    let _lock = RepoLock::acquire_with_options(&context.repo_root, &options.lock)?;
+    let lock;
+    let context;
+    if options.dry_run {
+        lock = None;
+        context = open_context(&options.path)?;
+    } else {
+        let (acquired_lock, locked_context) =
+            acquire_locked_open_context_for_recovery(&options.path, &options.lock, "commit")?;
+        lock = Some(acquired_lock);
+        context = locked_context;
+    }
+    reject_pending_active_ledger_transition(&context.active_state)?;
     let idempotency_payload = commit_idempotency_payload(options, &context);
+    let active_state_path = context.active_state.path().to_path_buf();
+    if options.dry_run {
+        reject_pending_commit_transaction_for_preview(&context.active_state)?;
+    } else if let Some(result) = recover_commit_transaction(
+        &context,
+        lock.as_ref()
+            .expect("live commit must hold repository lock"),
+        &context.active_state,
+        options,
+        &idempotency_payload,
+    )? {
+        return Ok(result);
+    }
     if !options.dry_run {
         if let Some(key) = options.idempotency_key.as_deref() {
             if let Some(result) =
@@ -6213,31 +7185,34 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
             }
         }
     }
-    let active_state_path = PathBuf::from(required_string(
-        &context.registry,
-        &["open", "active_state_path"],
-    )?);
-    let verify_execution = compute_verify(&context.open_dir, !options.dry_run)?;
+    let mut validation_cache = codefire_store::SealedCommitValidationCache::default();
+    let verify_execution =
+        compute_verify_with_cache(&context.open_dir, lock.as_ref(), &mut validation_cache)?;
     let verification = verify_execution.verification;
+    maybe_mutate_commit_worktree_for_test(&context.open_dir, "after_verify")?;
+    ensure_verification_subject_matches_worktree(
+        &context.open_dir,
+        &verification,
+        "after verification",
+    )?;
 
     let objects = context.repo_root.join(".codefire").join("objects");
     let scan = verify_execution.scan;
-    let fires: Vec<codefire_core::Fire> = if active_state_path.join("fires.json").exists() {
-        serde_json::from_value(read_json(&active_state_path.join("fires.json"))?)?
-    } else {
-        Vec::new()
-    };
+    let fires: Vec<codefire_core::Fire> =
+        read_active_json_optional(&context.active_state, Path::new("fires.json"))?
+            .map(serde_json::from_value)
+            .transpose()?
+            .unwrap_or_default();
     let extinguished_fires = fires
         .iter()
         .filter(|fire| fire.status == "extinguished")
         .map(|fire| fire.fire_uid.clone())
         .collect::<Vec<_>>();
     let resolutions: Vec<codefire_core::Resolution> =
-        if active_state_path.join("resolutions.json").exists() {
-            serde_json::from_value(read_json(&active_state_path.join("resolutions.json"))?)?
-        } else {
-            Vec::new()
-        };
+        read_active_json_optional(&context.active_state, Path::new("resolutions.json"))?
+            .map(serde_json::from_value)
+            .transpose()?
+            .unwrap_or_default();
     let extinguished_fire_count = extinguished_fires.len();
     let active_resolution_count = resolutions
         .iter()
@@ -6253,8 +7228,9 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         active_resolution_count,
         evidence_ref_count,
     };
-    let policy = codefire_core::parse_verification_policy(&context.open_dir)?;
-    let parents = commit_parents_for_open(&context, &active_state_path)?;
+    let parsed_policy = codefire_core::parse_effective_verification_policy(&context.open_dir)?;
+    let policy = &parsed_policy.policy;
+    let parents = commit_parents_for_open(&context, &context.active_state)?;
     let plan = commit_operation_plan(
         options,
         &context,
@@ -6264,22 +7240,23 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         &parents,
         &summary,
     );
-    if verification.result != "passed" {
-        if options.dry_run {
-            return Ok(CommitResult {
-                repo_root: context.repo_root,
-                open_dir: context.open_dir,
-                commit_id: String::new(),
-                branch: context.branch,
-                dry_run: true,
-                blocked: true,
-                exit_code: verification_exit_code(&verification),
-                plan,
-            });
-        }
-        return Err(CliError::Usage(
-            "commit blocked: verification failed or consistency blockers remain".to_string(),
-        ));
+    let decision = codefire_core::committable_decision(&verification);
+    ensure_verification_subject_matches_worktree(
+        &context.open_dir,
+        &verification,
+        "before commit decision publication",
+    )?;
+    if !decision.is_committable() {
+        return Ok(CommitResult {
+            repo_root: context.repo_root,
+            open_dir: context.open_dir,
+            commit_id: String::new(),
+            branch: context.branch,
+            dry_run: options.dry_run,
+            blocked: true,
+            exit_code: verification_exit_code(&verification),
+            plan,
+        });
     }
     if options.dry_run {
         return Ok(CommitResult {
@@ -6294,90 +7271,83 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         });
     }
 
-    let transaction_id = begin_commit_transaction(&context, &active_state_path, options, &parents)?;
-    let manifest_id = codefire_store::store_object(
-        &objects,
-        "content_manifest",
-        build_manifest(&objects, &context.open_dir)?,
+    let signature_required = policy.require_commit_signature;
+    let transaction_id = begin_commit_transaction(
+        &context,
+        &context.active_state,
+        options,
+        &parents,
+        &idempotency_payload,
+        &plan,
     )?;
-    update_commit_transaction(
-        &active_state_path,
-        &transaction_id,
-        "stored_content_manifest",
-        Some(&manifest_id),
+    let signing_key = signatures::commit_signing_key(signature_required)?;
+    let manifest_plan = build_manifest_plan(&context.open_dir)?;
+    maybe_mutate_commit_worktree_for_test(&context.open_dir, "after_manifest_plan")?;
+    ensure_verification_subject_matches_worktree(
+        &context.open_dir,
+        &verification,
+        "after manifest planning",
     )?;
-    maybe_fail_commit_transaction_for_test(&active_state_path, "after_content_manifest")?;
-    let atom_id = codefire_store::store_object(
-        &objects,
+    let manifest_id = manifest_plan.manifest.object_id.clone();
+    let atom_plan = planned_commit_object(
+        "atom_index",
+        None,
         "atom_index",
         serde_json::to_value(&scan.atom_index)?,
+        CommitObjectStage::SealedRoot,
     )?;
-    update_commit_transaction(
-        &active_state_path,
-        &transaction_id,
-        "stored_atom_index",
-        Some(&atom_id),
-    )?;
-    let trace_id = codefire_store::store_object(
-        &objects,
+    let atom_id = atom_plan.object_id.clone();
+    let trace_plan = planned_commit_object(
+        "trace_graph",
+        None,
         "trace_graph",
         serde_json::to_value(&scan.trace_graph)?,
+        CommitObjectStage::SealedRoot,
     )?;
-    update_commit_transaction(
-        &active_state_path,
-        &transaction_id,
-        "stored_trace_graph",
-        Some(&trace_id),
-    )?;
-    let fire_id = codefire_store::store_object(
-        &objects,
+    let trace_id = trace_plan.object_id.clone();
+    let fire_plan = planned_commit_object(
+        "fire_ledger",
+        None,
         "fire_ledger",
         json!({"type": "fire_ledger", "version": 1, "fires": fires}),
+        CommitObjectStage::SealedRoot,
     )?;
-    update_commit_transaction(
-        &active_state_path,
-        &transaction_id,
-        "stored_fire_ledger",
-        Some(&fire_id),
-    )?;
-    let resolution_id = codefire_store::store_object(
-        &objects,
+    let fire_id = fire_plan.object_id.clone();
+    let resolution_plan = planned_commit_object(
+        "resolution_ledger",
+        None,
         "resolution_ledger",
         json!({"type": "resolution_ledger", "version": 1, "resolutions": resolutions}),
+        CommitObjectStage::SealedRoot,
     )?;
-    update_commit_transaction(
-        &active_state_path,
-        &transaction_id,
-        "stored_resolution_ledger",
-        Some(&resolution_id),
-    )?;
-    let verification_id = codefire_store::store_object(
-        &objects,
+    let resolution_id = resolution_plan.object_id.clone();
+    let verification_plan = planned_commit_object(
+        "verification",
+        None,
         "verification",
         serde_json::to_value(&verification)?,
+        CommitObjectStage::SealedRoot,
     )?;
-    update_commit_transaction(
-        &active_state_path,
-        &transaction_id,
-        "stored_verification",
-        Some(&verification_id),
-    )?;
-    let policy_id = codefire_store::store_object(
-        &objects,
+    let verification_id = verification_plan.object_id.clone();
+    let policy_plan = planned_commit_object(
         "policy",
-        json!({"type": "policy", "version": 1, "policy": policy}),
+        None,
+        "policy",
+        json!({
+            "type": "policy",
+            "version": 1,
+            "policy": policy,
+            "effective_policy": parsed_policy.effective,
+        }),
+        CommitObjectStage::SealedRoot,
     )?;
-    update_commit_transaction(
-        &active_state_path,
-        &transaction_id,
-        "stored_policy",
-        Some(&policy_id),
-    )?;
+    let policy_id = policy_plan.object_id.clone();
 
     let commit = json!({
         "type": "commit",
         "version": 1,
         "root_schema_version": 2,
+        "semantic_validation_profile": codefire_store::CURRENT_SEMANTIC_VALIDATION_PROFILE,
         "parents": parents,
         "message": options.message,
         "roots": {
@@ -6390,13 +7360,18 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
             "policy": policy_id,
         },
         "certificate": {
-            "result": verification.result,
+            "result": decision.outcome.as_str(),
+            "subject": &verification.subject,
+            "profile": "local_verification_v1",
+            "phase": "pre_commit",
             "open_required_fires": verification.open_required_fires,
             "failed_checks": verification.failed_checks.len(),
             "missing_required_links": verification.missing_required_links.len(),
             "stale_resolutions": verification.stale_resolutions.len(),
             "missing_evidence_refs": verification.missing_evidence_refs.len(),
             "duplicate_atom_ids": verification.duplicate_atom_ids.len(),
+            "effective_policy_digest": verification.effective_policy.as_ref().map(|policy| &policy.digest),
+            "change_coverage_digest": verification.change_coverage.as_ref().map(|coverage| &coverage.digest),
         },
         "changed_atoms": scan.changed_atoms,
         "extinguished_fires": extinguished_fires,
@@ -6406,33 +7381,136 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         commit,
         options.signer.as_deref(),
         options.key_id.as_deref(),
-        commit_signature_required(&context.open_dir)?,
+        signing_key.as_deref(),
     )?;
-    let commit_id = codefire_store::store_object(&objects, "commit", commit)?;
-    update_commit_transaction(
-        &active_state_path,
-        &transaction_id,
-        "publishing_branch",
-        Some(&commit_id),
+    let commit = maybe_corrupt_commit_candidate_for_test(&active_state_path, commit);
+    let candidate_plan = planned_commit_object(
+        "candidate_commit",
+        None,
+        "commit",
+        commit,
+        CommitObjectStage::CandidateCommit,
     )?;
-
+    let commit_id = candidate_plan.object_id.clone();
     let mut branch = load_branch_record(&context.repo_root, &context.branch)?;
     branch["head"] = Value::String(commit_id.clone());
     branch["state"] = Value::String("open-clean".to_string());
-    save_branch_record(&context.repo_root, &branch)?;
+    let branch_snapshot_plan = planned_commit_object(
+        "branch_snapshot",
+        None,
+        "branch",
+        branch.clone(),
+        CommitObjectStage::BranchSnapshot,
+    )?;
+
+    // Every immutable role is declared before the first store. Identical file
+    // contents may intentionally produce duplicate object IDs; each path keeps
+    // its own ordered role entry and therefore its own planned -> stored state.
+    let mut planned_objects = manifest_plan.blobs;
+    planned_objects.push(manifest_plan.manifest);
+    planned_objects.push(atom_plan);
+    planned_objects.push(trace_plan);
+    planned_objects.push(fire_plan);
+    planned_objects.push(resolution_plan);
+    planned_objects.push(verification_plan);
+    planned_objects.push(policy_plan);
+    planned_objects.push(candidate_plan);
+    planned_objects.push(branch_snapshot_plan);
+    plan_commit_transaction_objects(&context.active_state, &transaction_id, &planned_objects)?;
+    let candidate_index = planned_objects
+        .iter()
+        .position(|planned| planned.role == "candidate_commit")
+        .expect("commit plan must contain a candidate");
+    for (index, planned) in planned_objects
+        .iter_mut()
+        .enumerate()
+        .take(candidate_index + 1)
+    {
+        store_planned_commit_object(
+            &objects,
+            &context.open_dir,
+            &context.active_state,
+            &transaction_id,
+            index,
+            planned,
+        )?;
+    }
+    maybe_fail_commit_transaction_for_test(&active_state_path, "before_candidate_validation")?;
+    let candidate_commit_path =
+        codefire_store::object_record_path(&objects, &commit_id).unwrap_or_else(|| objects.clone());
+    let validated_candidate = codefire_store::validate_sealed_commit_pinned_with_cache(
+        &objects,
+        &commit_id,
+        &mut validation_cache,
+    )
+    .map_err(|error| CliError::StoreContext {
+        error: Box::new(error),
+        repo_root: context.repo_root.clone(),
+        path: candidate_commit_path,
+    })?;
+    let authenticated_candidate = validated_candidate.read_commit()?;
+    signatures::verify_local_commit_signature(
+        &authenticated_candidate,
+        signing_key.as_deref(),
+        signature_required,
+    )?;
+    for (index, planned) in planned_objects
+        .iter_mut()
+        .enumerate()
+        .skip(candidate_index + 1)
+    {
+        store_planned_commit_object(
+            &objects,
+            &context.open_dir,
+            &context.active_state,
+            &transaction_id,
+            index,
+            planned,
+        )?;
+    }
+    lock.as_ref()
+        .expect("live commit must hold repo lock")
+        .ensure_repo_root(&context.repo_root)?;
+    update_commit_transaction(&context.active_state, &transaction_id, "publishing_branch")?;
+    validated_candidate
+        .ensure_subject_identity()
+        .map_err(|error| CliError::StoreContext {
+            error: Box::new(error),
+            repo_root: context.repo_root.clone(),
+            path: objects.clone(),
+        })?;
+    maybe_mutate_commit_worktree_for_test(&context.open_dir, "before_branch_publish")?;
+    ensure_verification_subject_matches_worktree(
+        &context.open_dir,
+        &verification,
+        "before branch publication",
+    )?;
+    write_branch_record_reference(&context.repo_root, &branch)?;
+    validated_candidate
+        .ensure_subject_identity()
+        .map_err(|error| CliError::StoreContext {
+            error: Box::new(error),
+            repo_root: context.repo_root.clone(),
+            path: objects.clone(),
+        })?;
+    maybe_fail_commit_transaction_for_test(
+        &active_state_path,
+        "after_branch_publish_before_registry",
+    )?;
     let mut registry = context.registry.clone();
     registry["open"]["current_base_commit"] = Value::String(commit_id.clone());
     registry["state"]["last_known"] = Value::String("open-clean".to_string());
     write_json_atomic(&context.registry_path, &registry)?;
-    update_commit_transaction(
+    maybe_fail_commit_transaction_for_test(
         &active_state_path,
-        &transaction_id,
-        "resetting_active_state",
-        None,
+        "after_registry_publish_before_phase",
     )?;
-    reset_active(&active_state_path, "open-clean")?;
-    complete_commit_transaction(&active_state_path)?;
-
+    transition_commit_transaction_to_active_reset(&context.active_state, &transaction_id)?;
+    reset_commit_active_state(&context.active_state, &transaction_id)?;
+    maybe_fail_commit_transaction_for_test(
+        &active_state_path,
+        "after_active_reset_before_marker_clear",
+    )?;
     let result = CommitResult {
         repo_root: context.repo_root.clone(),
         open_dir: context.open_dir.clone(),
@@ -6444,8 +7522,23 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         plan,
     };
     if let Some(key) = options.idempotency_key.as_deref() {
-        save_commit_idempotency(&context.repo_root, key, &idempotency_payload, &result)?;
+        update_commit_transaction(
+            &context.active_state,
+            &transaction_id,
+            "publishing_idempotency",
+        )?;
+        ensure_commit_idempotency(&context.repo_root, key, &idempotency_payload, &result)?;
+        maybe_fail_commit_transaction_for_test(
+            &active_state_path,
+            "after_idempotency_store_before_marker_update",
+        )?;
     }
+    update_commit_transaction(
+        &context.active_state,
+        &transaction_id,
+        "idempotency_published",
+    )?;
+    complete_commit_transaction(&context.active_state)?;
     Ok(result)
 }
 
@@ -6458,47 +7551,6 @@ fn commit_idempotency_payload(options: &CommitOptions, context: &OpenContext) ->
         "signer": &options.signer,
         "key_id": &options.key_id,
     })
-}
-
-fn commit_signature_required(open_dir: &Path) -> Result<bool, CliError> {
-    let path = open_dir.join("codefire.policy.yaml");
-    if !path.exists() {
-        return Ok(false);
-    }
-    let contents = fs::read_to_string(path)?;
-    let mut in_commit_policy = false;
-    for raw_line in contents.lines() {
-        let line = raw_line.split('#').next().unwrap_or_default().trim_end();
-        let stripped = line.trim();
-        if stripped.is_empty() {
-            continue;
-        }
-        if !raw_line.starts_with([' ', '\t']) {
-            in_commit_policy = stripped == "commit_policy:";
-            continue;
-        }
-        if in_commit_policy {
-            if let Some(value) = stripped.strip_prefix("require_commit_signature:") {
-                return parse_policy_bool(value.trim());
-            }
-        }
-    }
-    Ok(false)
-}
-
-fn parse_policy_bool(value: &str) -> Result<bool, CliError> {
-    match value
-        .trim_matches(['"', '\''])
-        .trim()
-        .to_ascii_lowercase()
-        .as_str()
-    {
-        "true" | "yes" | "on" | "1" => Ok(true),
-        "false" | "no" | "off" | "0" => Ok(false),
-        _ => Err(CliError::Usage(format!(
-            "invalid boolean value in policy: {value}"
-        ))),
-    }
 }
 
 fn load_commit_idempotency(
@@ -6554,6 +7606,42 @@ fn save_commit_idempotency(
     write_json_atomic(&path, &record)
 }
 
+fn ensure_commit_idempotency(
+    repo_root: &Path,
+    key: &str,
+    payload: &Value,
+    result: &CommitResult,
+) -> Result<(), CliError> {
+    let path = idempotency_record_path(repo_root, "commit", key);
+    if let Some(existing) = read_optional_json(&path)? {
+        verify_idempotency_record(&existing, &path, "commit", key, payload)?;
+        let existing_commit = required_string(&existing, &["result", "commit_id"])?;
+        let existing_branch = required_string(&existing, &["result", "branch"])?;
+        let existing_open_dir = existing
+            .pointer("/result/open_dir")
+            .and_then(Value::as_str)
+            .map(Path::new)
+            .ok_or_else(|| {
+                CliError::InvalidRepository(format!(
+                    "commit idempotency result is missing open_dir: {}",
+                    path.display()
+                ))
+            })?;
+        if existing_commit != result.commit_id
+            || existing_branch != result.branch
+            || existing_open_dir != result.open_dir
+            || existing.pointer("/result/plan") != Some(&result.plan)
+        {
+            return Err(CliError::IdempotencyConflict(format!(
+                "commit idempotency result conflicts with recovered publication: {}",
+                path.display()
+            )));
+        }
+        return Ok(());
+    }
+    save_commit_idempotency(repo_root, key, payload, result)
+}
+
 fn extinguish_operation_plan(
     options: &ExtinguishOptions,
     context: &OpenContext,
@@ -6601,6 +7689,76 @@ struct CommitOperationSummary {
     evidence_ref_count: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CommitObjectStage {
+    ManifestBlob,
+    SealedRoot,
+    CandidateCommit,
+    BranchSnapshot,
+}
+
+#[derive(Debug)]
+struct PlannedCommitObject {
+    role: &'static str,
+    path: Option<String>,
+    object_type: &'static str,
+    object_id: String,
+    payload: Option<Value>,
+    worktree_source: Option<PathBuf>,
+    stage: CommitObjectStage,
+}
+
+impl PlannedCommitObject {
+    fn marker_value(&self) -> Value {
+        json!({
+            "role": self.role,
+            "path": &self.path,
+            "object_type": self.object_type,
+            "object_id": &self.object_id,
+            "state": "planned",
+        })
+    }
+
+    fn storing_phase(&self) -> &'static str {
+        match self.stage {
+            CommitObjectStage::ManifestBlob => "storing_manifest_blobs",
+            CommitObjectStage::SealedRoot => "storing_commit_roots",
+            CommitObjectStage::CandidateCommit => "storing_candidate_commit",
+            CommitObjectStage::BranchSnapshot => "storing_branch_snapshot",
+        }
+    }
+
+    fn stored_phase(&self) -> &'static str {
+        match self.role {
+            "manifest_blob" => "stored_manifest_blob",
+            "content_manifest" => "stored_content_manifest",
+            "atom_index" => "stored_atom_index",
+            "trace_graph" => "stored_trace_graph",
+            "fire_ledger" => "stored_fire_ledger",
+            "resolution_ledger" => "stored_resolution_ledger",
+            "verification" => "stored_verification",
+            "policy" => "stored_policy",
+            "candidate_commit" => "validating_candidate_commit",
+            "branch_snapshot" => "stored_branch_snapshot",
+            _ => "stored_commit_object",
+        }
+    }
+
+    fn store_gap_failpoint(&self) -> &'static str {
+        match self.stage {
+            CommitObjectStage::ManifestBlob => "after_manifest_blob_store_before_marker",
+            CommitObjectStage::SealedRoot => "after_root_store_before_marker",
+            CommitObjectStage::CandidateCommit => "after_candidate_store_before_marker",
+            CommitObjectStage::BranchSnapshot => "after_branch_snapshot_store_before_marker",
+        }
+    }
+}
+
+struct ManifestCommitPlan {
+    blobs: Vec<PlannedCommitObject>,
+    manifest: PlannedCommitObject,
+}
+
 fn commit_operation_plan(
     options: &CommitOptions,
     context: &OpenContext,
@@ -6639,7 +7797,18 @@ fn commit_operation_plan(
         .non_atom_changed_files
         .len()
         .saturating_sub(non_atom_changed_files.len());
-    let next_actions = if verification.result != "passed" {
+    let change_coverage_limit = if options.full_output {
+        scan.change_coverage
+            .as_ref()
+            .map(|coverage| coverage.entries.len())
+            .unwrap_or_default()
+    } else {
+        DEFAULT_COMMIT_CHANGED_ATOM_LIMIT
+    };
+    let change_coverage =
+        change_coverage_data_json(scan.change_coverage.as_ref(), change_coverage_limit);
+    let decision = codefire_core::committable_decision(verification);
+    let next_actions = if !decision.is_committable() {
         vec![json!({
             "kind": "verify",
             "command": format!("codefire verify --path {} --details --json", context.open_dir.display()),
@@ -6674,18 +7843,23 @@ fn commit_operation_plan(
         "non_atom_changed_files": non_atom_changed_files,
         "non_atom_changed_files_omitted": non_atom_changed_files_omitted,
         "non_atom_changed_files_truncated": non_atom_changed_files_omitted > 0,
+        "change_coverage": change_coverage,
         "extinguished_fire_count": summary.extinguished_fire_count,
         "active_resolution_count": summary.active_resolution_count,
         "evidence_ref_count": summary.evidence_ref_count,
         "verification": {
-            "result": &verification.result,
+            "result": decision.outcome.as_str(),
+            "primary_reason": decision.primary_reason,
             "open_required_fires": verification.open_required_fires,
             "missing_required_links": verification.missing_required_links.len(),
             "stale_resolutions": verification.stale_resolutions.len(),
             "duplicate_atom_ids": verification.duplicate_atom_ids.len(),
             "failed_checks": verification.failed_checks.len(),
+            "effective_policy": &verification.effective_policy,
+            "change_coverage": &verification.change_coverage,
         },
         "objects": [
+            "blob",
             "content_manifest",
             "atom_index",
             "trace_graph",
@@ -6694,6 +7868,7 @@ fn commit_operation_plan(
             "verification",
             "policy",
             "commit",
+            "branch",
         ],
         "transaction": {
             "marker": active_state_path.join("commit_transaction.json"),
@@ -6713,25 +7888,36 @@ fn commit_operation_plan(
 
 fn begin_commit_transaction(
     context: &OpenContext,
-    active_state_path: &Path,
+    active_state: &active_state::ActiveStateDir,
     options: &CommitOptions,
     parents: &[String],
+    request_payload: &Value,
+    operation_plan: &Value,
 ) -> Result<String, CliError> {
+    let transaction_path = commit_transaction_path(active_state);
+    if active_state.exists(Path::new("commit_transaction.json"))? {
+        return Err(CliError::InvalidRepository(format!(
+            "pending commit transaction must be inspected before another commit can start: {}",
+            transaction_path.display()
+        )));
+    }
     let started_at = now_iso_utc();
+    let mut nonce = [0u8; 16];
+    getrandom::getrandom(&mut nonce).map_err(|error| {
+        CliError::InvalidRepository(format!(
+            "failed to generate commit transaction identity: {error}"
+        ))
+    })?;
     let transaction_id = format!(
-        "commit_tx_{:012x}",
-        stable_hash_48(
-            format!(
-                "{}:{}:{}:{started_at}",
-                context.branch,
-                context.open_dir.display(),
-                options.message
-            )
-            .as_bytes(),
-        )
+        "commit_tx_{}",
+        nonce
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
     );
-    write_json_atomic(
-        &commit_transaction_path(active_state_path),
+    let active_reset = build_commit_active_reset_authority(active_state)?;
+    write_pending_commit_transaction(
+        active_state,
         &json!({
             "version": 1,
             "transaction_id": transaction_id,
@@ -6741,6 +7927,10 @@ fn begin_commit_transaction(
             "open_dir": &context.open_dir,
             "parents": parents,
             "message": &options.message,
+            "request_payload": request_payload,
+            "idempotency_key": &options.idempotency_key,
+            "operation_plan": operation_plan,
+            "active_reset": active_reset,
             "objects": [],
             "started_at": started_at,
             "updated_at": started_at,
@@ -6750,13 +7940,11 @@ fn begin_commit_transaction(
 }
 
 fn update_commit_transaction(
-    active_state_path: &Path,
+    active_state: &active_state::ActiveStateDir,
     transaction_id: &str,
     phase: &str,
-    object_id: Option<&str>,
 ) -> Result<(), CliError> {
-    let path = commit_transaction_path(active_state_path);
-    let mut record = read_json(&path)?;
+    let mut record = read_commit_transaction(active_state)?;
     if required_string(&record, &["transaction_id"])? != transaction_id {
         return Err(CliError::InvalidRepository(
             "commit transaction id changed during commit".to_string(),
@@ -6764,29 +7952,919 @@ fn update_commit_transaction(
     }
     record["phase"] = Value::String(phase.to_string());
     record["updated_at"] = Value::String(now_iso_utc());
-    if let Some(object_id) = object_id {
-        let objects = record
-            .get_mut("objects")
-            .and_then(Value::as_array_mut)
-            .ok_or_else(|| {
-                CliError::InvalidRepository("commit transaction objects must be a list".to_string())
+    write_pending_commit_transaction(active_state, &record)
+}
+
+fn plan_commit_transaction_objects(
+    active_state: &active_state::ActiveStateDir,
+    transaction_id: &str,
+    planned_objects: &[PlannedCommitObject],
+) -> Result<(), CliError> {
+    let mut record = read_commit_transaction(active_state)?;
+    if required_string(&record, &["transaction_id"])? != transaction_id {
+        return Err(CliError::InvalidRepository(
+            "commit transaction id changed while planning immutable objects".to_string(),
+        ));
+    }
+    let existing_objects = record
+        .get("objects")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            CliError::InvalidRepository("commit transaction objects must be a list".to_string())
+        })?;
+    if !existing_objects.is_empty() {
+        return Err(CliError::InvalidRepository(
+            "commit transaction objects were already planned".to_string(),
+        ));
+    }
+    let mut candidate_objects = planned_objects
+        .iter()
+        .filter(|planned| planned.role == "candidate_commit");
+    let candidate = candidate_objects.next().ok_or_else(|| {
+        CliError::InvalidRepository(
+            "commit transaction plan is missing the candidate commit".to_string(),
+        )
+    })?;
+    if candidate_objects.next().is_some() {
+        return Err(CliError::InvalidRepository(
+            "commit transaction plan contains multiple candidate commits".to_string(),
+        ));
+    }
+    record["phase"] = Value::String("objects_planned".to_string());
+    record["objects"] = Value::Array(
+        planned_objects
+            .iter()
+            .map(PlannedCommitObject::marker_value)
+            .collect(),
+    );
+    record["candidate_commit"] = json!({
+        "object_id": &candidate.object_id,
+        "state": "planned",
+    });
+    record["updated_at"] = Value::String(now_iso_utc());
+    write_pending_commit_transaction(active_state, &record)
+}
+
+fn store_planned_commit_object(
+    objects_root: &Path,
+    open_dir: &Path,
+    active_state: &active_state::ActiveStateDir,
+    transaction_id: &str,
+    object_index: usize,
+    planned: &mut PlannedCommitObject,
+) -> Result<(), CliError> {
+    update_commit_transaction(active_state, transaction_id, planned.storing_phase())?;
+    let payload = match planned.payload.take() {
+        Some(payload) => payload,
+        None => {
+            let source = planned.worktree_source.as_ref().ok_or_else(|| {
+                CliError::InvalidRepository(format!(
+                    "planned {} has neither inline payload nor worktree source",
+                    planned.role
+                ))
             })?;
-        objects.push(Value::String(object_id.to_string()));
+            manifest_blob_payload(&fs::read(open_dir.join(source))?)
+        }
+    };
+    let materialized_id = codefire_store::object_id(planned.object_type, &payload)?;
+    if materialized_id != planned.object_id {
+        return Err(CliError::InvalidRepository(format!(
+            "planned {} source changed before storage: planned {}, materialized {materialized_id}",
+            planned.role, planned.object_id
+        )));
     }
-    write_json_atomic(&path, &record)
+    let stored_id = codefire_store::store_object(objects_root, planned.object_type, payload)?;
+    if stored_id != planned.object_id {
+        return Err(CliError::InvalidRepository(format!(
+            "stored {} id differs from planned object: planned {}, stored {stored_id}",
+            planned.role, planned.object_id
+        )));
+    }
+    maybe_fail_commit_transaction_for_test(active_state.path(), planned.store_gap_failpoint())?;
+    mark_commit_object_stored(active_state, transaction_id, object_index, planned)?;
+    if planned.role == "content_manifest" {
+        maybe_fail_commit_transaction_for_test(active_state.path(), "after_content_manifest")?;
+    }
+    Ok(())
 }
 
-fn complete_commit_transaction(active_state_path: &Path) -> Result<(), CliError> {
-    let path = commit_transaction_path(active_state_path);
-    match fs::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(CliError::Io(error)),
+fn mark_commit_object_stored(
+    active_state: &active_state::ActiveStateDir,
+    transaction_id: &str,
+    object_index: usize,
+    planned: &PlannedCommitObject,
+) -> Result<(), CliError> {
+    let mut record = read_commit_transaction(active_state)?;
+    if required_string(&record, &["transaction_id"])? != transaction_id {
+        return Err(CliError::InvalidRepository(
+            "commit transaction id changed while recording an immutable object".to_string(),
+        ));
+    }
+    let object = record
+        .get_mut("objects")
+        .and_then(Value::as_array_mut)
+        .and_then(|objects| objects.get_mut(object_index))
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| {
+            CliError::InvalidRepository(format!(
+                "commit transaction object entry {object_index} is missing or invalid"
+            ))
+        })?;
+    let marker_string = |field: &str| {
+        object.get(field).and_then(Value::as_str).ok_or_else(|| {
+            CliError::InvalidRepository(format!(
+                "commit transaction object entry {object_index} must contain string field {field}"
+            ))
+        })
+    };
+    if marker_string("role")? != planned.role
+        || marker_string("object_type")? != planned.object_type
+        || marker_string("object_id")? != planned.object_id
+        || marker_string("state")? != "planned"
+        || object.get("path").and_then(Value::as_str) != planned.path.as_deref()
+    {
+        return Err(CliError::InvalidRepository(
+            "planned commit object changed before storage completed".to_string(),
+        ));
+    }
+    object.insert("state".to_string(), Value::String("stored".to_string()));
+    if planned.role == "candidate_commit" {
+        if required_string(&record, &["candidate_commit", "object_id"])? != planned.object_id {
+            return Err(CliError::InvalidRepository(
+                "planned candidate commit id changed before storage completed".to_string(),
+            ));
+        }
+        record["candidate_commit"]["state"] = Value::String("stored".to_string());
+    }
+    record["phase"] = Value::String(planned.stored_phase().to_string());
+    record["updated_at"] = Value::String(now_iso_utc());
+    write_pending_commit_transaction(active_state, &record)
+}
+
+fn complete_commit_transaction(
+    active_state: &active_state::ActiveStateDir,
+) -> Result<(), CliError> {
+    active_state.remove_file_if_exists(Path::new("commit_transaction.json"))?;
+    Ok(())
+}
+
+fn commit_transaction_path(active_state: &active_state::ActiveStateDir) -> PathBuf {
+    active_state.display_path(Path::new("commit_transaction.json"))
+}
+
+pub(crate) const COMMIT_TRANSACTION_BYTE_LIMIT: u64 = 64 * 1024 * 1024;
+const COMMIT_TRANSACTION_RECOVERY_RESERVE_BYTES: u64 = 4096;
+const COMMIT_TRANSACTION_PENDING_BYTE_LIMIT: u64 =
+    COMMIT_TRANSACTION_BYTE_LIMIT - COMMIT_TRANSACTION_RECOVERY_RESERVE_BYTES;
+
+const COMMIT_TRANSACTION_PHASES: &[&str] = &[
+    "started",
+    "objects_planned",
+    "storing_manifest_blobs",
+    "stored_manifest_blob",
+    "storing_commit_roots",
+    "stored_content_manifest",
+    "stored_atom_index",
+    "stored_trace_graph",
+    "stored_fire_ledger",
+    "stored_resolution_ledger",
+    "stored_verification",
+    "stored_policy",
+    "storing_candidate_commit",
+    "validating_candidate_commit",
+    "storing_branch_snapshot",
+    "stored_branch_snapshot",
+    "publishing_branch",
+    "resetting_active_state",
+    "publishing_idempotency",
+    "idempotency_published",
+];
+
+const COMMIT_PREPUBLICATION_PHASES: &[&str] = &[
+    "started",
+    "objects_planned",
+    "storing_manifest_blobs",
+    "stored_manifest_blob",
+    "storing_commit_roots",
+    "stored_content_manifest",
+    "stored_atom_index",
+    "stored_trace_graph",
+    "stored_fire_ledger",
+    "stored_resolution_ledger",
+    "stored_verification",
+    "stored_policy",
+    "storing_candidate_commit",
+    "validating_candidate_commit",
+    "storing_branch_snapshot",
+    "stored_branch_snapshot",
+    "publishing_branch",
+];
+
+pub(crate) fn validate_commit_transaction_record(transaction: &Value) -> Result<(), String> {
+    if transaction.get("version").and_then(Value::as_u64) != Some(1) {
+        return Err("commit_transaction.json version must be 1".to_string());
+    }
+    for field in [
+        "transaction_id",
+        "status",
+        "phase",
+        "branch",
+        "open_dir",
+        "message",
+        "started_at",
+        "updated_at",
+    ] {
+        if transaction.get(field).and_then(Value::as_str).is_none() {
+            return Err(format!(
+                "commit_transaction.json must contain string field {field}"
+            ));
+        }
+    }
+    let status = transaction["status"]
+        .as_str()
+        .expect("commit transaction status was checked");
+    if status != "pending" {
+        return Err(format!(
+            "commit_transaction.json status must be pending, found {status}"
+        ));
+    }
+    let phase = transaction["phase"]
+        .as_str()
+        .expect("commit transaction phase was checked");
+    if !COMMIT_TRANSACTION_PHASES.contains(&phase) {
+        return Err(format!(
+            "commit_transaction.json contains unsupported phase: {phase}"
+        ));
+    }
+    if transaction
+        .get("idempotency_key")
+        .is_some_and(|key| !key.is_null() && !key.is_string())
+    {
+        return Err("commit_transaction.json idempotency_key must be a string or null".to_string());
+    }
+    for field in ["request_payload", "operation_plan"] {
+        if transaction
+            .get(field)
+            .is_some_and(|value| !value.is_object())
+        {
+            return Err(format!(
+                "commit_transaction.json {field} must be an object when present"
+            ));
+        }
+    }
+    if matches!(
+        phase,
+        "resetting_active_state" | "publishing_idempotency" | "idempotency_published"
+    ) && ["request_payload", "idempotency_key", "operation_plan"]
+        .iter()
+        .any(|field| transaction.get(*field).is_none())
+    {
+        return Err(format!(
+            "commit_transaction.json phase {phase} requires request_payload, idempotency_key, and operation_plan"
+        ));
+    }
+    if let Some(authority) = transaction.get("active_reset") {
+        validate_commit_active_reset_authority(authority)?;
+        if matches!(phase, "publishing_idempotency" | "idempotency_published")
+            && !commit_active_reset_complete(authority)
+        {
+            return Err(format!(
+                "commit_transaction.json phase {phase} requires a completed active_reset authority"
+            ));
+        }
+        if phase != "resetting_active_state"
+            && !matches!(phase, "publishing_idempotency" | "idempotency_published")
+            && !commit_active_reset_unstarted(authority)
+        {
+            return Err(format!(
+                "commit_transaction.json phase {phase} cannot contain active_reset progress"
+            ));
+        }
+    }
+    let parents = transaction
+        .get("parents")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "commit_transaction.json must contain list field parents".to_string())?;
+    if parents.iter().any(|parent| !parent.is_string()) {
+        return Err("commit_transaction.json parents entries must be strings".to_string());
+    }
+    let objects = transaction
+        .get("objects")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "commit_transaction.json must contain list field objects".to_string())?;
+    let mut candidate_entry = None;
+    let mut has_legacy_entry = false;
+    for (index, entry) in objects.iter().enumerate() {
+        if entry.is_string() {
+            has_legacy_entry = true;
+            continue;
+        }
+        let object = entry.as_object().ok_or_else(|| {
+            format!(
+                "commit_transaction.json object entry {index} must be a legacy string or object"
+            )
+        })?;
+        for field in ["role", "object_type", "object_id", "state"] {
+            if !object.get(field).is_some_and(Value::is_string) {
+                return Err(format!(
+                    "commit_transaction.json object entry {index} must contain string field {field}"
+                ));
+            }
+        }
+        let state = object["state"]
+            .as_str()
+            .expect("commit object state was checked");
+        if !matches!(state, "planned" | "stored") {
+            return Err(format!(
+                "commit_transaction.json object entry {index} contains unsupported state: {state}"
+            ));
+        }
+        if object
+            .get("path")
+            .is_some_and(|path| !path.is_null() && !path.is_string())
+        {
+            return Err(format!(
+                "commit_transaction.json object entry {index} path must be a string or null"
+            ));
+        }
+        if object.get("role").and_then(Value::as_str) == Some("candidate_commit")
+            && candidate_entry.replace(entry).is_some()
+        {
+            return Err(
+                "commit_transaction.json contains multiple candidate commit entries".to_string(),
+            );
+        }
+    }
+    if objects.is_empty() {
+        if phase != "started" || transaction.get("candidate_commit").is_some() {
+            return Err(
+                "an empty commit transaction plan is valid only at phase started without a candidate"
+                    .to_string(),
+            );
+        }
+    } else if !has_legacy_entry {
+        let candidate = candidate_entry.ok_or_else(|| {
+            "commit_transaction.json object plan is missing candidate_commit".to_string()
+        })?;
+        let alias = transaction
+            .get("candidate_commit")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                "commit_transaction.json object plan is missing candidate alias".to_string()
+            })?;
+        for field in ["object_id", "state"] {
+            if !alias.get(field).is_some_and(Value::is_string) {
+                return Err(format!(
+                    "commit_transaction.json candidate alias must contain string field {field}"
+                ));
+            }
+        }
+        if alias.get("object_id") != candidate.get("object_id")
+            || alias.get("state") != candidate.get("state")
+        {
+            return Err(
+                "commit_transaction.json candidate alias does not match its object entry"
+                    .to_string(),
+            );
+        }
+    }
+    Ok(())
+}
+
+fn read_commit_transaction(active_state: &active_state::ActiveStateDir) -> Result<Value, CliError> {
+    let bytes = active_state.read_required(
+        Path::new("commit_transaction.json"),
+        COMMIT_TRANSACTION_BYTE_LIMIT,
+    )?;
+    Ok(serde_json::from_slice(&bytes)?)
+}
+
+fn write_pending_commit_transaction(
+    active_state: &active_state::ActiveStateDir,
+    transaction: &Value,
+) -> Result<(), CliError> {
+    write_active_json_atomic_bounded(
+        active_state,
+        Path::new("commit_transaction.json"),
+        transaction,
+        COMMIT_TRANSACTION_PENDING_BYTE_LIMIT,
+        "commit transaction marker",
+    )
+}
+
+fn recover_commit_transaction(
+    context: &OpenContext,
+    lock: &RepoLock,
+    active_state: &active_state::ActiveStateDir,
+    options: &CommitOptions,
+    requested_payload: &Value,
+) -> Result<Option<CommitResult>, CliError> {
+    let path = commit_transaction_path(active_state);
+    if !active_state.exists(Path::new("commit_transaction.json"))? {
+        return Ok(None);
+    }
+    let transaction = read_commit_transaction(active_state)?;
+    validate_commit_transaction_record(&transaction)
+        .map_err(|message| CliError::InvalidRepository(format!("{message}: {}", path.display())))?;
+    if transaction.get("status").and_then(Value::as_str) != Some("pending") {
+        return Err(CliError::InvalidRepository(format!(
+            "commit transaction is not pending and cannot be recovered automatically: {}",
+            path.display()
+        )));
+    }
+    let phase = transaction["phase"]
+        .as_str()
+        .expect("validated commit transaction phase")
+        .to_string();
+    let marker_payload = transaction.get("request_payload").cloned();
+    let marker_key = match transaction.get("idempotency_key") {
+        Some(Value::String(key)) => Some(key.clone()),
+        Some(Value::Null) => None,
+        _ => {
+            return Err(CliError::OpenRecoveryPending(Box::new(
+                OpenRecoveryPendingError {
+                    operation: "commit".to_string(),
+                    phase,
+                    repo_root: context.repo_root.clone(),
+                    branch: context.branch.clone(),
+                    open_dir: context.open_dir.clone(),
+                },
+            )))
+        }
+    };
+    if marker_payload.as_ref() != Some(requested_payload)
+        || marker_key.as_deref() != options.idempotency_key.as_deref()
+    {
+        return Err(CliError::OpenRecoveryPending(Box::new(
+            OpenRecoveryPendingError {
+                operation: "commit".to_string(),
+                phase,
+                repo_root: context.repo_root.clone(),
+                branch: context.branch.clone(),
+                open_dir: context.open_dir.clone(),
+            },
+        )));
+    }
+    let marker_payload = marker_payload.expect("exact commit retry has a request payload");
+    let pending_transaction_id = transaction["transaction_id"]
+        .as_str()
+        .expect("validated commit transaction id")
+        .to_string();
+    let current_format_entries = transaction["objects"]
+        .as_array()
+        .expect("validated commit transaction objects")
+        .iter()
+        .all(Value::is_object);
+    let marker_branch = transaction["branch"]
+        .as_str()
+        .expect("validated commit transaction branch");
+    let marker_open_dir = Path::new(
+        transaction["open_dir"]
+            .as_str()
+            .expect("validated commit transaction open_dir"),
+    );
+    let branch = load_branch_record(&context.repo_root, &context.branch)?;
+    let branch_head = required_string(&branch, &["head"])?;
+    let mut registry = context.registry.clone();
+    let mut registry_base = required_string(&registry, &["open", "current_base_commit"])?;
+    let marker_parents = transaction["parents"]
+        .as_array()
+        .expect("validated commit transaction parents")
+        .iter()
+        .map(|parent| {
+            parent
+                .as_str()
+                .expect("validated commit transaction parent")
+                .to_string()
+        })
+        .collect::<Vec<_>>();
+    let current_parents = commit_parents_for_open(context, active_state)?;
+    let can_abort_before_retry = COMMIT_PREPUBLICATION_PHASES.contains(&phase.as_str())
+        && current_format_entries
+        && marker_branch == context.branch
+        && marker_open_dir == context.open_dir
+        && marker_parents == current_parents
+        && branch_head == registry_base
+        && current_parents.first() == Some(&branch_head);
+    if can_abort_before_retry {
+        archive_commit_transaction(
+            active_state,
+            transaction,
+            "aborted",
+            "aborted_before_publication",
+            &phase,
+        )?;
+        return Ok(None);
+    }
+
+    let postpublication_phase = matches!(
+        phase.as_str(),
+        "publishing_branch"
+            | "resetting_active_state"
+            | "publishing_idempotency"
+            | "idempotency_published"
+    );
+    let candidate_id = transaction
+        .pointer("/candidate_commit/object_id")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let candidate_stored = transaction
+        .pointer("/candidate_commit/state")
+        .and_then(Value::as_str)
+        == Some("stored");
+    let every_object_stored = transaction["objects"]
+        .as_array()
+        .expect("validated commit transaction objects")
+        .iter()
+        .all(|entry| entry.get("state").and_then(Value::as_str) == Some("stored"));
+    let objects_root = context.repo_root.join(".codefire").join("objects");
+    let candidate_parents_match = match candidate_id.as_deref() {
+        Some(candidate) if candidate_stored => {
+            commit_object_parents(&objects_root, candidate)? == marker_parents
+        }
+        _ => false,
+    };
+    if phase == "publishing_branch"
+        && current_format_entries
+        && marker_branch == context.branch
+        && marker_open_dir == context.open_dir
+        && candidate_stored
+        && every_object_stored
+    {
+        let candidate = candidate_id.as_deref().expect("stored candidate has an id");
+        let branch_is_candidate = branch_head == candidate;
+        let registry_is_parent = marker_parents.first() == Some(&registry_base);
+        let registry_is_candidate = registry_base == candidate;
+        if branch_is_candidate
+            && (registry_is_parent || registry_is_candidate)
+            && branch.get("state").and_then(Value::as_str) == Some("open-clean")
+            && (!registry_is_candidate
+                || registry
+                    .pointer("/state/last_known")
+                    .and_then(Value::as_str)
+                    == Some("open-clean"))
+            && candidate_parents_match
+            && commit_candidate_matches_open_subject(
+                &objects_root,
+                candidate,
+                context,
+                active_state,
+                &marker_parents,
+            )?
+        {
+            codefire_store::validate_sealed_commit(&objects_root, candidate).map_err(|error| {
+                CliError::StoreContext {
+                    error: Box::new(error),
+                    repo_root: context.repo_root.clone(),
+                    path: codefire_store::object_record_path(&objects_root, candidate)
+                        .unwrap_or_else(|| objects_root.clone()),
+                }
+            })?;
+            lock.ensure_repo_root(&context.repo_root)?;
+            if registry_is_parent {
+                registry["open"]["current_base_commit"] = Value::String(candidate.to_string());
+                registry["state"]["last_known"] = Value::String("open-clean".to_string());
+                write_json_atomic(&context.registry_path, &registry)?;
+                registry_base = candidate.to_string();
+            }
+            transition_commit_transaction_to_active_reset(active_state, &pending_transaction_id)?;
+            reset_commit_active_state(active_state, &pending_transaction_id)?;
+        }
+    }
+    if phase == "resetting_active_state"
+        && transaction.get("active_reset").is_some()
+        && current_format_entries
+        && marker_branch == context.branch
+        && marker_open_dir == context.open_dir
+        && candidate_stored
+        && every_object_stored
+    {
+        let candidate = candidate_id.as_deref().expect("stored candidate has an id");
+        if branch_head == candidate
+            && registry_base == candidate
+            && branch.get("state").and_then(Value::as_str) == Some("open-clean")
+            && registry
+                .pointer("/state/last_known")
+                .and_then(Value::as_str)
+                == Some("open-clean")
+            && candidate_parents_match
+        {
+            codefire_store::validate_sealed_commit(&objects_root, candidate).map_err(|error| {
+                CliError::StoreContext {
+                    error: Box::new(error),
+                    repo_root: context.repo_root.clone(),
+                    path: codefire_store::object_record_path(&objects_root, candidate)
+                        .unwrap_or_else(|| objects_root.clone()),
+                }
+            })?;
+            lock.ensure_repo_root(&context.repo_root)?;
+            reset_commit_active_state(active_state, &pending_transaction_id)?;
+        }
+    }
+    let transaction_after_reset = read_commit_transaction(active_state)?;
+    validate_commit_transaction_record(&transaction_after_reset)
+        .map_err(|message| CliError::InvalidRepository(format!("{message}: {}", path.display())))?;
+    if matches!(
+        transaction_after_reset.get("phase").and_then(Value::as_str),
+        Some("publishing_idempotency" | "idempotency_published")
+    ) {
+        if let Some(authority) = transaction_after_reset.get("active_reset") {
+            preflight_commit_active_reset_authority(active_state, authority)?;
+        }
+    }
+    let durable_reset_progress_complete = transaction_after_reset
+        .get("active_reset")
+        .map(commit_active_reset_complete)
+        .unwrap_or(true);
+    let active_state_record = read_active_state_for_commit_recovery(active_state)?;
+    let mut reset_files_absent = true;
+    for name in [
+        "fires.json",
+        "resolutions.json",
+        "scan.json",
+        "verification.json",
+        "state_transaction.json",
+    ] {
+        if active_state.exists(Path::new(name))? {
+            reset_files_absent = false;
+            break;
+        }
+    }
+    let active_reset_complete = active_state_record.get("state").and_then(Value::as_str)
+        == Some("open-clean")
+        && reset_files_absent;
+    let fully_published = candidate_id
+        .as_deref()
+        .is_some_and(|candidate| branch_head == candidate && registry_base == candidate)
+        && branch.get("state").and_then(Value::as_str) == Some("open-clean")
+        && registry
+            .pointer("/state/last_known")
+            .and_then(Value::as_str)
+            == Some("open-clean");
+    if !postpublication_phase
+        || !current_format_entries
+        || marker_branch != context.branch
+        || marker_open_dir != context.open_dir
+        || !candidate_stored
+        || !every_object_stored
+        || !candidate_parents_match
+        || !durable_reset_progress_complete
+        || !active_reset_complete
+        || !fully_published
+    {
+        return Err(CliError::InvalidRepository(format!(
+            "pending commit transaction at phase {phase} requires explicit inspection; branch/open state or transaction subject may be partially published: {}",
+            path.display()
+        )));
+    }
+    let candidate_id = candidate_id.expect("fully published transaction has a candidate");
+    codefire_store::validate_sealed_commit(&objects_root, &candidate_id).map_err(|error| {
+        CliError::StoreContext {
+            error: Box::new(error),
+            repo_root: context.repo_root.clone(),
+            path: codefire_store::object_record_path(&objects_root, &candidate_id)
+                .unwrap_or(objects_root),
+        }
+    })?;
+    let operation_plan = transaction.get("operation_plan").cloned().ok_or_else(|| {
+        CliError::InvalidRepository(format!(
+            "published commit transaction is missing operation_plan: {}",
+            path.display()
+        ))
+    })?;
+    let result = CommitResult {
+        repo_root: context.repo_root.clone(),
+        open_dir: context.open_dir.clone(),
+        commit_id: candidate_id,
+        branch: context.branch.clone(),
+        dry_run: false,
+        blocked: false,
+        exit_code: ExitCode::Success,
+        plan: operation_plan,
+    };
+    if let Some(key) = marker_key.as_deref() {
+        ensure_commit_idempotency(&context.repo_root, key, &marker_payload, &result)?;
+    }
+    let completed_transaction = read_commit_transaction(active_state)?;
+    archive_commit_transaction(
+        active_state,
+        completed_transaction,
+        "recovered",
+        "completed_published_commit",
+        &phase,
+    )?;
+    Ok(Some(result))
+}
+
+fn read_active_state_for_commit_recovery(
+    active_state: &active_state::ActiveStateDir,
+) -> Result<Value, CliError> {
+    let bytes = active_state.read_required(Path::new("state.json"), 1024 * 1024)?;
+    Ok(serde_json::from_slice(&bytes)?)
+}
+
+fn commit_object_parents(objects: &Path, commit_id: &str) -> Result<Vec<String>, CliError> {
+    let commit = codefire_store::read_object(objects, commit_id)?;
+    commit
+        .get("parents")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            CliError::InvalidRepository(format!("commit {commit_id} is missing its parents list"))
+        })?
+        .iter()
+        .map(|parent| {
+            parent.as_str().map(str::to_string).ok_or_else(|| {
+                CliError::InvalidRepository(format!(
+                    "commit {commit_id} contains a non-string parent"
+                ))
+            })
+        })
+        .collect()
+}
+
+fn commit_candidate_matches_open_subject(
+    objects: &Path,
+    commit_id: &str,
+    context: &OpenContext,
+    active_state: &active_state::ActiveStateDir,
+    expected_parents: &[String],
+) -> Result<bool, CliError> {
+    let commit = codefire_store::read_object(objects, commit_id)?;
+    let root_matches = |name: &str, object_type: &str, payload: &Value| {
+        let expected = required_string(&commit, &["roots", name])?;
+        Ok::<bool, CliError>(codefire_store::object_id(object_type, payload)? == expected)
+    };
+
+    let active_state_record = read_active_state_for_commit_recovery(active_state)?;
+    if active_state_record
+        .get("pending_merge_parent")
+        .and_then(Value::as_str)
+        != expected_parents.get(1).map(String::as_str)
+    {
+        return Ok(false);
+    }
+
+    let manifest = build_manifest_fingerprint(&context.open_dir)?;
+    if !root_matches("content_manifest", "content_manifest", &manifest)? {
+        return Ok(false);
+    }
+    let atom_index = codefire_core::build_atom_index(&context.open_dir)?;
+    let atom_value = serde_json::to_value(&atom_index)?;
+    if !root_matches("atom_index", "atom_index", &atom_value)? {
+        return Ok(false);
+    }
+    let trace_graph = codefire_core::current_trace_graph(&context.open_dir)?;
+    codefire_core::validate_trace_graph_endpoints(&atom_index, &trace_graph)?;
+    let trace_value = serde_json::to_value(&trace_graph)?;
+    if !root_matches("trace_graph", "trace_graph", &trace_value)? {
+        return Ok(false);
+    }
+
+    let fires = read_active_json_optional(active_state, Path::new("fires.json"))?
+        .unwrap_or_else(|| json!([]));
+    if !root_matches(
+        "fire_delta",
+        "fire_ledger",
+        &json!({"type": "fire_ledger", "version": 1, "fires": fires}),
+    )? {
+        return Ok(false);
+    }
+    let resolutions = read_active_json_optional(active_state, Path::new("resolutions.json"))?
+        .unwrap_or_else(|| json!([]));
+    if !root_matches(
+        "resolution_ledger",
+        "resolution_ledger",
+        &json!({"type": "resolution_ledger", "version": 1, "resolutions": resolutions}),
+    )? {
+        return Ok(false);
+    }
+    let verification = read_active_json_required(active_state, Path::new("verification.json"))?;
+    if !root_matches("verification", "verification", &verification)? {
+        return Ok(false);
+    }
+    let parsed_policy = codefire_core::parse_effective_verification_policy(&context.open_dir)?;
+    if !root_matches(
+        "policy",
+        "policy",
+        &json!({
+            "type": "policy",
+            "version": 1,
+            "policy": parsed_policy.policy,
+            "effective_policy": parsed_policy.effective,
+        }),
+    )? {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+fn archive_commit_transaction(
+    active_state: &active_state::ActiveStateDir,
+    mut transaction: Value,
+    status: &str,
+    action: &str,
+    phase: &str,
+) -> Result<(), CliError> {
+    let transaction_id = transaction["transaction_id"]
+        .as_str()
+        .expect("validated commit transaction id");
+    let suffix = transaction_id.strip_prefix("commit_tx_").filter(|suffix| {
+        matches!(suffix.len(), 12 | 32) && suffix.bytes().all(|byte| byte.is_ascii_hexdigit())
+    });
+    let Some(suffix) = suffix else {
+        return Err(CliError::InvalidRepository(format!(
+            "pending commit transaction uses an unsupported recovery identity: {}",
+            commit_transaction_path(active_state).display()
+        )));
+    };
+    let archive_name = format!("commit_transaction.{status}.commit_tx_{suffix}.json");
+    let archive_relative = Path::new(&archive_name);
+    let archive_path = active_state.display_path(archive_relative);
+    transaction["status"] = Value::String(status.to_string());
+    transaction["recovery"] = json!({
+        "action": action,
+        "reason": "safe_retry",
+        "phase": phase,
+    });
+    if active_state.exists(archive_relative)? {
+        let bytes = active_state.read_required(archive_relative, COMMIT_TRANSACTION_BYTE_LIMIT)?;
+        let existing: Value = serde_json::from_slice(&bytes)?;
+        if existing != transaction {
+            return Err(CliError::InvalidRepository(format!(
+                "commit transaction recovery archive conflicts with the pending marker: {}",
+                archive_path.display()
+            )));
+        }
+    } else {
+        write_active_json_atomic_bounded(
+            active_state,
+            archive_relative,
+            &transaction,
+            COMMIT_TRANSACTION_BYTE_LIMIT,
+            "commit transaction recovery archive",
+        )?;
+    }
+    active_state.remove_file_if_exists(Path::new("commit_transaction.json"))?;
+    Ok(())
+}
+
+fn reject_pending_commit_transaction_for_preview(
+    active_state: &active_state::ActiveStateDir,
+) -> Result<(), CliError> {
+    let path = commit_transaction_path(active_state);
+    if !active_state.exists(Path::new("commit_transaction.json"))? {
+        Ok(())
+    } else {
+        let transaction = read_commit_transaction(active_state)?;
+        validate_commit_transaction_record(&transaction).map_err(|message| {
+            CliError::InvalidRepository(format!("{message}: {}", path.display()))
+        })?;
+        Err(CliError::InvalidRepository(format!(
+            "pending commit transaction must be inspected before commit preview; dry-run never recovers or mutates it: {}",
+            path.display()
+        )))
     }
 }
 
-fn commit_transaction_path(active_state_path: &Path) -> PathBuf {
-    active_state_path.join("commit_transaction.json")
+#[cfg(test)]
+fn maybe_mutate_commit_worktree_for_test(open_dir: &Path, point: &str) -> Result<(), CliError> {
+    let injection = {
+        let mut guard = COMMIT_WORKTREE_MUTATION
+            .lock()
+            .expect("commit worktree mutation lock poisoned");
+        guard
+            .iter()
+            .position(|injection| injection.open_dir == open_dir && injection.point == point)
+            .map(|index| guard.swap_remove(index))
+    };
+    if let Some(injection) = injection {
+        fs::write(open_dir.join(injection.relative_path), injection.contents)?;
+    }
+    Ok(())
+}
+
+#[cfg(not(test))]
+fn maybe_mutate_commit_worktree_for_test(_open_dir: &Path, _point: &str) -> Result<(), CliError> {
+    Ok(())
+}
+
+#[cfg(test)]
+fn set_commit_worktree_mutation_for_test(
+    open_dir: &Path,
+    point: &str,
+    relative_path: &Path,
+    contents: &[u8],
+) {
+    let mut guard = COMMIT_WORKTREE_MUTATION
+        .lock()
+        .expect("commit worktree mutation lock poisoned");
+    guard.retain(|injection| injection.open_dir != open_dir || injection.point != point);
+    guard.push(CommitWorktreeMutationInjection {
+        open_dir: open_dir.to_path_buf(),
+        point: point.to_string(),
+        relative_path: relative_path.to_path_buf(),
+        contents: contents.to_vec(),
+    });
 }
 
 #[cfg(test)]
@@ -6797,10 +8875,10 @@ fn maybe_fail_commit_transaction_for_test(
     let mut guard = COMMIT_TRANSACTION_FAILURE_PHASE
         .lock()
         .expect("commit transaction failure phase lock poisoned");
-    if guard.as_ref().is_some_and(|injection| {
+    if let Some(index) = guard.iter().position(|injection| {
         injection.phase == phase && injection.active_state_path == active_state_path
     }) {
-        *guard = None;
+        guard.swap_remove(index);
         return Err(CliError::Usage(format!(
             "injected commit transaction failure at {phase}"
         )));
@@ -6818,26 +8896,410 @@ fn maybe_fail_commit_transaction_for_test(
 
 #[cfg(test)]
 fn set_commit_transaction_failure_for_test(active_state_path: &Path, phase: &str) {
-    *COMMIT_TRANSACTION_FAILURE_PHASE
+    let mut guard = COMMIT_TRANSACTION_FAILURE_PHASE
         .lock()
-        .expect("commit transaction failure phase lock poisoned") =
-        Some(CommitTransactionFailureInjection {
+        .expect("commit transaction failure phase lock poisoned");
+    guard.retain(|injection| {
+        injection.active_state_path != active_state_path || injection.phase != phase
+    });
+    guard.push(CommitTransactionFailureInjection {
+        active_state_path: active_state_path.to_path_buf(),
+        phase: phase.to_string(),
+    });
+}
+
+#[cfg(test)]
+fn maybe_corrupt_commit_candidate_for_test(active_state_path: &Path, mut commit: Value) -> Value {
+    let mut guard = COMMIT_CANDIDATE_CORRUPTION
+        .lock()
+        .expect("commit candidate corruption lock poisoned");
+    let injection = guard
+        .as_ref()
+        .is_some_and(|injection| injection.active_state_path == active_state_path)
+        .then(|| guard.take().expect("matching candidate corruption exists"));
+    if let Some(injection) = injection {
+        match injection.kind {
+            CommitCandidateCorruptionKind::InvalidCertificate => {
+                commit["certificate"]["result"] = Value::String("failed".to_string());
+            }
+            CommitCandidateCorruptionKind::MissingRoot => {
+                commit["roots"]
+                    .as_object_mut()
+                    .expect("commit roots must be an object")
+                    .remove("policy");
+            }
+            CommitCandidateCorruptionKind::WrongRootType => {
+                let atom_index = commit["roots"]["atom_index"].clone();
+                commit["roots"]["policy"] = atom_index;
+            }
+            CommitCandidateCorruptionKind::InvalidParent => {
+                commit["parents"][0] = Value::String("CF-BLOB-not-a-parent".to_string());
+            }
+            CommitCandidateCorruptionKind::InvalidSignature => {
+                commit["signature"]["signature"] = Value::String("0".repeat(64));
+            }
+        }
+    }
+    commit
+}
+
+#[cfg(not(test))]
+fn maybe_corrupt_commit_candidate_for_test(_active_state_path: &Path, commit: Value) -> Value {
+    commit
+}
+
+#[cfg(test)]
+fn set_commit_candidate_corruption_for_test(
+    active_state_path: &Path,
+    kind: CommitCandidateCorruptionKind,
+) {
+    *COMMIT_CANDIDATE_CORRUPTION
+        .lock()
+        .expect("commit candidate corruption lock poisoned") =
+        Some(CommitCandidateCorruptionInjection {
             active_state_path: active_state_path.to_path_buf(),
-            phase: phase.to_string(),
+            kind,
+        });
+}
+
+#[cfg(test)]
+fn maybe_mutate_locked_open_context_for_test(start: &Path) -> Result<(), CliError> {
+    let injection = {
+        let mut guard = LOCKED_OPEN_CONTEXT_MUTATION
+            .lock()
+            .expect("locked open context mutation lock poisoned");
+        if guard
+            .as_ref()
+            .is_some_and(|injection| injection.start == start)
+        {
+            guard.take()
+        } else {
+            None
+        }
+    };
+    if let Some(injection) = injection {
+        let mut registry = read_json(&injection.registry_path)?;
+        let branch_name = required_string(&registry, &["branch", "name"])?;
+        registry["open"]["current_base_commit"] = Value::String(injection.base_commit.clone());
+        write_json_atomic(&injection.registry_path, &registry)?;
+        let repo_root = find_repo_root(start)?;
+        let mut branch = load_branch_record(&repo_root, &branch_name)?;
+        branch["head"] = Value::String(injection.base_commit);
+        save_branch_record(&repo_root, &branch)?;
+    }
+    Ok(())
+}
+
+#[cfg(not(test))]
+fn maybe_mutate_locked_open_context_for_test(_start: &Path) -> Result<(), CliError> {
+    Ok(())
+}
+
+#[cfg(test)]
+fn set_locked_open_context_mutation_for_test(
+    start: &Path,
+    registry_path: &Path,
+    base_commit: &str,
+) {
+    *LOCKED_OPEN_CONTEXT_MUTATION
+        .lock()
+        .expect("locked open context mutation lock poisoned") = Some(LockedOpenContextMutation {
+        start: start.to_path_buf(),
+        registry_path: registry_path.to_path_buf(),
+        base_commit: base_commit.to_string(),
+    });
+}
+
+#[cfg(test)]
+fn maybe_change_open_target_before_use_for_test(requested_path: &Path) -> Result<(), CliError> {
+    let should_change = {
+        let mut guard = OPEN_TARGET_PRE_USE_MUTATION
+            .lock()
+            .expect("open target pre-use mutation lock poisoned");
+        if guard.as_ref().is_some_and(|path| path == requested_path) {
+            *guard = None;
+            true
+        } else {
+            false
+        }
+    };
+    if should_change {
+        fs::create_dir_all(requested_path)?;
+        fs::write(requested_path.join("concurrent-owner.txt"), b"occupied\n")?;
+    }
+    Ok(())
+}
+
+#[cfg(not(test))]
+fn maybe_change_open_target_before_use_for_test(_requested_path: &Path) -> Result<(), CliError> {
+    Ok(())
+}
+
+#[cfg(test)]
+fn set_open_target_pre_use_mutation_for_test(requested_path: &Path) {
+    *OPEN_TARGET_PRE_USE_MUTATION
+        .lock()
+        .expect("open target pre-use mutation lock poisoned") = Some(requested_path.to_path_buf());
+}
+
+#[cfg(all(test, unix))]
+fn maybe_insert_nested_open_target_symlink_for_test(
+    requested_path: &Path,
+    target_path: &Path,
+    materialization_path: &Path,
+) -> std::io::Result<()> {
+    let injection = {
+        let mut guard = OPEN_TARGET_NESTED_SYMLINK_INJECTION
+            .lock()
+            .expect("open target nested symlink injection lock poisoned");
+        if guard.as_ref().is_some_and(|injection| {
+            injection.requested_path == requested_path && injection.target_path == target_path
+        }) {
+            guard.take()
+        } else {
+            None
+        }
+    };
+    if let Some(injection) = injection {
+        fs::create_dir_all(&injection.outside_path)?;
+        std::os::unix::fs::symlink(
+            &injection.outside_path,
+            materialization_path.join(injection.nested_path),
+        )?;
+    }
+    Ok(())
+}
+
+#[cfg(not(all(test, unix)))]
+fn maybe_insert_nested_open_target_symlink_for_test(
+    _requested_path: &Path,
+    _target_path: &Path,
+    _materialization_path: &Path,
+) -> std::io::Result<()> {
+    Ok(())
+}
+
+#[cfg(all(test, unix))]
+fn set_open_target_nested_symlink_injection_for_test(
+    requested_path: &Path,
+    target_path: &Path,
+    nested_path: &Path,
+    outside_path: &Path,
+) {
+    *OPEN_TARGET_NESTED_SYMLINK_INJECTION
+        .lock()
+        .expect("open target nested symlink injection lock poisoned") =
+        Some(OpenTargetNestedSymlinkInjection {
+            requested_path: requested_path.to_path_buf(),
+            target_path: target_path.to_path_buf(),
+            nested_path: nested_path.to_path_buf(),
+            outside_path: outside_path.to_path_buf(),
+        });
+}
+
+#[cfg(test)]
+fn maybe_swap_close_target_before_delete_for_test(target: &Path) -> Result<(), CliError> {
+    let injection = {
+        let mut guard = CLOSE_TARGET_SWAP_INJECTION
+            .lock()
+            .expect("close target swap injection lock poisoned");
+        if guard
+            .as_ref()
+            .is_some_and(|injection| injection.target == target)
+        {
+            guard.take()
+        } else {
+            None
+        }
+    };
+    if let Some(injection) = injection {
+        fs::rename(&injection.target, &injection.moved_original)?;
+        fs::create_dir(&injection.target)?;
+        fs::write(injection.target.join("victim.txt"), b"victim\n")?;
+    }
+    Ok(())
+}
+
+#[cfg(not(test))]
+fn maybe_swap_close_target_before_delete_for_test(_target: &Path) -> Result<(), CliError> {
+    Ok(())
+}
+
+#[cfg(test)]
+fn set_close_target_swap_injection_for_test(target: &Path, moved_original: &Path) {
+    *CLOSE_TARGET_SWAP_INJECTION
+        .lock()
+        .expect("close target swap injection lock poisoned") = Some(CloseTargetSwapInjection {
+        target: target.to_path_buf(),
+        moved_original: moved_original.to_path_buf(),
+    });
+}
+
+#[cfg(test)]
+fn maybe_fail_state_transaction_for_test(
+    active_state_path: &Path,
+    operation: &str,
+    phase: &str,
+) -> Result<(), CliError> {
+    let mut guard = STATE_TRANSACTION_FAILURE
+        .lock()
+        .expect("state transaction failure lock poisoned");
+    if let Some(index) = guard.iter().position(|injection| {
+        injection.active_state_path == active_state_path
+            && injection.operation == operation
+            && injection.phase == phase
+    }) {
+        guard.swap_remove(index);
+        return Err(CliError::Usage(format!(
+            "injected {operation} state transaction failure at {phase}"
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(not(test))]
+fn maybe_fail_state_transaction_for_test(
+    _active_state_path: &Path,
+    _operation: &str,
+    _phase: &str,
+) -> Result<(), CliError> {
+    Ok(())
+}
+
+#[cfg(test)]
+fn set_state_transaction_failure_for_test(active_state_path: &Path, operation: &str, phase: &str) {
+    let mut guard = STATE_TRANSACTION_FAILURE
+        .lock()
+        .expect("state transaction failure lock poisoned");
+    guard.retain(|injection| {
+        injection.active_state_path != active_state_path
+            || injection.operation != operation
+            || injection.phase != phase
+    });
+    guard.push(StateTransactionFailureInjection {
+        active_state_path: active_state_path.to_path_buf(),
+        operation: operation.to_string(),
+        phase: phase.to_string(),
+    });
+}
+
+#[cfg(all(test, unix))]
+fn maybe_swap_active_state_after_validation_for_test(
+    context: &OpenContext,
+) -> Result<(), CliError> {
+    use std::os::unix::fs::symlink;
+
+    let injection = {
+        let mut guard = ACTIVE_STATE_SWAP_AFTER_VALIDATION
+            .lock()
+            .expect("active state swap injection lock poisoned");
+        if guard.as_ref().is_some_and(|injection| {
+            injection.open_dir == context.open_dir
+                && injection.active_path == context.active_state.path()
+        }) {
+            guard.take()
+        } else {
+            None
+        }
+    };
+    let Some(injection) = injection else {
+        return Ok(());
+    };
+
+    fs::rename(&injection.active_path, &injection.moved_path)?;
+    if let Err(error) = symlink(&injection.outside_path, &injection.active_path) {
+        let _ = fs::rename(&injection.moved_path, &injection.active_path);
+        return Err(CliError::Io(error));
+    }
+    Ok(())
+}
+
+#[cfg(not(all(test, unix)))]
+fn maybe_swap_active_state_after_validation_for_test(
+    _context: &OpenContext,
+) -> Result<(), CliError> {
+    Ok(())
+}
+
+#[cfg(all(test, unix))]
+fn set_active_state_swap_after_validation_for_test(
+    open_dir: &Path,
+    active_path: &Path,
+    moved_path: &Path,
+    outside_path: &Path,
+) {
+    *ACTIVE_STATE_SWAP_AFTER_VALIDATION
+        .lock()
+        .expect("active state swap injection lock poisoned") = Some(ActiveStateSwapInjection {
+        open_dir: open_dir.to_path_buf(),
+        active_path: active_path.to_path_buf(),
+        moved_path: moved_path.to_path_buf(),
+        outside_path: outside_path.to_path_buf(),
+    });
+}
+
+#[cfg(all(test, unix))]
+fn maybe_swap_validated_store_before_verify_persist_for_test(
+    repo_root: &Path,
+) -> Result<(), CliError> {
+    let injection = {
+        let mut guard = VALIDATED_STORE_SWAP_BEFORE_VERIFY_PERSIST
+            .lock()
+            .expect("validated store swap injection lock poisoned");
+        if guard
+            .as_ref()
+            .is_some_and(|injection| injection.repo_root == repo_root)
+        {
+            guard.take()
+        } else {
+            None
+        }
+    };
+    let Some(injection) = injection else {
+        return Ok(());
+    };
+    fs::rename(&injection.objects_path, &injection.moved_path)?;
+    if let Err(error) = fs::rename(&injection.replacement_path, &injection.objects_path) {
+        let _ = fs::rename(&injection.moved_path, &injection.objects_path);
+        return Err(CliError::Io(error));
+    }
+    Ok(())
+}
+
+#[cfg(not(all(test, unix)))]
+fn maybe_swap_validated_store_before_verify_persist_for_test(
+    _repo_root: &Path,
+) -> Result<(), CliError> {
+    Ok(())
+}
+
+#[cfg(all(test, unix))]
+fn set_validated_store_swap_before_verify_persist_for_test(
+    repo_root: &Path,
+    objects_path: &Path,
+    moved_path: &Path,
+    replacement_path: &Path,
+) {
+    *VALIDATED_STORE_SWAP_BEFORE_VERIFY_PERSIST
+        .lock()
+        .expect("validated store swap injection lock poisoned") =
+        Some(ValidatedStoreSwapInjection {
+            repo_root: repo_root.to_path_buf(),
+            objects_path: objects_path.to_path_buf(),
+            moved_path: moved_path.to_path_buf(),
+            replacement_path: replacement_path.to_path_buf(),
         });
 }
 
 fn commit_parents_for_open(
     context: &OpenContext,
-    active_state_path: &Path,
+    active_state: &active_state::ActiveStateDir,
 ) -> Result<Vec<String>, CliError> {
     let mut parents = vec![required_string(
         &context.registry,
         &["open", "current_base_commit"],
     )?];
-    let state_path = active_state_path.join("state.json");
-    if state_path.exists() {
-        let state = read_json(&state_path)?;
+    if let Some(state) = read_active_json_optional(active_state, Path::new("state.json"))? {
         if let Some(parent) = state.get("pending_merge_parent").and_then(Value::as_str) {
             parents.push(parent.to_string());
         }
@@ -6845,130 +9307,1072 @@ fn commit_parents_for_open(
     Ok(parents)
 }
 
+struct VerificationCommandBatch {
+    failures: Vec<codefire_core::FailedCheck>,
+    records: Vec<codefire_core::VerificationExecutionRecord>,
+}
+
+fn validate_verification_command_plans(
+    open_dir: &Path,
+    policy: &codefire_core::VerificationPolicy,
+) -> Result<(), CliError> {
+    for check in &policy.verification {
+        resolve_verification_cwd(open_dir, &check.cwd)?;
+        if secret_redaction::redact_text(&check.command).count > 0 {
+            return Err(CliError::Usage(format!(
+                "verification command '{}' contains secret-like inline metadata; use a secret-free helper and an explicitly inherited environment instead",
+                check.id
+            )));
+        }
+        if check
+            .env
+            .iter()
+            .any(|(key, value)| secret_redaction::redact_text(&format!("{key}={value}")).count > 0)
+        {
+            return Err(CliError::Usage(format!(
+                "verification command '{}' contains a secret-like explicit environment entry; policy environment values are persisted and cannot contain secrets",
+                check.id
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn run_verification_commands(
     open_dir: &Path,
     policy: &codefire_core::VerificationPolicy,
-) -> Result<Vec<codefire_core::FailedCheck>, CliError> {
+    subject: &codefire_core::AssessmentSubject,
+) -> Result<VerificationCommandBatch, CliError> {
     let mut failures = Vec::new();
+    let mut records = Vec::with_capacity(policy.verification.len());
+    ensure_live_subject_matches_worktree(open_dir, subject, "before verification execution")?;
     for check in &policy.verification {
-        let output = run_verification_command(open_dir, check)?;
-        if output.timed_out || (!output.success && !check.allow_failure) {
-            let mut combined = output.combined_output;
-            if output.timed_out {
-                combined.push_str(&format!(
-                    "\nverification command timed out after {}ms",
-                    check.timeout_ms
-                ));
-            }
+        let worktree_before = ensure_live_subject_matches_worktree(
+            open_dir,
+            subject,
+            "before verification command execution",
+        )?;
+        let cwd = resolve_verification_cwd(open_dir, &check.cwd)?;
+        let mut environment = if check.inherit_env {
+            std::env::vars().collect::<BTreeMap<_, _>>()
+        } else {
+            command_execution::minimal_command_environment()
+        };
+        environment.extend(check.env.clone());
+        let environment_policy = if check.inherit_env {
+            "inherited_snapshot_with_explicit_overrides"
+        } else {
+            "minimal_allowlist_with_explicit_overrides"
+        };
+        let environment_digest = command_execution::canonical_digest(&json!(&environment))?;
+        let input_digest = command_execution::canonical_digest(&json!({
+            "type": "codefire_verification_execution_input",
+            "version": 1,
+            "profile": "trusted_local_shell_v1",
+            "phase": "verification_command",
+            "subject_digest": &subject.subject_digest,
+            "command": &check.command,
+            "cwd": &cwd.repo_relative,
+            "environment_policy": environment_policy,
+            "environment_digest": &environment_digest,
+            "timeout_ms": check.timeout_ms,
+            "max_output_bytes": check.max_output_bytes,
+            "allow_failure": check.allow_failure,
+        }))?;
+        let output =
+            command_execution::run_bounded_command(&command_execution::CommandExecutionSpec {
+                program: "sh".to_string(),
+                args: vec!["-c".to_string(), check.command.clone()],
+                cwd: cwd.resolved.clone(),
+                clear_env: true,
+                env: environment,
+                timeout_ms: check.timeout_ms,
+                stdout_limit: check.max_output_bytes,
+                stderr_limit: check.max_output_bytes,
+            })?;
+        let worktree_after = worktree_manifest_digest(open_dir)?;
+        let subject_unchanged = worktree_before == worktree_after
+            && subject.worktree_digest.as_deref() == Some(worktree_after.as_str());
+        let stdout = secret_redaction::redact_text(&output.stdout.text);
+        let stderr = secret_redaction::redact_text(&output.stderr.text);
+        let command = secret_redaction::redact_text(&check.command);
+        let redacted_value_count = command.count + stdout.count + stderr.count;
+        let mut combined = String::with_capacity(stdout.value.len() + stderr.value.len() + 160);
+        combined.push_str(&stdout.value);
+        combined.push_str(&stderr.value);
+        if output.stdout.truncated || output.stderr.truncated {
+            combined.push_str(&format!(
+                "\n[verification output truncated at {} bytes per stream]",
+                check.max_output_bytes
+            ));
+        }
+        if output.timed_out {
+            combined.push_str(&format!(
+                "\nverification command timed out after {}ms",
+                check.timeout_ms
+            ));
+        }
+        if !subject_unchanged {
+            combined.push_str("\nverification subject changed while the command was running");
+        }
+        let success = output.success && subject_unchanged;
+        let must_block =
+            output.timed_out || !subject_unchanged || (!success && !check.allow_failure);
+        if must_block {
             failures.push(codefire_core::FailedCheck {
                 id: check.id.clone(),
-                command: check.command.clone(),
+                command: command.value,
                 output: combined,
             });
         }
-    }
-    Ok(failures)
-}
-
-struct VerificationCommandRun {
-    success: bool,
-    timed_out: bool,
-    combined_output: String,
-}
-
-fn run_verification_command(
-    open_dir: &Path,
-    check: &codefire_core::VerificationCommand,
-) -> Result<VerificationCommandRun, CliError> {
-    let mut command = Command::new("sh");
-    command
-        .arg("-c")
-        .arg(&check.command)
-        .current_dir(open_dir.join(&check.cwd))
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    if !check.inherit_env {
-        command.env_clear();
-    }
-    for (key, value) in &check.env {
-        command.env(key, value);
-    }
-    let mut child = command.spawn()?;
-    let started = Instant::now();
-    let timeout = Duration::from_millis(check.timeout_ms);
-    let mut timed_out = false;
-    while child.try_wait()?.is_none() {
-        if started.elapsed() >= timeout {
-            timed_out = true;
-            let _ = child.kill();
+        let explicit_env_keys = check.env.keys().cloned().collect::<Vec<_>>();
+        records.push(codefire_core::VerificationExecutionRecord {
+            id: check.id.clone(),
+            profile: "trusted_local_shell_v1".to_string(),
+            phase: "verification_command".to_string(),
+            trust_kind: "local_unisolated".to_string(),
+            subject_digest: subject.subject_digest.clone(),
+            input_digest,
+            environment_digest,
+            worktree_before,
+            worktree_after,
+            subject_unchanged,
+            cwd: cwd.repo_relative,
+            cwd_kind: "repo_relative".to_string(),
+            environment_policy: environment_policy.to_string(),
+            explicit_env_keys,
+            timeout_ms: check.timeout_ms,
+            max_output_bytes: check.max_output_bytes,
+            stdout_bytes_seen: output.stdout.bytes_seen,
+            stdout_bytes_stored: output.stdout.bytes_stored,
+            stdout_truncated: output.stdout.truncated,
+            stderr_bytes_seen: output.stderr.bytes_seen,
+            stderr_bytes_stored: output.stderr.bytes_stored,
+            stderr_truncated: output.stderr.truncated,
+            exit_code: output.exit_code,
+            success,
+            timed_out: output.timed_out,
+            termination_scope: output.termination_scope.to_string(),
+            redacted_value_count,
+        });
+        if !subject_unchanged {
             break;
         }
-        thread::sleep(Duration::from_millis(10));
     }
-    let output = child.wait_with_output()?;
-    let mut combined = Vec::with_capacity(output.stdout.len() + output.stderr.len());
-    combined.extend_from_slice(&output.stdout);
-    combined.extend_from_slice(&output.stderr);
-    let (combined_output, truncated) = lossy_truncated(&combined, check.max_output_bytes);
-    let combined_output = if truncated {
-        format!(
-            "{combined_output}\n[verification output truncated at {} bytes]",
-            check.max_output_bytes
-        )
+    Ok(VerificationCommandBatch { failures, records })
+}
+
+struct VerificationCwd {
+    resolved: PathBuf,
+    repo_relative: String,
+}
+
+fn resolve_verification_cwd(open_dir: &Path, requested: &str) -> Result<VerificationCwd, CliError> {
+    let root = open_dir.canonicalize()?;
+    let candidate = root.join(requested).canonicalize().map_err(|error| {
+        CliError::Usage(format!(
+            "verification cwd must exist below the open directory: {requested} ({error})"
+        ))
+    })?;
+    if !candidate.is_dir() || !candidate.starts_with(&root) {
+        return Err(CliError::Usage(format!(
+            "verification cwd escapes the open directory: {requested}"
+        )));
+    }
+    let relative = candidate
+        .strip_prefix(&root)
+        .expect("candidate checked below root");
+    let repo_relative = if relative.as_os_str().is_empty() {
+        ".".to_string()
     } else {
-        combined_output
+        to_posix(relative)
     };
-    Ok(VerificationCommandRun {
-        success: output.status.success() && !timed_out,
-        timed_out,
-        combined_output,
+    Ok(VerificationCwd {
+        resolved: candidate,
+        repo_relative,
     })
 }
 
-fn lossy_truncated(bytes: &[u8], limit: usize) -> (String, bool) {
-    if bytes.len() <= limit {
-        return (String::from_utf8_lossy(bytes).into_owned(), false);
+fn worktree_manifest_digest(open_dir: &Path) -> Result<String, CliError> {
+    let manifest = build_manifest_fingerprint(open_dir)?;
+    Ok(format!(
+        "sha256:{}",
+        codefire_util::sha256_hex(&codefire_store::canonical_json(&manifest)?)
+    ))
+}
+
+fn ensure_verification_subject_matches_worktree(
+    open_dir: &Path,
+    verification: &codefire_core::Verification,
+    boundary: &str,
+) -> Result<String, CliError> {
+    let subject = verification.subject.as_ref().ok_or_else(|| {
+        CliError::InvalidRepository(
+            "current verification is missing its assessment subject".to_string(),
+        )
+    })?;
+    ensure_live_subject_matches_worktree(open_dir, subject, boundary)
+}
+
+fn ensure_live_subject_matches_worktree(
+    open_dir: &Path,
+    subject: &codefire_core::AssessmentSubject,
+    boundary: &str,
+) -> Result<String, CliError> {
+    if subject.kind != "live_open" || subject.trust_kind != "local_unisolated" || subject.immutable
+    {
+        return Err(CliError::InvalidRepository(
+            "local verification carries an incompatible assessment subject".to_string(),
+        ));
     }
-    let mut end = limit;
-    while end > 0 && std::str::from_utf8(&bytes[..end]).is_err() {
-        end -= 1;
+    let expected = subject.worktree_digest.as_deref().ok_or_else(|| {
+        CliError::InvalidRepository(
+            "local verification assessment subject is missing its worktree digest".to_string(),
+        )
+    })?;
+    let actual = worktree_manifest_digest(open_dir)?;
+    if actual != expected {
+        return Err(CliError::InvalidRepository(format!(
+            "assessment subject no longer matches the worktree {boundary}; rerun verification"
+        )));
     }
-    (String::from_utf8_lossy(&bytes[..end]).into_owned(), true)
+    Ok(actual)
 }
 
 fn load_base_atom_index(
     objects: &Path,
     base_commit: &str,
 ) -> Result<codefire_core::AtomIndex, CliError> {
-    let commit = codefire_store::read_object(objects, base_commit)?;
-    let atom_index_id = required_string(&commit, &["roots", "atom_index"])?;
-    let atom_index = codefire_store::read_object(objects, &atom_index_id)?;
+    let validated = codefire_store::validate_sealed_commit_pinned(objects, base_commit)?;
+    load_validated_base_atom_index(&validated)
+}
+
+fn load_validated_base_atom_index(
+    validated: &codefire_store::ValidatedSealedCommit,
+) -> Result<codefire_core::AtomIndex, CliError> {
+    let atom_index = validated.read_root("atom_index")?;
     Ok(serde_json::from_value(atom_index)?)
 }
 
-fn set_open_state(
+fn state_transaction_path(active_state: &active_state::ActiveStateDir) -> PathBuf {
+    active_state.display_path(Path::new("state_transaction.json"))
+}
+
+pub(crate) const STATE_TRANSACTION_BYTE_LIMIT: u64 = 1024 * 1024;
+
+fn begin_state_transaction(
     context: &OpenContext,
-    active_state_path: &Path,
+    operation: &str,
+    intended_state: &str,
+) -> Result<(), CliError> {
+    begin_state_transaction_with_request_hash(context, operation, intended_state, None)
+}
+
+fn begin_state_transaction_with_request_hash(
+    context: &OpenContext,
+    operation: &str,
+    intended_state: &str,
+    request_hash: Option<&str>,
+) -> Result<(), CliError> {
+    let active_state = &context.active_state;
+    if state_transaction_phases(operation).is_none() {
+        return Err(CliError::InvalidRepository(format!(
+            "unsupported state transaction operation: {operation}"
+        )));
+    }
+    match (active_ledger_state_operation(operation), request_hash) {
+        (true, None) => {
+            return Err(CliError::InvalidRepository(format!(
+            "active-ledger state transaction operation {operation} requires an exact request hash"
+        )))
+        }
+        (false, Some(_)) => {
+            return Err(CliError::InvalidRepository(format!(
+                "state transaction operation {operation} cannot carry an active-ledger request hash"
+            )))
+        }
+        (_, Some(hash)) if !active_ledger_hash_is_valid(hash) => {
+            return Err(CliError::InvalidRepository(format!(
+                "active-ledger state transaction operation {operation} has an invalid request hash"
+            )))
+        }
+        _ => {}
+    }
+    if !matches!(
+        intended_state,
+        "open-clean" | "open-burning" | "open-consistent"
+    ) {
+        return Err(CliError::InvalidRepository(format!(
+            "unsupported state transaction target: {intended_state}"
+        )));
+    }
+    let current_registry = read_json(&context.registry_path)?;
+    let open_instance_id = required_string(&current_registry, &["open", "open_instance_id"])?;
+    let current_base_commit = required_string(&current_registry, &["open", "current_base_commit"])?;
+    if active_state.exists(Path::new("state_transaction.json"))? {
+        validate_pending_state_transaction_for_recovery(active_state)?;
+        let pending = read_state_transaction(active_state)?;
+        if pending.get("version").and_then(Value::as_u64) != Some(2)
+            || required_string(&pending, &["operation"])? != operation
+            || required_string(&pending, &["intended_state"])? != intended_state
+            || required_string(&pending, &["subject", "branch"])? != context.branch
+            || required_string(&pending, &["subject", "open_instance_id"])? != open_instance_id
+            || required_string(&pending, &["subject", "current_base_commit"])?
+                != current_base_commit
+            || pending.get("request_hash").and_then(Value::as_str) != request_hash
+        {
+            return Err(CliError::InvalidRepository(format!(
+                "pending state transaction does not match the exact {operation} retry subject: {}",
+                state_transaction_path(active_state).display()
+            )));
+        }
+        return Ok(());
+    }
+    let branch = load_branch_record(&context.repo_root, &context.branch)?;
+    let active = read_active_json_required(active_state, Path::new("state.json"))?;
+    let branch_state = required_string(&branch, &["state"])?;
+    let registry_state = required_string(&current_registry, &["state", "last_known"])?;
+    let active_state_value = required_string(&active, &["state"])?;
+    if branch_state != registry_state || branch_state != active_state_value {
+        return Err(CliError::InvalidRepository(
+            "cannot begin a state transaction from divergent stable authorities".to_string(),
+        ));
+    }
+    let pre_state = branch_state;
+    let now = now_iso_utc();
+    let mut transaction = json!({
+        "version": 2,
+        "status": "pending",
+        "operation": operation,
+        "phase": "started",
+        "intended_state": intended_state,
+        "subject": {
+            "branch": &context.branch,
+            "open_instance_id": open_instance_id,
+            "current_base_commit": current_base_commit,
+        },
+        "pre_state": {
+            "branch": &pre_state,
+            "registry": &pre_state,
+            "active": &pre_state,
+        },
+        "started_at": now,
+        "updated_at": now,
+    });
+    if let Some(request_hash) = request_hash {
+        transaction["request_hash"] = Value::String(request_hash.to_string());
+    }
+    write_active_json_atomic_bounded(
+        active_state,
+        Path::new("state_transaction.json"),
+        &transaction,
+        STATE_TRANSACTION_BYTE_LIMIT,
+        "state transaction marker",
+    )
+}
+
+fn validate_pending_state_transaction_for_recovery(
+    active_state: &active_state::ActiveStateDir,
+) -> Result<(), CliError> {
+    let path = state_transaction_path(active_state);
+    let transaction = read_state_transaction(active_state)?;
+    validate_state_transaction_record(&transaction)
+        .map_err(|message| CliError::InvalidRepository(format!("{message}: {}", path.display())))
+}
+
+fn read_state_transaction(active_state: &active_state::ActiveStateDir) -> Result<Value, CliError> {
+    let bytes = active_state.read_required(
+        Path::new("state_transaction.json"),
+        STATE_TRANSACTION_BYTE_LIMIT,
+    )?;
+    Ok(serde_json::from_slice(&bytes)?)
+}
+
+const SCAN_STATE_TRANSACTION_PHASES: &[&str] = &[
+    "started",
+    "verification_invalidated",
+    "fires_written",
+    "scan_written",
+    "registry_written",
+    "active_state_written",
+    "branch_written",
+];
+const VERIFY_STATE_TRANSACTION_PHASES: &[&str] = &[
+    "started",
+    "verification_written",
+    "registry_written",
+    "active_state_written",
+    "branch_written",
+];
+const ACTIVE_LEDGER_STATE_TRANSACTION_PHASES: &[&str] = &[
+    "started",
+    "registry_written",
+    "active_state_written",
+    "branch_written",
+];
+
+fn active_ledger_state_operation(operation: &str) -> bool {
+    matches!(
+        operation,
+        "fire" | "fire-batch" | "extinguish" | "extinguish-batch"
+    )
+}
+
+fn state_transaction_phases(operation: &str) -> Option<&'static [&'static str]> {
+    match operation {
+        "scan" => Some(SCAN_STATE_TRANSACTION_PHASES),
+        "verify" => Some(VERIFY_STATE_TRANSACTION_PHASES),
+        operation if active_ledger_state_operation(operation) => {
+            Some(ACTIVE_LEDGER_STATE_TRANSACTION_PHASES)
+        }
+        _ => None,
+    }
+}
+
+pub(crate) fn state_transaction_phase_is_supported(operation: &str, phase: &str) -> bool {
+    state_transaction_phases(operation).is_some_and(|phases| phases.contains(&phase))
+}
+
+fn state_transaction_transition_is_supported(
+    operation: &str,
+    current_phase: &str,
+    next_phase: &str,
+) -> bool {
+    state_transaction_phases(operation).is_some_and(|phases| {
+        phases
+            .windows(2)
+            .any(|transition| transition[0] == current_phase && transition[1] == next_phase)
+    })
+}
+
+pub(crate) fn validate_state_transaction_record(transaction: &Value) -> Result<(), String> {
+    let version = transaction
+        .get("version")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| "state_transaction.json version must be 1 or 2".to_string())?;
+    if !matches!(version, 1 | 2) {
+        return Err("state_transaction.json version must be 1 or 2".to_string());
+    }
+    for field in [
+        "status",
+        "operation",
+        "phase",
+        "intended_state",
+        "started_at",
+        "updated_at",
+    ] {
+        if transaction.get(field).and_then(Value::as_str).is_none() {
+            return Err(format!(
+                "state_transaction.json must contain string field {field}"
+            ));
+        }
+    }
+    if transaction.get("status").and_then(Value::as_str) != Some("pending") {
+        return Err("state_transaction.json status must be pending".to_string());
+    }
+    let operation = transaction["operation"]
+        .as_str()
+        .expect("operation string was checked above");
+    if state_transaction_phases(operation).is_none() {
+        return Err(format!(
+            "state_transaction.json contains unsupported operation: {operation}"
+        ));
+    }
+    let phase = transaction["phase"]
+        .as_str()
+        .expect("phase string was checked above");
+    if !state_transaction_phase_is_supported(operation, phase) {
+        return Err(format!(
+            "state_transaction.json phase {phase} is unsupported for operation {operation}"
+        ));
+    }
+    let intended_state = transaction["intended_state"]
+        .as_str()
+        .expect("intended_state string was checked above");
+    if !matches!(
+        intended_state,
+        "open-clean" | "open-burning" | "open-consistent"
+    ) {
+        return Err(format!(
+            "state_transaction.json contains unsupported intended_state: {intended_state}"
+        ));
+    }
+    if version == 2 {
+        for field in [
+            "/subject/branch",
+            "/subject/open_instance_id",
+            "/subject/current_base_commit",
+            "/pre_state/branch",
+            "/pre_state/registry",
+            "/pre_state/active",
+        ] {
+            if transaction.pointer(field).and_then(Value::as_str).is_none() {
+                return Err(format!(
+                    "state_transaction.json version 2 must contain string field {field}"
+                ));
+            }
+        }
+        let pre_branch = transaction
+            .pointer("/pre_state/branch")
+            .and_then(Value::as_str)
+            .expect("version 2 pre-state branch was checked");
+        let pre_registry = transaction
+            .pointer("/pre_state/registry")
+            .and_then(Value::as_str)
+            .expect("version 2 pre-state registry was checked");
+        let pre_active = transaction
+            .pointer("/pre_state/active")
+            .and_then(Value::as_str)
+            .expect("version 2 pre-state active was checked");
+        if pre_branch != pre_registry || pre_branch != pre_active {
+            return Err(
+                "state_transaction.json version 2 pre-state authorities must agree".to_string(),
+            );
+        }
+        if !matches!(
+            pre_branch,
+            "open-clean" | "open-burning" | "open-consistent"
+        ) {
+            return Err(format!(
+                "state_transaction.json contains unsupported pre-state: {pre_branch}"
+            ));
+        }
+        if active_ledger_state_operation(operation) {
+            let request_hash = transaction
+                .get("request_hash")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    format!(
+                        "state_transaction.json version 2 operation {operation} must contain string field request_hash"
+                    )
+                })?;
+            if !active_ledger_hash_is_valid(request_hash) {
+                return Err(format!(
+                    "state_transaction.json version 2 operation {operation} contains invalid request_hash"
+                ));
+            }
+        } else if transaction.get("request_hash").is_some() {
+            return Err(format!(
+                "state_transaction.json version 2 operation {operation} cannot contain request_hash"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn invalidate_active_verification(
+    active_state: &active_state::ActiveStateDir,
+) -> Result<(), CliError> {
+    active_state.remove_file_if_exists(Path::new("verification.json"))?;
+    Ok(())
+}
+
+fn update_state_transaction_phase(
+    active_state: &active_state::ActiveStateDir,
+    phase: &str,
+) -> Result<(), CliError> {
+    let path = state_transaction_path(active_state);
+    let mut transaction = read_state_transaction(active_state)?;
+    validate_state_transaction_record(&transaction)
+        .map_err(|message| CliError::InvalidRepository(format!("{message}: {}", path.display())))?;
+    let operation = transaction["operation"]
+        .as_str()
+        .expect("validated state transaction operation")
+        .to_string();
+    let current_phase = transaction["phase"]
+        .as_str()
+        .expect("validated state transaction phase")
+        .to_string();
+    let phases = state_transaction_phases(&operation)
+        .expect("validated state transaction operation must have phases");
+    let current_index = phases
+        .iter()
+        .position(|candidate| *candidate == current_phase)
+        .expect("validated current state transaction phase must be supported");
+    let target_index = phases
+        .iter()
+        .position(|candidate| *candidate == phase)
+        .ok_or_else(|| {
+            CliError::InvalidRepository(format!(
+                "state transaction operation {operation} cannot advance from {current_phase} to {phase}: {}",
+                path.display()
+            ))
+        })?;
+    if target_index <= current_index {
+        return Ok(());
+    }
+    if target_index != current_index + 1
+        || !state_transaction_transition_is_supported(&operation, &current_phase, phase)
+    {
+        return Err(CliError::InvalidRepository(format!(
+            "state transaction operation {operation} cannot advance from {current_phase} to {phase}: {}",
+            path.display()
+        )));
+    }
+    transaction["phase"] = Value::String(phase.to_string());
+    transaction["updated_at"] = Value::String(now_iso_utc());
+    write_active_json_atomic_bounded(
+        active_state,
+        Path::new("state_transaction.json"),
+        &transaction,
+        STATE_TRANSACTION_BYTE_LIMIT,
+        "state transaction marker",
+    )
+}
+
+enum StateTransactionAuthority<'a> {
+    Scan {
+        scan: &'a codefire_core::ScanResult,
+        fires: &'a [codefire_core::Fire],
+    },
+    Verify {
+        scan: &'a codefire_core::ScanResult,
+        fires: &'a [codefire_core::Fire],
+        verification: &'a codefire_core::Verification,
+    },
+}
+
+impl StateTransactionAuthority<'_> {
+    fn operation(&self) -> &'static str {
+        match self {
+            Self::Scan { .. } => "scan",
+            Self::Verify { .. } => "verify",
+        }
+    }
+
+    fn scan(&self) -> &codefire_core::ScanResult {
+        match self {
+            Self::Scan { scan, .. } | Self::Verify { scan, .. } => scan,
+        }
+    }
+
+    fn fires(&self) -> &[codefire_core::Fire] {
+        match self {
+            Self::Scan { fires, .. } | Self::Verify { fires, .. } => fires,
+        }
+    }
+}
+
+fn persist_transactional_open_state(
+    context: &OpenContext,
+    operation: &str,
+    state: &str,
+    validated_base: &codefire_store::ValidatedSealedCommit,
+    authority: StateTransactionAuthority<'_>,
+) -> Result<(), CliError> {
+    if authority.operation() != operation {
+        return Err(CliError::InvalidRepository(format!(
+            "state transaction authority operation {} does not match {operation}",
+            authority.operation()
+        )));
+    }
+    publish_transactional_open_state_fields(context, operation, state)?;
+    ensure_validated_store_subject(context, validated_base)?;
+    complete_state_transaction(context, state, authority)?;
+    ensure_validated_store_subject(context, validated_base)
+}
+
+fn publish_transactional_open_state_fields(
+    context: &OpenContext,
+    operation: &str,
     state: &str,
 ) -> Result<(), CliError> {
+    let mut registry = read_json(&context.registry_path)?;
+    registry["state"]["last_known"] = Value::String(state.to_string());
+    write_json_atomic(&context.registry_path, &registry)?;
+    maybe_fail_state_transaction_for_test(
+        context.active_state.path(),
+        operation,
+        "after_registry_write_before_phase",
+    )?;
+    update_state_transaction_phase(&context.active_state, "registry_written")?;
+    maybe_fail_state_transaction_for_test(
+        context.active_state.path(),
+        operation,
+        "registry_written",
+    )?;
+
+    let mut active_state_record =
+        read_active_json_optional(&context.active_state, Path::new("state.json"))?
+            .unwrap_or_else(|| json!({}));
+    active_state_record["state"] = Value::String(state.to_string());
+    write_active_json_atomic(
+        &context.active_state,
+        Path::new("state.json"),
+        &active_state_record,
+    )?;
+    update_state_transaction_phase(&context.active_state, "active_state_written")?;
+    maybe_fail_state_transaction_for_test(
+        context.active_state.path(),
+        operation,
+        "active_state_written",
+    )?;
+
+    let mut branch = load_branch_record(&context.repo_root, &context.branch)?;
+    branch["state"] = Value::String(state.to_string());
+    save_branch_record(&context.repo_root, &branch)?;
+    update_state_transaction_phase(&context.active_state, "branch_written")?;
+    maybe_fail_state_transaction_for_test(
+        context.active_state.path(),
+        operation,
+        "branch_written",
+    )?;
+    Ok(())
+}
+
+fn ensure_validated_store_subject(
+    context: &OpenContext,
+    validated: &codefire_store::ValidatedSealedCommit,
+) -> Result<(), CliError> {
+    validated
+        .ensure_subject_identity()
+        .map_err(|error| CliError::StoreContext {
+            error: Box::new(error),
+            repo_root: context.repo_root.clone(),
+            path: validated.objects_root().to_path_buf(),
+        })
+}
+
+fn complete_state_transaction(
+    context: &OpenContext,
+    intended_state: &str,
+    authority: StateTransactionAuthority<'_>,
+) -> Result<(), CliError> {
+    let transaction_path = state_transaction_path(&context.active_state);
+    let transaction = read_state_transaction(&context.active_state)?;
+    validate_state_transaction_record(&transaction).map_err(|message| {
+        CliError::InvalidRepository(format!("{message}: {}", transaction_path.display()))
+    })?;
+    let transaction_operation = required_string(&transaction, &["operation"])?;
+    if transaction_operation != authority.operation() {
+        return Err(CliError::InvalidRepository(format!(
+            "state transaction expected authority operation {}, but marker contains {transaction_operation}: {}",
+            authority.operation(),
+            transaction_path.display()
+        )));
+    }
+    let transaction_phase = required_string(&transaction, &["phase"])?;
+    if transaction_phase != "branch_written" {
+        return Err(CliError::InvalidRepository(format!(
+            "state transaction cannot complete from phase {transaction_phase}: {}",
+            transaction_path.display()
+        )));
+    }
+    let marker_state = required_string(&transaction, &["intended_state"])?;
+    if marker_state != intended_state {
+        return Err(CliError::InvalidRepository(format!(
+            "state transaction expected {intended_state}, but marker contains {marker_state}: {}",
+            transaction_path.display()
+        )));
+    }
+
+    let registry = read_json(&context.registry_path)?;
+    let active_state_record =
+        read_active_json_required(&context.active_state, Path::new("state.json"))?;
+    let branch = load_branch_record(&context.repo_root, &context.branch)?;
+    for (subject, actual) in [
+        (
+            "open registry",
+            required_string(&registry, &["state", "last_known"])?,
+        ),
+        (
+            "active state",
+            required_string(&active_state_record, &["state"])?,
+        ),
+        ("branch", required_string(&branch, &["state"])?),
+    ] {
+        if actual != intended_state {
+            return Err(CliError::InvalidRepository(format!(
+                "state transaction expected {intended_state}, but {subject} contains {actual}"
+            )));
+        }
+    }
+    validate_state_transaction_authorities(context, intended_state, &registry, &branch, authority)?;
+    context
+        .active_state
+        .remove_file_if_exists(Path::new("state_transaction.json"))?;
+    Ok(())
+}
+
+fn validate_state_transaction_authorities(
+    context: &OpenContext,
+    intended_state: &str,
+    registry: &Value,
+    branch: &Value,
+    authority: StateTransactionAuthority<'_>,
+) -> Result<(), CliError> {
+    let persisted_fires: Vec<codefire_core::Fire> = serde_json::from_value(
+        read_active_json_required(&context.active_state, Path::new("fires.json"))?,
+    )?;
+    if persisted_fires != authority.fires() {
+        return Err(CliError::InvalidRepository(format!(
+            "state transaction persisted fires differ from the computed authority: {}",
+            context
+                .active_state
+                .display_path(Path::new("fires.json"))
+                .display()
+        )));
+    }
+
+    let persisted_scan: codefire_core::ScanResult = serde_json::from_value(
+        read_active_json_required(&context.active_state, Path::new("scan.json"))?,
+    )?;
+    if &persisted_scan != authority.scan() {
+        return Err(CliError::InvalidRepository(format!(
+            "state transaction persisted scan differs from the computed authority: {}",
+            context
+                .active_state
+                .display_path(Path::new("scan.json"))
+                .display()
+        )));
+    }
+    let open_fires = persisted_fires
+        .iter()
+        .filter(|fire| fire.status == "open")
+        .cloned()
+        .collect::<Vec<_>>();
+    if persisted_scan.open_fires != open_fires {
+        return Err(CliError::InvalidRepository(
+            "state transaction scan.open_fires differs from persisted fires".to_string(),
+        ));
+    }
+
+    let registry_base = required_string(registry, &["open", "current_base_commit"])?;
+    let branch_head = required_string(branch, &["head"])?;
+    if persisted_scan.base_commit != registry_base || persisted_scan.base_commit != branch_head {
+        return Err(CliError::InvalidRepository(format!(
+            "state transaction scan base {}, registry base {registry_base}, and branch head {branch_head} disagree",
+            persisted_scan.base_commit
+        )));
+    }
+
+    let derived_state = match authority {
+        StateTransactionAuthority::Scan { .. } => {
+            if read_active_json_optional(&context.active_state, Path::new("verification.json"))?
+                .is_some()
+            {
+                return Err(CliError::InvalidRepository(
+                    "state transaction scan completed with a stale verification authority"
+                        .to_string(),
+                ));
+            }
+            scan_branch_state(
+                scan_change_count(&persisted_scan),
+                persisted_scan.open_fires.len(),
+            )
+        }
+        StateTransactionAuthority::Verify { verification, .. } => {
+            let persisted_verification: codefire_core::Verification = serde_json::from_value(
+                read_active_json_required(&context.active_state, Path::new("verification.json"))?,
+            )?;
+            if &persisted_verification != verification {
+                return Err(CliError::InvalidRepository(format!(
+                    "state transaction persisted verification differs from the computed authority: {}",
+                    context
+                        .active_state
+                        .display_path(Path::new("verification.json"))
+                        .display()
+                )));
+            }
+            let open_required_fires = persisted_scan
+                .open_fires
+                .iter()
+                .filter(|fire| fire.status == "open" && fire.severity == "required")
+                .count();
+            if persisted_verification.open_required_fires != open_required_fires
+                || persisted_verification.duplicate_atom_ids
+                    != persisted_scan.atom_index.duplicate_atom_ids
+            {
+                return Err(CliError::InvalidRepository(
+                    "state transaction verification summary differs from the persisted scan"
+                        .to_string(),
+                ));
+            }
+            verification_open_state(&persisted_verification, &persisted_scan)
+        }
+    };
+    if derived_state != intended_state {
+        return Err(CliError::InvalidRepository(format!(
+            "state transaction derived {derived_state} from persisted authorities, expected {intended_state}"
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) fn ensure_active_ledger_state_transaction_request(
+    context: &OpenContext,
+    operation: &str,
+    request: &Value,
+) -> Result<(), CliError> {
+    if !active_ledger_state_operation(operation) {
+        return Err(CliError::InvalidRepository(format!(
+            "unsupported active-ledger state transaction operation: {operation}"
+        )));
+    }
+    if !context
+        .active_state
+        .exists(Path::new("state_transaction.json"))?
+    {
+        return Ok(());
+    }
+    let path = state_transaction_path(&context.active_state);
+    let transaction = read_state_transaction(&context.active_state)?;
+    validate_state_transaction_record(&transaction)
+        .map_err(|message| CliError::InvalidRepository(format!("{message}: {}", path.display())))?;
+    let request_hash = active_ledger_request_hash(request)?;
+    if transaction.get("version").and_then(Value::as_u64) != Some(2)
+        || required_string(&transaction, &["operation"])? != operation
+        || required_string(&transaction, &["request_hash"])? != request_hash
+    {
+        return Err(CliError::IdempotencyConflict(format!(
+            "pending state transaction does not belong to the exact {operation}/{request_hash} request: {}",
+            path.display()
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) fn set_open_state_transactional(
+    context: &OpenContext,
+    operation: &str,
+    state: &str,
+    request: &Value,
+) -> Result<(), CliError> {
+    if !active_ledger_state_operation(operation) {
+        return Err(CliError::InvalidRepository(format!(
+            "unsupported active-ledger state transaction operation: {operation}"
+        )));
+    }
+    ensure_active_ledger_state_transaction_request(context, operation, request)?;
+    ensure_completed_active_ledger_transition(&context.active_state, operation, request)?;
+    let request_hash = active_ledger_request_hash(request)?;
+    let has_state_transaction = context
+        .active_state
+        .exists(Path::new("state_transaction.json"))?;
+    let descriptor = validate_active_ledger_descriptor(&context.active_state)?.ok_or_else(|| {
+        CliError::InvalidRepository(format!(
+            "active-ledger state publication lost its completed receipt for {operation}/{request_hash}"
+        ))
+    })?;
+    if !has_state_transaction
+        && descriptor.publication_status == ActiveLedgerPublicationStatus::Released
+    {
+        let registry = read_json(&context.registry_path)?;
+        let active = read_active_json_required(&context.active_state, Path::new("state.json"))?;
+        let branch = load_branch_record(&context.repo_root, &context.branch)?;
+        for (authority, actual) in [
+            (
+                "registry",
+                required_string(&registry, &["state", "last_known"])?,
+            ),
+            ("active", required_string(&active, &["state"])?),
+            ("branch", required_string(&branch, &["state"])?),
+        ] {
+            if actual != state {
+                return Err(CliError::InvalidRepository(format!(
+                    "released active-ledger receipt {operation}/{request_hash} expected {state}, but {authority} contains {actual}"
+                )));
+            }
+        }
+        return Ok(());
+    }
+    begin_state_transaction_with_request_hash(context, operation, state, Some(&request_hash))?;
+    maybe_fail_state_transaction_for_test(context.active_state.path(), operation, "started")?;
+    publish_transactional_open_state_fields(context, operation, state)?;
+    complete_active_ledger_state_transaction(context, operation, state, &request_hash)
+}
+
+fn complete_active_ledger_state_transaction(
+    context: &OpenContext,
+    operation: &str,
+    intended_state: &str,
+    request_hash: &str,
+) -> Result<(), CliError> {
+    let path = state_transaction_path(&context.active_state);
+    let transaction = read_state_transaction(&context.active_state)?;
+    validate_state_transaction_record(&transaction)
+        .map_err(|message| CliError::InvalidRepository(format!("{message}: {}", path.display())))?;
+    if required_string(&transaction, &["operation"])? != operation
+        || required_string(&transaction, &["phase"])? != "branch_written"
+        || required_string(&transaction, &["intended_state"])? != intended_state
+        || required_string(&transaction, &["request_hash"])? != request_hash
+    {
+        return Err(CliError::InvalidRepository(format!(
+            "active-ledger state transaction does not match completed {operation}/{intended_state}/{request_hash} publication: {}",
+            path.display()
+        )));
+    }
+    let registry = read_json(&context.registry_path)?;
+    let active = read_active_json_required(&context.active_state, Path::new("state.json"))?;
+    let branch = load_branch_record(&context.repo_root, &context.branch)?;
+    for (authority, actual) in [
+        (
+            "registry",
+            required_string(&registry, &["state", "last_known"])?,
+        ),
+        ("active", required_string(&active, &["state"])?),
+        ("branch", required_string(&branch, &["state"])?),
+    ] {
+        if actual != intended_state {
+            return Err(CliError::InvalidRepository(format!(
+                "active-ledger state transaction expected {intended_state}, but {authority} contains {actual}"
+            )));
+        }
+    }
+    release_completed_active_ledger_transition(&context.active_state, operation, request_hash)?;
+    context
+        .active_state
+        .remove_file_if_exists(Path::new("state_transaction.json"))?;
+    Ok(())
+}
+
+fn set_open_state(context: &OpenContext, state: &str) -> Result<(), CliError> {
     let mut registry = context.registry.clone();
     registry["state"]["last_known"] = Value::String(state.to_string());
     write_json_atomic(&context.registry_path, &registry)?;
-    let state_path = active_state_path.join("state.json");
-    let mut active_state = if state_path.exists() {
-        read_json(&state_path)?
-    } else {
-        json!({})
-    };
-    active_state["state"] = Value::String(state.to_string());
-    write_json_atomic(&state_path, &active_state)?;
+    let mut active_state_record =
+        read_active_json_optional(&context.active_state, Path::new("state.json"))?
+            .unwrap_or_else(|| json!({}));
+    active_state_record["state"] = Value::String(state.to_string());
+    write_active_json_atomic(
+        &context.active_state,
+        Path::new("state.json"),
+        &active_state_record,
+    )?;
     let mut branch = load_branch_record(&context.repo_root, &context.branch)?;
     branch["state"] = Value::String(state.to_string());
     save_branch_record(&context.repo_root, &branch)?;
     Ok(())
 }
 
-fn initial_roots(objects: &Path, now: &str) -> Result<Value, CliError> {
+fn initial_decision_contracts() -> Result<
+    (
+        codefire_core::EffectivePolicy,
+        codefire_core::ChangeCoverage,
+    ),
+    CliError,
+> {
+    let policy = codefire_core::default_verification_policy();
+    let effective =
+        codefire_core::effective_policy(&policy, &codefire_core::PolicyProvenance::default())?;
+    let empty_index = codefire_core::AtomIndex {
+        type_tag: "atom_index".to_string(),
+        version: 1,
+        hash_schema_version: codefire_core::ATOM_HASH_SCHEMA_VERSION,
+        atoms: Vec::new(),
+        duplicate_atom_ids: Vec::new(),
+    };
+    let coverage =
+        codefire_core::build_change_coverage(Vec::new(), &empty_index, &empty_index, &[], None)?;
+    Ok((effective, coverage))
+}
+
+fn initial_roots(
+    objects: &Path,
+    now: &str,
+    effective_policy: &codefire_core::EffectivePolicy,
+    change_coverage: &codefire_core::ChangeCoverage,
+) -> Result<Value, CliError> {
     let content_manifest = codefire_store::store_object(
         objects,
         "content_manifest",
@@ -7001,18 +10405,27 @@ fn initial_roots(objects: &Path, now: &str) -> Result<Value, CliError> {
             "type": "verification",
             "version": 1,
             "result": "passed",
+            "trace_completeness_required": true,
             "open_required_fires": 0,
             "failed_checks": [],
             "missing_required_links": [],
             "stale_resolutions": [],
+            "missing_evidence_refs": [],
             "duplicate_atom_ids": [],
             "verified_at": now,
+            "effective_policy": effective_policy,
+            "change_coverage": change_coverage,
         }),
     )?;
     let policy = codefire_store::store_object(
         objects,
         "policy",
-        json!({"type": "policy", "version": 1, "policy": {}}),
+        json!({
+            "type": "policy",
+            "version": 1,
+            "policy": {},
+            "effective_policy": effective_policy,
+        }),
     )?;
     Ok(json!({
         "content_manifest": content_manifest,
@@ -7073,15 +10486,187 @@ fn stable_hash_48(bytes: &[u8]) -> u64 {
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 #[cfg(test)]
 #[derive(Debug)]
+struct CommitWorktreeMutationInjection {
+    open_dir: PathBuf,
+    point: String,
+    relative_path: PathBuf,
+    contents: Vec<u8>,
+}
+#[cfg(test)]
+static COMMIT_WORKTREE_MUTATION: Mutex<Vec<CommitWorktreeMutationInjection>> =
+    Mutex::new(Vec::new());
+#[cfg(test)]
+#[derive(Debug)]
 struct CommitTransactionFailureInjection {
     active_state_path: PathBuf,
     phase: String,
 }
 #[cfg(test)]
-static COMMIT_TRANSACTION_FAILURE_PHASE: Mutex<Option<CommitTransactionFailureInjection>> =
+static COMMIT_TRANSACTION_FAILURE_PHASE: Mutex<Vec<CommitTransactionFailureInjection>> =
+    Mutex::new(Vec::new());
+#[cfg(test)]
+#[derive(Debug)]
+struct CommitCandidateCorruptionInjection {
+    active_state_path: PathBuf,
+    kind: CommitCandidateCorruptionKind,
+}
+#[cfg(test)]
+#[derive(Debug, Clone, Copy)]
+enum CommitCandidateCorruptionKind {
+    InvalidCertificate,
+    MissingRoot,
+    WrongRootType,
+    InvalidParent,
+    InvalidSignature,
+}
+#[cfg(test)]
+static COMMIT_CANDIDATE_CORRUPTION: Mutex<Option<CommitCandidateCorruptionInjection>> =
+    Mutex::new(None);
+#[cfg(test)]
+#[derive(Debug)]
+struct LockedOpenContextMutation {
+    start: PathBuf,
+    registry_path: PathBuf,
+    base_commit: String,
+}
+#[cfg(test)]
+static LOCKED_OPEN_CONTEXT_MUTATION: Mutex<Option<LockedOpenContextMutation>> = Mutex::new(None);
+#[cfg(test)]
+static OPEN_TARGET_PRE_USE_MUTATION: Mutex<Option<PathBuf>> = Mutex::new(None);
+#[cfg(all(test, unix))]
+#[derive(Debug)]
+struct OpenTargetNestedSymlinkInjection {
+    requested_path: PathBuf,
+    target_path: PathBuf,
+    nested_path: PathBuf,
+    outside_path: PathBuf,
+}
+#[cfg(all(test, unix))]
+static OPEN_TARGET_NESTED_SYMLINK_INJECTION: Mutex<Option<OpenTargetNestedSymlinkInjection>> =
+    Mutex::new(None);
+#[cfg(test)]
+#[derive(Debug)]
+struct CloseTargetSwapInjection {
+    target: PathBuf,
+    moved_original: PathBuf,
+}
+#[cfg(test)]
+static CLOSE_TARGET_SWAP_INJECTION: Mutex<Option<CloseTargetSwapInjection>> = Mutex::new(None);
+#[cfg(test)]
+#[derive(Debug)]
+struct StateTransactionFailureInjection {
+    active_state_path: PathBuf,
+    operation: String,
+    phase: String,
+}
+#[cfg(test)]
+static STATE_TRANSACTION_FAILURE: Mutex<Vec<StateTransactionFailureInjection>> =
+    Mutex::new(Vec::new());
+#[cfg(all(test, unix))]
+#[derive(Debug)]
+struct ActiveStateSwapInjection {
+    open_dir: PathBuf,
+    active_path: PathBuf,
+    moved_path: PathBuf,
+    outside_path: PathBuf,
+}
+#[cfg(all(test, unix))]
+static ACTIVE_STATE_SWAP_AFTER_VALIDATION: Mutex<Option<ActiveStateSwapInjection>> =
+    Mutex::new(None);
+#[cfg(all(test, unix))]
+#[derive(Debug)]
+struct ValidatedStoreSwapInjection {
+    repo_root: PathBuf,
+    objects_path: PathBuf,
+    moved_path: PathBuf,
+    replacement_path: PathBuf,
+}
+#[cfg(all(test, unix))]
+static VALIDATED_STORE_SWAP_BEFORE_VERIFY_PERSIST: Mutex<Option<ValidatedStoreSwapInjection>> =
     Mutex::new(None);
 
+pub(crate) const REPOSITORY_JSON_BYTE_LIMIT: u64 = 64 * 1024 * 1024;
+
+fn read_active_json_optional(
+    active_state: &active_state::ActiveStateDir,
+    relative: &Path,
+) -> Result<Option<Value>, CliError> {
+    active_state
+        .read_optional(relative, REPOSITORY_JSON_BYTE_LIMIT)?
+        .map(|bytes| serde_json::from_slice(&bytes).map_err(CliError::from))
+        .transpose()
+}
+
+fn read_active_json_required(
+    active_state: &active_state::ActiveStateDir,
+    relative: &Path,
+) -> Result<Value, CliError> {
+    let bytes = active_state.read_required(relative, REPOSITORY_JSON_BYTE_LIMIT)?;
+    Ok(serde_json::from_slice(&bytes)?)
+}
+
+fn write_active_json_atomic(
+    active_state: &active_state::ActiveStateDir,
+    relative: &Path,
+    value: &Value,
+) -> Result<(), CliError> {
+    write_active_json_atomic_bounded(
+        active_state,
+        relative,
+        value,
+        REPOSITORY_JSON_BYTE_LIMIT,
+        "active-state JSON file",
+    )
+}
+
+fn write_active_json_atomic_bounded(
+    active_state: &active_state::ActiveStateDir,
+    relative: &Path,
+    value: &Value,
+    limit: u64,
+    context: &str,
+) -> Result<(), CliError> {
+    let mut rendered = serde_json::to_vec_pretty(value)?;
+    rendered.push(b'\n');
+    if rendered.len() as u64 > limit {
+        return Err(CliError::InvalidRepository(format!(
+            "{context} exceeds the {limit}-byte limit at {}: {} bytes",
+            active_state.display_path(relative).display(),
+            rendered.len()
+        )));
+    }
+    active_state.write_atomic(relative, &rendered, limit)?;
+    Ok(())
+}
+
 fn write_json_atomic(path: &Path, value: &Value) -> Result<(), CliError> {
+    write_json_atomic_bounded(
+        path,
+        value,
+        REPOSITORY_JSON_BYTE_LIMIT,
+        "repository JSON file",
+    )
+}
+
+fn write_json_atomic_bounded(
+    path: &Path,
+    value: &Value,
+    limit: u64,
+    context: &str,
+) -> Result<(), CliError> {
+    let mut rendered = serde_json::to_vec_pretty(value)?;
+    rendered.push(b'\n');
+    if rendered.len() as u64 > limit {
+        return Err(CliError::InvalidRepository(format!(
+            "{context} exceeds the {limit}-byte limit at {}: {} bytes",
+            path.display(),
+            rendered.len()
+        )));
+    }
+    write_bytes_atomic(path, &rendered)
+}
+
+fn write_bytes_atomic(path: &Path, contents: &[u8]) -> Result<(), CliError> {
     let parent = path
         .parent()
         .ok_or_else(|| CliError::Usage(format!("path has no parent: {}", path.display())))?;
@@ -7092,8 +10677,7 @@ fn write_json_atomic(path: &Path, value: &Value) -> Result<(), CliError> {
             .write(true)
             .create_new(true)
             .open(&temp_path)?;
-        file.write_all(serde_json::to_string_pretty(value)?.as_bytes())?;
-        file.write_all(b"\n")?;
+        file.write_all(contents)?;
         file.sync_all()?;
     }
     fs::rename(temp_path, path)?;
@@ -7122,20 +10706,32 @@ fn sync_directory_best_effort(path: &Path) -> Result<(), CliError> {
     }
 }
 
+#[cfg(test)]
 fn read_status(start: &Path) -> Result<Status, CliError> {
-    let context = open_context(start)?;
+    let mut validation_cache = codefire_store::SealedCommitValidationCache::default();
+    read_status_with_cache(start, &mut validation_cache)
+}
+
+fn read_status_with_cache(
+    start: &Path,
+    validation_cache: &mut codefire_store::SealedCommitValidationCache,
+) -> Result<Status, CliError> {
+    let context = open_context_for_status(start)?;
 
     let base = required_string(&context.registry, &["open", "current_base_commit"])?;
     let objects_root = context.repo_root.join(".codefire").join("objects");
-    codefire_store::validate_sealed_commit(&objects_root, &base)?;
+    let base_commit_path = codefire_store::object_record_path(&objects_root, &base)
+        .unwrap_or_else(|| objects_root.clone());
+    codefire_store::validate_sealed_commit_with_cache(&objects_root, &base, validation_cache)
+        .map_err(|error| CliError::StoreContext {
+            error: Box::new(error),
+            repo_root: context.repo_root.clone(),
+            path: base_commit_path,
+        })?;
     let raw_state = required_string(&context.registry, &["state", "last_known"])?;
-    let active_state_path = PathBuf::from(required_string(
-        &context.registry,
-        &["open", "active_state_path"],
-    )?);
-    let fires_path = active_state_path.join("fires.json");
-    let open_fires = if fires_path.exists() {
-        let fires: Value = read_json(&fires_path)?;
+    let open_fires = if let Some(fires) =
+        read_active_json_optional(&context.active_state, Path::new("fires.json"))?
+    {
         fires
             .as_array()
             .map(|items| {
@@ -7263,15 +10859,16 @@ fn commit_info(objects: &Path, commit_id: &str) -> Result<CommitInfo, CliError> 
     })
 }
 
-fn write_merged_file(root: &Path, rel_path: &str, data: Option<&[u8]>) -> Result<(), CliError> {
-    let path = safe_manifest_output_path(root, rel_path)?;
+fn write_merged_file(
+    worktree: &ExistingWorktree,
+    rel_path: &str,
+    data: Option<&[u8]>,
+) -> Result<(), CliError> {
+    let path = safe_relative_manifest_path(rel_path)?;
     if let Some(data) = data {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(path, data)?;
-    } else if path.exists() {
-        fs::remove_file(path)?;
+        worktree.write_file_atomic(&path, data)?;
+    } else {
+        worktree.delete_file(&path)?;
     }
     Ok(())
 }
@@ -7319,9 +10916,40 @@ fn optional_repo_root(start: &Path) -> Option<PathBuf> {
     find_repo_root(start).ok()
 }
 
-fn open_context(start: &Path) -> Result<OpenContext, CliError> {
-    let marker_path =
-        find_open_marker(start)?.ok_or_else(|| CliError::NotOpen(start.to_path_buf()))?;
+fn validated_active_state_dir(
+    repo_root: &Path,
+    registry: &Value,
+) -> Result<active_state::ActiveStateDir, CliError> {
+    let open_instance_id = required_string(registry, &["open", "open_instance_id"])?;
+    let recorded = PathBuf::from(required_string(registry, &["open", "active_state_path"])?);
+    let expected = repo_root
+        .join(".codefire")
+        .join("active")
+        .join(ref_file_name(&open_instance_id));
+    if recorded != expected {
+        return Err(CliError::InvalidMarker(format!(
+            "active_state_path does not match repository/open instance: expected {}, found {}",
+            expected.display(),
+            recorded.display()
+        )));
+    }
+    Ok(active_state::ActiveStateDir::bind(&expected)?)
+}
+
+fn open_context_for_status(start: &Path) -> Result<OpenContext, CliError> {
+    if let Some(context) = legacy_python_status_context(start)? {
+        return Ok(context);
+    }
+    open_context(start)
+}
+
+/// The Python fallback historically emitted only marker, opened registry,
+/// object store, and active fire data. Keep that exact read-only status shape
+/// readable without weakening the current snapshot required by mutations.
+fn legacy_python_status_context(start: &Path) -> Result<Option<OpenContext>, CliError> {
+    let Some(marker_path) = find_open_marker(start)? else {
+        return Ok(None);
+    };
     let marker = read_json(&marker_path)?;
     let open_dir = marker_path
         .parent()
@@ -7335,55 +10963,1030 @@ fn open_context(start: &Path) -> Result<OpenContext, CliError> {
     let branch = required_string(&marker, &["branch", "name"])?;
     let registry_path = opened_registry_path(&repo_root, &branch);
     let registry = read_json(&registry_path)?;
+    let active_state_path =
+        PathBuf::from(required_string(&registry, &["open", "active_state_path"])?);
+    let is_exact_legacy_shape = !repo_root.join(".codefire").join("repo.json").exists()
+        && !branch_record_path(&repo_root, &branch).exists()
+        && !active_state_path.join("state.json").exists();
+    if !is_exact_legacy_shape {
+        return Ok(None);
+    }
+
     let registry_open_path = PathBuf::from(required_string(&registry, &["open", "path"])?);
     if registry_open_path != open_dir {
         return Err(CliError::InvalidMarker(
             "opened_path does not match registry".to_string(),
         ));
     }
-    let open_instance_id = required_string(&marker, &["open", "open_instance_id"])?;
+    let marker_open_instance_id = required_string(&marker, &["open", "open_instance_id"])?;
     let registry_open_instance_id = required_string(&registry, &["open", "open_instance_id"])?;
-    if open_instance_id != registry_open_instance_id {
+    if marker_open_instance_id != registry_open_instance_id {
         return Err(CliError::InvalidMarker(
             "open_instance_id does not match registry".to_string(),
         ));
     }
-    Ok(OpenContext {
+    let active_state = validated_active_state_dir(&repo_root, &registry)?;
+    Ok(Some(OpenContext {
         repo_root,
         open_dir,
         branch,
         registry_path,
+        active_state,
         registry,
+        authority: OpenContextAuthority::LegacyPythonStatus,
+    }))
+}
+
+fn open_context(start: &Path) -> Result<OpenContext, CliError> {
+    open_context_with_recovery(start, None)
+}
+
+fn open_context_for_recovery(start: &Path, operation: &str) -> Result<OpenContext, CliError> {
+    open_context_with_recovery(start, Some(operation))
+}
+
+fn open_context_with_recovery(
+    start: &Path,
+    allowed_operation: Option<&str>,
+) -> Result<OpenContext, CliError> {
+    if legacy_python_status_context(start)?.is_some() {
+        return Err(CliError::InvalidRepository(
+            "legacy Python-compatible open metadata is read-only; use status or migrate before mutation"
+                .to_string(),
+        ));
+    }
+    let context = load_verified_open_context(start)?;
+    let pending = match &context.authority {
+        OpenContextAuthority::Verified(snapshot) => match &snapshot.disposition {
+            open_snapshot::OpenSnapshotDisposition::Steady => None,
+            open_snapshot::OpenSnapshotDisposition::PendingCommit { phase } => {
+                Some(("commit".to_string(), phase.clone()))
+            }
+            open_snapshot::OpenSnapshotDisposition::PendingState { operation, phase } => {
+                Some((operation.clone(), phase.clone()))
+            }
+            open_snapshot::OpenSnapshotDisposition::PendingActiveLedger {
+                operation,
+                phase,
+                ..
+            } => Some((operation.clone(), phase.clone())),
+        },
+        OpenContextAuthority::LegacyPythonStatus => None,
+    };
+    let Some((operation, phase)) = pending else {
+        return Ok(context);
+    };
+    if allowed_operation == Some(operation.as_str()) {
+        return Ok(context);
+    }
+    Err(CliError::OpenRecoveryPending(Box::new(
+        OpenRecoveryPendingError {
+            operation,
+            phase,
+            repo_root: context.repo_root,
+            branch: context.branch,
+            open_dir: context.open_dir,
+        },
+    )))
+}
+
+fn load_verified_open_context(start: &Path) -> Result<OpenContext, CliError> {
+    let marker_path =
+        find_open_marker(start)?.ok_or_else(|| CliError::NotOpen(start.to_path_buf()))?;
+    let marker = read_json(&marker_path)?;
+    let open_dir = marker_path
+        .parent()
+        .ok_or_else(|| CliError::InvalidMarker("marker has no parent directory".to_string()))?
+        .to_path_buf();
+    let repo_dir = PathBuf::from(required_string(&marker, &["repository", "path"])?);
+    let repo_root = repo_dir
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| CliError::InvalidMarker("repository path has no parent".to_string()))?;
+    let branch = required_string(&marker, &["branch", "name"])?;
+    let repository_record_path = repo_root.join(".codefire").join("repo.json");
+    let repository = read_json(&repository_record_path)?;
+    let branch_record_path = branch_record_path(&repo_root, &branch);
+    let branch_record = read_json(&branch_record_path)?;
+    let registry_path = opened_registry_path(&repo_root, &branch);
+    let registry = read_json(&registry_path)?;
+    let registry_open_path = PathBuf::from(required_string(&registry, &["open", "path"])?);
+    let marker_open_path = PathBuf::from(required_string(&marker, &["open", "opened_path"])?);
+    let marker_open_instance_id = required_string(&marker, &["open", "open_instance_id"])?;
+    let registry_open_instance_id = required_string(&registry, &["open", "open_instance_id"])?;
+    let registry_active_state_path =
+        PathBuf::from(required_string(&registry, &["open", "active_state_path"])?);
+    let expected_active_state_path = repo_root
+        .join(".codefire")
+        .join("active")
+        .join(ref_file_name(&marker_open_instance_id));
+    let expected_repository_path = repo_root.join(".codefire");
+    let marker_repository_path = PathBuf::from(required_string(&marker, &["repository", "path"])?);
+    let repository_id = required_string(&repository, &["repository_id"])?;
+    let marker_repository_id = required_string(&marker, &["repository", "repository_id"])?;
+    let marker_branch = required_string(&marker, &["branch", "name"])?;
+    let registry_branch = required_string(&registry, &["branch", "name"])?;
+    let branch_record_name = required_string(&branch_record, &["name"])?;
+    let marker_opened_from_commit = required_string(&marker, &["branch", "opened_from_commit"])?;
+    let registry_opened_from_commit = required_string(&registry, &["open", "opened_from_commit"])?;
+    let branch_head = required_string(&branch_record, &["head"])?;
+    let registry_current_base = required_string(&registry, &["open", "current_base_commit"])?;
+
+    let locator = open_snapshot::OpenSnapshotIdentityAuthorities {
+        repo_root: &repo_root,
+        repository_record_path: &repository_record_path,
+        marker_path: &marker_path,
+        branch_record_path: &branch_record_path,
+        registry_path: &registry_path,
+        expected_repository_path: &expected_repository_path,
+        marker_repository_path: &marker_repository_path,
+        repository_id: &repository_id,
+        marker_repository_id: &marker_repository_id,
+        branch: &branch,
+        marker_branch: &marker_branch,
+        registry_branch: &registry_branch,
+        branch_record_name: &branch_record_name,
+        open_dir: &open_dir,
+        marker_open_path: &marker_open_path,
+        registry_open_path: &registry_open_path,
+        marker_open_instance_id: &marker_open_instance_id,
+        registry_open_instance_id: &registry_open_instance_id,
+        marker_opened_from_commit: &marker_opened_from_commit,
+        registry_opened_from_commit: &registry_opened_from_commit,
+        expected_active_state_path: &expected_active_state_path,
+        registry_active_state_path: &registry_active_state_path,
+        branch_head: &branch_head,
+        registry_current_base: &registry_current_base,
+        pending_commit_transaction: None,
+    };
+    open_snapshot::verify_open_snapshot_locator(&locator)
+        .map_err(CliError::OpenSnapshotDivergence)?;
+    validate_open_snapshot_commit(&repo_root, &branch_head)?;
+    if registry_current_base != branch_head {
+        validate_open_snapshot_commit(&repo_root, &registry_current_base)?;
+    }
+
+    let active_state = validated_active_state_dir(&repo_root, &registry)?;
+    let active_state_record_path = active_state.display_path(Path::new("state.json"));
+    let active_state_record = read_active_json_required(&active_state, Path::new("state.json"))?;
+    let pending_commit_transaction =
+        read_active_json_optional(&active_state, Path::new("commit_transaction.json"))?;
+    let pending_state_transaction =
+        read_active_json_optional(&active_state, Path::new("state_transaction.json"))?;
+    let active_ledger_descriptor = validate_active_ledger_descriptor(&active_state)?;
+    if let Some(transaction) = pending_commit_transaction.as_ref() {
+        validate_commit_transaction_record(transaction).map_err(|message| {
+            CliError::InvalidRepository(format!(
+                "{message}: {}",
+                active_state
+                    .display_path(Path::new("commit_transaction.json"))
+                    .display()
+            ))
+        })?;
+    }
+    if let Some(transaction) = pending_state_transaction.as_ref() {
+        validate_state_transaction_record(transaction).map_err(|message| {
+            CliError::InvalidRepository(format!(
+                "{message}: {}",
+                active_state
+                    .display_path(Path::new("state_transaction.json"))
+                    .display()
+            ))
+        })?;
+    }
+    let branch_state = required_string(&branch_record, &["state"])?;
+    let registry_state = required_string(&registry, &["state", "last_known"])?;
+    let active_state_value = required_string(&active_state_record, &["state"])?;
+    let identity = open_snapshot::OpenSnapshotIdentityAuthorities {
+        pending_commit_transaction: pending_commit_transaction.as_ref(),
+        ..locator
+    };
+    let state = open_snapshot::OpenSnapshotStateAuthorities {
+        active_state_record_path: &active_state_record_path,
+        branch_state: &branch_state,
+        registry_state: &registry_state,
+        active_state: &active_state_value,
+        pending_commit_transaction: pending_commit_transaction.as_ref(),
+        pending_state_transaction: pending_state_transaction.as_ref(),
+        active_ledger_descriptor: active_ledger_descriptor.as_ref(),
+    };
+    let verified_snapshot = open_snapshot::verify_open_snapshot(&identity, &state)
+        .map_err(CliError::OpenSnapshotDivergence)?;
+    Ok(OpenContext {
+        repo_root: verified_snapshot.repo_root.clone(),
+        open_dir: verified_snapshot.open_dir.clone(),
+        branch: verified_snapshot.branch.clone(),
+        registry_path,
+        active_state,
+        registry,
+        authority: OpenContextAuthority::Verified(Box::new(verified_snapshot)),
     })
 }
 
-fn list_branches(start: &Path) -> Result<Vec<Branch>, CliError> {
-    let repo_root = find_repo_root(start)?;
-    let branches_root = repo_root.join(".codefire").join("branches");
-    let objects_root = repo_root.join(".codefire").join("objects");
-    let mut branch_paths = Vec::new();
-    for entry in fs::read_dir(branches_root)? {
-        let path = entry?.path();
-        if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
-            branch_paths.push(path);
+fn validate_open_snapshot_commit(repo_root: &Path, commit_id: &str) -> Result<(), CliError> {
+    let objects = repo_root.join(".codefire").join("objects");
+    let path =
+        codefire_store::object_record_path(&objects, commit_id).unwrap_or_else(|| objects.clone());
+    codefire_store::validate_sealed_commit(&objects, commit_id).map_err(|error| {
+        CliError::StoreContext {
+            error: Box::new(error),
+            repo_root: repo_root.to_path_buf(),
+            path,
+        }
+    })
+}
+
+#[derive(Debug)]
+#[must_use = "branch-list results own an unfinished command ledger and must be completed"]
+struct BranchListResult {
+    repo_root: PathBuf,
+    metadata_snapshot: RepositoryMetadataSnapshot,
+    branches: Vec<Branch>,
+    opened: Vec<Value>,
+    store_work: codefire_store::SealedValidationWork,
+    ref_work: BranchRefWork,
+    opened_work: BranchRefWork,
+    opened_snapshot: Option<OpenedRegistrySnapshot>,
+    ledger: codefire_core::DecisionWorkLedger,
+    retained_bytes: u64,
+}
+
+impl BranchListResult {
+    fn decision_work_snapshot(&self) -> &codefire_core::DecisionWorkSnapshot {
+        self.ledger.snapshot()
+    }
+
+    fn prepare_opened_registries(mut self) -> Result<Self, CliError> {
+        if let Err(error) = self.metadata_snapshot.ensure_current() {
+            let error = branch_list_ref_error(error);
+            let reason = branch_list_cli_terminal_reason(&error);
+            self.abort_after_branch_list_failure(reason);
+            return Err(error);
+        }
+        let opened_root = self.repo_root.join(".codefire").join("opened");
+        let snapshot = match OpenedRegistrySnapshot::capture(
+            &opened_root,
+            REPOSITORY_JSON_BYTE_LIMIT,
+            &mut self.ledger,
+        ) {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                let error = opened_registry_ref_error(error);
+                let reason = branch_list_cli_terminal_reason(&error);
+                self.abort_after_branch_list_failure(reason);
+                return Err(error);
+            }
+        };
+        if snapshot.parent_identity() != self.metadata_snapshot.identity() {
+            let _ = snapshot.release(&mut self.ledger);
+            self.abort_after_branch_list_failure(
+                codefire_core::DecisionWorkTerminalReason::SubjectChanged,
+            );
+            return Err(CliError::OpenedRegistrySubjectChanged {
+                subject: opened_root,
+                message: "repository metadata identity changed between branch and opened capture"
+                    .to_string(),
+            });
+        }
+        let projection = project_opened_registries(&snapshot, &mut self.ledger);
+        match projection {
+            Ok((opened, retained_bytes)) => {
+                let Some(total_retained) = self.retained_bytes.checked_add(retained_bytes) else {
+                    let _ = self.ledger.release(
+                        codefire_core::DecisionWorkDimension::RetainedBytes,
+                        retained_bytes,
+                    );
+                    let _ = snapshot.release(&mut self.ledger);
+                    self.abort_after_branch_list_failure(
+                        codefire_core::DecisionWorkTerminalReason::CorruptSubject,
+                    );
+                    return Err(CliError::InvalidRepository(
+                        "opened registry projection size overflow".to_string(),
+                    ));
+                };
+                self.retained_bytes = total_retained;
+                self.opened = opened;
+                self.opened_snapshot = Some(snapshot);
+                Ok(self)
+            }
+            Err(error) => {
+                let _ = snapshot.release(&mut self.ledger);
+                let reason = branch_list_cli_terminal_reason(&error);
+                self.abort_after_branch_list_failure(reason);
+                Err(error)
+            }
         }
     }
-    branch_paths.sort();
 
-    let mut branches = Vec::with_capacity(branch_paths.len());
-    for path in branch_paths {
-        let record = read_json(&path)?;
-        let name = required_string(&record, &["name"])?;
-        let head = required_string(&record, &["head"])?;
-        codefire_store::validate_sealed_commit(&objects_root, &head)?;
-        let state = record
+    fn revalidate_opened_registries(&mut self) -> Result<(), CliError> {
+        let Some(snapshot) = self.opened_snapshot.take() else {
+            return Ok(());
+        };
+        match snapshot.revalidate(REPOSITORY_JSON_BYTE_LIMIT, &mut self.ledger) {
+            Ok(work) => {
+                self.opened_work = work;
+                Ok(())
+            }
+            Err(error) => {
+                let error = opened_registry_ref_error(error);
+                let reason = branch_list_cli_terminal_reason(&error);
+                self.abort_after_branch_list_failure(reason);
+                Err(error)
+            }
+        }
+    }
+
+    fn output_branch_list(
+        mut self,
+        json_output: bool,
+        metrics: Option<CommandMetrics>,
+    ) -> Result<(), CliError> {
+        let encoded = if json_output {
+            let data = BranchListDataWire {
+                type_tag: "codefire_branch_list",
+                version: 1,
+                branches: BranchesWire(&self.branches),
+                metrics: metrics.as_ref().map(metrics_wire),
+            };
+            let envelope = CommandResultWire {
+                schema: automation::COMMAND_RESULT_SCHEMA,
+                command: "branch-list",
+                ok: true,
+                exit_code: 0,
+                repo: Some(&self.repo_root),
+                data,
+                diagnostics: &[],
+                next_actions: &[],
+            };
+            encode_pretty_json_output(&mut self.ledger, &envelope)
+        } else {
+            encode_text_output(&mut self.ledger, |writer| {
+                write_branches(writer, &self.branches)?;
+                if let Some(metrics) = metrics.as_ref() {
+                    write_metrics(writer, metrics)?;
+                }
+                Ok(())
+            })
+        };
+        let (bytes, retained_bytes) = match encoded {
+            Ok(encoded) => encoded,
+            Err(error) => {
+                let reason = branch_list_cli_terminal_reason(&error);
+                self.abort_after_branch_list_failure(reason);
+                return Err(error);
+            }
+        };
+        self.retained_bytes = self
+            .retained_bytes
+            .checked_add(retained_bytes)
+            .ok_or_else(|| CliError::InvalidRepository("output size overflow".to_string()))?;
+        self.publish_and_finish(bytes)
+    }
+
+    fn output_local_list(mut self, json_output: bool) -> Result<(), CliError> {
+        let encoded = if json_output {
+            let data = LocalListDataWire {
+                type_tag: "codefire_local_list",
+                version: 1,
+                branches: BranchesWire(&self.branches),
+                opened: &self.opened,
+            };
+            let envelope = CommandResultWire {
+                schema: automation::COMMAND_RESULT_SCHEMA,
+                command: "list",
+                ok: true,
+                exit_code: 0,
+                repo: Some(&self.repo_root),
+                data,
+                diagnostics: &[],
+                next_actions: &[],
+            };
+            encode_pretty_json_output(&mut self.ledger, &envelope)
+        } else {
+            encode_text_output(&mut self.ledger, |writer| {
+                writeln!(writer, "Branches:")?;
+                write_branches(writer, &self.branches)?;
+                writeln!(writer, "Opened:")?;
+                if self.opened.is_empty() {
+                    writeln!(writer, "none")?;
+                } else {
+                    for item in &self.opened {
+                        writeln!(
+                            writer,
+                            "{}\t{}",
+                            item.get("branch")
+                                .and_then(Value::as_str)
+                                .unwrap_or("(unknown)"),
+                            item.get("path").and_then(Value::as_str).unwrap_or("")
+                        )?;
+                    }
+                }
+                Ok(())
+            })
+        };
+        let (bytes, retained_bytes) = match encoded {
+            Ok(encoded) => encoded,
+            Err(error) => {
+                let reason = branch_list_cli_terminal_reason(&error);
+                self.abort_after_branch_list_failure(reason);
+                return Err(error);
+            }
+        };
+        self.retained_bytes = self
+            .retained_bytes
+            .checked_add(retained_bytes)
+            .ok_or_else(|| CliError::InvalidRepository("output size overflow".to_string()))?;
+        if let Err(error) = self.revalidate_opened_registries() {
+            drop(bytes);
+            return Err(error);
+        }
+        self.publish_and_finish(bytes)
+    }
+
+    fn publish_and_finish(mut self, bytes: Vec<u8>) -> Result<(), CliError> {
+        if let Err(error) = self.metadata_snapshot.ensure_current() {
+            drop(bytes);
+            let error = branch_list_ref_error(error);
+            self.abort_after_branch_list_failure(
+                codefire_core::DecisionWorkTerminalReason::SubjectChanged,
+            );
+            return Err(error);
+        }
+        let write_result = std::io::stdout().lock().write_all(&bytes);
+        drop(bytes);
+        if let Err(error) = write_result {
+            self.abort_after_branch_list_failure(
+                codefire_core::DecisionWorkTerminalReason::CorruptSubject,
+            );
+            return Err(CliError::Io(error));
+        }
+        self.finish_complete().map(drop)
+    }
+
+    fn abort_after_branch_list_failure(
+        &mut self,
+        reason: codefire_core::DecisionWorkTerminalReason,
+    ) {
+        if let Some(snapshot) = self.opened_snapshot.take() {
+            let _ = snapshot.release(&mut self.ledger);
+        }
+        if self.retained_bytes > 0 {
+            let _ = self.ledger.release(
+                codefire_core::DecisionWorkDimension::RetainedBytes,
+                self.retained_bytes,
+            );
+            self.retained_bytes = 0;
+        }
+        if self.ledger.snapshot().terminal_reason.is_none() {
+            let _ = self.ledger.finish(reason);
+        }
+    }
+
+    fn finish_complete(mut self) -> Result<codefire_core::DecisionWorkSnapshot, CliError> {
+        self.ledger
+            .release(
+                codefire_core::DecisionWorkDimension::RetainedBytes,
+                self.retained_bytes,
+            )
+            .map_err(branch_list_accounting_error)?;
+        self.retained_bytes = 0;
+        self.ledger
+            .finish(codefire_core::DecisionWorkTerminalReason::Complete)
+            .map_err(branch_list_accounting_error)?;
+        Ok(self.ledger.snapshot().clone())
+    }
+}
+
+fn write_branches<W: Write + ?Sized>(writer: &mut W, branches: &[Branch]) -> std::io::Result<()> {
+    for branch in branches {
+        writeln!(writer, "{}\t{}\t{}", branch.name, branch.head, branch.state)?;
+    }
+    Ok(())
+}
+
+fn list_branches(start: &Path) -> Result<BranchListResult, CliError> {
+    let ledger = codefire_core::DecisionWorkLedger::new(
+        codefire_core::DecisionWorkProfile::local_v1(),
+        codefire_core::DecisionWorkCommandKind::LocalGraph,
+        "branch-list",
+    )
+    .map_err(branch_list_accounting_error)?;
+    list_branches_with_ledger_and_hook(start, ledger, |_| Ok(()))
+}
+
+fn list_branches_with_ledger_and_hook<F>(
+    start: &Path,
+    mut ledger: codefire_core::DecisionWorkLedger,
+    before_finalize: F,
+) -> Result<BranchListResult, CliError>
+where
+    F: FnOnce(&Path) -> Result<(), CliError>,
+{
+    let repo_root = match find_repo_root(start) {
+        Ok(repo_root) => repo_root,
+        Err(error) => {
+            if ledger.snapshot().terminal_reason.is_none() {
+                let _ = ledger.finish(branch_list_cli_terminal_reason(&error));
+            }
+            return Err(error);
+        }
+    };
+    let branches_root = repo_root.join(".codefire").join("branches");
+    let objects_root = repo_root.join(".codefire").join("objects");
+    let metadata_snapshot = match RepositoryMetadataSnapshot::capture(&repo_root.join(".codefire"))
+    {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            finish_branch_list_failure(&mut ledger, &error);
+            return Err(branch_list_ref_error(error));
+        }
+    };
+    let branch_snapshot = match metadata_snapshot.capture_branch_refs(
+        &branches_root,
+        REPOSITORY_JSON_BYTE_LIMIT,
+        &mut ledger,
+    ) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            finish_branch_list_failure(&mut ledger, &error);
+            return Err(branch_list_ref_error(error));
+        }
+    };
+    let mut validation =
+        match codefire_store::begin_sealed_commit_validation_session_with_recoverable_ledger(
+            &objects_root,
+            ledger,
+        ) {
+            Ok(validation) => validation,
+            Err(begin_error) => {
+                let (error, mut ledger) = begin_error.into_parts();
+                branch_snapshot
+                    .release(&mut ledger)
+                    .map_err(branch_list_ref_error)?;
+                finish_branch_list_store_failure(&mut ledger, &error);
+                return Err(branch_list_store_error(error));
+            }
+        };
+    let mut validation_error = None;
+    for document in branch_snapshot.documents() {
+        if let Err(error) = validation.validate_commit(document.head()) {
+            validation_error = Some(error);
+            break;
+        }
+    }
+    if let Some(error) = validation_error {
+        let reason = branch_list_store_terminal_reason(&error);
+        let mut ledger = validation
+            .abort_and_take_decision_work_ledger(reason)
+            .map_err(branch_list_store_error)?
+            .expect("branch-list validation always owns a decision-work ledger");
+        branch_snapshot
+            .release(&mut ledger)
+            .map_err(branch_list_ref_error)?;
+        return Err(branch_list_store_error(error));
+    }
+    if let Err(error) = before_finalize(&branches_root) {
+        let reason = branch_list_cli_terminal_reason(&error);
+        let mut ledger = validation
+            .abort_and_take_decision_work_ledger(reason)
+            .map_err(branch_list_store_error)?
+            .expect("branch-list validation always owns a decision-work ledger");
+        branch_snapshot
+            .release(&mut ledger)
+            .map_err(branch_list_ref_error)?;
+        return Err(error);
+    }
+    let store_work = match validation.finalize() {
+        Ok(work) => work,
+        Err(error) => {
+            let mut ledger = validation
+                .take_decision_work_ledger()
+                .expect("finalized branch-list validation can return its ledger")
+                .expect("branch-list validation always owns a decision-work ledger");
+            branch_snapshot
+                .release(&mut ledger)
+                .map_err(branch_list_ref_error)?;
+            return Err(branch_list_store_error(error));
+        }
+    };
+    let mut ledger = validation
+        .take_decision_work_ledger()
+        .expect("finalized branch-list validation can return its ledger")
+        .expect("branch-list validation always owns a decision-work ledger");
+    let mut branches = Vec::with_capacity(branch_snapshot.documents().len());
+    let mut retained_bytes = 0_u64;
+    for document in branch_snapshot.documents() {
+        let state = document
+            .value()
             .get("state")
             .and_then(Value::as_str)
-            .unwrap_or("closed")
-            .to_string();
-        branches.push(Branch { name, head, state });
+            .unwrap_or("closed");
+        let branch_bytes = compact_branch_result_size(document.name(), document.head(), state)?;
+        let next_retained = retained_bytes.checked_add(branch_bytes).ok_or_else(|| {
+            CliError::InvalidRepository("branch result size overflow".to_string())
+        })?;
+        if let Err(error) = ledger.apply(
+            codefire_core::DecisionWorkReservation::new(
+                codefire_core::DecisionWorkPhase::PublicationPreflight,
+                codefire_core::DecisionWorkSurface::Atomic,
+            )
+            .acquire(
+                codefire_core::DecisionWorkDimension::RetainedBytes,
+                branch_bytes,
+            ),
+        ) {
+            let _ = ledger.release(
+                codefire_core::DecisionWorkDimension::RetainedBytes,
+                retained_bytes,
+            );
+            branch_snapshot
+                .release(&mut ledger)
+                .map_err(branch_list_ref_error)?;
+            return Err(branch_list_accounting_error(error));
+        }
+        retained_bytes = next_retained;
+        branches.push(Branch {
+            name: document.name().to_string(),
+            head: document.head().to_string(),
+            state: state.to_string(),
+        });
     }
-    Ok(branches)
+    debug_assert!(branches
+        .iter()
+        .all(|branch| branch_snapshot.heads().contains(&branch.head)));
+    let ref_work = match branch_snapshot.revalidate(REPOSITORY_JSON_BYTE_LIMIT, &mut ledger) {
+        Ok(work) => work,
+        Err(error) => {
+            let _ = ledger.release(
+                codefire_core::DecisionWorkDimension::RetainedBytes,
+                retained_bytes,
+            );
+            finish_branch_list_failure(&mut ledger, &error);
+            return Err(branch_list_ref_error(error));
+        }
+    };
+    if let Err(error) = metadata_snapshot.ensure_current() {
+        let _ = ledger.release(
+            codefire_core::DecisionWorkDimension::RetainedBytes,
+            retained_bytes,
+        );
+        finish_branch_list_failure(&mut ledger, &error);
+        return Err(branch_list_ref_error(error));
+    }
+    Ok(BranchListResult {
+        repo_root,
+        metadata_snapshot,
+        branches,
+        opened: Vec::new(),
+        store_work,
+        ref_work,
+        opened_work: BranchRefWork::default(),
+        opened_snapshot: None,
+        ledger,
+        retained_bytes,
+    })
+}
+
+#[derive(Serialize)]
+struct BorrowedBranchResult<'a> {
+    name: &'a str,
+    head: &'a str,
+    state: &'a str,
+}
+
+#[derive(Serialize)]
+struct BorrowedOpenedRegistryResult<'a> {
+    branch: &'a str,
+    path: &'a str,
+    open_instance_id: Option<&'a Value>,
+    current_base_commit: Option<&'a Value>,
+    opened_from_commit: Option<&'a Value>,
+    registry_path: &'a Path,
+}
+
+struct BranchesWire<'a>(&'a [Branch]);
+
+impl Serialize for BranchesWire<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut sequence = serializer.serialize_seq(Some(self.0.len()))?;
+        for branch in self.0 {
+            sequence.serialize_element(&BorrowedBranchResult {
+                name: &branch.name,
+                head: &branch.head,
+                state: &branch.state,
+            })?;
+        }
+        sequence.end()
+    }
+}
+
+#[derive(Serialize)]
+struct BranchListDataWire<'a> {
+    #[serde(rename = "type")]
+    type_tag: &'static str,
+    version: u64,
+    branches: BranchesWire<'a>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metrics: Option<MetricsWire<'a>>,
+}
+
+#[derive(Serialize)]
+struct LocalListDataWire<'a> {
+    #[serde(rename = "type")]
+    type_tag: &'static str,
+    version: u64,
+    branches: BranchesWire<'a>,
+    opened: &'a [Value],
+}
+
+#[derive(Serialize)]
+struct CommandResultWire<'a, T> {
+    schema: &'static str,
+    command: &'static str,
+    ok: bool,
+    exit_code: i32,
+    repo: Option<&'a Path>,
+    data: T,
+    diagnostics: &'a [Value],
+    next_actions: &'a [Value],
+}
+
+#[derive(Default)]
+struct JsonSizeWriter(u64);
+
+impl Write for JsonSizeWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let amount = u64::try_from(bytes.len())
+            .map_err(|_| std::io::Error::other("serialized JSON size does not fit u64"))?;
+        self.0 = self
+            .0
+            .checked_add(amount)
+            .ok_or_else(|| std::io::Error::other("serialized JSON size overflow"))?;
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+fn reserve_output_bytes(
+    ledger: &mut codefire_core::DecisionWorkLedger,
+    bytes: u64,
+) -> Result<(), CliError> {
+    ledger
+        .apply(
+            codefire_core::DecisionWorkReservation::new(
+                codefire_core::DecisionWorkPhase::PublicationPreflight,
+                codefire_core::DecisionWorkSurface::Atomic,
+            )
+            .acquire(codefire_core::DecisionWorkDimension::RetainedBytes, bytes)
+            .count(
+                codefire_core::DecisionWorkCounter::ResponseBytesEncoded,
+                bytes,
+            ),
+        )
+        .map_err(branch_list_accounting_error)
+}
+
+fn encode_pretty_json_output(
+    ledger: &mut codefire_core::DecisionWorkLedger,
+    value: &impl Serialize,
+) -> Result<(Vec<u8>, u64), CliError> {
+    let mut counter = JsonSizeWriter::default();
+    serde_json::to_writer_pretty(&mut counter, value)?;
+    let retained_bytes = counter
+        .0
+        .checked_add(1)
+        .ok_or_else(|| CliError::InvalidRepository("JSON output size overflow".to_string()))?;
+    reserve_output_bytes(ledger, retained_bytes)?;
+    let capacity = usize::try_from(retained_bytes)
+        .map_err(|_| CliError::InvalidRepository("JSON output is too large".to_string()))?;
+    let mut bytes = Vec::with_capacity(capacity);
+    if let Err(error) = serde_json::to_writer_pretty(&mut bytes, value) {
+        let _ = ledger.release(
+            codefire_core::DecisionWorkDimension::RetainedBytes,
+            retained_bytes,
+        );
+        return Err(error.into());
+    }
+    bytes.push(b'\n');
+    debug_assert_eq!(bytes.len(), capacity);
+    Ok((bytes, retained_bytes))
+}
+
+fn encode_text_output<F>(
+    ledger: &mut codefire_core::DecisionWorkLedger,
+    render: F,
+) -> Result<(Vec<u8>, u64), CliError>
+where
+    F: Fn(&mut dyn Write) -> std::io::Result<()>,
+{
+    let mut counter = JsonSizeWriter::default();
+    render(&mut counter)?;
+    let retained_bytes = counter.0;
+    reserve_output_bytes(ledger, retained_bytes)?;
+    let capacity = usize::try_from(retained_bytes)
+        .map_err(|_| CliError::InvalidRepository("text output is too large".to_string()))?;
+    let mut bytes = Vec::with_capacity(capacity);
+    if let Err(error) = render(&mut bytes) {
+        let _ = ledger.release(
+            codefire_core::DecisionWorkDimension::RetainedBytes,
+            retained_bytes,
+        );
+        return Err(error.into());
+    }
+    debug_assert_eq!(bytes.len(), capacity);
+    Ok((bytes, retained_bytes))
+}
+
+fn compact_branch_result_size(name: &str, head: &str, state: &str) -> Result<u64, CliError> {
+    let mut writer = JsonSizeWriter::default();
+    serde_json::to_writer(&mut writer, &BorrowedBranchResult { name, head, state })?;
+    Ok(writer.0)
+}
+
+fn project_opened_registries(
+    snapshot: &OpenedRegistrySnapshot,
+    ledger: &mut codefire_core::DecisionWorkLedger,
+) -> Result<(Vec<Value>, u64), CliError> {
+    let mut retained_bytes = 0_u64;
+    let result = (|| {
+        let mut opened = Vec::with_capacity(snapshot.documents().len());
+        for document in snapshot.documents() {
+            let registry = document.value();
+            let branch = registry
+                .get("branch")
+                .and_then(Value::as_str)
+                .or_else(|| {
+                    registry
+                        .get("branch")
+                        .and_then(|branch| branch.get("name"))
+                        .and_then(Value::as_str)
+                })
+                .or_else(|| registry.get("name").and_then(Value::as_str))
+                .ok_or_else(|| {
+                    CliError::InvalidRepository(format!(
+                        "opened registry at {} has no branch name",
+                        document.display_path().display()
+                    ))
+                })?;
+            let open = registry.get("open").and_then(Value::as_object);
+            let open_path = open
+                .and_then(|open| open.get("path").or_else(|| open.get("opened_path")))
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let borrowed = BorrowedOpenedRegistryResult {
+                branch,
+                path: open_path,
+                open_instance_id: open.and_then(|open| open.get("open_instance_id")),
+                current_base_commit: open.and_then(|open| open.get("current_base_commit")),
+                opened_from_commit: open.and_then(|open| open.get("opened_from_commit")),
+                registry_path: document.display_path(),
+            };
+            let mut counter = JsonSizeWriter::default();
+            serde_json::to_writer(&mut counter, &borrowed)?;
+            let next_retained = retained_bytes.checked_add(counter.0).ok_or_else(|| {
+                CliError::InvalidRepository("opened registry projection size overflow".to_string())
+            })?;
+            ledger
+                .apply(
+                    codefire_core::DecisionWorkReservation::new(
+                        codefire_core::DecisionWorkPhase::PublicationPreflight,
+                        codefire_core::DecisionWorkSurface::Atomic,
+                    )
+                    .acquire(
+                        codefire_core::DecisionWorkDimension::RetainedBytes,
+                        counter.0,
+                    ),
+                )
+                .map_err(branch_list_accounting_error)?;
+            retained_bytes = next_retained;
+            opened.push(json!({
+                "branch": branch,
+                "path": open_path,
+                "open_instance_id": borrowed.open_instance_id.cloned().unwrap_or(Value::Null),
+                "current_base_commit": borrowed.current_base_commit.cloned().unwrap_or(Value::Null),
+                "opened_from_commit": borrowed.opened_from_commit.cloned().unwrap_or(Value::Null),
+                "registry_path": document.display_path(),
+            }));
+        }
+        Ok(opened)
+    })();
+    match result {
+        Ok(opened) => Ok((opened, retained_bytes)),
+        Err(error) => {
+            let _ = ledger.release(
+                codefire_core::DecisionWorkDimension::RetainedBytes,
+                retained_bytes,
+            );
+            Err(error)
+        }
+    }
+}
+
+fn finish_branch_list_failure(
+    ledger: &mut codefire_core::DecisionWorkLedger,
+    error: &BranchRefSnapshotError,
+) {
+    if ledger.snapshot().terminal_reason.is_none() {
+        let reason = match error {
+            BranchRefSnapshotError::SubjectChanged { .. } => {
+                codefire_core::DecisionWorkTerminalReason::SubjectChanged
+            }
+            _ => codefire_core::DecisionWorkTerminalReason::CorruptSubject,
+        };
+        let _ = ledger.finish(reason);
+    }
+}
+
+fn finish_branch_list_store_failure(
+    ledger: &mut codefire_core::DecisionWorkLedger,
+    error: &codefire_store::StoreError,
+) {
+    if ledger.snapshot().terminal_reason.is_none() {
+        let _ = ledger.finish(branch_list_store_terminal_reason(error));
+    }
+}
+
+fn branch_list_store_terminal_reason(
+    error: &codefire_store::StoreError,
+) -> codefire_core::DecisionWorkTerminalReason {
+    if matches!(
+        error,
+        codefire_store::StoreError::SealedValidationSubjectChanged { .. }
+    ) {
+        codefire_core::DecisionWorkTerminalReason::SubjectChanged
+    } else {
+        codefire_core::DecisionWorkTerminalReason::CorruptSubject
+    }
+}
+
+fn branch_list_cli_terminal_reason(error: &CliError) -> codefire_core::DecisionWorkTerminalReason {
+    if matches!(
+        error,
+        CliError::BranchReferenceSubjectChanged { .. }
+            | CliError::OpenedRegistrySubjectChanged { .. }
+    ) {
+        codefire_core::DecisionWorkTerminalReason::SubjectChanged
+    } else {
+        codefire_core::DecisionWorkTerminalReason::CorruptSubject
+    }
+}
+
+fn branch_list_ref_error(error: BranchRefSnapshotError) -> CliError {
+    match error {
+        BranchRefSnapshotError::Io(error) => CliError::Io(error),
+        BranchRefSnapshotError::Json(error) => CliError::Json(error),
+        BranchRefSnapshotError::Accounting(error) => branch_list_accounting_error(error),
+        BranchRefSnapshotError::SubjectChanged { subject, reason } => {
+            CliError::BranchReferenceSubjectChanged {
+                subject,
+                message: reason,
+            }
+        }
+        BranchRefSnapshotError::InvalidRecord { path, reason } => CliError::InvalidRepository(
+            format!("invalid branch reference at {}: {reason}", path.display()),
+        ),
+    }
+}
+
+fn opened_registry_ref_error(error: BranchRefSnapshotError) -> CliError {
+    match error {
+        BranchRefSnapshotError::Io(error) => CliError::Io(error),
+        BranchRefSnapshotError::Json(error) => CliError::Json(error),
+        BranchRefSnapshotError::Accounting(error) => branch_list_accounting_error(error),
+        BranchRefSnapshotError::SubjectChanged { subject, reason } => {
+            CliError::OpenedRegistrySubjectChanged {
+                subject,
+                message: reason,
+            }
+        }
+        BranchRefSnapshotError::InvalidRecord { path, reason } => CliError::InvalidRepository(
+            format!("invalid opened registry at {}: {reason}", path.display()),
+        ),
+    }
+}
+
+fn branch_list_accounting_error(error: codefire_core::DecisionWorkAccountingError) -> CliError {
+    match error.budget_exceeded() {
+        Some(exhaustion) => CliError::from(exhaustion.clone()),
+        None => CliError::InvalidRepository(format!(
+            "decision-work accounting failed while listing branches: {error}"
+        )),
+    }
+}
+
+fn branch_list_store_error(error: codefire_store::StoreError) -> CliError {
+    match error {
+        codefire_store::StoreError::DecisionWorkAccounting(accounting) => {
+            branch_list_accounting_error(*accounting)
+        }
+        error => CliError::from(error),
+    }
 }
 
 fn load_branch_record(repo_root: &Path, branch: &str) -> Result<Value, CliError> {
@@ -7395,14 +11998,17 @@ fn load_branch_record(repo_root: &Path, branch: &str) -> Result<Value, CliError>
 }
 
 fn save_branch_record(repo_root: &Path, branch: &Value) -> Result<(), CliError> {
-    let name = required_string(branch, &["name"])?;
-    write_json_atomic(&branch_record_path(repo_root, &name), branch)?;
     codefire_store::store_object(
         &repo_root.join(".codefire").join("objects"),
         "branch",
         branch.clone(),
     )?;
-    Ok(())
+    write_branch_record_reference(repo_root, branch)
+}
+
+fn write_branch_record_reference(repo_root: &Path, branch: &Value) -> Result<(), CliError> {
+    let name = required_string(branch, &["name"])?;
+    write_json_atomic(&branch_record_path(repo_root, &name), branch)
 }
 
 fn branch_record_path(repo_root: &Path, branch: &str) -> PathBuf {
@@ -7419,10 +12025,11 @@ fn opened_registry_path(repo_root: &Path, branch: &str) -> PathBuf {
         .join(format!("{}.json", ref_file_name(branch)))
 }
 
-fn materialize_commit(objects: &Path, commit_id: &str, target: &Path) -> Result<(), CliError> {
-    let commit = codefire_store::read_object(objects, commit_id)?;
-    let manifest_id = required_string(&commit, &["roots", "content_manifest"])?;
-    let manifest = codefire_store::read_object(objects, &manifest_id)?;
+fn materialize_commit(
+    validated: &codefire_store::ValidatedSealedCommit,
+    target: &StagedWorktree,
+) -> Result<(), CliError> {
+    let manifest = validated.read_root("content_manifest")?;
     let entries = manifest
         .get("entries")
         .and_then(Value::as_array)
@@ -7435,7 +12042,7 @@ fn materialize_commit(objects: &Path, commit_id: &str, target: &Path) -> Result<
         }
         let rel_path = required_string(entry, &["path"])?;
         let blob_id = required_string(entry, &["blob"])?;
-        let blob = codefire_store::read_object(objects, &blob_id)?;
+        let blob = validated.read_object(&blob_id)?;
         let encoding = required_string(&blob, &["encoding"])?;
         if encoding != "base64" {
             return Err(CliError::InvalidRepository(format!(
@@ -7443,37 +12050,74 @@ fn materialize_commit(objects: &Path, commit_id: &str, target: &Path) -> Result<
             )));
         }
         let content = required_string(&blob, &["content"])?;
-        let output_path = safe_manifest_output_path(target, &rel_path)?;
-        if let Some(parent) = output_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(output_path, decode_base64(&content)?)?;
+        let output_path = safe_relative_manifest_path(&rel_path)?;
+        target
+            .write_file(&output_path, &decode_base64(&content)?)
+            .map_err(CliError::Io)?;
     }
     Ok(())
 }
 
-fn build_manifest(objects: &Path, open_dir: &Path) -> Result<Value, CliError> {
+fn planned_commit_object(
+    role: &'static str,
+    path: Option<String>,
+    object_type: &'static str,
+    payload: Value,
+    stage: CommitObjectStage,
+) -> Result<PlannedCommitObject, CliError> {
+    let object_id = codefire_store::object_id(object_type, &payload)?;
+    Ok(PlannedCommitObject {
+        role,
+        path,
+        object_type,
+        object_id,
+        payload: Some(payload),
+        worktree_source: None,
+        stage,
+    })
+}
+
+fn manifest_blob_payload(data: &[u8]) -> Value {
+    json!({
+        "type": "blob",
+        "version": 1,
+        "encoding": "base64",
+        "content": encode_base64(data),
+    })
+}
+
+fn build_manifest_plan(open_dir: &Path) -> Result<ManifestCommitPlan, CliError> {
     let mut entries = Vec::new();
+    let mut blobs = Vec::new();
     for rel in rel_files(open_dir)? {
         let data = fs::read(open_dir.join(&rel))?;
-        let blob_id = codefire_store::store_object(
-            objects,
-            "blob",
-            json!({
-                "type": "blob",
-                "version": 1,
-                "encoding": "base64",
-                "content": encode_base64(&data),
-            }),
-        )?;
+        let path = to_posix(&rel);
+        let blob_payload = manifest_blob_payload(&data);
+        let blob = PlannedCommitObject {
+            role: "manifest_blob",
+            path: Some(path.clone()),
+            object_type: "blob",
+            object_id: codefire_store::object_id("blob", &blob_payload)?,
+            payload: None,
+            worktree_source: Some(rel),
+            stage: CommitObjectStage::ManifestBlob,
+        };
         entries.push(json!({
-            "path": to_posix(&rel),
+            "path": path,
             "kind": "file",
             "mode": "100644",
-            "blob": blob_id,
+            "blob": &blob.object_id,
         }));
+        blobs.push(blob);
     }
-    Ok(json!({"type": "content_manifest", "version": 1, "entries": entries}))
+    let manifest = planned_commit_object(
+        "content_manifest",
+        None,
+        "content_manifest",
+        json!({"type": "content_manifest", "version": 1, "entries": entries}),
+        CommitObjectStage::SealedRoot,
+    )?;
+    Ok(ManifestCommitPlan { blobs, manifest })
 }
 
 fn source_manifest_unchanged(
@@ -7481,35 +12125,45 @@ fn source_manifest_unchanged(
     base_commit: &str,
     open_dir: &Path,
 ) -> Result<bool, CliError> {
-    let commit = codefire_store::read_object(objects, base_commit)?;
-    let manifest_id = required_string(&commit, &["roots", "content_manifest"])?;
-    let base_manifest = codefire_store::read_object(objects, &manifest_id)?;
+    let validated = codefire_store::validate_sealed_commit_pinned(objects, base_commit)?;
+    source_manifest_unchanged_validated(&validated, open_dir)
+}
+
+fn source_manifest_unchanged_validated(
+    validated: &codefire_store::ValidatedSealedCommit,
+    open_dir: &Path,
+) -> Result<bool, CliError> {
+    let base_manifest = validated.read_root("content_manifest")?;
     let current_manifest = build_manifest_fingerprint(open_dir)?;
     Ok(manifest_blob_map(&base_manifest)? == manifest_blob_map(&current_manifest)?)
 }
 
-fn non_atom_changed_files_since_base(
-    objects: &Path,
-    base_commit: &str,
+fn source_manifest_unchanged_existing(
+    validated: &codefire_store::ValidatedSealedCommit,
+    open_dir: &ExistingWorktree,
+) -> Result<bool, CliError> {
+    let base_manifest = validated.read_root("content_manifest")?;
+    let current_manifest = build_manifest_fingerprint_from_files(open_dir.read_manifest_files()?)?;
+    Ok(manifest_blob_map(&base_manifest)? == manifest_blob_map(&current_manifest)?)
+}
+
+fn source_manifest_unchanged_secure(
+    validated: &codefire_store::ValidatedSealedCommit,
+    open_dir: &secure_worktree::SecureWorktree,
+) -> Result<bool, CliError> {
+    let base_manifest = validated.read_root("content_manifest")?;
+    let current_manifest = build_manifest_fingerprint_from_files(open_dir.read_manifest_files()?)?;
+    Ok(manifest_blob_map(&base_manifest)? == manifest_blob_map(&current_manifest)?)
+}
+
+fn manifest_file_changes_since_base(
+    validated: &codefire_store::ValidatedSealedCommit,
     open_dir: &Path,
-    current: &codefire_core::AtomIndex,
-    base_index: &codefire_core::AtomIndex,
-) -> Result<Vec<codefire_core::NonAtomFileChange>, CliError> {
-    let commit = codefire_store::read_object(objects, base_commit)?;
-    let manifest_id = required_string(&commit, &["roots", "content_manifest"])?;
-    let base_manifest = codefire_store::read_object(objects, &manifest_id)?;
+) -> Result<Vec<codefire_core::ManifestFileChange>, CliError> {
+    let base_manifest = validated.read_root("content_manifest")?;
     let current_manifest = build_manifest_fingerprint(open_dir)?;
     let base_files = manifest_blob_map(&base_manifest)?;
     let current_files = manifest_blob_map(&current_manifest)?;
-    let changed_atom_ids = codefire_core::changed_atoms(current, base_index)
-        .into_iter()
-        .collect::<BTreeSet<_>>();
-    let changed_atom_paths = current
-        .atoms
-        .iter()
-        .filter(|atom| changed_atom_ids.contains(&atom.atom_id))
-        .map(|atom| atom.artifact_path.clone())
-        .collect::<BTreeSet<_>>();
     let paths = base_files
         .keys()
         .chain(current_files.keys())
@@ -7517,9 +12171,6 @@ fn non_atom_changed_files_since_base(
         .collect::<BTreeSet<_>>();
     let mut changes = Vec::new();
     for path in paths {
-        if changed_atom_paths.contains(&path) {
-            continue;
-        }
         let base_blob = base_files.get(&path).cloned();
         let current_blob = current_files.get(&path).cloned();
         if base_blob == current_blob {
@@ -7531,7 +12182,7 @@ fn non_atom_changed_files_since_base(
             (Some(_), Some(_)) => "modified",
             (None, None) => continue,
         };
-        changes.push(codefire_core::NonAtomFileChange {
+        changes.push(codefire_core::ManifestFileChange {
             path,
             status: status.to_string(),
             base_blob,
@@ -7561,9 +12212,21 @@ fn manifest_blob_map(manifest: &Value) -> Result<BTreeMap<String, String>, CliEr
 }
 
 fn build_manifest_fingerprint(open_dir: &Path) -> Result<Value, CliError> {
-    let mut entries = Vec::new();
-    for rel in rel_files(open_dir)? {
-        let data = fs::read(open_dir.join(&rel))?;
+    let files = rel_files(open_dir)?
+        .into_iter()
+        .map(|relative| {
+            let data = fs::read(open_dir.join(&relative))?;
+            Ok((relative, data))
+        })
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    build_manifest_fingerprint_from_files(files)
+}
+
+fn build_manifest_fingerprint_from_files(
+    files: Vec<(PathBuf, Vec<u8>)>,
+) -> Result<Value, CliError> {
+    let mut entries = Vec::with_capacity(files.len());
+    for (rel, data) in files {
         let blob_payload = json!({
             "type": "blob",
             "version": 1,
@@ -7605,8 +12268,23 @@ fn collect_rel_files(
                 continue;
             }
             collect_rel_files(root, &rel, files)?;
-        } else if file_type.is_file() && to_posix(&rel) != ".codefire-open" {
-            files.push(rel);
+        } else if file_type.is_file() {
+            let rel_path = to_posix(&rel);
+            let import_operational_temp = rel.components().count() == 1
+                && ((rel_path.starts_with(".codefire-import.lock.bootstrap-")
+                    && (rel_path.ends_with(".tmp") || rel_path.ends_with(".part")))
+                    || (rel_path.starts_with(".codefire-import.write-")
+                        && rel_path.ends_with(".tmp")));
+            if !import_operational_temp
+                && !matches!(
+                    rel_path.as_str(),
+                    ".codefire-open"
+                        | ".codefire-import.lock"
+                        | ".codefire-import-transaction.json"
+                )
+            {
+                files.push(rel);
+            }
         }
     }
     Ok(())
@@ -7619,14 +12297,14 @@ fn to_posix(path: &Path) -> String {
         .join("/")
 }
 
-fn safe_manifest_output_path(target: &Path, rel_path: &str) -> Result<PathBuf, CliError> {
+fn safe_relative_manifest_path(rel_path: &str) -> Result<PathBuf, CliError> {
     let path = Path::new(rel_path);
     if path.is_absolute() {
         return Err(CliError::InvalidRepository(format!(
             "manifest path must be relative: {rel_path}"
         )));
     }
-    let mut output = target.to_path_buf();
+    let mut output = PathBuf::new();
     for component in path.components() {
         match component {
             Component::Normal(part) => output.push(part),
@@ -7729,60 +12407,83 @@ fn is_empty_dir(path: &Path) -> Result<bool, CliError> {
     Ok(path.is_dir() && fs::read_dir(path)?.next().is_none())
 }
 
-fn reset_active(active_state_path: &Path, state: &str) -> Result<(), CliError> {
-    for name in [
-        "fires.json",
-        "resolutions.json",
-        "scan.json",
-        "verification.json",
-        "commit_transaction.json",
-    ] {
-        let path = active_state_path.join(name);
-        if path.exists() {
-            fs::remove_file(path)?;
-        }
-    }
-    write_json_atomic(
-        &active_state_path.join("state.json"),
-        &json!({"state": state}),
-    )?;
-    Ok(())
-}
-
 #[derive(Debug)]
 struct RepoLock {
+    repo_root: PathBuf,
     path: PathBuf,
+    identity: secure_worktree::LockFileIdentity,
+    file: File,
+}
+
+const REPO_LOCK_OWNER_BYTE_LIMIT: u64 = 16 * 1024;
+
+fn acquire_locked_open_context(
+    start: &Path,
+    options: &LockOptions,
+) -> Result<(RepoLock, OpenContext), CliError> {
+    acquire_locked_open_context_with_recovery(start, options, None)
+}
+
+fn acquire_locked_open_context_for_recovery(
+    start: &Path,
+    options: &LockOptions,
+    operation: &str,
+) -> Result<(RepoLock, OpenContext), CliError> {
+    acquire_locked_open_context_with_recovery(start, options, Some(operation))
+}
+
+fn acquire_locked_open_context_with_recovery(
+    start: &Path,
+    options: &LockOptions,
+    recovery_operation: Option<&str>,
+) -> Result<(RepoLock, OpenContext), CliError> {
+    let repo_root = find_repo_root(start)?;
+    let lock = RepoLock::acquire_with_options(&repo_root, options)?;
+    maybe_mutate_locked_open_context_for_test(start)?;
+    let context = match recovery_operation {
+        Some(operation) => open_context_for_recovery(start, operation)?,
+        None => open_context(start)?,
+    };
+    lock.ensure_repo_root(&context.repo_root)?;
+    Ok((lock, context))
 }
 
 impl RepoLock {
     fn acquire_with_options(repo_root: &Path, options: &LockOptions) -> Result<Self, CliError> {
+        let repo_root = fs::canonicalize(repo_root)?;
         let path = repo_root.join(".codefire").join("locks").join("repo.lock");
+        let owner_path = repo_lock_owner_path(&path);
+        let (file, identity) = secure_worktree::open_lock_file_nofollow(&path)?;
         let timeout = options.timeout_ms.map(Duration::from_millis);
         let start = Instant::now();
         loop {
-            match fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&path)
-            {
-                Ok(mut file) => {
-                    file.write_all(
-                        serde_json::to_string_pretty(&json!({
-                            "version": 1,
-                            "pid": std::process::id(),
-                            "created_at": now_iso_utc(),
-                        }))?
-                        .as_bytes(),
-                    )?;
-                    file.write_all(b"\n")?;
-                    return Ok(Self { path });
+            match Fs2FileExt::try_lock_exclusive(&file) {
+                Ok(()) => {
+                    secure_worktree::ensure_lock_file_identity_nofollow(&path, identity)?;
+                    publish_repo_lock_owner(&owner_path)?;
+                    return Ok(Self {
+                        repo_root: repo_root.clone(),
+                        path,
+                        identity,
+                        file,
+                    });
                 }
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                     if !options.wait {
-                        return Err(repo_lock_contention(repo_root, &path, options));
+                        return Err(repo_lock_contention_with_owner(
+                            &repo_root,
+                            &path,
+                            Some(&owner_path),
+                            options,
+                        ));
                     }
                     if timeout.is_some_and(|timeout| start.elapsed() >= timeout) {
-                        return Err(repo_lock_contention(repo_root, &path, options));
+                        return Err(repo_lock_contention_with_owner(
+                            &repo_root,
+                            &path,
+                            Some(&owner_path),
+                            options,
+                        ));
                     }
                     std::thread::sleep(Duration::from_millis(50));
                 }
@@ -7790,10 +12491,28 @@ impl RepoLock {
             }
         }
     }
+
+    fn ensure_repo_root(&self, repo_root: &Path) -> Result<(), CliError> {
+        let resolved = fs::canonicalize(repo_root)?;
+        if resolved != self.repo_root {
+            return Err(CliError::InvalidMarker(format!(
+                "open marker repository changed while acquiring the repository lock: locked {}, resolved {}",
+                self.repo_root.display(),
+                resolved.display()
+            )));
+        }
+        secure_worktree::ensure_lock_file_identity_nofollow(&self.path, self.identity)?;
+        Ok(())
+    }
 }
 
-fn repo_lock_contention(repo_root: &Path, path: &Path, options: &LockOptions) -> CliError {
-    let owner = read_json(path).ok();
+fn repo_lock_contention_with_owner(
+    repo_root: &Path,
+    path: &Path,
+    owner_path: Option<&Path>,
+    options: &LockOptions,
+) -> CliError {
+    let owner = owner_path.and_then(read_repo_lock_owner);
     let mut message = format!("CodeFire repository is locked: {}", path.display());
     if let Some(timeout_ms) = options.timeout_ms {
         message.push_str(&format!("; timed out after {timeout_ms}ms"));
@@ -7813,76 +12532,47 @@ fn repo_lock_contention(repo_root: &Path, path: &Path, options: &LockOptions) ->
     }
 }
 
+fn repo_lock_owner_path(lock_path: &Path) -> PathBuf {
+    lock_path.with_file_name("repo.lock.owner.json")
+}
+
+fn publish_repo_lock_owner(path: &Path) -> Result<(), CliError> {
+    let mut owner = serde_json::to_vec_pretty(&json!({
+        "version": 1,
+        "pid": std::process::id(),
+        "created_at": now_iso_utc(),
+    }))?;
+    owner.push(b'\n');
+    let temp_path = unique_temp_path(path);
+    secure_worktree::write_file_atomic_nofollow(path, &temp_path, &owner)?;
+    Ok(())
+}
+
+fn read_repo_lock_owner(path: &Path) -> Option<Value> {
+    let bytes =
+        secure_worktree::read_file_nofollow_bounded(path, REPO_LOCK_OWNER_BYTE_LIMIT).ok()?;
+    serde_json::from_slice(&bytes).ok()
+}
+
 impl Drop for RepoLock {
     fn drop(&mut self) {
-        let _ = fs::remove_file(&self.path);
+        let _ = Fs2FileExt::unlock(&self.file);
     }
 }
 
 struct FileLock {
-    path: PathBuf,
+    _lock: stable_lock::StableFileLock,
 }
 
 impl FileLock {
     fn acquire_with_options(path: PathBuf, options: &LockOptions) -> Result<Self, CliError> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let timeout = options.timeout_ms.map(Duration::from_millis);
-        let start = Instant::now();
-        loop {
-            match fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&path)
-            {
-                Ok(mut file) => {
-                    file.write_all(
-                        serde_json::to_string_pretty(&json!({
-                            "version": 1,
-                            "pid": std::process::id(),
-                            "created_at": now_iso_utc(),
-                        }))?
-                        .as_bytes(),
-                    )?;
-                    file.write_all(b"\n")?;
-                    return Ok(Self { path });
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                    if !options.wait {
-                        return Err(file_lock_contention(&path, options));
-                    }
-                    if timeout.is_some_and(|timeout| start.elapsed() >= timeout) {
-                        return Err(file_lock_contention(&path, options));
-                    }
-                    std::thread::sleep(Duration::from_millis(50));
-                }
-                Err(error) => return Err(CliError::Io(error)),
-            }
-        }
-    }
-}
-
-fn file_lock_contention(path: &Path, options: &LockOptions) -> CliError {
-    let owner = read_json(path).ok();
-    let mut message = format!("CodeFire resource is locked: {}", path.display());
-    if let Some(timeout_ms) = options.timeout_ms {
-        message.push_str(&format!("; timed out after {timeout_ms}ms"));
-    }
-    if let Some(owner) = owner {
-        if let Some(pid) = owner.get("pid").and_then(Value::as_u64) {
-            message.push_str(&format!("; owner pid {pid}"));
-        }
-        if let Some(created_at) = owner.get("created_at").and_then(Value::as_str) {
-            message.push_str(&format!("; locked at {created_at}"));
-        }
-    }
-    CliError::LockContention(message)
-}
-
-impl Drop for FileLock {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.path);
+        let deadline = stable_lock::LockDeadline::from_options(options);
+        stable_lock::StableFileLock::acquire(
+            &path,
+            stable_lock::StableLockMode::Exclusive,
+            &deadline,
+        )
+        .map(|lock| Self { _lock: lock })
     }
 }
 
@@ -7928,7 +12618,8 @@ fn find_open_marker(start: &Path) -> Result<Option<PathBuf>, CliError> {
 }
 
 fn read_json(path: &Path) -> Result<Value, CliError> {
-    Ok(serde_json::from_str(&fs::read_to_string(path)?)?)
+    let bytes = secure_worktree::read_file_nofollow_bounded(path, REPOSITORY_JSON_BYTE_LIMIT)?;
+    Ok(serde_json::from_slice(&bytes)?)
 }
 
 fn required_string(value: &Value, path: &[&str]) -> Result<String, CliError> {

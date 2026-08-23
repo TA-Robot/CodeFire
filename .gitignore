@@ -13,6 +13,17 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+.codex-second-agent/
+.codex-worktrees/
+.claude-second-agent/
+.claude-worktrees/
+.fugu-second-agent/
+.fugu-worktrees/
+.dev-swarm/
+fugu-api
+
+docs/development/ai/audit-latest.md
+
 .codefire/
 .codefire-open
 .codefire-server/

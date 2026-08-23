@@ -71,6 +71,11 @@ crates/
     src/main.rs
     src/automation.rs
     src/cli_model.rs
+    src/active_state.rs
+    src/close_transaction.rs
+    src/close_worktree.rs
+    src/open_transaction.rs
+    src/secure_worktree.rs
     src/context.rs
     src/verification.rs
     src/fire.rs
@@ -106,10 +111,13 @@ Ownership rules:
 | `main.rs` | dispatch and thin orchestration | domain logic, JSON string building, large command implementations |
 | `cli_model.rs` | CLI option/result/context types | object store invariants |
 | `automation.rs` | JSON envelope, diagnostics rendering, next_actions | command mutation logic |
+| `close_transaction.rs` | durable close/discard request, evidence matrix, phase/retry/archive ordering | generic tree traversal or CLI rendering |
+| `close_worktree.rs` / `active_state.rs` | capability-bound worktree/active subjects and exact transactional removal | cross-record close phase policy |
+| `secure_worktree.rs` | shared stable identity, no-follow capability, no-replace publication primitives | command-specific close/open policy |
 | `codefire-core` | Atom, Trace Graph, scan, verification semantics | CLI parsing, filesystem mutation outside read/index operations |
 | `codefire-store` | canonical JSON, object record, sealed commit validation | open directory state transitions |
 | `doctor/*` | repository health diagnostics | migration write behavior |
-| `migration.rs` | migration plan/apply | independent layout definitions that diverge from doctor |
+| `migration.rs` | compatibility-profile inspection plus locked, capability-relative application of shared auto-create layout actions | independent layout definitions, arbitrary paths, or repository/object format rewriting |
 | `storage.rs` | capacity and artifact observability | verification policy |
 | `remote/*` | remote project mutation and validation | local open state mutation except via explicit service calls |
 
@@ -160,6 +168,13 @@ Requirements:
 - final object path must match object kind and ID.
 - writes must be publish-after-validate.
 - legacy shorter IDs may be read only if full record validation passes.
+- serialized records are capped at 64 MiB on write and read; readers use no-follow, non-blocking regular-file opens plus metadata and bounded-read checks.
+- writer, ordinary reader, sealed traversal, and full-store scan open absolute root/subdirectory components without following symlinks; a symlink at the object root or an intermediate subdirectory is rejected.
+- object publication uses a validated, synced create-new temp and no-replace hard link, then rechecks the pinned root/subdirectory identities; a full scan likewise succeeds only after its final identity recheck. Sealed consumers that cross a later mutable visibility point retain `ValidatedSealedCommit`, read commit/root/reference objects from the validation-bound handles, and recheck the same subject immediately before and after publication.
+
+Sealed validation is a stronger consuming boundary than an ordinary object read. It opens and pins the canonical objects root, records the identity-or-missing state of the twelve built-in subdirectories and every currently present extension subdirectory, and reads commit/parent/root/reachable records relative to those directory handles with final-component no-follow semantics. At most 128 extension subdirectories may be bound; exceeding the cap fails as `InvalidSealedCommit` before handles enter the cache. The command-scoped cache key is `(root path + root identity + ordered subdirectory identity/missing set, commit ID)`, and successful entries are published only after the ambient root and bound subdirectories are rechecked. Root or child replacement therefore cannot reuse a validation result for the old subject. One cache retains only its current store subject: binding a different root/identity/subdirectory set evicts prior pins and validation entries. On platforms without stable directory identity, one traversal still uses pinned handles but cache results are not reused across calls.
+
+This boundary assumes the cooperative object-store rule that a published object file is immutable. It binds directory subjects and read handles; it is not an in-place rewrite detector for an already cached object record. ADR-011 owns this decision and its root/subdirectory swap-back fixtures.
 
 ### Sealed Commit
 
@@ -167,11 +182,15 @@ Sealed commit references the complete consistency state.
 
 ```text
 Commit
+  version = 1
+  root_schema_version = 2
+  semantic_validation_profile = sealed-snapshot-v1
   parents
   manifest_root
   atom_index_root
   trace_graph_root
   fire_delta_root
+  resolution_ledger_root
   verification_root
   policy_root
   certificate
@@ -181,11 +200,17 @@ Commit
 Validation must check:
 
 - commit object type.
+- commit/root schema versions and compatibility mode.
 - parent commit validity.
 - root object existence and type.
 - certificate structure and consistency counters.
 - evidence/artifact references reachable from verification and resolutions.
-- optional signature policy.
+- Atom-versus-Trace endpoint integrity for the commit's declared semantic profile.
+- schema-2 cross-root Fire/Resolution/Atom/Trace/policy/verification semantics through the authoritative `codefire-core` predicate.
+
+Current Rust commits use commit version 1, root schema 2, semantic profile `sealed-snapshot-v1`, and version-1 roots. Missing `root_schema_version` selects the legacy schema-1 required-root/shape contract; any schema other than 1 or 2 and any commit/root object version other than 1 fails closed. Missing semantic profile selects the explicitly weaker legacy-unversioned cross-root contract, while unknown/non-string profiles fail closed. Each parent is validated under its own profile, so a strict current commit may retain an unmodified legacy parent. For schema 2, empty `verification.missing_evidence_refs` and `verification.unresolved_merge_conflicts` arrays may be omitted. The missing-evidence certificate count may also be omitted only when the verification count is zero; unresolved merge conflicts have no certificate count because only zero may seal. ADR-012 defines the independent semantic-profile axis, and ADR-014 defines the merge extension.
+
+For root schema 2, the store decodes Atom index, Trace Graph, Fire ledger, Resolution ledger, verification, and policy into `codefire-core` types and invokes `validate_sealed_snapshot_semantics`. Core consumes unresolved merge facts and recomputes the open required-Fire count, duplicate Atom IDs, missing required links, stale resolutions, trace-completeness flag, verification result, and Fire/active-Resolution UID/cardinality/identity agreement. The store then checks certificate result/count agreement and reachable evidence/artifact references. Commit/request signature generation and policy enforcement remain a CLI `signatures` responsibility at local commit and remote/security boundaries; the store must not claim that a structurally valid optional signature is cryptographically trusted.
 
 ### Active State
 
@@ -198,6 +223,8 @@ Active state is mutable metadata for one open directory.
   fires.json
   resolutions.json
   verification.json
+  state_transaction.json    # only while live scan/verify publication is pending
+  commit_transaction.json   # only while commit is pending/interrupted
 ```
 
 Allowed:
@@ -251,18 +278,22 @@ Status, scan, verify, commit, close must call the same state reducer. Individual
 
 ## 11.6 Command Lifecycle
 
-Every mutating command follows the same lifecycle.
+Every mutating command follows this conceptual lifecycle. When validation depends on mutable repository/open metadata, lock acquisition and context reload move before that validation and plan construction; dry-run keeps the read-only path and does not acquire ownership merely to render a plan.
 
 ```text
 parse args
 resolve path/repo/open context
+if dry-run:
+  load/validate the read-only subject
+  build and render the plan
+  exit
+acquire locks for the mutation subject
+reload mutable context under the lock
 load policy and current state
 validate command-specific preconditions
 build operation plan
-if dry-run:
+if no longer applicable:
   render plan and exit
-acquire locks
-revalidate mutable preconditions
 apply writes through atomic helpers
 render result
 ```
@@ -302,6 +333,7 @@ Design requirements:
 - `exit_code` equals the process exit code.
 - `diagnostics[].blocking` is authoritative for blocker filtering.
 - `next_actions` must include enough machine-readable target data to be run outside the original cwd.
+- collection samples preserve full total/omitted counts and bound every echoed untrusted string. For `link --batch`, diagnostics, plan items, and applied-link projections are independently capped at 100, with 256-byte UTF-8-safe string samples and explicit omission fields.
 - envelope schema changes require explicit versioning.
 
 ## 11.8 Scan Design
@@ -309,19 +341,18 @@ Design requirements:
 Scan flow:
 
 ```text
-1. resolve open context
-2. validate marker/open registry/base/head
-3. load codefire.yaml
-4. build current AtomIndex
-5. load base AtomIndex
-6. compare Atom hashes
-7. compare non-Atom files against manifest
-8. load Trace Graph and policy
-9. generate automatic fires from changed atoms and trace impact
-10. preserve manual fires
-11. remove obsolete automatic fires
-12. write active scan/fires/state
-13. render changed atoms, non-Atom changes, open fires, metrics
+1. find the repository, acquire RepoLock, and reload open context
+2. validate the complete sealed base through the command cache
+3. load codefire.yaml and build the current AtomIndex
+4. load the base AtomIndex
+5. load the Trace Graph and validate all endpoints against the current index
+6. compare Atom hashes and non-Atom files against the base manifest
+7. generate automatic fires from changed atoms and trace impact
+8. preserve manual fires and remove obsolete automatic fires
+9. validate any existing state-transaction marker before the first recovery write
+10. publish verification invalidation, fires, scan, registry, active state, and branch through the scan phase sequence
+11. verify the three state authorities agree and remove the marker
+12. render changed atoms, non-Atom changes, open fires, metrics
 ```
 
 Algorithm requirements:
@@ -334,6 +365,8 @@ Algorithm requirements:
 ## 11.9 Verification Design
 
 Verification combines internal and external checks.
+
+Live verification preflights policy and strict active merge metadata before the locked scan may write, then computes the internal/external result. It validates any surviving state marker before writing a new verify marker, writes `verification.json`, advances registry/active/branch through the verify phase sequence, and removes the marker only after the three state authorities agree. Read-only preview callers use the compute boundary without these writes.
 
 Internal checks:
 
@@ -411,29 +444,32 @@ Batch extinguish must validate every item before writing any resolution.
 Commit flow:
 
 ```text
-1. acquire repo and branch locks
-2. validate open identity
-3. run or load fresh scan
-4. run verification
-5. reject blockers
-6. build content manifest from working files
-7. store blobs and derived objects
-8. store verification and fire delta
-9. build certificate
-10. optionally sign commit
-11. store commit object
-12. atomically update branch head
-13. reset active state to clean base
-14. render summary
+1. acquire the repository lock and reload open context
+2. validate the complete sealed base and open identity
+3. run fresh scan and verification under that lock
+4. reject blockers
+5. create commit_transaction.json
+6. if policy requires a signature, acquire the key before the first immutable write
+7. purely plan every manifest blob, seven sealed roots, signed/unsigned candidate, and next branch snapshot
+8. publish all ordered role entries as planned before the first store
+9. store blobs and roots, verify each ID, and mark each role entry stored
+10. store/mark the candidate and validate the complete sealed candidate
+11. store/mark the precomputed branch snapshot
+12. publish the mutable branch ref, update opened registry, and reset active state
+13. remove the transaction marker and render the summary
 ```
 
 Write ordering:
 
-- store immutable objects first.
-- update branch head only after all referenced objects exist and validate.
+- `objects[]` is an ordered role ledger with `role`, nullable repo-relative `path`, `object_type`, `object_id`, and `planned|stored` state. Duplicate blob IDs at different paths remain separate role entries.
+- predeclare every immutable role before any object storage so every store-to-marker interruption is diagnosable.
+- store the branch snapshot object after candidate validation but before publishing the mutable branch ref.
+- update branch head only after all referenced objects exist and complete sealed validation passes.
 - reset active state only after branch head update succeeds.
 
 If commit fails before branch head update, no formal history is changed.
+
+Current failpoint/corruption evidence covers the store-before-marker gap for a manifest blob, sealed root, candidate, and branch snapshot; interruption immediately before candidate validation; and rejection of invalid certificate, missing/wrong root, and invalid parent candidates. Each store-gap fixture proves the object is discoverable through its still-planned entry while branch/opened heads remain unchanged. It does not claim an exhaustive process-crash fixture at every write boundary.
 
 ## 11.12 Diff and Merge Design
 
@@ -460,11 +496,14 @@ Merge flow:
 2. find common ancestor with bounded traversal
 3. materialize merge into target open directory
 4. detect file conflicts and binary conflicts
-5. create merge_changed fires
-6. leave target open-burning
+5. record text/binary/semantic unresolved authority
+6. create merge_changed fires
+7. leave target open-burning
+8. require `merge --continue` after marker/sidecar resolution and semantic acknowledgement
+9. verify, then seal through the normal two-parent commit transaction
 ```
 
-Merge must not create a sealed commit directly. Human or external automation must resolve fires and verify.
+Merge must not create a sealed commit directly. Human or external automation resolves file conflicts, removes binary sidecars after choosing the target result, explicitly acknowledges semantic candidates, runs `merge --continue`, resolves any derivative Fires, and verifies. Non-empty merge facts are the highest-priority `CommittableDecision` blocker and map to exit 15.
 
 ## 11.13 Remote Design
 
@@ -547,6 +586,7 @@ Locks:
 
 ```text
 repo.lock
+repo.lock.owner.json
 branch-<encoded-name>.lock
 object-store.lock
 active-<open_instance_id>.lock
@@ -558,9 +598,20 @@ Rules:
 
 - acquire locks in stable order.
 - timeouts return stable lock contention exit code.
-- lock files should include owner metadata when available.
+- local/import `repo.lock` is a persistent regular no-follow file with exactly one provable filesystem link; ownership is its kernel advisory lock, not pathname existence. Acquisition never truncates or writes its contents. File identity/link provenance is checked before locking, immediately after locking through the canonical pathname, and again at the mutation use boundary. Process exit releases ownership, while normal unlock never unlinks the inode.
+- repository owner metadata `{version,pid,created_at}` is atomically replaced only after ownership in the common `repo.lock.owner.json` sidecar. Contention reads are no-follow, regular-file only, and capped at 16 KiB; invalid sidecars are ignored. Unlock leaves both files in place.
+- import uses that same repository-lock/sidecar rule plus a persistent root `.codefire-import.lock` whose immutable payload binds bootstrap provenance. Mutable import recovery phase lives in the separately atomically replaced `.codefire-import-transaction.json`.
+- the older specialized remote/resource `FileLock` still uses create-new/unlink semantics and is outside ADR-010 until migrated with its own fixtures.
 - writes use temp file, fsync where appropriate, validation, atomic rename or link finalization.
 - after lock acquisition, revalidate mutable preconditions.
+
+Generic CLI repository JSON uses one symmetric 64 MiB serialization/read cap. The writer rejects oversized rendered JSON before temp publication. The reader opens the absolute parent component-by-component without following symlinks, opens the final name no-follow/non-blocking, requires a regular file, and enforces both metadata size and a limit-plus-one read. Specialized transaction/import/owner formats may use smaller documented limits.
+
+Close/discard publishes a 1 MiB-capped pending marker before deletion and uses only transaction-derived single-component quarantine names. Worktree, active state, opened registry, branch reference, and their parents are checked against recorded stable identities at their use boundaries. The closed branch object is immutable and precedes the mutable branch reference. Completion publishes an exact fixed archive before identity-bound removal of pending authority; a subsequent distinct close retires that archive explicitly.
+
+Import reserves only these root namespaces: exact `.codefire-import.lock`, `.codefire-import-transaction.json`, and `.codefire-open`; `.codefire-import.lock.bootstrap-*.part` unpublished staging; fully written `.codefire-import.lock.bootstrap-*.tmp` publication candidates; and `.codefire-import.write-<transaction-id>-*.tmp` atomic-write remnants. `.part` files are not parsed as authority and are preserved unless identity proves that they are another name for the canonical lock. A valid/malformed foreign bootstrap candidate is never blindly deleted; malformed published `.tmp` and foreign write-temp IDs fail closed. Matching write temps are recoverable. Nested or merely similar names remain user content.
+
+Import's parsed operational/control JSON is read no-follow and non-blocking with a 1 MiB cap, regular-file requirement, metadata precheck, and limit-plus-one guard. Repository byte-copy reads are capped at 64 MiB. Ordinary imported user files are capped at 49,545,216 bytes (47.25 MiB) so base64 serialization plus reserved record overhead remains inside the object store's 64 MiB record cap.
 
 ## 11.17 Error and Exit Code Design
 
@@ -624,10 +675,14 @@ Requirements:
 - remote server validates all received object graphs.
 - HTTP path parsing rejects traversal and invalid encodings.
 - TLS insecure mode is explicit and local/test only.
-- command capture uses bounded output and timeout.
+- verification/evidence command capture drains stdout/stderr while the process runs, stores only each configured prefix, reports bytes seen/stored/truncation, and records whether timeout terminated a Unix process group or only a direct child.
 - argv mode avoids shell expansion when requested.
-- secrets should not be stored in object payloads or diagnostics.
-- signatures and nonce replay protect mutating remote operations when policy requires them.
+- command environments are default-deny/minimal and their values are bound by digest rather than serialized; secret-like values and external/home path literals are redacted before evidence or diagnostics are stored.
+- verification cwd is contained below its open subject; the live subject binds the canonical worktree manifest, stale pre-execution subjects are rejected, passing commands that change that subject are blockers, and execution records carry profile/phase/subject/input/environment/worktree identities.
+- request signature v2 authenticates a versioned subject containing the complete payload digest, actor/operation/target/key/idempotency/time/nonce; key validity precedes nonce publication and cache saturation preserves live replay memory by failing new requests closed.
+- context, explain, review pack, verification, and commit certificate project one versioned assessment subject appropriate to their live or sealed trust boundary. Commit rechecks a live worktree subject before its transaction, after manifest planning, and immediately before mutable branch publication; recovery recomputes candidate/open agreement before completing an interrupted visibility step.
+- open materialization resolves the target below the canonical repository-parent boundary, rejects parent traversal/symlink/overlap, writes relative to pinned no-follow capabilities, and rechecks the ambient target identity before repository metadata publication.
+- sealed object validation reads through pinned root/subdirectory capabilities and binds cache reuse to both root and child directory subjects.
 
 ## 11.20 Test Architecture
 
@@ -652,6 +707,7 @@ Testing rules:
 - any bug fix gets a regression test named after behavior, not after the issue number only.
 - large algorithmic changes need boundary tests for size, depth, repeated data, malformed input.
 - docs/help/completion must remain consistent.
+- transaction claims name the exact tested windows. State-transaction fixtures currently cover scan after `fires_written`, verify after `verification_written`, cross-operation retry, and invalid-operation/phase rejection before recovery writes; they are not evidence for every possible metadata-write interruption.
 
 ## 11.21 Recovery Model
 
@@ -664,7 +720,10 @@ Recovery strategy:
 - open registry/marker mismatch is blocking for mutation.
 - cache can be deleted and rebuilt.
 - active state corruption can be diagnosed; recovery must not fabricate file content.
-- pending `commit_transaction.json` markers are diagnostic evidence for interrupted multi-object commits; doctor reports the phase and stored object count instead of guessing recovery.
+- pending `commit_transaction.json` markers are diagnostic evidence for interrupted multi-object commits. Current `objects[]` entries carry role/path/type/ID plus planned/stored state; a candidate alias mirrors the candidate entry. Doctor exposes marker path and a message containing phase plus stored/planned role-entry counts, not separate entry/candidate fields. Legacy string entries remain readable and count as stored.
+- pending `state_transaction.json` markers identify interrupted live scan/verify publication. Retry validates marker shape and the current operation/phase membership before its first recovery write, then recomputes derived state. Only the writer can enforce adjacent phase transitions; one persisted current phase cannot prove historical transition order.
+- pending `.codefire/close_transaction.json` is the retry authority for interrupted close/discard. Only the exact request may resume its five adjacent phases. Deterministic worktree/active/registry quarantine plus branch before/object/after evidence distinguishes every tested publication gap; divergent replacements and simultaneous pending open/close authority fail closed. Dry-run never recovers it, and completion archives before removing it.
+- import retry accepts only the request-bound bootstrap/transaction/repository provenance for the same normalized subject. It preserves unpublished `.part` scratch, can recover fully formed matching `.tmp` publication, removes only transaction-bound write temps, and rejects foreign/malformed published provenance without adopting a normal `init` repository.
 
 `doctor` explains the state. `migrate` changes layout/policy when the change is known and bounded. Neither should silently mutate by default.
 
@@ -703,7 +762,7 @@ Known gaps that drive v0.8 planning:
 - command surface contract is still uneven across show/list/branch/diff/commit failure paths.
 - state derivation needs one reducer shared by status/scan/verify/commit.
 - doctor and migrate need a shared layout definition.
-- evidence command failure semantics need stricter trust handling.
+- evidence command execution is local and unsandboxed; `trust_kind=local_unisolated` and platform termination scope must not be interpreted as OS isolation.
 - fire volume needs grouping and batch template generation.
 - non-Atom changed files need first-class scan visibility.
 - metrics should distinguish unmeasured from measured zero-cost phases.

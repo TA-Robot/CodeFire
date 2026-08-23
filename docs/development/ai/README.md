@@ -16,7 +16,7 @@ The acceleration system has eight parts:
 4. **Review gates**: fast checks focused on invariants, JSON contracts, module boundaries, and validation evidence.
 5. **Learning loop**: every friction point becomes either a CFB/CFR issue, a docs update, or an automation backlog item.
 6. **Tooling**: small repository-local checks that make context packs, task packets, and dirty-tree classification executable.
-7. **Model routing**: GPT-5.6 Sol Medium/High/Ultra tiers selected from risk, uncertainty, and verification cost.
+7. **Provider and model routing**: Codex orchestrates; Claude Opus 5 and Grok 4.6 do individual and audit work. Codex `gpt-5.6-sol` is the guarded orchestrator adapter only.
 8. **Exploration and evals**: falsifiable research notes and task corpora that prevent operating policy from becoming unsupported folklore.
 
 ## Core Rule
@@ -41,8 +41,9 @@ Do not spawn or delegate implementation work until the task packet has:
 | Single task | Hand one focused issue to one agent. | `operating-protocol.md`, relevant context pack |
 | Parallel batch | Split one batch across multiple safe lanes. | `operating-protocol.md` |
 | Review | Check an implementation without redoing it. | `operating-protocol.md` |
-| Role routing | Map external model/runtime choices to work roles. | `operating-protocol.md`, `role-routing-matrix.json` |
-| Model routing | Select GPT-5.6 Sol Medium/High/Ultra and adapt surface differences. | `model-routing-policy.md`, `.codex/` |
+| Provider routing | Codex orchestrates; Claude/Grok implement and audit. | `provider-routing-policy.md`, `provider-routing-matrix.json`, `orchestration-protocol.md` |
+| Milestone control | Five-ahead board; only next-milestone blockers are active. | `../milestones.md`, `../milestone-operating-model.md`, `audit-cadence.md` |
+| Codex model routing | Select GPT-5.6 Sol Medium/High/Ultra when Codex is explicitly selected. | `model-routing-policy.md`, `role-routing-matrix.json`, `.codex/` |
 | Exploration | Keep hypotheses separate from accepted strategy and executable policy. | `../exploration/` |
 | Retrospective | Convert friction into better systems. | `acceleration-master-plan.md`, `../bug-backlog.md`, `../history.md` |
 
@@ -52,21 +53,26 @@ For a new task:
 
 1. Pick a context pack from the index below.
 2. Resolve it to a content-addressed manifest with `../tools/resolve_context_pack.py` when reproducible delegation matters.
-3. Pick an execution role and score risk using `model-routing-policy.md`.
+3. Pick an execution role, score risk, and select the provider using `provider-routing-policy.md`.
 4. Create or reuse a JSON task packet under `task-packets/json/`; validate it with `../tools/check_ai_contracts.py`.
 5. Add the task to the active roadmap batch or issue detail.
-6. Inspect the dry-run manifest from `../tools/run_ai_role.py`; resolve stale base, unavailable preflight capabilities, and dirty write-set intersections before granting `workspace-write`.
+6. Inspect the dry-run manifest from `../tools/run_ai_role.py` or a `dev-swarm plan`; resolve stale base, unavailable provider/capabilities, and dirty write-set intersections before granting writes.
 7. Run an independent reviewer and bind the review to task/patch digests.
 8. Run `python3 docs/development/tools/check_ai_development.py` when the AI system or strategy changed.
 9. Update canonical docs and history with the result.
 
 For a batch:
 
-1. Freeze the batch.
-2. Group tasks by non-overlapping files or modules.
-3. Assign one lane per group.
-4. Keep one manager lane responsible for conflict control and final integration.
-5. Run reviewers after implementation, not in the same lane.
+1. Confirm every task is on the active M1 card in `../milestones.md`.
+2. Group M1 tasks by non-overlapping files or modules.
+3. Assign one Claude or Grok lane per group.
+4. Keep the Codex orchestrator responsible for parking, conflict control, and integration.
+5. Run reviewers after implementation, not in the same lane. Reviewers may only require `block-m1` findings.
+
+The committed-state audit at
+`swarm-batches/codefire-state-audit-20260729.json` is a concrete five-lane example: four disjoint Fugu
+evidence lanes run with four-hour runaway limits, then a fifth Fugu lane merges only their report branches
+and prepares a manager handoff. Its automation stops at that integration branch and never updates `main`.
 
 ## Context Pack Index
 
@@ -129,6 +135,11 @@ If the agent cannot state these, the work is not ready.
 | `../command-source-trace.md` | Command-to-source map for CLI work packets. |
 | `acceleration-master-plan.md` | Selected implementation path and execution backlog for the acceleration system. |
 | `role-routing-matrix.json` | Machine-readable role and reasoning-effort routing. |
+| `provider-routing-matrix.json` | Machine-readable Claude/Grok worker and Codex orchestrator selection, concurrency, timeout, fallback, and integration rules. |
+| `provider-routing-policy.md` | Milestone control-plane decision, worker families, 30-minute audit, swarm, and recovery semantics. |
+| `orchestration-protocol.md` | Three-role topology: Codex orchestrator, Claude/Grok individual agents, Claude/Grok auditor. |
+| `audit-cadence.md` | 30-minute stall and scope-creep audit. |
+| `swarm-batches/codefire-state-audit-20260729.json` | Reproducible four-worker-plus-integration Fugu audit of the current CFR-168 branch family. |
 | `model-routing-policy.md` | Risk scoring, Medium/High/Ultra semantics, escalation, fallback, and eval rules. |
 | `schemas/` | Versioned task/context/review machine contracts. |
 | `evals/` | Deterministic routing cases, redacted historical defect inputs, evaluator oracles, the dated live routing smoke, and future scored live-eval records. |
@@ -152,7 +163,7 @@ If the agent cannot state these, the work is not ready.
 | `../tools/probe_validation_capabilities.py` | Reports available validators and distinguishes binary presence from a revalidated clean-HEAD provenance artifact. |
 | `../tools/build_source_bound_rust.py` | Builds the release Rust CLI and writes canonical provenance only when Cargo/crates/`.cargo`/toolchain inputs are clean against HEAD and unchanged across the build. |
 | `../tools/run_dogfood_smoke.py` | Runs bounded dogfood status checks read-only by default; `scan` and `verify` require explicit `--allow-mutation`. |
-| `../tools/run_ai_role.py` | Validates a typed packet, binds context/base/dirty-state preflight, and builds or explicitly executes a routed Codex run; dry-run/read-only is the default. |
+| `../tools/run_ai_role.py` | Codex-specific low-level adapter; validates a typed packet and binds context/base/dirty-state. Dry-run is default and real use requires explicit `--allow-codex`. |
 | `../tools/prepare_historical_eval.py` | Materializes one deterministic historical CFB/CFR candidate input while withholding the evaluator oracle. |
 
 Dogfood findings start with `task-packets/cfb-intake.md`; only the manager may promote them into the authoritative issue ledgers or amend the frozen batch.

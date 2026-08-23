@@ -70,7 +70,9 @@ Rust実装をdefault CLIとし、Python reference/fallbackとの互換境界を�
 
 ## テスト方針
 
-変更範囲に応じて、最小ではなく十分なテストを走らせる。
+テストは **いまのマイルストーンが指名した範囲** で十分であればよい。変更と無関係な全workspace gate、Install、dogfood Retrospectを毎回の入場条件にしない。
+
+変更範囲に応じて、M1 カードまたは task packet が書いたコマンドを走らせる。
 
 `codefire` 本体を触ったら:
 

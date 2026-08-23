@@ -4,14 +4,20 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 ## Current Operating Snapshot
 
-Last audited: 2026-07-12.
+Last audited: 2026-08-21.
 
+- Execution is milestone-based. The live board is `docs/development/milestones.md`. M1 is `MS-2026-08-control-restore`. Remaining review-portfolio issues are parked on M2–M5 and are not active work.
+- Codex orchestrates. Individual and 30-minute audit agents are Claude Opus 5 or Grok 4.6. Codex does not implement or audit.
 - Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
-- CFB detail ledger: 127 total; 120 `fixed`, 7 `open`.
-- CFR detail ledger: 160 total; 150 `fixed`, 10 `fixed in v0.7`.
-- `subprojects/algorithm-evolution-agent-lab/` reports CodeFire `open-clean` with 0 open fires when checked via the local Rust binary.
-- The mixed worktree was split into eight purpose-specific commits on 2026-07-12; the organization checkpoint is clean and no unknown paths remain.
-- The base environment does not expose `cargo` on `PATH`. The 2026-07-11 audit used an isolated Rust 1.97.0 toolchain under `/tmp` and passed fmt, locked workspace tests, and warning-denying Clippy; a durable pinned toolchain/CI identity is still release work.
+- CFB detail ledger: 137 total; 135 `fixed`, 2 `investigating`. Open/investigating count: 2.
+- CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, 6 `investigating`. Open/investigating count: 6.
+- Final installed `/tmp/codefire-cfr167-final.KWa8TC/bin/codefire` has source-matching SHA-256 `1483874b4c1de4a78478595d5d158cf34a12e5ec3b05255dfc8819f511f00272`; policy/coverage reversal, sealed digest binding, and canonical Dogfood pass.
+- The current Git worktree contains the intentional uncommitted review, invariant-fix, regression, ADR, and management-document packages. They remain classified project state and must not be destructively cleaned or presented as a clean checkpoint.
+- CFB-120..132 and the complete Stage 1 Dogfood-blocker lifecycle are closed. Canonical Algorithm is now sealed at `CF-COMMIT-e5ca290905c2a4b5e2c05bd4` with Atom hash schema 4, `sealed-snapshot-v1`, `open-clean`, and zero Fires; the configured legacy repository was not mutated.
+- RVC-011 / CFR-161 is closed through Install, installed counterexample replay, both real-repository read-only probes, canonical trace-warning verification, and Retrospect. ADR-013 now owns the typed committable decision and non-relaxable safety floor.
+- RVC-039 / CFR-162 is closed through the full lifecycle. ADR-014 makes unresolved text, binary, and semantic merge facts authoritative blockers and makes `merge --continue` the explicit validated resolution boundary.
+- `BATCH-2026-07-review-portfolio-completion` is historical. CFB-133, CFB-136, and CFR-168..173 remain open in the ledgers but are parked on M3–M5. They are not M1 work.
+- The base environment still does not expose `cargo` on `PATH`; a durable pinned toolchain/CI identity remains release work.
 
 If any line above changes, update this snapshot and append the reason to `docs/development/history.md`.
 
@@ -23,7 +29,8 @@ If any line above changes, update this snapshot and append the reason to `docs/d
 | What happened? | `docs/development/history.md` | Append-only chronological work log. Do not rewrite history to fix current state. |
 | What is the active issue ledger? | `docs/development/bug-backlog.md`, `docs/development/bug-issues/` | Summary row and detail file must agree. |
 | What source-review issues exist? | `docs/development/code-review-issues-2026-06-06.md`, `docs/development/code-review-issues/` | Index count and detail statuses must agree. |
-| What is the active burn-down batch? | `docs/development/current-cycle-burn-down-plan.md` | Keep only active batch state at the top. Historical cycle detail belongs in `history.md`. |
+| What may be worked now? | `docs/development/milestones.md`, `docs/development/milestone-operating-model.md` | Five-ahead board; only M1 is active. |
+| What is the historical burn-down batch? | `docs/development/current-cycle-burn-down-plan.md` | Ledger counts for checkers. Not permission to work. |
 | What is the active strategic roadmap? | `docs/development/strategy/modernization-roadmap.md` | One stage/gate roadmap; exploration and old version labels are not task boards. |
 | What is the release/format identity? | `docs/development/strategy/release-and-format-roadmap.md` | Keep product/package/repository/object/schema versions separate. |
 | How is the Rust code organized? | `source-architecture.md`, `command-source-trace.md`, `source-data-model-catalog.md`, `change-playbook.md` | Update with command/module/type/persistence boundary changes; run the source-doc checker. |
@@ -46,12 +53,12 @@ Before starting implementation:
 
 ## Current Cleanup Priorities
 
-The organization gate is complete. The next constrained work is:
+The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md` (restore milestone control). Parked, not started:
 
-1. Keep CFB-120..CFB-126 frozen as the first Stage 1 correctness batch; do not claim zero open product issues.
-2. Resolve sealed-base/publish, path-containment, Trace Graph endpoint, mutable-state locking, full-digest collision, and import-idempotency invariants before discretionary feature work.
-3. Preserve the green Rust source gate in a durable pinned toolchain/CI environment and produce a source-bound binary from a clean checkpoint.
-4. Investigate the recorded `branch list` timeout before treating that surface as healthy.
+1. M2: one local sealed-commit loop increment.
+2. M3: agent-consumable local contract (CFR-169, CFR-170, CFB-133).
+3. M4: remote happy path (CFR-168, CFB-136).
+4. M5: adoption wedge (CFR-171, CFR-172, CFR-173).
 
 ## Validation Matrix
 
@@ -70,9 +77,10 @@ If an environment cannot run a required gate, record that limitation explicitly 
 
 | Family | Files | Purpose |
 |---|---|---|
-| Management | `README.md`, `project-management.md`, `history.md`, `current-cycle-burn-down-plan.md` | State, workflow, cycle execution, and handoff control. |
+| Management | `README.md`, `project-management.md`, `milestones.md`, `milestone-operating-model.md`, `history.md`, `current-cycle-burn-down-plan.md` | State, five-ahead execution, and historical cycle narrative. |
 | Strategy | `strategy/README.md`, engineering principles, product strategy, modernization and release/format roadmaps, decision register | Promoted decisions, bounded hypotheses, and the only active strategic roadmap. |
 | Exploration | `exploration/` | Non-authoritative alternatives, falsifiable hypotheses, and experiment designs from the three completed exploration phases. |
+| CodeFire improvement review | [`codefire-review-portfolio/`](codefire-review-portfolio/README.md) | Evidence-backed product, domain, architecture, implementation, workflow, and evolution reviews kept as next-discovery candidates until promotion. |
 | AI acceleration | `ai/README.md`, `ai/context-packs.json`, `ai/schemas/`, `ai/evals/`, role/runtime policy, task/review packets, and `tools/` | External AI task definition, typed contracts, context compression, review, model routing, validation selection, and parallel-lane operation. |
 | Issues | `bug-backlog.md`, `bug-issues/`, `code-review-issues-2026-06-06.md`, `code-review-issues/`, `issue-root-cause-map.json` | Product and source-review issue tracking. |
 | Historical deletion audit | `archive/deletion-manifest.md`, `history.md`, Git history | Destinations and recovery path for removed completion/version plans. |

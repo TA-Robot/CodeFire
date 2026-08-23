@@ -31,7 +31,7 @@ For mutating workflows, name:
 - idempotent retry result;
 - recovery action.
 
-Immutable object writes are preparation. Publishing a validated branch or request pointer is the candidate visibility point; this remains an experiment-backed product decision until the failpoint matrix confirms it.
+Immutable object writes are preparation. Publishing a completely validated branch or request pointer is the visibility point. The local commit writer now predeclares ordered role/path/type/ID entries for every manifest blob, seven roots, candidate, and branch snapshot before the first store; each role moves from `planned` to `stored` only after exact-ID storage. Candidate validation and stored branch snapshot both precede mutable branch-ref publication. Evidence claims remain window-specific: one blob/root/candidate/branch-snapshot store gap, pre-validation, and corruption fixtures do not imply exhaustive crash injection at every entry/write.
 
 ## 4. Parse, Validate, Plan, Apply, Render
 
@@ -39,7 +39,7 @@ Keep these responsibilities separable and testable. Rendering never decides vali
 
 ## 5. Identity Uses Canonical Bytes and Full Digests
 
-Public short identifiers are navigation, not collision proof. The target invariant is that storage and comparison retain and verify the full digest. Current `store_object` reuse does not yet compare the existing and newly requested full digests for a same-prefix collision (CFB-125); that case must fail explicitly in every path.
+Public short identifiers are navigation, not collision proof. Storage and comparison retain and verify the full digest. Both the pre-existing-path and hard-link race branches validate the existing record and compare requested/existing type, full digest, and canonical payload; a same-prefix mismatch is a typed collision and is never silently reused.
 
 Canonical serialization requires cross-runtime golden vectors. Format, root schema, hash schema, extractor semantics, and product release are separate version axes.
 
@@ -47,13 +47,15 @@ Canonical serialization requires cross-runtime golden vectors. Format, root sche
 
 Every repository-wide or graph command declares the entities it traverses and an expected complexity budget. Prefer stable work counters—object reads, parses, hashes, graph visits—to wall time alone.
 
-Shared ancestry is validated once per command context when the validity inputs are identical. Any optimization needs equivalence tests for success and corruption diagnostics.
+Shared ancestry is validated once per command context when the validity inputs and filesystem subject are identical. For sealed objects, the subject includes stable root identity plus the ordered identity-or-missing state of all bound object subdirectories, records are read through pinned handles, and cache entries are staged until the final identity recheck. Retention itself is bounded: no more than 128 extension subdirectories and one current store subject; switching subjects evicts prior pins/results. The cache still relies on immutable object files and must not be described as detecting an in-place rewrite of an already cached record. Any optimization needs equivalence tests for success and corruption diagnostics.
 
 Before a semantic refactor or performance rewrite, add or identify at least one focused regression that fails for the targeted defect or protects the invariant being moved. Test count alone is not evidence; the test must discriminate the relevant behavior.
 
 ## 7. Trust Boundaries Are Product Behavior
 
-Repository roots, symlinks, external commands, remotes, evidence payloads, credentials, and generated artifacts cross trust boundaries. Validate paths at use time, constrain resources, minimize captured data, and state the deployment boundary honestly.
+Repository roots, object subdirectories, symlinks, external commands, remotes, evidence payloads, credentials, and generated artifacts cross trust boundaries. Validate paths at use time, use descriptor-relative/no-follow reads or writes where an ambient path can be swapped, constrain resources, minimize captured data, and state the deployment boundary honestly.
+
+Persistent advisory locks separate the stable kernel-lock inode, best-effort owner sidecar, and actual ownership. Repository lock bytes stay untouched, exactly-one-link identity/provenance is revalidated at acquisition and use boundaries, and owner sidecars are atomically replaced only after ownership then read no-follow/bounded. Never unlink either file as normal unlock or assume a process that ignores advisory locks is prevented from mutating state. Reserved recovery namespaces must distinguish unpublished scratch (`.part`) from fully formed publication candidates and transaction-bound write temps.
 
 Until an isolation profile is implemented and red-teamed, server-side verification is for trusted local or single-tenant operation only. Evidence capture must not imply that arbitrary command output is safe to retain or distribute.
 

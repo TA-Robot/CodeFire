@@ -1,18 +1,22 @@
-# GPT-5.6 Sol Model Routing Policy
+# Codex GPT-5.6 Sol Model Routing Policy
 
 Status: active development policy  
-Last verified locally: 2026-07-11  
+Last verified locally: 2026-07-29  
 Applies to: external AI development of CodeFire, not the CodeFire product runtime
 
 ## Decision
 
-CodeFire development uses `gpt-5.6-sol` as the explicit primary model and exposes three project-level reasoning tiers:
+When external provider routing explicitly selects Codex, CodeFire development uses `gpt-5.6-sol` and exposes three project-level reasoning tiers:
 
 - `Medium`
 - `High`
 - `Ultra`
 
 The tier is selected from task risk, uncertainty, blast radius, reversibility, and verification cost. It is not a prestige label and must not be chosen only because a task is large.
+
+Provider selection is governed first by `provider-routing-policy.md` and
+`provider-routing-matrix.json`. Codex is the orchestrator only. Medium/High individual and audit work
+runs on Claude Opus 5 or Grok 4.6. This document does not authorize routing those tasks to Codex merely because Codex is available.
 
 ## Why The Policy Has An Adapter
 
@@ -23,14 +27,15 @@ Runtime vocabularies currently differ:
 | Surface | Medium | High | Strongest CodeFire tier |
 |---|---|---|---|
 | CodeFire policy | `Medium` | `High` | `Ultra` |
-| Current local Codex CLI 0.144.1 | `medium` | `high` | `ultra` |
+| Current local Codex CLI 0.146.0 | `medium` | `high` | `ultra` |
 | Public GPT-5.6 Sol API model page | `medium` | `high` | `max` |
 | Portable Codex fallback | `medium` | `high` | `xhigh` |
 
 Local evidence:
 
 - `codex doctor --json` reports the project configuration loaded with `gpt-5.6-sol`.
-- the installed Codex 0.144.1 bundle contains the GPT-5.6 Sol catalog entry and the `Ultra` description “Maximum reasoning with automatic task delegation”.
+- the installed Codex 0.146.0 bundle accepts GPT-5.6 Sol with strict-config
+  `medium`/`high`/`ultra` probes; the 0.144 adapter remains recorded for the dated live smoke.
 
 Official references:
 

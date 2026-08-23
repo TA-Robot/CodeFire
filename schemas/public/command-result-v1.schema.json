@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "codefire.command_result.v1",
+  "title": "CodeFire command result envelope v1",
+  "type": "object",
+  "required": ["schema", "command", "ok", "exit_code", "repo", "data", "diagnostics", "next_actions"],
+  "properties": {
+    "schema": {"const": "codefire.command_result.v1"},
+    "command": {"type": "string", "minLength": 1},
+    "ok": {"type": "boolean"},
+    "exit_code": {"type": "integer"},
+    "repo": {"type": ["string", "null"]},
+    "data": {"type": "object"},
+    "diagnostics": {"type": "array", "items": {"type": "object"}},
+    "next_actions": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": false
+}

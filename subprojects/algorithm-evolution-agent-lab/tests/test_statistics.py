@@ -20,6 +20,12 @@ class ConfidenceIntervalEstimatorTests(unittest.TestCase):
         self.assertEqual(interval.lower, 0.8)
         self.assertEqual(interval.upper, 0.8)
 
+    def test_confidence_interval_estimator_rejects_non_finite_values(self):
+        for label, value in (("nan", float("nan")), ("inf", float("inf")), ("-inf", float("-inf"))):
+            with self.subTest(value=label):
+                with self.assertRaisesRegex(ValueError, "values must be finite"):
+                    ConfidenceIntervalEstimator().estimate([0.80, 0.82, value])
+
 
 if __name__ == "__main__":
     unittest.main()

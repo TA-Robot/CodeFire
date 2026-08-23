@@ -33,6 +33,7 @@ Update trigger: evidence changes a decision status or the reconsideration trigge
 | STR-012 | Use document lifecycle states and a deletion manifest; Git history is the forensic archive for superseded tracked prose. | P3D-021 | consolidation plan, project docs checker | Findability or audit evidence worsens in the deletion rehearsal. |
 | STR-013 | Keep CLI JSON/schema as the compatibility kernel; integrations are thin adapters. | DC-AI-031/070 | automation envelope and Stage 2 roadmap | Independent consumers cannot preserve required semantics. |
 | STR-014 | Separate events, telemetry, diagnostics, and attestation by purpose instead of inventing one omnibus format. | DC-AI-034/035/063 | Stage 3 lossiness experiments | Standards cannot carry the required meaning even with bounded extensions. |
+| STR-015 | Schedule work on a five-ahead milestone board. Only next-milestone blockers are active; other issues and review findings are parked. Codex orchestrates; Claude Opus 5 and Grok 4.6 implement and audit; a non-Codex auditor runs every 30 minutes. | stall from review-portfolio burn-down | `../milestone-operating-model.md`, `../milestones.md`, `../ai/orchestration-protocol.md` | Evidence that this control plane itself prevents a required safety gate; then change the board, not silently resume unbounded burn-down. |
 
 ## Experiment
 

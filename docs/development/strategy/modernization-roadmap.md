@@ -46,7 +46,7 @@ Priority experiments:
 6. root/path/symlink and server-verification trust-boundary red team;
 7. stale lock, pending transaction, corrupt object, and user-work recovery table.
 
-The first frozen implementation batch is CFB-120..CFB-126: scan base sealing, pre-publication commit sealing, resolved path containment, Trace Graph endpoint integrity, live mutable-state locking, full-digest collision rejection, and import idempotency request binding.
+The CFB-120..132 correctness batch and the CFR-161..167 safety/contract roots completed source gates, isolated Install, Algorithm Dogfood, and Retrospect by 2026-07-19; same-root CFB-134/135 and CFR-174/175 are also closed. Live execution moved on 2026-08-21 to the five-ahead board `../milestones.md` (STR-015). Remaining CFB-133, CFB-136, and CFR-168..173 stay in the ledgers and are parked on M3–M5 rather than gating all further work. M1 is restoring milestone control; M2 is the local sealed loop; later slots consume the parked roots only when that slot names them.
 
 Exit gate:
 

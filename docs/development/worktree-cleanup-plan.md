@@ -2,7 +2,7 @@
 
 This completed record documents how the mixed dirty tree was classified and saved before new product development resumes.
 
-Last audited: 2026-07-12.
+Checkpoint captured: 2026-07-12. For live issue, Git, validation, and Dogfood state use `docs/development/README.md`; the values below are historical evidence for this completed organization checkpoint.
 
 ## Goal
 
@@ -11,12 +11,12 @@ Last audited: 2026-07-12.
 - Define reviewable save/commit packages.
 - Record validation gaps explicitly before handoff.
 
-## Current State
+## Historical Checkpoint State
 
 - Git branch: `main`.
 - Remote relation: local `main` is ahead of `origin/main`; no push was performed by this organization pass.
 - Dirty tree: clean after the purpose-specific organization checkpoint.
-- Product issue state: the organization/source audit opened CFB-120..CFB-126 and the restored gate found/fixed CFB-127; CFB/CFR totals are 287 tracked, 280 closed, 7 open.
+- Product issue state: the organization/source audit opened CFB-120..CFB-126, the restored gate found/fixed CFB-127, and the Stage 1 Close gate fixed CFB-120..CFB-126; CFB/CFR totals are 287 tracked, 287 closed, 0 open.
 - Dogfood target state: `subprojects/algorithm-evolution-agent-lab/` is `open-clean` with 0 open fires through the local Rust binary.
 - Rust validation: base `PATH` still has no cargo, but an isolated `/tmp` Rust 1.97.0 toolchain passed fmt, locked workspace tests, and warning-denying Clippy. A durable pinned toolchain and clean-HEAD provenance build remain pending.
 - The managed sandbox denies socket creation. Five Python HTTP/HTTPS tests failed only there and passed when rerun outside that network restriction.
@@ -81,7 +81,7 @@ Last audited: 2026-07-12.
 - Do not discard untracked files until they are classified as accidental.
 - Do not combine CodeFire product fixes and algorithm dogfood expansion into one commit unless unavoidable.
 - Do not treat historical cycle sections as current issue state.
-- Do not start a new discovery batch while CFB-120..CFB-126 remain the frozen active batch.
+- Do not start a new discovery batch until the closed CFB-120..CFB-126 batch completes Install, Dogfood, and Retrospect.
 
 ## Validation Record
 

@@ -1,6 +1,8 @@
 use super::remote::{parse_cf_project_url, remote_dirs, RemoteDirs};
 use super::{find_repo_root, read_json, CliError};
 use crate::automation::{cli_command, next_action as automation_next_action};
+use cap_fs_ext::DirExt;
+use cap_std::fs::Dir;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::fs;
@@ -220,7 +222,7 @@ pub(crate) fn run_storage_report(
     warnings.extend(remote_scan.warnings);
     Ok(StorageReport {
         repo_root,
-        active_state: scan_area(&cf.join("active"))?,
+        active_state: scan_active_state_area(&cf.join("active"))?,
         idempotency: scan_area(&cf.join("idempotency"))?,
         objects: object_scan.area,
         object_types: object_scan.object_types,
@@ -429,11 +431,11 @@ fn scan_objects(
     };
     let mut json_records_parsed = 0u64;
     let mut invalid_records = 0u64;
-    for path in collect_files_optional(objects_root)? {
-        let bytes = fs::metadata(&path)?.len();
-        area.files += 1;
-        area.bytes += bytes;
-        if quick {
+    if quick {
+        for path in collect_files_optional(objects_root)? {
+            let bytes = fs::symlink_metadata(&path)?.len();
+            area.files += 1;
+            area.bytes += bytes;
             let object_id = path
                 .file_stem()
                 .and_then(|name| name.to_str())
@@ -459,80 +461,84 @@ fn scan_objects(
                     bytes,
                 },
             );
-            continue;
         }
-        let value = match read_json(&path) {
-            Ok(value) => value,
-            Err(error) => {
+    } else {
+        codefire_store::scan_object_store_record_documents(objects_root, |entry| {
+            let path = entry.path;
+            let warning_bytes = entry.size_bytes;
+            let bytes = warning_bytes.unwrap_or(0);
+            area.files += 1;
+            area.bytes += bytes;
+            let record = match entry.document {
+                Ok(document) => {
+                    json_records_parsed += 1;
+                    document.record
+                }
+                Err(error) => {
+                    invalid_records += 1;
+                    warnings.push(StorageWarning {
+                        kind: object_record_read_warning_kind(&error).to_string(),
+                        message: error.to_string(),
+                        path: Some(path),
+                        bytes: warning_bytes,
+                    });
+                    return;
+                }
+            };
+            if let Err(error) = codefire_store::validate_object_record(&record, None, Some(&path)) {
                 invalid_records += 1;
                 warnings.push(StorageWarning {
-                    kind: "invalid_object_json".to_string(),
+                    kind: "object_integrity_error".to_string(),
                     message: error.to_string(),
                     path: Some(path),
-                    bytes: Some(bytes),
+                    bytes: warning_bytes,
                 });
-                continue;
+                return;
             }
-        };
-        let record = match serde_json::from_value::<codefire_store::ObjectRecord>(value) {
-            Ok(record) => {
-                json_records_parsed += 1;
-                record
+            let type_tag = record.type_tag.clone();
+            let object_id = record.object_id.clone();
+            let stats = by_type.entry(type_tag.clone()).or_default();
+            stats.files += 1;
+            stats.bytes += bytes;
+            if let Some(payload_type) = record.payload.get("type").and_then(Value::as_str) {
+                if payload_type != type_tag {
+                    warnings.push(StorageWarning {
+                        kind: "payload_type_mismatch".to_string(),
+                        message: format!(
+                            "object record type '{type_tag}' differs from payload type '{payload_type}'"
+                        ),
+                        path: Some(path.clone()),
+                        bytes: warning_bytes,
+                    });
+                }
             }
-            Err(error) => {
-                invalid_records += 1;
+            if type_tag == "artifact_ref" {
+                external_artifacts.refs += 1;
+                external_artifacts.referenced_bytes += record
+                    .payload
+                    .get("size_bytes")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0);
+            }
+            if bytes >= large_threshold_bytes {
                 warnings.push(StorageWarning {
-                    kind: "invalid_object_record".to_string(),
-                    message: error.to_string(),
-                    path: Some(path),
-                    bytes: Some(bytes),
-                });
-                continue;
-            }
-        };
-        let type_tag = record.type_tag.clone();
-        let object_id = record.object_id.clone();
-        let stats = by_type.entry(type_tag.clone()).or_default();
-        stats.files += 1;
-        stats.bytes += bytes;
-        if let Some(payload_type) = record.payload.get("type").and_then(Value::as_str) {
-            if payload_type != type_tag {
-                warnings.push(StorageWarning {
-                    kind: "payload_type_mismatch".to_string(),
-                    message: format!(
-                        "object record type '{type_tag}' differs from payload type '{payload_type}'"
-                    ),
+                    kind: "large_object".to_string(),
+                    message: format!("{type_tag} object exceeds large threshold"),
                     path: Some(path.clone()),
-                    bytes: Some(bytes),
+                    bytes: warning_bytes,
                 });
             }
-        }
-        if type_tag == "artifact_ref" {
-            external_artifacts.refs += 1;
-            external_artifacts.referenced_bytes += record
-                .payload
-                .get("size_bytes")
-                .and_then(Value::as_u64)
-                .unwrap_or(0);
-        }
-        if bytes >= large_threshold_bytes {
-            warnings.push(StorageWarning {
-                kind: "large_object".to_string(),
-                message: format!("{type_tag} object exceeds large threshold"),
-                path: Some(path.clone()),
-                bytes: Some(bytes),
-            });
-        }
-        push_largest_object(
-            &mut largest_objects,
-            ObjectFileStats {
-                object_id,
-                type_tag,
-                type_confidence: "object_record",
-                path,
-                bytes,
-            },
-        );
+            push_largest_object(
+                &mut largest_objects,
+                ObjectFileStats {
+                    object_id,
+                    type_tag,
+                    type_confidence: "object_record",
+                    path,
+                    bytes,
+                },
+            );
+        })?;
     }
     let mut object_types = by_type
         .into_iter()
@@ -567,6 +573,20 @@ fn scan_objects(
     })
 }
 
+fn object_record_read_warning_kind(error: &codefire_store::StoreError) -> &'static str {
+    match error {
+        codefire_store::StoreError::Json(error)
+            if matches!(
+                error.classify(),
+                serde_json::error::Category::Syntax | serde_json::error::Category::Eof
+            ) =>
+        {
+            "invalid_object_json"
+        }
+        _ => "invalid_object_record",
+    }
+}
+
 fn object_scan_metrics_json(metrics: &ObjectScanMetrics) -> Value {
     json!({
         "mode": &metrics.mode,
@@ -583,6 +603,41 @@ fn scan_area(path: &Path) -> Result<AreaStats, CliError> {
     for file in collect_files_optional(path)? {
         stats.files += 1;
         stats.bytes += fs::metadata(file)?.len();
+    }
+    Ok(stats)
+}
+
+fn scan_active_state_area(path: &Path) -> Result<AreaStats, CliError> {
+    let root = match crate::secure_worktree::open_absolute_dir_nofollow(path) {
+        Ok(root) => root,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(AreaStats::default());
+        }
+        Err(error) => return Err(CliError::Io(error)),
+    };
+    let stats = scan_capability_area(&root)?;
+    crate::secure_worktree::ensure_absolute_dir_identity(&root, path)?;
+    Ok(stats)
+}
+
+fn scan_capability_area(directory: &Dir) -> Result<AreaStats, CliError> {
+    let mut stats = AreaStats::default();
+    let mut entries = directory.entries()?.collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let name = entry.file_name();
+        let metadata = directory.symlink_metadata(&name)?;
+        if metadata.is_dir() && !metadata.file_type().is_symlink() {
+            let child = directory.open_dir_nofollow(&name)?;
+            let child_stats = scan_capability_area(&child)?;
+            let current = directory.open_dir_nofollow(&name)?;
+            crate::secure_worktree::ensure_same_directory(&child, &current)?;
+            stats.files = stats.files.saturating_add(child_stats.files);
+            stats.bytes = stats.bytes.saturating_add(child_stats.bytes);
+        } else if metadata.is_file() && !metadata.file_type().is_symlink() {
+            stats.files = stats.files.saturating_add(1);
+            stats.bytes = stats.bytes.saturating_add(metadata.len());
+        }
     }
     Ok(stats)
 }
@@ -706,19 +761,21 @@ fn scan_remote_storage(remote_urls: &[String]) -> Result<RemoteStorageScan, CliE
                 bytes: Some(idempotency_retention.expired_bytes),
             });
         }
+        let (objects, objects_by_generation) =
+            scan_remote_object_generations(&dirs.objects, &mut warnings)?;
         remotes.push(RemoteStorageStats {
             url: url.clone(),
             status: "ok".to_string(),
             project_root: project_root.clone(),
             missing_required_paths: Vec::new(),
-            objects: scan_area_required(&dirs.objects)?,
+            objects,
             branches: scan_area_required(&dirs.branches)?,
             merge_requests: scan_area_required(&dirs.merge_requests)?,
             idempotency,
             idempotency_retention,
             nonce_cache: scan_remote_nonce_cache(&project_root)?,
             retention,
-            objects_by_generation: scan_remote_object_generations(&dirs.objects)?,
+            objects_by_generation,
         });
     }
     Ok(RemoteStorageScan { remotes, warnings })
@@ -860,28 +917,58 @@ fn scan_remote_idempotency_retention(
 
 fn scan_remote_object_generations(
     objects_root: &Path,
-) -> Result<Vec<RemoteGenerationStats>, CliError> {
+    warnings: &mut Vec<StorageWarning>,
+) -> Result<(AreaStats, Vec<RemoteGenerationStats>), CliError> {
+    let mut area = AreaStats::default();
     let mut by_generation = BTreeMap::<Option<u64>, AreaStats>::new();
-    for path in collect_files_required(objects_root)? {
-        let bytes = fs::metadata(&path)?.len();
-        let generation = read_json(&path).ok().and_then(|value| {
-            value
-                .get("remote")
-                .and_then(|remote| remote.get("last_seen_generation"))
-                .and_then(Value::as_u64)
-        });
+    codefire_store::scan_object_store_record_documents(objects_root, |entry| {
+        let path = entry.path;
+        let warning_bytes = entry.size_bytes;
+        let bytes = warning_bytes.unwrap_or(0);
+        area.files += 1;
+        area.bytes += bytes;
+        let document = match entry.document {
+            Ok(document) => document,
+            Err(error) => {
+                warnings.push(StorageWarning {
+                    kind: "invalid_remote_object_record".to_string(),
+                    message: error.to_string(),
+                    path: Some(path),
+                    bytes: warning_bytes,
+                });
+                return;
+            }
+        };
+        let record = document.record;
+        if let Err(error) = codefire_store::validate_object_record(&record, None, Some(&path)) {
+            warnings.push(StorageWarning {
+                kind: "remote_object_integrity_error".to_string(),
+                message: error.to_string(),
+                path: Some(path),
+                bytes: warning_bytes,
+            });
+            return;
+        }
+        let generation = document
+            .extensions
+            .get("remote")
+            .and_then(|remote| remote.get("last_seen_generation"))
+            .and_then(Value::as_u64);
         let stats = by_generation.entry(generation).or_default();
         stats.files += 1;
         stats.bytes += bytes;
-    }
-    Ok(by_generation
-        .into_iter()
-        .map(|(generation, stats)| RemoteGenerationStats {
-            generation,
-            files: stats.files,
-            bytes: stats.bytes,
-        })
-        .collect())
+    })?;
+    Ok((
+        area,
+        by_generation
+            .into_iter()
+            .map(|(generation, stats)| RemoteGenerationStats {
+                generation,
+                files: stats.files,
+                bytes: stats.bytes,
+            })
+            .collect(),
+    ))
 }
 
 fn read_optional_json_value(path: &Path) -> Result<Option<Value>, CliError> {
@@ -1052,5 +1139,48 @@ fn format_bytes(bytes: u64) -> String {
         format!("{:.1} KiB", bytes as f64 / KIB as f64)
     } else {
         format!("{bytes} B")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn active_state_scan_does_not_follow_outside_symlinks() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().unwrap();
+        let active = temp.path().join("active");
+        let instance = active.join("open_1");
+        let outside = temp.path().join("outside");
+        fs::create_dir_all(&instance).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(instance.join("state.json"), b"inside\n").unwrap();
+        fs::write(outside.join("large.bin"), vec![0_u8; 4096]).unwrap();
+        symlink(outside.join("large.bin"), instance.join("file-link")).unwrap();
+        symlink(&outside, instance.join("dir-link")).unwrap();
+
+        let stats = scan_active_state_area(&active).unwrap();
+
+        assert_eq!(stats.files, 1);
+        assert_eq!(stats.bytes, 7);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn active_state_scan_rejects_symlinked_root() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().unwrap();
+        let outside = temp.path().join("outside");
+        let active = temp.path().join("active");
+        fs::create_dir(&outside).unwrap();
+        fs::write(outside.join("victim"), b"outside\n").unwrap();
+        symlink(&outside, &active).unwrap();
+
+        assert!(scan_active_state_area(&active).is_err());
+        assert_eq!(fs::read(outside.join("victim")).unwrap(), b"outside\n");
     }
 }

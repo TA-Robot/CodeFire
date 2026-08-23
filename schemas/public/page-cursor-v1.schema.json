@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "codefire.page_cursor.v1",
+  "title": "CodeFire snapshot cursor payload v1",
+  "type": "object",
+  "required": ["type", "version", "collection", "snapshot", "offset", "limit"],
+  "properties": {
+    "type": {"const": "codefire_page_cursor"},
+    "version": {"const": 1},
+    "collection": {"type": "string", "minLength": 1},
+    "snapshot": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "offset": {"type": "integer", "minimum": 0},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 1000}
+  },
+  "additionalProperties": false
+}

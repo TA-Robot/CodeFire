@@ -1,6 +1,7 @@
 use crate::{
-    load_base_atom_index, non_atom_changed_files_since_base, open_context, read_json,
-    required_string, scan_branch_state, scan_change_count, CliError, OpenContext,
+    assessment_subject::{live_open_subject, subject_json},
+    compute_scan_with_cache, read_active_json_optional, scan_branch_state, scan_change_count,
+    CliError, OpenContext,
 };
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -244,54 +245,16 @@ fn set_selector(
 }
 
 fn context_snapshot(start: &Path) -> Result<ContextSnapshot, CliError> {
-    let open = open_context(start)?;
-    let objects = open.repo_root.join(".codefire").join("objects");
-    let base_commit = required_string(&open.registry, &["open", "current_base_commit"])?;
-    let active_state_path = PathBuf::from(required_string(
-        &open.registry,
-        &["open", "active_state_path"],
-    )?);
-    let active_scan_path = active_state_path.join("scan.json");
-    let current = codefire_core::build_atom_index(&open.open_dir)?;
-    let base_index = load_base_atom_index(&objects, &base_commit)?;
-    let trace_graph = codefire_core::current_trace_graph(&open.open_dir)?;
-    let fires_path = active_state_path.join("fires.json");
-    let fires = if fires_path.exists() {
-        serde_json::from_value(read_json(&fires_path)?)?
-    } else {
-        Vec::new()
-    };
-    let state_path = active_state_path.join("state.json");
-    let state_data = if state_path.exists() {
-        read_json(&state_path)?
-    } else {
-        json!({"state": "open-clean"})
-    };
-    let reason = if state_data.get("pending_merge_parent").is_some() {
-        "merge_changed"
-    } else {
-        "atom_changed"
-    };
-    let non_atom_changed_files = non_atom_changed_files_since_base(
-        &objects,
-        &base_commit,
-        &open.open_dir,
-        &current,
-        &base_index,
-    )?;
-    let (mut preview_scan, _) = codefire_core::build_scan_result(
-        current,
-        base_index,
-        trace_graph,
-        fires,
-        base_commit,
-        reason,
-        "preview-context",
-    )?;
-    preview_scan.non_atom_changed_files = non_atom_changed_files;
-    if active_scan_path.exists() {
-        let active_scan: codefire_core::ScanResult =
-            serde_json::from_value(read_json(&active_scan_path)?)?;
+    let mut validation_cache = codefire_store::SealedCommitValidationCache::default();
+    let preview = compute_scan_with_cache(start, None, &mut validation_cache)?;
+    let open = preview.context;
+    let preview_scan = preview.scan;
+    let active_scan_path = open.active_state.display_path(Path::new("scan.json"));
+    if let Some(active_scan) =
+        read_active_json_optional(&open.active_state, Path::new("scan.json"))?
+            .map(serde_json::from_value)
+            .transpose()?
+    {
         if scan_fingerprint(&active_scan)? == scan_fingerprint(&preview_scan)? {
             return Ok(ContextSnapshot {
                 open,
@@ -453,9 +416,11 @@ fn context_data_json(
     let scan_non_atom_changed_files_truncated =
         snapshot.scan.non_atom_changed_files.len() > scan_non_atom_changed_files.len();
     let scan_open_fires_truncated = snapshot.scan.open_fires.len() > scan_open_fires.len();
+    let subject = subject_json(&live_open_subject(&snapshot.open, &snapshot.scan)?)?;
     Ok(json!({
         "type": "codefire_context_pack",
         "version": 1,
+        "subject": subject,
         "selector": selector_json(selector, depth),
         "limits": {
             "max_depth": MAX_CONTEXT_DEPTH,

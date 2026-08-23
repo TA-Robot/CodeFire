@@ -32,6 +32,7 @@ from ai_contracts import (  # noqa: E402
 )
 from classify_worktree import classify_path  # noqa: E402
 from check_ai_acceleration_docs import STALE_PATTERNS, check_live_routing_smoke  # noqa: E402
+from check_project_docs import check_current_claims  # noqa: E402
 from build_source_bound_rust import (  # noqa: E402
     BINARY_PATH,
     build_source_manifest,
@@ -683,6 +684,51 @@ class WorktreeClassifierTests(unittest.TestCase):
     def test_current_open_count_is_not_a_generic_stale_phrase(self) -> None:
         self.assertFalse(any(pattern.search("7 open") for pattern, _ in STALE_PATTERNS))
         self.assertTrue(any(pattern.search("104 | 7") for pattern, _ in STALE_PATTERNS))
+
+    def test_project_docs_reject_stale_active_burn_down_count(self) -> None:
+        ledgers = {
+            "cfb": {
+                "total": 137,
+                "statuses": {"fixed": 135, "investigating": 2},
+            },
+            "cfr": {
+                "total": 175,
+                "statuses": {
+                    "fixed": 159,
+                    "fixed in v0.7": 10,
+                    "investigating": 6,
+                },
+            },
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            development = root / "docs/development"
+            development.mkdir(parents=True)
+            (development / "README.md").write_text(
+                "CFB detail ledger: 137 total; 135 `fixed`, 2 `investigating`.\n"
+                "CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, "
+                "6 `investigating`.\n",
+                encoding="utf-8",
+            )
+            (development / "current-cycle-burn-down-plan.md").write_text(
+                "- CFB/CFR product/review issues: 8 open/investigating.\n"
+                "- CFB detail ledger: 136 total; 134 `fixed`, 2 `investigating`.\n"
+                "- CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, "
+                "6 `investigating`.\n",
+                encoding="utf-8",
+            )
+            (development / "codefire-improvement-cycle.md").write_text(
+                "| CFB dogfood issues | 137 | 135 | 2 |\n"
+                "| CFR code review issues | 175 | 169 | 6 |\n"
+                "| Total | 312 | 304 | 8 |\n",
+                encoding="utf-8",
+            )
+            findings = []
+            check_current_claims(root, ledgers, findings)
+        self.assertIn(
+            "stale-active-cycle-ledger-claim",
+            {finding.code for finding in findings},
+        )
 
 
 class RuntimeConfigTests(unittest.TestCase):

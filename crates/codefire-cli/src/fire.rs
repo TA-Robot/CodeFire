@@ -1,12 +1,19 @@
+pub(crate) mod active_ledger_transaction;
 mod batch;
 
 #[cfg(test)]
 pub(crate) use batch::FireBatchOptions;
 pub(crate) use batch::{fire_batch_data_json, parse_fire_batch_args, run_fire_batch};
 
+use self::active_ledger_transaction::{
+    apply_active_ledger_transition, recover_active_ledger_transition,
+    reject_pending_active_ledger_transition, ActiveLedgerWrite,
+};
+
 use super::{
-    now_iso_utc, open_context, parse_lock_option, read_json, required_string, set_open_state,
-    write_json_atomic, CliError, LockOptions, OpenContext, RepoLock,
+    acquire_locked_open_context_for_recovery, ensure_active_ledger_state_transaction_request,
+    now_iso_utc, open_context, parse_lock_option, read_active_json_optional, required_string,
+    set_open_state_transactional, CliError, LockOptions, OpenContext,
 };
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -51,11 +58,11 @@ pub(crate) struct FireResult {
 
 struct ManualFireContext {
     context: OpenContext,
-    active_state_path: PathBuf,
     base_commit: String,
     atom_index: codefire_core::AtomIndex,
     trace_graph: codefire_core::TraceGraph,
     fires_path: PathBuf,
+    existing_fires_value: Option<Value>,
     existing_fires: Vec<codefire_core::Fire>,
 }
 
@@ -173,20 +180,58 @@ pub(crate) fn run_manual_fire_specs(
         _lock = None;
         context = load_manual_fire_context(path)?;
     } else {
-        let lock_context = open_context(path)?;
-        _lock = Some(RepoLock::acquire_with_options(
-            &lock_context.repo_root,
-            lock,
-        )?);
-        context = load_manual_fire_context(path)?;
+        let (acquired_lock, locked_context) =
+            acquire_locked_open_context_for_recovery(path, lock, command)?;
+        _lock = Some(acquired_lock);
+        context = load_manual_fire_context_from_open_context(locked_context)?;
     }
-    let new_fires = build_manual_fires(&context, specs)?;
+    let transition_request = (!dry_run)
+        .then(|| manual_fire_transition_request(&context, specs, full_output, command))
+        .transpose()?;
+    if let Some(request) = transition_request.as_ref() {
+        ensure_active_ledger_state_transaction_request(&context.context, command, request)?;
+    }
+    let mut new_fires;
+    if dry_run {
+        reject_pending_active_ledger_transition(&context.context.active_state)?;
+        new_fires = build_manual_fires(&context, specs)?;
+    } else {
+        let request = transition_request
+            .as_ref()
+            .expect("live fire must have a ledger request");
+        if let Some(replayed) =
+            recover_active_ledger_transition(&context.context.active_state, command, request)?
+        {
+            new_fires = fire_transition_fires(&replayed, &context.context.active_state)?;
+        } else {
+            new_fires = build_manual_fires(&context, specs)?;
+            let mut fires = context.existing_fires.clone();
+            fires.extend(new_fires.iter().cloned());
+            let result = fire_transition_result(&new_fires);
+            let durable_result = apply_active_ledger_transition(
+                &context.context.active_state,
+                command,
+                request,
+                vec![ActiveLedgerWrite::new(
+                    "fires.json",
+                    context.existing_fires_value.clone(),
+                    serde_json::to_value(&fires)?,
+                )],
+                &result,
+            )?;
+            new_fires = fire_transition_fires(&durable_result, &context.context.active_state)?;
+        }
+    }
+    if new_fires.len() != specs.len() {
+        return Err(CliError::InvalidRepository(format!(
+            "active ledger fire transaction durable result contains {} fires, expected {}",
+            new_fires.len(),
+            specs.len()
+        )));
+    }
     let plan = fire_operation_plan(command, dry_run, full_output, &context, specs, &new_fires);
-    if !dry_run {
-        let mut fires = context.existing_fires.clone();
-        fires.extend(new_fires.iter().cloned());
-        write_json_atomic(&context.fires_path, &serde_json::to_value(&fires)?)?;
-        set_open_state(&context.context, &context.active_state_path, "open-burning")?;
+    if let Some(request) = transition_request.as_ref() {
+        set_open_state_transactional(&context.context, command, "open-burning", request)?;
     }
     Ok(FireResult {
         repo_root: context.context.repo_root,
@@ -264,28 +309,130 @@ fn single_fire_usage() -> CliError {
 
 fn load_manual_fire_context(path: &Path) -> Result<ManualFireContext, CliError> {
     let context = open_context(path)?;
-    let active_state_path = PathBuf::from(required_string(
-        &context.registry,
-        &["open", "active_state_path"],
-    )?);
+    load_manual_fire_context_from_open_context(context)
+}
+
+fn load_manual_fire_context_from_open_context(
+    context: OpenContext,
+) -> Result<ManualFireContext, CliError> {
     let base_commit = required_string(&context.registry, &["open", "current_base_commit"])?;
+    let objects = context.repo_root.join(".codefire").join("objects");
+    let base_commit_path = codefire_store::object_record_path(&objects, &base_commit)
+        .unwrap_or_else(|| objects.clone());
+    codefire_store::validate_sealed_commit(&objects, &base_commit).map_err(|error| {
+        CliError::StoreContext {
+            error: Box::new(error),
+            repo_root: context.repo_root.clone(),
+            path: base_commit_path,
+        }
+    })?;
     let atom_index = codefire_core::build_atom_index(&context.open_dir)?;
     let trace_graph = codefire_core::current_trace_graph(&context.open_dir)?;
-    let fires_path = active_state_path.join("fires.json");
-    let existing_fires = if fires_path.exists() {
-        serde_json::from_value(read_json(&fires_path)?)?
-    } else {
-        Vec::new()
-    };
+    codefire_core::validate_trace_graph_endpoints(&atom_index, &trace_graph).map_err(|error| {
+        CliError::CoreContext {
+            error,
+            repo_root: context.repo_root.clone(),
+            path: context.open_dir.join("codefire.links.yaml"),
+        }
+    })?;
+    let fires_path = context.active_state.display_path(Path::new("fires.json"));
+    let existing_fires_value =
+        read_active_json_optional(&context.active_state, Path::new("fires.json"))?;
+    let existing_fires = existing_fires_value
+        .clone()
+        .map(serde_json::from_value)
+        .transpose()?
+        .unwrap_or_default();
     Ok(ManualFireContext {
         context,
-        active_state_path,
         base_commit,
         atom_index,
         trace_graph,
         fires_path,
+        existing_fires_value,
         existing_fires,
     })
+}
+
+fn manual_fire_transition_request(
+    context: &ManualFireContext,
+    specs: &[ManualFireSpec],
+    full_output: bool,
+    command: &str,
+) -> Result<Value, CliError> {
+    let open_instance_id =
+        required_string(&context.context.registry, &["open", "open_instance_id"])?;
+    Ok(json!({
+        "type": "codefire_fire_transition_request",
+        "version": 1,
+        "command": command,
+        "branch": &context.context.branch,
+        "open_instance_id": open_instance_id,
+        "current_base_commit": &context.base_commit,
+        "full_output": full_output,
+        "fires": specs.iter().map(|spec| json!({
+            "source_atom": &spec.source_atom,
+            "target_atom": &spec.target_atom,
+            "reason": &spec.reason,
+            "severity": &spec.severity,
+        })).collect::<Vec<_>>(),
+    }))
+}
+
+fn fire_transition_result(fires: &[codefire_core::Fire]) -> Value {
+    json!({
+        "type": "codefire_fire_transition_result",
+        "version": 1,
+        "fire_uids": fires.iter().map(|fire| &fire.fire_uid).collect::<Vec<_>>(),
+    })
+}
+
+fn fire_transition_fires(
+    value: &Value,
+    active_state: &crate::active_state::ActiveStateDir,
+) -> Result<Vec<codefire_core::Fire>, CliError> {
+    if value.get("type").and_then(Value::as_str) != Some("codefire_fire_transition_result")
+        || value.get("version").and_then(Value::as_u64) != Some(1)
+    {
+        return Err(CliError::InvalidRepository(
+            "active ledger fire transaction contains an invalid durable result".to_string(),
+        ));
+    }
+    let fire_uids: Vec<String> = value
+        .get("fire_uids")
+        .cloned()
+        .ok_or_else(|| {
+            CliError::InvalidRepository(
+                "active ledger fire transaction durable result is missing fire_uids".to_string(),
+            )
+        })
+        .and_then(|value| serde_json::from_value(value).map_err(CliError::from))?;
+    let persisted: Vec<codefire_core::Fire> =
+        read_active_json_optional(active_state, Path::new("fires.json"))?
+            .ok_or_else(|| {
+                CliError::InvalidRepository(
+                    "active ledger fire transaction postimage is missing fires.json".to_string(),
+                )
+            })
+            .and_then(|value| serde_json::from_value(value).map_err(CliError::from))?;
+    let mut by_uid = BTreeMap::new();
+    for fire in persisted {
+        if by_uid.insert(fire.fire_uid.clone(), fire).is_some() {
+            return Err(CliError::InvalidRepository(
+                "active ledger fire transaction postimage contains duplicate fire_uid".to_string(),
+            ));
+        }
+    }
+    fire_uids
+        .into_iter()
+        .map(|uid| {
+            by_uid.remove(&uid).ok_or_else(|| {
+                CliError::InvalidRepository(format!(
+                    "active ledger fire transaction postimage is missing {uid}"
+                ))
+            })
+        })
+        .collect()
 }
 
 fn build_manual_fires(

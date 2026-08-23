@@ -1,8 +1,14 @@
 use super::{
-    compute_scan, now_iso_utc, open_context, parse_lock_option, read_json, required_string,
-    stable_hash_48, validate_evidence_refs, write_json_atomic, CliError, LockOptions, RepoLock,
+    acquire_locked_open_context_for_recovery, compute_scan, compute_scan_locked,
+    ensure_active_ledger_state_transaction_request, now_iso_utc, open_context, parse_lock_option,
+    read_active_json_optional, set_open_state_transactional, stable_hash_48,
+    validate_evidence_refs, CliError, LockOptions,
 };
 use crate::automation::{cli_command, path_command};
+use crate::fire::active_ledger_transaction::{
+    apply_active_ledger_transition, recover_active_ledger_transition,
+    reject_pending_active_ledger_transition, ActiveLedgerWrite,
+};
 use crate::{limited_yaml, read_batch_file};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
@@ -286,7 +292,7 @@ pub(super) fn run_batch_template(
     options: &BatchTemplateOptions,
 ) -> Result<BatchTemplateResult, CliError> {
     let context = open_context(&options.path)?;
-    let scan_execution = compute_scan(&context.open_dir, false)?;
+    let scan_execution = compute_scan(&context.open_dir)?;
     let open_fires = scan_execution
         .fires
         .iter()
@@ -398,14 +404,49 @@ pub(super) fn run_extinguish_batch(
             "batch extinguish requires at least one fire".to_string(),
         ));
     }
-    let context = open_context(&options.path)?;
-    let _lock = RepoLock::acquire_with_options(&context.repo_root, &options.lock)?;
-    let active_state_path = PathBuf::from(required_string(
-        &context.registry,
-        &["open", "active_state_path"],
-    )?);
+    let lock;
+    let context;
+    if options.dry_run {
+        lock = None;
+        context = open_context(&options.path)?;
+    } else {
+        let (acquired_lock, locked_context) = acquire_locked_open_context_for_recovery(
+            &options.path,
+            &options.lock,
+            "extinguish-batch",
+        )?;
+        lock = Some(acquired_lock);
+        context = locked_context;
+    }
+    let transaction_request = if options.dry_run {
+        reject_pending_active_ledger_transition(&context.active_state)?;
+        None
+    } else {
+        Some(batch_extinguish_transition_request(
+            &context, &batch, options,
+        )?)
+    };
+    if let Some(request) = transaction_request.as_ref() {
+        ensure_active_ledger_state_transaction_request(&context, "extinguish-batch", request)?;
+        if let Some(replayed) =
+            recover_active_ledger_transition(&context.active_state, "extinguish-batch", request)?
+        {
+            let target_state = batch_extinguish_target_state(&replayed)?;
+            let result = batch_extinguish_result_from_transaction(&context, replayed)?;
+            set_open_state_transactional(&context, "extinguish-batch", &target_state, request)?;
+            return Ok(result);
+        }
+    }
     let policy = codefire_core::parse_verification_policy(&context.open_dir)?;
-    let scan_execution = compute_scan(&context.open_dir, !options.dry_run)?;
+    let scan_execution = if options.dry_run {
+        compute_scan(&context.open_dir)?
+    } else {
+        compute_scan_locked(
+            &context.open_dir,
+            lock.as_ref()
+                .expect("live batch extinguish must hold repo lock"),
+        )?
+    };
     let scan = scan_execution.scan;
     let mut fires = scan_execution.fires;
     let mut resolved = resolve_batch_fires(&batch, &policy, &scan, &fires, &context.repo_root)?;
@@ -432,12 +473,14 @@ pub(super) fn run_extinguish_batch(
         });
     }
 
-    let resolutions_path = active_state_path.join("resolutions.json");
-    let mut resolutions: Vec<codefire_core::Resolution> = if resolutions_path.exists() {
-        serde_json::from_value(read_json(&resolutions_path)?)?
-    } else {
-        Vec::new()
-    };
+    let fires_before = read_active_json_optional(&context.active_state, Path::new("fires.json"))?;
+    let resolutions_before =
+        read_active_json_optional(&context.active_state, Path::new("resolutions.json"))?;
+    let mut resolutions: Vec<codefire_core::Resolution> = resolutions_before
+        .clone()
+        .map(serde_json::from_value)
+        .transpose()?
+        .unwrap_or_default();
     for fire in &resolved {
         fires[fire.fire_index].status = "extinguished".to_string();
         fires[fire.fire_index].resolution_uid = Some(fire.resolution_uid.clone());
@@ -459,25 +502,183 @@ pub(super) fn run_extinguish_batch(
         .collect::<Vec<_>>();
     let applied_count = resolved.len();
     resolutions.extend(resolved.drain(..).map(|fire| fire.resolution_record));
-    write_json_atomic(
-        &active_state_path.join("fires.json"),
-        &serde_json::to_value(&fires)?,
-    )?;
-    write_json_atomic(&resolutions_path, &serde_json::to_value(&resolutions)?)?;
     let remaining_open_fire_count = fires.iter().filter(|fire| fire.status == "open").count();
+    let target_state =
+        crate::scan_branch_state(crate::scan_change_count(&scan), remaining_open_fire_count);
+    let transaction_result = json!({
+        "type": "codefire_extinguish_batch_transition_result",
+        "version": 1,
+        "item_count": applied_count,
+        "applied_count": applied_count,
+        "fire_ids": fire_ids,
+        "resolution_uids": resolution_uids,
+        "remaining_open_fire_count": remaining_open_fire_count,
+        "target_state": target_state,
+        "plan": plan,
+    });
+    let durable_result = apply_active_ledger_transition(
+        &context.active_state,
+        "extinguish-batch",
+        transaction_request
+            .as_ref()
+            .expect("live batch extinguish must have a transaction request"),
+        vec![
+            ActiveLedgerWrite::new("fires.json", fires_before, serde_json::to_value(&fires)?),
+            ActiveLedgerWrite::new(
+                "resolutions.json",
+                resolutions_before,
+                serde_json::to_value(&resolutions)?,
+            ),
+        ],
+        &transaction_result,
+    )?;
+    let target_state = batch_extinguish_target_state(&durable_result)?;
+    let result = batch_extinguish_result_from_transaction(&context, durable_result)?;
+    set_open_state_transactional(
+        &context,
+        "extinguish-batch",
+        &target_state,
+        transaction_request
+            .as_ref()
+            .expect("live batch extinguish must have a transaction request"),
+    )?;
+    Ok(result)
+}
 
-    Ok(BatchExtinguishResult {
-        repo_root: context.repo_root,
-        branch: context.branch,
-        open_dir: context.open_dir,
-        dry_run: false,
-        item_count: applied_count,
-        applied_count,
-        fire_ids,
-        resolution_uids,
-        remaining_open_fire_count,
-        plan,
+fn batch_extinguish_transition_request(
+    context: &crate::OpenContext,
+    batch: &BatchExtinguishFile,
+    options: &BatchExtinguishOptions,
+) -> Result<Value, CliError> {
+    let open_instance_id =
+        crate::required_string(&context.registry, &["open", "open_instance_id"])?;
+    let current_base_commit =
+        crate::required_string(&context.registry, &["open", "current_base_commit"])?;
+    Ok(json!({
+        "type": "codefire_extinguish_batch_transition_request",
+        "version": 1,
+        "command": "extinguish-batch",
+        "branch": &context.branch,
+        "open_instance_id": open_instance_id,
+        "current_base_commit": current_base_commit,
+        "path": &options.path,
+        "batch_path": &options.batch_path,
+        "full_output": options.full_output,
+        "batch": {
+            "version": batch.version,
+            "defaults": batch_defaults_json(&batch.defaults),
+            "fires": batch.fires.iter().map(batch_fire_spec_json).collect::<Vec<_>>(),
+        },
+    }))
+}
+
+fn batch_defaults_json(defaults: &BatchFireDefaults) -> Value {
+    json!({
+        "resolution": &defaults.resolution,
+        "rationale": &defaults.rationale,
+        "evidence": &defaults.evidence,
+        "evidence_refs": &defaults.evidence_refs,
+        "refresh": defaults.refresh,
     })
+}
+
+fn batch_fire_spec_json(fire: &BatchFireSpec) -> Value {
+    json!({
+        "id": &fire.id,
+        "resolution": &fire.resolution,
+        "rationale": &fire.rationale,
+        "evidence": &fire.evidence,
+        "evidence_refs": &fire.evidence_refs,
+        "refresh": fire.refresh,
+    })
+}
+
+fn batch_extinguish_target_state(value: &Value) -> Result<String, CliError> {
+    let state = value
+        .get("target_state")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            CliError::InvalidRepository(
+                "active ledger batch extinguish durable result is missing target_state".to_string(),
+            )
+        })?;
+    if !matches!(state, "open-clean" | "open-burning" | "open-consistent") {
+        return Err(CliError::InvalidRepository(format!(
+            "active ledger batch extinguish durable result has unsupported target_state {state}"
+        )));
+    }
+    Ok(state.to_string())
+}
+
+fn batch_extinguish_result_from_transaction(
+    context: &crate::OpenContext,
+    value: Value,
+) -> Result<BatchExtinguishResult, CliError> {
+    if value.get("type").and_then(Value::as_str)
+        != Some("codefire_extinguish_batch_transition_result")
+        || value.get("version").and_then(Value::as_u64) != Some(1)
+    {
+        return Err(CliError::InvalidRepository(
+            "active ledger batch extinguish transaction contains an invalid durable result"
+                .to_string(),
+        ));
+    }
+    let required_usize = |field: &str| -> Result<usize, CliError> {
+        value
+            .get(field)
+            .and_then(Value::as_u64)
+            .and_then(|number| usize::try_from(number).ok())
+            .ok_or_else(|| {
+                CliError::InvalidRepository(format!(
+                    "active ledger batch extinguish durable result has invalid {field}"
+                ))
+            })
+    };
+    let required_strings = |field: &str| -> Result<Vec<String>, CliError> {
+        value
+            .get(field)
+            .cloned()
+            .ok_or_else(|| {
+                CliError::InvalidRepository(format!(
+                    "active ledger batch extinguish durable result is missing {field}"
+                ))
+            })
+            .and_then(|value| serde_json::from_value(value).map_err(CliError::from))
+    };
+    let plan = value.get("plan").cloned().ok_or_else(|| {
+        CliError::InvalidRepository(
+            "active ledger batch extinguish durable result is missing plan".to_string(),
+        )
+    })?;
+    if plan.get("type").and_then(Value::as_str) != Some("codefire_operation_plan")
+        || plan.get("command").and_then(Value::as_str) != Some("extinguish-batch")
+        || plan.get("dry_run").and_then(Value::as_bool) != Some(false)
+    {
+        return Err(CliError::InvalidRepository(
+            "active ledger batch extinguish durable result contains an invalid plan".to_string(),
+        ));
+    }
+    let result = BatchExtinguishResult {
+        repo_root: context.repo_root.clone(),
+        branch: context.branch.clone(),
+        open_dir: context.open_dir.clone(),
+        dry_run: false,
+        item_count: required_usize("item_count")?,
+        applied_count: required_usize("applied_count")?,
+        fire_ids: required_strings("fire_ids")?,
+        resolution_uids: required_strings("resolution_uids")?,
+        remaining_open_fire_count: required_usize("remaining_open_fire_count")?,
+        plan,
+    };
+    if result.item_count != result.applied_count
+        || result.fire_ids.len() != result.item_count
+        || result.resolution_uids.len() != result.item_count
+    {
+        return Err(CliError::InvalidRepository(
+            "active ledger batch extinguish durable result counts disagree".to_string(),
+        ));
+    }
+    Ok(result)
 }
 
 fn batch_template_defaults(options: &BatchTemplateOptions) -> Value {

@@ -1,8 +1,11 @@
 use super::{
-    parse_duration_ms, run_evidence_add, validate_evidence_add_options, EvidenceAddOptions,
-    EvidenceAddResult, DEFAULT_MAX_OUTPUT_BYTES,
+    parse_duration_ms, portable_plan_path, redact_capture_argv, redact_capture_text,
+    resolve_command_cwd, run_evidence_add, sensitive_path_literals, validate_evidence_add_options,
+    EvidenceAddOptions, EvidenceAddResult, DEFAULT_MAX_OUTPUT_BYTES,
 };
-use crate::{find_repo_root, limited_yaml, read_batch_file, CliError};
+use crate::{
+    find_repo_root, limited_yaml, read_batch_file, secret_redaction::redact_text, CliError,
+};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
@@ -74,7 +77,7 @@ pub(crate) fn run_evidence_batch(
         validate_evidence_add_options(item)?;
     }
 
-    let plan = evidence_batch_operation_plan(options, batch_path, &resolved);
+    let plan = evidence_batch_operation_plan(options, batch_path, &resolved, &repo_root)?;
     if options.dry_run {
         return Ok(EvidenceBatchResult {
             repo_root,
@@ -166,16 +169,22 @@ fn evidence_batch_operation_plan(
     options: &EvidenceAddOptions,
     batch_path: &Path,
     items: &[EvidenceAddOptions],
-) -> Value {
-    json!({
+    repo_root: &Path,
+) -> Result<Value, CliError> {
+    let batch_file = portable_plan_path(batch_path, repo_root)?;
+    let items = items
+        .iter()
+        .map(|item| evidence_batch_item_plan(item, repo_root))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(json!({
         "type": "codefire_operation_plan",
         "version": 1,
         "command": "evidence-add-batch",
         "dry_run": options.dry_run,
         "would_apply": !options.dry_run,
-        "batch_file": batch_path,
+        "batch_file": batch_file,
         "item_count": items.len(),
-        "items": items.iter().map(evidence_batch_item_plan).collect::<Vec<_>>(),
+        "items": items,
         "operations": [
             {"kind": "validate_all_batch_items", "count": items.len()},
             {"kind": "store_artifact_refs"},
@@ -185,23 +194,54 @@ fn evidence_batch_operation_plan(
             {"kind": "storage_report", "command": "codefire storage report --json"},
             {"kind": "verify", "command": "codefire verify --details --json"},
         ],
-    })
+    }))
 }
 
-fn evidence_batch_item_plan(item: &EvidenceAddOptions) -> Value {
-    json!({
+fn evidence_batch_item_plan(
+    item: &EvidenceAddOptions,
+    repo_root: &Path,
+) -> Result<Value, CliError> {
+    let cwd = if item.command.is_some() || item.command_argv.is_some() {
+        Some(resolve_command_cwd(item, repo_root)?)
+    } else {
+        None
+    };
+    let sensitive_literals = cwd
+        .as_ref()
+        .map(sensitive_path_literals)
+        .unwrap_or_default();
+    let command = item
+        .command
+        .as_deref()
+        .map(|value| redact_capture_text(value, &sensitive_literals).value);
+    let command_argv = item
+        .command_argv
+        .as_deref()
+        .map(|value| redact_capture_argv(value, &sensitive_literals).value);
+    let artifact = item
+        .artifact_path
+        .as_deref()
+        .map(|path| portable_plan_path(path, repo_root))
+        .transpose()?;
+    let artifact_uri = item
+        .artifact_uri
+        .as_deref()
+        .map(redact_text)
+        .map(|value| value.value);
+    Ok(json!({
         "label": &item.label,
         "has_artifact": item.artifact_path.is_some(),
-        "artifact": &item.artifact_path,
-        "artifact_uri": &item.artifact_uri,
+        "artifact": artifact,
+        "artifact_uri": artifact_uri,
         "has_command": item.command.is_some(),
-        "command": &item.command,
+        "command": command,
         "has_command_argv": item.command_argv.is_some(),
-        "command_argv": &item.command_argv,
-        "cwd": &item.command_cwd,
+        "command_argv": command_argv,
+        "cwd": cwd.as_ref().map(|value| &value.portable),
+        "cwd_redacted": cwd.as_ref().is_some_and(|value| value.redacted),
         "timeout_ms": item.command_timeout_ms,
         "max_output_bytes": item.max_output_bytes,
-    })
+    }))
 }
 
 fn parse_evidence_batch_file(path: &Path) -> Result<EvidenceBatchFile, CliError> {

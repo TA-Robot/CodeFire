@@ -140,10 +140,10 @@ fn issue_root_cause_map_covers_open_issues() {
 
     let detail_statuses = detail_issue_statuses(&repo_root);
     for (id, status) in &detail_statuses {
-        if status == "open" {
+        if !issue_status_is_closed(status) {
             assert!(
                 mapped_issues.contains_key(id),
-                "{id} is open but missing from issue-root-cause-map.json"
+                "{id} is not closed but missing from issue-root-cause-map.json"
             );
         }
     }
@@ -155,6 +155,20 @@ fn issue_root_cause_map_covers_open_issues() {
                 "{id} status differs between detail file and root cause map"
             );
         }
+    }
+}
+
+fn issue_status_is_closed(status: &str) -> bool {
+    matches!(status, "fixed" | "fixed in v0.7" | "wontfix")
+}
+
+#[test]
+fn issue_root_cause_map_treats_every_nonclosed_status_as_active() {
+    for status in ["open", "investigating"] {
+        assert!(!issue_status_is_closed(status));
+    }
+    for status in ["fixed", "fixed in v0.7", "wontfix"] {
+        assert!(issue_status_is_closed(status));
     }
 }
 

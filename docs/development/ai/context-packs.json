@@ -9,6 +9,8 @@
         "README.md",
         "docs/development/README.md",
         "docs/development/project-management.md",
+        "docs/development/milestones.md",
+        "docs/development/milestone-operating-model.md",
         "docs/development/worktree-cleanup-plan.md"
       ],
       "purpose": "Repository boundaries, current state, validation gaps, and dirty-tree classification."
@@ -92,6 +94,8 @@
         "README.md",
         "docs/development/README.md",
         "docs/development/project-management.md",
+        "docs/development/milestones.md",
+        "docs/development/milestone-operating-model.md",
         "docs/development/worktree-cleanup-plan.md",
         "docs/development/history.md"
       ],

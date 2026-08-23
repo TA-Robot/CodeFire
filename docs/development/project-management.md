@@ -34,7 +34,8 @@ Use a small number of live documents and many append-only or historical document
 | Strategy and roadmap | `docs/development/strategy/README.md` | Accepted principles, product direction, decision status, modernization gates, and release/format identity. |
 | Exploration | `docs/development/exploration/README.md` | Non-authoritative hypotheses, alternatives, falsifiers, and experiments. |
 | History | `docs/development/history.md` | Append-only work log. |
-| Active batch | `docs/development/current-cycle-burn-down-plan.md` | Current burn-down batch only. Move old detail into history or mark it historical. |
+| Live milestones | `docs/development/milestones.md`, `docs/development/milestone-operating-model.md` | Five-ahead execution board and admission rules. This is what may be worked now. |
+| Historical batch | `docs/development/current-cycle-burn-down-plan.md` | Frozen review-portfolio narrative. Not permission to work. |
 | Issue ledgers | `bug-backlog.md`, `bug-issues/`, `code-review-issues-2026-06-06.md`, `code-review-issues/` | Issue facts, status, evidence, and closure. |
 | Deletion audit | `docs/development/archive/deletion-manifest.md` | Destination and recovery record for superseded tracked prose. |
 | Source architecture | `source-architecture.md`, `command-source-trace.md`, `source-data-model-catalog.md`, `change-playbook.md` | Module ownership, command routing, data contracts, and change recipes. |
@@ -66,18 +67,19 @@ The detail file status is authoritative for closure. Index files are navigationa
 
 ## Cycle Lifecycle
 
-Use this lifecycle for long-running CodeFire improvement work:
+Long-running work is scheduled on the five-ahead board in `milestones.md`, governed by `milestone-operating-model.md`.
 
-1. **Discover**: dogfood or source review identifies issues.
-2. **Freeze**: define a bounded batch and stop adding unrelated issues to it.
-3. **Plan**: group issues by root fix, not by symptom.
-4. **Implement**: fix the root cause with focused tests.
-5. **Close**: update detail file, index, root-cause map, and history.
-6. **Install**: install or select the built CodeFire binary intended for dogfood.
-7. **Dogfood**: use the fixed CodeFire against the algorithm project.
-8. **Retrospect**: record new issues or explicitly record that none were found.
+1. **Name five slots**: M1 is the next exit; M2–M5 are queued only.
+2. **Admit**: an issue, review finding, or extra test enters M1 only if the M1 exit cannot be met without it.
+3. **Park**: everything else is assigned M2–M5 (or `unscheduled`) and is not active work.
+4. **Plan the graph**: name the critical path to the M1 exit and the parallel set of independent packets. Launch the parallel set immediately.
+5. **Implement**: Codex orchestrates; Claude Opus 5 / Grok 4.6 individual agents do the assigned M1 packets.
+6. **Audit**: a Claude or Grok auditor, never Codex, runs every 30 minutes against plan vs progress.
+7. **Review**: only `block-m1` findings are required. Other comments are parked.
+8. **Validate**: run the M1 card's command list, not the historical full catalog, unless the card names a wider gate.
+9. **Exit and shift**: close or park every M1 item, record evidence in `history.md`, then shift slots.
 
-Do not start a new discovery batch while the active frozen batch still has open issues.
+Do not start M2 while M1 is open. Do not require every open CFB/CFR issue to close before the next milestone. The revoked rule was "discover, freeze, burn down every issue, then discover again".
 
 ## Change Package Types
 
@@ -136,6 +138,7 @@ Validation evidence must name both the command and the result.
 - A skipped command is not evidence; it is an environment limitation or pending task.
 - If `cargo` is unavailable, Rust release readiness remains unverified in that environment.
 - Docs-only changes can skip full tests, but not consistency checks.
+- Active-milestone work runs only the validation list on that milestone card. Workspace-wide product gates wait until a later slot names them.
 
 ## Current-State Hygiene
 
@@ -143,6 +146,7 @@ Follow these rules to prevent stale docs:
 
 - `README.md` should describe stable structure and commands, not live issue counts.
 - `docs/development/README.md` may contain a current snapshot and must carry a `Last audited` line.
+- `milestones.md` is the live execution board. `current-cycle-burn-down-plan.md` must not be treated as permission to work.
 - `current-cycle-burn-down-plan.md` should not accumulate every historical dogfood pass as live current state.
 - Historical numbers are allowed only when labeled as historical.
 - If two files disagree, update the management hub first, then either fix or explicitly demote the stale text.
@@ -156,7 +160,7 @@ Follow these rules to prevent stale docs:
 - What is explicitly out of scope or blocked by an earlier gate?
 - Which accepted decision or product contract receives the result?
 
-Release and format identity belongs only in `docs/development/strategy/release-and-format-roadmap.md`. Do not create a new version-number plan as a task board. Active bounded execution belongs in the current burn-down plan; outcomes belong in history and the relevant issue/evidence record.
+Release and format identity belongs only in `docs/development/strategy/release-and-format-roadmap.md`. Do not create a new version-number plan as a task board. Active bounded execution belongs on `milestones.md`; outcomes belong in history and the relevant issue/evidence record. The burn-down plan is historical.
 
 ## Handoff Template
 
