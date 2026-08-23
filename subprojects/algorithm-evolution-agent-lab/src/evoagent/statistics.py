@@ -21,6 +21,8 @@ class ConfidenceIntervalEstimator:
         if confidence_level != 0.95:
             raise ValueError("only 0.95 confidence_level is currently supported")
         numeric_values = tuple(float(value) for value in values)
+        if not all(math.isfinite(value) for value in numeric_values):
+            raise ValueError("values must be finite")
         mean = sum(numeric_values) / len(numeric_values)
         if len(numeric_values) == 1:
             return ConfidenceInterval(mean=mean, lower=mean, upper=mean, confidence_level=confidence_level, n=1)

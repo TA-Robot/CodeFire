@@ -33,7 +33,7 @@ class ExternalValidityEvaluator:
         domain_by_benchmark = {item.benchmark: item.domain for item in domains}
         improvements = [result for result in results if result.quality_delta > 0]
         improved_benchmarks = tuple(sorted({result.plan.benchmark for result in improvements}))
-        improved_domains = tuple(sorted({domain_by_benchmark.get(result.plan.benchmark, "unknown") for result in improvements}))
+        improved_domains = tuple(sorted({domain_by_benchmark[result.plan.benchmark] for result in improvements if result.plan.benchmark in domain_by_benchmark}))
         mean_delta = sum(result.quality_delta for result in results) / len(results) if results else 0.0
         return ExternalValidityReport(
             improved_benchmarks=improved_benchmarks,
