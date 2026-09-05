@@ -12,7 +12,7 @@ use std::fmt;
 use std::fs;
 #[cfg(test)]
 use std::fs::OpenOptions;
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -1663,6 +1663,54 @@ fn prepared_stage_v1_object_id(name: &Path) -> Option<&str> {
     Some(object_id)
 }
 
+/// Inspected staging candidate kept live until the unlink fence.
+///
+/// A stored device/inode pair is not ownership: the handle prevents the
+/// inspected file object from being freed (and its number reused), and the
+/// digest detects in-place byte changes on that same object.
+struct PreparedStageRecoveryCandidate {
+    file: cap_std::fs::File,
+    identity: ObjectStoreIdentity,
+    content_digest: String,
+    size_bytes: u64,
+}
+
+fn prepared_stage_recovery_ownership_bytes() -> Result<u64, StoreError> {
+    const CONTENT_DIGEST_HEX_LEN: u64 = 64;
+    codefire_core::LOGICAL_FRAME_BASE_BYTES
+        .checked_add(CONTENT_DIGEST_HEX_LEN)
+        .ok_or_else(prepared_object_batch_size_overflow)
+}
+
+fn retain_prepared_stage_recovery_ownership(
+    ledger: &mut codefire_core::DecisionWorkLedger,
+    ownership_bytes: u64,
+) -> Result<(), StoreError> {
+    ledger.apply(
+        codefire_core::DecisionWorkReservation::new(
+            codefire_core::DecisionWorkPhase::Staging,
+            codefire_core::DecisionWorkSurface::Atomic,
+        )
+        .acquire(
+            codefire_core::DecisionWorkDimension::RetainedBytes,
+            ownership_bytes,
+        )
+        .charge(codefire_core::DecisionWorkDimension::GraphNodes, 1),
+    )?;
+    Ok(())
+}
+
+fn prepared_stage_recovery_metadata_matches(
+    metadata: &cap_std::fs::Metadata,
+    expected_identity: ObjectStoreIdentity,
+    expected_size: u64,
+) -> Result<bool, StoreError> {
+    Ok(metadata.is_file()
+        && prepared_stage_has_one_link(metadata)
+        && stable_capability_object_store_identity(metadata)? == expected_identity
+        && metadata.len() == expected_size)
+}
+
 fn recover_prepared_object_stages<C, H>(
     entries: &[PreparedObjectRecordEntry],
     ledger: &mut codefire_core::DecisionWorkLedger,
@@ -1673,9 +1721,10 @@ where
     C: FnMut() -> bool,
     H: FnOnce() -> Result<(), StoreError>,
 {
-    let mut candidates = BTreeMap::<(usize, PathBuf), (ObjectStoreIdentity, u64)>::new();
+    let mut candidates = BTreeMap::<(usize, PathBuf), PreparedStageRecoveryCandidate>::new();
     let mut candidate_retained_bytes = 0_u64;
     let recovery = (|| -> Result<(), StoreError> {
+        let ownership_bytes = prepared_stage_recovery_ownership_bytes()?;
         let mut visited = [false; OBJECT_KINDS.len()];
         for (entry_index, entry) in entries.iter().enumerate() {
             let kind_index = OBJECT_KINDS
@@ -1696,8 +1745,13 @@ where
                 names_retained_bytes = names_retained_bytes
                     .checked_sub(frame_bytes)
                     .ok_or_else(object_store_scan_accounting_underflow)?;
-                let inspected =
-                    inspect_prepared_stage_recovery_candidate(entry, &name, ledger, should_cancel);
+                let inspected = inspect_prepared_stage_recovery_candidate(
+                    entry,
+                    &name,
+                    ledger,
+                    should_cancel,
+                    ownership_bytes,
+                );
                 let inspected = match inspected {
                     Ok(inspected) => inspected,
                     Err(error) => {
@@ -1708,13 +1762,17 @@ where
                         return Err(error);
                     }
                 };
-                let Some(identity) = inspected else {
+                let Some(candidate) = inspected else {
                     drop(name);
                     release_object_store_scan_retained(ledger, frame_bytes)?;
                     continue;
                 };
-                let Some(next_candidate_bytes) = candidate_retained_bytes.checked_add(frame_bytes)
+                let Some(next_candidate_bytes) = candidate_retained_bytes
+                    .checked_add(frame_bytes)
+                    .and_then(|bytes| bytes.checked_add(ownership_bytes))
                 else {
+                    drop(candidate);
+                    release_object_store_scan_retained(ledger, ownership_bytes)?;
                     drop(name);
                     release_object_store_scan_retained(ledger, frame_bytes)?;
                     drop(names);
@@ -1722,7 +1780,7 @@ where
                     return Err(prepared_object_batch_size_overflow());
                 };
                 candidate_retained_bytes = next_candidate_bytes;
-                candidates.insert((entry_index, name), (identity, frame_bytes));
+                candidates.insert((entry_index, name), candidate);
             }
             release_object_store_scan_retained(ledger, names_retained_bytes)?;
         }
@@ -1730,18 +1788,16 @@ where
         poll_prepared_object_batch(should_cancel)?;
         before_unlink()?;
         poll_prepared_object_batch(should_cancel)?;
-        for ((entry_index, name), (expected_identity, _)) in &candidates {
+        for ((entry_index, name), candidate) in &mut candidates {
             poll_prepared_object_batch(should_cancel)?;
             let entry = &entries[*entry_index];
-            let metadata = match entry.directory.symlink_metadata(name) {
-                Ok(metadata) => metadata,
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
-                Err(error) => return Err(StoreError::Io(error)),
-            };
-            if !metadata.is_file()
-                || !prepared_stage_has_one_link(&metadata)
-                || stable_capability_object_store_identity(&metadata)? != *expected_identity
-            {
+            if !prepared_stage_recovery_candidate_still_owned(
+                entry,
+                name,
+                candidate,
+                ledger,
+                should_cancel,
+            )? {
                 continue;
             }
             match entry.directory.remove_file(name) {
@@ -1766,7 +1822,8 @@ fn inspect_prepared_stage_recovery_candidate<C>(
     name: &Path,
     ledger: &mut codefire_core::DecisionWorkLedger,
     should_cancel: &mut C,
-) -> Result<Option<ObjectStoreIdentity>, StoreError>
+    ownership_bytes: u64,
+) -> Result<Option<PreparedStageRecoveryCandidate>, StoreError>
 where
     C: FnMut() -> bool,
 {
@@ -1790,7 +1847,41 @@ where
     if object_subdir_by_id(object_id) != Some(entry.subdir) {
         return Ok(None);
     }
-    let metadata = match entry.directory.symlink_metadata(name) {
+    retain_prepared_stage_recovery_ownership(ledger, ownership_bytes)?;
+    let inspected =
+        inspect_prepared_stage_recovery_owned_file(entry, name, ledger, should_cancel, object_id);
+    match inspected {
+        Ok(Some(candidate)) => Ok(Some(candidate)),
+        Ok(None) => {
+            release_object_store_scan_retained(ledger, ownership_bytes)?;
+            Ok(None)
+        }
+        Err(error) => match release_object_store_scan_retained(ledger, ownership_bytes) {
+            Ok(()) => Err(error),
+            Err(release) => Err(release),
+        },
+    }
+}
+
+fn inspect_prepared_stage_recovery_owned_file<C>(
+    entry: &PreparedObjectRecordEntry,
+    name: &Path,
+    ledger: &mut codefire_core::DecisionWorkLedger,
+    should_cancel: &mut C,
+    object_id: &str,
+) -> Result<Option<PreparedStageRecoveryCandidate>, StoreError>
+where
+    C: FnMut() -> bool,
+{
+    let mut options = CapabilityOpenOptions::new();
+    options.read(true);
+    options.follow(FollowSymlinks::No);
+    options.nonblock(true);
+    let mut file = match entry.directory.open_with(name, &options) {
+        Ok(file) => file,
+        Err(_) => return Ok(None),
+    };
+    let metadata = match file.metadata() {
         Ok(metadata) => metadata,
         Err(_) => return Ok(None),
     };
@@ -1801,9 +1892,9 @@ where
         return Ok(None);
     }
     let identity = stable_capability_object_store_identity(&metadata)?;
-    let validation = with_accounted_prepared_object_read(
-        &entry.directory,
-        name,
+    let size_bytes = metadata.len();
+    let validation = with_accounted_prepared_object_file_read(
+        &mut file,
         &entry.display_path,
         ledger,
         PreparedObjectReadKind::Initial,
@@ -1812,11 +1903,25 @@ where
             let document = parse_object_record_document(bytes)?;
             validate_object_extension_support(&document.extensions)?;
             validate_object_record(&document.record, Some(object_id), None)?;
-            Ok(())
+            Ok(codefire_util::sha256_hex(bytes))
         },
     );
     match validation {
-        Ok(()) => Ok(Some(identity)),
+        Ok(content_digest) => {
+            let metadata = match file.metadata() {
+                Ok(metadata) => metadata,
+                Err(_) => return Ok(None),
+            };
+            if !prepared_stage_recovery_metadata_matches(&metadata, identity, size_bytes)? {
+                return Ok(None);
+            }
+            Ok(Some(PreparedStageRecoveryCandidate {
+                file,
+                identity,
+                content_digest,
+                size_bytes,
+            }))
+        }
         Err(error)
             if matches!(
                 error,
@@ -1827,6 +1932,74 @@ where
         }
         Err(_) => Ok(None),
     }
+}
+
+fn prepared_stage_recovery_candidate_still_owned<C>(
+    entry: &PreparedObjectRecordEntry,
+    name: &Path,
+    candidate: &mut PreparedStageRecoveryCandidate,
+    ledger: &mut codefire_core::DecisionWorkLedger,
+    should_cancel: &mut C,
+) -> Result<bool, StoreError>
+where
+    C: FnMut() -> bool,
+{
+    poll_prepared_object_batch(should_cancel)?;
+    let pinned = match candidate.file.metadata() {
+        Ok(metadata) => metadata,
+        Err(_) => return Ok(false),
+    };
+    if !prepared_stage_recovery_metadata_matches(&pinned, candidate.identity, candidate.size_bytes)?
+    {
+        return Ok(false);
+    }
+    let named = match entry.directory.symlink_metadata(name) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(StoreError::Io(error)),
+    };
+    if !prepared_stage_recovery_metadata_matches(&named, candidate.identity, candidate.size_bytes)?
+    {
+        return Ok(false);
+    }
+    poll_prepared_object_batch(should_cancel)?;
+    let content_matches = match with_accounted_prepared_object_file_read(
+        &mut candidate.file,
+        &entry.display_path,
+        ledger,
+        PreparedObjectReadKind::Initial,
+        should_cancel,
+        |bytes| Ok(codefire_util::sha256_hex(bytes) == candidate.content_digest),
+    ) {
+        Ok(matches) => matches,
+        Err(error)
+            if matches!(
+                error,
+                StoreError::DecisionWorkAccounting(_) | StoreError::ValidationCancelled
+            ) =>
+        {
+            return Err(error);
+        }
+        Err(_) => return Ok(false),
+    };
+    if !content_matches {
+        return Ok(false);
+    }
+    poll_prepared_object_batch(should_cancel)?;
+    let pinned = match candidate.file.metadata() {
+        Ok(metadata) => metadata,
+        Err(_) => return Ok(false),
+    };
+    if !prepared_stage_recovery_metadata_matches(&pinned, candidate.identity, candidate.size_bytes)?
+    {
+        return Ok(false);
+    }
+    let named = match entry.directory.symlink_metadata(name) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(StoreError::Io(error)),
+    };
+    prepared_stage_recovery_metadata_matches(&named, candidate.identity, candidate.size_bytes)
 }
 
 fn build_prepared_object_path(
@@ -2230,21 +2403,45 @@ where
     C: FnMut() -> bool,
     F: FnOnce(&[u8]) -> Result<T, StoreError>,
 {
+    let mut options = CapabilityOpenOptions::new();
+    options.read(true);
+    options.follow(FollowSymlinks::No);
+    options.nonblock(true);
+    let mut file = directory.open_with(file_name, &options)?;
+    with_accounted_prepared_object_file_read(
+        &mut file,
+        display_path,
+        ledger,
+        kind,
+        should_cancel,
+        consume,
+    )
+}
+
+fn with_accounted_prepared_object_file_read<T, C, F>(
+    file: &mut cap_std::fs::File,
+    display_path: &Path,
+    ledger: &mut codefire_core::DecisionWorkLedger,
+    kind: PreparedObjectReadKind,
+    should_cancel: &mut C,
+    consume: F,
+) -> Result<T, StoreError>
+where
+    C: FnMut() -> bool,
+    F: FnOnce(&[u8]) -> Result<T, StoreError>,
+{
+    file.seek(SeekFrom::Start(0))?;
     let mut scratch_bytes = 0_u64;
-    let read = read_object_record_bytes_from_directory_with_limit_and_hooks(
-        directory,
-        file_name,
+    let read = read_object_record_bytes_from_open_file_with_limit_and_hooks(
+        file,
         display_path,
         MAX_OBJECT_RECORD_BYTES,
         |size_bytes| {
-            scratch_bytes = size_bytes
+            let needed = size_bytes
                 .checked_mul(2)
                 .ok_or_else(prepared_object_batch_size_overflow)?;
-            ledger.apply(prepared_object_read_reservation(
-                kind,
-                size_bytes,
-                scratch_bytes,
-            ))?;
+            ledger.apply(prepared_object_read_reservation(kind, size_bytes, needed))?;
+            scratch_bytes = needed;
             Ok(())
         },
         || poll_prepared_object_batch(should_cancel),
@@ -4310,7 +4507,7 @@ fn read_object_record_bytes_from_directory_with_limit_and_hooks<F, C>(
     display_path: &Path,
     limit: u64,
     after_metadata_check: F,
-    mut before_read_chunk: C,
+    before_read_chunk: C,
 ) -> Result<Vec<u8>, StoreError>
 where
     F: FnOnce(u64) -> Result<(), StoreError>,
@@ -4320,7 +4517,27 @@ where
     options.read(true);
     options.follow(FollowSymlinks::No);
     options.nonblock(true);
-    let file = directory.open_with(file_name, &options)?;
+    let mut file = directory.open_with(file_name, &options)?;
+    read_object_record_bytes_from_open_file_with_limit_and_hooks(
+        &mut file,
+        display_path,
+        limit,
+        after_metadata_check,
+        before_read_chunk,
+    )
+}
+
+fn read_object_record_bytes_from_open_file_with_limit_and_hooks<F, C>(
+    file: &mut cap_std::fs::File,
+    display_path: &Path,
+    limit: u64,
+    after_metadata_check: F,
+    mut before_read_chunk: C,
+) -> Result<Vec<u8>, StoreError>
+where
+    F: FnOnce(u64) -> Result<(), StoreError>,
+    C: FnMut() -> Result<(), StoreError>,
+{
     let metadata = file.metadata()?;
     if !metadata.is_file() {
         return Err(StoreError::IncompleteRecord(format!(
@@ -4344,7 +4561,7 @@ where
     let mut bytes = Vec::with_capacity(initial_capacity);
     let mut chunk = [0_u8; OBJECT_STORE_TRAVERSAL_POLL_BYTES];
     {
-        let mut reader = (&file).take(expected_size);
+        let mut reader = (&*file).take(expected_size);
         loop {
             before_read_chunk()?;
             let read = reader.read(&mut chunk)?;
@@ -4356,7 +4573,7 @@ where
     }
     before_read_chunk()?;
     let mut growth_fence = [0_u8; 1];
-    let grew_past_fstat = (&file).read(&mut growth_fence)? != 0;
+    let grew_past_fstat = (&*file).read(&mut growth_fence)? != 0;
     let final_size = file.metadata()?.len();
     if final_size > limit {
         return Err(StoreError::ObjectRecordTooLarge {
@@ -11844,16 +12061,33 @@ mod tests {
             codefire_core::DecisionWorkDimension::TemporaryBytes,
         ] {
             assert_eq!(
-                ledger
-                    .snapshot()
-                    .current
-                    .get(&dimension)
-                    .copied()
-                    .unwrap_or_default(),
+                ledger_current(ledger, dimension),
                 0,
                 "prepared object batch leaked {dimension:?}"
             );
         }
+    }
+
+    fn ledger_current(
+        ledger: &codefire_core::DecisionWorkLedger,
+        dimension: codefire_core::DecisionWorkDimension,
+    ) -> u64 {
+        ledger
+            .snapshot()
+            .current
+            .get(&dimension)
+            .copied()
+            .unwrap_or_default()
+    }
+
+    fn policies_scan_name_frame_bytes(objects: &Path) -> u64 {
+        fs::read_dir(objects.join("policies"))
+            .unwrap()
+            .map(|entry| {
+                let name = entry.unwrap().file_name();
+                object_store_scan_name_frame_bytes(Path::new(&name)).unwrap()
+            })
+            .sum()
     }
 
     struct PreparedBatchTestOwner<'a> {
@@ -12678,6 +12912,176 @@ mod tests {
     }
 
     #[test]
+    fn prepared_object_stage_recovery_preserves_same_content_replacement_before_unlink() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let document = prepared_policy_document("recovery-pin-lifetime");
+        store_object_record_document(&objects, document.clone()).unwrap();
+        let mut ledger = object_transfer_ledger("prepared-stage-pin-lifetime");
+        let mut batch = PreparedObjectRecordBatch::prepare_with_ledger_and_poll(
+            &objects,
+            vec![document.clone()],
+            &mut ledger,
+            || false,
+        )
+        .unwrap();
+        let candidate = write_prepared_recovery_stage(&objects, &document);
+        let original = fs::read(&candidate).unwrap();
+
+        recover_prepared_object_stages(&batch.entries, &mut ledger, &mut || false, || {
+            fs::remove_file(&candidate)?;
+            fs::write(&candidate, &original)?;
+            Ok(())
+        })
+        .unwrap();
+
+        assert_eq!(fs::read(&candidate).unwrap(), original);
+        batch.cancel(&mut ledger).unwrap();
+        assert_prepared_batch_current_zero(&ledger);
+        ledger
+            .finish(codefire_core::DecisionWorkTerminalReason::Complete)
+            .unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn prepared_object_stage_recovery_pin_keeps_inspected_bytes_after_unlink() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let document = prepared_policy_document("recovery-live-pin");
+        store_object_record_document(&objects, document.clone()).unwrap();
+        let mut ledger = object_transfer_ledger("prepared-stage-live-pin");
+        let mut batch = PreparedObjectRecordBatch::prepare_with_ledger_and_poll(
+            &objects,
+            vec![document.clone()],
+            &mut ledger,
+            || false,
+        )
+        .unwrap();
+        let path = write_prepared_recovery_stage(&objects, &document);
+        let original = fs::read(&path).unwrap();
+        let ownership = prepared_stage_recovery_ownership_bytes().unwrap();
+        let entry = &batch.entries[0];
+        let name = Path::new(path.file_name().unwrap());
+        let mut candidate = inspect_prepared_stage_recovery_candidate(
+            entry,
+            name,
+            &mut ledger,
+            &mut || false,
+            ownership,
+        )
+        .unwrap()
+        .unwrap();
+        let observed = (|| -> Result<(Vec<u8>, bool), StoreError> {
+            // Reading through the retained handle after unlink proves its lifetime
+            // directly, independent of which inode a replacement would receive.
+            fs::remove_file(&path)?;
+            fs::write(&path, b"foreign replacement")?;
+            candidate.file.seek(SeekFrom::Start(0))?;
+            let mut bytes = Vec::new();
+            candidate.file.read_to_end(&mut bytes)?;
+            let still_owned = prepared_stage_recovery_candidate_still_owned(
+                entry,
+                name,
+                &mut candidate,
+                &mut ledger,
+                &mut || false,
+            )?;
+            Ok((bytes, still_owned))
+        })();
+        drop(candidate);
+        release_object_store_scan_retained(&mut ledger, ownership).unwrap();
+        batch.cancel(&mut ledger).unwrap();
+        assert_prepared_batch_current_zero(&ledger);
+        let (bytes, still_owned) = observed.unwrap();
+        assert_eq!(bytes, original);
+        assert!(!still_owned);
+        assert_eq!(fs::read(&path).unwrap(), b"foreign replacement");
+    }
+
+    #[test]
+    fn prepared_object_stage_recovery_preserves_in_place_tamper_before_unlink() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let document = prepared_policy_document("recovery-in-place-tamper");
+        store_object_record_document(&objects, document.clone()).unwrap();
+        let mut ledger = object_transfer_ledger("prepared-stage-in-place-tamper");
+        let mut batch = PreparedObjectRecordBatch::prepare_with_ledger_and_poll(
+            &objects,
+            vec![document.clone()],
+            &mut ledger,
+            || false,
+        )
+        .unwrap();
+        let candidate = write_prepared_recovery_stage(&objects, &document);
+        let original = fs::read(&candidate).unwrap();
+        assert!(!original.is_empty());
+        let mut replacement = original.clone();
+        replacement[0] ^= 0xff;
+
+        recover_prepared_object_stages(&batch.entries, &mut ledger, &mut || false, || {
+            #[cfg(unix)]
+            let inode_before = {
+                use std::os::unix::fs::MetadataExt;
+                fs::metadata(&candidate)?.ino()
+            };
+            let mut file = OpenOptions::new().write(true).open(&candidate)?;
+            file.seek(SeekFrom::Start(0))?;
+            file.write_all(&replacement)?;
+            drop(file);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                let inode_after = fs::metadata(&candidate)?.ino();
+                if inode_after != inode_before {
+                    return Err(StoreError::InvalidSealedCommit(
+                        "in-place tamper fixture must keep the inspected inode".to_string(),
+                    ));
+                }
+            }
+            Ok(())
+        })
+        .unwrap();
+
+        assert_eq!(fs::read(&candidate).unwrap(), replacement);
+        batch.cancel(&mut ledger).unwrap();
+        assert_prepared_batch_current_zero(&ledger);
+        ledger
+            .finish(codefire_core::DecisionWorkTerminalReason::Complete)
+            .unwrap();
+    }
+
+    #[test]
+    fn prepared_object_stage_recovery_unlinks_unchanged_owned_candidate() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let document = prepared_policy_document("recovery-owned-unlink");
+        store_object_record_document(&objects, document.clone()).unwrap();
+        let mut ledger = object_transfer_ledger("prepared-stage-owned-unlink");
+        let mut batch = PreparedObjectRecordBatch::prepare_with_ledger_and_poll(
+            &objects,
+            vec![document.clone()],
+            &mut ledger,
+            || false,
+        )
+        .unwrap();
+        let candidate = write_prepared_recovery_stage(&objects, &document);
+
+        recover_prepared_object_stages(&batch.entries, &mut ledger, &mut || false, || Ok(()))
+            .unwrap();
+
+        assert!(
+            !candidate.exists(),
+            "unchanged owned staging candidate must still be recovered"
+        );
+        batch.cancel(&mut ledger).unwrap();
+        assert_prepared_batch_current_zero(&ledger);
+        ledger
+            .finish(codefire_core::DecisionWorkTerminalReason::Complete)
+            .unwrap();
+    }
+
+    #[test]
     fn prepared_object_stage_recovery_limit_and_cancel_do_not_unlink_candidates() {
         let temp = tempdir().unwrap();
         let objects = temp.path().join("objects");
@@ -12738,6 +13142,185 @@ mod tests {
         assert!(first.exists());
         assert!(second.exists());
         assert_prepared_batch_current_zero(&cancelled);
+    }
+
+    #[test]
+    fn prepared_object_stage_recovery_ownership_quota_rejects_before_pin() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        let document = prepared_policy_document("recovery-ownership-quota");
+        store_object_record_document(&objects, document.clone()).unwrap();
+        let mut ledger = object_transfer_ledger("prepared-stage-ownership-quota");
+        let mut batch = PreparedObjectRecordBatch::prepare_with_ledger_and_poll(
+            &objects,
+            vec![document.clone()],
+            &mut ledger,
+            || false,
+        )
+        .unwrap();
+        let candidate = write_prepared_recovery_stage(&objects, &document);
+        let name_frames = policies_scan_name_frame_bytes(&objects);
+        let limit = ledger
+            .profile()
+            .limit(codefire_core::DecisionWorkDimension::RetainedBytes)
+            .unwrap()
+            .limit;
+        let current = ledger_current(&ledger, codefire_core::DecisionWorkDimension::RetainedBytes);
+        let remaining = limit.checked_sub(current).unwrap();
+        assert!(
+            remaining >= name_frames,
+            "scan name frames must still fit so ownership is the rejected acquire"
+        );
+        let fill = remaining - name_frames;
+        if fill > 0 {
+            ledger
+                .apply(
+                    codefire_core::DecisionWorkReservation::new(
+                        codefire_core::DecisionWorkPhase::Validation,
+                        codefire_core::DecisionWorkSurface::Atomic,
+                    )
+                    .acquire(codefire_core::DecisionWorkDimension::RetainedBytes, fill),
+                )
+                .unwrap();
+        }
+        let retained_before =
+            ledger_current(&ledger, codefire_core::DecisionWorkDimension::RetainedBytes);
+        let temporary_before = ledger_current(
+            &ledger,
+            codefire_core::DecisionWorkDimension::TemporaryBytes,
+        );
+
+        let counters_before = ledger.snapshot().counters.clone();
+        let error =
+            recover_prepared_object_stages(&batch.entries, &mut ledger, &mut || false, || Ok(()))
+                .expect_err("zero leftover ownership capacity must reject before pin");
+        let counters_after = ledger.snapshot().counters.clone();
+        let candidate_exists = candidate.exists();
+        let retained_after =
+            ledger_current(&ledger, codefire_core::DecisionWorkDimension::RetainedBytes);
+        let temporary_after = ledger_current(
+            &ledger,
+            codefire_core::DecisionWorkDimension::TemporaryBytes,
+        );
+        if fill > 0 {
+            ledger
+                .release(codefire_core::DecisionWorkDimension::RetainedBytes, fill)
+                .unwrap();
+        }
+        batch.cancel(&mut ledger).unwrap();
+        assert_prepared_batch_current_zero(&ledger);
+        assert!(candidate_exists);
+        assert_eq!(retained_after, retained_before);
+        assert_eq!(temporary_after, temporary_before);
+        assert!(
+            matches!(
+                error,
+                StoreError::DecisionWorkAccounting(ref error)
+                    if error.budget_exceeded().is_some_and(|budget| {
+                        budget.dimension == codefire_core::DecisionWorkDimension::RetainedBytes
+                            && budget.observed == limit + 1
+                            && budget.limit == limit
+                    })
+            ),
+            "expected RetainedBytes budget error at the ownership acquire, got {error:?}"
+        );
+        for counter in [
+            codefire_core::DecisionWorkCounter::RecordReads,
+            codefire_core::DecisionWorkCounter::FileBytesRead,
+            codefire_core::DecisionWorkCounter::BytesHashed,
+        ] {
+            assert_eq!(counters_after[&counter], counters_before[&counter]);
+        }
+    }
+
+    #[test]
+    fn prepared_object_stage_recovery_rejected_read_scratch_preserves_caller_temporary_bytes() {
+        let temp = tempdir().unwrap();
+        let objects = temp.path().join("objects");
+        fs::create_dir_all(&objects).unwrap();
+        let file_name = Path::new("scratch.json");
+        let payload = b"rejected-scratch\n";
+        fs::write(objects.join(file_name), payload).unwrap();
+        let directory = open_absolute_directory_nofollow(&objects).unwrap();
+        let mut options = CapabilityOpenOptions::new();
+        options.read(true);
+        options.follow(FollowSymlinks::No);
+        options.nonblock(true);
+        let mut file = directory.open_with(file_name, &options).unwrap();
+        let mut ledger = object_transfer_ledger("prepared-stage-rejected-scratch");
+        let caller_temporary = 128_u64;
+        ledger
+            .apply(
+                codefire_core::DecisionWorkReservation::new(
+                    codefire_core::DecisionWorkPhase::Validation,
+                    codefire_core::DecisionWorkSurface::Atomic,
+                )
+                .acquire(
+                    codefire_core::DecisionWorkDimension::TemporaryBytes,
+                    caller_temporary,
+                ),
+            )
+            .unwrap();
+        let aggregate_limit = ledger
+            .profile()
+            .limit(codefire_core::DecisionWorkDimension::AggregateBytes)
+            .unwrap()
+            .limit;
+        ledger
+            .apply(
+                codefire_core::DecisionWorkReservation::new(
+                    codefire_core::DecisionWorkPhase::Validation,
+                    codefire_core::DecisionWorkSurface::Atomic,
+                )
+                .charge(
+                    codefire_core::DecisionWorkDimension::AggregateBytes,
+                    aggregate_limit,
+                ),
+            )
+            .unwrap();
+
+        let error = with_accounted_prepared_object_file_read(
+            &mut file,
+            &objects.join(file_name),
+            &mut ledger,
+            PreparedObjectReadKind::Initial,
+            &mut || false,
+            |_| Ok(()),
+        )
+        .expect_err("rejected read scratch must surface the original budget error");
+        assert_eq!(
+            ledger_current(
+                &ledger,
+                codefire_core::DecisionWorkDimension::TemporaryBytes
+            ),
+            caller_temporary
+        );
+        assert!(
+            matches!(
+                error,
+                StoreError::DecisionWorkAccounting(ref error)
+                    if error.budget_exceeded().is_some_and(|budget| {
+                        budget.dimension == codefire_core::DecisionWorkDimension::AggregateBytes
+                            && budget.observed == aggregate_limit + 1
+                            && budget.limit == aggregate_limit
+                    })
+            ),
+            "expected original AggregateBytes budget error, got {error:?}"
+        );
+
+        ledger
+            .release(
+                codefire_core::DecisionWorkDimension::TemporaryBytes,
+                caller_temporary,
+            )
+            .unwrap();
+        assert_eq!(
+            ledger_current(
+                &ledger,
+                codefire_core::DecisionWorkDimension::TemporaryBytes
+            ),
+            0
+        );
     }
 
     #[test]

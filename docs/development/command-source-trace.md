@@ -235,6 +235,10 @@ Repository discovery, open-marker validation, explicit `--path`, remote URLs, ou
 
 `link_batch::{validate_links, link_batch_operation_plan, link_batch_data_json}` composes the shared core endpoint predicate with self/duplicate/existing-link checks. Core endpoint issues retain `missing_atom` versus `ambiguous_atom_id`, total/omitted counts, and UTF-8-safe 256-byte ID samples. Link-batch output keeps at most 100 detail diagnostics plus an omission summary and exposes `diagnostic_total` / `diagnostics_omitted`. Plan `items` and live `added_links` are independently capped at 100 projected links, keep full `item_count` / `added_link_count`, and report `items_omitted` / `added_links_omitted`; projection strings use the same UTF-8-safe 256-byte metadata. Live endpoint failure is rendered through `CoreContext` as `trace_graph_endpoint_integrity` with repo/path context.
 
+### Prepared Store staging recovery
+
+`PreparedObjectRecordBatch` preparation calls `recover_prepared_object_stages` under the stage-writer lock before publication. Candidate inspection pins the actual validated file; the final bounded reread and name/type/link/identity fence preserve replacement or tampered files. `prepared_object_stage_recovery_*` tests in Store cover this internal path. It adds no command, persisted format or automation envelope field.
+
 ### Docs and test synchronization
 
 When a command changes, update the registry, help/completion, CLI spec, this table, JSON/text tests, and the focused validation map together. `check_source_docs.py` detects command set drift, but semantic routing still needs review.

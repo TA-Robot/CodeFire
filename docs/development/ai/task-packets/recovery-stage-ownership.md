@@ -1,6 +1,6 @@
 # REC-08: Preserve replaced Store staging candidates (CFB-139)
 
-Status: implementation under independent review; two ownership/accounting corrections pending
+Status: completed at packet scope; independent review and Store suite passed; final workspace gate pending
 
 ## Objective
 
@@ -46,3 +46,11 @@ bound. Budget32 turns, last four reserved for handoff. If complex, checkpoint ra
 Native reviewer examined Store SHA256 `71c10a70e2a34cf8000f31adb8dcc8eea3e94bde2b9c906845114e2ae6ca2eb9`. Pin lifetime and raw-byte digest direction are valid; block-m1 findings: acquire candidate ownership before File/digest creation, and record scratch ownership only after a successful atomic ledger acquisition. Rejected acquisition must preserve the original typed budget error and caller-owned TemporaryBytes. A suggested SnapshotRevalidation reclassification was withdrawn after checking the preparation call site; existing Initial/AggregateBytes accounting is appropriate to stale cleanup.
 
 Initial Grok32-turn run ended at its limit with a patch, not completion. The test-only resume was interrupted to incorporate the two concrete findings; neither run is counted as acceptance. A focused dependent fix follows in the same session; no Fable usage or paid fallback.
+
+## Integration Correction and Focused Evidence
+
+Grok supplied the pin/digest implementation and quota/tamper tests, then reached its bounded16-turn follow-up limit. Native review confirmed the two initial blockers fixed and identified a remaining short-lived digest ownership gap. Root integration compares the final digest inside the accounted read closure and returns only bool, so the temporary digest drops before scratch release. Root also strengthened the quota test with unchanged read/hash counters and added a Unix held-file regression: after unlink and foreign replacement, the inspected handle still reads original bytes; the replacement is not treated as owned. Reviewer remains separate from all edits.
+
+`RUST_TEST_THREADS=4 cargo test --locked -p codefire-store prepared_object_stage_recovery -- --nocapture`: **9 passed,193 filtered**, log `target/recovery-rust/store-final-focused.log`. A test-only move-from-borrow compilation error in root counter snapshots was corrected using cloned snapshots before this passing run; it was not counted as a test pass. Store/full workspace gates follow on stable source. Grok final usage snapshot24%, purchased credits/PAYG cap/used0, auto-topup disabled; no Fable calls.
+
+Final native independent code review: **PASS**, no block-m1, Store SHA256 `132c4d7b34c300d887fc02c54b6d37ca26d6b57f2a84ef747bf8300080de6688`. Reviewer read code/tests/canonical docs and did not edit or run cargo. Root independently executed `RUST_TEST_THREADS=4 cargo test --locked -p codefire-store`: **202 passed**,14.26s; Store doc-tests contained0 cases and are not counted as additional coverage. Log `target/recovery-rust/store-final-suite.log`. REC-06 still owns final full-workspace validation.

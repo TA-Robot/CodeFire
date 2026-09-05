@@ -272,6 +272,7 @@ handler wiring.
 - `missing_evidence_refs` omission is accepted only as the documented empty compatibility case;
 - object writer/read/sealed/full-scan roots and subdirectories are no-follow capabilities, records are capped at 64 MiB, and publication/snapshot identity is rechecked;
 - a multi-object commit predeclares every blob/root/candidate/branch-snapshot role before its first store and marks each exact ID stored before the mutable visibility point;
+- staging recovery retains the inspected file object through unlink; dev/inode numbers alone do not prove ownership after a handle is closed. Regressions must cover name replacement, same-size in-place tamper, admission-before-open, failed-acquisition ownership preservation, cancellation and true stale cleanup. State the remaining final-check/unlink race honestly;
 - no reachable object deletion or silent alias.
 
 ### Branch and workspace state
