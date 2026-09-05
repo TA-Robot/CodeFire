@@ -36,19 +36,22 @@ results are preserved, not relabelled as human adoption or full stage completion
 
 ## Execution graph
 
-Critical path: REC-02 failing baseline -> REC-07 reproduced bootstrap cleanup fix -> independent review and source gate -> M1 exit; REC-03 runtime repair and REC-04 billing guard run alongside.
-Parallel now: REC-01 governance/admission, REC-02 Rust setup/source validation, REC-03 runtime consistency.
-External Grok: verified via read-only ACP at 2026-09-05 10:37 UTC: weekly use 22%, purchased credits/PAYG cap/PAYG used all zero, auto-topup disabled. Built-in route has no API credential/config overrides. Recheck before and after each bounded job.
+Critical path: REC-02 baseline -> reviewed REC-07 bootstrap fix -> REC-08 Store replacement protection -> independent review and source gate -> M1 exit; REC-03 runtime repair and REC-04 billing guard run alongside.
+Parallel now: REC-08 Store implementation and REC-01/05 documentation/evidence audit. Completed toolchain/runtime/billing changes are checkpointed; final source integration waits for Store repair.
+External Grok: reverified via read-only ACP at 2026-09-05 11:28 UTC: weekly use 23%, purchased credits/PAYG cap/PAYG used all zero, auto-topup disabled. Built-in route has no API credential/config overrides. Recheck before and after each bounded job.
 
 | Node | State | Owner | Write set / packet | Depends on |
 |---|---|---|---|---|
 | REC-01 | running | Codex orchestrator | board, AGENTS, governance/provider prose and provider matrix, history | — |
-| REC-02 | running | current-session Codex bootstrap worker | `rust-toolchain.toml`, `docs/development/tools/rust_env.sh`, `docs/development/ai/task-packets/recovery-rust-baseline.md`, ignored local toolchain/logs | — |
-| REC-03 | running | current-session Codex bootstrap worker | `.codex/`, role-routing matrix, external role profiles, runtime validator/launcher/audit prompt, focused tests; `ai/task-packets/recovery-runtime.md` | — |
-| REC-04 | running | native billing investigator | `grok_subscription_preflight.py`, dedicated tests, billing capability evidence; no model call | — |
-| REC-05 | running | fresh Grok/native independent reviewer sessions | bounded review of REC-02/03 diff, no implementation | REC-02, REC-03 |
-| REC-07 | running | Grok 4.6 | CFB-138: remote/project.rs and focused tests; packet recovery-bootstrap-budget.md | reproduced REC-02 failure |
-| REC-06 | blocked | orchestrator | integration tests, checkpoint and board shift | REC-01..05, REC-07 |
+| REC-02 | complete | current-session Codex bootstrap worker | `rust-toolchain.toml`, `docs/development/tools/rust_env.sh`, `docs/development/ai/task-packets/recovery-rust-baseline.md`, ignored local toolchain/logs | — |
+| REC-03 | complete | current-session Codex bootstrap worker | `.codex/`, role-routing matrix, external role profiles, runtime validator/launcher/audit prompt, focused tests; `ai/task-packets/recovery-runtime.md` | — |
+| REC-04 | complete | native billing investigator | `grok_subscription_preflight.py`, dedicated tests, billing capability evidence; no model call | — |
+| REC-05 | complete | fresh Grok/native independent reviewer sessions | bounded review of REC-02/03 diff, no implementation | REC-02, REC-03 |
+| REC-07 | complete | Grok 4.6 | CFB-138: remote/project.rs and focused tests; packet recovery-bootstrap-budget.md | reproduced REC-02 failure |
+| REC-08 | running | Grok 4.6 | CFB-139: Store recovery candidate code/tests; recovery-stage-ownership.md | Store failure reproduced |
+| REC-06 | blocked | orchestrator | integration tests, checkpoint and board shift | REC-01..05, REC-07, REC-08 |
+
+Packet completion records scoped implementation/review, not M1 exit. REC-02 identified the baseline failures; REC-03/04/05 passed independent reviews and the seven-group AI gate; REC-07 passed independent review and all CLI tests. REC-06 owns the final integrated source gate and remains blocked by REC-08.
 
 ## Validation
 
@@ -85,3 +88,5 @@ CFB-138 is explicitly admitted as the smallest blocker of the Rust source gate. 
 REC-06 readmitted the remaining unverified external Codex `run_ai_role.py --execute` path: disable real execution before CLI/capability calls until subscription billing can be verified; preserve native-role dry-run. This does not stop the current host session.
 
 The integrated test harness uses RUST_TEST_THREADS=4 to bound concurrent cases; test-internal threads/barriers are unchanged. The initial 14-way default run and 5s import timeout remain recorded, not relabelled as fixed.
+
+REC-08/CFB-139 explicitly admitted: full gate now reaches Store and reproduces deletion of a replacement candidate. CFB-138 has reviewed code and all CLI/Core gates passed, but M1 remains open pending Store repair. Checkpoints: toolchain0e9c43a, workflow6226488, bootstrap3ca04d7.

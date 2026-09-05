@@ -1,6 +1,6 @@
 # REC-03: Repair native/external runtime consistency
 
-Status: implemented; awaiting independent review
+Status: completed; independent reviews and integrated AI gate passed
 
 Milestone: MS-recovery-baseline
 
@@ -36,7 +36,7 @@ Native config contains only Codex manager/architect. External roles use Grok pro
 
 REC-06 readiness review additionally admitted a fail-closed guard: `run_ai_role.py --execute` is disabled during subscription-only recovery, even with `--allow-codex`, until a verified Codex billing preflight exists. This check runs before repository, capability or CLI probes. Native-role dry-run and the current subscription session remain available. An offline regression covers both manager and architect with every applicable explicit execution override.
 
-Active milestone: MS-recovery-baseline. This packet is on the critical path, parallel to REC-02. Required because current runtime configuration did not agree with provider routing. Parked: broader scheduler/backend work and product changes. Next allowed action: independent REC-05 review, then integrated M1 gates. No commits: integrator owns shared branch commits.
+Active milestone: MS-recovery-baseline. This packet is on the critical path, parallel to REC-02. Required because current runtime configuration did not agree with provider routing. Parked: broader scheduler/backend work and product changes. Next allowed action: final integrated M1 source gate after REC-08. No commits: integrator owns shared branch commits.
 
 ## Independent Review
 

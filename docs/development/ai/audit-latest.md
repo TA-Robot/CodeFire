@@ -1,5 +1,7 @@
 # Milestone audit
 
+Historical audit (2026-08-22), preserved unchanged below. This ACCEPT applies only to the named product-value study. The active 2026-09-05 recovery milestone is tracked on [milestones](../milestones.md); this historical audit does not close it.
+
 Final independent **other-family** audit of node 6 for active M1 `MS-product-value-proof`
 at exact integration HEAD `ca955fc`. This is the product-value first-seal final audit. It
 authorizes or blocks M1 exit. It does **not** convert `narrow` into `adopt`.

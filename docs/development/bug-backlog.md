@@ -155,6 +155,8 @@
 
 | CFB-138 | investigating | Rust remote / Bootstrap recovery | Bootstrap cancellation exceeds its own reserved byte budget; six cleanup cases fail | REC-02 source baseline | Failed cancellation may require avoidable recovery/quarantine | Preserve state and treat source gate as blocked | Reconcile rollback reservation with bounded actual cleanup work |
 
+| CFB-139 | investigating | Store / Prepared-stage recovery | Recovery deletes a candidate replacement after preflight, then test aborts in cleanup | REC-06 full workspace gate | Unrelated replacement data may be removed | Preserve state; no false source completion | Pin/revalidate candidate ownership across cleanup with bounded resources |
+
 ## Triage Notes
 
 - CFB-001は `test_stale_resolution_blocks_verify` でrefresh導線を確認する。

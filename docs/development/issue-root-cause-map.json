@@ -1013,6 +1013,23 @@
         "docs/development/bug-issues/cfb-138.md",
         "docs/development/ai/task-packets/recovery-bootstrap-budget.md"
       ]
+    },
+    {
+      "id": "CFB-139",
+      "status": "investigating",
+      "root_cause": "recovery_candidate_identity_lifetime_not_pinned_through_unlink",
+      "fix_group": "recovery-baseline-store-ownership",
+      "target_version": "recovery-baseline",
+      "owner_module": "crates/codefire-store/src/lib.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/milestones.md",
+        "phase": "MS-recovery-baseline",
+        "decision": "Preserve prepared-stage replacements across the supported recovery boundary."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-139.md",
+        "docs/development/ai/task-packets/recovery-stage-ownership.md"
+      ]
     }
   ]
 }

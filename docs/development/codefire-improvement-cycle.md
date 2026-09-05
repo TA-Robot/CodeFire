@@ -241,9 +241,9 @@ Current global issue inventory:
 
 | Series | Total tracked | Fixed / closed | Open |
 |---|---:|---:|---:|
-| CFB dogfood issues | 138 | 135 | 3 |
+| CFB dogfood issues | 139 | 135 | 4 |
 | CFR code review issues | 175 | 169 | 6 |
-| Total | 313 | 304 | 9 |
+| Total | 314 | 304 | 10 |
 
 Close audit note:
 

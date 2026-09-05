@@ -13,7 +13,7 @@ Last audited: 2026-09-05.
 - Native current-session Codex subagents handled recovery environment/tooling and independent billing review. Grok billing preflight now verifies purchased credits/PAYG/auto-topup zero or off and included quota available; Grok is executing independent runtime review and the admitted product fix. No external Codex API fallback is enabled.
 - Rust `codefire-rs` remains the default implementation; Python is reference/fallback. Rust 1.98.1 is installed locally and pinned; fmt, strict Clippy, build and help/version pass. The final CFB-138 snapshot passes CLI 782, separate integration 7, and Core 89 tests at four-way concurrency, including all original CLI failures. The previously unrun Store suite exposes a separate replacement-file deletion/abort and blocks M1; Util/doc-tests have not yet run. Historical binaries remain historical evidence only.
 - Runtime repair REC-03 resolved 18 pre-existing model/role/config/CLI adapter errors. The combined AI development gate passed; independent Grok runtime review returned ACCEPT, with subsequent execute-refusal independently checked. Final integration reruns the gate after all tool changes.
-- CFB detail ledger: 138 total; 135 `fixed`, 3 `investigating`.
+- CFB detail ledger: 139 total; 135 `fixed`, 4 `investigating`.
 - CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, 6 `investigating`.
 - Slot changes do not close issue roots; partially implemented roots must be inspected before new work.
 - The previous product-value study remains literal `narrow`: one AI-assisted maintainer, not human adoption or market validation. Public JSON identifier reliance and configured-glob claim limits are inputs to M2.

@@ -1,6 +1,6 @@
 # REC-07: Repair bootstrap cleanup work reservation (CFB-138)
 
-Status: patched; awaiting root full-suite integration
+Status: completed at packet scope; reviewed fix and full CLI tests passed
 
 ## Objective
 
@@ -73,3 +73,5 @@ All five named tests passed. Root owns clippy/full-suite with bounded concurrenc
 ## Handoff
 
 Product diff is ready for final independent review and integrated source validation. Root owns issue closure and commit; focused intermediate passes do not mark M1 complete.
+
+REC-07 checkpoint: committed as `3ca04d7`. Integrated source gate passed CLI782, CLI integration7 and Core89 on unchanged Rust input digest `8ef5f8bd…`, then exposed CFB-139 in Store. REC-06 owns the replacement-protection fix integration and final workspace evidence; this packet completion does not close M1 or erase the initial default-concurrency import timeout.

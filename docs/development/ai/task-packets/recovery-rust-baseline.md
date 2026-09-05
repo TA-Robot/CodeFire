@@ -1,6 +1,6 @@
 # REC-02: Recover the current Rust source baseline
 
-Status: handoff complete; M1 blocked by existing source test failures
+Status: completed at packet scope; baseline failures transferred to REC-07/08
 
 Milestone: MS-recovery-baseline
 
@@ -157,3 +157,5 @@ exit codes and full traces are in `target/recovery-rust/focused-results.json` an
 
 These failures block M1. REC-02 does not authorize fixing product source; the
 orchestrator must admit the exact defect and write set into a successor packet.
+
+The original baseline evidence above is preserved. Toolchain checkpoint `0e9c43a` was independently reviewed. REC-07 subsequently repaired CFB-138 and passed the full CLI/Core integration portions; the newly reached Store failure is admitted as REC-08/CFB-139. REC-06 owns final source-bound workspace evidence and M1 closure.

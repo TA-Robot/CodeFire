@@ -12,8 +12,8 @@
 
 Current known issue count and lifecycle position, audited 2026-07-19 after CFR-167 Retrospect:
 
-- CFB/CFR product/review issues: 9 open/investigating.
-- CFB detail ledger: 138 total; 135 `fixed`, 3 `investigating`.
+- CFB/CFR product/review issues: 10 open/investigating.
+- CFB detail ledger: 139 total; 135 `fixed`, 4 `investigating`.
 - CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, 6 `investigating`.
 - The CFR-167 Install gate produced `/tmp/codefire-cfr167-final.KWa8TC/bin/codefire`; source and installed SHA-256 are `1483874b4c1de4a78478595d5d158cf34a12e5ec3b05255dfc8819f511f00272`.
 - Algorithm source tests pass 281/281. Installed schema 4 scan/verify removed the false fixture-string duplicates and sealed canonical bridge `CF-COMMIT-e5ca290905c2a4b5e2c05bd4` from legacy parent `CF-COMMIT-1bc27ac05b3a2f8e9d9c1de3`.
