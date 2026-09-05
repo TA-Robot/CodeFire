@@ -207,6 +207,25 @@ impl BootstrapRecoveryWork<'_> {
         Ok(())
     }
 
+    fn charge_tree_entry_frame(&mut self, name: &OsStr) -> Result<(), BootstrapRecoveryError> {
+        let logical_bytes =
+            bootstrap_entry_frame_bytes(name).ok_or(BootstrapRecoveryError::ByteLimitExceeded {
+                limit: self.byte_limit,
+            })?;
+        self.charge_entry(logical_bytes)
+    }
+
+    fn charge_tree_entry_payload(
+        &mut self,
+        is_directory: bool,
+        physical_len: u64,
+    ) -> Result<(), BootstrapRecoveryError> {
+        self.charge_payload_bytes(bootstrap_tree_entry_payload_bytes(
+            is_directory,
+            physical_len,
+        ))
+    }
+
     fn charge_descriptor_read(&mut self, bytes: u64) -> Result<(), BootstrapRecoveryError> {
         self.charge_bytes(bytes)?;
         self.descriptor_reads = self.descriptor_reads.saturating_add(1);
@@ -840,20 +859,7 @@ impl BootstrapDecisionWorkOwner {
     }
 
     fn cleanup_limits(&self) -> Result<(u64, u64), CliError> {
-        let entries = BOOTSTRAP_FIXED_LAYOUT_ENTRIES
-            .checked_add(self.footprint.entries)
-            .ok_or_else(|| {
-                CliError::InvalidRepository("remote bootstrap cleanup entry overflow".to_string())
-            })?;
-        let bytes = BOOTSTRAP_FIXED_LAYOUT_PAYLOAD_BYTES
-            .checked_add(self.footprint.payload_bytes)
-            .and_then(|value| {
-                value.checked_add(entries.saturating_mul(BOOTSTRAP_RECOVERY_ENTRY_FRAME_BYTES))
-            })
-            .ok_or_else(|| {
-                CliError::InvalidRepository("remote bootstrap cleanup byte overflow".to_string())
-            })?;
-        Ok((entries, bytes))
+        bootstrap_cleanup_pass_limits(self.footprint)
     }
 
     fn cancel_without_effect(
@@ -1048,16 +1054,50 @@ fn bootstrap_creation_actual_reservation(
 fn bootstrap_rollback_reservation(
     footprint: BootstrapStageFootprint,
 ) -> codefire_core::DecisionWorkReservation {
-    let entries = BOOTSTRAP_FIXED_LAYOUT_ENTRIES.saturating_add(footprint.entries);
-    let bytes = entries
-        .saturating_mul(BOOTSTRAP_RECOVERY_ENTRY_FRAME_BYTES)
-        .saturating_add(BOOTSTRAP_FIXED_LAYOUT_PAYLOAD_BYTES)
-        .saturating_add(footprint.payload_bytes);
+    let (entries, bytes) = bootstrap_cleanup_pass_limits(footprint)
+        .expect("validated bootstrap footprint has bounded cleanup limits");
+    // Scan and remove are separate passes whose observations are summed.
+    // TemporaryBytes is a peak, so it is reserved once.
     bootstrap_recovery_reservation(
         entries.saturating_mul(2),
         bytes.saturating_mul(2),
         BOOTSTRAP_CLEANUP_TEMPORARY_BYTES,
     )
+}
+
+fn bootstrap_cleanup_pass_limits(
+    footprint: BootstrapStageFootprint,
+) -> Result<(u64, u64), CliError> {
+    let entries = BOOTSTRAP_FIXED_LAYOUT_ENTRIES
+        .checked_add(footprint.entries)
+        .ok_or_else(|| {
+            CliError::InvalidRepository("remote bootstrap cleanup entry overflow".to_string())
+        })?;
+    let bytes = BOOTSTRAP_FIXED_LAYOUT_PAYLOAD_BYTES
+        .checked_add(footprint.payload_bytes)
+        .and_then(|value| {
+            value.checked_add(entries.checked_mul(BOOTSTRAP_RECOVERY_ENTRY_FRAME_BYTES)?)
+        })
+        .ok_or_else(|| {
+            CliError::InvalidRepository("remote bootstrap cleanup byte overflow".to_string())
+        })?;
+    Ok((entries, bytes))
+}
+
+fn bootstrap_entry_frame_bytes(name: &OsStr) -> Option<u64> {
+    u64::try_from(name.as_encoded_bytes().len())
+        .ok()
+        .and_then(|len| codefire_core::LOGICAL_FRAME_BASE_BYTES.checked_add(len))
+}
+
+fn bootstrap_tree_entry_payload_bytes(is_directory: bool, physical_len: u64) -> u64 {
+    // Directory st_size is host allocator data (for example 4096 on ext4),
+    // not a reserved recovery payload. File payload is the bounded term.
+    if is_directory {
+        0
+    } else {
+        physical_len
+    }
 }
 
 fn bootstrap_visibility_reservation() -> codefire_core::DecisionWorkReservation {
@@ -2351,15 +2391,11 @@ fn recover_owned_bootstrap_stages_inner(
             work.acquire_temporary(BOOTSTRAP_RECOVERY_ENTRY_FRAME_BYTES)?;
             let entry_result = (|| -> Result<(), BootstrapRecoveryError> {
                 let name = entry.file_name();
-                let logical_bytes = codefire_core::LOGICAL_FRAME_BASE_BYTES
-                    .checked_add(u64::try_from(name.as_encoded_bytes().len()).map_err(|_| {
-                        BootstrapRecoveryError::ByteLimitExceeded {
-                            limit: work.byte_limit,
-                        }
-                    })?)
-                    .ok_or(BootstrapRecoveryError::ByteLimitExceeded {
+                let logical_bytes = bootstrap_entry_frame_bytes(&name).ok_or(
+                    BootstrapRecoveryError::ByteLimitExceeded {
                         limit: work.byte_limit,
-                    })?;
+                    },
+                )?;
                 work.charge_entry(logical_bytes)?;
                 let Some(name_text) = name.to_str() else {
                     return Ok(());
@@ -2561,19 +2597,12 @@ fn remove_bootstrap_tree_bounded(
         work.acquire_temporary(BOOTSTRAP_RECOVERY_ENTRY_FRAME_BYTES)?;
         let entry_result = (|| -> Result<(), BootstrapRecoveryError> {
             let child_name = entry.file_name();
-            let logical_bytes =
-                codefire_core::LOGICAL_FRAME_BASE_BYTES
-                    .checked_add(u64::try_from(child_name.as_encoded_bytes().len()).map_err(
-                        |_| BootstrapRecoveryError::ByteLimitExceeded {
-                            limit: work.byte_limit,
-                        },
-                    )?)
-                    .ok_or(BootstrapRecoveryError::ByteLimitExceeded {
-                        limit: work.byte_limit,
-                    })?;
-            work.charge_entry(logical_bytes)?;
+            work.charge_tree_entry_frame(&child_name)?;
             let metadata = directory.symlink_metadata(&child_name)?;
-            work.charge_payload_bytes(metadata.len())?;
+            work.charge_tree_entry_payload(
+                metadata.is_dir() && !metadata.file_type().is_symlink(),
+                metadata.len(),
+            )?;
             if depth == 0 && child_name == OsStr::new(PROJECT_DESCRIPTOR_FILE) {
                 descriptor_present = true;
                 return Ok(());
@@ -2631,19 +2660,12 @@ fn scan_bootstrap_tree_bounded(
         work.acquire_temporary(BOOTSTRAP_RECOVERY_ENTRY_FRAME_BYTES)?;
         let entry_result = (|| -> Result<(), BootstrapRecoveryError> {
             let child_name = entry.file_name();
-            let logical_bytes =
-                codefire_core::LOGICAL_FRAME_BASE_BYTES
-                    .checked_add(u64::try_from(child_name.as_encoded_bytes().len()).map_err(
-                        |_| BootstrapRecoveryError::ByteLimitExceeded {
-                            limit: work.byte_limit,
-                        },
-                    )?)
-                    .ok_or(BootstrapRecoveryError::ByteLimitExceeded {
-                        limit: work.byte_limit,
-                    })?;
-            work.charge_entry(logical_bytes)?;
+            work.charge_tree_entry_frame(&child_name)?;
             let metadata = directory.symlink_metadata(&child_name)?;
-            work.charge_payload_bytes(metadata.len())?;
+            work.charge_tree_entry_payload(
+                metadata.is_dir() && !metadata.file_type().is_symlink(),
+                metadata.len(),
+            )?;
             if metadata.is_dir() && !metadata.file_type().is_symlink() {
                 let child = directory.open_dir_nofollow(&child_name)?;
                 let child_identity = secure_worktree::StableFsIdentity::for_directory(&child)?;
@@ -2680,20 +2702,12 @@ fn remove_one_bootstrap_child_for_test(
             return Ok(false);
         };
         let child_name = entry.file_name();
-        let logical_bytes = codefire_core::LOGICAL_FRAME_BASE_BYTES
-            .checked_add(
-                u64::try_from(child_name.as_encoded_bytes().len()).map_err(|_| {
-                    BootstrapRecoveryError::ByteLimitExceeded {
-                        limit: work.byte_limit,
-                    }
-                })?,
-            )
-            .ok_or(BootstrapRecoveryError::ByteLimitExceeded {
-                limit: work.byte_limit,
-            })?;
-        work.charge_entry(logical_bytes)?;
+        work.charge_tree_entry_frame(&child_name)?;
         let metadata = directory.symlink_metadata(&child_name)?;
-        work.charge_payload_bytes(metadata.len())?;
+        work.charge_tree_entry_payload(
+            metadata.is_dir() && !metadata.file_type().is_symlink(),
+            metadata.len(),
+        )?;
         if child_name != OsStr::new(PROJECT_DESCRIPTOR_FILE)
             && (!metadata.is_dir() || metadata.file_type().is_symlink())
         {
@@ -3428,6 +3442,44 @@ mod tests {
         assert!(ledger.snapshot().current.values().all(|value| *value == 0));
     }
 
+    fn recovery_work(entry_limit: u64, byte_limit: u64) -> BootstrapRecoveryWork<'static> {
+        BootstrapRecoveryWork {
+            ledger: None,
+            permit: None,
+            entries: 0,
+            bytes: 0,
+            descriptor_reads: 0,
+            file_bytes_read: 0,
+            temporary_current: 0,
+            temporary_peak: 0,
+            ledger_temporary_owned: 0,
+            entry_limit,
+            byte_limit,
+        }
+    }
+
+    fn logical_bootstrap_tree_cost(root: &Path) -> (u64, u64) {
+        fn visit(path: &Path, entries: &mut u64, bytes: &mut u64) {
+            for entry in fs::read_dir(path).unwrap() {
+                let entry = entry.unwrap();
+                let name = entry.file_name();
+                let meta = fs::symlink_metadata(entry.path()).unwrap();
+                *entries += 1;
+                *bytes += codefire_core::LOGICAL_FRAME_BASE_BYTES
+                    + u64::try_from(name.as_encoded_bytes().len()).unwrap();
+                if meta.is_dir() && !meta.file_type().is_symlink() {
+                    visit(&entry.path(), entries, bytes);
+                } else {
+                    *bytes += meta.len();
+                }
+            }
+        }
+        let mut entries = 0;
+        let mut bytes = 0;
+        visit(root, &mut entries, &mut bytes);
+        (entries, bytes)
+    }
+
     #[test]
     fn strict_component_contract_accepts_single_portable_names() {
         for value in ["org", "app-name", "feature.alpha", "日本語", ".hidden"] {
@@ -3720,6 +3772,154 @@ mod tests {
             error,
             BootstrapRecoveryError::ByteLimitExceeded { limit: 1 }
         ));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bootstrap_cleanup_pass_limits_are_the_reproduced_single_pass_budgets() {
+        assert_eq!(
+            bootstrap_cleanup_pass_limits(BootstrapStageFootprint::default()).unwrap(),
+            (23, 45_732)
+        );
+        assert_eq!(
+            bootstrap_cleanup_pass_limits(BootstrapStageFootprint::new(1, 128)).unwrap(),
+            (24, 47_136)
+        );
+    }
+
+    #[test]
+    fn bootstrap_cleanup_byte_budget_counts_frames_and_file_payload_not_directory_blocks() {
+        let root = std::env::temp_dir().join(format!(
+            "codefire-bootstrap-cleanup-logical-bytes-{}-{}",
+            std::process::id(),
+            TEMP_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let org_path = root.join("projects/org");
+        let name = ".bootstrap-CF-PROJECT-logical-bytes.removing";
+        create_crashed_bootstrap_stage(&org_path, name, "app");
+        let stage_path = org_path.join(name);
+        let (entries, bytes) = logical_bootstrap_tree_cost(&stage_path);
+        assert!(entries > 0);
+        assert!(bytes > 0);
+        let reserved = bootstrap_cleanup_pass_limits(BootstrapStageFootprint::default()).unwrap();
+        assert!(
+            bytes <= reserved.1,
+            "logical cleanup {bytes} exceeds reserved single-pass bytes {}",
+            reserved.1
+        );
+
+        let org_root = open_pinned_absolute(&org_path).unwrap();
+        let stage = org_root.directory.open_dir_nofollow(name).unwrap();
+        let identity = secure_worktree::StableFsIdentity::for_directory(&stage).unwrap();
+        let mut exact = recovery_work(entries, bytes);
+        scan_bootstrap_tree_bounded(
+            &org_root.directory,
+            OsStr::new(name),
+            identity,
+            0,
+            &mut exact,
+        )
+        .unwrap();
+        assert_eq!(exact.entries, entries);
+        assert_eq!(exact.bytes, bytes);
+
+        let mut short = recovery_work(entries, bytes - 1);
+        let error = scan_bootstrap_tree_bounded(
+            &org_root.directory,
+            OsStr::new(name),
+            identity,
+            0,
+            &mut short,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            BootstrapRecoveryError::ByteLimitExceeded { limit } if limit == bytes - 1
+        ));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bootstrap_cleanup_rejects_realized_file_payload_beyond_reserved_pass_limit() {
+        let root = std::env::temp_dir().join(format!(
+            "codefire-bootstrap-cleanup-payload-overflow-{}-{}",
+            std::process::id(),
+            TEMP_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let org_path = root.join("projects/org");
+        let name = ".bootstrap-CF-PROJECT-payload-overflow.removing";
+        create_crashed_bootstrap_stage(&org_path, name, "app");
+        fs::write(
+            org_path.join(name).join("overflow.bin"),
+            vec![0_u8; 64 * 1024],
+        )
+        .unwrap();
+        let (entries, bytes) = logical_bootstrap_tree_cost(&org_path.join(name));
+        let (entry_limit, byte_limit) =
+            bootstrap_cleanup_pass_limits(BootstrapStageFootprint::new(1, 0)).unwrap();
+        assert!(entries <= entry_limit);
+        assert!(
+            bytes > byte_limit,
+            "realized file payload {bytes} should exceed reserved {byte_limit}"
+        );
+
+        let org_root = open_pinned_absolute(&org_path).unwrap();
+        let stage = org_root.directory.open_dir_nofollow(name).unwrap();
+        let identity = secure_worktree::StableFsIdentity::for_directory(&stage).unwrap();
+        let mut work = recovery_work(entry_limit, byte_limit);
+        let error = scan_bootstrap_tree_bounded(
+            &org_root.directory,
+            OsStr::new(name),
+            identity,
+            0,
+            &mut work,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            BootstrapRecoveryError::ByteLimitExceeded { limit } if limit == byte_limit
+        ));
+        assert!(org_path.join(name).join("overflow.bin").is_file());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bootstrap_ledger_cancel_fits_reserved_rollback_after_logical_payload_accounting() {
+        let root = std::env::temp_dir().join(format!(
+            "codefire-bootstrap-cleanup-ledger-cancel-{}-{}",
+            std::process::id(),
+            TEMP_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let project = root.join("projects/org/app");
+        let deadline = LockDeadline::from_options(&LockOptions::default());
+        let mut ledger = codefire_core::DecisionWorkLedger::new(
+            codefire_core::DecisionWorkProfile::local_v1(),
+            codefire_core::DecisionWorkCommandKind::ObjectTransfer,
+            "bootstrap-logical-cancel",
+        )
+        .unwrap();
+        let unpublished = prepare_unpublished_remote_project_with_ledger(
+            &project,
+            &deadline,
+            &mut ledger,
+            BootstrapStageFootprint::new(1, 128),
+        )
+        .unwrap()
+        .expect("missing project should bootstrap");
+        let stage = unpublished.project().display_root().to_path_buf();
+        let (entries, bytes) = logical_bootstrap_tree_cost(&stage);
+        let reserved = bootstrap_cleanup_pass_limits(BootstrapStageFootprint::new(1, 128)).unwrap();
+        assert_eq!(entries, BOOTSTRAP_FIXED_LAYOUT_ENTRIES);
+        assert!(entries <= reserved.0);
+        assert!(
+            bytes <= reserved.1,
+            "prepared layout logical bytes {bytes} exceed reserved {}",
+            reserved.1
+        );
+        let (_prelocked, mut publication) = unpublished.into_hidden_parts();
+        publication.cancel_with_ledger(&mut ledger).unwrap();
+        assert_ledger_has_no_live_owners(&ledger);
+        assert!(!project.exists());
         fs::remove_dir_all(root).unwrap();
     }
 
