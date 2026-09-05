@@ -2,7 +2,7 @@
 
 Status: canonical
 
-Last reviewed: 2026-07-11
+Last reviewed: 2026-09-05
 
 Owner: Product and Engineering Steward
 
@@ -25,8 +25,8 @@ This directory is the canonical bridge between non-authoritative exploration and
 - AI orchestration stays outside the product core. The current Rust top-level JSON envelope, capability discovery, and evidence are the starting integration surface; stable public payload schemas and conformance profiles remain Stage 2 deliverables.
 - Development uses GPT-5.6 Sol with project-level Medium/High/Ultra routing. Model selection is an explicit runtime policy, while role and risk semantics remain vendor-independent.
 - Deterministic checks outrank model claims. A model can propose, implement, and review; it cannot self-certify a failed or unexecuted gate as passing.
-- The immediate program is repository hygiene and contract/eval infrastructure. Execution is the five-ahead board in `../milestones.md`; remaining review-portfolio issues are parked, not an active burn-down.
-- Codex orchestrates. Claude Opus 5 and Grok 4.6 do individual and 30-minute audit work.
+- The immediate program is the user-approved recovery baseline followed by usable first-seal and repeat-use improvements. Execution is the five-ahead board in `../milestones.md`; remaining review-portfolio issues are parked, not an active burn-down.
+- Codex orchestrates. Grok 4.6 is primary, Fable 5.1 is scarce explicit escalation. Subscription-only operation and event-triggered review follow the provider policy.
 
 ## Authority and Promotion
 

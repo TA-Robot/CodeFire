@@ -4,23 +4,23 @@ This directory is the control plane for CodeFire development. Use it to understa
 
 ## Current Operating Snapshot
 
-Last audited: 2026-08-22.
+Last audited: 2026-09-05.
 
-- Execution is milestone-based. The live board is `docs/development/milestones.md`. `MS-product-value-proof` exited with literal `narrow`: one source-blind clean-room AI-assisted maintainer sealed the isolated first-seal task (base `CF-COMMIT-3456b0494fd47761a0522cac`, head `CF-COMMIT-d6bb8b1d159ad489dc67ec92`), scored Q1–Q7 7/7 with task value 3/3, and the fresh final Grok audit `218ef86` returned `ACCEPT` with no `block-m1`. The frozen table matched `narrow` on undocumented JSON identifier reliance (fresh auditor 6; controller 4), so the admitted consequence is a narrowed public claim — no retry and no product/README/docs/schema/threshold fix. M1 is now `MS-ecosystem-conformance-seed`, beginning with two parallel read-only classification packets. No ecosystem work has run.
-- The product-value result is bounded: n=1 clean-room AI-assisted maintainer/operator, which is not human adoption and not market validation; timings are machine timings, with time to first successful seal 402s; one genuine exit-10 refusal occurred and its six Fires were cleared; no wrong action, off-task mutation, or private correction was observed. The study fixture's own unconfigured `README.md`, outside that fixture's configured globs, can contradict the sealed requirement without the first-seal loop noticing, and the handed public docs pack does not enumerate every JSON identifier the envelopes return. The earlier adoption milestone remains terminal `adopt` and the release milestone remains internal-only `ACCEPT`.
-- Codex orchestrates. Individual and 30-minute audit agents are Claude Opus 5 or Grok 4.6. Codex does not implement or audit.
-- Rust `codefire-rs` is the default CLI line; Python `codefire` remains the reference/fallback implementation.
-- CFB detail ledger: 137 total; 135 `fixed`, 2 `investigating`. Open/investigating count: 2.
-- CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, 6 `investigating`. Open/investigating count: 6.
-- The latest release-rehearsal runner is `/workspace/worktrees/m1-release-rehearsal-20260822/target/release/codefire-rs`, SHA-256 `90cb2895aadc45b559a96207cdd5ae3b08485f9a7e5a07014db8cca8b5b90ce9`; provenance `7998bcf6…` binds it to source `01a4de0`, manifest `3925fc03…` over 101 files. It is internal-only evidence, not a public release candidate or permission to publish.
-- The current Git worktree contains the intentional uncommitted review, invariant-fix, regression, ADR, and management-document packages. They remain classified project state and must not be destructively cleaned or presented as a clean checkpoint.
-- CFB-120..132 and the complete Stage 1 Dogfood-blocker lifecycle are closed. Canonical Algorithm is sealed at `CF-COMMIT-2792b54ad730e6d644668c38`, `open-clean`, and zero Fires after the agent-local-contract milestone; all remote-M1 attempts preserved it exactly.
-- RVC-011 / CFR-161 is closed through Install, installed counterexample replay, both real-repository read-only probes, canonical trace-warning verification, and Retrospect. ADR-013 now owns the typed committable decision and non-relaxable safety floor.
-- RVC-039 / CFR-162 is closed through the full lifecycle. ADR-014 makes unresolved text, binary, and semantic merge facts authoritative blockers and makes `merge --continue` the explicit validated resolution boundary.
-- `BATCH-2026-07-review-portfolio-completion` is historical. CFB-133, CFB-136, and CFR-168..173 remain open/investigating in the ledgers and are backlog-parked. The bounded CFR-171..173 adoption slices were measured sufficient, but their broader roots were neither closed nor admitted to release M1.
-- The base environment still does not expose `cargo` on `PATH`; a durable pinned toolchain/CI identity remains release work.
+- Active execution is **MS-recovery-baseline** on [milestones](milestones.md), following the user's accepted recovery plan. The ecosystem sequence is parked until repeat use establishes a real interoperability need.
+- Grok 4.6 is the primary worker. Fable 5.1 is scarce and explicit-only. All providers must use verified subscription allowance; metered billing, purchased credits, extra usage, and auto top-up are forbidden.
+- The original `/workspace/project` main is ahead of origin by 92 commits and has a pre-existing cherry-pick sequencer with no current `CHERRY_PICK_HEAD`. It is preserved. Recovery runs on `recovery/subscription-first-20260905` in `.codex-worktrees/recovery-20260905`.
+- Original worktree changes at recovery start were the prior-turn proposal and its exploration link. The earlier assertion that it held large uncommitted review/invariant packages was stale. A clean porcelain listing did not expose the outstanding sequencer; full `git status` did.
+- Native current-session Codex subagents handled recovery environment/tooling and independent billing review. Grok billing preflight now verifies purchased credits/PAYG/auto-topup zero or off and included quota available; Grok is executing independent runtime review and the admitted product fix. No external Codex API fallback is enabled.
+- Rust `codefire-rs` remains the default implementation; Python is reference/fallback. Rust 1.98.1 is installed locally and pinned; fmt, strict Clippy, build and help/version pass. The final CFB-138 snapshot passes CLI 782, separate integration 7, and Core 89 tests at four-way concurrency, including all original CLI failures. The previously unrun Store suite exposes a separate replacement-file deletion/abort and blocks M1; Util/doc-tests have not yet run. Historical binaries remain historical evidence only.
+- Runtime repair REC-03 resolved 18 pre-existing model/role/config/CLI adapter errors. The combined AI development gate passed; independent Grok runtime review returned ACCEPT, with subsequent execute-refusal independently checked. Final integration reruns the gate after all tool changes.
+- CFB detail ledger: 138 total; 135 `fixed`, 3 `investigating`.
+- CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, 6 `investigating`.
+- Slot changes do not close issue roots; partially implemented roots must be inspected before new work.
+- The previous product-value study remains literal `narrow`: one AI-assisted maintainer, not human adoption or market validation. Public JSON identifier reliance and configured-glob claim limits are inputs to M2.
+- Historical release evidence is internal-only. No public release identity, rights resolution, external publication, or funded ecosystem has been established by this recovery.
+- Canonical Algorithm and user-installed binaries are not mutation targets of M1. Product-code changes need their own reproduced M1 admission.
 
-If any line above changes, update this snapshot and append the reason to `docs/development/history.md`.
+Update this snapshot from actual evidence and append the reason to history; do not copy live state into additional documents.
 
 ## Management Sources of Truth
 
@@ -54,12 +54,10 @@ Before starting implementation:
 
 ## Current Cleanup Priorities
 
-The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1 on `milestones.md`: `MS-ecosystem-conformance-seed`. Its public profile/maturity/extension/corpus classification and its independent client/corpus/falsifier topology classification are the two ready read-only packets. Queued, not started:
-
-1. M2: ecosystem multi-implementation proof (bounded roadmap Stage 6 slice).
-2. M3: ecosystem third-organization proof (next bounded roadmap Stage 6 slice).
-3. M4: ecosystem compatible release cycles (next bounded roadmap Stage 6 slice).
-4. M5: ecosystem funded-maintainer capacity (next bounded roadmap Stage 6 slice).
+Only the current [M1 board](milestones.md) authorizes implementation. Recover reproducible source validation,
+coherent runtime roles, and subscription-only execution. The next increments are the usable first-seal path,
+fast safe changes, repeat use, and bounded distribution. Historical review/experiment details are evidence,
+not an additional work queue.
 
 ## Validation Matrix
 
@@ -73,6 +71,21 @@ The CFB-120..132 and CFR-161..167 roots are complete. Active work is **only** M1
 | CodeFire dogfood state | `codefire status --path subprojects/algorithm-evolution-agent-lab --json` or local binary equivalent |
 
 If an environment cannot run a required gate, record that limitation explicitly in the handoff.
+
+## Local Rust baseline
+
+The repository pins Rust 1.98.1. For the checkout-local toolchain installed during recovery:
+
+```bash
+source docs/development/tools/rust_env.sh
+RUST_TEST_THREADS=4 cargo test --workspace --locked
+```
+
+The helper only selects ignored local toolchain/cache/temp directories; it does not install anything or
+change shell profiles. Setup, checksum verification, removal and initial failures are recorded in
+[REC-02](ai/task-packets/recovery-rust-baseline.md). Four test-case workers bound suite contention while
+retaining the explicit threads/barriers inside concurrency tests. This is a harness setting, not a claim
+that the original full-concurrency import timeout has been fixed.
 
 ## Document Families
 

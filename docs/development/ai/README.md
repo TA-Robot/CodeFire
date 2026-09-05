@@ -16,7 +16,7 @@ The acceleration system has eight parts:
 4. **Review gates**: fast checks focused on invariants, JSON contracts, module boundaries, and validation evidence.
 5. **Learning loop**: every friction point becomes either a CFB/CFR issue, a docs update, or an automation backlog item.
 6. **Tooling**: small repository-local checks that make context packs, task packets, and dirty-tree classification executable.
-7. **Provider and model routing**: Codex orchestrates; Claude Opus 5 and Grok 4.6 do individual and audit work. Codex `gpt-5.6-sol` is the guarded orchestrator adapter only.
+7. **Provider and model routing**: Codex orchestrates; Grok 4.6 is primary, Fable 5.1 is scarce escalation. Subscription-only billing and explicit recovery bootstrap exceptions are defined in provider-routing-policy.md.
 8. **Exploration and evals**: falsifiable research notes and task corpora that prevent operating policy from becoming unsupported folklore.
 
 ## Core Rule
@@ -41,7 +41,7 @@ Do not spawn or delegate implementation work until the task packet has:
 | Single task | Hand one focused issue to one agent. | `operating-protocol.md`, relevant context pack |
 | Parallel batch | Split one batch across multiple safe lanes. | `operating-protocol.md` |
 | Review | Check an implementation without redoing it. | `operating-protocol.md` |
-| Provider routing | Codex orchestrates; Claude/Grok implement and audit. | `provider-routing-policy.md`, `provider-routing-matrix.json`, `orchestration-protocol.md` |
+| Provider routing | Codex orchestrates; Grok implements; Fable is explicit escalation; review uses a fresh session. | `provider-routing-policy.md`, `provider-routing-matrix.json`, `orchestration-protocol.md` |
 | Milestone control | Five-ahead board; only next-milestone blockers are active. | `../milestones.md`, `../milestone-operating-model.md`, `audit-cadence.md` |
 | Codex model routing | Select GPT-5.6 Sol Medium/High/Ultra when Codex is explicitly selected. | `model-routing-policy.md`, `role-routing-matrix.json`, `.codex/` |
 | Exploration | Keep hypotheses separate from accepted strategy and executable policy. | `../exploration/` |
@@ -136,9 +136,9 @@ If the agent cannot state these, the work is not ready.
 | `acceleration-master-plan.md` | Selected implementation path and execution backlog for the acceleration system. |
 | `role-routing-matrix.json` | Machine-readable role and reasoning-effort routing. |
 | `provider-routing-matrix.json` | Machine-readable Claude/Grok worker and Codex orchestrator selection, concurrency, timeout, fallback, and integration rules. |
-| `provider-routing-policy.md` | Milestone control-plane decision, worker families, 30-minute audit, swarm, and recovery semantics. |
+| `provider-routing-policy.md` | Grok-first selection, scarce Fable, subscription-only preflight and recovery semantics. |
 | `orchestration-protocol.md` | Three-role topology: Codex orchestrator, Claude/Grok individual agents, Claude/Grok auditor. |
-| `audit-cadence.md` | 30-minute stall and scope-creep audit. |
+| `audit-cadence.md` | deterministic progress monitoring and independent review. |
 | `swarm-batches/codefire-state-audit-20260729.json` | Reproducible four-worker-plus-integration Fugu audit of the current CFR-168 branch family. |
 | `model-routing-policy.md` | Risk scoring, Medium/High/Ultra semantics, escalation, fallback, and eval rules. |
 | `schemas/` | Versioned task/context/review machine contracts. |
@@ -163,7 +163,7 @@ If the agent cannot state these, the work is not ready.
 | `../tools/probe_validation_capabilities.py` | Reports available validators and distinguishes binary presence from a revalidated clean-HEAD provenance artifact. |
 | `../tools/build_source_bound_rust.py` | Builds the release Rust CLI and writes canonical provenance only when Cargo/crates/`.cargo`/toolchain inputs are clean against HEAD and unchanged across the build. |
 | `../tools/run_dogfood_smoke.py` | Runs bounded dogfood status checks read-only by default; `scan` and `verify` require explicit `--allow-mutation`. |
-| `../tools/run_ai_role.py` | Codex-specific low-level adapter; validates a typed packet and binds context/base/dirty-state. Dry-run is default and real use requires explicit `--allow-codex`. |
+| `../tools/run_ai_role.py` | Codex-native dry-run adapter; validates a typed packet and binds context/base/dirty-state. External `--execute` is disabled during subscription-only recovery until a Codex-specific billing preflight exists. |
 | `../tools/prepare_historical_eval.py` | Materializes one deterministic historical CFB/CFR candidate input while withholding the evaluator oracle. |
 
 Dogfood findings start with `task-packets/cfb-intake.md`; only the manager may promote them into the authoritative issue ledgers or amend the frozen batch.

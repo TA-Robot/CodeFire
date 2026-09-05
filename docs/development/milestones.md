@@ -4,150 +4,84 @@ Status: live execution board
 
 Owner: Orchestrator (Codex)
 
-Last audited: 2026-08-22
+Last audited: 2026-09-05
 
-Update trigger: M1 exit, M1 blocker admission, or slot shift.
+Update trigger: exit evidence, blocker admission, user priority, or subscription capacity changes.
 
-`MS-product-value-proof` exited with literal `narrow`. One source-blind clean-room AI-assisted
-maintainer completed the isolated first-seal study on participant base `CF-COMMIT-3456b0494fd47761a0522cac`,
-sealed head `CF-COMMIT-d6bb8b1d159ad489dc67ec92`, scored Q1–Q7 7/7 with task value 3/3, and the fresh
-final Grok node-6 audit `218ef8668d96d5e011f62586f54712d69da68c79` returned `ACCEPT` with no
-`block-m1`. The frozen ordered decision table first-matched `narrow` on undocumented JSON identifier
-reliance — the fresh auditor independently counted 6 where the controller recorded 4 — so the only
-admitted consequence is to narrow the public claim. No retry and no product, README, docs, schema, or
-threshold fix was performed, because the frozen table required `narrow`. The active milestone is now
-`MS-ecosystem-conformance-seed`. No ecosystem work has run.
-
-Standing product-value limitations carried forward: n=1 clean-room AI-assisted maintainer/operator
-only, which is not human adoption and not market validation; timings are machine timings, with time
-to first successful seal 402s; one genuine exit-10 refusal occurred and its six Fires were
-subsequently cleared; no wrong action, off-task mutation, or private correction was observed; the study
-fixture's own unconfigured `README.md`, outside that fixture's configured globs, can contradict the
-sealed requirement without the first-seal loop noticing; and the handed public docs pack does not
-enumerate every JSON identifier the envelopes return.
-
-This is the only live five-ahead execution board. Historical burn-down narrative stays in
-`current-cycle-burn-down-plan.md` and `history.md`; those files are not permission to work.
+The user accepted the [recovery proposal](exploration/recovery-2026-09-05.md) on 2026-09-05:
+Grok is the primary worker; Fable exhausts quickly and is reserved for important decisions.
+Metered billing, purchased credits, and automatic top-ups are forbidden.
+This board replaces the ecosystem sequence recorded at Git `83b4522`; historical `narrow`/`adopt`
+results are preserved, not relabelled as human adoption or full stage completion.
 
 ## Active slots
 
-| Slot | ID | Name | Exit (must all be true) | In-scope now |
+| Slot | ID | Outcome | Exit | In-scope now |
 |---|---|---|---|---|
-| M1 | `MS-ecosystem-conformance-seed` | Ecosystem interoperability seed | One maturity-labelled public profile plus extension rules is consumed by one independently authored adapter/client that passes its bounded conformance corpus | **Yes** |
-| M2 | `MS-ecosystem-multi-implementation-proof` | Ecosystem multi-implementation proof | A second independent integration from a distinct organization consumes a compatibility-preserving profile update and passes the bounded conformance corpus; formal standards/governance remain roadmap work | No |
-| M3 | `MS-ecosystem-third-organization-proof` | Ecosystem third-organization proof | A third distinct organization consumes the stable public profile without a compatibility exception and passes the bounded conformance corpus; release-cycle and formal-governance gates remain roadmap work | No |
-| M4 | `MS-ecosystem-compatible-release-cycles` | Ecosystem compatible release cycles | Two successive compatibility-preserving profile releases pass the bounded conformance corpus without an emergency exception; funded-maintainer and formal-governance gates remain roadmap work | No |
-| M5 | `MS-ecosystem-funded-maintainer-capacity` | Ecosystem funded-maintainer capacity | A named funded maintainer rotation independently handles one compatibility review and bounded conformance release rehearsal; formal standards-body activity remains roadmap work | No |
+| M1 | MS-recovery-baseline | A source-validated, subscription-only development baseline | Rust source gates and CLI smoke; coherent runtime routing; billing guard rejects unverified external execution; evidence identifies remaining limitations | Yes |
+| M2 | MS-first-seal-usable | One useful request-to-seal-and-recovery path | Isolated real-task replay and one measured top-friction fix, independently reviewed | No |
+| M3 | MS-fast-safe-change | Faster changes without integrity regressions | Focused invariant counterexamples, measured performance, and bounded module changes on the selected path | No |
+| M4 | MS-repeat-use | Repeat use on another real change | Small human pilot with repeat use, intervention and friction recorded; no market-validation overclaim | No |
+| M5 | MS-limited-distribution | A bounded installable product | Explicit support/rights/version, install/update/rollback rehearsal; publication remains a separate final action | No |
 
-M1–M5 are now five successive bounded slices of roadmap Stage 6, not copies of that stage.
-`strategy/modernization-roadmap.md` remains a stage/gate roadmap and must not become a second task board.
+## M1 card
 
-## M1 card — Ecosystem interoperability seed
+- Preserve the original main worktree and its pre-existing cherry-pick sequencer.
+- Work in `/workspace/project/.codex-worktrees/recovery-20260905`, branch `recovery/subscription-first-20260905`.
+- Rebuild current product source with a named Rust toolchain. Do not reuse historical binary results as current-source evidence.
+- Repair development runtime validation to distinguish native Codex roles from external Claude/Grok profiles.
+- Admit external workers only after subscription authentication and no extra-usage billing are verified. A blocked external lane must not trigger paid fallback.
+- Use current-session Codex subagents for REC-02/REC-03 bootstrap while external billing remains unverified. This is explicit user-authorized recovery work, not an external API route.
+- Do not consume Fable for routine setup or periodic status checking.
 
-Objective: prove or falsify that one bounded, maturity-labelled CodeFire public profile is precise
-enough for an independently authored client to consume without product source, private clarification,
-or a compatibility exception. Earn interoperability before governance or standardization claims.
+## Execution graph
 
-Exact M1 exit (nothing else counts):
+Critical path: REC-02 failing baseline -> REC-07 reproduced bootstrap cleanup fix -> independent review and source gate -> M1 exit; REC-03 runtime repair and REC-04 billing guard run alongside.
+Parallel now: REC-01 governance/admission, REC-02 Rust setup/source validation, REC-03 runtime consistency.
+External Grok: verified via read-only ACP at 2026-09-05 10:37 UTC: weekly use 22%, purchased credits/PAYG cap/PAYG used all zero, auto-topup disabled. Built-in route has no API credential/config overrides. Recheck before and after each bounded job.
 
-- one existing public profile, its maturity label, extension namespace/critical-extension behavior,
-  version/unknown behavior, exact schemas/vectors, and bounded corpus are frozen before client work;
-- one independently authored source-blind adapter/client consumes only the frozen profile and passes
-  positive, negative, unknown-version, and critical/noncritical-extension cases without private clarification;
-- the client preserves DENY/UNKNOWN versus ALLOW/CLEAN semantics, records unsupported capabilities,
-  and does not obtain mutation authority or depend on a Git bridge, telemetry, hosted service, or agent platform;
-- authoring time, docs/schema reliance, ambiguity, exception count, conformance results, and maintenance
-  surface are measured with an explicit adopt / narrow / stop decision;
-- an independent other-family audit verifies corpus/provenance, client independence, preservation,
-  compatibility claims, and the absence of formal-standard/governance or multi-organization overclaim.
+| Node | State | Owner | Write set / packet | Depends on |
+|---|---|---|---|---|
+| REC-01 | running | Codex orchestrator | board, AGENTS, governance/provider prose and provider matrix, history | — |
+| REC-02 | running | current-session Codex bootstrap worker | `rust-toolchain.toml`, `docs/development/tools/rust_env.sh`, `docs/development/ai/task-packets/recovery-rust-baseline.md`, ignored local toolchain/logs | — |
+| REC-03 | running | current-session Codex bootstrap worker | `.codex/`, role-routing matrix, external role profiles, runtime validator/launcher/audit prompt, focused tests; `ai/task-packets/recovery-runtime.md` | — |
+| REC-04 | running | native billing investigator | `grok_subscription_preflight.py`, dedicated tests, billing capability evidence; no model call | — |
+| REC-05 | running | fresh Grok/native independent reviewer sessions | bounded review of REC-02/03 diff, no implementation | REC-02, REC-03 |
+| REC-07 | running | Grok 4.6 | CFB-138: remote/project.rs and focused tests; packet recovery-bootstrap-budget.md | reproduced REC-02 failure |
+| REC-06 | blocked | orchestrator | integration tests, checkpoint and board shift | REC-01..05, REC-07 |
 
-Issue inputs:
-
-- no open CFB/CFR root is pre-admitted;
-- a root may enter only if one classifier or the frozen client run reproduces it as the smallest
-  blocker of the exact profile/corpus/client path.
-
-The two classification packets are read-only and may not author the client, change schemas/product,
-mutate a repository, claim an external organization, or work on M2–M5.
-
-M1 validation is packet-scoped. Every admitted run/fix packet must name exact commands, subjects,
-hashes, and focused tests. Standing management checks:
+## Validation
 
 ```bash
-python3 docs/development/tools/check_project_docs.py
-python3 docs/development/tools/check_ai_acceleration_docs.py
+cargo fmt --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+RUST_TEST_THREADS=4 cargo test --workspace --locked
+cargo build --workspace --locked
+./target/debug/codefire-rs --help
+./target/debug/codefire-rs --version
+python3 docs/development/tools/check_ai_development.py --timeout 60
+git diff --check
 ```
 
-M1 non-goals:
+Record actual environment and commands if Cargo requires an explicit local environment helper.
+Source gate failure is a blocker, not a parked test. Setup-only changes do not authorize unrelated product fixes.
+If a source failure needs a product change, admit its exact reproduction and write set before dispatching it.
 
-- a second implementation/organization, third-organization claim, compatible release cycles, or funded capacity;
-- formal standards body, IPR/trademark/governance process, public beta, or external registry publication;
-- broad schema redesign, all-command descriptor, Git bridge, telemetry, hosted service, or agent platform;
-- CFR-168..173 residual implementation unless the exact client reproduces the smallest unavoidable blocker;
-- canonical Algorithm or user-install mutation, external network dependence, or hidden private corpus;
-- changing the profile/corpus/thresholds after client output or serializing independent classification lanes.
+## Parked work
 
-## M1 execution graph (current)
-
-```text
-Critical path: parallel profile/corpus and client-topology classification -> orchestrator fan-in -> frozen independent-client run -> confirmation -> final audit -> M1 exit
-Progress: product-value M1 closed with terminal `narrow`; ecosystem nodes 1–2 are ready and no client/profile work has run
-Parallel now: node 1 public profile/maturity/extensions classification + node 2 independent client/corpus/falsifier topology
-Blocked: nodes 3–7 wait on both read-only classifiers
-Next legal action: dispatch both ready packets concurrently; do not author a client or change schemas before node 3 admission
-```
-
-### Nodes
-
-| # | Node | State | Owner | Waits on | Packet | Write set | Evidence |
-|---|---|---|---|---|---|---|---|
-| 1 | Public profile, maturity label, version/extension rules, and bounded corpus classification | **ready** | Claude Opus 5 | — | `ai/task-packets/milestone-ecosystem-conformance-profile.md` | that packet only | — |
-| 2 | Independent client topology, source-blind handoff, falsifiers, and conformance measurements | **ready** | Grok 4.6 | — | `ai/task-packets/milestone-ecosystem-conformance-client.md` | that packet only | — |
-| 3 | Orchestrator fan-in and bounded profile/client/fix admission | **blocked** | Orchestrator | 1, 2 | — | board plus admitted run/fix packet | — |
-| 4 | Smallest reproduced conformance-contract fix, if any | **blocked** | persistent source-context owner | 3 | — | exact admitted source/docs/test set | — |
-| 5a | Frozen corpus/client handoff | **blocked** | persistent topology owner | 3, optional 4 | — | isolated corpus/key/evidence plus run packet | — |
-| 5b | Fresh independent client authoring/run and distinct confirmation | **blocked** | fresh other-family client author + persistent controller | 5a | — | handed root/evidence plus packet only | — |
-| 6 | Final independent audit | **blocked** | fresh other-family audit agent | 5b | `ai/audit-latest.md` | audit file only | — |
-| 7 | M1 exit and slot shift | **blocked** | Orchestrator | 6 | — | board/history/current-state docs | — |
-
-Nodes 1 and 2 are independent: profile/maturity/extension selection does not depend on client
-implementation topology. After fan-in, keep serially dependent work with the context owner unless
-client-author or audit independence requires a fresh session.
-
-## Open issue placement
-
-All remain `investigating`; slot movement is not a status transition.
-
-| Issue | Slot / role | Admission rule |
-|---|---|---|
-| CFR-171 | backlog parked | Bounded branch/show data-schema slice measured sufficient; full descriptor unadmitted |
-| CFR-172 | backlog parked | Read-only sealed-inspect experiment ended terminal `adopt`; broader adapter work unadmitted |
-| CFR-173 | backlog parked | Bounded metric/falsifier slice satisfied; cohort, telemetry, and pilot residuals unadmitted |
-| CFR-168 | backlog parked | Remote M1 did not reproduce decision-work budgeting as its blocker |
-| CFB-136 | backlog parked | Remote M1 did not reproduce validation-cache subject reuse as its blocker |
-| CFB-133 | backlog parked | Migrate slice not reproduced by completed local milestones |
-| CFR-169 | backlog parked | Architecture seam classified off the critical path |
-| CFR-170 | backlog parked | Local-loop slice completed; all-command residual is not adoption permission |
-
-Product-value M1 added two parked facts: six cited JSON keys were absent as identifiers from its handed
-public pack (controller recorded four of them), and an unconfigured README could contradict the sealed
-requirement. The historical adoption milestone still ended terminal `adopt`, and the release milestone
-still ended internal-only `ACCEPT`; neither is restated by this close. Earlier adoption/release parks
-remain. None is ecosystem-M1 permission without reproduction on the selected profile/client.
-
-`BATCH-2026-07-review-portfolio-completion` is frozen as history. Backlog-parked residuals do not
-enter an active slot without a later evidence-triggered board update.
-
-## M2 preview (queued)
-
-When M1 exits, M2 `MS-ecosystem-multi-implementation-proof` may select one second independent
-integration and one compatibility-preserving profile update. It must not start early.
+- The five ecosystem milestones from `83b4522` are unscheduled until repeat use produces a real interoperability need.
+- Existing CFB-133/136 and CFR-168..173 remain investigating; partial implementations must be checked before new work is admitted.
+- Historical product-value `narrow`, undocumented JSON fields, and configured-glob limitations are inputs to M2.
+- No broad rewrite, issue-portfolio burn-down, standardization, telemetry service, or agent scheduler inside the product.
+- Human recruitment and external publication require their own explicit action authorization.
 
 ## Shift rule
 
-On M1 close:
+Close only with evidence bound to the integrated source. Shift M2–M5 forward after the exit, choosing the next
+bounded increment from observed user friction. A terminal experiment outcome does not automatically meet a strategic stage gate.
 
-1. Record exit evidence in `history.md`.
-2. Rename slots: old M2 becomes M1, old M3 becomes M2, and so on.
-3. Name a new M5 from `strategy/modernization-roadmap.md` without turning that roadmap into a task board.
-4. Refuse any in-flight parked work that tried to start early.
+CFB-138 is explicitly admitted as the smallest blocker of the Rust source gate. Six deterministic bootstrap cleanup failures must be repaired before exit. The separate import full-suite lock timeout is being assessed under bounded test concurrency; single-test success alone does not close it.
+
+REC-06 readmitted the remaining unverified external Codex `run_ai_role.py --execute` path: disable real execution before CLI/capability calls until subscription billing can be verified; preserve native-role dry-run. This does not stop the current host session.
+
+The integrated test harness uses RUST_TEST_THREADS=4 to bound concurrent cases; test-internal threads/barriers are unchanged. The initial 14-way default run and 5s import timeout remain recorded, not relabelled as fixed.

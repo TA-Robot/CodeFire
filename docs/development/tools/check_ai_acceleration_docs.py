@@ -183,7 +183,7 @@ def check_role_routing(root: Path, findings: list[Finding]) -> None:
         if runtime_policy.get("primary_model") != "gpt-5.6-sol":
             findings.append(Finding("error", "bad-primary-model", relative_path, "primary_model must be gpt-5.6-sol"))
         tiers = runtime_policy.get("policy_tiers")
-        if not isinstance(tiers, list) or set(tiers) != {"medium", "high", "ultra"}:
+        if not isinstance(tiers, list) or not all(isinstance(tier, str) for tier in tiers) or set(tiers) != {"medium", "high", "ultra"}:
             findings.append(Finding("error", "bad-policy-tiers", relative_path, "policy_tiers must be medium/high/ultra"))
         adapters = runtime_policy.get("adapters")
         if not isinstance(adapters, dict):
@@ -208,7 +208,7 @@ def check_role_routing(root: Path, findings: list[Finding]) -> None:
         provider = role.get("provider")
         model = role.get("model")
         if role_name in {"manager", "architect"}:
-            if provider not in {None, "codex"} or model != "gpt-5.6-sol":
+            if provider != "codex" or model != "gpt-5.6-sol":
                 findings.append(
                     Finding(
                         "error",
@@ -218,17 +218,17 @@ def check_role_routing(root: Path, findings: list[Finding]) -> None:
                     )
                 )
         else:
-            allowed_models = {"claude-opus-5", "grok-4.6"}
-            if model not in allowed_models:
+            allowed_models = {"claude": "claude-fable-5-1", "grok": "grok-4.6"}
+            if not isinstance(provider, str) or model != allowed_models.get(provider):
                 findings.append(
                     Finding(
                         "error",
                         "bad-role-model",
                         path,
-                        f"{role_name} must use claude-opus-5 or grok-4.6, not Codex",
+                        f"{role_name} must pair Grok with grok-4.6 or Claude with claude-fable-5-1",
                     )
                 )
-            if provider not in {None, "claude", "grok"}:
+            if not isinstance(provider, str) or provider not in {"claude", "grok"}:
                 findings.append(
                     Finding(
                         "error",
@@ -247,7 +247,7 @@ def check_role_routing(root: Path, findings: list[Finding]) -> None:
                     )
                 )
         tier = role.get("reasoning_tier")
-        if tier not in {"medium", "high", "ultra"}:
+        if not isinstance(tier, str) or tier not in {"medium", "high", "ultra"}:
             findings.append(Finding("error", "missing-reasoning-tier", path, f"{role_name} needs medium/high/ultra reasoning_tier"))
         config_file = role.get("config_file")
         if not isinstance(config_file, str) or not config_file or not (root / config_file).is_file():
@@ -268,7 +268,7 @@ def check_provider_routing(root: Path, findings: list[Finding]) -> None:
     if data.get("schema") != "codefire.ai_provider_routing.v1":
         findings.append(Finding("error", "bad-provider-schema", relative_path, "Unexpected provider-routing schema"))
     routes = data.get("tier_routes")
-    expected = {"medium": "claude", "high": "claude", "ultra": "codex"}
+    expected = {"medium": "grok", "high": "grok", "ultra": "codex"}
     if not isinstance(routes, dict):
         findings.append(Finding("error", "missing-tier-routes", relative_path, "tier_routes is required"))
     else:
@@ -288,39 +288,39 @@ def check_provider_routing(root: Path, findings: list[Finding]) -> None:
             if not isinstance(route, dict):
                 continue
             alternate = route.get("alternate")
-            if not isinstance(alternate, dict) or alternate.get("provider") != "grok" or alternate.get("model") != "grok-4.6":
+            if not isinstance(alternate, dict) or alternate.get("provider") != "claude" or alternate.get("model") != "claude-fable-5-1" or alternate.get("requires_explicit_selection") is not True or alternate.get("requires_subscription_entitlement") is not True:
                 findings.append(
                     Finding(
                         "error",
-                        "missing-grok-alternate",
+                        "unguarded-fable-alternate",
                         relative_path,
-                        f"{worker_tier} must name grok-4.6 as the alternate individual/audit model",
+                        f"{worker_tier} must reserve claude-fable-5-1 for explicit selection with verified subscription entitlement",
                     )
                 )
         medium = routes.get("medium")
-        if isinstance(medium, dict) and medium.get("model") != "claude-opus-5":
+        if isinstance(medium, dict) and medium.get("model") != "grok-4.6":
             findings.append(
                 Finding(
                     "error",
                     "bad-medium-provider-model",
                     relative_path,
-                    "Medium workers must use claude-opus-5 (Grok 4.6 is the alternate)",
+                    "Medium workers must use grok-4.6",
                 )
             )
         high = routes.get("high")
         if isinstance(high, dict):
             models = high.get("models")
-            expected_claude_models = {
-                "implementation": "claude-opus-5",
-                "review_or_research": "claude-opus-5",
+            expected_grok_models = {
+                "implementation": "grok-4.6",
+                "review_or_research": "grok-4.6",
             }
-            if not isinstance(models, dict) or models != expected_claude_models:
+            if not isinstance(models, dict) or models != expected_grok_models:
                 findings.append(
                     Finding(
                         "error",
-                        "bad-claude-provider-models",
+                        "bad-grok-provider-models",
                         relative_path,
-                        "High Claude implementation and review/research must use claude-opus-5",
+                        "High implementation and review/research must use grok-4.6",
                     )
                 )
         ultra = routes.get("ultra")
@@ -342,6 +342,19 @@ def check_provider_routing(root: Path, findings: list[Finding]) -> None:
     fallback = data.get("fallback")
     if not isinstance(fallback, dict) or fallback.get("automatic_codex_fallback") is not False:
         findings.append(Finding("error", "automatic-codex-fallback", relative_path, "automatic Codex fallback must be false"))
+    if not isinstance(fallback, dict) or fallback.get("automatic_paid_fallback") is not False:
+        findings.append(Finding("error", "automatic-paid-fallback", relative_path, "automatic paid fallback must be false"))
+    billing = data.get("billing")
+    for key, expected_value in {
+        "subscription_only": True,
+        "metered_allowed": False,
+        "extra_usage_allowed": False,
+        "auto_top_up_allowed": False,
+        "unverified_policy": "block_external_launch",
+    }.items():
+        value = billing.get(key) if isinstance(billing, dict) else None
+        if type(value) is not type(expected_value) or value != expected_value:
+            findings.append(Finding("error", "unsafe-billing-policy", relative_path, f"billing.{key} must be {expected_value!r}"))
     integration = data.get("integration")
     if isinstance(integration, dict) and integration.get("auditor_must_not_be_codex") is not True:
         findings.append(Finding("error", "auditor-on-codex", relative_path, "auditor must not run on Codex"))
@@ -350,11 +363,12 @@ def check_provider_routing(root: Path, findings: list[Finding]) -> None:
         findings.append(Finding("error", "missing-provider-role-defaults", relative_path, "role_defaults is required"))
     else:
         required = {
-            "implementer": "claude",
-            "reviewer": "claude",
-            "classifier": "claude",
-            "validation_runner": "claude",
-            "auditor": "claude",
+            "implementer": "grok",
+            "reviewer": "grok",
+            "classifier": "grok",
+            "validation_runner": "grok",
+            "auditor": "grok",
+            "final_auditor": "grok",
             "integrator": "codex",
             "manager": "codex",
         }

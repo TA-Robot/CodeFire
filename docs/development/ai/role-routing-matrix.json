@@ -2,8 +2,12 @@
   "schema": "codefire.ai_role_routing.v2",
   "runtime_policy": {
     "primary_model": "gpt-5.6-sol",
-    "policy_tiers": ["medium", "high", "ultra"],
-    "active_cli_adapter": "codex_cli_0_146",
+    "policy_tiers": [
+      "medium",
+      "high",
+      "ultra"
+    ],
+    "active_cli_adapter": "codex_cli_0_153",
     "adapters": {
       "codex_cli_0_146": {
         "medium": {
@@ -62,6 +66,20 @@
           "delegation": "explicit_or_instruction_driven",
           "semantic_equivalence": false
         }
+      },
+      "codex_cli_0_153": {
+        "medium": {
+          "reasoning_effort": "medium",
+          "delegation": "explicit_or_instruction_driven"
+        },
+        "high": {
+          "reasoning_effort": "high",
+          "delegation": "explicit_or_instruction_driven"
+        },
+        "ultra": {
+          "reasoning_effort": "ultra",
+          "delegation": "proactive_when_parallelism_materially_helps"
+        }
       }
     },
     "unavailable_model_policy": "stop_without_silent_model_substitution",
@@ -77,9 +95,18 @@
       "downstream_multiplier"
     ],
     "thresholds": {
-      "medium": {"min": 0, "max": 3},
-      "high": {"min": 4, "max": 7},
-      "ultra": {"min": 8, "max": 12}
+      "medium": {
+        "min": 0,
+        "max": 3
+      },
+      "high": {
+        "min": 4,
+        "max": 7
+      },
+      "ultra": {
+        "min": 8,
+        "max": 12
+      }
     },
     "mandatory_ultra": [
       "object_identity_or_format",
@@ -99,7 +126,12 @@
       "model": "gpt-5.6-sol",
       "reasoning_tier": "ultra",
       "config_file": ".codex/agents/ultra.toml",
-      "outputs": ["task_packets", "lane_plan", "milestone_admission", "integration_order"]
+      "outputs": [
+        "task_packets",
+        "lane_plan",
+        "milestone_admission",
+        "integration_order"
+      ]
     },
     {
       "role": "architect",
@@ -107,79 +139,138 @@
       "model": "gpt-5.6-sol",
       "reasoning_tier": "ultra",
       "config_file": ".codex/agents/ultra.toml",
-      "outputs": ["design_note", "alternatives", "risk_list", "boundary_decision", "falsification_plan"]
+      "outputs": [
+        "design_note",
+        "alternatives",
+        "risk_list",
+        "boundary_decision",
+        "falsification_plan"
+      ]
     },
     {
       "role": "implementer",
-      "provider": "claude",
-      "model": "claude-opus-5",
-      "alternate_model": "grok-4.6",
+      "provider": "grok",
+      "model": "grok-4.6",
+      "alternate_model": "claude-fable-5-1",
       "reasoning_tier": "high",
-      "config_file": "docs/development/ai/agents/claude-opus-5.toml",
-      "outputs": ["patch", "focused_tests", "scope_statement", "handoff"]
+      "config_file": "docs/development/ai/agents/grok-4.6.toml",
+      "outputs": [
+        "patch",
+        "focused_tests",
+        "scope_statement",
+        "handoff"
+      ],
+      "alternate_config_file": "docs/development/ai/agents/claude-fable-5-1.toml",
+      "alternate_requires_explicit_selection": true
     },
     {
       "role": "reviewer",
-      "provider": "claude",
-      "model": "claude-opus-5",
-      "alternate_model": "grok-4.6",
+      "provider": "grok",
+      "model": "grok-4.6",
+      "alternate_model": "claude-fable-5-1",
       "reasoning_tier": "high",
-      "config_file": "docs/development/ai/agents/claude-opus-5.toml",
-      "outputs": ["block_m1_or_park", "correctness_concern", "validation_assessment"]
+      "config_file": "docs/development/ai/agents/grok-4.6.toml",
+      "outputs": [
+        "block_m1_or_park",
+        "correctness_concern",
+        "validation_assessment"
+      ],
+      "alternate_config_file": "docs/development/ai/agents/claude-fable-5-1.toml",
+      "alternate_requires_explicit_selection": true
     },
     {
       "role": "researcher",
-      "provider": "claude",
-      "model": "claude-opus-5",
-      "alternate_model": "grok-4.6",
+      "provider": "grok",
+      "model": "grok-4.6",
+      "alternate_model": "claude-fable-5-1",
       "reasoning_tier": "high",
-      "config_file": "docs/development/ai/agents/claude-opus-5.toml",
-      "outputs": ["evidence", "alternatives", "hypotheses", "decision_candidates"]
+      "config_file": "docs/development/ai/agents/grok-4.6.toml",
+      "outputs": [
+        "evidence",
+        "alternatives",
+        "hypotheses",
+        "decision_candidates"
+      ],
+      "alternate_config_file": "docs/development/ai/agents/claude-fable-5-1.toml",
+      "alternate_requires_explicit_selection": true
     },
     {
       "role": "docs_synchronizer",
-      "provider": "claude",
-      "model": "claude-opus-5",
-      "alternate_model": "grok-4.6",
+      "provider": "grok",
+      "model": "grok-4.6",
+      "alternate_model": "claude-fable-5-1",
       "reasoning_tier": "medium",
-      "config_file": "docs/development/ai/agents/claude-opus-5.toml",
-      "outputs": ["docs_diff", "source_evidence", "inbound_link_updates", "consistency_check"]
+      "config_file": "docs/development/ai/agents/grok-4.6.toml",
+      "outputs": [
+        "docs_diff",
+        "source_evidence",
+        "inbound_link_updates",
+        "consistency_check"
+      ],
+      "alternate_config_file": "docs/development/ai/agents/claude-fable-5-1.toml",
+      "alternate_requires_explicit_selection": true
     },
     {
       "role": "validation_runner",
-      "provider": "claude",
-      "model": "claude-opus-5",
-      "alternate_model": "grok-4.6",
+      "provider": "grok",
+      "model": "grok-4.6",
+      "alternate_model": "claude-fable-5-1",
       "reasoning_tier": "medium",
-      "config_file": "docs/development/ai/agents/claude-opus-5.toml",
-      "outputs": ["validation_table", "duration", "environment_limitations", "reproduction_command"]
+      "config_file": "docs/development/ai/agents/grok-4.6.toml",
+      "outputs": [
+        "validation_table",
+        "duration",
+        "environment_limitations",
+        "reproduction_command"
+      ],
+      "alternate_config_file": "docs/development/ai/agents/claude-fable-5-1.toml",
+      "alternate_requires_explicit_selection": true
     },
     {
       "role": "dogfood_runner",
-      "provider": "claude",
-      "model": "claude-opus-5",
-      "alternate_model": "grok-4.6",
+      "provider": "grok",
+      "model": "grok-4.6",
+      "alternate_model": "claude-fable-5-1",
       "reasoning_tier": "high",
-      "config_file": "docs/development/ai/agents/claude-opus-5.toml",
-      "outputs": ["dogfood_evidence", "reproduction", "parked_cfb_candidates"]
+      "config_file": "docs/development/ai/agents/grok-4.6.toml",
+      "outputs": [
+        "dogfood_evidence",
+        "reproduction",
+        "parked_cfb_candidates"
+      ],
+      "alternate_config_file": "docs/development/ai/agents/claude-fable-5-1.toml",
+      "alternate_requires_explicit_selection": true
     },
     {
       "role": "classifier",
-      "provider": "claude",
-      "model": "claude-opus-5",
-      "alternate_model": "grok-4.6",
+      "provider": "grok",
+      "model": "grok-4.6",
+      "alternate_model": "claude-fable-5-1",
       "reasoning_tier": "medium",
-      "config_file": "docs/development/ai/agents/claude-opus-5.toml",
-      "outputs": ["classification_table", "unknowns", "ownership_conflicts"]
+      "config_file": "docs/development/ai/agents/grok-4.6.toml",
+      "outputs": [
+        "classification_table",
+        "unknowns",
+        "ownership_conflicts"
+      ],
+      "alternate_config_file": "docs/development/ai/agents/claude-fable-5-1.toml",
+      "alternate_requires_explicit_selection": true
     },
     {
       "role": "auditor",
       "provider": "grok",
       "model": "grok-4.6",
-      "alternate_model": "claude-opus-5",
+      "alternate_model": "claude-fable-5-1",
       "reasoning_tier": "high",
       "config_file": "docs/development/ai/agents/grok-4.6.toml",
-      "outputs": ["stall_verdict", "scope_creep_verdict", "m1_advice", "audit-latest.md"]
+      "outputs": [
+        "stall_verdict",
+        "scope_creep_verdict",
+        "m1_advice",
+        "audit-latest.md"
+      ],
+      "alternate_config_file": "docs/development/ai/agents/claude-fable-5-1.toml",
+      "alternate_requires_explicit_selection": true
     }
   ]
 }

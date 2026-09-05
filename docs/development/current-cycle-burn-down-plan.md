@@ -12,15 +12,15 @@
 
 Current known issue count and lifecycle position, audited 2026-07-19 after CFR-167 Retrospect:
 
-- CFB/CFR product/review issues: 8 open/investigating.
-- CFB detail ledger: 137 total; 135 `fixed`, 2 `investigating`.
+- CFB/CFR product/review issues: 9 open/investigating.
+- CFB detail ledger: 138 total; 135 `fixed`, 3 `investigating`.
 - CFR detail ledger: 175 total; 159 `fixed`, 10 `fixed in v0.7`, 6 `investigating`.
 - The CFR-167 Install gate produced `/tmp/codefire-cfr167-final.KWa8TC/bin/codefire`; source and installed SHA-256 are `1483874b4c1de4a78478595d5d158cf34a12e5ec3b05255dfc8819f511f00272`.
 - Algorithm source tests pass 281/281. Installed schema 4 scan/verify removed the false fixture-string duplicates and sealed canonical bridge `CF-COMMIT-e5ca290905c2a4b5e2c05bd4` from legacy parent `CF-COMMIT-1bc27ac05b3a2f8e9d9c1de3`.
 - `CFB-120`..`CFB-132` are fixed; final canonical state is `open-clean`, Fire 0, tool migration none. The separately configured repository's branch/open/active control hashes remain unchanged.
 - RVC-011/CFR-161 completed Discover through Retrospect. Installed unsafe-policy replay fails before writes, both real read-only matrices pass without hash drift, and canonical trace-warning policy returns a typed passed decision with no blockers.
 - CFR-162 completed Discover, Freeze, Plan, Implement, Close, Install, Dogfood, and Retrospect. All unresolved merge classes now block the authoritative decision until an explicit validated continue transition.
-- The 60-review current-source audit classified 6 implemented, 3 accepted non-goals, and 51 residual reviews. The residuals remain mapped exactly once to CFR-163..173. Roots through CFR-167/CFB-134 completed the full lifecycle; open CFB-133/136 and CFR-168..173 remain `investigating`. Adoption satisfied only bounded CFR-171..173 slices and ended terminal `adopt`; release admitted no open root and completed internal-only `ACCEPT`; product value admitted no open root and ended literal `narrow` with no product or docs fix. All broader roots remain backlog-parked. `BATCH-2026-07-review-portfolio-completion` is historical; live work is `milestones.md` M1 `MS-ecosystem-conformance-seed`, and no ecosystem work has run.
+- The 60-review current-source audit classified 6 implemented, 3 accepted non-goals, and 51 residual reviews. The residuals remain mapped exactly once to CFR-163..173. Roots through CFR-167/CFB-134 completed the full lifecycle; open CFB-133/136 and CFR-168..173 remain `investigating`. Adoption satisfied only bounded CFR-171..173 slices and ended terminal `adopt`; release admitted no open root and completed internal-only `ACCEPT`; product value admitted no open root and ended literal `narrow` with no product or docs fix. All broader roots remain backlog-parked. `BATCH-2026-07-review-portfolio-completion` is historical; live work follows `milestones.md`; the 2026-09-05 user-approved recovery parks ecosystem work.
 - Historical cycle sections were moved to `archive/completed-cycle-ledger.md`. Do not infer current issue counts from historical headings or remaining-count notes.
 - The management hub `docs/development/README.md` is the current-state entry point; update it and append `history.md` when this section changes.
 

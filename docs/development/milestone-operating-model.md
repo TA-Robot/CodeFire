@@ -27,7 +27,7 @@ The live board is `docs/development/milestones.md`. It always shows exactly five
 | M2 | The following increment. Issues may be **queued**, not started. |
 | M3–M5 | Queued increments. Capture deferred review and non-blocking issues. Do not implement. |
 
-When M1 exits, every slot shifts forward one step and a new M5 is named. Do not keep a sixth live execution target.
+When M1 exits, every slot shifts forward one step and a new M5 is named. A bounded experiment result does not imply its entire strategic stage passed. User-approved reprioritization may replace the sequence while preserving historical results. Do not keep a sixth live execution target.
 
 ## What may enter M1
 
@@ -50,7 +50,7 @@ Examples that **do not** enter M1:
 M1 admission is not a to-do list. The orchestrator must turn the M1 card into an execution graph before launching agents.
 
 1. **Name the critical path.** The shortest dependency chain from "now" to the M1 exit. Only work that later M1 work waits on belongs on this path.
-2. **Split the rest.** Every M1 item that does not wait on another unfinished M1 item is a parallel packet. Launch those immediately, up to provider concurrency, with disjoint write sets.
+2. **Split the rest.** Every M1 item that does not wait on another unfinished M1 item is a parallel packet. Launch eligible packets immediately, up to verified subscription capacity, with disjoint write sets and contract ownership. Billing-unverified/quota-paused lanes are not eligible capacity.
 3. **Do not serialize by habit.** One agent finishing A before another starts independent B is a planning defect, not caution.
 4. **Do not parallelize parked work.** Extra lanes are for M1 slices only. M2–M5 stay queued.
 5. **Keep the path short.** If two packets share a file, either merge them, give the shared file to the orchestrator, or sequence only that edge — not the whole milestone.
@@ -63,7 +63,7 @@ Parallel now: packet-b, packet-d
 Blocked: packet-c waits on packet-a
 ```
 
-A plan that lists M1 work as a single queue with no parallel set is incomplete. The auditor treats idle capacity plus an unstarted independent M1 packet as stall.
+A plan that lists M1 work as a single queue with no parallel set is incomplete. The monitor treats eligible idle capacity plus an unstarted independent M1 packet as stall.
 
 ## Parking rule
 
@@ -112,15 +112,14 @@ This does not weaken sealed-commit, object-identity, or branch-head invariants. 
 
 ## Agent topology
 
-See `docs/development/ai/orchestration-protocol.md`.
+Follow [orchestration protocol](ai/orchestration-protocol.md) and [provider policy](ai/provider-routing-policy.md).
+Codex owns admission/integration; Grok is primary; Fable is scarce escalation, not a periodic monitor.
+No metered billing, purchased credits or automatic top-up. Native current-session Codex bootstrap work is
+explicitly admitted by the recovery board while external billing verification is pending.
 
-| Role | Provider | Allowed work |
-|---|---|---|
-| Orchestrator | Codex `gpt-5.6-sol` only | Choose M1 work, draw the critical path, fan out independent packets, refuse parked work, integrate |
-| Individual agents | strongest available Claude or Grok | Implement, focused test, docs sync for the assigned M1 packet only |
-| Audit agent | strongest available Claude or Grok, never Codex | Every 30 minutes, compare plan vs progress, detect stall and scope creep |
-
-Codex does not implement M1 product changes and does not act as the 30-minute auditor. Individual and audit agents never silently fall back to Codex.
+Progress checks are deterministic at least every 30 minutes. Model reviews are event-triggered at integration,
+high-risk boundaries or real stalls. A reviewer never approves its own implementation. A reproduced data-loss
+or integrity risk can be explicitly readmitted to M1 even if previously parked; log why before changing code.
 
 ## Handoff
 

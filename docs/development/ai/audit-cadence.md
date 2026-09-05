@@ -1,100 +1,32 @@
-# 30-Minute Audit Cadence
+# Progress Monitoring and Independent Review
 
 Status: canonical
 
 Owner: Orchestrator
 
-Update trigger: cadence, auditor provider, or stall definition changes.
-
-The audit agent exists to **prevent stall**, not to create more work. It never implements. It never files a new review portfolio. It never promotes parked issues into M1.
+Update trigger: observed stalls, quota pressure, or a changed integration gate.
 
 ## Cadence
 
-While an M1 individual lane is running, the Codex orchestrator must invoke the audit agent at least once every 30 minutes. The clock starts at the first individual-agent launch.
+Check running lanes at least every 30 minutes with deterministic status, diffs, test results and quota
+where available. Do not spend Fable on periodic status prose. A monitoring interval is not a model call.
 
-If the orchestrator session cannot host a timer, a human or Grok Build scheduler may fire the same prompt. The auditor is still not Codex.
+Request a bounded independent model review at integration, a high-risk contract change, or a real stall.
+Use a fresh Grok session by default, an explicitly selected Fable session for critical judgments if quota
+and subscription inclusion are verified. The native Codex recovery exception is in provider-routing-policy.md.
 
-A missed tick is recorded as `audit-missed`. Two missed ticks in a row is a stall.
+## Scope and evidence
 
-## Who runs it
+Read only the current board, packet, exact diff and validation evidence. Reproduce a blocker when possible.
+Return `block-m1`, `park`, or `drop`; do not turn ordinary suggestions into another mandatory batch.
+A data-loss/integrity failure is explicitly readmitted even if its issue was parked.
 
-| Preference | Auditor |
-|---|---|
-| Implementer is Grok 4.6 | Claude Opus 5 |
-| Implementer is Claude Opus 5 | Grok 4.6 |
-| Only one family available | That family, new session, read-only |
+Each review records base/head, commands actually run, blockers and at most five next actions.
+Implementation and review never share a session. No same-session self-approval.
+A failed or unexecuted required test cannot be approved away.
 
-Codex is forbidden as auditor.
+## Stalls
 
-## What the auditor reads
-
-Generate the brief with:
-
-```bash
-python3 docs/development/tools/run_milestone_audit.py
-```
-
-The auditor then reads, and does not expand beyond:
-
-- `docs/development/milestones.md`
-- `docs/development/milestone-operating-model.md`
-- `docs/development/ai/orchestration-protocol.md`
-- `git status --short --branch` at `/workspace/project`
-- the active task packet, if named on the board
-- the previous `docs/development/ai/audit-latest.md` if present
-
-Do not reread the CFB/CFR corpus. Do not reopen CFR-168.
-
-## Required output
-
-Write `docs/development/ai/audit-latest.md` with this shape:
-
-```markdown
-# Milestone audit
-
-- time (ISO, if known):
-- active milestone:
-- stalled: yes/no
-- scope_creep: yes/no
-- next_milestone_risk:
-
-## Evidence
-
-- git:
-- packets in flight:
-- validation actually run:
-
-## Advice (at most five bullets)
-
-- 
-```
-
-Advice must be about **how to reach M1**, not new product work. Legal advice classes:
-
-- cut the current packet to the exit criterion;
-- park a finding that is not `block-m1`;
-- start an independent M1 packet that is sitting idle while a worker slot is free;
-- restart one worker with a narrower write set;
-- stop a lane that is implementing a parked issue;
-- run the M1 validation list and close M1 if already met.
-
-Forbidden advice:
-
-- "finish the remaining review roots first";
-- "run the full workspace test suite before continuing";
-- "keep Codex implementing";
-- adding M2–M5 work to the current lane.
-
-## Stall definition
-
-The work is stalled when any of these hold:
-
-- more than 30 minutes of individual-agent time with no commit, packet update, or explicit blocker;
-- the active lane is implementing a parked issue;
-- an independent M1 packet is unstarted while a worker slot is free;
-- M1 work is queued as one serial list with no critical path / parallel set on the board;
-- review output treats `park` findings as required;
-- validation wider than the M1 card is blocking merge;
-- two consecutive audit ticks were missed.
-
-The orchestrator must respond to stall by reducing scope, not by adding agents.
+No new diff, test or concrete blocker for 30 minutes triggers investigation. Two repeated unsuccessful
+attempts trigger narrowing or handoff. A billing-unverified or quota-paused lane is a documented capacity
+constraint. Preserve its checkpoint, proceed with independent eligible work, and never enable paid fallback.

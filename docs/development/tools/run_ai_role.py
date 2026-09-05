@@ -255,6 +255,11 @@ def build_command(
     persist: bool,
     json_events: bool,
 ) -> list[str]:
+    if role.get("provider") != "codex":
+        raise ValueError(
+            "external Grok/Claude profiles require a verified subscription launcher; "
+            "run_ai_role.py cannot generate or execute a Codex command for them"
+        )
     runtime = matrix["runtime_policy"]
     adapter = runtime["adapters"][runtime["active_cli_adapter"]][tier]
     effort = adapter["reasoning_effort"]
@@ -287,7 +292,7 @@ def main() -> int:
     parser.add_argument("--prompt")
     parser.add_argument("--root", type=Path, default=repository_root())
     parser.add_argument("--sandbox", choices=("read-only", "workspace-write"), default="read-only")
-    parser.add_argument("--execute", action="store_true", help="Run guarded Codex. The default only prints a manifest.")
+    parser.add_argument("--execute", action="store_true", help="Disabled during subscription-only recovery; no verified Codex billing preflight exists.")
     parser.add_argument(
         "--allow-codex",
         action="store_true",
@@ -307,6 +312,15 @@ def main() -> int:
     parser.add_argument("--json-events", action="store_true")
     args = parser.parse_args()
 
+    if args.execute:
+        print(
+            "error: external Codex CLI execution is disabled during subscription-only "
+            "recovery until a verified Codex billing preflight exists; --allow-codex "
+            "does not verify billing. Use the current subscription session.",
+            file=sys.stderr,
+        )
+        return 2
+
     try:
         root = args.root.resolve()
         matrix = load_matrix(root)
@@ -323,12 +337,17 @@ def main() -> int:
         if role_name is None:
             raise ValueError("provide --role unless a JSON task packet declares it")
         role = select_role(matrix, role_name)
+        if role.get("provider") != "codex":
+            raise ValueError(
+                "external Grok/Claude profiles require a verified subscription launcher; "
+                "run_ai_role.py supports only native Codex roles, including dry-run"
+            )
         tier = packet["risk"]["selected_tier"] if packet is not None else role["reasoning_tier"]
         if args.execute and role_name not in {"manager", "architect"}:
             raise ValueError(
                 "run_ai_role.py executes Codex only for orchestrator roles "
-                "(manager, architect). Individual and audit work uses Claude Opus 5 "
-                "or Grok 4.6 via dev-agent / grok, never Codex"
+                "(manager, architect). Individual and audit work uses Grok 4.6 "
+                "or explicitly selected Fable through a verified subscription launcher"
             )
         if args.execute and not args.allow_codex:
             raise ValueError(

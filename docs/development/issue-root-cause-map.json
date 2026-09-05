@@ -1,7 +1,7 @@
 {
   "type": "codefire.issue_root_cause_map.v1",
   "version": 1,
-  "updated_at": "2026-07-19",
+  "updated_at": "2026-09-05",
   "sources": [
     "docs/development/bug-backlog.md",
     "docs/development/bug-issues/",
@@ -995,6 +995,23 @@
         "schemas/fixtures/remote-component-contract-v1.json",
         "crates/codefire-cli/src/remote/project.rs",
         "tests/test_codefire_cli.py"
+      ]
+    },
+    {
+      "id": "CFB-138",
+      "status": "investigating",
+      "root_cause": "bootstrap_rollback_reservation_and_recovery_accounting_mismatch_under_investigation",
+      "fix_group": "recovery-baseline-bootstrap",
+      "target_version": "recovery-baseline",
+      "owner_module": "crates/codefire-cli/src/remote/project.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/milestones.md",
+        "phase": "MS-recovery-baseline",
+        "decision": "Repair reproduced bounded bootstrap cleanup failures without weakening ownership or work limits."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-138.md",
+        "docs/development/ai/task-packets/recovery-bootstrap-budget.md"
       ]
     }
   ]

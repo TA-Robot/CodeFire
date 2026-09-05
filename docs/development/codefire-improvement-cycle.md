@@ -231,7 +231,7 @@ Current named cycle:
 - Active strategic line: repository/development control, then invariant-backed correctness and recovery.
 - Current roadmap: `docs/development/strategy/modernization-roadmap.md`。
 - Release/format identity: `docs/development/strategy/release-and-format-roadmap.md`; old v0.6–v1.0 labels are internal milestones/plans, not current public release claims.
-- Current phase: milestone board `docs/development/milestones.md`. `MS-product-value-proof` exited 2026-08-22 with literal `narrow` after one source-blind clean-room AI-assisted maintainer sealed the isolated first-seal task, scored 7/7 with task value 3/3, and the fresh final Grok audit `218ef86` returned `ACCEPT` with no `block-m1`; the frozen table matched `narrow` on undocumented JSON identifier reliance (fresh auditor 6; controller 4), so the consequence is a narrowed public claim with no retry and no product/docs fix. M1 is now `MS-ecosystem-conformance-seed`, starting with parallel public-profile/corpus and independent-client/topology classification packets, and no ecosystem work has run. The earlier adoption milestone remains terminal `adopt` and the release milestone remains internal-only `ACCEPT`. `BATCH-2026-07-review-portfolio-completion` is historical. All eight open issue statuses are unchanged and backlog-parked.
+- Current phase: follow `docs/development/milestones.md`. The 2026-09-05 user-approved recovery restores source validation and subscription-only execution, then improves first-seal usability and repeat use. Historical adoption `adopt`, internal release `ACCEPT`, and product-value `narrow` remain unchanged; no human adoption or market proof is claimed. Ecosystem work and the old review-portfolio batch are parked.
 - Latest accepted source-bound Rust runner: `/workspace/worktrees/m1-release-rehearsal-20260822/target/release/codefire-rs`, SHA-256 `90cb2895aadc45b559a96207cdd5ae3b08485f9a7e5a07014db8cca8b5b90ce9`, source manifest `3925fc035690296fa5e132b630dab65a7fbd5ddb1a55f0fb1226e6efd295d97a` over 101 files, provenance `7998bcf6…` bound to `01a4de0`. It is internal-only evidence, not a public release candidate.
 - Git remote: `git@github.com:TA-Robot/CodeFire.git`。
 - Algorithm CodeFire state: canonical is `open-clean` at `CF-COMMIT-2792b54ad730e6d644668c38`, Fire 0 after the agent-local-contract milestone. Remote and adoption experiments preserved it exactly.
@@ -241,9 +241,9 @@ Current global issue inventory:
 
 | Series | Total tracked | Fixed / closed | Open |
 |---|---:|---:|---:|
-| CFB dogfood issues | 137 | 135 | 2 |
+| CFB dogfood issues | 138 | 135 | 3 |
 | CFR code review issues | 175 | 169 | 6 |
-| Total | 312 | 304 | 8 |
+| Total | 313 | 304 | 9 |
 
 Close audit note:
 

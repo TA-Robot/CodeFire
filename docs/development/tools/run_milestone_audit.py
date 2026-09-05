@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a bounded brief for the 30-minute milestone auditor."""
+"""Build a bounded brief for an event-triggered milestone audit."""
 
 from __future__ import annotations
 
@@ -71,10 +71,16 @@ def build_brief(root: Path) -> str:
 def build_prompt(root: Path) -> str:
     brief = build_brief(root)
     return (
-        "You are the CodeFire milestone audit agent. You are Claude Opus 5 or "
-        "Grok 4.6, never Codex. Run a 15-minute read-only audit of plan vs "
-        "progress.\n\n"
+        "You are the CodeFire milestone audit agent in a fresh session, independent "
+        "of the implementer. Grok 4.6 is the default; scarce Fable 5.1 requires "
+        "explicit selection and verified subscription entitlement. Current-session "
+        "Codex independent review is allowed only for explicitly admitted recovery "
+        "bootstrap packets. Run a bounded read-only audit of plan vs progress "
+        "when an integration, failure, stall, or capacity event warrants it; do not "
+        "consume model quota for periodic status checks.\n\n"
         "Rules:\n"
+        "- Use subscription capacity only: no metered billing, extra usage, "
+        "automatic top-ups, or unverified external model execution.\n"
         "- Only advise how to reach the current M1 exit.\n"
         "- Park non-blocking review and extra tests.\n"
         "- Treat implementation of parked issues as stall.\n"

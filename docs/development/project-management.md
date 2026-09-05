@@ -73,8 +73,8 @@ Long-running work is scheduled on the five-ahead board in `milestones.md`, gover
 2. **Admit**: an issue, review finding, or extra test enters M1 only if the M1 exit cannot be met without it.
 3. **Park**: everything else is assigned M2–M5 (or `unscheduled`) and is not active work.
 4. **Plan the graph**: name the critical path to the M1 exit and the parallel set of independent packets. Launch the parallel set immediately.
-5. **Implement**: Codex orchestrates; Claude Opus 5 / Grok 4.6 individual agents do the assigned M1 packets.
-6. **Audit**: a Claude or Grok auditor, never Codex, runs every 30 minutes against plan vs progress.
+5. **Implement**: Codex orchestrates; Grok is the primary worker and Fable is reserved for important decisions. Recovery bootstrap exceptions follow the board.
+6. **Audit**: deterministic health checks run every 30 minutes; a fresh reviewer runs at integration, high-risk boundaries, or detected stall.
 7. **Review**: only `block-m1` findings are required. Other comments are parked.
 8. **Validate**: run the M1 card's command list, not the historical full catalog, unless the card names a wider gate.
 9. **Exit and shift**: close or park every M1 item, record evidence in `history.md`, then shift slots.

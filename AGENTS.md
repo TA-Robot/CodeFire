@@ -6,11 +6,11 @@
 
 - `docs/development/milestones.md`: いま進めてよい唯一の作業。5段先までのボード。
 - `docs/development/milestone-operating-model.md`: 次マイルストーンに必要なissueだけを進め、他は後段へ送る規則。
-- `docs/development/ai/orchestration-protocol.md`: Codex指揮、Claude/Grok個別、30分ごとの監査エージェント。
+- `docs/development/ai/orchestration-protocol.md`: Codex指揮、Grok主力、Fableは重要判断に限定。契約枠内のみ。
 - `docs/development/README.md`: 開発管理ハブ、現在状態、正本ドキュメント対応表。
 - `docs/development/project-management.md`: 長期開発に耐えるproject管理モデル、issue/cycle/dirty tree運用。
 - `docs/development/ai/README.md`: 外部AIで開発を加速するためのcontext pack、task packet、role routing、review、parallel lane、local tool運用。
-- `docs/development/ai/provider-routing-policy.md`: Codexは指揮のみ。個別と監査は Claude Opus 5 / Grok 4.6。
+- `docs/development/ai/provider-routing-policy.md`: Grok優先、Fable節約、従量課金禁止と契約確認。
 - `docs/development/agent-code-quality.md`: AtCoder red レベルのコード品質、計算量、メモリ、アルゴリズム、不変条件。
 - `docs/development/module-boundaries.md`: module/file分割、責務境界、`main.rs` 肥大化防止。
 - `docs/development/agent-workflow.md`: 作業運用、Rust v0.6方針、diff/merge方針、テスト、禁止事項。
@@ -39,7 +39,9 @@
 
 - 作業許可は `docs/development/milestones.md` の **M1 だけ**。M2–M5 と review の非ブロッキング指摘は実装しない。
 - オーケストレータは M1 のクリティカルパスを切り、依存しない packet は空きスロットがある限りすぐ並列起動する。直列キューは計画として不合格。
-- 指揮は Codex `gpt-5.6-sol`。個別実装・レビュー・30分監査は Claude Opus 5 または Grok 4.6。Codex に実装も監査もさせない。
+- 指揮は現在の契約内Codexセッション。通常実装は Grok 4.6 を優先し、Fable 5.1 は重要な設計・根本修正・レビューに限定する。Fableを常駐監査や定型作業に使わない。
+- 従量課金、追加クレジット消費、自動チャージ、API課金へのfallbackは禁止。外部CLIの課金経路が未確認なら起動しない。
+- 2026-09-05の立て直しでは、外部CLIの課金確認を待つ間、現在のCodexセッション内のsubagentでREC-02/REC-03の環境・開発ツール整備を並列実行してよい。外部Codex CLI/APIの新規認証は使わない。製品コードの自己承認は禁止。
 - レビューは `block-m1` / `park` / `drop` のみ。`park` を今やる仕事にしない。
 - テストは当該マイルストーンの exit が指名したコマンドだけを必須にする。カタログ全件を日次入場条件にしない。
 - 常にコードは **AtCoder red レベルの最高レベルのコードを作成すること** を心がける。

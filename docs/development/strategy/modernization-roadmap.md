@@ -8,6 +8,18 @@ Update trigger: a stage exit gate passes, a P0 risk is discovered, or evidence c
 
 This roadmap replaces version-number task plans as the active ordering mechanism. It uses evidence gates rather than dates because the current repository has no coherent public release identity or reproducible Rust validation environment.
 
+## Recovery ordering adopted 2026-09-05
+
+The user accepted the [recovery assessment](../exploration/recovery-2026-09-05.md). The execution board now
+orders: source/runtime baseline -> usable first-seal/recovery path -> fast safe change -> repeat use -> bounded
+distribution. The stages below remain capability gates, not a competing task queue.
+
+The previous n=1 AI-assisted study ended `narrow`; it did not meet Stage 5. Ecosystem work is parked until
+repeat use yields a real interoperability need. Past experiment outcomes remain immutable evidence; they do
+not prohibit a newly scoped improvement or justify automatically advancing to the next strategic stage.
+Grok is primary, Fable scarce, and metered billing forbidden. The development control plane must produce
+observable product improvements rather than merely closing review/document packets.
+
 ## Stage 0 — Repository and Development Control
 
 Objective: make the project safe to change and cheap to understand.
@@ -46,7 +58,7 @@ Priority experiments:
 6. root/path/symlink and server-verification trust-boundary red team;
 7. stale lock, pending transaction, corrupt object, and user-work recovery table.
 
-The CFB-120..132 correctness batch and the CFR-161..167 safety/contract roots completed source gates, isolated Install, Algorithm Dogfood, and Retrospect by 2026-07-19; same-root CFB-134/135 and CFR-174/175 are also closed. Live execution moved on 2026-08-21 to the five-ahead board `../milestones.md` (STR-015). Control restore, the local sealed loop, the agent-consumable local contract, the remote happy path, the adoption wedge, the bounded internal release rehearsal, and the bounded first-seal product-value study have exited. The active M1 is now a bounded Stage 6 interoperability slice, and M2–M5 are the successive bounded Stage 6 slices. Open issue status stays in the ledgers; the board alone controls which slice may run. This roadmap remains a stage/gate document, not a second task board.
+The CFB-120..132 correctness batch and the CFR-161..167 safety/contract roots completed source gates, isolated Install, Algorithm Dogfood, and Retrospect by 2026-07-19; same-root CFB-134/135 and CFR-174/175 are also closed. Live execution moved on 2026-08-21 to the five-ahead board `../milestones.md` (STR-015). Control restore, the local sealed loop, the agent-consumable local contract, the remote happy path, the adoption wedge, the bounded internal release rehearsal, and the bounded first-seal product-value study have exited. That historical board advanced to Stage 6; the 2026-09-05 recovery decision now parks that sequence. Open issue status stays in the ledgers; the board alone controls which slice may run. This roadmap remains a stage/gate document, not a second task board.
 
 Exit gate:
 

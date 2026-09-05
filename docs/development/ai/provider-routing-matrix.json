@@ -1,6 +1,6 @@
 {
   "schema": "codefire.ai_provider_routing.v1",
-  "policy_version": "milestone-v1",
+  "policy_version": "recovery-subscription-v1",
   "decision_order": [
     "task_packet_risk_tier",
     "role_default",
@@ -8,11 +8,13 @@
   ],
   "tier_routes": {
     "medium": {
-      "provider": "claude",
-      "model": "claude-opus-5",
+      "provider": "grok",
+      "model": "grok-4.6",
       "alternate": {
-        "provider": "grok",
-        "model": "grok-4.6"
+        "provider": "claude",
+        "model": "claude-fable-5-1",
+        "requires_explicit_selection": true,
+        "requires_subscription_entitlement": true
       },
       "default_timeout": "4h",
       "use_for": [
@@ -23,14 +25,16 @@
       ]
     },
     "high": {
-      "provider": "claude",
+      "provider": "grok",
       "models": {
-        "implementation": "claude-opus-5",
-        "review_or_research": "claude-opus-5"
+        "implementation": "grok-4.6",
+        "review_or_research": "grok-4.6"
       },
       "alternate": {
-        "provider": "grok",
-        "model": "grok-4.6"
+        "provider": "claude",
+        "model": "claude-fable-5-1",
+        "requires_explicit_selection": true,
+        "requires_subscription_entitlement": true
       },
       "default_timeout": {
         "implementation": "6h",
@@ -63,41 +67,71 @@
     "orchestrator": "codex",
     "architect": "codex",
     "integrator": "codex",
-    "final_auditor": "codex",
-    "implementer": "claude",
-    "reviewer": "claude",
-    "researcher": "claude",
-    "dogfood_runner": "claude",
-    "debugger": "claude",
-    "classifier": "claude",
-    "docs_synchronizer": "claude",
-    "validation_runner": "claude",
-    "triage": "claude",
-    "test_generator": "claude",
-    "auditor": "claude"
+    "final_auditor": "grok",
+    "implementer": "grok",
+    "reviewer": "grok",
+    "researcher": "grok",
+    "dogfood_runner": "grok",
+    "debugger": "grok",
+    "classifier": "grok",
+    "docs_synchronizer": "grok",
+    "validation_runner": "grok",
+    "triage": "grok",
+    "test_generator": "grok",
+    "auditor": "grok"
   },
   "strongest_models": {
-    "claude": "claude-opus-5",
+    "claude": "claude-fable-5-1",
     "grok": "grok-4.6",
     "codex": "gpt-5.6-sol"
   },
   "concurrency": {
-    "claude": 2,
+    "claude": 1,
     "grok": 2,
     "codex": 1,
-    "fugu": 1
+    "fugu": 0
   },
   "fallback": {
     "automatic_codex_fallback": false,
-    "worker_families": ["claude", "grok"],
-    "fugu_is_overflow_only": true,
-    "unavailable_provider": "use_the_other_worker_family_or_stop_never_codex"
+    "worker_families": [
+      "grok",
+      "claude"
+    ],
+    "fugu_is_overflow_only": false,
+    "fugu_enabled": false,
+    "unavailable_provider": "checkpoint_then_verified_subscription_or_pause",
+    "automatic_paid_fallback": false
   },
   "integration": {
     "implementation_and_review_must_use_independent_agents": true,
     "review_decision_gate": "block-m1_only",
     "automatic_main_merge": false,
     "integration_branch_required": true,
-    "auditor_must_not_be_codex": true
+    "auditor_must_not_be_codex": true,
+    "recovery_native_independent_review_exception": true
+  },
+  "billing": {
+    "subscription_only": true,
+    "metered_allowed": false,
+    "extra_usage_allowed": false,
+    "auto_top_up_allowed": false,
+    "unverified_policy": "block_external_launch"
+  },
+  "recovery_bootstrap": {
+    "native_session_workers_allowed": true,
+    "scope": [
+      "REC-02",
+      "REC-03",
+      "REC-04",
+      "REC-05"
+    ],
+    "external_codex_api_allowed": false,
+    "reason": "user-approved recovery while external billing is unverified"
+  },
+  "execution": {
+    "legacy_dev_agent_enabled": false,
+    "legacy_dev_swarm_enabled": false,
+    "external_launch": "subscription_preflight_required",
+    "grok_scheduler_backend_available": false
   }
 }

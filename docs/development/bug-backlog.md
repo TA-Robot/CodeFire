@@ -153,6 +153,8 @@
 | CFB-136 | investigating | Store / Validation cache subject | validated shared objectを同一inode/pathへ書換えてもdirectory identity+commit ID cacheがhitし得る | CFR-168 command-scoped cache設計の独立反証 | cross-head cache拡張が破損を隠し、branch/Doctor/storageのintegrity診断を分裂させる | cache共有を手動で避け、協調mutator停止中だけreadする | CFR-168でsnapshot-bound sessionまたはrecord digest再検証、iterative traversal、typed countersを統合する |
 | CFB-137 | fixed | Python test / HTTP retry wire | surrogate identity rejection testが2応答のwall-clock `Date` headerまでbyte比較し、秒境界を跨ぐとproduct差分なしでflakeする | CFR-168 carrier統合後のcanonical Python 525件再実行 | 正しいerror/body/accountingでも全体gateが非決定的にredになり、実回帰との切り分けに約18分を要する | 失敗時に単独再実行する | retry同一性はstatus・`Date`以外のheaders・bodyを比較し、各応答に`Date`がexactly one存在することを別途検証する |
 
+| CFB-138 | investigating | Rust remote / Bootstrap recovery | Bootstrap cancellation exceeds its own reserved byte budget; six cleanup cases fail | REC-02 source baseline | Failed cancellation may require avoidable recovery/quarantine | Preserve state and treat source gate as blocked | Reconcile rollback reservation with bounded actual cleanup work |
+
 ## Triage Notes
 
 - CFB-001は `test_stale_resolution_blocks_verify` でrefresh導線を確認する。

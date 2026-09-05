@@ -1,0 +1,5 @@
+# Scarce escalation profile; explicit selection and verified subscription required.
+# Not a Codex CLI config. No metered or extra-usage fallback is allowed.
+model = "claude-fable-5-1"
+provider = "claude"
+role_class = "individual_or_audit"

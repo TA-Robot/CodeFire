@@ -29,9 +29,11 @@ except ModuleNotFoundError:  # Python 3.10 compatibility in the dev container.
 
 EXPECTED_MODEL = "gpt-5.6-sol"
 EXPECTED_TIERS = {"medium", "high", "ultra"}
+PROVIDER_MODELS = {"codex": EXPECTED_MODEL, "grok": "grok-4.6", "claude": "claude-fable-5-1"}
 MATRIX_PATH = Path("docs/development/ai/role-routing-matrix.json")
 PROJECT_CONFIG = Path(".codex/config.toml")
 AGENT_CONFIG_DIR = Path(".codex/agents")
+EXTERNAL_CONFIG_DIR = Path("docs/development/ai/agents")
 
 
 @dataclass(frozen=True)
@@ -163,7 +165,7 @@ def check_matrix(root: Path, findings: list[Finding]) -> set[str]:
             Finding("error", "wrong-primary-model", str(MATRIX_PATH), f"expected {EXPECTED_MODEL}")
         )
     tiers = runtime.get("policy_tiers")
-    if not isinstance(tiers, list) or set(tiers) != EXPECTED_TIERS:
+    if not isinstance(tiers, list) or not all(isinstance(tier, str) for tier in tiers) or set(tiers) != EXPECTED_TIERS:
         findings.append(
             Finding("error", "wrong-policy-tiers", str(MATRIX_PATH), "tiers must be medium/high/ultra")
         )
@@ -173,6 +175,7 @@ def check_matrix(root: Path, findings: list[Finding]) -> set[str]:
         findings.append(Finding("error", "missing-adapters", str(MATRIX_PATH), "adapters are required"))
     else:
         expected_efforts = {
+            "codex_cli_0_153": {"medium": "medium", "high": "high", "ultra": "ultra"},
             "codex_cli_0_146": {"medium": "medium", "high": "high", "ultra": "ultra"},
             "codex_cli_0_144": {"medium": "medium", "high": "high", "ultra": "ultra"},
             "openai_responses_api": {"medium": "medium", "high": "high", "ultra": "max"},
@@ -230,16 +233,33 @@ def check_matrix(root: Path, findings: list[Finding]) -> set[str]:
         if name in seen:
             findings.append(Finding("error", "duplicate-role", role_path, name))
         seen.add(name)
-        if role.get("model") != EXPECTED_MODEL:
+        provider = role.get("provider")
+        if not isinstance(provider, str) or provider not in PROVIDER_MODELS:
+            findings.append(Finding("error", "wrong-role-provider", role_path, repr(provider)))
+        elif role.get("model") != PROVIDER_MODELS[provider]:
             findings.append(Finding("error", "wrong-role-model", role_path, name))
         tier = role.get("reasoning_tier")
-        if tier not in EXPECTED_TIERS:
+        if not isinstance(tier, str) or tier not in EXPECTED_TIERS:
             findings.append(Finding("error", "wrong-role-tier", role_path, f"{name}: {tier!r}"))
         else:
             used_tiers.add(tier)
         config_ref = role.get("config_file")
-        if not isinstance(config_ref, str) or not (root / config_ref).is_file():
+        if not isinstance(config_ref, str) or not config_ref or not (root / config_ref).is_file():
             findings.append(Finding("error", "missing-role-config", role_path, str(config_ref)))
+        elif isinstance(provider, str) and provider in PROVIDER_MODELS:
+            check_role_layer(root, role, findings)
+        if "alternate_model" in role:
+            alternate_model = role.get("alternate_model")
+            alternate_provider = next((key for key, value in PROVIDER_MODELS.items() if value == alternate_model and key != "codex"), None)
+            alternate_ref = role.get("alternate_config_file")
+            if alternate_provider is None or alternate_provider == provider:
+                findings.append(Finding("error", "wrong-alternate-model", role_path, repr(alternate_model)))
+            elif role.get("alternate_requires_explicit_selection") is not True:
+                findings.append(Finding("error", "unguarded-alternate", role_path, name))
+            elif not isinstance(alternate_ref, str) or not alternate_ref or not (root / alternate_ref).is_file():
+                findings.append(Finding("error", "missing-alternate-config", role_path, repr(alternate_ref)))
+            else:
+                check_role_layer(root, {**role, "model": alternate_model, "provider": alternate_provider, "config_file": alternate_ref}, findings)
         outputs = role.get("outputs")
         if not isinstance(outputs, list) or not outputs or not all(isinstance(item, str) and item for item in outputs):
             findings.append(Finding("error", "missing-role-outputs", role_path, name))
@@ -249,6 +269,35 @@ def check_matrix(root: Path, findings: list[Finding]) -> set[str]:
             Finding("error", "unused-policy-tier", str(MATRIX_PATH), f"used tiers: {sorted(used_tiers)}")
         )
     return used_tiers
+
+
+def check_role_layer(root: Path, role: dict[str, Any], findings: list[Finding]) -> None:
+    """External profiles are metadata; only native layers are Codex TOML configs."""
+    reference = role["config_file"]
+    provider = role["provider"]
+    path = (root / reference).resolve()
+    directory = AGENT_CONFIG_DIR if provider == "codex" else EXTERNAL_CONFIG_DIR
+    if Path(reference).is_absolute() or not path.is_relative_to((root / directory).resolve()):
+        findings.append(Finding("error", "wrong-role-config-scope", reference, f"{provider} configs must stay in {directory}"))
+        return
+    layer = load_toml(path, findings)
+    if layer is None:
+        return
+    if layer.get("model") != role.get("model"):
+        findings.append(Finding("error", "role-layer-model-mismatch", reference, role["role"]))
+    if provider == "codex":
+        if layer.get("model_reasoning_effort") != role.get("reasoning_tier"):
+            findings.append(Finding("error", "role-layer-tier-mismatch", reference, role["role"]))
+        if "provider" in layer or "role_class" in layer:
+            findings.append(Finding("error", "external-profile-in-native-config", reference, role["role"]))
+    else:
+        if layer.get("provider") != provider:
+            findings.append(Finding("error", "role-layer-provider-mismatch", reference, role["role"]))
+        if layer.get("role_class") != "individual_or_audit":
+            findings.append(Finding("error", "wrong-external-role-class", reference, role["role"]))
+        unknown = set(layer) - {"model", "provider", "role_class"}
+        if unknown:
+            findings.append(Finding("error", "unknown-external-profile-key", reference, repr(sorted(unknown))))
 
 
 def check_agent_configs(root: Path, findings: list[Finding]) -> None:
@@ -275,10 +324,13 @@ def check_role_config_mapping(root: Path, findings: list[Finding]) -> None:
     if not isinstance(project_agents, dict):
         findings.append(Finding("error", "missing-project-agents", str(PROJECT_CONFIG), "[agents] is required"))
         return
+    roles = matrix.get("roles")
+    if not isinstance(roles, list):
+        return  # check_matrix reports the malformed role collection.
     matrix_roles = {
         role.get("role"): role
-        for role in matrix.get("roles", [])
-        if isinstance(role, dict) and isinstance(role.get("role"), str)
+        for role in roles
+        if isinstance(role, dict) and isinstance(role.get("role"), str) and role.get("provider") == "codex"
     }
     configured_roles = {
         name: value
@@ -311,13 +363,6 @@ def check_role_config_mapping(root: Path, findings: list[Finding]) -> None:
                 Finding("error", "role-config-ref-mismatch", str(PROJECT_CONFIG), f"{name}: {project_ref} != {matrix_ref}")
             )
             continue
-        layer = load_toml(matrix_path, findings)
-        if layer is None:
-            continue
-        if layer.get("model") != role.get("model"):
-            findings.append(Finding("error", "role-layer-model-mismatch", matrix_ref, name))
-        if layer.get("model_reasoning_effort") != role.get("reasoning_tier"):
-            findings.append(Finding("error", "role-layer-tier-mismatch", matrix_ref, name))
 
 
 def file_contains_all(path: Path, needles: tuple[bytes, ...]) -> bool:
@@ -375,12 +420,16 @@ def check_codex_installation(root: Path, findings: list[Finding], timeout: float
         return
     adapter_key = f"codex_cli_{version_match.group(1)}_{version_match.group(2)}"
     matrix = load_json(root / MATRIX_PATH, findings)
-    adapters = matrix.get("runtime_policy", {}).get("adapters", {}) if matrix else {}
+    runtime = matrix.get("runtime_policy") if matrix else None
+    if not isinstance(runtime, dict) or not isinstance(runtime.get("adapters"), dict):
+        findings.append(Finding("error", "missing-adapters", str(MATRIX_PATH), "valid runtime adapters are required"))
+        return
+    adapters = runtime["adapters"]
     if adapter_key not in adapters:
         findings.append(
             Finding("error", "missing-codex-version-adapter", str(MATRIX_PATH), adapter_key)
         )
-    active_adapter = matrix.get("runtime_policy", {}).get("active_cli_adapter") if matrix else None
+    active_adapter = runtime.get("active_cli_adapter")
     if active_adapter != adapter_key:
         findings.append(
             Finding(

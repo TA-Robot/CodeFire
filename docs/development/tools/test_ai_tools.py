@@ -46,6 +46,8 @@ from run_ai_role import preflight_task_execution, resolve_packet_manifest  # noq
 from run_dogfood_smoke import smoke_commands, validate_result  # noqa: E402
 from suggest_validation import parse_porcelain_paths, suggestions  # noqa: E402
 from validate_ai_runtime import strict_config_probe  # noqa: E402
+from test_ai_runtime import RuntimeSeparationTests  # noqa: E402,F401
+from test_grok_subscription_preflight import BillingStateTests, TransportTests  # noqa: E402,F401
 
 
 ROOT = Path(__file__).resolve().parents[3]
