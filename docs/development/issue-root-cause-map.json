@@ -996,6 +996,22 @@
         "crates/codefire-cli/src/remote/project.rs",
         "tests/test_codefire_cli.py"
       ]
+    },
+    {
+      "id": "CFB-140",
+      "status": "open",
+      "root_cause": "stale_resolution_diagnostics_and_next_actions_do_not_carry_fire_identity",
+      "fix_group": "first-run-journey",
+      "target_version": "backlog",
+      "owner_module": "crates/codefire-cli/src/automation.rs",
+      "next_plan_mapping": {
+        "plan": "docs/development/exploration/handoff-2026-11-05.md",
+        "phase": "environment-handoff-2026-11-05",
+        "decision": "Expose fire display ID/UID and atom pair on every stale diagnostic, make refresh_resolution a ready argv action, and add a bulk stale refresh path."
+      },
+      "close_evidence": [
+        "docs/development/bug-issues/cfb-140.md"
+      ]
     }
   ]
 }
