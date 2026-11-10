@@ -15,7 +15,7 @@ This repository contains the CodeFire product, its reference implementation, and
 | Python fallback | `codefire`, `tests/` | Reference implementation and compatibility fallback. |
 | Installer | `install.sh`, `pyproject.toml`, `setup.py` | Rust-first install path with Python fallback support. |
 | Product docs | numbered product docs (`docs/00_*`–`docs/11_*`, `docs/13_*`), `adr/`, `schemas/` | Product definition, concepts, architecture, schemas, and decisions. The retired chapter 12 MVP plan is preserved through Git history and the completion ledger. |
-| Development management | `docs/development/` | Project state, plans, issue ledgers, source maps, and long-term workflow. |
+| Development management | `docs/development/` | The plan, open issues, history, and source maps. |
 | Dogfood project | `subprojects/algorithm-evolution-agent-lab/` | A separate research project used to exercise CodeFire in real workflows. |
 
 Do not treat `subprojects/algorithm-evolution-agent-lab/` as CodeFire product code. It is a managed target project and should stay separated from CodeFire's CLI, store, and core domains.
@@ -79,60 +79,22 @@ codefire completion zsh > ~/.local/share/zsh/site-functions/_codefire
 
 ## Development Management
 
-Start all project-management work from `docs/development/README.md`.
-
-The durable management model is defined in `docs/development/project-management.md`. In short:
-
-- `README.md` is the stable product and repository entry point.
-- `docs/development/README.md` is the development-management hub and current state entry.
-- `docs/development/project-management.md` defines the long-term governance model.
-- `docs/development/ai/README.md` defines the external AI development acceleration system.
-- `docs/development/strategy/README.md` holds promoted engineering/product decisions and the only active strategic roadmap.
-- `docs/development/exploration/README.md` holds the three completed, non-authoritative exploration phases and their falsifiable experiments.
+- `docs/development/PLAN.md` is the only current plan: goal, stage, and frozen scope.
+- `docs/development/issues.md` lists open issues only.
 - `docs/development/history.md` is the append-only work log.
-- `docs/development/bug-backlog.md` and `docs/development/bug-issues/` are the CFB product issue ledger.
-- `docs/development/code-review-issues-2026-06-06.md` and `docs/development/code-review-issues/` are the CFR source-review issue ledger.
-- `docs/development/current-cycle-burn-down-plan.md` is only for the active burn-down batch; old cycle details belong in history.
+- `AGENTS.md` holds the working rules.
 
-Avoid duplicating current issue counts or phase names across multiple files. If a current value changes, update the management hub and append the reason to `history.md`.
+Management documents from before 2026-11-10 are preserved at tag `archive/pre-rebuild-20261110`.
 
 ## Validation Gates
 
-Use the narrowest relevant check first, then widen before handoff.
-
-Rust product changes:
-
 ```bash
-cargo fmt --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+scripts/check.sh                                      # fmt, clippy, all Rust tests
+python3 docs/development/tools/check_source_docs.py   # when commands/modules/types change
 ```
 
-Python fallback changes:
-
-```bash
-python3 -m py_compile codefire tests/test_codefire_cli.py
-python3 -m unittest discover -s tests -v
-./demo.sh
-```
-
-Installer changes:
-
-```bash
-bash -n install.sh
-./install.sh --prefix /tmp/codefire-install-smoke
-/tmp/codefire-install-smoke/bin/codefire --help
-/tmp/codefire-install-smoke/bin/codefire-py --help
-```
-
-Dogfood project changes:
-
-```bash
-cd subprojects/algorithm-evolution-agent-lab
-PYTHONPATH=src python3 -m unittest discover -s tests -v
-```
-
-Docs-only changes do not require full test runs, but links, current-state claims, issue counts, and source-of-truth references must be checked.
+The Rust toolchain is pinned in `rust-toolchain.toml`. The Python reference line is frozen
+(see `PLAN.md`); its checks are `python3 -m unittest discover -s tests -v` and `./demo.sh`.
 
 ## Product Reading Path
 
@@ -147,14 +109,12 @@ Read these first for product concepts:
 
 Read these first for implementation work:
 
-1. `docs/development/README.md`
-2. `docs/development/project-management.md`
-3. `docs/development/ai/README.md`
-4. `docs/development/module-boundaries.md`
-5. `docs/development/source-architecture.md`
-6. `docs/development/command-source-trace.md`
-7. `docs/development/source-data-model-catalog.md`
-8. `docs/development/change-playbook.md`
+1. `docs/development/PLAN.md`
+2. `docs/development/module-boundaries.md`
+3. `docs/development/source-architecture.md`
+4. `docs/development/command-source-trace.md`
+5. `docs/development/source-data-model-catalog.md`
+6. `docs/development/change-playbook.md`
 
 ## Feature Surface
 

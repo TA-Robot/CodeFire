@@ -3,7 +3,7 @@
 - Status: Accepted and implemented; independent source/install/dogfood close review passed
 - Date: 2026-07-19
 - Decision owners: Remote mutation / Store / Recovery
-- Related: [CFR-165](../docs/development/code-review-issues/cfr-165.md), [CFR-174](../docs/development/code-review-issues/cfr-174.md), [CFR-175](../docs/development/code-review-issues/cfr-175.md), RVC-026, RVC-030, RVC-044, RVC-050, RVC-056, ADR-010, ADR-016
+- Related: CFR-165, CFR-174, CFR-175, RVC-026, RVC-030, RVC-044, RVC-050, RVC-056, ADR-010, ADR-016
 
 ## Context
 

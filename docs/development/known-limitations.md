@@ -75,7 +75,7 @@
 
 ## 既知制約
 
-実運用で見つかった不具合やバグに近いUXは `docs/development/bug-backlog.md` に分離して管理する。
+実運用で見つかった不具合やバグに近いUXは `docs/development/issues.md` に分離して管理する。
 
 ### Rust default and Python fallback
 

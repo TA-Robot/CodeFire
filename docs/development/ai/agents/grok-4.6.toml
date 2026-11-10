@@ -1,8 +1,0 @@
-# Individual / audit worker pin for Grok.
-# Not a Codex CLI config. The orchestrator remains gpt-5.6-sol.
-# Grok is launched as a Grok Build subagent or `grok -m grok-4.6`;
-# it is not a second-agent backend in this milestone.
-
-model = "grok-4.6"
-provider = "grok"
-role_class = "individual_or_audit"

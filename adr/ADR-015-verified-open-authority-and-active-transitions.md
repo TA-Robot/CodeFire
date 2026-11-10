@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-07-12
 - Decision owners: Local lifecycle / recovery / doctor
-- Related: [CFR-163](../docs/development/code-review-issues/cfr-163.md), RVC-012, RVC-024, RVC-027, RVC-028, RVC-037, ADR-009, ADR-010, ADR-011
+- Related: CFR-163, RVC-012, RVC-024, RVC-027, RVC-028, RVC-037, ADR-009, ADR-010, ADR-011
 
 ## Context
 

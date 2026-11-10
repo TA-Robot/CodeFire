@@ -94,4 +94,4 @@ Rust CLIの横断integration-style testsは、`crates/codefire-cli/src/tests.rs`
 
 ## 記録ルール
 
-module分割が必要なのに時間都合で後回しにする場合は、必ず `docs/development/bug-backlog.md` または `docs/development/todo-checklist.md` に記録する。記録には、対象file、肥大化している責務、想定される分割先、放置した場合のリスクを書く。
+module分割が必要なのに時間都合で後回しにする場合は、必ず `docs/development/issues.md` に記録する。記録には、対象file、肥大化している責務、想定される分割先、放置した場合のリスクを書く。

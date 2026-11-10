@@ -1,5 +1,0 @@
-# AI Review Packets
-
-Place machine-readable review results under `json/` using `../schemas/review-packet.v1.schema.json`. A review packet must bind its claims to the task packet digest, canonical committed base/head revisions, exact Git changed-file set, and canonical patch digest. Every validation row names the task's `validation_id` and repeats its exact command; approval requires passed evidence plus a log digest for every required task validation. A post-validation capability also needs `capability_evidence_path` and the SHA-256 of that exact artifact. Rust provenance is accepted only when its source manifest is clean and identical to the review HEAD and its current binary digest still matches. Do not create an approval template that can be mistaken for completed evidence.
-
-`check_ai_contracts.py` derives canonical patch bytes and changed paths from the review's committed base/head and fails closed for approval when either commit or any referenced capability artifact cannot be verified. `block` and `request_changes` records may omit approval-only validation/provenance evidence.

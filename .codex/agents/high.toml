@@ -1,4 +1,0 @@
-# Non-trivial implementation, synthesis, and dogfood investigation.
-model = "gpt-5.6-sol"
-model_reasoning_effort = "high"
-model_reasoning_summary = "detailed"

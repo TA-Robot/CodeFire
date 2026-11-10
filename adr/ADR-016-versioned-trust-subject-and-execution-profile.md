@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-07-12
 - Decision owners: Remote security / Verification / Evidence / Automation
-- Related: [CFR-164](../docs/development/code-review-issues/cfr-164.md), RVC-005, RVC-018, RVC-038, RVC-041, RVC-043, RVC-046, ADR-013, ADR-015
+- Related: CFR-164, RVC-005, RVC-018, RVC-038, RVC-041, RVC-043, RVC-046, ADR-013, ADR-015
 
 ## Context
 
