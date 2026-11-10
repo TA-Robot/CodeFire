@@ -25,13 +25,15 @@ Updated: 2026-11-10
 | 2 | 管理を作り直す | 開発管理の文書が本書・`issues.md`・`history.md`・ソース設計文書だけになる | 完了（2026-11-10） |
 | 3 | 最初の10分を通す | 初期化→変更→Fire検出→解消→検証→commit をRust CLIで通す自動テストがあり、CLIの出力だけでcommitまで到達できる（CFB-140） | 完了（2026-11-10） |
 | 4 | 架空プロジェクトで回す | Algorithm Lab をRust CLIへ取り込み直し、エージェントの変更を3回以上、手助けなしでsealできる | 完了（2026-11-10、4周）。以後も同じやり方で回し続ける |
-| 5 | 触った所から分割 | 段階4で改修した領域のファイルが3,000行以下 | `main.rs` は完了（12,866 → 2,334行）。残り: `codefire-core/src/lib.rs`（約6,100行） |
+| 5 | 触った所から分割 | 段階4で改修した領域のファイルが3,000行以下 | 完了（2026-11-10）。`codefire-cli/src/main.rs` 12,866 → 2,334行、`codefire-core/src/lib.rs` 6,092 → 2,480行 |
 
-段階4の作業:
+## これから
 
-- 済: `subprojects/algorithm-evolution-agent-lab` を `import` でRust CLIの管理下に入れた（`.codefire/` はgit管理外。新しい環境では `import` からやり直す）。
-- エージェントに機能追加・仕様変更をさせ、CodeFireを通してsealさせる。詰まった所を `issues.md` に起こして直す。
-- 試用には release build（`cargo build --release --locked -p codefire-cli` → `target/release/codefire-rs`）を使う。Algorithm Lab での実測: status 0.3秒 / scan 0.5秒 / verify 2.7秒（debug build は 2.5秒 / 3.5秒 / 10秒）。
+段階1–5は完了した。以後は「進め方」の繰り返しだけを続ける。
+
+- Algorithm Lab での試用を続ける（release build: `cargo build --release --locked -p codefire-cli` → `target/release/codefire-rs`）。新しい環境では `.codefire/` がないので `import` からやり直す。
+- 試用で詰まった所を `issues.md` に起こし、上から直す。
+- 3,000行を超えるファイルのうち凍結範囲外のもの（`codefire-store/src/lib.rs` 約20,500行、`codefire-cli/src/tests.rs` 約13,100行）は、改修で触るときに分割する。
 
 ## 凍結している範囲
 
