@@ -31,7 +31,7 @@ No machine may infer a stronger claim than its inputs. In particular, an automat
 
 ## CLI Module Ownership
 
-`main.rs` owns top-level dispatch and workflows that have not yet moved behind focused modules. New responsibilities belong in a module unless coupling to the orchestration transaction is essential.
+`main.rs` owns top-level dispatch (`run`) and a few shared helpers (repository lookup, branch records, initial repository layout). New responsibilities belong in a module unless coupling to the orchestration transaction is essential.
 
 | Module | Stable responsibility |
 |---|---|
@@ -39,43 +39,60 @@ No machine may infer a stronger claim than its inputs. In particular, an automat
 | `assessment_subject` | canonical live-open and sealed-pair assessment identities shared by context, explain, verification, review, and certificates. | <!-- module: assessment_subject -->
 | `automation` | `codefire.command_result.v1`, diagnostics, bounded `next_actions`, optional `codefire.action_execution.v1` on admitted local-loop actions, state/scan/verification JSON. | <!-- module: automation -->
 | `batch` | extinguish batch parsing, validation, planning, rendering, and shared active-ledger reducer integration. | <!-- module: batch -->
+| `branch_lifecycle` | `clone`, `open`, and `close` of branches: target resolution, operation plans, and the open-clean refresh used before branch operations. | <!-- module: branch_lifecycle -->
+| `branch_list` | budgeted local branch listing, its terminal-reason mapping, and the size-accounted wire encoding. | <!-- module: branch_list -->
 | `branch_refs` | pinned `.codefire`/branch/opened directory capabilities, membership/document capture, retained-byte ownership, and final subject revalidation for local branch listing. | <!-- module: branch_refs -->
+| `cli_args` | argument parsing for the commands dispatched from `main.rs`; no filesystem behavior beyond the current directory. | <!-- module: cli_args -->
+| `cli_error` | `CliError`, its exit codes, `Display`, `From` conversions, and core/store/resource-budget diagnostics. | <!-- module: cli_error -->
 | `cli_model` | shared command option/result types and the `OpenContextAuthority` proof carrier; no filesystem behavior. | <!-- module: cli_model -->
+| `cli_output` | text and JSON rendering shared by command handlers: status, scan, branch show/list data, error envelopes, and error `next_actions`. | <!-- module: cli_output -->
 | `close_transaction` | durable close/discard evidence, phase validation, deterministic quarantine recovery, and ordered multi-record publication. | <!-- module: close_transaction -->
 | `close_worktree` | capability-bound close/discard marker validation, exact-marker removal, and quarantined no-follow worktree deletion. | <!-- module: close_worktree -->
-| `command_registry` | declared public command capabilities used by help/completion/metrics/capability output, including optional per-command `data_schema` for `branch` and `show`. | <!-- module: command_registry -->
-| `compatibility` | one generated support manifest for readable/writable format versions, public schemas, runtime roles, and unknown-version/extension decisions. Public schema IDs include command-data `codefire.branch_list.v1` and `codefire.show_result.v1`. | <!-- module: compatibility -->
-| `commit_active_reset` | byte-snapshot authority, ordered progress, preflight, and idempotent roll-forward for post-commit active-state reset. | <!-- module: commit_active_reset -->
 | `command_execution` | streaming bounded child output, explicit environment profiles, timeout, and platform-reported process-tree termination. | <!-- module: command_execution -->
+| `command_registry` | declared public command capabilities used by help/completion/metrics/capability output, including optional per-command `data_schema` for `branch` and `show`. | <!-- module: command_registry -->
+| `commit` | `commit`: decision, operation plan, the journaled commit transaction with recovery, idempotency records, and commit materialization. | <!-- module: commit -->
+| `commit_active_reset` | byte-snapshot authority, ordered progress, preflight, and idempotent roll-forward for post-commit active-state reset. | <!-- module: commit_active_reset -->
+| `compatibility` | one generated support manifest for readable/writable format versions, public schemas, runtime roles, and unknown-version/extension decisions. Public schema IDs include command-data `codefire.branch_list.v1` and `codefire.show_result.v1`. | <!-- module: compatibility -->
 | `completion` | top-level help and shell completion rendering. | <!-- module: completion -->
 | `context` | bounded read-only automation context packs. | <!-- module: context -->
 | `doctor` | read-only repository diagnosis using shared open-snapshot and active-transaction validators. The request ledger starts before collection; `DoctorIssueCollection` accounts repository-layout, object-scan, transaction-marker, and malformed/missing-field opened-entry issue destinations across Store validation. Object scanning reuses the pinned Store subject/cache and publishes exact kind/message/path/slot ownership through a consuming work view; scanner sources and failed cache seeds drop before their scalars. Opened-entry issue payloads and the residual Vec slot are likewise reserved before materialization through the Store provisional ledger. `branch_heads::DoctorBranchSnapshot` owns sorted branch membership, bounded no-follow candidate reads, shared-session validation, and the final file/root fence. `opened_registry::DoctorOpenedRegistrySnapshot` owns recursive candidate membership, no-follow directory capabilities, absolute-open scratch, single-link evidence, bounded raw JSON, and parsed JSON `Value` through the post-Store membership/content fence on that same ledger. Parse cleanup and upper-level finish/abort keep the snapshot and ledger retry owner attached after cleanup failure. Marker authority and legacy issue order remain stable. Open-summary evidence work, active transactions, extracted opened fields, later diagnostics, active-state, and JSON collectors remain residuals. | <!-- module: doctor -->
 | `evidence` | evidence/artifact capture, batch validation, and result rendering. | <!-- module: evidence -->
 | `exit_code` | stable error-to-exit classification. | <!-- module: exit_code -->
 | `explain` | read-only explanation of Fire/Atom/verification/storage targets. | <!-- module: explain -->
+| `extinguish` | single-fire `extinguish` and `--refresh`: resolution recording through the active-ledger reducer, evidence-ref validation, and idempotency. | <!-- module: extinguish -->
 | `extinguish_ux` | interactive and recent-evidence input assistance. | <!-- module: extinguish_ux -->
 | `fire` | manual/batch Fire validation and plan/apply behavior; its `active_ledger_transaction` child owns bounded Fire/Resolution postimage staging and replay. | <!-- module: fire -->
+| `help` | per-command help text and help-flag detection. | <!-- module: help -->
 | `http` | HTTP client/server framing, ledger-bound parsed-body ownership, route dispatch, bounded pre-header JSON encoding, typed 413 transport, size/time/concurrency boundaries. | <!-- module: http -->
 | `http_tls` | TLS transport configuration and key/certificate loading. | <!-- module: http_tls -->
 | `idempotency` | common idempotency record identity/conflict helpers. | <!-- module: idempotency -->
 | `import_workflow` | importing an existing directory into a new native open branch. | <!-- module: import_workflow -->
+| `json_files` | bounded reads and atomic writes of repository and active-state JSON files. | <!-- module: json_files -->
 | `limited_yaml` | intentionally bounded YAML-like scalar/key parsing shared by batch inputs. | <!-- module: limited_yaml -->
 | `link_batch` | Trace Link batch parsing, full validation, plan, and apply. | <!-- module: link_batch -->
+| `local_commands` | command handlers for the local loop: `scan`, `verify`, `fire`, `extinguish`, `commit`. | <!-- module: local_commands -->
+| `manifest` | content manifest construction, fingerprints, changes since base, and safe relative manifest paths. | <!-- module: manifest -->
+| `merge` | `merge`: common-ancestor search, line-level and whole-file planning, applying the result, conflict content, and merge reporting. | <!-- module: merge -->
 | `merge_patch_idempotency` | merge and patch-import replay/conflict records. | <!-- module: merge_patch_idempotency -->
 | `merge_resolution` | strict active merge metadata decoding, typed unresolved-conflict projection, and locked `merge --continue` validation/apply/render flow. | <!-- module: merge_resolution -->
 | `metrics` | phase/counter values and attachment under `data.metrics`. | <!-- module: metrics -->
 | `migration` | compatibility inspection, typed layout planning, and locked capability-relative application of registered auto-create directories. | <!-- module: migration -->
 | `open_clone_idempotency` | open/clone replay and conflict records. | <!-- module: open_clone_idempotency -->
+| `open_context` | locating the repository and the open directory a command runs in, and loading its verified open context. | <!-- module: open_context -->
 | `open_snapshot` | one typed repository/marker/branch/opened/active authority check, documented pending-window classification, and field-level divergence. | <!-- module: open_snapshot -->
 | `open_transaction` | durable open evidence, exact-or-create artifact publication, phase recovery, and transaction archive/retirement. | <!-- module: open_transaction -->
 | `pagination` | bounded `codefire.page.v1` metadata and collection/snapshot-bound `codefire.page_cursor.v1` encoding/validation. | <!-- module: pagination -->
 | `remote` | file/HTTP remote models, strict authority components, descriptor-backed project bootstrap, ordered project gates, object transfer, and merge-request operations. | <!-- module: remote -->
 | `repo_layout` | required versus auto-created repository directories shared by doctor/migrate. | <!-- module: repo_layout -->
-| `secure_worktree` | capability-relative, no-follow sibling staging, abandoned-stage cleanup, and single-rename open-target publication below a pinned workspace boundary. | <!-- module: secure_worktree -->
+| `repo_lock` | `RepoLock`, lock-owner publication, and locked open-context acquisition. | <!-- module: repo_lock -->
+| `scan_verify` | scan and verify computation, verification command execution, and persistence of the verification result state. | <!-- module: scan_verify -->
 | `secret_redaction` | secret-like command/argv/output and sensitive local-path redaction before evidence or diagnostic serialization. | <!-- module: secret_redaction -->
+| `secure_worktree` | capability-relative, no-follow sibling staging, abandoned-stage cleanup, and single-rename open-target publication below a pinned workspace boundary. | <!-- module: secure_worktree -->
 | `signatures` | commit/request signing, verification, key lifecycle, nonce/replay policy. | <!-- module: signatures -->
 | `stable_lock` | persistent no-follow kernel-backed shared/exclusive locks, one operation deadline, and bounded atomic owner diagnostics. | <!-- module: stable_lock -->
+| `state_transaction` | journaled publication of open-directory state for scan, verify, and active-ledger transitions. | <!-- module: state_transaction -->
 | `storage` | bounded local/remote storage report and warnings. | <!-- module: storage -->
+| `test_hooks` | failure-injection hooks and their state for tests; no-ops in normal builds. | <!-- module: test_hooks -->
 | `tests` | CLI-wide regression module compiled only for tests; focused module tests should stay near their owners. | <!-- module: tests -->
 | `verification` | verify argument parsing plus text rendering of a core `Verification`. | <!-- module: verification -->
 | `view` | show/diff/review-pack/patch views, algorithms, bounded payload handling. `show --json` keeps the certificate result string and adds `claim` by projecting persisted certificate result/profile/phase and subject kind/trust_kind/immutable when present. | <!-- module: view -->
