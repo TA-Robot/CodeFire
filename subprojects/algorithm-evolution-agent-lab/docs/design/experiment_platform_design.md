@@ -2262,9 +2262,10 @@ The runner remains read-only. It does not infer repository roots, render Markdow
 
 The planner:
 
-- validates that the maximum run count is a positive integer
+- validates that the maximum run count is a positive integer, otherwise raising ValueError with the message `max_runs must be an integer of at least 1`
 - validates that every seed is an integer (booleans are rejected)
 - rejects a negative seed with ValueError
+- rejects a seed greater than the optional `max_seed` keyword argument (default `None`, meaning no upper bound) with ValueError
 - rejects a duplicate seed with ValueError naming the duplicated seed
 - truncates the validated seeds to the maximum run count
 - returns a copy of the base configuration plus a `seed` entry for each run
@@ -2272,3 +2273,9 @@ The planner:
 `SeedSweepPlanner.from_range(start, count)` is a class method that returns the consecutive seeds `start, start+1, ..., start+count-1`. It rejects a negative `start` or a `count` that is not a positive integer (booleans are rejected) with ValueError.
 
 The planner is pure. It does not mutate the base configuration or execute runs.
+
+## DES-AUTO-155: Run labeler
+
+`RunLabeler` provides a single function, `format_run_label(experiment, seed)`, that returns `f"{experiment}-seed{seed:04d}"`.
+
+The function is pure. It does not validate its inputs, touch the filesystem, or mutate state.

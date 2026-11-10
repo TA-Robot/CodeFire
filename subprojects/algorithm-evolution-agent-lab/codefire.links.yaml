@@ -1974,3 +1974,12 @@ links:
   - from: REQ-AUTO-172
     to: TEST-seed-sweep-planner-dedups-and-truncates
     type: verified_by
+  - from: REQ-AUTO-173
+    to: DES-AUTO-155
+    type: refined_by
+  - from: DES-AUTO-155
+    to: CODE-RunLabeler
+    type: implemented_by
+  - from: REQ-AUTO-173
+    to: TEST-run-labeler-formats-label
+    type: verified_by

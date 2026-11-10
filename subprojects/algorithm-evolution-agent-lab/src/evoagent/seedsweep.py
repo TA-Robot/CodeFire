@@ -18,15 +18,19 @@ class SeedSweepPlanner:
         base_config: dict[str, Any],
         seeds: list[int],
         max_runs: int,
+        *,
+        max_seed: int | None = None,
     ) -> list[dict[str, Any]]:
         if isinstance(max_runs, bool) or not isinstance(max_runs, int) or max_runs <= 0:
-            raise ValueError("max_runs must be a positive integer")
+            raise ValueError("max_runs must be an integer of at least 1")
         unique: list[int] = []
         for seed in seeds:
             if isinstance(seed, bool) or not isinstance(seed, int):
                 raise ValueError("seeds must be integers")
             if seed < 0:
                 raise ValueError(f"seed must be non-negative: {seed}")
+            if max_seed is not None and seed > max_seed:
+                raise ValueError(f"seed exceeds max_seed {max_seed}: {seed}")
             if seed in unique:
                 raise ValueError(f"duplicate seed: {seed}")
             unique.append(seed)

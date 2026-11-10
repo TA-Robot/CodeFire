@@ -20,14 +20,22 @@ class SeedSweepPlannerTests(unittest.TestCase):
         self.assertNotIn("1", str(ctx.exception))
 
     def test_seed_sweep_planner_rejects_bad_input(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as ctx:
             SeedSweepPlanner().plan({}, [1], 0)
+        self.assertEqual(str(ctx.exception), "max_runs must be an integer of at least 1")
         with self.assertRaises(ValueError):
             SeedSweepPlanner().plan({}, [1, "2"], 2)
 
     def test_seed_sweep_planner_rejects_negative_seed(self):
         with self.assertRaises(ValueError):
             SeedSweepPlanner().plan({}, [1, -2], 2)
+
+    def test_seed_sweep_planner_max_seed(self):
+        planner = SeedSweepPlanner()
+        self.assertEqual(planner.plan({}, [1, 5], 2, max_seed=5), [{"seed": 1}, {"seed": 5}])
+        self.assertEqual(planner.plan({}, [1, 99], 2), [{"seed": 1}, {"seed": 99}])
+        with self.assertRaises(ValueError):
+            planner.plan({}, [1, 6], 2, max_seed=5)
 
     def test_seed_sweep_planner_builds_range(self):
         self.assertEqual(SeedSweepPlanner.from_range(5, 3), [5, 6, 7])
