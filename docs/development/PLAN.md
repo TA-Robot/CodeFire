@@ -23,15 +23,15 @@ Updated: 2026-11-10
 |---|---|---|---|
 | 1 | 土台を固定 | `scripts/check.sh` 1本で整形・lint・全テストが再現できる | 完了（2026-11-10） |
 | 2 | 管理を作り直す | 開発管理の文書が本書・`issues.md`・`history.md`・ソース設計文書だけになる | 完了（2026-11-10） |
-| 3 | 最初の10分を通す | 初期化→変更→Fire検出→解消→検証→commit をRust CLIで通す自動テストがあり、CLIの出力だけでcommitまで到達できる（CFB-140） | 次 |
-| 4 | 架空プロジェクトで回す | Algorithm Lab をRust CLIへ取り込み直し、エージェントの変更を3回以上、手助けなしでsealできる | 未着手 |
+| 3 | 最初の10分を通す | 初期化→変更→Fire検出→解消→検証→commit をRust CLIで通す自動テストがあり、CLIの出力だけでcommitまで到達できる（CFB-140） | 完了（2026-11-10） |
+| 4 | 架空プロジェクトで回す | Algorithm Lab をRust CLIへ取り込み直し、エージェントの変更を3回以上、手助けなしでsealできる | 次 |
 | 5 | 触った所から分割 | 段階4で改修した領域のファイルが3,000行以下 | 未着手 |
 
-段階3の作業:
+段階4の作業:
 
-- `demo.sh` をRust CLIで完走させる（現状 `open main <repo>/main` が repository root との重なりで失敗する）。
-- CFB-140: stale resolution の診断と `next_actions` に fire ID を出す。
-- 上の流れを `scripts/check.sh` から実行する。
+- SECRET-FP を直す（`issues.md`）。
+- `subprojects/algorithm-evolution-agent-lab` を `import` でRust CLIの管理下に入れる。
+- エージェントに機能追加・仕様変更をさせ、CodeFireを通してsealさせる。詰まった所を `issues.md` に起こして直す。
 
 ## 凍結している範囲
 
