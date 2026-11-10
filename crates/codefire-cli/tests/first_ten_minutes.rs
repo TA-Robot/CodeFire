@@ -254,3 +254,117 @@ fn extinguish_help_documents_refresh() {
     );
     assert!(text.contains("[--refresh]"), "{text}");
 }
+
+#[test]
+fn failed_check_details_show_exit_code_and_the_end_of_the_output() {
+    let root = tempdir().unwrap();
+    let repo = root.path().join("repo");
+    let open_dir = root.path().join("main");
+    success(root.path(), &["init", repo.to_str().unwrap()]);
+    success(&repo, &["open", "main", open_dir.to_str().unwrap()]);
+    write_project(
+        &open_dir,
+        30,
+        "echo first-line && echo cause-of-failure && exit 3",
+    );
+    drain_actions(
+        &open_dir,
+        &["scan", "--json"],
+        "extinguish_fire",
+        "initial import",
+    );
+
+    let output = run(&open_dir, &["verify", "--details"]);
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(!output.status.success(), "{text}");
+    for expected in ["files-present:", "exit code 3", "| cause-of-failure"] {
+        assert!(text.contains(expected), "missing {expected:?} in:\n{text}");
+    }
+}
+
+#[test]
+fn rejected_open_targets_say_where_an_open_directory_belongs() {
+    let root = tempdir().unwrap();
+    let repo = root.path().join("repo");
+    success(root.path(), &["init", repo.to_str().unwrap()]);
+
+    let inside = run(
+        &repo,
+        &["open", "main", repo.join("main").to_str().unwrap()],
+    );
+    let text = String::from_utf8_lossy(&inside.stderr);
+    assert!(!inside.status.success());
+    let suggestion = root.path().canonicalize().unwrap().join("main");
+    assert!(
+        text.contains("outside the repository root") && text.contains(suggestion.to_str().unwrap()),
+        "{text}"
+    );
+
+    let parent = run(&repo, &["open", "main", "../main"]);
+    let text = String::from_utf8_lossy(&parent.stderr);
+    assert!(!parent.status.success());
+    assert!(text.contains("use an absolute path without '..'"), "{text}");
+
+    // The suggested directory is accepted as given.
+    success(&repo, &["open", "main", suggestion.to_str().unwrap()]);
+}
+
+#[test]
+fn status_points_at_scan_when_files_changed_since_the_last_scan() {
+    let root = tempdir().unwrap();
+    let repo = root.path().join("repo");
+    let open_dir = root.path().join("main");
+    success(root.path(), &["init", repo.to_str().unwrap()]);
+    success(&repo, &["open", "main", open_dir.to_str().unwrap()]);
+
+    let clean = String::from_utf8_lossy(&success(&open_dir, &["status"]).stdout).into_owned();
+    assert!(!clean.contains("Unscanned changes"), "{clean}");
+
+    write_project(&open_dir, 30, "test -f src/auth.py");
+    let edited = String::from_utf8_lossy(&success(&open_dir, &["status"]).stdout).into_owned();
+    assert!(
+        edited.contains("Unscanned changes") && edited.contains("codefire scan"),
+        "{edited}"
+    );
+
+    success(&open_dir, &["scan"]);
+    let scanned = String::from_utf8_lossy(&success(&open_dir, &["status"]).stdout).into_owned();
+    assert!(!scanned.contains("Unscanned changes"), "{scanned}");
+}
+
+#[test]
+fn batch_template_keeps_the_rationale_given_on_the_command_line() {
+    let root = tempdir().unwrap();
+    let repo = root.path().join("repo");
+    let open_dir = root.path().join("main");
+    success(root.path(), &["init", repo.to_str().unwrap()]);
+    success(&repo, &["open", "main", open_dir.to_str().unwrap()]);
+    write_project(&open_dir, 30, "test -f src/auth.py");
+
+    let batch = root.path().join("batch.json");
+    success(
+        &open_dir,
+        &[
+            "extinguish",
+            "--batch-template",
+            "--rationale",
+            "initial import",
+            "--output",
+            batch.to_str().unwrap(),
+        ],
+    );
+    let template: Value = serde_json::from_slice(&fs::read(&batch).unwrap()).unwrap();
+    assert_eq!(template["defaults"]["rationale"], "initial import");
+    let fires = template["fires"].as_array().unwrap();
+    assert!(!fires.is_empty());
+    assert!(
+        fires.iter().all(|fire| fire.get("rationale").is_none()),
+        "per-fire placeholders must not override the given rationale: {template}"
+    );
+
+    success(
+        &open_dir,
+        &["extinguish", "--batch", batch.to_str().unwrap()],
+    );
+    success(&open_dir, &["verify"]);
+}

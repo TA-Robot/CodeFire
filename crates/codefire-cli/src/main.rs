@@ -1044,7 +1044,15 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     ))?
                 );
             } else {
+                let data = status_data_json_with_prediction(
+                    &status,
+                    &options.path,
+                    &mut validation_cache,
+                );
                 print_status(&status);
+                if let Some(line) = unscanned_changes_line(&status, &data) {
+                    println!("{line}");
+                }
                 if let Some(metrics) = metrics.as_ref() {
                     print_metrics(metrics);
                 }
@@ -2702,6 +2710,22 @@ fn print_status(status: &Status) {
     println!("State: {}", status.state);
     println!("Base: {}", status.base);
     println!("Open fires: {}", status.open_fires);
+}
+
+/// `status` reports the last recorded state. When the working files have
+/// moved past it, say so and name the command that records the change.
+fn unscanned_changes_line(status: &Status, data: &Value) -> Option<String> {
+    let prediction = data.get("scan_prediction")?;
+    let predicted_state = prediction.get("branch_state")?.as_str()?;
+    if predicted_state == status.state {
+        return None;
+    }
+    let count = |field: &str| prediction.get(field).and_then(Value::as_u64).unwrap_or(0);
+    Some(format!(
+        "Unscanned changes: {} changed item(s), {} fire(s) expected; run `codefire scan`",
+        count("changed_count"),
+        count("open_fire_count")
+    ))
 }
 
 fn status_data_json_with_prediction(
@@ -6165,10 +6189,11 @@ fn resolve_open_target(
             &boundary,
             "repository_overlap",
             format!(
-                "open target must not overlap repository root {}: requested {}, resolved {}",
+                "open target must not overlap repository root {}: requested {}, resolved {}; choose a directory outside the repository root, for example {}",
                 repo_root.display(),
                 requested.display(),
-                target.display()
+                target.display(),
+                suggested_open_dir(repo_root, &boundary, requested_branch).display()
             ),
         ));
     }
@@ -6237,6 +6262,17 @@ fn open_target_resolution_error(
     }))
 }
 
+/// A directory beside the repository root to suggest after a rejected target.
+fn suggested_open_dir(repo_root: &Path, boundary: &Path, branch: &str) -> PathBuf {
+    let leaf = branch.replace('/', "-");
+    let candidate = boundary.join(&leaf);
+    if candidate.starts_with(repo_root) || repo_root.starts_with(&candidate) {
+        boundary.join(format!("{leaf}-open"))
+    } else {
+        candidate
+    }
+}
+
 fn resolve_path_without_symlinks(path: &Path) -> Result<PathBuf, CliError> {
     let absolute = absolute_path(path)?;
     if absolute
@@ -6244,7 +6280,7 @@ fn resolve_path_without_symlinks(path: &Path) -> Result<PathBuf, CliError> {
         .any(|component| component == Component::ParentDir)
     {
         return Err(CliError::Usage(format!(
-            "path traversal with '..' is not allowed for open targets: {}",
+            "path traversal with '..' is not allowed for open targets: {}; use an absolute path without '..' (open directories live beside the repository root, not inside it)",
             path.display()
         )));
     }

@@ -304,13 +304,23 @@ pub(super) fn run_batch_template(
         ));
     }
     let defaults = batch_template_defaults(options);
+    // A rationale or evidence given on the command line applies to every
+    // fire through `defaults`. Only without one does each entry get a
+    // placeholder for the author to replace.
+    let has_default_basis = options.rationale.is_some()
+        || options.evidence.is_some()
+        || !options.evidence_refs.is_empty();
     let fires = open_fires
         .iter()
         .map(|fire| {
-            json!({
-                "id": &fire.display_id,
-                "rationale": format!("reviewed {} -> {}", fire.source.atom_id, fire.target.atom_id),
-            })
+            if has_default_basis {
+                json!({"id": &fire.display_id})
+            } else {
+                json!({
+                    "id": &fire.display_id,
+                    "rationale": format!("reviewed {} -> {}", fire.source.atom_id, fire.target.atom_id),
+                })
+            }
         })
         .collect::<Vec<_>>();
     let template_value = json!({

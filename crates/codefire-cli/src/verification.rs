@@ -209,6 +209,7 @@ fn render_blocking_verification_details(
         for item in verification.unresolved_merge_conflicts.iter().take(5) {
             output.push_str(&format!("  {}: {}\n", item.kind.as_str(), item.subject));
         }
+        push_omitted_note(verification.unresolved_merge_conflicts.len(), output);
     }
     if (!blocking_only
         || decision.is_blocking(codefire_core::CommittableReason::MissingRequiredLinks))
@@ -222,6 +223,7 @@ fn render_blocking_verification_details(
             ));
             output.push('\n');
         }
+        push_omitted_note(verification.missing_required_links.len(), output);
     }
     if !verification.stale_resolutions.is_empty() {
         output.push_str("Stale resolution details:\n");
@@ -251,20 +253,63 @@ fn render_blocking_verification_details(
                 item.resolution_uid, item.evidence_id
             ));
         }
+        push_omitted_note(verification.missing_evidence_refs.len(), output);
     }
     if !verification.duplicate_atom_ids.is_empty() {
         output.push_str("Duplicate Atom ID details:\n");
         for atom_id in verification.duplicate_atom_ids.iter().take(5) {
             output.push_str(&format!("  {atom_id}\n"));
         }
+        push_omitted_note(verification.duplicate_atom_ids.len(), output);
     }
     if !verification.failed_checks.is_empty() {
         output.push_str("Failed check details:\n");
         for item in verification.failed_checks.iter().take(5) {
-            let summary = item.output.trim().lines().next().unwrap_or_default();
-            output.push_str(&format!("  {}: {} {}\n", item.id, item.command, summary));
+            output.push_str(&failed_check_block(verification, item));
         }
+        push_omitted_note(verification.failed_checks.len(), output);
     }
+}
+
+/// Lists above show at most five entries; say how many were left out.
+fn push_omitted_note(total: usize, output: &mut String) {
+    let hidden = total.saturating_sub(5);
+    if hidden > 0 {
+        output.push_str(&format!("  ... and {hidden} more (use --json for all)\n"));
+    }
+}
+
+/// A failing test run reports its cause at the end of its output.
+const FAILED_CHECK_TAIL_LINES: usize = 20;
+
+fn failed_check_block(
+    verification: &codefire_core::Verification,
+    item: &codefire_core::FailedCheck,
+) -> String {
+    let mut block = format!("  {}: {}\n", item.id, item.command);
+    if let Some(record) = verification
+        .execution
+        .iter()
+        .find(|record| record.id == item.id)
+    {
+        let status = match record.exit_code {
+            _ if record.timed_out => format!("timed out after {}ms", record.timeout_ms),
+            Some(code) => format!("exit code {code}"),
+            None => "terminated without an exit code".to_string(),
+        };
+        block.push_str(&format!("    {status}\n"));
+    }
+    let lines = item.output.trim().lines().collect::<Vec<_>>();
+    let hidden = lines.len().saturating_sub(FAILED_CHECK_TAIL_LINES);
+    if hidden > 0 {
+        block.push_str(&format!(
+            "    ... {hidden} earlier line(s) omitted (use --json for the stored output)\n"
+        ));
+    }
+    for line in &lines[hidden..] {
+        block.push_str(&format!("    | {line}\n"));
+    }
+    block
 }
 
 /// Every listed entry names the fire to refresh, so the cap is generous.

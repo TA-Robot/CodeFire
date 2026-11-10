@@ -197,7 +197,7 @@ impl PinnedTargetResolution {
                     return Err(io::Error::new(
                         io::ErrorKind::PermissionDenied,
                         format!(
-                            "path traversal with '..' is not allowed for open targets: {}",
+                            "path traversal with '..' is not allowed for open targets: {}; use an absolute path without '..' (open directories live beside the repository root, not inside it)",
                             requested.display()
                         ),
                     ))
