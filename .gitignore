@@ -29,3 +29,5 @@ docs/development/ai/audit-latest.md
 .codefire-server/
 
 .DS_Store
+.codefire-import-transaction.json
+.codefire-import.lock

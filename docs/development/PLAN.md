@@ -29,8 +29,7 @@ Updated: 2026-11-10
 
 段階4の作業:
 
-- SECRET-FP を直す（`issues.md`）。
-- `subprojects/algorithm-evolution-agent-lab` を `import` でRust CLIの管理下に入れる。
+- 済: `subprojects/algorithm-evolution-agent-lab` を `import` でRust CLIの管理下に入れた（`.codefire/` はgit管理外。新しい環境では `import` からやり直す）。
 - エージェントに機能追加・仕様変更をさせ、CodeFireを通してsealさせる。詰まった所を `issues.md` に起こして直す。
 
 ## 凍結している範囲

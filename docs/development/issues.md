@@ -4,10 +4,10 @@
 
 | ID | 概要 | 優先 | 扱い |
 |---|---|---|---|
-| SECRET-FP | 検証コマンドに `_auth`・`_key`・`_token` などで終わる単語（例 `tests.test_auth`）があると「secret-like inline metadata」として拒否される | 中 | 段階4の前に直す |
 | CHECK-OUTPUT | `verify --details` が失敗した検証コマンドの出力を先頭1行しか出さず、exit codeも出さない | 中 | 段階4で詰まったら |
 | OPEN-PATH | `open <branch> ../dir` を相対パスの `..` として拒否し、置き場所の決まり（repositoryの外・同じ親の下）を案内しない | 中 | 段階4で詰まったら |
 | STALE-BULK | stale resolution をまとめて更新する手段がない（1件ずつ `extinguish --refresh`） | 低 | 件数が多くて詰まったら |
+| IMPORT-RESIDUE | `import` 成功後も `.codefire-import-transaction.json` と `.codefire-import.lock` がopen directoryに残る。意図した記録か未整理かを確認する | 低 | 段階4で詰まったら |
 | [CFB-136](issues/cfb-136.md) | command cache が同一inodeのobject書換えを検証済みとして再利用する | 中 | 現HEADで再現してから判断 |
 | [CFR-169](issues/cfr-169.md) | lifecycle/object/test の責務が巨大moduleに残る | 中 | 段階5 |
 | [CFR-170](issues/cfr-170.md) | next action が全commandで実行可能な形になっていない | 中 | 段階4で詰まったら |
