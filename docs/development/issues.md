@@ -6,6 +6,9 @@
 |---|---|---|---|
 | STALE-BULK | stale resolution をまとめて更新する手順が案内されない（batch は `refresh` 項目を受け付けるが、template は open fire がないと作れない） | 低 | 件数が多くて詰まったら |
 | VERIFY-WORDING | `Change coverage` 行の語（unclassified spans、file_only_no_span_claim）が利用者に読めない | 低 | 次の周で詰まったら |
+| STATUS-STALE | `status` は stale resolution を示さない（`scan`・`verify`・`commit` は示す）。未scanの変更があっても `State: open-clean` の行はそのまま | 低 | 次の周で詰まったら |
+| NO-PROGRESS | `verify`・`commit` が検証コマンドの実行中に何も表示しない | 低 | 次の周で詰まったら |
+| METHOD-ATOMS | `scan` が `CODE:path::method:...` 形式の自動Atomを説明なしで並べる。Atom ID の名前と中身のずれ（例 dedups → rejects）は検出対象外 | 低 | 保留 |
 | IMPORT-RESIDUE | `import` 成功後も `.codefire-import-transaction.json` と `.codefire-import.lock` がopen directoryに残る。意図した記録か未整理かを確認する | 低 | 段階4で詰まったら |
 | [CFB-136](issues/cfb-136.md) | command cache が同一inodeのobject書換えを検証済みとして再利用する | 中 | 現HEADで再現してから判断 |
 | [CFR-169](issues/cfr-169.md) | lifecycle/object/test の責務が巨大moduleに残る | 中 | 段階5 |
