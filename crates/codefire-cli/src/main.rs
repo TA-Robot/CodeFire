@@ -2303,6 +2303,13 @@ fn run_scan_command(args: &[String]) -> Result<(), CliError> {
         );
     } else {
         print_scan(&scan);
+        let stale = stale_resolution_count(&options.path, &scan);
+        if stale > 0 {
+            println!(
+                "Stale resolutions: {stale} recorded resolution(s) no longer match the current files; \
+                 codefire verify lists them with the refresh command"
+            );
+        }
         if let Some(metrics) = metrics.as_ref() {
             print_metrics(metrics);
         }
@@ -2644,6 +2651,10 @@ fn run_commit_command(args: &[String]) -> Result<(), CliError> {
                 "commit blocked: verification failed with exit code {}",
                 result.exit_code.code()
             );
+            if let Some(report) = &result.blocked_report {
+                print!("{report}");
+            }
+            println!("Nothing was sealed. Clear the blocking checks above, then run commit again.");
         }
         return Err(CliError::CommandFailed(result.exit_code));
     }
@@ -2952,6 +2963,30 @@ fn branch_error_repo_root(args: &[String]) -> Option<PathBuf> {
         index += 1;
     }
     find_repo_root(&path).ok()
+}
+
+/// Resolutions that a later edit made stale. Best effort: scan output must
+/// not fail because the policy cannot be read; verify reports that properly.
+fn stale_resolution_count(path: &Path, scan: &codefire_core::ScanResult) -> usize {
+    let Ok(context) = open_context(path) else {
+        return 0;
+    };
+    let Ok(parsed_policy) = codefire_core::parse_effective_verification_policy(&context.open_dir)
+    else {
+        return 0;
+    };
+    let resolutions: Vec<codefire_core::Resolution> =
+        match read_active_json_optional(&context.active_state, Path::new("resolutions.json")) {
+            Ok(Some(value)) => serde_json::from_value(value).unwrap_or_default(),
+            _ => return 0,
+        };
+    codefire_core::stale_resolutions(
+        &scan.atom_index,
+        &scan.trace_graph,
+        &parsed_policy.policy,
+        &resolutions,
+    )
+    .map_or(0, |stale| stale.len())
 }
 
 fn print_scan(scan: &codefire_core::ScanResult) {
@@ -7307,6 +7342,7 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
             blocked: true,
             exit_code: verification_exit_code(&verification),
             plan,
+            blocked_report: Some(verification::render_verification(&verification, true, true)),
         });
     }
     if options.dry_run {
@@ -7319,6 +7355,7 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
             blocked: false,
             exit_code: ExitCode::Success,
             plan,
+            blocked_report: None,
         });
     }
 
@@ -7571,6 +7608,7 @@ fn run_commit(options: &CommitOptions) -> Result<CommitResult, CliError> {
         blocked: false,
         exit_code: ExitCode::Success,
         plan,
+        blocked_report: None,
     };
     if let Some(key) = options.idempotency_key.as_deref() {
         update_commit_transaction(
@@ -7629,6 +7667,7 @@ fn load_commit_idempotency(
         blocked: false,
         exit_code: ExitCode::Success,
         plan: idempotency_result_plan(&record, &path)?,
+        blocked_report: None,
     }))
 }
 
@@ -8696,6 +8735,7 @@ fn recover_commit_transaction(
         blocked: false,
         exit_code: ExitCode::Success,
         plan: operation_plan,
+        blocked_report: None,
     };
     if let Some(key) = marker_key.as_deref() {
         ensure_commit_idempotency(&context.repo_root, key, &marker_payload, &result)?;

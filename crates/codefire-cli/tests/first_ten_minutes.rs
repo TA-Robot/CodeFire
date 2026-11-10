@@ -214,6 +214,22 @@ fn new_user_reaches_sealed_commits_using_only_cli_output() {
         "text details must name the fire and the refresh command:\n{details}"
     );
 
+    // The refusal names the fire without asking for a second command, on
+    // every path a user may take from here.
+    let plain = success_or_code(&open_dir, &["verify"], EXIT_STALE_RESOLUTION);
+    assert!(plain.contains(first_fire), "{plain}");
+    let blocked = success_or_code(
+        &open_dir,
+        &["commit", "-m", "too early"],
+        EXIT_STALE_RESOLUTION,
+    );
+    assert!(
+        blocked.contains(first_fire) && blocked.contains("Nothing was sealed"),
+        "{blocked}"
+    );
+    let scan = String::from_utf8_lossy(&success(&open_dir, &["scan"]).stdout).into_owned();
+    assert!(scan.contains("Stale resolutions:"), "{scan}");
+
     let refreshed = drain_actions(
         &open_dir,
         &["verify", "--json"],

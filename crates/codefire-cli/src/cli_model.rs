@@ -127,6 +127,8 @@ pub(crate) struct CommitResult {
     pub(crate) blocked: bool,
     pub(crate) exit_code: ExitCode,
     pub(crate) plan: Value,
+    /// Human-readable reasons when `blocked` is true.
+    pub(crate) blocked_report: Option<String>,
 }
 
 #[derive(Debug)]

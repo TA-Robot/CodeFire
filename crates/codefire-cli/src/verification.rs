@@ -186,6 +186,9 @@ pub(crate) fn render_verification(
             output.push_str("Detail filter: blocking-only\n");
         }
         render_blocking_verification_details(verification, blocking_only, &mut output);
+    } else if !decision.is_committable() {
+        // A refusal must name what blocks without a second command.
+        render_blocking_verification_details(verification, true, &mut output);
     }
     output
 }
