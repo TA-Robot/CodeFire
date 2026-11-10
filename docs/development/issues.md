@@ -4,7 +4,6 @@
 
 | ID | 概要 | 優先 | 扱い |
 |---|---|---|---|
-| MERGE-GUIDANCE | conflict 後の `merge`・`verify`・`explain` が marker の存在、対象ファイル、`merge --continue` を案内しない。conflict 領域にAtomが含まれて二重になると exit 21 の別エラーになる | 高 | 次に直す |
 | STALE-BULK | stale resolution をまとめて更新する手順が案内されない（batch は `refresh` 項目を受け付けるが、template は open fire がないと作れない） | 低 | 件数が多くて詰まったら |
 | VERIFY-WORDING | `Change coverage` 行の語（unclassified spans、file_only_no_span_claim）が利用者に読めない | 低 | 次の周で詰まったら |
 | STATUS-STATE | 未scanの変更があっても `status` の `State: open-clean` 行はそのまま（下に案内行は出る） | 低 | 保留 |
