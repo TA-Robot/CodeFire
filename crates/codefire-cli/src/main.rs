@@ -1053,6 +1053,14 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 if let Some(line) = unscanned_changes_line(&status, &data) {
                     println!("{line}");
                 }
+                let stale = data["scan_prediction"]["stale_resolution_count"]
+                    .as_u64()
+                    .unwrap_or(0);
+                if stale > 0 {
+                    println!(
+                        "Stale resolutions: {stale}; run `codefire verify` to list them with the refresh command"
+                    );
+                }
                 if let Some(metrics) = metrics.as_ref() {
                     print_metrics(metrics);
                 }
@@ -2749,6 +2757,7 @@ fn status_data_json_with_prediction(
         let scan = scan_execution.scan;
         data["scan_prediction"] = json!({
             "source": "preview_recomputed",
+            "stale_resolution_count": stale_resolution_count(path, &scan),
             "branch_state": scan_branch_state(scan_change_count(&scan), scan.open_fires.len()),
             "changed_count": scan_change_count(&scan),
             "changed_atom_count": scan.changed_atoms.len(),
@@ -9474,6 +9483,9 @@ fn run_verification_commands(
             "max_output_bytes": check.max_output_bytes,
             "allow_failure": check.allow_failure,
         }))?;
+        // Checks can run for a long time; say which one is running. This goes
+        // to stderr so text and JSON results on stdout stay unchanged.
+        eprintln!("codefire: running check '{}' ...", check.id);
         let output =
             command_execution::run_bounded_command(&command_execution::CommandExecutionSpec {
                 program: "sh".to_string(),
