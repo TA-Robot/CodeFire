@@ -25,6 +25,18 @@ class SeedSweepPlannerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             SeedSweepPlanner().plan({}, [1, "2"], 2)
 
+    def test_seed_sweep_planner_rejects_negative_seed(self):
+        with self.assertRaises(ValueError):
+            SeedSweepPlanner().plan({}, [1, -2], 2)
+
+    def test_seed_sweep_planner_builds_range(self):
+        self.assertEqual(SeedSweepPlanner.from_range(5, 3), [5, 6, 7])
+        for bad in (0, -1, "2", True):
+            with self.assertRaises(ValueError):
+                SeedSweepPlanner.from_range(0, bad)
+        with self.assertRaises(ValueError):
+            SeedSweepPlanner.from_range(-1, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

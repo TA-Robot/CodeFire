@@ -2264,8 +2264,11 @@ The planner:
 
 - validates that the maximum run count is a positive integer
 - validates that every seed is an integer (booleans are rejected)
+- rejects a negative seed with ValueError
 - rejects a duplicate seed with ValueError naming the duplicated seed
 - truncates the validated seeds to the maximum run count
 - returns a copy of the base configuration plus a `seed` entry for each run
+
+`SeedSweepPlanner.from_range(start, count)` is a class method that returns the consecutive seeds `start, start+1, ..., start+count-1`. It rejects a negative `start` or a `count` that is not a positive integer (booleans are rejected) with ValueError.
 
 The planner is pure. It does not mutate the base configuration or execute runs.

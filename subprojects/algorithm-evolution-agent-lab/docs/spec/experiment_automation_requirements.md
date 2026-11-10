@@ -686,4 +686,4 @@ The system shall render the identifier audit aggregate summary as deterministic 
 
 ## REQ-AUTO-172: Seed sweep planning
 
-The system shall expand a base experiment configuration into per-seed run configurations. Each run configuration shall be the base configuration plus its seed, a duplicate seed in the input shall be rejected with ValueError naming the duplicated seed, and the result shall be truncated to a maximum run count. A non-positive maximum or a non-integer seed shall be rejected with ValueError.
+The system shall expand a base experiment configuration into per-seed run configurations. Each run configuration shall be the base configuration plus its seed, a duplicate seed in the input shall be rejected with ValueError naming the duplicated seed, and the result shall be truncated to a maximum run count. A non-positive maximum or a non-integer seed shall be rejected with ValueError. Seeds must be non-negative integers. The planner shall also build a consecutive seed list from a non-negative start seed and a count via a from_range class method, rejecting a negative start or a count that is not a positive integer with ValueError.
