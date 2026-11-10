@@ -8,9 +8,6 @@
 | VERIFY-WORDING | `Change coverage` 行の語（unclassified spans、file_only_no_span_claim）が利用者に読めない | 低 | 次の周で詰まったら |
 | STATUS-STATE | 未scanの変更があっても `status` の `State: open-clean` 行はそのまま（下に案内行は出る） | 低 | 保留 |
 | METHOD-ATOMS | `scan` が `CODE:path::method:...` 形式の自動Atomを説明なしで並べる。Atom ID の名前と中身のずれ（例 dedups → rejects）は検出対象外 | 低 | 保留 |
-| NEW-ATOM-LINKS | 新しいAtomを足しても `scan` は trace link を書くよう促さない（必須リンク不足は既存分と合算の警告数だけ）。link の書式もCLIからは分からない | 中 | 次に直す |
-| MERGE-REVIEW | semantic conflict の確認用に、merge結果と各枝の差分を見る手段がCLIにない（試用エージェントは自前で事前コピーを取って比較した） | 中 | 次に直す |
-| MERGE-EXIT | conflict が残っても `merge` は exit 0（`merge --continue` と `verify` は非0）。スクリプトが見落とす | 低 | 仕様として決める |
 | BATCH-RATIONALE | batch template は全Fire共通の rationale 1つ。Fireごとの理由はJSONを手で編集するしかない | 低 | 保留 |
 | IMPORT-RESIDUE | `import` 成功後も `.codefire-import-transaction.json` と `.codefire-import.lock` がopen directoryに残る。意図した記録か未整理かを確認する | 低 | 段階4で詰まったら |
 | [CFB-136](issues/cfb-136.md) | command cache が同一inodeのobject書換えを検証済みとして再利用する | 中 | 現HEADで再現してから判断 |
