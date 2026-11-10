@@ -368,3 +368,29 @@ fn batch_template_keeps_the_rationale_given_on_the_command_line() {
     );
     success(&open_dir, &["verify"]);
 }
+
+#[test]
+fn help_and_scan_teach_the_daily_loop() {
+    let root = tempdir().unwrap();
+    let repo = root.path().join("repo");
+    let open_dir = root.path().join("main");
+    let help = String::from_utf8_lossy(&success(root.path(), &["--help"]).stdout).into_owned();
+    for step in [
+        "codefire scan",
+        "codefire extinguish",
+        "codefire verify",
+        "codefire commit -m",
+    ] {
+        assert!(help.contains(step), "help must name {step}:\n{help}");
+    }
+    assert!(help.contains("A fire is"), "{help}");
+
+    success(root.path(), &["init", repo.to_str().unwrap()]);
+    success(&repo, &["open", "main", open_dir.to_str().unwrap()]);
+    write_project(&open_dir, 30, "test -f src/auth.py");
+    let scan = String::from_utf8_lossy(&success(&open_dir, &["scan"]).stdout).into_owned();
+    assert!(
+        scan.contains("Next:") && scan.contains("codefire extinguish"),
+        "{scan}"
+    );
+}

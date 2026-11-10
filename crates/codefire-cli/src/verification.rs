@@ -107,6 +107,18 @@ pub(crate) fn render_verification(
         }
     ));
     output.push('\n');
+    let warnings = decision
+        .warning_reasons
+        .iter()
+        .copied()
+        .map(blocking_reason_label)
+        .collect::<Vec<_>>();
+    if !warnings.is_empty() {
+        output.push_str(&format!(
+            "Warnings (allowed by the commit policy, not blocking): {}\n",
+            warnings.join(", ")
+        ));
+    }
     output.push_str(&format!(
         "Unresolved merge conflicts: {}\n",
         verification.unresolved_merge_conflicts.len()

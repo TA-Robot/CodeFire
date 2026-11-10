@@ -3014,7 +3014,22 @@ fn render_scan(scan: &codefire_core::ScanResult) -> String {
             output.push('\n');
         }
     }
+    output.push_str(scan_next_step(state, scan.open_fires.len()));
     output
+}
+
+/// What to do after a scan, for someone who has not learned the loop yet.
+fn scan_next_step(state: &str, open_fires: usize) -> &'static str {
+    if open_fires > 0 {
+        "Next: each fire asks you to confirm that its target still agrees with the changed source.\n\
+         \x20 one fire:   codefire extinguish <FIRE-id> --resolution <type> --rationale <text>\n\
+         \x20 many fires: codefire extinguish --batch-template --rationale <text> --output <file>, then codefire extinguish --batch <file>\n\
+         \x20 then:       codefire verify\n"
+    } else if state == "open-clean" {
+        ""
+    } else {
+        "Next: codefire verify, then codefire commit -m <message>\n"
+    }
 }
 
 fn print_lock_contention_json(command: &str, error: &CliError) -> Result<(), CliError> {

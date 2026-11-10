@@ -19,6 +19,17 @@ common:
   codefire doctor [path] [--quick] [--json]
   codefire commit -m <message> [--signer <name>] [--key-id <id>]
   codefire completion <bash|zsh>
+
+daily loop, run inside an open branch directory:
+  1. edit files
+  2. codefire scan        find changed atoms and the fires they open
+  3. codefire extinguish  record, per fire, why the linked atom is still consistent
+  4. codefire verify      run the policy checks; refuses while anything blocks
+  5. codefire commit -m   seal the consistent state
+
+  An atom is a tracked requirement, design, code, or test unit. A fire is an
+  open duty to re-check one atom because a linked atom changed.
+  codefire status shows where you are; codefire explain verify-failure says what blocks.
 ",
         version = codefire_core::VERSION,
         commands = COMMAND_NAMES.join(" "),
