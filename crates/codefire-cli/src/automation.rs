@@ -493,6 +493,10 @@ pub(crate) fn verification_diagnostics_json_with_filter(
             "blocking": blocking,
             "resolution_uid": &item.resolution_uid,
             "reason": &item.reason,
+            "fire_display_id": &item.fire_display_id,
+            "fire_uid": &item.fire_uid,
+            "source_atom_id": &item.source_atom_id,
+            "target_atom_id": &item.target_atom_id,
             }),
         );
     }
@@ -666,21 +670,7 @@ pub(crate) fn verification_next_actions(
         }
     }
     for item in &verification.stale_resolutions {
-        actions.push(next_action(
-            verification_reason_action_kind(CommittableReason::StaleResolutions),
-            cli_command(path_command(
-                "extinguish <fire-id> --refresh --resolution <type> --rationale <text>",
-                action_path,
-            )),
-            "refresh the stale resolution against the current atom and trace basis",
-            action_target(
-                json!({
-                    "resolution_uid": &item.resolution_uid,
-                    "reason": &item.reason,
-                }),
-                action_path,
-            ),
-        ));
+        actions.push(refresh_resolution_next_action(item, action_path));
     }
     for item in &verification.missing_evidence_refs {
         actions.push(next_action(
@@ -984,47 +974,100 @@ fn extinguish_fire_next_action(fire: &codefire_core::Fire, action_path: Option<&
             }),
             action_path,
         ),
-        parameterized_execution(
-            argv_template,
-            vec![
-                json!({
-                    "name": "resolution",
-                    "cli_flag": "--resolution",
-                    "value_kind": "string",
-                    "required": true,
-                    "accepts": "extensible_string",
-                    "cli_default": "addressed",
-                    "examples": ["addressed", "changed", "no-change-required"],
-                    "notes": "resolution type is an extensible string; the CLI does not constrain it to a closed enum. If the flag is omitted the parser defaults to addressed. no-change-required additionally requires --rationale when policy requires it.",
-                }),
-                json!({
-                    "name": "rationale",
-                    "cli_flag": "--rationale",
-                    "value_kind": "string",
-                    "required": false,
-                    "group": "rationale_or_evidence",
-                }),
-                json!({
-                    "name": "evidence",
-                    "cli_flag": "--evidence",
-                    "value_kind": "string",
-                    "required": false,
-                    "group": "rationale_or_evidence",
-                }),
-                json!({
-                    "name": "evidence_ref",
-                    "cli_flag": "--evidence-ref",
-                    "value_kind": "string",
-                    "required": false,
-                    "group": "rationale_or_evidence",
-                }),
-            ],
-            vec![json!({
-                "name": "rationale_or_evidence",
-                "min_selected": 1,
-                "notes": "supply at least one of --rationale, --evidence, or --evidence-ref",
-            })],
+        extinguish_inputs_execution(argv_template),
+    )
+}
+
+/// Builds the action that refreshes one stale resolution.
+///
+/// The fire id is filled in when the stale record carries one; otherwise it
+/// stays a named input, as it was before the record identified its fire.
+fn refresh_resolution_next_action(
+    item: &codefire_core::StaleResolution,
+    action_path: Option<&Path>,
+) -> Value {
+    let fire_id = if item.fire_display_id.is_empty() {
+        item.fire_uid.as_str()
+    } else {
+        item.fire_display_id.as_str()
+    };
+    let mut argv_template = vec![
+        argv_literal(CLI_DISPLAY_NAME),
+        argv_literal("extinguish"),
+        if fire_id.is_empty() {
+            argv_input("fire-id")
+        } else {
+            argv_literal(fire_id)
+        },
+        argv_literal("--refresh"),
+        argv_literal("--resolution"),
+        argv_input("resolution"),
+    ];
+    if let Some(path) = action_path {
+        argv_template.push(argv_literal("--path"));
+        argv_template.push(argv_literal(path_string(path)));
+    }
+    argv_template.push(argv_literal("--json"));
+    executable_next_action(
+        verification_reason_action_kind(CommittableReason::StaleResolutions),
+        "refresh the stale resolution against the current atom and trace basis; fill required_inputs before executing",
+        action_target(
+            json!({
+                "resolution_uid": &item.resolution_uid,
+                "reason": &item.reason,
+                "display_id": &item.fire_display_id,
+                "fire_uid": &item.fire_uid,
+                "source_atom_id": &item.source_atom_id,
+                "target_atom_id": &item.target_atom_id,
+            }),
+            action_path,
         ),
+        extinguish_inputs_execution(argv_template),
+    )
+}
+
+/// Execution metadata shared by every single-fire `extinguish` action.
+fn extinguish_inputs_execution(argv_template: Vec<Value>) -> Value {
+    parameterized_execution(
+        argv_template,
+        vec![
+            json!({
+                "name": "resolution",
+                "cli_flag": "--resolution",
+                "value_kind": "string",
+                "required": true,
+                "accepts": "extensible_string",
+                "cli_default": "addressed",
+                "examples": ["addressed", "changed", "no-change-required"],
+                "notes": "resolution type is an extensible string; the CLI does not constrain it to a closed enum. If the flag is omitted the parser defaults to addressed. no-change-required additionally requires --rationale when policy requires it.",
+            }),
+            json!({
+                "name": "rationale",
+                "cli_flag": "--rationale",
+                "value_kind": "string",
+                "required": false,
+                "group": "rationale_or_evidence",
+            }),
+            json!({
+                "name": "evidence",
+                "cli_flag": "--evidence",
+                "value_kind": "string",
+                "required": false,
+                "group": "rationale_or_evidence",
+            }),
+            json!({
+                "name": "evidence_ref",
+                "cli_flag": "--evidence-ref",
+                "value_kind": "string",
+                "required": false,
+                "group": "rationale_or_evidence",
+            }),
+        ],
+        vec![json!({
+            "name": "rationale_or_evidence",
+            "min_selected": 1,
+            "notes": "supply at least one of --rationale, --evidence, or --evidence-ref",
+        })],
     )
 }
 
@@ -1512,6 +1555,7 @@ mod tests {
             stale_resolutions: vec![codefire_core::StaleResolution {
                 resolution_uid: "resolution_1".to_string(),
                 reason: "source changed".to_string(),
+                ..Default::default()
             }],
             missing_evidence_refs: vec![codefire_core::MissingEvidenceRef {
                 resolution_uid: "resolution_1".to_string(),
@@ -1601,6 +1645,7 @@ mod tests {
             stale_resolutions: vec![codefire_core::StaleResolution {
                 resolution_uid: "resolution_1".to_string(),
                 reason: "source changed".to_string(),
+                ..Default::default()
             }],
             missing_evidence_refs: vec![codefire_core::MissingEvidenceRef {
                 resolution_uid: "resolution_1".to_string(),

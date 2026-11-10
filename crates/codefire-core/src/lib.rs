@@ -623,10 +623,35 @@ pub struct VerificationExecutionRecord {
     pub redacted_value_count: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// A resolution whose recorded basis no longer matches the current state.
+///
+/// The fire and atom fields identify what to refresh. They are omitted when
+/// empty so records written before they existed keep their encoding.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StaleResolution {
     pub resolution_uid: String,
     pub reason: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub fire_uid: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub fire_display_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub source_atom_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub target_atom_id: String,
+}
+
+impl StaleResolution {
+    fn for_resolution(resolution: &Resolution, reason: &str) -> Self {
+        Self {
+            resolution_uid: resolution.resolution_uid.clone(),
+            reason: reason.to_string(),
+            fire_uid: resolution.fire_uid.clone(),
+            fire_display_id: fire_display_id_from_uid(&resolution.fire_uid).unwrap_or_default(),
+            source_atom_id: resolution.basis.source_atom.atom_id.clone(),
+            target_atom_id: resolution.basis.target_atom.atom_id.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1722,35 +1747,35 @@ pub fn stale_resolutions(
         }
         let source_id = resolution.basis.source_atom.atom_id.as_str();
         if atoms.get(source_id).cloned() != resolution.basis.source_atom.content_hash {
-            stale.push(StaleResolution {
-                resolution_uid: resolution.resolution_uid.clone(),
-                reason: "source atom changed".to_string(),
-            });
+            stale.push(StaleResolution::for_resolution(
+                resolution,
+                "source atom changed",
+            ));
             continue;
         }
         let target_id = resolution.basis.target_atom.atom_id.as_str();
         if atoms.get(target_id).cloned() != resolution.basis.target_atom.content_hash {
-            stale.push(StaleResolution {
-                resolution_uid: resolution.resolution_uid.clone(),
-                reason: "target atom changed".to_string(),
-            });
+            stale.push(StaleResolution::for_resolution(
+                resolution,
+                "target atom changed",
+            ));
             continue;
         }
         if current_policy_hash != resolution.basis.policy_hash {
-            stale.push(StaleResolution {
-                resolution_uid: resolution.resolution_uid.clone(),
-                reason: "policy changed".to_string(),
-            });
+            stale.push(StaleResolution::for_resolution(
+                resolution,
+                "policy changed",
+            ));
             continue;
         }
         if resolution.basis.trace_links.iter().any(|link| {
             link_hashes.get(link.link_id.as_str()).map(String::as_str)
                 != Some(link.link_hash.as_str())
         }) {
-            stale.push(StaleResolution {
-                resolution_uid: resolution.resolution_uid.clone(),
-                reason: "trace link changed".to_string(),
-            });
+            stale.push(StaleResolution::for_resolution(
+                resolution,
+                "trace link changed",
+            ));
         }
     }
     Ok(stale)
@@ -3368,6 +3393,7 @@ fn digest_bytes(bytes: &[u8]) -> String {
     codefire_util::sha256_prefixed(bytes)
 }
 
+const FIRE_UID_PREFIX: &str = "fire_sha256_";
 const FIRE_UID_HEX_LENGTH: usize = 32;
 const FIRE_DISPLAY_HEX_LENGTH: usize = 12;
 
@@ -3376,7 +3402,14 @@ fn fire_digest_hex(key: &str) -> String {
 }
 
 fn fire_uid_from_digest(digest: &str) -> String {
-    format!("fire_sha256_{}", &digest[..FIRE_UID_HEX_LENGTH])
+    format!("{FIRE_UID_PREFIX}{}", &digest[..FIRE_UID_HEX_LENGTH])
+}
+
+/// Derives the display id (`FIRE-XXXXXXXXXXXX`) from a fire uid.
+pub fn fire_display_id_from_uid(fire_uid: &str) -> Option<String> {
+    let digest = fire_uid.strip_prefix(FIRE_UID_PREFIX)?;
+    (digest.len() >= FIRE_DISPLAY_HEX_LENGTH && digest.is_ascii())
+        .then(|| fire_display_id_from_digest(digest))
 }
 
 fn fire_display_id_from_digest(digest: &str) -> String {
@@ -4936,6 +4969,7 @@ def real_function():
                 stale_resolutions: vec![StaleResolution {
                     resolution_uid: "resolution_1".to_string(),
                     reason: "source changed".to_string(),
+                    ..Default::default()
                 }],
                 missing_evidence_refs: vec![MissingEvidenceRef {
                     resolution_uid: "resolution_1".to_string(),
@@ -5459,7 +5493,27 @@ def real_function():
             vec![StaleResolution {
                 resolution_uid: "res_001".to_string(),
                 reason: "source atom changed".to_string(),
+                fire_uid: "fire_001".to_string(),
+                fire_display_id: String::new(),
+                source_atom_id: "REQ-AUTH-001".to_string(),
+                target_atom_id: "DES-AUTH-001".to_string(),
             }]
+        );
+
+        assert_eq!(
+            fire_display_id_from_uid("fire_sha256_571b5e2c0245bdd96db0c7407e4328bf").as_deref(),
+            Some("FIRE-571B5E2C0245")
+        );
+        assert_eq!(fire_display_id_from_uid("fire_001"), None);
+        let encoded = serde_json::to_value(StaleResolution {
+            resolution_uid: "res_001".to_string(),
+            reason: "policy changed".to_string(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            encoded,
+            serde_json::json!({"resolution_uid": "res_001", "reason": "policy changed"})
         );
     }
 

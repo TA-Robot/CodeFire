@@ -225,9 +225,23 @@ fn render_blocking_verification_details(
     }
     if !verification.stale_resolutions.is_empty() {
         output.push_str("Stale resolution details:\n");
-        for item in verification.stale_resolutions.iter().take(5) {
-            output.push_str(&format!("  {}: {}\n", item.resolution_uid, item.reason));
+        for item in verification
+            .stale_resolutions
+            .iter()
+            .take(STALE_RESOLUTION_DETAIL_LIMIT)
+        {
+            output.push_str(&stale_resolution_line(item));
         }
+        let hidden = verification
+            .stale_resolutions
+            .len()
+            .saturating_sub(STALE_RESOLUTION_DETAIL_LIMIT);
+        if hidden > 0 {
+            output.push_str(&format!("  ... and {hidden} more (use --json for all)\n"));
+        }
+        output.push_str(
+            "  refresh each with: codefire extinguish <FIRE-id> --refresh --resolution <type> --rationale <text>\n",
+        );
     }
     if !verification.missing_evidence_refs.is_empty() {
         output.push_str("Missing evidence ref details:\n");
@@ -251,4 +265,22 @@ fn render_blocking_verification_details(
             output.push_str(&format!("  {}: {} {}\n", item.id, item.command, summary));
         }
     }
+}
+
+/// Every listed entry names the fire to refresh, so the cap is generous.
+const STALE_RESOLUTION_DETAIL_LIMIT: usize = 50;
+
+fn stale_resolution_line(item: &codefire_core::StaleResolution) -> String {
+    let fire = if item.fire_display_id.is_empty() {
+        &item.fire_uid
+    } else {
+        &item.fire_display_id
+    };
+    if fire.is_empty() {
+        return format!("  {}: {}\n", item.resolution_uid, item.reason);
+    }
+    format!(
+        "  {fire} ({})  {} -> {}: {}\n",
+        item.resolution_uid, item.source_atom_id, item.target_atom_id, item.reason
+    )
 }

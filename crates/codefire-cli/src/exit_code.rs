@@ -129,6 +129,7 @@ mod tests {
             stale_resolutions: vec![codefire_core::StaleResolution {
                 resolution_uid: "resolution_1".to_string(),
                 reason: "source changed".to_string(),
+                ..Default::default()
             }],
             missing_evidence_refs: vec![codefire_core::MissingEvidenceRef {
                 resolution_uid: "resolution_1".to_string(),
