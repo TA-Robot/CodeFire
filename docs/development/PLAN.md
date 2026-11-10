@@ -31,6 +31,7 @@ Updated: 2026-11-10
 
 - 済: `subprojects/algorithm-evolution-agent-lab` を `import` でRust CLIの管理下に入れた（`.codefire/` はgit管理外。新しい環境では `import` からやり直す）。
 - エージェントに機能追加・仕様変更をさせ、CodeFireを通してsealさせる。詰まった所を `issues.md` に起こして直す。
+- 試用には release build（`cargo build --release --locked -p codefire-cli` → `target/release/codefire-rs`）を使う。Algorithm Lab での実測: status 0.3秒 / scan 0.5秒 / verify 2.7秒（debug build は 2.5秒 / 3.5秒 / 10秒）。
 
 ## 凍結している範囲
 
