@@ -128,7 +128,7 @@ fn redact_token(token: &str, next: &mut NextValue) -> Redacted<String> {
         }
     }
 
-    if is_sensitive_key(token) {
+    if announces_secret_value(token) {
         *next = if normalized_key(token) == "authorization" {
             NextValue::Authorization
         } else {
@@ -185,10 +185,34 @@ fn assignment_separator(token: &str) -> Option<(usize, char)> {
         .find(|(_, character)| matches!(character, '=' | ':'))
 }
 
+/// Whether a standalone word announces that the next word is a secret.
+///
+/// A flag (`--db-password`) may match by suffix. A bare word must be an exact
+/// sensitive name: ordinary identifiers such as `tests.test_auth` or
+/// `sort_key` end in a sensitive suffix without naming a credential.
+fn announces_secret_value(token: &str) -> bool {
+    if token.starts_with('-') {
+        is_sensitive_key(token)
+    } else {
+        is_sensitive_name(&normalized_key(token))
+    }
+}
+
 fn is_sensitive_key(key: &str) -> bool {
     let key = normalized_key(key);
+    is_sensitive_name(&key)
+        || key.ends_with("_token")
+        || key.ends_with("_secret")
+        || key.ends_with("_password")
+        || key.ends_with("_key")
+        || key.ends_with("_credential")
+        || key.ends_with("_signature")
+        || key.ends_with("_auth")
+}
+
+fn is_sensitive_name(normalized: &str) -> bool {
     matches!(
-        key.as_str(),
+        normalized,
         "token"
             | "api_token"
             | "access_token"
@@ -206,13 +230,7 @@ fn is_sensitive_key(key: &str) -> bool {
             | "sig"
             | "private_key"
             | "access_key"
-    ) || key.ends_with("_token")
-        || key.ends_with("_secret")
-        || key.ends_with("_password")
-        || key.ends_with("_key")
-        || key.ends_with("_credential")
-        || key.ends_with("_signature")
-        || key.ends_with("_auth")
+    )
 }
 
 fn normalized_key(key: &str) -> String {
@@ -274,5 +292,36 @@ mod tests {
             "https://<redacted>@example.test/path?mode=safe&token=<redacted>&api_key=<redacted>&X-Amz-Signature=<redacted>"
         );
         assert_eq!(redacted.count, 4);
+    }
+
+    #[test]
+    fn identifiers_with_sensitive_suffixes_do_not_redact_the_next_word() {
+        for command in [
+            "python3 -c 'from tests.test_auth import check; check()'",
+            "pytest -k test_api_key tests",
+            "cargo test sort_key -- --nocapture",
+        ] {
+            let redacted = redact_text(command);
+            assert_eq!(redacted.count, 0, "{command}");
+            assert_eq!(redacted.value, command);
+        }
+    }
+
+    #[test]
+    fn flags_assignments_and_exact_names_still_redact() {
+        for (input, expected) in [
+            (
+                "tool --db-password hunter2",
+                "tool --db-password <redacted>",
+            ),
+            ("tool DB_PASSWORD=hunter2", "tool DB_PASSWORD=<redacted>"),
+            ("db_password: hunter2", "db_password: <redacted>"),
+            ("password hunter2", "password <redacted>"),
+            ("tool --token abc", "tool --token <redacted>"),
+        ] {
+            let redacted = redact_text(input);
+            assert_eq!(redacted.value, expected, "{input}");
+            assert_eq!(redacted.count, 1, "{input}");
+        }
     }
 }
