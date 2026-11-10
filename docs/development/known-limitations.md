@@ -17,7 +17,7 @@
 - `verify`
 - `commit`
 - common ancestor search
-- file-level 3-way merge
+- 3-way merge（textは行単位、それ以外はfile単位）
 - merge fire and merge commit parents
 - local `show`
 - local `diff`
@@ -272,7 +272,7 @@ Python extractorはclass methodの派生IDにclass ownerを含める。より複
 
 ### Merge Semantics
 
-mergeはfile-level 3-way mergeである。
+mergeは3-way mergeである。両方の枝が同じtext fileを変更した場合、Rust defaultは行単位で統合し、片側だけが変えた行はその側を採用する。両側が異なる内容に変えた領域だけをconflict marker（`<<<<<<< target` / `=======` / `>>>>>>> source`）で囲む。次の場合はfile全体のconflictになる: 片側での削除、binary、baseからの差分が大きすぎて比較上限（1側あたり2,000編集）を超えるfile、marker行を既に含むfile。行単位の統合は文面だけを扱い、整合性の判定はmerge fire・semantic candidate・verifyが担う。Python fallbackはfile単位のままである。
 
 semantic merge、Atom-level自動解決、AI提案は未実装。Rust defaultではtext/binary/semantic競合はtyped verify/commit blockerとなり、text markerとbinary sidecarを手動解消し、semantic candidateを明示確認した後に`merge --continue`でresolution transitionを記録する。CodeFireは競合内容そのものを自動選択しない。Python fallbackは既存text-conflict blockerを維持するが、Rustのcontinue writerは持たない。
 

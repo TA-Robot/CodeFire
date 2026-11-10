@@ -57,10 +57,10 @@ W = target open directory
 ```text
 1. B, S, TのContentManifestを読む
 2. B, S, TのAtomIndexを読む
-3. file-level 3-way mergeを行う
+3. 3-way mergeを行う（text fileは行単位、それ以外はfile単位）
 4. Atom-level変更を計算する
 5. TraceGraph変更をmergeする
-6. conflictがあればconflict markerを出す
+6. 両側が異なる内容に変えた領域があれば、その領域にconflict markerを出す
 7. semantic conflict候補を検出する
 8. merge fireを作る
 9. targetをopen-burningにする

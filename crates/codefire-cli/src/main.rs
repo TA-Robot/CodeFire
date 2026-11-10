@@ -5344,9 +5344,33 @@ fn build_merge_result(
         if source_data == target_data {
             continue;
         }
-        conflicts.push(path.clone());
         let target_bytes = target_data.map(Vec::as_slice);
         let source_bytes = source_data.map(Vec::as_slice);
+        // Both branches changed the file. Combine their line-level changes;
+        // only a region changed differently on both sides is a conflict.
+        match line_level_merge(base_data.map(Vec::as_slice), target_bytes, source_bytes) {
+            Some(codefire_core::TextMerge::Clean(content)) => {
+                file_actions.push(MergeFileAction {
+                    path,
+                    action: MergeAction::WriteMerged,
+                    content: Some(content),
+                });
+                continue;
+            }
+            Some(codefire_core::TextMerge::Conflict { content, .. }) => {
+                conflicts.push(path.clone());
+                file_actions.push(MergeFileAction {
+                    path,
+                    action: MergeAction::WriteConflictMarkers,
+                    content: Some(content),
+                });
+                continue;
+            }
+            // Deleted on one side, binary, or too far apart to compare:
+            // keep the whole-file conflict.
+            None => {}
+        }
+        conflicts.push(path.clone());
         if conflict_markers_are_safe(target_bytes, source_bytes) {
             let content = conflict_content(target_bytes, source_bytes);
             file_actions.push(MergeFileAction {
@@ -10978,6 +11002,21 @@ fn write_merged_file(
         worktree.delete_file(&path)?;
     }
     Ok(())
+}
+
+fn line_level_merge(
+    base: Option<&[u8]>,
+    target: Option<&[u8]>,
+    source: Option<&[u8]>,
+) -> Option<codefire_core::TextMerge> {
+    let (base, target, source) = (base?, target?, source?);
+    if ![base, target, source]
+        .into_iter()
+        .all(is_text_conflict_side)
+    {
+        return None;
+    }
+    codefire_core::merge_text_three_way(base, target, source)
 }
 
 fn conflict_content(target_data: Option<&[u8]>, source_data: Option<&[u8]>) -> Vec<u8> {

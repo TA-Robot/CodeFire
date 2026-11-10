@@ -410,3 +410,69 @@ fn help_and_scan_teach_the_daily_loop() {
         "{scan}"
     );
 }
+
+/// Seals `notes.txt` with the given lines on `main`, clones `feature`, and
+/// returns (repo, main open dir, feature open dir).
+fn two_branches(
+    root: &Path,
+    lines: &[&str],
+) -> (std::path::PathBuf, std::path::PathBuf, std::path::PathBuf) {
+    let repo = root.join("repo");
+    let main_dir = root.join("main");
+    let feature_dir = root.join("feature");
+    success(root, &["init", repo.to_str().unwrap()]);
+    success(&repo, &["open", "main", main_dir.to_str().unwrap()]);
+    fs::write(main_dir.join("notes.txt"), lines.join("\n") + "\n").unwrap();
+    success(&main_dir, &["commit", "-m", "base"]);
+    success(&repo, &["clone", "main", "feature"]);
+    success(&repo, &["open", "feature", feature_dir.to_str().unwrap()]);
+    (repo, main_dir, feature_dir)
+}
+
+fn replace_line(dir: &Path, from: &str, to: &str) {
+    let path = dir.join("notes.txt");
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(text.contains(from));
+    fs::write(path, text.replace(from, to)).unwrap();
+}
+
+#[test]
+fn merge_combines_changes_to_different_lines_of_one_file() {
+    let root = tempdir().unwrap();
+    let (repo, main_dir, feature_dir) =
+        two_branches(root.path(), &["one", "two", "three", "four", "five", "six"]);
+    replace_line(&feature_dir, "two", "two from feature");
+    success(&feature_dir, &["commit", "-m", "feature edit"]);
+    replace_line(&main_dir, "five", "five from main");
+    success(&main_dir, &["commit", "-m", "main edit"]);
+
+    let merge = success(&repo, &["merge", "feature", "--into", "main"]);
+    let report = String::from_utf8_lossy(&merge.stdout);
+    assert!(!report.contains("conflict"), "{report}");
+    assert_eq!(
+        fs::read_to_string(main_dir.join("notes.txt")).unwrap(),
+        "one\ntwo from feature\nthree\nfour\nfive from main\nsix\n"
+    );
+    success(&main_dir, &["verify"]);
+    success(&main_dir, &["commit", "-m", "merge feature"]);
+}
+
+#[test]
+fn merge_marks_only_the_region_both_branches_changed() {
+    let root = tempdir().unwrap();
+    let (repo, main_dir, feature_dir) =
+        two_branches(root.path(), &["one", "two", "three", "four", "five", "six"]);
+    replace_line(&feature_dir, "two", "two from feature");
+    replace_line(&feature_dir, "six", "six from feature");
+    success(&feature_dir, &["commit", "-m", "feature edit"]);
+    replace_line(&main_dir, "two", "two from main");
+    success(&main_dir, &["commit", "-m", "main edit"]);
+
+    let merge = run(&repo, &["merge", "feature", "--into", "main"]);
+    let report = String::from_utf8_lossy(&merge.stdout);
+    assert!(report.contains("conflict: notes.txt"), "{report}");
+    assert_eq!(
+        fs::read_to_string(main_dir.join("notes.txt")).unwrap(),
+        "one\n<<<<<<< target\ntwo from main\n=======\ntwo from feature\n>>>>>>> source\nthree\nfour\nfive\nsix from feature\n"
+    );
+}

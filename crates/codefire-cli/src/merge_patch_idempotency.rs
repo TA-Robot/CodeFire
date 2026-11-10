@@ -288,6 +288,7 @@ fn semantic_conflicts_from_result(
 fn merge_action_from_str(value: &str) -> Result<MergeAction, CliError> {
     match value {
         "write_source" => Ok(MergeAction::WriteSource),
+        "write_merged" => Ok(MergeAction::WriteMerged),
         "delete_target" => Ok(MergeAction::DeleteTarget),
         "write_conflict_markers" => Ok(MergeAction::WriteConflictMarkers),
         "write_conflict_side" => Ok(MergeAction::WriteConflictSide),

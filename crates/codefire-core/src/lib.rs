@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 mod change_coverage;
 mod effective_policy;
+mod text_merge;
 mod trace_evaluation;
 mod work_budget;
 
@@ -17,6 +18,7 @@ pub use effective_policy::{
     effective_policy, effective_policy_matches_policy, validate_effective_policy, EffectivePolicy,
     EffectivePolicyRule, PolicyProvenance, PolicyRuleSource, PolicySafetyClass,
 };
+pub use text_merge::{merge_text_three_way, TextMerge};
 pub use trace_evaluation::{TraceEvaluationIndex, TraceWorkCounters};
 pub use work_budget::{
     logical_retained_frame_bytes, DecisionWorkAccountingError, DecisionWorkBudgetExceeded,

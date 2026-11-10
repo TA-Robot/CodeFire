@@ -255,6 +255,8 @@ pub(crate) struct BinaryMergeConflict {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MergeAction {
     WriteSource,
+    /// Both branches changed the file; their line-level changes combined.
+    WriteMerged,
     DeleteTarget,
     WriteConflictMarkers,
     WriteConflictSide,
@@ -264,6 +266,7 @@ impl MergeAction {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::WriteSource => "write_source",
+            Self::WriteMerged => "write_merged",
             Self::DeleteTarget => "delete_target",
             Self::WriteConflictMarkers => "write_conflict_markers",
             Self::WriteConflictSide => "write_conflict_side",
