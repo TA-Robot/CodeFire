@@ -162,7 +162,7 @@ CodeFire v0.6 uses a stable process exit code taxonomy. The `exit_code` field in
 | 12 | stale resolution blocks operation | `verify` with stale resolutions |
 | 13 | duplicate Atom ID blocks operation | `verify` with duplicate Atom IDs |
 | 14 | verification command failed | `verify` with failed configured checks |
-| 15 | merge conflict blocks operation | `verify`, `commit`, and blocked `merge --continue` with unresolved text/binary/semantic facts |
+| 15 | merge conflict blocks operation | `merge` that applied and left text/binary conflicts to edit (JSON: `ok=false`, the plan is still under `data.plan`), and `verify`, `commit`, and blocked `merge --continue` with unresolved text/binary/semantic facts |
 | 20 | repository corruption detected | invalid marker/repository JSON or structural corruption |
 | 21 | object hash or object reference invalid | object id/hash/reference validation failures, including missing evidence refs in `verify` |
 | 22 | sealed commit validation failed | sealed commit graph/certificate validation failures |

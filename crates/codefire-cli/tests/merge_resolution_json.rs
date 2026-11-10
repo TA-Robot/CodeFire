@@ -92,7 +92,16 @@ fn setup_divergent_text_merge(root: &Path) -> (PathBuf, PathBuf, String, String)
         .as_str()
         .unwrap()
         .to_string();
-    assert_success(&repo, &["merge", "feature", "--into", "main"]);
+    // The merge applies and writes conflict markers; it reports them with the
+    // merge-conflict exit code.
+    let merge = run(&repo, &["merge", "feature", "--into", "main"]);
+    assert_eq!(
+        merge.status.code(),
+        Some(15),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&merge.stdout),
+        String::from_utf8_lossy(&merge.stderr)
+    );
     (repo, main_open, target, source)
 }
 

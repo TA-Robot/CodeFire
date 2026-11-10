@@ -548,7 +548,8 @@ pub(crate) fn render_merge_continue(result: &MergeContinueResult) -> String {
         if has("semantic_acknowledgement_required") {
             output.push_str(
                 "semantic_acknowledgement_required: both branches changed this atom; review the \
-                 merged result, then rerun with --accept-semantic-conflicts to record that you did\n",
+                 merged result (`codefire diff <target-branch> <source-branch> --atoms` shows what each \
+                 branch changed), then rerun with --accept-semantic-conflicts to record that you did\n",
             );
         }
         return output;

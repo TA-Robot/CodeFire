@@ -702,6 +702,12 @@ pub(crate) fn merge_next_steps(result: &MergeResult) -> String {
             if result.conflicts.is_empty() { 1 } else { 2 }
         ));
     }
+    if needs_continue {
+        steps.push_str(&format!(
+            "     to review what each branch changed: codefire diff {} {} [--atoms]\n",
+            result.target_branch, result.source_branch
+        ));
+    }
     steps.push_str(
         "  then: codefire scan, extinguish the merge fires, codefire verify, codefire commit -m <message>\n",
     );

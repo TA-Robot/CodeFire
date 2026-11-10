@@ -12,6 +12,7 @@ use std::process::{Command, Output};
 use tempfile::tempdir;
 
 const EXIT_STALE_RESOLUTION: i32 = 12;
+const EXIT_MERGE_CONFLICT: i32 = 15;
 
 fn run(cwd: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_codefire-rs"))
@@ -471,6 +472,7 @@ fn merge_marks_only_the_region_both_branches_changed() {
     let merge = run(&repo, &["merge", "feature", "--into", "main"]);
     let report = String::from_utf8_lossy(&merge.stdout);
     assert!(report.contains("conflict: notes.txt"), "{report}");
+    assert_eq!(merge.status.code(), Some(EXIT_MERGE_CONFLICT), "{report}");
     assert_eq!(
         fs::read_to_string(main_dir.join("notes.txt")).unwrap(),
         "one\n<<<<<<< target\ntwo from main\n=======\ntwo from feature\n>>>>>>> source\nthree\nfour\nfive\nsix from feature\n"
@@ -512,7 +514,9 @@ fn branch_workflow_is_discoverable_from_command_output() {
     let merge = String::from_utf8_lossy(&run(&repo, &["merge", "topic", "--into", "main"]).stdout)
         .into_owned();
     assert!(
-        merge.contains("codefire merge --continue") && merge.contains("marker lines"),
+        merge.contains("codefire merge --continue")
+            && merge.contains("marker lines")
+            && merge.contains("codefire diff main topic"),
         "{merge}"
     );
     let status = String::from_utf8_lossy(&success(&main_dir, &["status"]).stdout).into_owned();
@@ -528,4 +532,29 @@ fn branch_workflow_is_discoverable_from_command_output() {
     success(&main_dir, &["commit", "-m", "merge topic"]);
     let status = String::from_utf8_lossy(&success(&main_dir, &["status"]).stdout).into_owned();
     assert!(!status.contains("Merge in progress"), "{status}");
+}
+
+#[test]
+fn scan_names_changed_atoms_that_no_trace_link_mentions() {
+    let root = tempdir().unwrap();
+    let repo = root.path().join("repo");
+    let open_dir = root.path().join("main");
+    success(root.path(), &["init", repo.to_str().unwrap()]);
+    success(&repo, &["open", "main", open_dir.to_str().unwrap()]);
+    write_project(&open_dir, 30, "test -f src/auth.py");
+    let linked = String::from_utf8_lossy(&success(&open_dir, &["scan"]).stdout).into_owned();
+    assert!(!linked.contains("without trace links"), "{linked}");
+
+    fs::write(
+        open_dir.join("src/labels.py"),
+        "# cf-atom: CODE-RunLabeler\ndef label(seed):\n    return f\"seed{seed:04d}\"\n",
+    )
+    .unwrap();
+    let unlinked = String::from_utf8_lossy(&success(&open_dir, &["scan"]).stdout).into_owned();
+    assert!(
+        unlinked.contains("Changed atoms without trace links: 1")
+            && unlinked.contains("to: CODE-RunLabeler")
+            && unlinked.contains("codefire.links.yaml"),
+        "{unlinked}"
+    );
 }

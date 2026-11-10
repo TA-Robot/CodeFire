@@ -1082,9 +1082,19 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
             }
             let options = parse_merge_args(&args[1..])?;
             let result = merge_branch(&env::current_dir()?, &options)?;
+            // Conflict markers were written and need an edit before anything
+            // else can pass; report that through the exit code as well.
+            let left_conflicts = !options.dry_run && !result.conflicts.is_empty();
             if options.json_output {
                 let plan = merge_result_json_value(&result);
-                print_plan_result_json("merge", &plan)?;
+                if left_conflicts {
+                    let mut envelope = cli_output::plan_result_envelope("merge", &plan);
+                    envelope["ok"] = Value::Bool(false);
+                    envelope["exit_code"] = json!(ExitCode::MergeConflict.code());
+                    println!("{}", serde_json::to_string_pretty(&envelope)?);
+                } else {
+                    print_plan_result_json("merge", &plan)?;
+                }
             } else if options.dry_run {
                 print!("{}", render_merge_dry_run(&result));
             } else if result.conflicts.is_empty() {
@@ -1102,6 +1112,9 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     println!("  conflict: {conflict}");
                 }
                 print!("{}", merge_next_steps(&result));
+            }
+            if left_conflicts {
+                return Err(CliError::CommandFailed(ExitCode::MergeConflict));
             }
             Ok(())
         }

@@ -373,8 +373,48 @@ pub(crate) fn render_scan(scan: &codefire_core::ScanResult) -> String {
             output.push('\n');
         }
     }
+    output.push_str(&unlinked_changed_atoms_note(scan));
     output.push_str(scan_next_step(state, scan.open_fires.len()));
     output
+}
+
+/// A changed atom that no trace link mentions can never get a fire, so its
+/// consistency with the rest is not tracked. Say so, with the link syntax.
+fn unlinked_changed_atoms_note(scan: &codefire_core::ScanResult) -> String {
+    const LISTED: usize = 5;
+    let linked = scan
+        .trace_graph
+        .links
+        .iter()
+        .flat_map(|link| [link.from.as_str(), link.to.as_str()])
+        .collect::<std::collections::BTreeSet<_>>();
+    // Ids containing `::` are derived from code structure (methods), not
+    // declared by the author, and are not expected to carry links.
+    let unlinked = scan
+        .changed_atoms
+        .iter()
+        .filter(|atom_id| !atom_id.contains("::") && !linked.contains(atom_id.as_str()))
+        .collect::<Vec<_>>();
+    let Some(example) = unlinked.first() else {
+        return String::new();
+    };
+    let mut note = format!(
+        "Changed atoms without trace links: {} (no fire can cover them)\n",
+        unlinked.len()
+    );
+    for atom_id in unlinked.iter().take(LISTED) {
+        note.push_str(&format!("  {atom_id}\n"));
+    }
+    if unlinked.len() > LISTED {
+        note.push_str(&format!("  ... and {} more\n", unlinked.len() - LISTED));
+    }
+    note.push_str(&format!(
+        "  link them in codefire.links.yaml, then scan again; for example:\n\
+         \x20   - from: <atom it refines, implements or verifies>\n\
+         \x20     to: {example}\n\
+         \x20     type: <refined_by|implemented_by|verified_by>\n"
+    ));
+    note
 }
 
 /// What to do after a scan, for someone who has not learned the loop yet.
