@@ -2264,8 +2264,8 @@ The planner:
 
 - validates that the maximum run count is a positive integer
 - validates that every seed is an integer (booleans are rejected)
-- drops duplicate seeds while keeping first-seen order
-- truncates the deduplicated seeds to the maximum run count
+- rejects a duplicate seed with ValueError naming the duplicated seed
+- truncates the validated seeds to the maximum run count
 - returns a copy of the base configuration plus a `seed` entry for each run
 
 The planner is pure. It does not mutate the base configuration or execute runs.

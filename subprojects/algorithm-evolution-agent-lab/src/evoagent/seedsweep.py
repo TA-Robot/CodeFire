@@ -17,6 +17,7 @@ class SeedSweepPlanner:
         for seed in seeds:
             if isinstance(seed, bool) or not isinstance(seed, int):
                 raise ValueError("seeds must be integers")
-            if seed not in unique:
-                unique.append(seed)
+            if seed in unique:
+                raise ValueError(f"duplicate seed: {seed}")
+            unique.append(seed)
         return [{**base_config, "seed": seed} for seed in unique[:max_runs]]
