@@ -1965,3 +1965,12 @@ links:
   - from: REQ-AUTO-171
     to: TEST-name-proj-ci-summary-run-renders-root
     type: verified_by
+  - from: REQ-AUTO-172
+    to: DES-AUTO-154
+    type: refined_by
+  - from: DES-AUTO-154
+    to: CODE-SeedSweepPlanner
+    type: implemented_by
+  - from: REQ-AUTO-172
+    to: TEST-seed-sweep-planner-dedups-and-truncates
+    type: verified_by

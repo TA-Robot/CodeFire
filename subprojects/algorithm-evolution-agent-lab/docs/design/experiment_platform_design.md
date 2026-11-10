@@ -2255,3 +2255,17 @@ The project runner:
 - avoids duplicate scans when CI wrappers need both machine-readable status and printable output
 
 The runner remains read-only. It does not infer repository roots, render Markdown tables, apply rename suggestions, or mutate source.
+
+## DES-AUTO-154: Seed sweep planner
+
+`SeedSweepPlanner` expands a base configuration dict into per-seed run configuration dicts.
+
+The planner:
+
+- validates that the maximum run count is a positive integer
+- validates that every seed is an integer (booleans are rejected)
+- drops duplicate seeds while keeping first-seen order
+- truncates the deduplicated seeds to the maximum run count
+- returns a copy of the base configuration plus a `seed` entry for each run
+
+The planner is pure. It does not mutate the base configuration or execute runs.

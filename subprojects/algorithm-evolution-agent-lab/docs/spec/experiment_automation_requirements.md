@@ -683,3 +683,7 @@ The system shall scan an explicit set of Python files and render the identifier 
 ## REQ-AUTO-171: Identifier project CI aggregate summary run
 
 The system shall render the identifier audit aggregate summary as deterministic JSON from explicit project roots. The workflow shall discover auditable Python files, scan every discovered file with the configured identifier length limit, preserve deterministic file and kind ordering, and return a compact whole-project summary for CI dashboards.
+
+## REQ-AUTO-172: Seed sweep planning
+
+The system shall expand a base experiment configuration into per-seed run configurations. Each run configuration shall be the base configuration plus its seed, duplicate seeds shall be dropped while keeping first-seen order, and the result shall be truncated to a maximum run count. A non-positive maximum or a non-integer seed shall be rejected with ValueError.

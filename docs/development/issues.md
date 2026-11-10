@@ -4,9 +4,10 @@
 
 | ID | 概要 | 優先 | 扱い |
 |---|---|---|---|
-| CHECK-OUTPUT | `verify --details` が失敗した検証コマンドの出力を先頭1行しか出さず、exit codeも出さない | 中 | 段階4で詰まったら |
-| OPEN-PATH | `open <branch> ../dir` を相対パスの `..` として拒否し、置き場所の決まり（repositoryの外・同じ親の下）を案内しない | 中 | 段階4で詰まったら |
-| STALE-BULK | stale resolution をまとめて更新する手段がない（1件ずつ `extinguish --refresh`） | 低 | 件数が多くて詰まったら |
+| STALE-BULK | stale resolution をまとめて更新する手順が案内されない（batch は `refresh` 項目を受け付けるが、template は open fire がないと作れない） | 低 | 件数が多くて詰まったら |
+| HELP-FLOW | `--help` と `scan` の出力が「scan → extinguish → verify → commit」の順序や Fire の意味を教えない。試用エージェントは対象プロジェクトの文書から流れを知った | 中 | 次に直す |
+| VERIFY-WORDING | `verify` が必須リンク不足7件でも「passed」と出す理由（policyで許可）を言わない。`Change coverage` 行の語（unclassified spans など）が読めない | 中 | 次に直す |
+| PERF-LOOP | Algorithm Lab（183ファイル）で scan 4–12秒、verify 10–34秒、commit 最大72秒（高負荷時の値を含む）。進行表示もない | 中 | 負荷の低い状態で測り直してから判断 |
 | IMPORT-RESIDUE | `import` 成功後も `.codefire-import-transaction.json` と `.codefire-import.lock` がopen directoryに残る。意図した記録か未整理かを確認する | 低 | 段階4で詰まったら |
 | [CFB-136](issues/cfb-136.md) | command cache が同一inodeのobject書換えを検証済みとして再利用する | 中 | 現HEADで再現してから判断 |
 | [CFR-169](issues/cfr-169.md) | lifecycle/object/test の責務が巨大moduleに残る | 中 | 段階5 |
