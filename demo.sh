@@ -31,6 +31,11 @@ from src.auth import SessionPolicy
 def test_session_expiration():
     assert SessionPolicy().expires_after_minutes() == $minutes
 EOF
+  cat > "$dir/run_checks.py" <<'EOF'
+from tests.test_auth import test_session_expiration
+
+test_session_expiration()
+EOF
   cat > "$dir/codefire.yaml" <<'EOF'
 version: 1
 artifacts:
@@ -65,7 +70,7 @@ version: 1
 verification:
   required:
     - id: unit-tests
-      command: "python3 -m unittest discover -s tests"
+      command: "python3 run_checks.py"
       cwd: "."
 EOF
 }
@@ -80,10 +85,13 @@ extinguish_all() {
 }
 
 echo "workdir: $workdir"
+repo="$workdir/repo"
 mkdir -p "$workdir"
-cd "$workdir"
 
-"$CODEFIRE" init
+# The repository and the open branch directories are siblings: an open
+# directory must not live inside the repository root.
+"$CODEFIRE" init "$repo"
+cd "$repo"
 "$CODEFIRE" open main "$workdir/main"
 cd "$workdir/main"
 write_demo_files "$PWD" 30
@@ -91,7 +99,7 @@ extinguish_all "$PWD" "initial consistent import"
 "$CODEFIRE" verify
 "$CODEFIRE" commit -m "Initial consistent auth sample"
 
-cd "$workdir"
+cd "$repo"
 "$CODEFIRE" clone main feature-session
 "$CODEFIRE" open feature-session "$workdir/feature-session"
 cd "$workdir/feature-session"
@@ -100,7 +108,7 @@ extinguish_all "$PWD" "change session expiration to 15 minutes"
 "$CODEFIRE" verify
 "$CODEFIRE" commit -m "Change session expiration to 15 minutes"
 
-cd "$workdir"
+cd "$repo"
 "$CODEFIRE" merge feature-session --into main
 cd "$workdir/main"
 extinguish_all "$PWD" "merge feature-session"
@@ -109,7 +117,7 @@ extinguish_all "$PWD" "merge feature-session"
 
 server="$workdir/server"
 project_url="cf://$server/org/app"
-cd "$workdir"
+cd "$repo"
 "$CODEFIRE" upload main "$project_url/main"
 "$CODEFIRE" upload feature-session "$project_url/feature-session"
 mr_output=$("$CODEFIRE" request-merge "$project_url/main" "$project_url/feature-session")
