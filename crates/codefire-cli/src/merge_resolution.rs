@@ -532,6 +532,25 @@ pub(crate) fn render_merge_continue(result: &MergeContinueResult) -> String {
                 blocker.reason
             ));
         }
+        let has = |reason: &str| result.blockers.iter().any(|item| item.reason == reason);
+        if has("conflict_markers_present") {
+            output.push_str(
+                "conflict_markers_present: edit the file, keep the lines you want, and delete the \
+                 `<<<<<<< target`, `=======` and `>>>>>>> source` marker lines\n",
+            );
+        }
+        if has("conflict_sidecar_present") {
+            output.push_str(
+                "conflict_sidecar_present: put the version you want at the original path and \
+                 delete its directory under .codefire-conflicts/\n",
+            );
+        }
+        if has("semantic_acknowledgement_required") {
+            output.push_str(
+                "semantic_acknowledgement_required: both branches changed this atom; review the \
+                 merged result, then rerun with --accept-semantic-conflicts to record that you did\n",
+            );
+        }
         return output;
     }
     if result.already_resolved {

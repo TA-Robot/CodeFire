@@ -412,6 +412,9 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 );
             } else {
                 println!("cloned {} -> {}", options.source, options.new_branch);
+                if let Some(line) = open_next_step(&options.new_branch) {
+                    println!("{line}");
+                }
             }
             Ok(())
         }
@@ -862,14 +865,16 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                     "merged {} into {}; target is open-burning",
                     options.source_branch, options.target_branch
                 );
+                print!("{}", merge_next_steps(&result));
             } else {
                 println!(
                     "merged {} into {} with conflicts; target is open-burning",
                     options.source_branch, options.target_branch
                 );
-                for conflict in result.conflicts {
+                for conflict in &result.conflicts {
                     println!("  conflict: {conflict}");
                 }
+                print!("{}", merge_next_steps(&result));
             }
             Ok(())
         }
@@ -1051,6 +1056,9 @@ fn run(args: Vec<String>) -> Result<(), CliError> {
                 );
                 print_status(&status);
                 if let Some(line) = unscanned_changes_line(&status, &data) {
+                    println!("{line}");
+                }
+                if let Some(line) = merge_in_progress_line(&options.path) {
                     println!("{line}");
                 }
                 let stale = data["scan_prediction"]["stale_resolution_count"]
@@ -1480,19 +1488,19 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire import [path] [--branch <name>] [--dry-run] [--json] [--idempotency-key <key>]\n\nAdopt an existing non-empty directory as a CodeFire open directory.\n"
         }
         "open" => {
-            "usage: codefire open <branch> <path> [--dry-run] [--json] [--idempotency-key <key>]\n\nOpen a sealed branch into a working directory.\n"
+            "usage: codefire open <branch> <path> [--dry-run] [--json] [--idempotency-key <key>]\n\nOpen a sealed branch into a working directory.\n\n<path> is the directory to work in. It must be an absolute path outside the repository root, beside it: for a repository at /work/repo, use for example /work/<branch>. A branch is open in at most one directory; `codefire close <branch>` removes it again.\n"
         }
         "clone" => {
-            "usage: codefire clone <source-branch> <new-branch> [--dry-run] [--json] [--idempotency-key <key>]\n\nCreate a new sealed branch from an existing branch.\n"
+            "usage: codefire clone <source-branch> <new-branch> [--dry-run] [--json] [--idempotency-key <key>]\n\nCreate a new sealed branch from an existing branch. This is how a branch is created.\n\nThe new branch starts closed. Run `codefire open <new-branch> <path>` to get a working directory for it.\n"
         }
         "close" => {
-            "usage: codefire close <branch> [--discard] [--keep-dir] [--dry-run] [--json]\n\nClose an open-clean branch and remove its open directory. Use --discard to explicitly discard unsealed open work.\n"
+            "usage: codefire close <branch> [--discard] [--keep-dir] [--dry-run] [--json]\n\nClose an open-clean branch and remove its open directory. Use --discard to explicitly discard unsealed open work.\n\nClosing loses nothing: the sealed commits stay and the branch can be opened again. close refuses while the directory holds unsealed work; commit it first, or throw it away with `codefire discard <branch>`.\n"
         }
         "discard" => {
-            "usage: codefire discard <branch> [--keep-dir] [--dry-run] [--json]\n\nDiscard an open branch worktree and close its open registry entry.\n"
+            "usage: codefire discard <branch> [--keep-dir] [--dry-run] [--json]\n\nDiscard an open branch worktree and close its open registry entry.\n\nThis throws away every change since the last sealed commit of the branch. For a branch with nothing unsealed, use `codefire close <branch>` instead.\n"
         }
         "merge" => {
-            "usage: codefire merge <source-branch> --into <target-branch> [--dry-run] [--json] [--idempotency-key <key>]\n       codefire merge --continue [path|--path <open-dir>] [--accept-semantic-conflicts] [--dry-run] [--json]\n\nMerge a sealed source branch head into an open-clean target branch, then explicitly continue after resolving conflicts.\n"
+            "usage: codefire merge <source-branch> --into <target-branch> [--dry-run] [--json] [--idempotency-key <key>]\n       codefire merge --continue [path|--path <open-dir>] [--accept-semantic-conflicts] [--dry-run] [--json]\n\nMerge a sealed source branch head into an open-clean target branch, then explicitly continue after resolving conflicts.\n\nText files changed on both branches are merged line by line. A region both branches changed differently is written between `<<<<<<< target`, `=======` and `>>>>>>> source` marker lines: edit the file, keep the lines you want, delete the marker lines.\n`merge --continue` (run in the target open directory) lists what is still unresolved and records the resolution when nothing is. An atom that both branches changed is a semantic conflict: review the merged result, then pass --accept-semantic-conflicts to record that you reviewed it. It does not skip verification; scan, extinguish, verify and commit still follow.\n"
         }
         "upload" => {
             "usage: codefire upload <branch> <remote-url> [--dry-run] [--json] [--idempotency-key <key>] [--request-key-id <key>]\n\nUpload a sealed branch to a remote project.\n"
@@ -1531,7 +1539,7 @@ fn subcommand_help(command: &str) -> &'static str {
             "usage: codefire commit [path|--path <open-dir>] -m <message> [--dry-run] [--json] [--idempotency-key <key>]\n"
         }
         "branch" => {
-            "usage: codefire branch list [path|--path <repo-or-open>] [--json] [--metrics]\n       codefire branch show [branch] [path|--path <repo-or-open>] [--json]\n\nInspect local branches.\n"
+            "usage: codefire branch list [path|--path <repo-or-open>] [--json] [--metrics]\n       codefire branch show [branch] [path|--path <repo-or-open>] [--json]\n\nInspect local branches.\n\nCreate a branch with `codefire clone <source-branch> <new-branch>`, work on it with `codefire open <new-branch> <path>`, bring it into another branch with `codefire merge <source-branch> --into <target-branch>`, and stop working on it with `codefire close <branch>`.\n"
         }
         "branch list" => {
             "usage: codefire branch list [path|--path <repo-or-open>] [--json] [--metrics]\n\nList local branches.\n"
@@ -2311,6 +2319,9 @@ fn run_scan_command(args: &[String]) -> Result<(), CliError> {
         );
     } else {
         print_scan(&scan);
+        if let Some(line) = merge_in_progress_line(&options.path) {
+            println!("{line}");
+        }
         let stale = stale_resolution_count(&options.path, &scan);
         if stale > 0 {
             println!(
@@ -2972,6 +2983,21 @@ fn branch_error_repo_root(args: &[String]) -> Option<PathBuf> {
         index += 1;
     }
     find_repo_root(&path).ok()
+}
+
+/// A merge whose conflicts are not all resolved blocks verify and commit;
+/// say so wherever the user looks first. Best effort, like the stale count.
+fn merge_in_progress_line(path: &Path) -> Option<String> {
+    let context = open_context(path).ok()?;
+    let state =
+        read_active_json_optional(&context.active_state, Path::new("state.json")).ok()??;
+    let unresolved = unresolved_merge_conflicts_from_state(&state).ok()?;
+    (!unresolved.is_empty()).then(|| {
+        format!(
+            "Merge in progress: {} unresolved item(s); run `codefire merge --continue` to list them",
+            unresolved.len()
+        )
+    })
 }
 
 /// Resolutions that a later edit made stale. Best effort: scan output must
@@ -3951,6 +3977,12 @@ fn parse_open_args(args: &[String]) -> Result<OpenOptions, CliError> {
             lock,
             idempotency_key,
         }),
+        [branch] => Err(CliError::Usage(format!(
+            "open needs the directory to work in: codefire open {branch} <path>{}",
+            open_next_step(branch)
+                .map(|line| format!("\n{line}"))
+                .unwrap_or_default()
+        ))),
         _ => Err(CliError::Usage(
             "usage: codefire open <branch> <path> [--dry-run] [--json] [--idempotency-key <key>] [--wait-lock] [--lock-timeout <duration>]".to_string(),
         )),
@@ -6343,6 +6375,16 @@ fn open_target_resolution_error(
         resolved_path: resolved_path.map(Path::to_path_buf),
         workspace_boundary: workspace_boundary.to_path_buf(),
     }))
+}
+
+/// After `clone`, the branch exists but has no working directory yet.
+fn open_next_step(branch: &str) -> Option<String> {
+    let repo_root = find_repo_root(&env::current_dir().ok()?).ok()?;
+    let boundary = repo_root.parent()?;
+    Some(format!(
+        "Next: codefire open {branch} {}    (any directory beside the repository root)",
+        suggested_open_dir(&repo_root, boundary, branch).display()
+    ))
 }
 
 /// A directory beside the repository root to suggest after a rejected target.
@@ -11002,6 +11044,37 @@ fn write_merged_file(
         worktree.delete_file(&path)?;
     }
     Ok(())
+}
+
+/// What to do in the target directory after a merge wrote its result.
+fn merge_next_steps(result: &MergeResult) -> String {
+    let target = result.target_dir.display();
+    let mut steps = format!("Next, in {target}:\n");
+    if !result.conflicts.is_empty() {
+        steps.push_str(
+            "  1. edit each conflicted file: keep the lines you want and delete the\n\
+             \x20    `<<<<<<< target`, `=======` and `>>>>>>> source` marker lines\n",
+        );
+        if !result.binary_conflicts.is_empty() {
+            steps.push_str(
+                "     binary files: both versions are under .codefire-conflicts/; put the one\n\
+                 \x20    you want at the original path and delete that directory\n",
+            );
+        }
+    }
+    let needs_continue = !result.conflicts.is_empty() || !result.semantic_conflicts.is_empty();
+    if needs_continue {
+        steps.push_str(&format!(
+            "  {}. codefire merge --continue    lists what is still unresolved; when only\n\
+             \x20    atoms changed on both branches remain, review them and add\n\
+             \x20    --accept-semantic-conflicts to record that you did\n",
+            if result.conflicts.is_empty() { 1 } else { 2 }
+        ));
+    }
+    steps.push_str(
+        "  then: codefire scan, extinguish the merge fires, codefire verify, codefire commit -m <message>\n",
+    );
+    steps
 }
 
 fn line_level_merge(

@@ -27,6 +27,11 @@ daily loop, run inside an open branch directory:
   4. codefire verify      run the policy checks; refuses while anything blocks
   5. codefire commit -m   seal the consistent state
 
+  branches: codefire clone <branch> <new-branch> creates one, codefire open
+  <new-branch> <path> gives it a working directory beside the repository,
+  codefire merge <source> --into <target> brings it back, codefire close
+  <branch> removes the working directory (sealed commits stay).
+
   An atom is a tracked requirement, design, code, or test unit. A fire is an
   open duty to re-check one atom because a linked atom changed.
   codefire status shows where you are; codefire explain verify-failure says what blocks.

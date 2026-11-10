@@ -476,3 +476,56 @@ fn merge_marks_only_the_region_both_branches_changed() {
         "one\n<<<<<<< target\ntwo from main\n=======\ntwo from feature\n>>>>>>> source\nthree\nfour\nfive\nsix from feature\n"
     );
 }
+
+#[test]
+fn branch_workflow_is_discoverable_from_command_output() {
+    let root = tempdir().unwrap();
+    let (repo, main_dir, feature_dir) = two_branches(root.path(), &["one", "two", "three"]);
+    success(&repo, &["close", "feature"]);
+    assert!(!feature_dir.exists());
+
+    let help = String::from_utf8_lossy(&success(&repo, &["branch", "--help"]).stdout).into_owned();
+    assert!(help.contains("codefire clone"), "{help}");
+
+    // clone names the open command, and that exact command works.
+    let clone =
+        String::from_utf8_lossy(&success(&repo, &["clone", "main", "topic"]).stdout).into_owned();
+    let next = clone
+        .lines()
+        .find_map(|line| line.strip_prefix("Next: codefire "))
+        .unwrap_or_else(|| panic!("clone must say what to run next:\n{clone}"));
+    let argv = next.split_whitespace().take(3).collect::<Vec<_>>();
+    assert_eq!(&argv[..2], ["open", "topic"], "{clone}");
+    success(&repo, &argv);
+
+    // open without a directory explains itself instead of printing bare usage.
+    let bare = run(&repo, &["open", "feature"]);
+    let text = String::from_utf8_lossy(&bare.stderr);
+    assert!(!bare.status.success());
+    assert!(text.contains("codefire open feature "), "{text}");
+
+    // A conflicting merge says what to do next, and so does status.
+    replace_line(&root.path().join("topic"), "two", "two from topic");
+    success(&root.path().join("topic"), &["commit", "-m", "topic edit"]);
+    replace_line(&main_dir, "two", "two from main");
+    success(&main_dir, &["commit", "-m", "main edit"]);
+    let merge = String::from_utf8_lossy(&run(&repo, &["merge", "topic", "--into", "main"]).stdout)
+        .into_owned();
+    assert!(
+        merge.contains("codefire merge --continue") && merge.contains("marker lines"),
+        "{merge}"
+    );
+    let status = String::from_utf8_lossy(&success(&main_dir, &["status"]).stdout).into_owned();
+    assert!(status.contains("Merge in progress"), "{status}");
+    let blocked = run(&main_dir, &["merge", "--continue"]);
+    let text = String::from_utf8_lossy(&blocked.stdout);
+    assert!(!blocked.status.success());
+    assert!(text.contains("delete the"), "{text}");
+
+    fs::write(main_dir.join("notes.txt"), "one\ntwo merged\nthree\n").unwrap();
+    success(&main_dir, &["merge", "--continue"]);
+    success(&main_dir, &["verify"]);
+    success(&main_dir, &["commit", "-m", "merge topic"]);
+    let status = String::from_utf8_lossy(&success(&main_dir, &["status"]).stdout).into_owned();
+    assert!(!status.contains("Merge in progress"), "{status}");
+}

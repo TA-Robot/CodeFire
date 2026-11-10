@@ -225,6 +225,9 @@ fn render_blocking_verification_details(
             output.push_str(&format!("  {}: {}\n", item.kind.as_str(), item.subject));
         }
         push_omitted_note(verification.unresolved_merge_conflicts.len(), output);
+        output.push_str(
+            "  resolve with: codefire merge --continue (it lists what remains and how)\n",
+        );
     }
     if (!blocking_only
         || decision.is_blocking(codefire_core::CommittableReason::MissingRequiredLinks))
